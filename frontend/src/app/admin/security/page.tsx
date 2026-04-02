@@ -92,8 +92,8 @@ export default function SecurityDashboard() {
             const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
 
             const [statusRes, agentRes] = await Promise.all([
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/admin/security/status`, { headers }),
-                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/admin/security/agent-status`, { headers })
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/admin/security/status`, { headers }),
+                fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/admin/security/agent-status`, { headers })
             ]);
 
             if (statusRes.ok) {
@@ -129,7 +129,7 @@ export default function SecurityDashboard() {
         setAgentState('ANALYZING');
         try {
             const token = localStorage.getItem('bev-token');
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/admin/security/agent-fix`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/admin/security/agent-fix`, {
                 method: 'POST',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -144,7 +144,7 @@ export default function SecurityDashboard() {
         setLocking(true);
         try {
             const token = localStorage.getItem('bev-token');
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/admin/security/lockdown`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/admin/security/lockdown`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ export default function SecurityDashboard() {
     const unblockIp = async (ip: string) => {
         try {
             const token = localStorage.getItem('bev-token');
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/admin/security/unblock`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/admin/security/unblock`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

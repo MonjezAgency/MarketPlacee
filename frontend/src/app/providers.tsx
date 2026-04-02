@@ -11,7 +11,7 @@ import { useEffect } from 'react';
 export function Providers({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // Fetch global platform currency configuration from Admin settings
-        fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/config/currency')
+        fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/config/currency')
             .then(res => res.json())
             .then(data => {
                 if (data && data.currency) {

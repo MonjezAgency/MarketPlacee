@@ -261,7 +261,7 @@ export default function AdminProductsPage() {
     const fetchProducts = React.useCallback(async () => {
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/products/admin/all', {
+            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/products/admin/all', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -281,7 +281,7 @@ export default function AdminProductsPage() {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/products/${id}/approve`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/products/${id}/approve`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -305,7 +305,7 @@ export default function AdminProductsPage() {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/products/${id}/reject`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/products/${id}/reject`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -327,7 +327,7 @@ export default function AdminProductsPage() {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/products/${id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/products/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -348,7 +348,7 @@ export default function AdminProductsPage() {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/products/${id}`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/products/${id}`, {
                 method: 'PATCH',
                 headers: { 
                     'Authorization': `Bearer ${token}`,

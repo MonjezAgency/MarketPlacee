@@ -60,8 +60,8 @@ function CategoriesContent() {
                     maxPrice: appliedPrice.max || undefined,
                     sort: sortMap[sortBy] || 'newest',
                 }),
-                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/ads?placement=SPONSORED_BRAND').then(res => res.json()),
-                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/ads?placement=SPONSORED_PRODUCT').then(res => res.json())
+                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/ads?placement=SPONSORED_BRAND').then(res => res.json()),
+                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/ads?placement=SPONSORED_PRODUCT').then(res => res.json())
             ]);
 
             if (productsP.status === 'fulfilled') setProducts(productsP.value);

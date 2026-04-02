@@ -33,7 +33,7 @@ export default function SupplierOverviewPage() {
         const fetchStats = async () => {
             try {
                 const token = localStorage.getItem('bev-token') || '';
-                const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+                const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
                 const res = await fetch(`${API_URL}/dashboard/supplier`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });

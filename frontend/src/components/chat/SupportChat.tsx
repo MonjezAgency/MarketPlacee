@@ -43,7 +43,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
     const scrollRef = React.useRef<HTMLDivElement>(null);
     const socketRef = React.useRef<Socket | null>(null);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
     // Load initial messages via HTTP
     const fetchMessages = React.useCallback(async () => {

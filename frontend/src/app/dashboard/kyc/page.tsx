@@ -72,7 +72,7 @@ function LivenessDot({ dir, done, active }: { dir: typeof LIVENESS_DIRECTIONS[0]
 export default function KycPage() {
     const { user } = useAuth();
     const router = useRouter();
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
     const [step, setStep] = React.useState<Step>('status');
     const [kycStatus, setKycStatus] = React.useState<KycStatus | null>(null);

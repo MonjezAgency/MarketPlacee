@@ -9,7 +9,7 @@ import { useCart } from '@/lib/cart';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/currency';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface WishlistProduct {
     id: string;

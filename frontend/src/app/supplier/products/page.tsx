@@ -67,7 +67,7 @@ export default function SupplierProductsPage() {
         // Fetch KYC status
         const token = localStorage.getItem('bev-token');
         if (token) {
-            fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/kyc/status', {
+            fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/kyc/status', {
                 headers: { Authorization: `Bearer ${token}` }
             }).then(r => r.json()).then(d => setKycStatus(d.kycStatus || 'UNVERIFIED')).catch(() => {});
         }
@@ -101,7 +101,7 @@ export default function SupplierProductsPage() {
             const formData = new FormData();
             formData.append('file', bulkFile);
 
-            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/products/bulk-upload', {
+            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/products/bulk-upload', {
                 method: 'POST',
                 headers: {
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -144,7 +144,7 @@ export default function SupplierProductsPage() {
                 window.location.href = '/auth/login'; return;
             }
 
-            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/products/bulk-delete', {
+            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/products/bulk-delete', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -176,7 +176,7 @@ export default function SupplierProductsPage() {
                 window.location.href = '/auth/login'; return;
             }
 
-            const url = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + 
+            const url = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + 
                 (editingProduct ? `/products/${editingProduct.id}` : '/products');
             
             const method = editingProduct ? 'PATCH' : 'POST';

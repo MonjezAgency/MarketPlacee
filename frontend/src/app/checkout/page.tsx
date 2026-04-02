@@ -53,7 +53,7 @@ export default function CheckoutPage() {
         const fetchRates = async () => {
             setIsLoadingRates(true);
             try {
-                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/shipping/rates?cartTotal=${total}&destination=Dubai`);
+                const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/shipping/rates?cartTotal=${total}&destination=Dubai`);
                 if (res.ok) {
                     const data = await res.json();
                     setShippingRates(data);
@@ -88,7 +88,7 @@ export default function CheckoutPage() {
         try {
             const token = localStorage.getItem('bev-token');
             const res = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/coupons/validate/${couponCode.trim()}`,
+                `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/coupons/validate/${couponCode.trim()}`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
             const data = await res.json();
@@ -117,7 +117,7 @@ export default function CheckoutPage() {
         setIsProcessing(true);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/orders', {
+            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/orders', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

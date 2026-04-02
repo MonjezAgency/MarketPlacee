@@ -37,7 +37,7 @@ export default function AdminOrdersPage() {
             try {
                 const token = localStorage.getItem('bev-token');
                 if (!token) return;
-                const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/orders', {
+                const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/orders', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!res.ok) throw new Error('Failed to fetch');
@@ -55,7 +55,7 @@ export default function AdminOrdersPage() {
     const handleUpdateStatus = async (id: string, status: string) => {
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/orders/${id}/status`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/orders/${id}/status`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ status })

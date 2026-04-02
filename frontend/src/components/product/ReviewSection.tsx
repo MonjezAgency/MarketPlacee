@@ -12,7 +12,7 @@ interface Review {
     user: { id: string; name: string; companyName?: string; avatar?: string };
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 function StarRating({ value, onChange, size = 20 }: { value: number; onChange?: (v: number) => void; size?: number }) {
     const [hovered, setHovered] = useState(0);

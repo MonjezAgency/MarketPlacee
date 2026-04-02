@@ -11,7 +11,7 @@ import { useAuth } from '@/lib/auth';
 import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 type Tab = 'invoices' | 'credit' | 'tax' | 'warehouses';
 
 export default function AdminFinancePage() {

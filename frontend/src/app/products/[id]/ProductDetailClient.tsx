@@ -45,7 +45,7 @@ export default function ProductDetailClient() {
     const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
     useEffect(() => {
         fetchProducts().then(data => {
@@ -99,7 +99,7 @@ export default function ProductDetailClient() {
         setIsSubmittingRating(true);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/products/${product.id}/rate`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/products/${product.id}/rate`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

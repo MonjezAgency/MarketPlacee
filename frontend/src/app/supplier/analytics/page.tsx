@@ -13,7 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/currency';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 const PIE_COLORS = ['#FF9900', '#1BC7C9', '#10b981', '#3b82f6', '#8b5cf6', '#f43f5e'];
 
 const PERIODS: { label: string; days: number }[] = [

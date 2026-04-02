@@ -97,14 +97,14 @@ export default function AdminCategoriesPage() {
         try {
             // Logic for updating products remains same but with better UI
             const token = localStorage.getItem('bev-token');
-            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/products', {
+            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/products', {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
                 const products = await res.json();
                 const toUpdate = products.filter((p: any) => p.category === categories[index].name);
                 for (const product of toUpdate) {
-                    await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/products/${product.id}`, {
+                    await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/products/${product.id}`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ category: trimmed })

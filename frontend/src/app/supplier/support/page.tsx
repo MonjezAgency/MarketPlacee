@@ -20,7 +20,7 @@ export default function SupportPage() {
     const fetchConversations = async () => {
         if (!isSupportTeam) return;
         try {
-            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
             const res = await axios.get(`${API_URL}/chat/admin/conversations`, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('bev-token')}` }
             });

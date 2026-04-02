@@ -42,11 +42,11 @@ export default function AdminDashboard() {
             const headers = { Authorization: `Bearer ${token}` };
 
             const [usersP, productsP, markupP, brandsP, adsP] = await Promise.allSettled([
-                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/users?status=PENDING_APPROVAL', { headers }),
-                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/admin/config/all-products', { headers }),
-                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/admin/config/markup', { headers }),
-                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/admin/config/allowed-brands', { headers }),
-                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/ads/admin/all', { headers })
+                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/users?status=PENDING_APPROVAL', { headers }),
+                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/admin/config/all-products', { headers }),
+                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/admin/config/markup', { headers }),
+                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/admin/config/allowed-brands', { headers }),
+                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/ads/admin/all', { headers })
             ]);
 
             if (usersP.status === 'fulfilled' && usersP.value.ok) {
@@ -85,7 +85,7 @@ export default function AdminDashboard() {
         if (!confirm(`Update global markup rating to ${markup}?`)) return;
         try {
             const token = localStorage.getItem('bev-token');
-            await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/admin/config/markup', {
+            await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/admin/config/markup', {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ percentage: markup })
@@ -100,7 +100,7 @@ export default function AdminDashboard() {
         setBrandsLoading(true);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/admin/config/allowed-brands', {
+            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/admin/config/allowed-brands', {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ brands })
@@ -133,7 +133,7 @@ export default function AdminDashboard() {
     const handleApproveProduct = async (id: string) => {
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/admin/config/products/${id}/approve`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/admin/config/products/${id}/approve`, {
                 method: 'PUT',
                 headers: { Authorization: `Bearer ${token}` }
             });
@@ -152,7 +152,7 @@ export default function AdminDashboard() {
         if (!reason) return;
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/admin/config/products/${id}/reject`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/admin/config/products/${id}/reject`, {
                 method: 'PUT',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason })
@@ -169,7 +169,7 @@ export default function AdminDashboard() {
         if (!adProductId) return alert("Enter Product ID");
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/ads/admin/create`, {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ads/admin/create`, {
                 method: 'POST',
                 headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
                 body: JSON.stringify({ productId: adProductId, placement: adPlacement })
@@ -189,7 +189,7 @@ export default function AdminDashboard() {
     const handleRemoveAd = async (id: string) => {
         try {
             const token = localStorage.getItem('bev-token');
-            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/ads/admin/${id}`, {
+            await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/ads/admin/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` }
             });

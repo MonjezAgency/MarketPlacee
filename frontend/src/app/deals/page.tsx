@@ -8,7 +8,7 @@ import { useCart } from '@/lib/cart';
 import { formatPrice } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export default function DealsPage() {
     const [products, setProducts] = React.useState<any[]>([]);

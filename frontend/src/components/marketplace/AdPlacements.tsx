@@ -28,7 +28,7 @@ export function AdPlacements() {
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
-            const response = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/ads?placement=SPONSORED_PRODUCT', {
+            const response = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/ads?placement=SPONSORED_PRODUCT', {
                 signal: controller.signal,
             });
             clearTimeout(timeoutId);

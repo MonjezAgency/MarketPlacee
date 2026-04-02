@@ -86,7 +86,7 @@ export default function AdminOverviewPage() {
                 if (!token) return;
 
                 const headers = { 'Authorization': `Bearer ${token}` };
-                const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+                const apiBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
                 const [usersRes, productsRes] = await Promise.all([
                     fetch(`${apiBase}/users`, { headers }),

@@ -14,7 +14,7 @@ import { formatPrice } from '@/lib/currency';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, TrendingUp } from 'lucide-react';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 interface UploadReport {
     totalRows: number;

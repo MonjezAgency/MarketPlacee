@@ -1,6 +1,6 @@
-import { Product } from './products';
+import { Product, ProductStatus } from './products';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 export interface ProductFilters {
     q?: string;
@@ -27,6 +27,7 @@ function mapProduct(item: any): Product {
         ean: item.ean,
         rating: 4.5 + (Math.random() * 0.5),
         reviews: Math.floor(Math.random() * 100) + 10,
+        status: item.status || ProductStatus.APPROVED,
     };
 }
 
@@ -76,6 +77,7 @@ export async function fetchProducts(): Promise<Product[]> {
             ean: item.ean,
             rating: 4.5 + (Math.random() * 0.5),
             reviews: Math.floor(Math.random() * 100) + 10,
+            status: item.status || ProductStatus.APPROVED,
         }));
     } catch (error) {
         console.error('Error fetching products:', error);
@@ -109,6 +111,7 @@ export async function fetchMyProducts(token: string): Promise<Product[]> {
             ean: item.ean,
             rating: 4.5 + (Math.random() * 0.5),
             reviews: Math.floor(Math.random() * 100) + 10,
+            status: item.status || ProductStatus.APPROVED,
         }));
     } catch (error) {
         console.error('Error fetching my products:', error);

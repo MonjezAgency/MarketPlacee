@@ -10,7 +10,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 // ── Permission groups for the UI ──────────────────────────────────────────────
 const PERMISSION_GROUPS = [

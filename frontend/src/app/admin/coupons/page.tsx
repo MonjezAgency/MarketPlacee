@@ -33,7 +33,7 @@ export default function AdminCouponsPage() {
                 const token = localStorage.getItem('bev-token');
                 if (!token) return;
 
-                const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/coupons', {
+                const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/coupons', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 

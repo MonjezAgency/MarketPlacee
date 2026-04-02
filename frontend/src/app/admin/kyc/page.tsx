@@ -32,7 +32,7 @@ interface Stats {
 type FilterStatus = 'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED';
 
 export default function AdminKycPage() {
-    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : '';
     const headers = { Authorization: `Bearer ${token}` };
 

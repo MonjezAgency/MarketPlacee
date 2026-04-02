@@ -86,7 +86,7 @@ export default function AdminHomepageConfig() {
                 return;
             }
 
-            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/admin/config/homepage-categories', {
+            const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/admin/config/homepage-categories', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

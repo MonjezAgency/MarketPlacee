@@ -13,7 +13,7 @@ import {
 import { io, Socket } from 'socket.io-client';
 import { cn } from '@/lib/utils';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 type Tab = 'overview' | 'disputes' | 'orders' | 'kyc' | 'chat';
 

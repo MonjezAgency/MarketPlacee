@@ -9,7 +9,7 @@ import { CreditCard, Lock, Landmark, Eye, EyeOff, Save, Loader2, CheckCircle2, A
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
 function maskIban(iban: string) {
     if (!iban || iban.length < 8) return iban;

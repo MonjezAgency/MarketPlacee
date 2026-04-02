@@ -63,7 +63,7 @@ function RegisterForm() {
             const countryCode = vat.substring(0, 2).toUpperCase();
             const vatNumber = vat.substring(2);
 
-            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/auth/validate-vat?countryCode=${countryCode}&vatNumber=${vatNumber}`);
+            const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'}/auth/validate-vat?countryCode=${countryCode}&vatNumber=${vatNumber}`);
             const data = await response.json();
 
             if (data.valid) {

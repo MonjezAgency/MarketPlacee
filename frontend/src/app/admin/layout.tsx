@@ -269,7 +269,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (isOwner) { setKycBlocked(false); return; }
         if (!isTeamMember) return;
         const token = localStorage.getItem('bev-token');
-        fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/kyc/status', {
+        fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/kyc/status', {
             headers: { Authorization: `Bearer ${token}` },
         })
             .then(r => r.ok ? r.json() : null)
@@ -287,7 +287,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             if (user?.role !== 'admin' && user?.role !== 'ADMIN' && !isOwner) return;
             try {
                 const token = localStorage.getItem('bev-token');
-                const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/dashboard/admin/notifications', {
+                const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001') + '/dashboard/admin/notifications', {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (res.ok) {
