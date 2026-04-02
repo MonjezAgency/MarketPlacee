@@ -86,15 +86,29 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (data.receiverId) {
       // Support replying to a specific user
       this.server.to(data.receiverId).emit('new_message', result);
-      // Also emit to all support staff
-      this.server.to('support-room').emit('new_message', result);
+      // Also emit back to sender (support agent) so their UI updates
+      this.server.to(senderId).emit('new_message', result);
+      // Notify all support staff that this conversation has a new message
+      this.server.to('support-room').emit('conversation_updated', {
+        userId: data.receiverId,
+        message: result,
+      });
     } else {
       // User sending to support — result contains userMessage + botMessage
       const { userMessage, botMessage } = result as any;
+      // Send user's own message back (echo so it appears in their chat)
+      this.server.to(senderId).emit('new_message', userMessage || result);
       // Send bot reply back to user
-      this.server.to(senderId).emit('new_message', botMessage || result);
-      // Notify support room of new user inquiry
+      if (botMessage) {
+        this.server.to(senderId).emit('new_message', botMessage);
+      }
+      // Notify support room: new inquiry arrived + refresh conversations list
       this.server.to('support-room').emit('new_inquiry', {
+        userId: senderId,
+        message: userMessage || result,
+        botReply: botMessage,
+      });
+      this.server.to('support-room').emit('conversation_updated', {
         userId: senderId,
         message: userMessage || result,
       });

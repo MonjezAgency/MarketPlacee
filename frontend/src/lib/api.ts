@@ -2,6 +2,54 @@ import { Product } from './products';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
 
+export interface ProductFilters {
+    q?: string;
+    category?: string;
+    brand?: string;
+    minPrice?: string;
+    maxPrice?: string;
+    sort?: 'newest' | 'price_asc' | 'price_desc' | 'name_asc';
+}
+
+function mapProduct(item: any): Product {
+    return {
+        id: item.id,
+        name: item.name,
+        brand: item.brand || item.supplier?.companyName || item.supplier?.name || 'Parallel Broker',
+        price: item.price,
+        basePrice: item.basePrice || null,
+        supplierId: item.supplierId || null,
+        unit: 'unit',
+        minOrder: 10,
+        image: (item.images && item.images.length > 0) ? item.images[0] : '',
+        inStock: item.stock > 0,
+        category: item.category,
+        ean: item.ean,
+        rating: 4.5 + (Math.random() * 0.5),
+        reviews: Math.floor(Math.random() * 100) + 10,
+    };
+}
+
+export async function fetchProductsWithFilters(filters: ProductFilters = {}): Promise<Product[]> {
+    try {
+        const params = new URLSearchParams({ status: 'APPROVED' });
+        if (filters.q) params.set('q', filters.q);
+        if (filters.category) params.set('category', filters.category);
+        if (filters.brand) params.set('brand', filters.brand);
+        if (filters.minPrice) params.set('minPrice', filters.minPrice);
+        if (filters.maxPrice) params.set('maxPrice', filters.maxPrice);
+        if (filters.sort) params.set('sort', filters.sort);
+        const response = await fetch(`${API_URL}/products?${params.toString()}`, { cache: 'no-store' });
+        if (!response.ok) return [];
+        const text = await response.text();
+        if (!text) return [];
+        return JSON.parse(text).map(mapProduct);
+    } catch (error) {
+        console.error('Error fetching products with filters:', error);
+        return [];
+    }
+}
+
 export async function fetchProducts(): Promise<Product[]> {
     try {
         const response = await fetch(`${API_URL}/products?status=APPROVED`, { cache: 'no-store' });

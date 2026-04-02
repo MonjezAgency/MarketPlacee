@@ -67,6 +67,8 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
             setFormData({
                 ...defaultData,
                 ...product,
+                // Show supplier's original price (basePrice), not the customer-facing marked-up price
+                price: (product as any).basePrice ?? product.price,
                 variants: product.variants || [],
                 images: product.images || [],
             });
@@ -252,6 +254,49 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
                                             Wholesale Verified
                                         </div>
                                     </div>
+                                </div>
+
+                                {/* Live Marketplace Preview */}
+                                <div className="bg-card rounded-[32px] p-6 border border-border/50 space-y-4">
+                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                        <Package size={14} className="text-secondary" /> Customer Preview
+                                    </h4>
+                                    <p className="text-[10px] text-muted-foreground">How buyers see your product card in the marketplace.</p>
+                                    <div className="bg-background rounded-2xl border border-border/50 overflow-hidden shadow-sm">
+                                        <div className="aspect-[4/3] bg-muted/30 flex items-center justify-center overflow-hidden">
+                                            {formData.image ? (
+                                                <img src={formData.image} alt="Preview" className="w-full h-full object-contain p-4" />
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-2 text-muted-foreground/40">
+                                                    <ImageIcon size={32} />
+                                                    <span className="text-[10px] font-bold uppercase tracking-widest">No Image</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="p-4 space-y-2">
+                                            {formData.brand && (
+                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{formData.brand}</p>
+                                            )}
+                                            <p className="font-black text-sm leading-tight line-clamp-2">
+                                                {formData.name || <span className="text-muted-foreground/40 font-normal italic">Product name...</span>}
+                                            </p>
+                                            <p className="text-[10px] text-muted-foreground">{formData.category}</p>
+                                            <div className="flex items-center justify-between pt-1">
+                                                <div>
+                                                    <p className="font-black text-base text-primary">
+                                                        {symbol}{formData.price > 0 ? formData.price.toFixed(2) : '—'}
+                                                    </p>
+                                                    <p className="text-[9px] text-muted-foreground uppercase tracking-widest">your price</p>
+                                                </div>
+                                                {formData.minOrder > 0 && (
+                                                    <div className="bg-secondary/10 text-secondary text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
+                                                        MOQ {formData.minOrder}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <p className="text-[9px] text-muted-foreground/60 text-center">* Marketplace price may include platform markup</p>
                                 </div>
                             </div>
 

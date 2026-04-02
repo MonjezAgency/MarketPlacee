@@ -1,4 +1,5 @@
-import { Controller, Post, Body, Get, Query, UnauthorizedException, UseGuards, Request } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, UnauthorizedException, ForbiddenException, UseGuards, Request, Req } from '@nestjs/common';
+import { Throttle, SkipThrottle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { ViesService } from './vies.service';
 import { TwoFaService } from './twofa.service';
@@ -30,6 +31,7 @@ export class AuthController {
     }
 
     @Post('register')
+    @Throttle({ default: { limit: 3, ttl: 60000 } })
     async register(@Body() createUserDto: RegisterDto) {
         const { password, ...userData } = createUserDto;
         // The service already handles hashing, duplicate checks, and setting status to PENDING_APPROVAL
@@ -43,15 +45,41 @@ export class AuthController {
     }
 
     @Post('login')
-    async login(@Body() loginDto: any) {
-        const user = await this.authService.validateUser(loginDto.email, loginDto.password);
+    @Throttle({ default: { limit: 6, ttl: 60000 } })
+    async login(@Body() loginDto: any, @Req() req: any) {
+        const ip = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress;
+        const user = await this.authService.validateUser(loginDto.email, loginDto.password, ip);
         if (!user) {
             throw new UnauthorizedException('البريد الإلكتروني أو كلمة المرور غير صحيحة');
         }
         if (!user.emailVerified) {
             throw new UnauthorizedException('يرجى تفعيل بريدك الإلكتروني أولاً');
         }
-        return this.authService.login(user);
+        return this.authService.loginStep1(user);
+    }
+
+    @Post('2fa/login-verify')
+    async loginVerify2FA(@Body() body: { partialToken: string; code: string }) {
+        return this.authService.loginVerify2FA(body.partialToken, body.code);
+    }
+
+    @Post('refresh')
+    @SkipThrottle()
+    async refresh(@Body('refresh_token') rawRefreshToken: string) {
+        if (!rawRefreshToken) throw new UnauthorizedException('Refresh token required');
+        return this.authService.refreshTokens(rawRefreshToken);
+    }
+
+    @Post('logout')
+    @UseGuards(JwtAuthGuard)
+    async logout(@Request() req, @Body('refresh_token') rawRefreshToken?: string) {
+        // Revoke the supplied refresh token (single device) or all tokens (if none supplied)
+        if (rawRefreshToken) {
+            await this.authService.revokeRefreshToken(rawRefreshToken);
+        } else {
+            await this.authService.revokeAllRefreshTokens(req.user.sub);
+        }
+        return { message: 'Logged out successfully' };
     }
 
     @Get('verify-email')
@@ -131,7 +159,11 @@ export class AuthController {
 
     @Post('seed-admin')
     async seedAdmin(@Body() body: any) {
-        // Bypasses DTO validation — used only for initial super admin creation/update
+        // Protected by a secret key — only the server owner can use this endpoint
+        const expectedSecret = process.env.SEED_ADMIN_SECRET;
+        if (!expectedSecret || body.secret !== expectedSecret) {
+            throw new ForbiddenException('Unauthorized seed attempt');
+        }
         try {
             const existing = await this.authService.findByEmail(body.email);
             if (existing) {

@@ -32,7 +32,8 @@ interface SupplierProduct {
     id: string;
     name: string;
     description: string;
-    price: number;
+    price: number;       // customer-facing price (with markup) — never shown to supplier
+    basePrice?: number;  // supplier's original price — what they set and what they get paid
     stock: number;
     category: string;
     images: string[];
@@ -91,8 +92,11 @@ export default function SupplierProductsPage() {
         setIsSubmitting(true);
         try {
             const token = localStorage.getItem('bev-token');
-            if (token === 'LOCAL_ONLY') {
-                throw new Error('You are in local-only mode. Please sign in again with a valid account to upload products.');
+            if (!token || token === 'LOCAL_ONLY') {
+                localStorage.removeItem('bev-token');
+                localStorage.removeItem('bev-user');
+                window.location.href = '/auth/login';
+                return;
             }
             const formData = new FormData();
             formData.append('file', bulkFile);
@@ -135,7 +139,10 @@ export default function SupplierProductsPage() {
         setIsDeletingBulk(true);
         try {
             const token = localStorage.getItem('bev-token');
-            if (token === 'LOCAL_ONLY') throw new Error('Session out of sync.');
+            if (!token || token === 'LOCAL_ONLY') {
+                localStorage.removeItem('bev-token'); localStorage.removeItem('bev-user');
+                window.location.href = '/auth/login'; return;
+            }
 
             const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/products/bulk-delete', {
                 method: 'POST',
@@ -164,9 +171,9 @@ export default function SupplierProductsPage() {
     const handleSaveProduct = async (formData: any) => {
         try {
             const token = localStorage.getItem('bev-token');
-            if (token === 'LOCAL_ONLY') {
-                alert('Session out of sync. Please sign in again.');
-                return;
+            if (!token || token === 'LOCAL_ONLY') {
+                localStorage.removeItem('bev-token'); localStorage.removeItem('bev-user');
+                window.location.href = '/auth/login'; return;
             }
 
             const url = (process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + 
@@ -427,7 +434,7 @@ export default function SupplierProductsPage() {
                                             <p className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground flex items-center gap-1">
                                                 <DollarSign size={8} /> Price
                                             </p>
-                                            <p className="text-base font-black text-foreground">€{product.price.toFixed(2)}</p>
+                                            <p className="text-base font-black text-foreground">€{(product.basePrice ?? product.price).toFixed(2)}</p>
                                         </div>
                                         <div className="space-y-0.5">
                                             <p className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground flex items-center gap-1">

@@ -20,6 +20,8 @@ export class ThreatDetectionService implements OnModuleInit {
 
     async analyzeThreats() {
         this.logger.log('Running automated threat analysis...');
+        // Order-level fraud patterns
+        await this.analyzeOrderFraud().catch(() => {});
 
         // 1. Detect Brute Force (e.g., > 10 UNAUTHORIZED_ACCESS from same IP in 5 mins)
         const fiveMinutesAgo = new Date(Date.now() - 5 * 60000);
@@ -102,5 +104,117 @@ export class ThreatDetectionService implements OnModuleInit {
                 description: `Emergency lockdown ${status ? 'ENABLED' : 'DISABLED'}`,
             });
         } catch (error) { }
+    }
+
+    // ─── Order-Level Fraud Detection ─────────────────────────────────────────
+    // Runs as part of the 5-minute threat analysis cycle (called from analyzeThreats).
+    // Also triggered manually from the security controller.
+
+    async analyzeOrderFraud(): Promise<{ flagged: number; patterns: string[] }> {
+        const oneHourAgo  = new Date(Date.now() - 3_600_000);
+        const oneDayAgo   = new Date(Date.now() - 86_400_000);
+        const patterns: string[] = [];
+        let flagged = 0;
+
+        try {
+            // ── Pattern 1: Velocity — buyer places >5 orders in 1 hour ──────
+            const velocityGroups = await this.prisma.order.groupBy({
+                by: ['buyerId'],
+                where: { createdAt: { gte: oneHourAgo } },
+                _count: { id: true },
+            });
+
+            for (const g of velocityGroups) {
+                if (g._count.id > 5) {
+                    flagged++;
+                    const msg = `Order velocity fraud: buyer ${g.buyerId} placed ${g._count.id} orders in 1 hour`;
+                    patterns.push(msg);
+                    await this.securityService.logEvent({
+                        level: 'WARN',
+                        eventType: 'FRAUD_ORDER_VELOCITY',
+                        description: msg,
+                        userId: g.buyerId,
+                    });
+                }
+            }
+
+            // ── Pattern 2: Abnormally large single order (> $10 000) ─────────
+            const largeOrders = await this.prisma.order.findMany({
+                where: {
+                    createdAt: { gte: oneDayAgo },
+                    totalAmount: { gt: 10000 },
+                    paymentStatus: { not: 'PAID' },
+                },
+                select: { id: true, buyerId: true, totalAmount: true },
+            });
+
+            for (const o of largeOrders) {
+                flagged++;
+                const msg = `Large unpaid order: #${o.id.slice(-8)} — $${o.totalAmount.toFixed(2)} by buyer ${o.buyerId}`;
+                patterns.push(msg);
+                await this.securityService.logEvent({
+                    level: 'WARN',
+                    eventType: 'FRAUD_LARGE_ORDER',
+                    description: msg,
+                    userId: o.buyerId,
+                    metadata: { orderId: o.id, amount: o.totalAmount },
+                });
+            }
+
+            // ── Pattern 3: High dispute rate for a single buyer (>2 in 7 days) ─
+            const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
+            const disputeGroups = await this.prisma.dispute.groupBy({
+                by: ['buyerId'],
+                where: { createdAt: { gte: sevenDaysAgo } },
+                _count: { id: true },
+            });
+
+            for (const g of disputeGroups) {
+                if (g._count.id > 2) {
+                    flagged++;
+                    const msg = `High dispute rate: buyer ${g.buyerId} opened ${g._count.id} disputes in 7 days`;
+                    patterns.push(msg);
+                    await this.securityService.logEvent({
+                        level: 'WARN',
+                        eventType: 'FRAUD_DISPUTE_ABUSE',
+                        description: msg,
+                        userId: g.buyerId,
+                    });
+                }
+            }
+
+            // ── Pattern 4: Same buyer cancels >3 orders in 24 hours ──────────
+            const cancelGroups = await this.prisma.order.groupBy({
+                by: ['buyerId'],
+                where: {
+                    status: 'CANCELLED',
+                    updatedAt: { gte: oneDayAgo },
+                },
+                _count: { id: true },
+            });
+
+            for (const g of cancelGroups) {
+                if (g._count.id > 3) {
+                    flagged++;
+                    const msg = `Cancellation abuse: buyer ${g.buyerId} cancelled ${g._count.id} orders in 24 hours`;
+                    patterns.push(msg);
+                    await this.securityService.logEvent({
+                        level: 'WARN',
+                        eventType: 'FRAUD_CANCEL_ABUSE',
+                        description: msg,
+                        userId: g.buyerId,
+                    });
+                }
+            }
+
+        } catch (err) {
+            this.logger.error('Order fraud analysis failed', err);
+        }
+
+        if (flagged > 0) {
+            this.logger.warn(`Fraud analysis: ${flagged} suspicious pattern(s) detected`);
+        }
+
+        return { flagged, patterns };
     }
 }

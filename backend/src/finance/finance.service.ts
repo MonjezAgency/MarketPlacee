@@ -146,4 +146,89 @@ export class FinanceService {
     async deleteWarehouse(id: string) {
         return this.prisma.warehouse.delete({ where: { id } });
     }
+
+    // ─── Revenue Reports ───────────────────────────────────
+
+    async getRevenueReport(period: 'week' | 'month' | 'year' = 'month') {
+        const now = new Date();
+        const since = new Date();
+        if (period === 'week') since.setDate(now.getDate() - 7);
+        else if (period === 'month') since.setMonth(now.getMonth() - 1);
+        else since.setFullYear(now.getFullYear() - 1);
+
+        const feePct = parseFloat(process.env.PLATFORM_FEE_PERCENT || '5') / 100;
+
+        const [orders, totalOrders, paidOrders, pendingOrders, cancelledOrders, topSuppliers] = await Promise.all([
+            // Revenue over time (daily buckets for chart)
+            this.prisma.order.findMany({
+                where: { createdAt: { gte: since }, paymentStatus: 'PAID' },
+                select: { createdAt: true, totalAmount: true },
+                orderBy: { createdAt: 'asc' },
+            }),
+            this.prisma.order.count({ where: { createdAt: { gte: since } } }),
+            this.prisma.order.count({ where: { createdAt: { gte: since }, paymentStatus: 'PAID' } }),
+            this.prisma.order.count({ where: { createdAt: { gte: since }, status: 'PENDING' } }),
+            this.prisma.order.count({ where: { createdAt: { gte: since }, status: 'CANCELLED' } }),
+            // Top suppliers by revenue
+            this.prisma.orderItem.groupBy({
+                by: ['productId'],
+                where: { order: { createdAt: { gte: since }, paymentStatus: 'PAID' } },
+                _sum: { price: true },
+                orderBy: { _sum: { price: 'desc' } },
+                take: 10,
+            }),
+        ]);
+
+        const totalRevenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+        const platformRevenue = totalRevenue * feePct;
+        const supplierRevenue = totalRevenue * (1 - feePct);
+
+        // Group by day for chart
+        const dailyMap: Record<string, number> = {};
+        for (const o of orders) {
+            const day = o.createdAt.toISOString().split('T')[0];
+            dailyMap[day] = (dailyMap[day] || 0) + o.totalAmount;
+        }
+        const chart = Object.entries(dailyMap).map(([date, revenue]) => ({ date, revenue }));
+
+        return {
+            period,
+            totalRevenue,
+            platformRevenue,
+            supplierRevenue,
+            totalOrders,
+            paidOrders,
+            pendingOrders,
+            cancelledOrders,
+            conversionRate: totalOrders > 0 ? ((paidOrders / totalOrders) * 100).toFixed(1) : '0',
+            chart,
+        };
+    }
+
+    async getSupplierEarnings(supplierId: string) {
+        const feePct = parseFloat(process.env.PLATFORM_FEE_PERCENT || '5') / 100;
+
+        const [items, pendingItems] = await Promise.all([
+            this.prisma.orderItem.findMany({
+                where: { product: { supplierId }, order: { paymentStatus: 'PAID' } },
+                select: { price: true, quantity: true, order: { select: { status: true, createdAt: true } } },
+            }),
+            this.prisma.orderItem.findMany({
+                where: { product: { supplierId }, order: { status: 'PENDING' } },
+                select: { price: true, quantity: true },
+            }),
+        ]);
+
+        const grossRevenue = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+        const netRevenue = grossRevenue * (1 - feePct);
+        const pendingRevenue = pendingItems.reduce((sum, i) => sum + i.price * i.quantity, 0) * (1 - feePct);
+
+        return {
+            grossRevenue,
+            netRevenue,
+            platformFee: grossRevenue * feePct,
+            pendingRevenue,
+            totalOrders: items.length,
+        };
+    }
 }

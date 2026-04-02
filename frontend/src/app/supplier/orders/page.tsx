@@ -3,272 +3,294 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-    ShoppingBag,
-    ChevronDown,
-    Search,
-    Truck,
-    ArrowRight,
-    Package,
-    Clock,
-    CheckCircle2,
-    ShieldCheck,
-    Eye
+    ShoppingBag, Search, Truck, Package, Eye,
+    ShieldCheck, Loader2, RefreshCw, CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/lib/auth';
 
-type OrderStatus = 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
 
-interface OrderItem {
-    id: string;
-    name: string;
-    quantity: number;
-    price: number; // The price the supplier gets
-    buyerPrice?: number; // The price the buyer paid (price * 1.05)
-}
+type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 interface SupplierOrder {
     id: string;
-    customerName: string;
-    customerEmail: string; // To be masked
-    items: OrderItem[];
-    total: number;
     status: OrderStatus;
-    date: string;
-    trackingNumber?: string;
+    totalAmount: number;
+    shippingCompany: string | null;
+    createdAt: string;
+    buyer: { name: string; email: string };
+    items: { id: string; name: string; image: string | null; quantity: number; price: number }[];
 }
 
+const STATUS_STYLES: Record<OrderStatus, string> = {
+    PENDING: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+    PROCESSING: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
+    SHIPPED: 'bg-primary/10 text-primary border-primary/20',
+    DELIVERED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    CANCELLED: 'bg-red-500/10 text-red-400 border-red-500/20',
+};
+
+const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
+    PENDING: 'PROCESSING',
+    PROCESSING: 'SHIPPED',
+};
+
+const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
+    PENDING: 'Confirm Order',
+    PROCESSING: 'Mark as Shipped',
+};
+
 export default function SupplierOrdersPage() {
-    const { user } = useAuth();
+    const [orders, setOrders] = React.useState<SupplierOrder[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
     const [searchTerm, setSearchTerm] = React.useState('');
-    const [orders, setOrders] = React.useState<SupplierOrder[]>([
-        {
-            id: 'ORD-5501',
-            customerName: 'A*** R***',
-            customerEmail: 'ab***@gmail.com',
-            items: [{ id: '1', name: 'Coca-Cola 330ml Can', quantity: 5, price: 18.25, buyerPrice: 19.16 }],
-            total: 91.25,
-            status: 'PROCESSING',
-            date: '2026-02-21'
-        },
-        {
-            id: 'ORD-5502',
-            customerName: 'J*** D***',
-            customerEmail: 'jo***@hotmail.com',
-            items: [{ id: '105', name: 'Davidoff Rich Aroma', quantity: 2, price: 9.80, buyerPrice: 10.29 }],
-            total: 19.60,
-            status: 'SHIPPED',
-            date: '2026-02-20',
-            trackingNumber: 'TRK-99228-B2B'
-        }
-    ]);
-    const [expandedOrderId, setExpandedOrderId] = React.useState<string | null>(null);
+    const [expandedId, setExpandedId] = React.useState<string | null>(null);
+    const [updatingId, setUpdatingId] = React.useState<string | null>(null);
 
-    const toggleExpand = (id: string) => {
-        setExpandedOrderId(prev => prev === id ? null : id);
+    const getToken = () => (typeof window !== 'undefined' ? localStorage.getItem('bev-token') || '' : '');
+
+    const fetchOrders = React.useCallback(async () => {
+        setIsLoading(true);
+        try {
+            const res = await fetch(`${API_URL}/orders/my-orders`, {
+                headers: { Authorization: `Bearer ${getToken()}` },
+            });
+            if (res.ok) setOrders(await res.json());
+        } catch { /* ignore */ }
+        finally { setIsLoading(false); }
+    }, []);
+
+    React.useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+    const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
+        setUpdatingId(orderId);
+        try {
+            const res = await fetch(`${API_URL}/orders/${orderId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                body: JSON.stringify({ status }),
+            });
+            if (res.ok) setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+        } catch { /* ignore */ }
+        finally { setUpdatingId(null); }
     };
 
-    const maskEmail = (email: string) => {
-        const [user, domain] = email.split('@');
-        return `${user.substring(0, 2)}***@${domain}`;
-    };
-
-    const handleStatusUpdate = (orderId: string, status: OrderStatus) => {
-        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-    };
+    const filtered = orders.filter(o =>
+        o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        o.buyer.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     return (
-        <div className="space-y-10 max-w-7xl mx-auto pb-20">
+        <div className="space-y-8 max-w-7xl mx-auto pb-20">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-3xl font-black text-white tracking-tight">Order Management</h1>
-                    <p className="text-white/40 font-medium">Track and fulfill wholesale orders from your customers.</p>
+                <div>
+                    <h1 className="text-3xl font-black tracking-tight">Order Management</h1>
+                    <p className="text-muted-foreground font-medium mt-1">Track and fulfill wholesale orders from your customers.</p>
                 </div>
-
-                <div className="relative">
-                    <Search className="absolute start-4 top-1/2 -translate-y-1/2 text-white/30" size={18} />
-                    <input
-                        type="text"
-                        placeholder="Search order ID..."
-                        className="h-12 ps-12 pe-6 bg-[#131921] rounded-xl border border-white/5 outline-none focus:border-emerald-500/50 text-white text-sm w-[250px] transition-all"
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                    />
+                <div className="flex gap-3">
+                    <div className="relative">
+                        <Search className="absolute start-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
+                        <input
+                            type="text"
+                            placeholder="Search order ID or customer..."
+                            className="h-11 ps-11 pe-6 bg-card border border-border/50 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm w-64 transition-all"
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                        />
+                    </div>
+                    <button
+                        onClick={fetchOrders}
+                        className="h-11 w-11 flex items-center justify-center bg-card border border-border/50 rounded-xl hover:bg-muted/40 transition-colors"
+                    >
+                        <RefreshCw size={16} className={isLoading ? 'animate-spin text-primary' : 'text-muted-foreground'} />
+                    </button>
                 </div>
             </div>
 
-            {/* Alert: Strict Isolation Notice */}
-            <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex items-center gap-4">
-                <ShieldCheck className="text-emerald-500" size={24} />
-                <p className="text-xs text-white/80 font-medium">
-                    <span className="font-black text-emerald-400 uppercase tracking-widest me-2">Secure Link:</span>
-                    Displaying only orders containing your products. Customer data is partially masked for privacy compliance.
+            {/* Privacy notice */}
+            <div className="bg-primary/5 border border-primary/20 p-4 rounded-2xl flex items-center gap-4">
+                <ShieldCheck className="text-primary shrink-0" size={20} />
+                <p className="text-xs text-muted-foreground font-medium">
+                    <span className="font-black text-primary uppercase tracking-widest me-2">Secure View:</span>
+                    Showing only orders containing your products. Customer data is partially masked for privacy compliance.
                 </p>
             </div>
 
-            {/* Orders List */}
-            <div className="space-y-6">
-                <AnimatePresence mode="popLayout">
-                    {orders.filter(o => o.id.includes(searchTerm)).map((order, i) => (
-                        <motion.div
-                            key={order.id}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: i * 0.1 }}
-                            className="bg-[#131921] border border-white/5 rounded-3xl overflow-hidden hover:border-emerald-500/20 transition-all group"
-                        >
-                            {/* Order Summary Row */}
-                            <div className="p-8 flex flex-col lg:flex-row lg:items-center justify-between gap-8 border-b border-white/5">
-                                <div className="flex items-center gap-6">
-                                    <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 group-hover:bg-emerald-500/10 group-hover:border-emerald-500/20 transition-all">
-                                        <ShoppingBag className="text-emerald-400" size={24} />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-3">
-                                            <span className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">{order.id}</span>
-                                            <span className="text-[10px] text-white/30 font-bold uppercase">{order.date}</span>
+            {/* Stats row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {(['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'] as OrderStatus[]).map(status => (
+                    <div key={status} className="rounded-2xl p-4 bg-card border border-border/50 text-center">
+                        <p className={cn('text-2xl font-black', STATUS_STYLES[status].split(' ')[1])}>
+                            {orders.filter(o => o.status === status).length}
+                        </p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{status}</p>
+                    </div>
+                ))}
+            </div>
+
+            {/* Orders list */}
+            {isLoading ? (
+                <div className="flex items-center justify-center py-20">
+                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                </div>
+            ) : filtered.length === 0 ? (
+                <div className="flex flex-col items-center gap-3 py-20 text-muted-foreground">
+                    <ShoppingBag className="w-12 h-12 opacity-20" />
+                    <p className="font-bold">{searchTerm ? 'No orders match your search.' : 'No orders yet.'}</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    <AnimatePresence mode="popLayout">
+                        {filtered.map((order, i) => (
+                            <motion.div
+                                key={order.id}
+                                initial={{ opacity: 0, y: 10 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: i * 0.05 }}
+                                className="bg-card border border-border/50 rounded-3xl overflow-hidden hover:border-primary/20 transition-all"
+                            >
+                                {/* Summary row */}
+                                <div className="p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0">
+                                            <ShoppingBag className="text-primary" size={20} />
                                         </div>
-                                        <h3 className="text-lg font-black text-white">{order.customerName}</h3>
-                                        <p className="text-white/40 text-[11px] font-bold tracking-widest uppercase">{maskEmail(order.customerEmail)}</p>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-[10px] font-black text-primary uppercase tracking-widest">
+                                                    #{order.id.slice(-8).toUpperCase()}
+                                                </span>
+                                                <span className="text-[10px] text-muted-foreground font-bold">
+                                                    {new Date(order.createdAt).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                            <p className="font-black">{order.buyer.name}</p>
+                                            <p className="text-[11px] text-muted-foreground">{order.buyer.email}</p>
+                                        </div>
                                     </div>
-                                </div>
 
-                                <div className="flex items-center gap-12">
-                                    <div className="text-center">
-                                        <p className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-1">Total Value</p>
-                                        <p className="text-xl font-black text-white">${order.total.toFixed(2)}</p>
-                                    </div>
-
-                                    <div className="flex flex-col items-end gap-2">
-                                        <div className={cn(
-                                            "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                                            order.status === 'DELIVERED' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" :
-                                                order.status === 'PROCESSING' ? "bg-amber-400/10 text-amber-400 border-amber-400/20" :
-                                                    order.status === 'SHIPPED' ? "bg-primary/10 text-primary border-primary/20" :
-                                                        "bg-red-500/10 text-red-400 border-red-500/20"
-                                        )}>
+                                    <div className="flex items-center gap-8">
+                                        <div className="text-center">
+                                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Total</p>
+                                            <p className="text-lg font-black">${order.totalAmount.toFixed(2)}</p>
+                                        </div>
+                                        <div className="text-center">
+                                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Items</p>
+                                            <p className="text-lg font-black">{order.items.length}</p>
+                                        </div>
+                                        <span className={cn('px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border', STATUS_STYLES[order.status])}>
                                             {order.status}
-                                        </div>
-                                        {order.trackingNumber && (
-                                            <p className="text-[9px] text-white/40 font-black tracking-widest flex items-center gap-1">
-                                                <Truck size={10} /> {order.trackingNumber}
-                                            </p>
+                                        </span>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        {NEXT_STATUS[order.status] && (
+                                            <button
+                                                onClick={() => handleStatusUpdate(order.id, NEXT_STATUS[order.status]!)}
+                                                disabled={updatingId === order.id}
+                                                className="h-10 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-black text-xs rounded-xl border border-primary/20 transition-all flex items-center gap-2 disabled:opacity-50"
+                                            >
+                                                {updatingId === order.id
+                                                    ? <Loader2 size={14} className="animate-spin" />
+                                                    : order.status === 'PROCESSING' ? <Truck size={14} /> : <CheckCircle2 size={14} />
+                                                }
+                                                {NEXT_LABEL[order.status]}
+                                            </button>
                                         )}
+                                        <button
+                                            onClick={() => setExpandedId(prev => prev === order.id ? null : order.id)}
+                                            className={cn(
+                                                'h-10 px-4 text-xs font-black rounded-xl border transition-all flex items-center gap-2',
+                                                expandedId === order.id
+                                                    ? 'bg-primary/20 text-primary border-primary/30'
+                                                    : 'bg-muted/30 text-muted-foreground border-border/50 hover:text-foreground'
+                                            )}
+                                        >
+                                            <Eye size={14} />
+                                            {expandedId === order.id ? 'Close' : 'Details'}
+                                        </button>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-3">
-                                    {order.status === 'PROCESSING' && (
-                                        <button
-                                            onClick={() => handleStatusUpdate(order.id, 'SHIPPED')}
-                                            className="h-12 px-6 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-black text-xs rounded-xl border border-emerald-500/20 transition-all flex items-center gap-2"
+                                {/* Expanded details */}
+                                <AnimatePresence>
+                                    {expandedId === order.id && (
+                                        <motion.div
+                                            initial={{ height: 0, opacity: 0 }}
+                                            animate={{ height: 'auto', opacity: 1 }}
+                                            exit={{ height: 0, opacity: 0 }}
+                                            className="border-t border-border/50 bg-muted/20 overflow-hidden"
                                         >
-                                            <Truck size={16} /> Mark as Shipped
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={() => toggleExpand(order.id)}
-                                        className={cn(
-                                            "h-12 px-6 text-xs font-black rounded-xl border transition-all flex items-center gap-2",
-                                            expandedOrderId === order.id
-                                                ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                                                : "bg-white/5 text-white/40 border-white/10 hover:text-white"
-                                        )}
-                                    >
-                                        <Eye size={16} /> {expandedOrderId === order.id ? 'Close Details' : 'View Details'}
-                                    </button>
-                                </div>
-                            </div>
-
-                            {/* Expanded Details View */}
-                            <AnimatePresence>
-                                {expandedOrderId === order.id && (
-                                    <motion.div
-                                        initial={{ height: 0, opacity: 0 }}
-                                        animate={{ height: 'auto', opacity: 1 }}
-                                        exit={{ height: 0, opacity: 0 }}
-                                        className="border-b border-white/5 bg-[#0d1117] overflow-hidden"
-                                    >
-                                        <div className="p-8 space-y-8">
-                                            <div>
-                                                <h4 className="text-[10px] font-black text-white/30 uppercase tracking-widest mb-4">Line Items</h4>
-                                                <div className="space-y-3">
+                                            <div className="p-6 space-y-4">
+                                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Line Items</p>
+                                                <div className="space-y-2">
                                                     {order.items.map(item => (
-                                                        <div key={item.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
-                                                            <div className="flex items-center gap-4">
-                                                                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center">
-                                                                    <Package className="text-white/60 w-5 h-5" />
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-sm font-bold text-white">{item.name}</p>
-                                                                    <p className="text-[10px] text-white/40 uppercase tracking-widest font-black">SKU: {item.id}</p>
-                                                                </div>
+                                                        <div key={item.id} className="flex items-center justify-between p-4 bg-card rounded-2xl border border-border/50">
+                                                            <div className="flex items-center gap-3">
+                                                                {item.image ? (
+                                                                    <img src={item.image} alt="" className="w-10 h-10 rounded-xl object-cover border border-border/50" />
+                                                                ) : (
+                                                                    <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center">
+                                                                        <Package size={16} className="text-muted-foreground" />
+                                                                    </div>
+                                                                )}
+                                                                <p className="font-bold text-sm">{item.name}</p>
                                                             </div>
                                                             <div className="flex items-center gap-8 text-end">
                                                                 <div>
-                                                                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Quantity</p>
-                                                                    <p className="text-sm font-bold text-white">{item.quantity} Units</p>
+                                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Qty</p>
+                                                                    <p className="font-bold">{item.quantity}</p>
                                                                 </div>
                                                                 <div>
-                                                                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Unit Revenue</p>
-                                                                    <p className="text-sm font-bold text-emerald-400">${item.price.toFixed(2)}</p>
+                                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Unit Price</p>
+                                                                    <p className="font-bold text-primary">${item.price.toFixed(2)}</p>
                                                                 </div>
                                                                 <div>
-                                                                    <p className="text-[9px] font-black text-white/30 uppercase tracking-widest">Line Total</p>
-                                                                    <p className="text-sm font-black text-white">${(item.price * item.quantity).toFixed(2)}</p>
+                                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Subtotal</p>
+                                                                    <p className="font-black">${(item.price * item.quantity).toFixed(2)}</p>
                                                                 </div>
                                                             </div>
                                                         </div>
                                                     ))}
                                                 </div>
-                                            </div>
 
-                                            <div className="grid grid-cols-2 gap-6 pt-6 border-t border-white/5">
-                                                <div className="space-y-4">
-                                                    <h4 className="text-[10px] font-black text-white/30 uppercase tracking-widest">Logistics Hub</h4>
-                                                    <div className="p-5 bg-white/5 rounded-2xl border border-white/5">
-                                                        <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-1">Destination Address (Partial)</p>
-                                                        <p className="text-sm font-black text-white mb-4">*** 14th Street, New York, NY 10001</p>
-
-                                                        {order.trackingNumber && (
-                                                            <>
-                                                                <p className="text-[10px] text-white/40 font-bold uppercase tracking-widest mb-1">Tracking Consignment</p>
-                                                                <div className="flex items-center gap-2">
-                                                                    <Truck size={14} className="text-primary" />
-                                                                    <p className="text-xs font-black text-primary tracking-widest">{order.trackingNumber}</p>
-                                                                </div>
-                                                            </>
-                                                        )}
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-4">
-                                                    <h4 className="text-[10px] font-black text-white/30 uppercase tracking-widest">Financial Summary</h4>
-                                                    <div className="p-5 bg-emerald-500/5 rounded-2xl border border-emerald-500/20">
-                                                        <div className="flex justify-between items-center mb-2">
-                                                            <p className="text-xs font-bold text-white/60">Gross Order Value</p>
-                                                            <p className="text-xs font-bold text-white">${(order.total * 1.05).toFixed(2)}</p>
+                                                {/* Financial summary */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/50">
+                                                    <div className="p-4 bg-card rounded-2xl border border-border/50 space-y-2">
+                                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Financial Summary</p>
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-muted-foreground">Gross Value</span>
+                                                            <span className="font-bold">${(order.totalAmount * 1.05).toFixed(2)}</span>
                                                         </div>
-                                                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-emerald-500/20">
-                                                            <p className="text-xs font-bold text-red-400">Platform Margin (5%)</p>
-                                                            <p className="text-xs font-bold text-red-400">-${(order.total * 0.05).toFixed(2)}</p>
+                                                        <div className="flex justify-between text-sm">
+                                                            <span className="text-red-400">Platform Fee (5%)</span>
+                                                            <span className="font-bold text-red-400">-${(order.totalAmount * 0.05).toFixed(2)}</span>
                                                         </div>
-                                                        <div className="flex justify-between items-center">
-                                                            <p className="text-sm font-black text-emerald-400">Your Net Revenue</p>
-                                                            <p className="text-lg font-black text-emerald-400">${order.total.toFixed(2)}</p>
+                                                        <div className="flex justify-between text-sm pt-2 border-t border-border/50">
+                                                            <span className="font-black text-primary">Your Net Revenue</span>
+                                                            <span className="font-black text-primary">${order.totalAmount.toFixed(2)}</span>
                                                         </div>
                                                     </div>
+                                                    {order.shippingCompany && (
+                                                        <div className="p-4 bg-card rounded-2xl border border-border/50 space-y-2">
+                                                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Shipping</p>
+                                                            <div className="flex items-center gap-2">
+                                                                <Truck size={14} className="text-primary" />
+                                                                <span className="font-bold text-sm">{order.shippingCompany}</span>
+                                                            </div>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
-                                    </motion.div>
-                                )}
-                            </AnimatePresence>
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
-            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            </motion.div>
+                        ))}
+                    </AnimatePresence>
+                </div>
+            )}
         </div>
     );
 }

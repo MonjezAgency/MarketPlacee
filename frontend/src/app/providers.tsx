@@ -19,6 +19,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
                 } else {
                     localStorage.removeItem('platform-currency');
                 }
+                // Notify Navbar + any components listening for currency changes
+                window.dispatchEvent(new Event('currency-changed'));
             })
             .catch(err => console.error('Failed to fetch platform currency', err));
     }, []);

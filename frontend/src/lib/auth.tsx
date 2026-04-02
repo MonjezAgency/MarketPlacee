@@ -15,7 +15,8 @@ interface User {
 interface AuthContextType {
     user: User | null;
     isLoggedIn: boolean;
-    login: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string }>;
+    login: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string }>;
+    verify2FALogin: (partialToken: string, code: string) => Promise<{ success: boolean; user?: User; message?: string }>;
     register: (data: {
         name: string;
         email: string;
@@ -43,6 +44,7 @@ const AuthContext = createContext<AuthContextType>({
     user: null,
     isLoggedIn: false,
     login: async () => ({ success: false }),
+    verify2FALogin: async () => ({ success: false }),
     register: async () => false,
     updateUser: () => { },
     logout: () => { },
@@ -112,7 +114,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const login = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string }> => {
+    const login = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string }> => {
         // Super Admin Shortcut with Backend Sync
         if ((email === '7bd0205@gmail.com' || email === '7bd02025@gmail.com') && (password === 'Admin@2025!' || password === 'Admin@123')) {
             try {
@@ -138,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 const seedRes = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/auth/seed-admin', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password, name: 'Super Admin' }),
+                    body: JSON.stringify({ email, password, name: 'Super Admin', secret: process.env.NEXT_PUBLIC_SEED_ADMIN_SECRET || 'atlantis_seed_2025_secure' }),
                 });
 
                 if (!seedRes.ok) {
@@ -168,15 +170,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     console.error("Super Admin retry failed:", errorData.message);
                 }
             } catch (err) {
-                console.error("Super Admin backend sync failed, using local only", err);
+                console.error("Super Admin backend sync failed", err);
             }
-            // Fallback — local-only admin (limited API access)
-            console.warn("Super Admin backend sync failed. Entering local-only mode with limited API access.");
-            const userData: User = { id: 'sa-7bd0', name: 'Super Admin', email, role: 'ADMIN', status: 'ACTIVE' };
-            setUser(userData);
-            localStorage.setItem('bev-user', JSON.stringify(userData));
-            localStorage.setItem('bev-token', 'LOCAL_ONLY'); // Placeholder to prevent immediate frontend failures
-            return { success: true, user: userData };
+            // لو كل المحاولات فشلت — أرجع خطأ واضح بدل LOCAL_ONLY
+            return { success: false, message: 'تعذر الاتصال بالسيرفر. تأكد من تشغيل الـ Backend.' };
         }
 
         try {
@@ -192,6 +189,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             const result = await res.json();
+
+            // 2FA challenge
+            if (result.requiresTwoFactor) {
+                return { success: true, requiresTwoFactor: true, partialToken: result.partialToken };
+            }
+
             if (!result.user || !result.access_token) {
                 console.error("Login response missing user or token:", result);
                 return { success: false, message: 'Invalid response from server.' };
@@ -203,6 +206,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { success: true, user: userData };
         } catch (err) {
             console.error("Login failed:", err);
+            return { success: false, message: 'Server connection failed.' };
+        }
+    };
+
+    const verify2FALogin = async (partialToken: string, code: string): Promise<{ success: boolean; user?: User; message?: string }> => {
+        try {
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001'}/auth/2fa/login-verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ partialToken, code }),
+            });
+            if (!res.ok) {
+                const error = await res.json();
+                return { success: false, message: error.message || 'Invalid verification code.' };
+            }
+            const result = await res.json();
+            const userData = result.user;
+            setUser(userData);
+            localStorage.setItem('bev-user', JSON.stringify(userData));
+            localStorage.setItem('bev-token', result.access_token);
+            return { success: true, user: userData };
+        } catch (err) {
             return { success: false, message: 'Server connection failed.' };
         }
     };
@@ -247,7 +272,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, isLoggedIn: !!user, login, register, updateUser, logout, isAuthReady }}>
+        <AuthContext.Provider value={{ user, isLoggedIn: !!user, login, verify2FALogin, register, updateUser, logout, isAuthReady }}>
             {children}
         </AuthContext.Provider>
     );

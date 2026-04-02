@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck, KeyRound } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { signIn } from 'next-auth/react';
@@ -14,9 +14,19 @@ export default function LoginPage() {
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    // 2FA step state
+    const [step, setStep] = useState<1 | 2>(1);
+    const [partialToken, setPartialToken] = useState('');
+    const [twoFACode, setTwoFACode] = useState('');
     const router = useRouter();
-    const { login } = useAuth();
+    const { login, verify2FALogin } = useAuth();
     const { t } = useLanguage();
+
+    const redirectByRole = (role: string) => {
+        if (role === 'admin' || role === 'ADMIN') router.push('/admin');
+        else if (role === 'supplier' || role === 'SUPPLIER') router.push('/supplier');
+        else router.push('/');
+    };
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -26,26 +36,48 @@ export default function LoginPage() {
         setLoading(true);
         try {
             const result = await login(email, password);
+
+            if (result.requiresTwoFactor && result.partialToken) {
+                setPartialToken(result.partialToken);
+                setStep(2);
+                setLoading(false);
+                return;
+            }
+
             if (!result.success) {
                 setError(result.message || t('auth', 'errorInvalidCredentials'));
                 setLoading(false);
                 return;
             }
 
-            const user = result.user;
-            if (!user?.role) {
+            if (!result.user?.role) {
                 setError(t('auth', 'errorUnexpected'));
                 setLoading(false);
                 return;
             }
 
-            if (user?.role === 'admin' || user?.role === 'ADMIN') {
-                router.push('/admin');
-            } else if (user?.role === 'supplier' || user?.role === 'SUPPLIER') {
-                router.push('/supplier');
-            } else {
-                router.push('/');
+            redirectByRole(result.user.role);
+        } catch (err: any) {
+            setError(err.message || t('auth', 'errorUnexpected'));
+            setLoading(false);
+        }
+    };
+
+    const handle2FAVerify = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError('');
+        if (!twoFACode.trim()) { setError('يرجى إدخال رمز التحقق'); return; }
+
+        setLoading(true);
+        try {
+            const result = await verify2FALogin(partialToken, twoFACode.trim());
+            if (!result.success) {
+                setError(result.message || 'رمز التحقق غير صحيح');
+                setTwoFACode('');
+                setLoading(false);
+                return;
             }
+            redirectByRole(result.user!.role);
         } catch (err: any) {
             setError(err.message || t('auth', 'errorUnexpected'));
             setLoading(false);
@@ -131,7 +163,65 @@ export default function LoginPage() {
                         </div>
                     )}
 
-                    <form onSubmit={handleLogin} className="space-y-8">
+                    {/* ── Step 2: 2FA Verification ── */}
+                    {step === 2 && (
+                        <form onSubmit={handle2FAVerify} className="space-y-6">
+                            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-start gap-4 mb-2">
+                                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
+                                    <KeyRound size={16} className="text-amber-600" />
+                                </div>
+                                <div>
+                                    <p className="text-amber-800 text-sm font-black">التحقق بخطوتين مفعّل</p>
+                                    <p className="text-amber-700 text-xs mt-1 font-medium">أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة الخاص بك</p>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="block text-[10px] font-black text-slate-400 tracking-widest uppercase ms-1">رمز التحقق</label>
+                                <div className="relative">
+                                    <KeyRound className="absolute start-5 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={6}
+                                        autoFocus
+                                        value={twoFACode}
+                                        onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ''))}
+                                        placeholder="000000"
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] ps-14 pe-6 py-5 text-2xl text-[#0A1A2F] font-black tracking-[0.5em] text-center outline-none focus:border-[#FF8A00]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-200 placeholder:tracking-normal"
+                                    />
+                                </div>
+                            </div>
+
+                            <button
+                                type="submit"
+                                disabled={loading || twoFACode.length < 6}
+                                className="group relative w-full h-[72px] bg-[#0A1A2F] hover:bg-[#FF8A00] text-white rounded-[24px] font-black text-sm tracking-[0.2em] uppercase overflow-hidden transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#FF8A00]/20"
+                            >
+                                <div className="flex items-center justify-center gap-3">
+                                    {loading ? (
+                                        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                    ) : (
+                                        <>
+                                            <span>تأكيد</span>
+                                            <ArrowRight size={20} />
+                                        </>
+                                    )}
+                                </div>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => { setStep(1); setError(''); setTwoFACode(''); setPartialToken(''); }}
+                                className="w-full text-center text-xs text-slate-400 hover:text-[#0A1A2F] font-bold tracking-widest uppercase transition-colors"
+                            >
+                                ← رجوع
+                            </button>
+                        </form>
+                    )}
+
+                    {/* ── Step 1: Email + Password ── */}
+                    {step === 1 && <form onSubmit={handleLogin} className="space-y-8">
                         <div className="space-y-2">
                             <label className="block text-[10px] md:text-xs font-black text-slate-400 tracking-widest uppercase mb-2 ms-1">{t('auth', 'emailLabel')}</label>
                             <div className="relative">
@@ -189,16 +279,16 @@ export default function LoginPage() {
                                 )}
                             </div>
                         </button>
-                    </form>
+                    </form>}
 
-                    {/* Divider */}
+                    {/* Divider + Google — hidden during 2FA step */}
+                    {step === 1 && <>
                     <div className="flex items-center gap-4 mt-8">
                         <div className="flex-1 h-px bg-slate-100" />
                         <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">Or</span>
                         <div className="flex-1 h-px bg-slate-100" />
                     </div>
 
-                    {/* Google Sign-in */}
                     <button
                         type="button"
                         onClick={() => signIn('google', { callbackUrl: '/auth/google-sync' })}
@@ -212,6 +302,7 @@ export default function LoginPage() {
                         </svg>
                         Continue with Google
                     </button>
+                    </>}
 
                     <div className="mt-8 text-center">
                         <p className="text-[#64748B] font-medium text-sm">

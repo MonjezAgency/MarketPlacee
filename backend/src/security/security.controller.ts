@@ -66,4 +66,9 @@ export class SecurityController {
         const started = await this.autoHealer.forceScanAndFix();
         return { success: started };
     }
+
+    @Get('fraud-analysis')
+    async getFraudAnalysis() {
+        return this.threatDetection.analyzeOrderFraud();
+    }
 }

@@ -16,6 +16,10 @@ export class RolesGuard implements CanActivate {
         }
         const { user } = context.switchToHttp().getRequest();
         if (!user || !user.role) return false;
+
+        // OWNER يتجاوز كل قيود الصلاحيات تلقائياً
+        if (user.role.toUpperCase() === 'OWNER') return true;
+
         return requiredRoles.some((role) => user.role.toUpperCase() === role.toUpperCase());
     }
 }

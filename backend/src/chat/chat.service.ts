@@ -151,4 +151,89 @@ export class ChatService {
       data: { isRead: true }
     });
   }
+
+  /**
+   * Switch conversation from bot to human agent.
+   * Marks all bot messages in this thread as handed over.
+   */
+  async switchToHuman(userId: string, agentId: string) {
+    // Mark the conversation thread as handed over
+    await this.prisma.supportMessage.updateMany({
+      where: { senderId: userId, isBot: false, receiverId: null },
+      data: { isHandedOver: true, handedOverBy: agentId },
+    });
+
+    // Post a system message so the user knows a human took over
+    const systemMessage = await this.prisma.supportMessage.create({
+      data: {
+        senderId: agentId,
+        receiverId: userId,
+        content: '✅ تم تحويل المحادثة إلى أحد أعضاء فريق الدعم. كيف يمكنني مساعدتك؟',
+        isBot: false,
+        isHandedOver: true,
+        handedOverBy: agentId,
+      },
+      include: { sender: { select: { name: true, role: true } } },
+    });
+
+    return { success: true, systemMessage };
+  }
+
+  /**
+   * Get all conversations for support panel with unread count + handover status.
+   */
+  async getConversationsWithStatus(userRole: string) {
+    const where: any = { receiverId: null };
+    if (userRole === 'DEVELOPER') where.assignedTeam = 'DEVELOPER';
+    else if (userRole === 'LOGISTICS') where.assignedTeam = 'LOGISTICS';
+    else if (userRole !== 'ADMIN' && userRole !== 'SUPPORT' && userRole !== 'OWNER') return [];
+
+    // Get latest message per user (distinct by senderId)
+    const latestMessages = await this.prisma.supportMessage.findMany({
+      where,
+      distinct: ['senderId'],
+      orderBy: { createdAt: 'desc' },
+      include: {
+        sender: { select: { id: true, name: true, email: true, role: true, avatar: true } },
+      },
+    });
+
+    // For each conversation, get unread count + handover status
+    const enriched = await Promise.all(
+      latestMessages.map(async (m) => {
+        const [unreadCount, lastMsg, handedOver] = await Promise.all([
+          this.prisma.supportMessage.count({
+            where: { senderId: m.senderId, receiverId: null, isRead: false },
+          }),
+          this.prisma.supportMessage.findFirst({
+            where: {
+              OR: [
+                { senderId: m.senderId, receiverId: null },
+                { receiverId: m.senderId },
+              ],
+            },
+            orderBy: { createdAt: 'desc' },
+            select: { content: true, isBot: true, createdAt: true },
+          }),
+          this.prisma.supportMessage.findFirst({
+            where: { senderId: m.senderId, isHandedOver: true },
+            select: { isHandedOver: true },
+          }),
+        ]);
+
+        return {
+          ...m.sender,
+          unread: unreadCount,
+          lastMessage: lastMsg?.content?.substring(0, 60),
+          lastMessageAt: lastMsg?.createdAt,
+          isBot: lastMsg?.isBot,
+          isHandedOver: !!handedOver,
+        };
+      }),
+    );
+
+    return enriched.sort(
+      (a, b) => new Date(b.lastMessageAt || 0).getTime() - new Date(a.lastMessageAt || 0).getTime(),
+    );
+  }
 }

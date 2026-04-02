@@ -4,6 +4,7 @@ import {
     ExecutionContext,
     CallHandler,
     Logger,
+    BadRequestException,
 } from '@nestjs/common';
 import { Observable } from 'rxjs';
 import { tap } from 'rxjs/operators';
@@ -58,8 +59,15 @@ export class SecurityInterceptor implements NestInterceptor {
                     method,
                     payload: body,
                 });
-                // In a real scenario, we could block the request here, but for now we just log
+                // Block the request immediately
+                throw new BadRequestException('Request contains invalid characters');
             }
+        }
+
+        // 3. Sanitize string fields in body — strip HTML tags to prevent stored XSS.
+        //    Modifies the request body in-place before it reaches the controller.
+        if (body && typeof body === 'object') {
+            this.sanitizeObject(body);
         }
 
         return next.handle().pipe(
@@ -69,5 +77,33 @@ export class SecurityInterceptor implements NestInterceptor {
                 },
             }),
         );
+    }
+
+    /**
+     * Recursively strip HTML tags from all string values in an object.
+     * Skips fields that are legitimately expected to hold URLs or base64 data.
+     */
+    private sanitizeObject(obj: Record<string, any>): void {
+        const HTML_TAG_PATTERN = /<[^>]+>/g;
+        // Fields that may contain HTML-like content legitimately (e.g. base64 image uploads)
+        const skipFields = new Set(['avatar', 'imageUrl', 'images', 'frontImageUrl', 'backImageUrl', 'selfieUrl', 'pdfUrl']);
+
+        for (const key of Object.keys(obj)) {
+            if (skipFields.has(key)) continue;
+            const val = obj[key];
+            if (typeof val === 'string') {
+                obj[key] = val.replace(HTML_TAG_PATTERN, '');
+            } else if (val && typeof val === 'object' && !Array.isArray(val)) {
+                this.sanitizeObject(val);
+            } else if (Array.isArray(val)) {
+                for (let i = 0; i < val.length; i++) {
+                    if (typeof val[i] === 'string') {
+                        val[i] = val[i].replace(HTML_TAG_PATTERN, '');
+                    } else if (val[i] && typeof val[i] === 'object') {
+                        this.sanitizeObject(val[i]);
+                    }
+                }
+            }
+        }
     }
 }

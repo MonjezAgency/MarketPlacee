@@ -10,14 +10,74 @@ services:
     plan: free
     runtime: node
     rootDir: backend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install && npm run build && npx prisma migrate deploy
     startCommand: npm run start:prod
     envVars:
       - key: DATABASE_URL
         fromDatabase:
           name: marketplace-db
           property: connectionString
+
+      # ── Auth ──────────────────────────────────────────────
       - key: JWT_SECRET
         generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+
+      # ── Encryption (for IBAN, Swift, taxId) ──────────────
+      - key: ENCRYPTION_KEY
+        generateValue: true
+
+      # ── App ───────────────────────────────────────────────
+      # PORT is injected automatically by Render — do NOT hardcode it
       - key: NODE_ENV
         value: production
+      - key: FRONTEND_URL
+        value: https://your-app.vercel.app   # ← change to your real Vercel URL
+
+      # ── Backend URL (used for KYC file links) ─────────────
+      # Set to your Render service URL, e.g. https://marketplace-backend.onrender.com
+      - key: BACKEND_URL
+        sync: false   # ← set manually in Render dashboard after first deploy
+
+      # ── Email (Hostinger SMTP) ────────────────────────────
+      - key: EMAIL_HOST
+        value: smtp.hostinger.com
+      - key: EMAIL_USER
+        value: Info@atlantisfmcg.com
+      - key: EMAIL_PASS
+        sync: false   # ← set manually in Render dashboard (never commit passwords)
+
+      # ── Stripe Payment Gateway ────────────────────────────
+      - key: STRIPE_SECRET_KEY
+        sync: false   # ← set manually: sk_live_...
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false   # ← set after adding webhook in Stripe dashboard
+
+      # ── AI Chat Bot (optional) ────────────────────────────
+      - key: OPENROUTER_API_KEY
+        sync: false   # ← set manually if you use the AI chat feature
+
+      # ── Platform Commission ───────────────────────────────
+      - key: PLATFORM_FEE_PERCENT
+        value: 5   # ← percentage taken from each supplier payout (default 5%)
+
+      # ── Seed Admin Secret (protects /auth/seed-admin endpoint) ──
+      - key: SEED_ADMIN_SECRET
+        sync: false   # ← set a long random string manually — keep it private!
+
+      # ── Shipping Carriers ─────────────────────────────────
+      - key: DHL_API_KEY
+        sync: false   # ← DHL Express API key (developer.dhl.com)
+      - key: ARAMEX_USERNAME
+        sync: false   # ← Aramex account username
+      - key: ARAMEX_PASSWORD
+        sync: false   # ← Aramex account password
+      - key: ARAMEX_ACCOUNT_NUMBER
+        sync: false   # ← Aramex account number
+      - key: LOW_STOCK_THRESHOLD
+        value: 10     # ← Alert supplier when stock drops to or below this number
+
+      # ── 2FA ───────────────────────────────────────────────
+      - key: TOTP_ISSUER
+        value: Atlantis Marketplace

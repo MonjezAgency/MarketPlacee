@@ -5,8 +5,10 @@ import {
     Put,
     Body,
     Param,
+    Query,
     UseGuards,
     Request,
+    ForbiddenException,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -36,14 +38,29 @@ export class OrdersController {
         return plainToInstance(OrderDto, order);
     }
 
+    @Get('supplier/analytics')
+    @Roles(Role.SUPPLIER)
+    async getSupplierAnalytics(@Request() req, @Query('days') days?: string) {
+        return this.ordersService.getSupplierAnalytics(
+            req.user.sub,
+            parseInt(days || '30', 10),
+        );
+    }
+
     @Get('my-orders')
-    async findMyOrders(@Request() req) {
+    async findMyOrders(
+        @Request() req,
+        @Query('page') page?: string,
+        @Query('limit') limit?: string,
+    ) {
         if (req.user.role === Role.CUSTOMER) {
-            const orders = await this.ordersService.findByBuyer(req.user.sub);
-            return plainToInstance(OrderDto, orders);
+            return this.ordersService.findByBuyer(
+                req.user.sub,
+                parseInt(page || '1', 10),
+                parseInt(limit || '20', 10),
+            );
         } else if (req.user.role === Role.SUPPLIER) {
-            const orders = await this.ordersService.findBySupplier(req.user.sub);
-            return plainToInstance(OrderDto, orders);
+            return this.ordersService.findBySupplier(req.user.sub);
         }
     }
 
@@ -52,6 +69,18 @@ export class OrdersController {
     async findAll() {
         const orders = await this.ordersService.findAll();
         return plainToInstance(OrderDto, orders);
+    }
+
+    @Get(':id')
+    async findOne(@Param('id') id: string, @Request() req) {
+        if (req.user.role === Role.CUSTOMER) {
+            return this.ordersService.findByIdForBuyer(id, req.user.sub);
+        }
+        if (req.user.role === Role.ADMIN) {
+            const orders = await this.ordersService.findAll();
+            return orders.find(o => o.id === id);
+        }
+        throw new ForbiddenException();
     }
 
     @Put(':id/status')

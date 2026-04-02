@@ -74,8 +74,11 @@ export default function AdminNewProductPage() {
 
         try {
             const token = localStorage.getItem('bev-token');
-            if (token === 'LOCAL_ONLY') {
-                throw new Error('You are in local-only mode. Please sign in again with a valid account to create products.');
+            if (!token || token === 'LOCAL_ONLY') {
+                localStorage.removeItem('bev-token');
+                localStorage.removeItem('bev-user');
+                window.location.href = '/auth/login';
+                return;
             }
             const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/products', {
                 method: 'POST',
@@ -122,8 +125,11 @@ export default function AdminNewProductPage() {
         setIsSubmitting(true);
         try {
             const token = localStorage.getItem('bev-token');
-            if (token === 'LOCAL_ONLY') {
-                throw new Error('You are in local-only mode. Please sign in again with a valid account to upload products.');
+            if (!token || token === 'LOCAL_ONLY') {
+                localStorage.removeItem('bev-token');
+                localStorage.removeItem('bev-user');
+                window.location.href = '/auth/login';
+                return;
             }
             const formData = new FormData();
             formData.append('file', bulkFile);

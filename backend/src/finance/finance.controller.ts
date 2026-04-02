@@ -3,11 +3,30 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { FinanceService } from './finance.service';
+import { ReportsService } from './reports.service';
+import { FinancialAuditService } from '../common/financial-audit.service';
 
 @Controller('finance')
 @UseGuards(AuthGuard('jwt'))
 export class FinanceController {
-    constructor(private readonly financeService: FinanceService) {}
+    constructor(
+        private readonly financeService: FinanceService,
+        private readonly reportsService: ReportsService,
+        private readonly auditService: FinancialAuditService,
+    ) {}
+
+    /** Admin: generate on-demand report for any time window */
+    @Get('report')
+    async getReport(@Query('days') days: string) {
+        return this.reportsService.generateReport(parseInt(days || '7', 10));
+    }
+
+    /** Admin: manually trigger sending weekly report email */
+    @Post('report/send')
+    async sendReport(@Query('days') days: string) {
+        await this.reportsService.sendWeeklyReport();
+        return { message: 'Report sent to all admins' };
+    }
 
     // ─── Credit Terms ──────────────────────────────────────
 
@@ -93,5 +112,34 @@ export class FinanceController {
     @Delete('warehouses/:id')
     deleteWarehouse(@Param('id') id: string) {
         return this.financeService.deleteWarehouse(id);
+    }
+
+    // ─── Financial Audit Trail ────────────────────────────────
+
+    @Get('audit/order/:orderId')
+    getAuditByOrder(@Param('orderId') orderId: string) {
+        return this.auditService.getByOrder(orderId);
+    }
+
+    @Get('audit/user/:userId')
+    getAuditByUser(@Param('userId') userId: string, @Query('limit') limit?: string) {
+        return this.auditService.getByUser(userId, parseInt(limit || '50', 10));
+    }
+
+    @Get('audit/recent')
+    getRecentAudit(@Query('limit') limit?: string) {
+        return this.auditService.getRecent(parseInt(limit || '100', 10));
+    }
+
+    // ─── Revenue Reports ────────────────────────────────────
+
+    @Get('reports/revenue')
+    getRevenueReport(@Query('period') period?: 'week' | 'month' | 'year') {
+        return this.financeService.getRevenueReport(period || 'month');
+    }
+
+    @Get('reports/supplier-earnings')
+    getSupplierEarnings(@Request() req) {
+        return this.financeService.getSupplierEarnings(req.user.sub);
     }
 }

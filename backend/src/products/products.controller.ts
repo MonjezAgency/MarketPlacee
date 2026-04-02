@@ -38,8 +38,8 @@ export class ProductsController {
 
     @Get()
     async findAll(@Request() req) {
-        const status = req.query.status as ProductStatus;
-        const products = await this.productsService.findAll(status);
+        const { status, category, brand, minPrice, maxPrice, sort, q } = req.query;
+        const products = await this.productsService.findAll(status, { category, brand, minPrice, maxPrice, sort, q });
         return products;
     }
 
@@ -92,6 +92,18 @@ export class ProductsController {
     async findImageByEan(@Param('ean') ean: string) {
         const imageUrl = await this.eanService.fetchImageUrlByEan(ean);
         return { imageUrl };
+    }
+
+    @Get(':id/similar')
+    async getSimilar(@Param('id') id: string) {
+        const product = await this.productsService.findOne(id);
+        if (!product) return [];
+        const recs = await this.productsService.findRecommendations(
+            [product.category],
+            [id],
+            6,
+        );
+        return plainToInstance(ProductDto, recs);
     }
 
     @Get('cart/recommendations')

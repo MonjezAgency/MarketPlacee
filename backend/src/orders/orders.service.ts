@@ -2,12 +2,26 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { InvoiceService } from '../invoices/invoice.service';
+import { EscrowService } from '../payments/escrow.service';
+
+const STATUS_LABELS: Record<OrderStatus, string> = {
+    PENDING: 'Pending',
+    PROCESSING: 'Processing',
+    SHIPPED: 'Shipped',
+    DELIVERED: 'Delivered',
+    CANCELLED: 'Cancelled',
+};
 
 @Injectable()
 export class OrdersService {
     constructor(
         private prisma: PrismaService,
         private emailService: EmailService,
+        private notificationsService: NotificationsService,
+        private invoiceService: InvoiceService,
+        private escrowService: EscrowService,
     ) { }
 
     async create(buyerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number) {
@@ -47,6 +61,31 @@ export class OrdersService {
                 order.buyer.name || 'Partner',
                 order.id,
                 totalAmount,
+            ).catch(() => {});
+        }
+
+        // Notify buyer
+        this.notificationsService.create(
+            buyerId,
+            'Order Placed',
+            `Your order #${order.id.slice(-8).toUpperCase()} has been placed successfully.`,
+            'SUCCESS',
+            { orderId: order.id },
+        ).catch(() => {});
+
+        // Notify each supplier
+        const supplierIds = [...new Set(
+            order.items
+                .map((item: any) => item.product?.supplierId)
+                .filter(Boolean)
+        )];
+        for (const supplierId of supplierIds) {
+            this.notificationsService.create(
+                supplierId as string,
+                'New Order Received',
+                `You have a new order #${order.id.slice(-8).toUpperCase()} waiting for confirmation.`,
+                'INFO',
+                { orderId: order.id },
             ).catch(() => {});
         }
 
@@ -104,40 +143,77 @@ export class OrdersService {
         });
     }
 
-    async findByBuyer(buyerId: string) {
-        return this.prisma.order.findMany({
-            where: { buyerId },
+    async findByBuyer(buyerId: string, page = 1, limit = 20) {
+        const skip = (page - 1) * limit;
+        const [orders, total] = await Promise.all([
+            this.prisma.order.findMany({
+                where: { buyerId },
+                include: {
+                    items: {
+                        include: {
+                            product: { select: { id: true, name: true, images: true } },
+                        },
+                    },
+                },
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.order.count({ where: { buyerId } }),
+        ]);
+        return { data: orders, total, page, limit, totalPages: Math.ceil(total / limit) };
+    }
+
+    async findByIdForBuyer(orderId: string, buyerId: string) {
+        const order = await this.prisma.order.findFirst({
+            where: { id: orderId, buyerId },
             include: {
-                items: true,
+                items: {
+                    include: {
+                        product: { select: { id: true, name: true, images: true, supplier: { select: { name: true } } } },
+                    },
+                },
+                history: { orderBy: { createdAt: 'asc' } },
             },
         });
+        if (!order) throw new NotFoundException('Order not found');
+        return order;
     }
 
     async findBySupplier(supplierId: string) {
-        // Logic to find orders that contain products from this supplier
-        return this.prisma.order.findMany({
+        const orders = await this.prisma.order.findMany({
             where: {
-                items: {
-                    some: {
-                        product: {
-                            supplierId,
-                        },
-                    },
-                },
+                items: { some: { product: { supplierId } } },
             },
             include: {
+                buyer: { select: { id: true, name: true, email: true } },
                 items: {
-                    where: {
-                        product: {
-                            supplierId,
-                        },
-                    },
-                    include: {
-                        product: true,
-                    },
+                    where: { product: { supplierId } },
+                    include: { product: { select: { id: true, name: true, images: true, supplierId: true } } },
                 },
             },
+            orderBy: { createdAt: 'desc' },
         });
+
+        return orders.map(order => ({
+            id: order.id,
+            status: order.status,
+            totalAmount: order.totalAmount,
+            shippingCompany: order.shippingCompany,
+            createdAt: order.createdAt,
+            buyer: {
+                name: order.buyer?.name ? order.buyer.name.split(' ').map((p, i) => i === 0 ? p[0] + '***' : p[0] + '***').join(' ') : 'Customer',
+                email: order.buyer?.email ? order.buyer.email.replace(/^(.{2}).*@/, '$1***@') : '',
+            },
+            items: order.items.map(item => ({
+                id: item.id,
+                productId: item.productId,
+                name: item.product.name,
+                image: item.product.images?.[0] ?? null,
+                quantity: item.quantity,
+                price: item.price,
+            })),
+        }));
     }
 
     async updateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string) {
@@ -174,6 +250,114 @@ export class OrdersService {
             ).catch(() => {});
         }
 
+        // Notify buyer of status change
+        this.notificationsService.create(
+            order.buyerId,
+            'Order Status Updated',
+            `Your order #${orderId.slice(-8).toUpperCase()} is now ${STATUS_LABELS[status]}.`,
+            status === 'CANCELLED' ? 'ERROR' : status === 'DELIVERED' ? 'SUCCESS' : 'INFO',
+            { orderId, status },
+        ).catch(() => {});
+
+        // Auto-generate invoice on delivery + send email
+        if (status === OrderStatus.DELIVERED && order.buyer?.email) {
+            this.invoiceService.createInvoiceForOrder(orderId).then(invoice => {
+                this.emailService.sendInvoiceEmail(
+                    order.buyer.email,
+                    order.buyer.name || 'Partner',
+                    invoice.invoiceNumber,
+                    orderId,
+                    invoice.totalAmount,
+                    invoice.dueDate,
+                ).catch(() => {});
+            }).catch(() => {});
+
+            // Release escrow → triggers supplier payout
+            this.escrowService.releaseEscrow(orderId).catch(err =>
+                console.error(`Escrow release failed for ${orderId}:`, err.message)
+            );
+        }
+
         return updated;
+    }
+
+    // ─── Supplier Analytics ───────────────────────────────────────────
+
+    async getSupplierAnalytics(supplierId: string, days: number) {
+        const since = new Date(Date.now() - days * 86_400_000);
+
+        // All orders that contain at least one product owned by this supplier
+        const orders = await this.prisma.order.findMany({
+            where: {
+                createdAt: { gte: since },
+                items: { some: { product: { supplierId } } },
+            },
+            include: {
+                items: {
+                    where: { product: { supplierId } },
+                    include: { product: { select: { id: true, name: true, basePrice: true, category: true } } },
+                },
+            },
+        });
+
+        // Revenue = sum of item.price * item.quantity (customer-facing prices)
+        let totalRevenue = 0;
+        let totalItems = 0;
+        const productMap: Record<string, { name: string; orders: number; revenue: number; category: string }> = {};
+        const categoryMap: Record<string, number> = {};
+
+        for (const order of orders) {
+            if (order.status === 'CANCELLED') continue;
+            for (const item of order.items) {
+                const lineTotal = item.price * item.quantity;
+                totalRevenue += lineTotal;
+                totalItems += item.quantity;
+                const pid = item.product?.id ?? 'unknown';
+                const pname = item.product?.name ?? 'Unknown';
+                const cat = item.product?.category ?? 'Other';
+                if (!productMap[pid]) productMap[pid] = { name: pname, orders: 0, revenue: 0, category: cat };
+                productMap[pid].orders += item.quantity;
+                productMap[pid].revenue += lineTotal;
+                categoryMap[cat] = (categoryMap[cat] ?? 0) + lineTotal;
+            }
+        }
+
+        // Monthly revenue buckets (last 7 months)
+        const monthlyMap: Record<string, { revenue: number; orders: number }> = {};
+        for (const order of orders) {
+            if (order.status === 'CANCELLED') continue;
+            const key = new Date(order.createdAt).toLocaleString('en-US', { month: 'short', year: '2-digit' });
+            if (!monthlyMap[key]) monthlyMap[key] = { revenue: 0, orders: 0 };
+            monthlyMap[key].orders += 1;
+            for (const item of order.items) monthlyMap[key].revenue += item.price * item.quantity;
+        }
+
+        const topProducts = Object.entries(productMap)
+            .map(([id, v]) => ({ id, ...v }))
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
+
+        const categoryBreakdown = Object.entries(categoryMap)
+            .map(([name, value]) => ({ name, value: Math.round(value) }))
+            .sort((a, b) => b.value - a.value);
+
+        const activeProducts = await this.prisma.product.count({
+            where: { supplierId, status: 'APPROVED' },
+        });
+
+        const totalOrders = orders.filter(o => o.status !== 'CANCELLED').length;
+        const deliveredOrders = orders.filter(o => o.status === 'DELIVERED').length;
+
+        return {
+            totalRevenue,
+            totalOrders,
+            deliveredOrders,
+            totalItems,
+            activeProducts,
+            conversionRate: totalOrders > 0 ? ((deliveredOrders / totalOrders) * 100).toFixed(1) : '0',
+            monthlyData: Object.entries(monthlyMap).map(([month, v]) => ({ month, ...v })),
+            topProducts,
+            categoryBreakdown,
+        };
     }
 }

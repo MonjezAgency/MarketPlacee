@@ -2,7 +2,9 @@
 
 import * as React from 'react';
 import { useCart } from '@/lib/cart';
-import { Search, ShoppingCart, User, Menu, PackageSearch, Bell, Moon, Sun, ChevronRight, ChevronDown } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, PackageSearch, Moon, Sun, ChevronRight, ChevronDown, Heart, Globe } from 'lucide-react';
+import NotificationBell from '@/components/ui/NotificationBell';
+import { SUPPORTED_CURRENCIES, getActiveCurrency, setActiveCurrency } from '@/lib/currency';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
@@ -22,7 +24,35 @@ export default function Navbar() {
     const [searchTerm, setSearchTerm] = React.useState('');
     const [scrolled, setScrolled] = React.useState(false);
     const [isCategoriesOpen, setIsCategoriesOpen] = React.useState(false);
+    const [isCurrencyOpen, setIsCurrencyOpen] = React.useState(false);
+    const [activeCurrency, setActiveCurrencyState] = React.useState('USD');
     const categoriesRef = React.useRef<HTMLDivElement>(null);
+    const currencyRef = React.useRef<HTMLDivElement>(null);
+
+    // Load saved currency on mount + react to changes
+    React.useEffect(() => {
+        setActiveCurrencyState(getActiveCurrency());
+        const handler = () => setActiveCurrencyState(getActiveCurrency());
+        window.addEventListener('currency-changed', handler);
+        return () => window.removeEventListener('currency-changed', handler);
+    }, []);
+
+    const handleCurrencySelect = (code: string) => {
+        setActiveCurrency(code);
+        setActiveCurrencyState(code);
+        setIsCurrencyOpen(false);
+    };
+
+    // Close currency dropdown on outside click
+    React.useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (currencyRef.current && !currencyRef.current.contains(e.target as Node)) {
+                setIsCurrencyOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
     const router = useRouter();
     const pathname = usePathname();
     const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
@@ -199,6 +229,45 @@ export default function Navbar() {
                         <User className="w-5 h-5 group-hover:text-secondary transition-colors" />
                         <span className="text-[10px] font-bold">{user ? (user.name?.split(' ')[0] || 'User') : t('navbar', 'account')}</span>
                     </Link>
+
+                    {/* Wishlist */}
+                    {user && (
+                        <Link href="/wishlist" className="flex flex-col items-center gap-0.5 group">
+                            <Heart className="w-5 h-5 group-hover:text-secondary transition-colors" />
+                            <span className="text-[10px] font-bold">Saved</span>
+                        </Link>
+                    )}
+
+                    {/* Currency Switcher */}
+                    <div className="relative" ref={currencyRef}>
+                        <button
+                            onClick={() => setIsCurrencyOpen(prev => !prev)}
+                            className="flex flex-col items-center gap-0.5 group"
+                        >
+                            <Globe className="w-5 h-5 group-hover:text-secondary transition-colors" />
+                            <span className="text-[10px] font-bold">{activeCurrency}</span>
+                        </button>
+                        {isCurrencyOpen && (
+                            <div className="absolute end-0 top-10 w-52 bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden z-50">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-4 pt-3 pb-1">Select Currency</p>
+                                <div className="max-h-64 overflow-y-auto">
+                                    {SUPPORTED_CURRENCIES.map(c => (
+                                        <button key={c.code} onClick={() => handleCurrencySelect(c.code)}
+                                            className={cn(
+                                                "w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-muted/50 transition-colors",
+                                                activeCurrency === c.code && "bg-primary/5 text-primary font-black"
+                                            )}>
+                                            <span className="font-bold">{c.name}</span>
+                                            <span className="text-xs font-black opacity-60">{c.symbol} {c.code}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Notifications */}
+                    <NotificationBell isLight={scrolled || isWhiteBackgroundPage} />
 
                     {/* Cart */}
                     <Link href="/cart" className="relative flex flex-col items-center gap-0.5 group">

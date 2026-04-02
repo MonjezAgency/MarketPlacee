@@ -18,8 +18,10 @@ import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateText } from '@/lib/translator';
 import { motion, AnimatePresence } from 'framer-motion';
+import ReviewSection from '@/components/product/ReviewSection';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { useWishlist } from '@/hooks/useWishlist';
 
 export default function ProductDetailClient() {
     const { id } = useParams();
@@ -35,11 +37,15 @@ export default function ProductDetailClient() {
     const [localRating, setLocalRating] = useState(0);
     const [localReviewsCount, setLocalReviewsCount] = useState(0);
 
+    const { isSaved, toggle: toggleWishlist } = useWishlist();
     const [translatedName, setTranslatedName] = useState('');
     const [translatedDesc, setTranslatedDesc] = useState('');
 
     const [products, setProducts] = useState<Product[]>([]);
+    const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
 
     useEffect(() => {
         fetchProducts().then(data => {
@@ -47,6 +53,15 @@ export default function ProductDetailClient() {
             setIsLoading(false);
         });
     }, []);
+
+    // Fetch similar products from the dedicated endpoint once id is known
+    useEffect(() => {
+        if (!id) return;
+        fetch(`${API_URL}/products/${id}/similar`)
+            .then(r => r.ok ? r.json() : [])
+            .then(data => setSimilarProducts(Array.isArray(data) ? data : []))
+            .catch(() => {});
+    }, [id, API_URL]);
 
     const currentProduct = products.find(p => p.id === id);
 
@@ -74,13 +89,10 @@ export default function ProductDetailClient() {
     }
 
     const product = currentProduct;
-    let relatedProducts = products.filter(p => p.id !== id && p.category === product?.category);
-    if (relatedProducts.length < 4) {
-        const padding = products.filter(p => p.id !== id && !relatedProducts.includes(p));
-        relatedProducts = [...relatedProducts, ...padding].slice(0, 4);
-    } else {
-        relatedProducts = relatedProducts.slice(0, 4);
-    }
+    // Prefer server-side similar products; fall back to local filter if API hasn't loaded yet
+    const relatedProducts = similarProducts.length > 0
+        ? similarProducts
+        : products.filter(p => p.id !== id && p.category === product?.category).slice(0, 4);
 
     const handleRate = async (rating: number) => {
         if (!user || userRating > 0 || isSubmittingRating || !product) return;
@@ -207,9 +219,19 @@ export default function ProductDetailClient() {
                                 )}
                             </div>
 
-                            <button className="absolute top-8 end-8 w-12 h-12 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl flex items-center justify-center shadow-xl text-muted-foreground hover:text-red-500 hover:scale-110 hover:bg-white transition-all z-20">
-                                <Heart size={20} />
-                            </button>
+                            {product && (
+                                <button
+                                    onClick={() => toggleWishlist(product.id)}
+                                    className={cn(
+                                        "absolute top-8 end-8 w-12 h-12 backdrop-blur-md border rounded-2xl flex items-center justify-center shadow-xl transition-all z-20 hover:scale-110",
+                                        isSaved(product.id)
+                                            ? "bg-red-500/20 border-red-500/30 text-red-500"
+                                            : "bg-white/10 border-white/20 text-muted-foreground hover:text-red-500 hover:bg-white"
+                                    )}
+                                >
+                                    <Heart size={20} fill={isSaved(product.id) ? 'currentColor' : 'none'} />
+                                </button>
+                            )}
                         </motion.div>
 
                         {/* Thumbnails (Simulated) */}
@@ -404,8 +426,11 @@ export default function ProductDetailClient() {
                     </div>
                 </div>
 
+                {/* Reviews */}
+                <ReviewSection productId={product.id} />
+
                 {/* Related Products */}
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 px-6">
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 px-6 mt-16">
                     <div className="space-y-2">
                         <h2 className="text-3xl lg:text-4xl font-heading font-black text-foreground tracking-tight">Expand Your Batch</h2>
                         <p className="text-muted-foreground font-medium text-sm">Compatible inventory from the same logistics hub</p>

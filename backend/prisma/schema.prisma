@@ -11,6 +11,7 @@ datasource db {
 }
 
 enum Role {
+  OWNER        // مالك المنصة — فوق الكل، لا يخضع لأي قيود
   ADMIN
   SUPPLIER
   CUSTOMER
@@ -80,6 +81,8 @@ model User {
   emailVerified        Boolean    @default(false)
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
+  stripeCustomerId     String?    // Stripe customer ID for saved cards (buyers)
+  stripeAccountId      String?    // Stripe Connect account ID (suppliers)
   permissions          Json? // Array of permission strings
 
   // Two-Factor Authentication
@@ -104,6 +107,8 @@ model User {
   adminActions AdminActionLog[] @relation("AdminActions")
   notifications Notification[]
   sentMessages  SupportMessage[] @relation("SentMessages")
+  reviews      Review[]
+  wishlist     WishlistItem[]
 
   kycStatus     KYCStatus @default(UNVERIFIED)
   kycDocuments  KYCDocument[]
@@ -159,6 +164,8 @@ model Product {
   placements   ProductPlacement[]
   orderItems   OrderItem[]
   tieredPrices TieredPrice[]
+  reviews      Review[]
+  wishlistItems WishlistItem[]
 }
 
 model ProductPlacement {
@@ -199,6 +206,16 @@ model Order {
   totalAmount Float
   status      OrderStatus @default(PENDING)
 
+  // Stripe Payment
+  paymentStatus    String  @default("UNPAID") // UNPAID | PROCESSING | PAID | FAILED | REFUNDED
+  paymentIntentId  String?
+  paidAt           DateTime?
+
+  // Escrow — funds held until delivery confirmed, then released to supplier
+  escrowStatus     String  @default("NOT_STARTED") // NOT_STARTED | HELD | RELEASED | REFUNDED
+  escrowHeldAt     DateTime?  // when funds were locked
+  escrowReleasedAt DateTime?  // when funds were sent to supplier
+
   shippingCompany String?
   shippingCost    Float?
 
@@ -209,6 +226,7 @@ model Order {
   history OrderStatusHistory[]
   invoices Invoice[]
   shipment Shipment?
+  disputes Dispute[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -423,16 +441,22 @@ model Warehouse {
 }
 
 model SupportMessage {
-  id          String   @id @default(uuid())
-  senderId    String
-  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
-  receiverId  String?  // if null, it's addressed to general support
-  content     String?
-  imageUrl    String?
-  isRead      Boolean  @default(false)
-  isBot       Boolean  @default(false)
-  assignedTeam String? // e.g., 'DEVELOPER', 'LOGISTICS'
-  createdAt   DateTime @default(now())
+  id           String   @id @default(uuid())
+  senderId     String
+  sender       User     @relation("SentMessages", fields: [senderId], references: [id])
+  receiverId   String?  // if null, it's addressed to general support
+  content      String?
+  imageUrl     String?
+  isRead       Boolean  @default(false)
+  isBot        Boolean  @default(false)
+  assignedTeam String?  // e.g., 'DEVELOPER', 'LOGISTICS'
+  isHandedOver Boolean  @default(false) // true = human took over from bot
+  handedOverBy String?  // userId of the support agent who took over
+  createdAt    DateTime @default(now())
+
+  @@index([senderId])
+  @@index([receiverId])
+  @@index([createdAt])
 }
 
 model Shipment {
@@ -458,4 +482,124 @@ model ShipmentUpdate {
   description String
   location    String?
   createdAt   DateTime @default(now())
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  rating    Int      // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, userId])  // One review per user per product
+}
+
+enum DisputeStatus {
+  OPEN
+  UNDER_REVIEW
+  RESOLVED_REFUND
+  RESOLVED_NO_REFUND
+  CLOSED
+}
+
+model Dispute {
+  id          String        @id @default(uuid())
+  orderId     String
+  order       Order         @relation(fields: [orderId], references: [id])
+  buyerId     String
+  reason      String        // e.g. "Item not received", "Wrong item", "Damaged"
+  description String
+  evidence    String[]      // uploaded image URLs
+  status      DisputeStatus @default(OPEN)
+  resolution  String?       // admin resolution note
+  resolvedBy  String?       // admin userId
+  resolvedAt  DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model WishlistItem {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+// ─── Webhook Idempotency ─────────────────────────────────────────────────────
+// Stores every Stripe event ID that has been processed.
+// Before handling a webhook, we check this table — if already present we skip.
+// Prevents double-charging or double-payouts on webhook retries / replay attacks.
+model ProcessedWebhookEvent {
+  id          String   @id @default(uuid())
+  eventId     String   @unique   // Stripe event ID (e.g. evt_xxx)
+  eventType   String             // e.g. payment_intent.succeeded
+  processedAt DateTime @default(now())
+
+  @@index([processedAt])
+}
+
+// ─── Financial Audit Log ─────────────────────────────────────────────────────
+// Immutable record of every financial operation on the platform.
+// Append-only: NEVER update or delete rows — only INSERT.
+// Covers: payment created, payment succeeded, escrow held/released/refunded,
+//         supplier payout sent, invoice generated, refund issued.
+model FinancialAuditLog {
+  id          String   @id @default(uuid())
+  eventType   String   // PAYMENT_CREATED | PAYMENT_SUCCEEDED | PAYMENT_FAILED |
+                       // ESCROW_HELD | ESCROW_RELEASED | ESCROW_REFUNDED |
+                       // PAYOUT_SENT | REFUND_ISSUED | INVOICE_GENERATED
+  orderId     String?
+  userId      String?  // buyer or supplier depending on event
+  amount      Float?   // in USD
+  currency    String   @default("USD")
+  stripeId    String?  // PaymentIntent ID / Transfer ID / Refund ID
+  status      String   @default("OK")  // OK | FAILED
+  metadata    Json?    // any extra context
+  createdAt   DateTime @default(now())
+
+  @@index([orderId])
+  @@index([userId])
+  @@index([eventType])
+  @@index([createdAt])
+}
+
+// ─── Refresh Token Store ─────────────────────────────────────────────────────
+// Stores hashed refresh tokens for rotation — each token is single-use.
+// On use, old token is deleted and a new one is issued.
+// Prevents refresh token replay attacks.
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique   // SHA-256 hash of the raw token
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ─── Login Attempt Log ───────────────────────────────────────────────────────
+// Tracks failed login attempts per email for account lockout logic.
+// Auto-cleaned after 24 hours by a cron job.
+model LoginAttempt {
+  id        String   @id @default(uuid())
+  email     String
+  ip        String?
+  success   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
 }

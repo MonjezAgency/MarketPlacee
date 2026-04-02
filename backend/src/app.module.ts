@@ -25,6 +25,11 @@ import { SecurityInterceptor } from './security/security.interceptor';
 import { AdsModule } from './ads/ads.module';
 import { ChatModule } from './chat/chat.module';
 import { KycModule } from './kyc/kyc.module';
+import { NotificationsModule } from './notifications/notifications.module';
+import { WishlistModule } from './wishlist/wishlist.module';
+import { PaymentsModule } from './payments/payments.module';
+import { DisputesModule } from './disputes/disputes.module';
+import { OwnerModule } from './owner/owner.module';
 
 @Module({
     imports: [
@@ -45,10 +50,15 @@ import { KycModule } from './kyc/kyc.module';
         AdsModule,
         ChatModule,
         KycModule,
+        NotificationsModule,
+        WishlistModule,
+        PaymentsModule,
+        DisputesModule,
         ShippingModule,
         DiscountsModule,
         InvoiceModule,
         FinanceModule,
+        OwnerModule,
     ],
     controllers: [AppController],
     providers: [

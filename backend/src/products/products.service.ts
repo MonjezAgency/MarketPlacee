@@ -70,11 +70,6 @@ export class ProductsService {
             adminNotes = adminNotes ? `${adminNotes} | ${msg}` : msg;
         }
 
-        console.log('--- PRODUCT CREATION DEBUG ---');
-        console.log('DTO:', JSON.stringify(createProductDto, null, 2));
-        console.log('isAdmin:', isAdmin);
-        console.log('Calculated supplierId:', createProductDto.supplierId);
-
         try {
             return await this.prisma.product.create({
                 data: {
@@ -91,19 +86,39 @@ export class ProductsService {
                 },
             });
         } catch (error) {
-            console.error('PRISMA CREATE ERROR:', error);
             throw error;
         }
     }
 
-    async findAll(status?: ProductStatus) {
+    async findAll(status?: ProductStatus, filters?: { category?: string; brand?: string; minPrice?: string; maxPrice?: string; sort?: string; q?: string; page?: string; limit?: string }) {
         const where: any = {};
-        if (status) {
-            where.status = status;
+        if (status) where.status = status;
+
+        // Text search
+        if (filters?.q) {
+            where.OR = [
+                { name: { contains: filters.q, mode: 'insensitive' } },
+                { description: { contains: filters.q, mode: 'insensitive' } },
+                { category: { contains: filters.q, mode: 'insensitive' } },
+                { brand: { contains: filters.q, mode: 'insensitive' } },
+                { ean: { contains: filters.q, mode: 'insensitive' } },
+            ];
+        }
+
+        // Category filter
+        if (filters?.category) where.category = { contains: filters.category, mode: 'insensitive' };
+
+        // Brand filter
+        if (filters?.brand) where.brand = { contains: filters.brand, mode: 'insensitive' };
+
+        // Price range
+        if (filters?.minPrice || filters?.maxPrice) {
+            where.price = {};
+            if (filters.minPrice) where.price.gte = parseFloat(filters.minPrice);
+            if (filters.maxPrice) where.price.lte = parseFloat(filters.maxPrice);
         }
 
         // Safety: Only apply strict content requirements for the public marketplace (APPROVED).
-        // Admins and Suppliers fetching all products (no status) should see everything.
         if (status === ProductStatus.APPROVED) {
             where.AND = [
                 ...(where.AND || []),
@@ -113,22 +128,43 @@ export class ProductsService {
             ];
         }
 
-        const products = await this.prisma.product.findMany({
-            where,
-            include: {
-                supplier: {
-                    select: { id: true, name: true, email: true, companyName: true }
-                }
-            },
-            orderBy: { createdAt: 'desc' }
-        });
+        // Sort order
+        let orderBy: any = { createdAt: 'desc' };
+        if (filters?.sort === 'price_asc') orderBy = { price: 'asc' };
+        else if (filters?.sort === 'price_desc') orderBy = { price: 'desc' };
+        else if (filters?.sort === 'name_asc') orderBy = { name: 'asc' };
+        else if (filters?.sort === 'newest') orderBy = { createdAt: 'desc' };
 
-        // Safety: Extra filtering in memory to ensure no products with only empty image strings reach the marketplace
-        if (status === ProductStatus.APPROVED) {
-            return products.filter(p => p.name && p.name.trim() !== '' && p.images.some(img => img && img.trim() !== ''));
-        }
+        const page = Math.max(1, parseInt(filters?.page || '1', 10));
+        const limit = Math.min(100, Math.max(1, parseInt(filters?.limit || '24', 10)));
+        const skip = (page - 1) * limit;
 
-        return products;
+        const [products, total] = await Promise.all([
+            this.prisma.product.findMany({
+                where,
+                include: {
+                    supplier: {
+                        select: { id: true, name: true, email: true, companyName: true }
+                    }
+                },
+                orderBy,
+                skip,
+                take: limit,
+            }),
+            this.prisma.product.count({ where }),
+        ]);
+
+        const filtered = status === ProductStatus.APPROVED
+            ? products.filter(p => p.name && p.name.trim() !== '' && p.images.some(img => img && img.trim() !== ''))
+            : products;
+
+        return {
+            data: filtered,
+            total,
+            page,
+            limit,
+            totalPages: Math.ceil(total / limit),
+        };
     }
 
     async findAllAdmin() {

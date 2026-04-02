@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
-import { authenticator } from 'otplib';
+import { generateSecret, generate, verify, generateURI } from 'otplib';
 import * as QRCode from 'qrcode';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
@@ -18,8 +18,8 @@ export class TwoFaService {
     const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (!user) throw new BadRequestException('User not found');
 
-    const secret = authenticator.generateSecret();
-    const otpauthUrl = authenticator.keyuri(user.email, 'Atlantis Marketplace', secret);
+    const secret = generateSecret();
+    const otpauthUrl = generateURI({ label: user.email, issuer: 'Atlantis Marketplace', secret });
     const qrCodeUrl = await QRCode.toDataURL(otpauthUrl);
 
     // Store secret temporarily (not yet enabled — user must verify first)
@@ -38,8 +38,8 @@ export class TwoFaService {
     });
     if (!user?.twoFactorSecret) throw new BadRequestException('TOTP setup not initiated');
 
-    const isValid = authenticator.verify({ token, secret: user.twoFactorSecret });
-    if (!isValid) throw new UnauthorizedException('Invalid verification code');
+    const result = await verify({ token, secret: user.twoFactorSecret });
+    if (!result.valid) throw new UnauthorizedException('Invalid verification code');
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -58,8 +58,8 @@ export class TwoFaService {
     });
     if (!user?.twoFactorEnabled) throw new BadRequestException('2FA is not enabled');
 
-    const isValid = authenticator.verify({ token, secret: user.twoFactorSecret! });
-    if (!isValid) throw new UnauthorizedException('Invalid verification code');
+    const result = await verify({ token, secret: user.twoFactorSecret! });
+    if (!result.valid) throw new UnauthorizedException('Invalid verification code');
 
     await this.prisma.user.update({
       where: { id: userId },
@@ -67,8 +67,9 @@ export class TwoFaService {
     });
   }
 
-  verifyTotpToken(secret: string, token: string): boolean {
-    return authenticator.verify({ token, secret });
+  async verifyTotpToken(secret: string, token: string): Promise<boolean> {
+    const result = await verify({ token, secret });
+    return result.valid;
   }
 
   // ── Email OTP ──

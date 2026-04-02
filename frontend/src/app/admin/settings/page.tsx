@@ -6,18 +6,20 @@ import {
     Camera,
     Save,
     User,
-    Mail,
-    Phone,
     Lock,
     Eye,
     EyeOff,
     Check,
     AlertCircle,
     Bell,
-    Shield
+    Shield,
+    Percent,
+    Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001';
 
 export default function AdminSettingsPage() {
     const { user, updateUser } = useAuth();
@@ -35,6 +37,55 @@ export default function AdminSettingsPage() {
 
     const [isSaving, setIsSaving] = React.useState(false);
     const [toast, setToast] = React.useState<{ type: 'success' | 'error', msg: string } | null>(null);
+
+    // ── Markup settings ──────────────────────────────────────
+    // Stored as multipliers (e.g. 1.10 = 10%). We display as % to the admin.
+    const [markupPiece, setMarkupPiece] = React.useState('10');       // default 10%
+    const [markupPallet, setMarkupPallet] = React.useState('5');      // default 5%
+    const [markupContainer, setMarkupContainer] = React.useState('2'); // default 2%
+    const [isLoadingMarkup, setIsLoadingMarkup] = React.useState(true);
+    const [isSavingMarkup, setIsSavingMarkup] = React.useState(false);
+
+    React.useEffect(() => {
+        const token = localStorage.getItem('bev-token');
+        fetch(`${API_URL}/admin/config/markup`, { headers: { Authorization: `Bearer ${token}` } })
+            .then(r => r.json())
+            .then(data => {
+                if (data?.markup) {
+                    // Convert multiplier → percentage string: 1.10 → "10"
+                    setMarkupPiece(String(Math.round((data.markup.piece - 1) * 100)));
+                    setMarkupPallet(String(Math.round((data.markup.pallet - 1) * 100)));
+                    setMarkupContainer(String(Math.round((data.markup.container - 1) * 100)));
+                }
+            })
+            .catch(() => {})
+            .finally(() => setIsLoadingMarkup(false));
+    }, []);
+
+    const handleSaveMarkup = async () => {
+        setIsSavingMarkup(true);
+        try {
+            const token = localStorage.getItem('bev-token');
+            // Convert percentage → multiplier: "10" → 1.10
+            const payload = {
+                piece:     1 + (parseFloat(markupPiece) || 0) / 100,
+                pallet:    1 + (parseFloat(markupPallet) || 0) / 100,
+                container: 1 + (parseFloat(markupContainer) || 0) / 100,
+            };
+            const res = await fetch(`${API_URL}/admin/config/markup`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify(payload),
+            });
+            if (res.ok) showToast('success', 'Markup percentages saved. New products will use the updated rates.');
+            else showToast('error', 'Failed to save markup settings.');
+        } catch {
+            showToast('error', 'Network error. Please try again.');
+        } finally {
+            setIsSavingMarkup(false);
+        }
+    };
+    // ─────────────────────────────────────────────────────────
 
     const showToast = (type: 'success' | 'error', msg: string) => {
         setToast({ type, msg });
@@ -235,6 +286,95 @@ export default function AdminSettingsPage() {
                             Your account is fully verified. You have maximum listing capacity and priority support access.
                         </p>
                     </div>
+                </div>
+            </div>
+
+            {/* ── Platform Markup Settings ───────────────────────── */}
+            <div className="bg-card border border-border/50 rounded-[32px] p-8 space-y-6">
+                <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
+                        <Percent size={16} className="text-primary" />
+                        Platform Markup Settings
+                    </h3>
+                    <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-widest">
+                        Admin Only
+                    </span>
+                </div>
+
+                <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4">
+                    <p className="text-xs text-amber-600 font-medium leading-relaxed">
+                        <strong>How it works:</strong> When a supplier lists a product at $5.00, the customer sees $5.00 + markup% (e.g. $5.50 at 10%).
+                        The supplier always receives their original price — the markup is platform revenue. Suppliers never see these percentages.
+                    </p>
+                </div>
+
+                {isLoadingMarkup ? (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                        <Loader2 size={16} className="animate-spin" />
+                        <span className="text-xs font-bold">Loading current rates...</span>
+                    </div>
+                ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {[
+                            {
+                                label: 'Per Unit / Piece',
+                                desc: 'Products sold individually or by case',
+                                value: markupPiece,
+                                set: setMarkupPiece,
+                                example: markupPiece ? `$5.00 → $${(5 * (1 + parseFloat(markupPiece) / 100)).toFixed(2)}` : '',
+                            },
+                            {
+                                label: 'Per Pallet',
+                                desc: 'Bulk pallet orders',
+                                value: markupPallet,
+                                set: setMarkupPallet,
+                                example: markupPallet ? `$100 → $${(100 * (1 + parseFloat(markupPallet) / 100)).toFixed(2)}` : '',
+                            },
+                            {
+                                label: 'Container / Truck',
+                                desc: 'Full container or truck load',
+                                value: markupContainer,
+                                set: setMarkupContainer,
+                                example: markupContainer ? `$1000 → $${(1000 * (1 + parseFloat(markupContainer) / 100)).toFixed(2)}` : '',
+                            },
+                        ].map(field => (
+                            <div key={field.label} className="space-y-2">
+                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">
+                                    {field.label}
+                                </label>
+                                <p className="text-[10px] text-muted-foreground/60 ms-1">{field.desc}</p>
+                                <div className="relative">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        max="100"
+                                        step="0.5"
+                                        value={field.value}
+                                        onChange={e => field.set(e.target.value)}
+                                        className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 pe-10 outline-none focus:border-primary/50 text-foreground font-black text-xl transition-all"
+                                    />
+                                    <span className="absolute end-4 top-1/2 -translate-y-1/2 text-primary font-black text-lg">%</span>
+                                </div>
+                                {field.example && (
+                                    <p className="text-[10px] text-emerald-500 font-bold ms-1">{field.example}</p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div className="pt-4 border-t border-border/50 flex items-center justify-between">
+                    <p className="text-[10px] text-muted-foreground font-medium">
+                        Changes apply to <strong>new products only</strong>. Existing products keep their current markup.
+                    </p>
+                    <button
+                        onClick={handleSaveMarkup}
+                        disabled={isSavingMarkup || isLoadingMarkup}
+                        className="h-11 px-7 bg-primary text-primary-foreground font-black text-[11px] uppercase tracking-widest rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-2"
+                    >
+                        {isSavingMarkup ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                        Save Markup Rates
+                    </button>
                 </div>
             </div>
 

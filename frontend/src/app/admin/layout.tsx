@@ -13,7 +13,6 @@ import {
     Bell,
     LogOut,
     Menu,
-    X,
     UserPlus,
     LayoutList,
     Tag,
@@ -32,7 +31,12 @@ import {
     Percent,
     DollarSign,
     Truck,
-    Warehouse as WarehouseIcon
+    Warehouse as WarehouseIcon,
+    AlertCircle,
+    Star,
+    Crown,
+    KeyRound,
+    ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -47,6 +51,17 @@ interface SidebarGroup {
     icon: React.ElementType;
     links: { label: string; translationKey: string; href: string; icon: React.ElementType }[];
 }
+
+// Owner-only group — بيظهر بس لـ OWNER
+const OWNER_GROUP: SidebarGroup = {
+    title: 'Owner Control',
+    titleKey: 'groupOwner',
+    icon: Crown,
+    links: [
+        { label: 'Owner Dashboard', translationKey: 'ownerDashboard', href: '/admin/owner', icon: Crown },
+        { label: 'Team & Permissions', translationKey: 'teamPermissions', href: '/admin/owner', icon: KeyRound },
+    ],
+};
 
 const SIDEBAR_GROUPS: SidebarGroup[] = [
     {
@@ -109,6 +124,8 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         icon: Megaphone,
         links: [
             { label: 'Support Center', translationKey: 'supportCenter', href: '/dashboard/support', icon: Megaphone },
+            { label: 'Disputes', translationKey: 'disputes', href: '/admin/disputes', icon: AlertCircle },
+            { label: 'Review Moderation', translationKey: 'reviews', href: '/admin/reviews', icon: Star },
         ]
     },
     {
@@ -235,16 +252,39 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         pendingOrders: 0,
         pendingPlacements: 0
     });
+    const [kycBlocked, setKycBlocked] = React.useState(false);
     const pathname = usePathname();
     const { user, logout } = useAuth();
     const { resolvedTheme, setTheme } = useTheme();
     const { locale, setLocale, t } = useLanguage();
     const [mounted, setMounted] = React.useState(false);
 
+    const isOwner = user?.role === 'OWNER' || user?.role === 'owner';
+    const isTeamMember = ['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS']
+        .includes((user?.role || '').toUpperCase());
+
+    // ── KYC Gate: block team members who haven't verified ────────────────────
+    React.useEffect(() => {
+        if (!user) return;
+        if (isOwner) { setKycBlocked(false); return; }
+        if (!isTeamMember) return;
+        const token = localStorage.getItem('bev-token');
+        fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/kyc/status', {
+            headers: { Authorization: `Bearer ${token}` },
+        })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                // لو الـ endpoint رجع null أو error — مش نحجب المستخدم
+                if (!data) return;
+                setKycBlocked(data?.kycStatus !== 'VERIFIED');
+            })
+            .catch(() => {}); // في حالة network error — مش نحجب
+    }, [user]);
+
     React.useEffect(() => {
         setMounted(true);
         const fetchNotifications = async () => {
-            if (user?.role !== 'admin' && user?.role !== 'ADMIN') return;
+            if (user?.role !== 'admin' && user?.role !== 'ADMIN' && !isOwner) return;
             try {
                 const token = localStorage.getItem('bev-token');
                 const res = await fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/dashboard/admin/notifications', {
@@ -273,6 +313,32 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     // Total pending interactions for the bell icon
     const totalPending = Object.values(notifications).reduce((a, b) => a + b, 0);
+
+    // ── KYC Block Screen ──────────────────────────────────────────────────────
+    if (kycBlocked) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-background" dir="rtl">
+                <div className="max-w-md w-full mx-4 bg-white dark:bg-white/5 border border-red-200 dark:border-red-700/30 rounded-3xl p-10 text-center shadow-2xl">
+                    <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-2xl flex items-center justify-center mx-auto mb-6">
+                        <ShieldAlert size={40} className="text-red-500" />
+                    </div>
+                    <h1 className="text-2xl font-black text-gray-900 dark:text-white mb-2">التحقق من الهوية مطلوب</h1>
+                    <p className="text-gray-500 dark:text-gray-400 text-sm leading-relaxed mb-6">
+                        لا يمكنك الوصول للوحة التحكم قبل إكمال التحقق من هويتك (KYC).
+                        يرجى رفع وثائقك وانتظار موافقة المالك.
+                    </p>
+                    <a href="/kyc/upload"
+                        className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-3 rounded-2xl text-sm transition-all">
+                        رفع وثائق KYC
+                    </a>
+                    <button onClick={() => { logout(); window.location.href = '/'; }}
+                        className="block w-full mt-3 text-xs text-gray-400 hover:text-red-500 font-bold">
+                        تسجيل الخروج
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
@@ -303,6 +369,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
                 {/* Sidebar Content */}
                 <nav className="flex-1 py-4 px-4 space-y-2 overflow-y-auto no-scrollbar">
+                    {/* Owner-only section — يظهر بس للمالك */}
+                    {isOwner && (
+                        <div className="mb-2">
+                            {isOpen && (
+                                <div className="px-4 py-2 mb-1">
+                                    <div className="flex items-center gap-2 text-yellow-400">
+                                        <Crown size={14} />
+                                        <span className="text-[10px] font-black uppercase tracking-widest">Owner Zone</span>
+                                    </div>
+                                </div>
+                            )}
+                            <SidebarGroupComponent group={OWNER_GROUP} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} />
+                            <div className="my-2 mx-4 border-t border-white/10" />
+                        </div>
+                    )}
                     {SIDEBAR_GROUPS.map(group => (
                         <SidebarGroupComponent key={group.title} group={group} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} />
                     ))}

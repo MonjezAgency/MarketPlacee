@@ -4,7 +4,7 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import {
     Building2, CreditCard, ShieldCheck, AlertCircle, CheckCircle2,
-    Eye, EyeOff, Save, Loader2, Lock, Landmark, Plus, Trash2
+    Eye, EyeOff, Save, Loader2, Lock, Landmark, ExternalLink, Zap,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
@@ -37,6 +37,10 @@ export default function PaymentMethodsPage() {
     const [saving, setSaving] = React.useState(false);
     const [toast, setToast] = React.useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
+    // Stripe Connect state
+    const [connectStatus, setConnectStatus] = React.useState<any>(null);
+    const [isConnecting, setIsConnecting] = React.useState(false);
+
     const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : '';
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
 
@@ -50,14 +54,27 @@ export default function PaymentMethodsPage() {
         Promise.all([
             fetch(`${API_URL}/kyc/status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
             fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-        ]).then(([kyc, profile]) => {
+            fetch(`${API_URL}/payments/connect/status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.ok ? r.json() : null),
+        ]).then(([kyc, profile, connect]) => {
             setKycStatus(kyc.kycStatus || 'UNVERIFIED');
-            if (profile?.iban) {
-                setSavedIban(maskIban(profile.iban));
-                setHasBank(true);
-            }
+            if (profile?.iban) { setSavedIban(maskIban(profile.iban)); setHasBank(true); }
+            if (connect) setConnectStatus(connect);
         }).catch(() => {}).finally(() => setLoadingKyc(false));
     }, []);
+
+    const handleStripeConnect = async () => {
+        setIsConnecting(true);
+        try {
+            const res = await fetch(`${API_URL}/payments/connect/onboard`, {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!res.ok) { showToast('error', 'Failed to start Stripe Connect onboarding'); return; }
+            const { url } = await res.json();
+            if (url) window.location.href = url;
+        } catch { showToast('error', 'Connection error. Please try again.'); }
+        finally { setIsConnecting(false); }
+    };
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -277,6 +294,69 @@ export default function PaymentMethodsPage() {
                         </div>
                     </form>
                 )}
+            </div>
+
+            {/* Stripe Connect — Automatic Payouts */}
+            <div className="bg-card border border-border rounded-2xl overflow-hidden">
+                <div className="p-5 border-b border-border flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-[#635BFF]/10 flex items-center justify-center">
+                            <Zap size={20} className="text-[#635BFF]" />
+                        </div>
+                        <div>
+                            <p className="font-black text-sm">Stripe Payouts (Automatic)</p>
+                            <p className="text-xs text-muted-foreground">Receive payments directly after order delivery</p>
+                        </div>
+                    </div>
+                    {connectStatus?.chargesEnabled && (
+                        <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                            <CheckCircle2 size={10} /> Active
+                        </span>
+                    )}
+                </div>
+                <div className="p-5">
+                    {connectStatus?.connected && connectStatus?.chargesEnabled ? (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
+                                <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
+                                <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                                    Your Stripe account is connected and ready to receive payouts.
+                                </p>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                Payouts are automatically processed after order delivery. Platform fee: {process.env.NEXT_PUBLIC_PLATFORM_FEE || '5'}%.
+                            </p>
+                        </div>
+                    ) : connectStatus?.connected && !connectStatus?.chargesEnabled ? (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-xl">
+                                <AlertCircle size={16} className="text-yellow-500 shrink-0" />
+                                <p className="text-sm font-bold text-yellow-600 dark:text-yellow-400">
+                                    Stripe account connected but onboarding incomplete.
+                                </p>
+                            </div>
+                            <button onClick={handleStripeConnect} disabled={isConnecting || kycBlocked}
+                                className="w-full py-3 bg-[#635BFF] text-white rounded-xl font-black text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#5851eb] transition-colors">
+                                {isConnecting ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
+                                Complete Stripe Onboarding
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <p className="text-xs text-muted-foreground">
+                                Connect your Stripe account to receive automatic payouts when orders are delivered. Stripe handles all compliance and identity verification.
+                            </p>
+                            <button onClick={handleStripeConnect} disabled={isConnecting || kycBlocked}
+                                className="w-full py-3 bg-[#635BFF] text-white rounded-xl font-black text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#5851eb] transition-colors">
+                                {isConnecting ? <Loader2 size={16} className="animate-spin" /> : <ExternalLink size={16} />}
+                                Connect with Stripe
+                            </button>
+                            {kycBlocked && (
+                                <p className="text-[10px] text-muted-foreground text-center">Complete KYC verification first to enable Stripe Connect.</p>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Card Payment placeholder */}

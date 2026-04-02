@@ -331,6 +331,42 @@ export class EmailService {
     }
   }
 
+  async sendInvoiceEmail(email: string, name: string, invoiceNumber: string, orderId: string, totalAmount: number, dueDate: Date) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    try {
+      await this.transporter.sendMail({
+        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        to: email,
+        subject: `🧾 Invoice ${invoiceNumber} — Atlantis Marketplace`,
+        html: `
+          <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+            <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid #1BC7C9;">
+              <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+              <p style="color:#B0BCCF; font-size:14px; margin:0;">B2B Marketplace</p>
+            </div>
+            <div style="padding:40px 30px; background:#fff;">
+              <h2 style="color:#0A1A2F; font-size:22px; margin:0 0 16px;">Invoice Ready 🧾</h2>
+              <p style="color:#2E2E2E; font-size:15px; line-height:1.7;">Hello <strong>${name}</strong>, your invoice for order #${orderId.slice(0,8).toUpperCase()} is now available.</p>
+              <div style="background:#F2F4F7; padding:20px; border-radius:12px; margin:20px 0; border-left:4px solid #1BC7C9;">
+                <p style="margin:0; font-size:14px;"><strong>Invoice:</strong> ${invoiceNumber}</p>
+                <p style="margin:8px 0 0; font-size:14px;"><strong>Total:</strong> $${totalAmount.toFixed(2)}</p>
+                <p style="margin:8px 0 0; font-size:14px;"><strong>Due Date:</strong> ${dueDate.toLocaleDateString()}</p>
+              </div>
+              <div style="text-align:center; margin:30px 0;">
+                <a href="${frontendUrl}/dashboard/customer" style="display:inline-block; padding:16px 40px; background:#1BC7C9; color:#fff; text-decoration:none; border-radius:12px; font-weight:800; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Download Invoice →</a>
+              </div>
+            </div>
+            <div style="background:#0A1A2F; padding:20px; text-align:center;">
+              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+            </div>
+          </div>
+        `,
+      });
+    } catch (error) {
+      console.error('SMTP ERROR [sendInvoiceEmail]:', error);
+    }
+  }
+
   async sendEmailOtp(email: string, name: string, code: string) {
     try {
       await this.transporter.sendMail({
@@ -394,6 +430,21 @@ export class EmailService {
     } catch (error) {
       console.error('SMTP ERROR [sendRegistrationConfirmationEmail]:', error);
       throw error;
+    }
+  }
+
+  /** Generic raw email — used by ReportsService and other internal senders */
+  async sendRawEmail(to: string, subject: string, html: string): Promise<void> {
+    try {
+      await this.transporter.sendMail({
+        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        to,
+        subject,
+        html,
+      });
+    } catch (error) {
+      console.error(`SMTP ERROR [sendRawEmail → ${to}]:`, error);
+      // Don't throw — report emails are non-critical
     }
   }
 }

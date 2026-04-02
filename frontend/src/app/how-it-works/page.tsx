@@ -1,134 +1,178 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, ShieldCheck, PackageSearch, CreditCard, Truck, Users, BarChart3, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useLanguage } from '@/contexts/LanguageContext';
+import {
+    ShieldCheck, PackageSearch, CreditCard, Truck,
+    Users, BarChart3, CheckCircle2, ArrowRight, Star,
+    Building2, Zap, Lock, Globe,
+} from 'lucide-react';
 
-const steps = [
-    {
-        icon: Users,
-        titleEn: '1. Create Your Account',
-        titleAr: '١. أنشئ حسابك',
-        descEn: 'Sign up as a Supplier or Customer. Fill in your company details and wait for admin approval to get started.',
-        descAr: 'سجّل كمورد أو عميل. املأ بيانات شركتك وانتظر موافقة الإدارة للبدء.',
-        color: 'from-blue-500 to-cyan-400',
-    },
-    {
-        icon: PackageSearch,
-        titleEn: '2. Browse or List Products',
-        titleAr: '٢. تصفح أو أضف المنتجات',
-        descEn: 'Customers can browse thousands of products across categories. Suppliers can list products individually or via bulk Excel upload.',
-        descAr: 'العملاء يقدروا يتصفحوا آلاف المنتجات. الموردين يقدروا يضيفوا منتجات فردية أو بالجملة عن طريق ملف Excel.',
-        color: 'from-emerald-500 to-teal-400',
-    },
-    {
-        icon: CreditCard,
-        titleEn: '3. Place Orders',
-        titleAr: '٣. اطلب المنتجات',
-        descEn: 'Add products to your cart, review your order, and complete checkout. Minimum order quantities apply for wholesale pricing.',
-        descAr: 'أضف المنتجات للسلة، راجع طلبك، وأكمل الشراء. الحد الأدنى للطلب ينطبق على أسعار الجملة.',
-        color: 'from-violet-500 to-purple-400',
-    },
-    {
-        icon: Truck,
-        titleEn: '4. Track & Receive',
-        titleAr: '٤. تتبع واستلم',
-        descEn: 'Track your order status in real-time from your dashboard. Get notifications at every stage of delivery.',
-        descAr: 'تتبع حالة طلبك في الوقت الفعلي من لوحة التحكم. استلم إشعارات في كل مرحلة من مراحل التوصيل.',
-        color: 'from-orange-500 to-amber-400',
-    },
-    {
-        icon: BarChart3,
-        titleEn: '5. Manage Your Dashboard',
-        titleAr: '٥. إدارة لوحة التحكم',
-        descEn: 'Suppliers get powerful analytics, inventory management, and placement tools. Customers can track orders and manage preferences.',
-        descAr: 'الموردين عندهم تحليلات قوية، إدارة مخزون، وأدوات إعلانية. العملاء يقدروا يتتبعوا طلباتهم',
-        color: 'from-rose-500 to-pink-400',
-    },
-    {
-        icon: ShieldCheck,
-        titleEn: '6. Secure & Trusted',
-        titleAr: '٦. آمن وموثوق',
-        descEn: 'All transactions are secured with military-grade encryption. Smart contracts ensure fair pricing and accountability.',
-        descAr: 'كل المعاملات مأمنة بتشفير عسكري. العقود الذكية تضمن أسعار عادلة ومسؤولية.',
-        color: 'from-sky-500 to-blue-400',
-    },
+const BUYER_STEPS = [
+    { icon: Users, title: 'Create Your Account', desc: 'Register as a buyer. Our team reviews and activates your account within 24 hours.', color: 'text-blue-500 bg-blue-500/10' },
+    { icon: PackageSearch, title: 'Browse & Search', desc: 'Explore thousands of verified products from suppliers across Europe and the Gulf. Filter by category, MOQ, price, and brand.', color: 'text-purple-500 bg-purple-500/10' },
+    { icon: ShieldCheck, title: 'Verify Suppliers', desc: 'Every supplier is KYC-verified before listing. View company details, certifications, and ratings.', color: 'text-emerald-500 bg-emerald-500/10' },
+    { icon: CreditCard, title: 'Pay Securely', desc: 'Checkout with Stripe — card, Apple Pay, Google Pay. Your payment is held in escrow until delivery is confirmed.', color: 'text-primary bg-primary/10' },
+    { icon: Truck, title: 'Track Your Order', desc: 'Real-time status updates from placement to delivery. Download your invoice automatically once delivered.', color: 'text-orange-500 bg-orange-500/10' },
+    { icon: Star, title: 'Review & Repeat', desc: 'Rate your supplier and products. Build long-term B2B relationships with trusted partners.', color: 'text-yellow-500 bg-yellow-500/10' },
+];
+
+const SUPPLIER_STEPS = [
+    { icon: Building2, title: 'Register & Verify', desc: 'Create your supplier account and complete KYC verification with ID and business documents.', color: 'text-blue-500 bg-blue-500/10' },
+    { icon: PackageSearch, title: 'List Your Products', desc: 'Add products with EAN lookup, bulk pricing tiers, MOQ, and warehouse details. Admin reviews within 48 hours.', color: 'text-purple-500 bg-purple-500/10' },
+    { icon: Zap, title: 'Connect Stripe', desc: 'Link your Stripe account for automatic payouts. Funds are released after the buyer confirms delivery.', color: 'text-[#635BFF] bg-[#635BFF]/10' },
+    { icon: BarChart3, title: 'Manage Orders', desc: 'Accept, process, and ship orders from your supplier dashboard. Track earnings and performance analytics.', color: 'text-emerald-500 bg-emerald-500/10' },
+    { icon: Globe, title: 'Grow Your Reach', desc: 'Access buyers across Europe and the Gulf. Boost visibility with sponsored placements and promotions.', color: 'text-orange-500 bg-orange-500/10' },
+];
+
+const FEATURES = [
+    { icon: Lock, title: 'Bank-Grade Security', desc: 'AES-256 encryption for all financial data. PCI DSS compliant payments via Stripe.' },
+    { icon: ShieldCheck, title: 'KYC Verification', desc: 'Every supplier is identity-verified before listing products on the platform.' },
+    { icon: CreditCard, title: 'Escrow Payments', desc: 'Your payment is held securely until delivery is confirmed — zero risk for buyers.' },
+    { icon: Truck, title: 'Logistics Partners', desc: 'Integrated shipping rates from leading European and Gulf carriers.' },
+    { icon: Star, title: 'Verified Reviews', desc: 'Only buyers who purchased can leave reviews — trustworthy ratings guaranteed.' },
+    { icon: BarChart3, title: 'Business Analytics', desc: 'Real-time dashboards for suppliers and buyers to track performance and spending.' },
 ];
 
 export default function HowItWorksPage() {
-    const { locale } = useLanguage();
-    const isAr = locale === 'ar';
-
     return (
-        <div className="min-h-screen bg-background" dir={isAr ? 'rtl' : 'ltr'}>
-            {/* Hero */}
-            <div className="relative bg-gradient-to-br from-[#0A1628] via-[#0F2847] to-[#0A1628] text-white py-24 overflow-hidden">
-                <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
-                <div className="absolute top-1/2 start-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-secondary/10 rounded-full blur-[100px]" />
-                <div className="container mx-auto px-6 relative z-10 text-center">
-                    <motion.div
-                        initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.6 }}
-                    >
-                        <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest mb-6">
-                            <HelpCircle size={14} />
-                            {isAr ? 'دليل المنصة' : 'Platform Guide'}
-                        </div>
-                        <h1 className="text-4xl md:text-6xl font-black tracking-tight mb-6">
-                            {isAr ? 'إزاى تستخدم ' : 'How to use '}
-                            <span className="text-secondary">Atlantis</span>
-                            {isAr ? '؟' : '?'}
-                        </h1>
-                        <p className="text-lg text-white/60 max-w-2xl mx-auto">
-                            {isAr
-                                ? 'منصة أتلانتس هي ماركت بليس B2B لتوزيع المشروبات والمنتجات بالجملة. هنا هتلاقي كل اللي محتاج تعرفه عشان تبدأ.'
-                                : 'Atlantis is a B2B marketplace for wholesale beverage distribution. Here\'s everything you need to know to get started.'}
-                        </p>
-                    </motion.div>
-                </div>
-            </div>
+        <main className="min-h-screen bg-muted/20 pt-20 pb-24">
+            <div className="container mx-auto px-6 max-w-5xl">
+                {/* Hero */}
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="py-16 text-center space-y-6">
+                    <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 px-4 py-1.5 rounded-full text-primary text-xs font-black uppercase tracking-widest">
+                        <CheckCircle2 size={12} /> Built for B2B
+                    </div>
+                    <h1 className="text-5xl font-heading font-black tracking-tight">
+                        How <span className="text-primary">Atlantis</span> Works
+                    </h1>
+                    <p className="text-muted-foreground max-w-2xl mx-auto text-lg leading-relaxed">
+                        A secure B2B marketplace connecting verified suppliers with professional buyers across Europe and the Gulf region.
+                    </p>
+                    <div className="flex items-center justify-center gap-4 flex-wrap pt-2">
+                        <Link href="/auth/register?role=CUSTOMER"
+                            className="h-12 px-8 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm">
+                            Start Buying <ArrowRight size={16} />
+                        </Link>
+                        <Link href="/auth/register?role=SUPPLIER"
+                            className="h-12 px-8 border border-border bg-card font-black rounded-2xl hover:bg-muted transition-colors text-sm">
+                            Become a Supplier
+                        </Link>
+                    </div>
+                </motion.div>
 
-            {/* Steps */}
-            <div className="container mx-auto px-6 py-20">
-                <div className="grid gap-8 max-w-4xl mx-auto">
-                    {steps.map((step, i) => (
-                        <motion.div
-                            key={i}
-                            initial={{ opacity: 0, x: isAr ? 30 : -30 }}
-                            whileInView={{ opacity: 1, x: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: i * 0.1 }}
-                            className="flex items-start gap-6 bg-card border border-border/50 rounded-2xl p-8 hover:shadow-xl transition-shadow group"
-                        >
-                            <div className={`shrink-0 w-14 h-14 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform`}>
-                                <step.icon size={24} />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-black mb-2">{isAr ? step.titleAr : step.titleEn}</h3>
-                                <p className="text-foreground/60 leading-relaxed">{isAr ? step.descAr : step.descEn}</p>
-                            </div>
-                        </motion.div>
-                    ))}
-                </div>
+                {/* For Buyers */}
+                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-20">
+                    <div className="flex items-center gap-3 mb-10">
+                        <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
+                            <Users size={20} className="text-primary" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">For Buyers</p>
+                            <h2 className="text-2xl font-black">How to Purchase</h2>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {BUYER_STEPS.map((step, i) => {
+                            const Icon = step.icon;
+                            return (
+                                <motion.div key={step.title}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.1 + i * 0.07 }}
+                                    className="bg-card border border-border/50 rounded-2xl p-6 space-y-4 hover:border-primary/30 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${step.color}`}>
+                                            <Icon size={18} />
+                                        </div>
+                                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Step {i + 1}</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black mb-1">{step.title}</h3>
+                                        <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                </motion.section>
+
+                {/* For Suppliers */}
+                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mb-20">
+                    <div className="flex items-center gap-3 mb-10">
+                        <div className="w-10 h-10 rounded-2xl bg-[#635BFF]/10 flex items-center justify-center">
+                            <Building2 size={20} className="text-[#635BFF]" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">For Suppliers</p>
+                            <h2 className="text-2xl font-black">How to Start Selling</h2>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {SUPPLIER_STEPS.map((step, i) => {
+                            const Icon = step.icon;
+                            return (
+                                <motion.div key={step.title}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: 0.2 + i * 0.07 }}
+                                    className="bg-card border border-border/50 rounded-2xl p-6 space-y-4 hover:border-primary/30 transition-colors"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${step.color}`}>
+                                            <Icon size={18} />
+                                        </div>
+                                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Step {i + 1}</span>
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black mb-1">{step.title}</h3>
+                                        <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
+                                    </div>
+                                </motion.div>
+                            );
+                        })}
+                    </div>
+                </motion.section>
+
+                {/* Platform Features */}
+                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-20">
+                    <h2 className="text-2xl font-black mb-10 text-center">Why Atlantis?</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {FEATURES.map((f, i) => {
+                            const Icon = f.icon;
+                            return (
+                                <div key={f.title} className="flex gap-4 p-5 bg-card border border-border/50 rounded-2xl">
+                                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                                        <Icon size={18} className="text-primary" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black text-sm mb-1">{f.title}</h3>
+                                        <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </motion.section>
 
                 {/* CTA */}
-                <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    whileInView={{ opacity: 1, y: 0 }}
-                    viewport={{ once: true }}
-                    className="text-center mt-16"
-                >
-                    <Link
-                        href="/"
-                        className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-8 py-4 rounded-full font-bold text-lg hover:bg-primary/90 transition-colors shadow-xl shadow-primary/20"
-                    >
-                        <ArrowLeft size={20} />
-                        {isAr ? 'ارجع للصفحة الرئيسية' : 'Back to Homepage'}
-                    </Link>
+                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
+                    className="bg-card border border-border/50 rounded-3xl p-12 text-center space-y-6">
+                    <h2 className="text-3xl font-black">Ready to get started?</h2>
+                    <p className="text-muted-foreground max-w-md mx-auto">Join thousands of businesses sourcing smarter with Atlantis.</p>
+                    <div className="flex items-center justify-center gap-4 flex-wrap">
+                        <Link href="/auth/register"
+                            className="h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm">
+                            Create Free Account <ArrowRight size={16} />
+                        </Link>
+                        <Link href="/categories"
+                            className="h-12 px-10 border border-border bg-card font-black rounded-2xl hover:bg-muted transition-colors text-sm">
+                            Browse Products
+                        </Link>
+                    </div>
                 </motion.div>
             </div>
-        </div>
+        </main>
     );
 }

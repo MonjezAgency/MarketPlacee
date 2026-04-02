@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 
 @Injectable()
@@ -43,5 +43,13 @@ export class CouponsService {
             },
             orderBy: { createdAt: 'desc' }
         });
+    }
+
+    async validate(code: string) {
+        const coupon = await this.prisma.coupon.findUnique({ where: { code: code.toUpperCase().trim() } });
+        if (!coupon) throw new NotFoundException('Invalid coupon code');
+        if (!coupon.isActive) throw new BadRequestException('Coupon is no longer active');
+        if (new Date() > coupon.expirationDate) throw new BadRequestException('Coupon has expired');
+        return { code: coupon.code, discountPercent: coupon.discountPercent };
     }
 }

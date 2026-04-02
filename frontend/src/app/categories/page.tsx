@@ -6,7 +6,7 @@ import ProductFilters from '@/components/product/ProductFilters';
 import SponsoredProductCard from '@/components/ads/SponsoredProductCard';
 import SponsoredBrandBanner from '@/components/ads/SponsoredBrandBanner';
 import { BRANDS, CATEGORIES_LIST, type Product } from '@/lib/products';
-import { fetchProducts } from '@/lib/api';
+import { fetchProductsWithFilters } from '@/lib/api';
 import { SlidersHorizontal, X, ChevronRight, Package, Search } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,47 +34,50 @@ function CategoriesContent() {
     const [sponsoredBrand, setSponsoredBrand] = useState<any>(null);
     const [sponsoredProducts, setSponsoredProducts] = useState<any[]>([]);
 
-    useEffect(() => {
-        const loadPageData = async () => {
-            const [productsP, brandAdsP, productAdsP] = await Promise.allSettled([
-                fetchProducts(),
-                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/ads?placement=SPONSORED_BRAND').then(res => res.json()),
-                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/ads?placement=SPONSORED_PRODUCT').then(res => res.json())
-            ]);
-
-            if (productsP.status === 'fulfilled') {
-                setProducts(productsP.value);
-            }
-
-            if (brandAdsP.status === 'fulfilled' && brandAdsP.value && brandAdsP.value.length > 0) {
-                const data = brandAdsP.value;
-                const brandItem = data[0].product;
-                const brandName = brandItem.brand || brandItem.supplier?.name || "Premium Selection";
-                setSponsoredBrand({
-                    brandName,
-                    products: data.map((d: any) => d.product)
-                });
-            }
-
-            if (productAdsP.status === 'fulfilled' && productAdsP.value && productAdsP.value.length > 0) {
-                setSponsoredProducts(productAdsP.value.map((d: any) => d.product));
-            }
-
-            setIsLoading(false);
-        };
-
-        loadPageData();
-    }, []);
-
+    // Initialise from URL params on first load
     useEffect(() => {
         const query = searchParams.get('q');
         const brand = searchParams.get('brand');
         const category = searchParams.get('category');
-
         if (query) setLocalQuery(query);
         if (brand) setSelectedBrands(brand.split(','));
         if (category) setSelectedCategories(category.split(','));
     }, [searchParams]);
+
+    // Re-fetch whenever filters change (debounced 400ms for text search)
+    useEffect(() => {
+        setIsLoading(true);
+        const timer = setTimeout(async () => {
+            const sortMap: Record<string, any> = {
+                featured: 'newest', 'price-low': 'price_asc', 'price-high': 'price_desc', name: 'name_asc',
+            };
+            const [productsP, brandAdsP, productAdsP] = await Promise.allSettled([
+                fetchProductsWithFilters({
+                    q: localQuery || undefined,
+                    category: selectedCategories.length === 1 ? selectedCategories[0] : undefined,
+                    brand: selectedBrands.length === 1 ? selectedBrands[0] : undefined,
+                    minPrice: appliedPrice.min || undefined,
+                    maxPrice: appliedPrice.max || undefined,
+                    sort: sortMap[sortBy] || 'newest',
+                }),
+                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/ads?placement=SPONSORED_BRAND').then(res => res.json()),
+                fetch((process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:3001') + '/ads?placement=SPONSORED_PRODUCT').then(res => res.json())
+            ]);
+
+            if (productsP.status === 'fulfilled') setProducts(productsP.value);
+
+            if (brandAdsP.status === 'fulfilled' && brandAdsP.value?.length > 0) {
+                const data = brandAdsP.value;
+                const brandItem = data[0].product;
+                setSponsoredBrand({ brandName: brandItem.brand || brandItem.supplier?.name || 'Premium Selection', products: data.map((d: any) => d.product) });
+            }
+            if (productAdsP.status === 'fulfilled' && productAdsP.value?.length > 0) {
+                setSponsoredProducts(productAdsP.value.map((d: any) => d.product));
+            }
+            setIsLoading(false);
+        }, localQuery ? 400 : 0);
+        return () => clearTimeout(timer);
+    }, [localQuery, selectedCategories, selectedBrands, appliedPrice, sortBy]);
 
     const handleBrandChange = (brand: string) => {
         setSelectedBrands((prev) => prev.includes(brand) ? prev.filter((b) => b !== brand) : [...prev, brand]);
@@ -88,42 +91,25 @@ function CategoriesContent() {
 
     const filteredProducts = useMemo(() => {
         let result = [...products];
-        if (selectedBrands.length > 0) result = result.filter((p) => selectedBrands.includes(p.brand));
-        if (selectedCategories.length > 0) result = result.filter((p) => selectedCategories.includes(p.category));
+
+        // Multi-select filtering (client-side for multiple selections since backend handles single values)
+        if (selectedBrands.length > 1) result = result.filter((p) => selectedBrands.includes(p.brand));
+        if (selectedCategories.length > 1) result = result.filter((p) => selectedCategories.includes(p.category));
 
         if (selectedAudience.length > 0) {
             result = result.filter(p => {
                 const searchStr = (p.name + ' ' + p.brand).toLowerCase();
                 const isMen = searchStr.includes('homme') || searchStr.includes('men') || searchStr.includes('boy') || searchStr.includes('bulldog') || searchStr.includes('diesel') || searchStr.includes('nautica') || searchStr.includes('(m)');
                 const isWomen = searchStr.includes('femme') || searchStr.includes('women') || searchStr.includes('girl') || searchStr.includes('pregnacare') || searchStr.includes('lady') || searchStr.includes('her') || searchStr.includes('(w)') || searchStr.includes('beauty') || searchStr.includes('makeup') || searchStr.includes('mascara') || searchStr.includes('lipstick');
-
                 if (selectedAudience.includes('Men') && isMen) return true;
                 if (selectedAudience.includes('Women') && isWomen) return true;
                 if (selectedAudience.includes('Unisex') && !isMen && !isWomen) return true;
-
                 return false;
             });
         }
 
-        if (appliedPrice.min) result = result.filter((p) => p.price >= parseFloat(appliedPrice.min));
-        if (appliedPrice.max) result = result.filter((p) => p.price <= parseFloat(appliedPrice.max));
-
-        if (localQuery.trim()) {
-            const q = localQuery.toLowerCase();
-            result = result.filter(p =>
-                p.name.toLowerCase().includes(q) ||
-                p.brand.toLowerCase().includes(q) ||
-                p.category.toLowerCase().includes(q)
-            );
-        }
-
-        switch (sortBy) {
-            case 'price-low': result.sort((a, b) => a.price - b.price); break;
-            case 'price-high': result.sort((a, b) => b.price - a.price); break;
-            case 'name': result.sort((a, b) => a.name.localeCompare(b.name)); break;
-        }
         return result;
-    }, [products, selectedBrands, selectedCategories, selectedAudience, appliedPrice, sortBy, localQuery]);
+    }, [products, selectedBrands, selectedCategories, selectedAudience]);
 
     const activeFilters = [...selectedBrands, ...selectedCategories, ...selectedAudience];
 

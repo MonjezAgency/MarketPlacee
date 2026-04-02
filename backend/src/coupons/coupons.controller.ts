@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, UseGuards } from '@nestjs/common';
 import { CouponsService } from './coupons.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -6,12 +6,18 @@ import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('coupons')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
 export class CouponsController {
     constructor(private readonly couponsService: CouponsService) { }
 
+    @Get('validate/:code')
+    @UseGuards(JwtAuthGuard)
+    async validate(@Param('code') code: string) {
+        return this.couponsService.validate(code);
+    }
+
     @Post()
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
     async create(
         @Body() body: { code: string; discountPercent: number; expirationDate: string; placementId: string }
     ) {
@@ -24,6 +30,8 @@ export class CouponsController {
     }
 
     @Get()
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
     async findAll() {
         return this.couponsService.findAll();
     }

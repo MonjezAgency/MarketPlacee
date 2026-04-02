@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import { FinancialAuditService } from '../common/financial-audit.service';
 
 @Injectable()
 export class InvoiceService {
-    constructor(private prisma: PrismaService) {}
+    constructor(
+        private prisma: PrismaService,
+        private audit: FinancialAuditService,
+    ) {}
 
     /**
      * Generate invoice number: INV-YYYYMMDD-XXXX
@@ -50,7 +54,7 @@ export class InvoiceService {
 
         const invoiceNumber = await this.generateInvoiceNumber();
 
-        return this.prisma.invoice.create({
+        const invoice = await this.prisma.invoice.create({
             data: {
                 invoiceNumber,
                 orderId,
@@ -62,6 +66,16 @@ export class InvoiceService {
                 status: 'ISSUED',
             },
         });
+
+        await this.audit.log({
+            eventType: 'INVOICE_GENERATED',
+            orderId,
+            userId:   order.buyerId,
+            amount:   totalAmount,
+            metadata: { invoiceNumber, invoiceId: invoice.id, tax, taxExempt: taxRate === 0 },
+        });
+
+        return invoice;
     }
 
     async getInvoicesByBuyer(buyerId: string) {
