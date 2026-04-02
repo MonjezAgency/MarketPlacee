@@ -9,6 +9,7 @@ interface User {
     phone?: string;
     avatar?: string;
     companyName?: string;
+    company?: string;
     country?: string;
     vatNumber?: string;
     role: string;
