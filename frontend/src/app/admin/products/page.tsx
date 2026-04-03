@@ -43,7 +43,7 @@ function ProductDetailModal({ product, onClose, onApprove, onReject, onDelete, o
     onApprove: (id: string) => void;
     onReject: (id: string) => void;
     onDelete: (id: string) => void;
-    onUpdate: (id: string, data: any) => Promise<void>;
+    onUpdate: (id: string, data: Partial<AdminProduct>) => Promise<void>;
     actionLoading: string | null;
     validationErrors?: string[];
 }) {
@@ -344,7 +344,7 @@ export default function AdminProductsPage() {
         } finally { setActionLoading(null); }
     };
 
-    const handleUpdate = async (id: string, data: any) => {
+    const handleUpdate = async (id: string, data: Partial<AdminProduct>) => {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('bev-token');
@@ -446,7 +446,7 @@ export default function AdminProductsPage() {
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            onClick={() => setActiveTab(tab.id as 'needs_approval' | 'approved' | 'rejected')}
                             className={cn(
                                 "flex items-center gap-3 px-10 py-5 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.1em] transition-all",
                                 activeTab === tab.id
@@ -576,6 +576,6 @@ export default function AdminProductsPage() {
 }
 
 // Helper icons needed by the tabs (already imported most but ensuring they align)
-const ShieldCheck = (props: any) => <CheckCircle {...props} />;
-const ShieldAlert = (props: any) => <XCircle {...props} />;
-const Activity = (props: any) => <BarChart3 {...props} />;
+const ShieldCheck = (props: React.SVGProps<SVGSVGElement>) => <CheckCircle {...props} />;
+const ShieldAlert = (props: React.SVGProps<SVGSVGElement>) => <XCircle {...props} />;
+const Activity = (props: React.SVGProps<SVGSVGElement>) => <BarChart3 {...props} />;

@@ -31,12 +31,12 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     const t = (section: keyof typeof translations['en'], key?: string) => {
         const dict = translations[locale] || translations['en'];
-        const sectionDict = dict[section] as any;
-        if (!key) return sectionDict || '';
+        const sectionDict = dict[section] as Record<string, unknown>;
+        if (!key) return (sectionDict as unknown as string) || '';
 
-        const resolveKey = (d: any, k: string) => {
+        const resolveKey = (d: Record<string, unknown>, k: string): string | undefined => {
             const parts = k.split('.');
-            let current = d;
+            let current: any = d;
             for (const part of parts) {
                 if (current && typeof current === 'object' && part in current) {
                     current = current[part];
@@ -44,7 +44,7 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
                     return undefined;
                 }
             }
-            return current;
+            return typeof current === 'string' ? current : undefined;
         };
 
         const result = resolveKey(sectionDict, key);

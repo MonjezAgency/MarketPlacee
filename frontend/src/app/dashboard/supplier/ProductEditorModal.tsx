@@ -7,33 +7,18 @@ import { createPortal } from 'react-dom';
 import { getCurrencyInfo } from '@/lib/currency';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+import { Product, ProductStatus } from '@/lib/products';
 
 interface VariantGroup {
     name: string;
     values: string[];
 }
 
-interface ProductData {
-    id?: string;
-    name: string;
-    brand: string;
-    price: number;
-    stock: number;
-    image: string;
-    images: string[];
-    category: string;
-    description: string;
-    unit: string;
-    minOrder: number;
-    ean: string;
-    variants: VariantGroup[];
-}
-
 interface ProductEditorModalProps {
     isOpen: boolean;
     onClose: () => void;
-    product?: ProductData | null;
-    onSave: (data: ProductData) => void;
+    product?: Product | null;
+    onSave: (data: Product) => void;
 }
 
 const ALL_CATEGORIES = [
@@ -52,13 +37,15 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { symbol } = getCurrencyInfo(false); // Dynamic for Supplier
 
-    const defaultData: ProductData = {
+    const defaultData: Product = {
+        id: '',
         name: '', brand: '', price: 0, stock: 0, image: '', images: [],
         category: 'Beverages', description: '', unit: 'Case (24 units)',
-        minOrder: 1, ean: '', variants: []
+        minOrder: 1, ean: '', variants: [], inStock: true,
+        status: ProductStatus.PENDING
     };
 
-    const [formData, setFormData] = useState<ProductData>(defaultData);
+    const [formData, setFormData] = useState<Product>(defaultData);
     const [newVariantName, setNewVariantName] = useState('');
     const [newVariantValue, setNewVariantValue] = useState<{ [key: number]: string }>({});
 
@@ -68,7 +55,7 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
                 ...defaultData,
                 ...product,
                 // Show supplier's original price (basePrice), not the customer-facing marked-up price
-                price: (product as any).basePrice ?? product.price,
+                price: product.basePrice ?? product.price,
                 variants: product.variants || [],
                 images: product.images || [],
             });
@@ -111,9 +98,9 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
                         ctx.drawImage(img, 0, 0, width, height);
                         const compressedDataUrl = canvas.toDataURL('image/webp', 0.8);
                         // Use functional update to avoid stale closure overwriting other fields
-                        setFormData(prev => ({ ...prev, image: compressedDataUrl }));
+                        setFormData((prev: Product) => ({ ...prev, image: compressedDataUrl }));
                     } else {
-                        setFormData(prev => ({ ...prev, image: reader.result as string }));
+                        setFormData((prev: Product) => ({ ...prev, image: reader.result as string }));
                     }
                 };
                 img.src = reader.result as string;
@@ -126,7 +113,7 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         if (!newVariantName.trim()) return;
         setFormData({
             ...formData,
-            variants: [...formData.variants, { name: newVariantName.trim(), values: [] }]
+            variants: [...(formData.variants || []), { name: newVariantName.trim(), values: [] }]
         });
         setNewVariantName('');
     };
@@ -134,14 +121,14 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
     const removeVariantGroup = (index: number) => {
         setFormData({
             ...formData,
-            variants: formData.variants.filter((_, i) => i !== index)
+            variants: (formData.variants || []).filter((_: any, i: number) => i !== index)
         });
     };
 
     const addVariantValue = (groupIndex: number) => {
         const value = newVariantValue[groupIndex]?.trim();
         if (!value) return;
-        const updated = [...formData.variants];
+        const updated = [...(formData.variants || [])];
         if (!updated[groupIndex].values.includes(value)) {
             updated[groupIndex] = {
                 ...updated[groupIndex],
@@ -153,10 +140,10 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
     };
 
     const removeVariantValue = (groupIndex: number, valueIndex: number) => {
-        const updated = [...formData.variants];
+        const updated = [...(formData.variants || [])];
         updated[groupIndex] = {
             ...updated[groupIndex],
-            values: updated[groupIndex].values.filter((_, i) => i !== valueIndex)
+            values: updated[groupIndex].values.filter((_: any, i: number) => i !== valueIndex)
         };
         setFormData({ ...formData, variants: updated });
     };
@@ -428,7 +415,7 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
                                     <p className="text-xs text-muted-foreground -mt-4">Add options like Size, Color, Material, Flavor, etc.</p>
 
                                     {/* Existing Variant Groups */}
-                                    {formData.variants.map((group, gi) => (
+                                    {(formData.variants || []).map((group: any, gi: number) => (
                                         <div key={gi} className="p-4 bg-background rounded-2xl border border-border/50 space-y-3">
                                             <div className="flex items-center justify-between">
                                                 <span className="text-sm font-black text-foreground uppercase tracking-wider">{group.name}</span>
@@ -437,7 +424,7 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
                                                 </button>
                                             </div>
                                             <div className="flex flex-wrap gap-2">
-                                                {group.values.map((val, vi) => (
+                                                {group.values.map((val: string, vi: number) => (
                                                     <span key={vi} className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-xs font-bold px-3 py-1.5 rounded-full">
                                                         {val}
                                                         <button type="button" onClick={() => removeVariantValue(gi, vi)} className="hover:text-destructive transition-colors">

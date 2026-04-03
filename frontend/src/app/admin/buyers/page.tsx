@@ -127,7 +127,7 @@ export default function AdminBuyersPage() {
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as any)}
+                            onClick={() => setActiveTab(tab.id as 'ALL' | 'ACTIVE' | 'PENDING')}
                             className={cn(
                                 "flex items-center gap-3 px-8 py-4 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.1em] transition-all",
                                 activeTab === tab.id

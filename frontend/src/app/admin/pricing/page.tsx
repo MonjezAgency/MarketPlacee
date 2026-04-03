@@ -47,7 +47,7 @@ export default function AdminPricingPage() {
                 const data = await res.json();
                 if (data.markup && typeof data.markup === 'object') {
                     // Filter out piece if it exists in the data from backend
-                    const { piece, ...filtered } = data.markup as any;
+                    const { piece, ...filtered } = data.markup as MarkupData & { piece?: number };
                     setCurrentMarkup(filtered);
                     setNewMarkup(filtered);
                 } else if (typeof data.markup === 'number') {

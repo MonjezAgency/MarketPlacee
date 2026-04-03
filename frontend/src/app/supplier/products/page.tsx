@@ -23,34 +23,19 @@ import {
     ShieldAlert
 } from 'lucide-react';
 import Link from 'next/link';
-import { CATEGORIES_LIST } from '@/lib/products';
+import { CATEGORIES_LIST, Product, ProductStatus } from '@/lib/products';
 import { fetchMyProducts } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import ProductEditorModal from '@/app/dashboard/supplier/ProductEditorModal';
 
-interface SupplierProduct {
-    id: string;
-    name: string;
-    description: string;
-    price: number;       // customer-facing price (with markup) — never shown to supplier
-    basePrice?: number;  // supplier's original price — what they set and what they get paid
-    stock: number;
-    category: string;
-    images: string[];
-    status: string;
-    ean?: string;
-    minOrder?: number;
-    unit?: string;
-}
-
 export default function SupplierProductsPage() {
     const { user } = useAuth();
-    const [products, setProducts] = React.useState<SupplierProduct[]>([]);
+    const [products, setProducts] = React.useState<Product[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [searchTerm, setSearchTerm] = React.useState('');
     const [selectedCategory, setSelectedCategory] = React.useState('All');
     const [isEditorOpen, setIsEditorOpen] = React.useState(false);
-    const [editingProduct, setEditingProduct] = React.useState<SupplierProduct | null>(null);
+    const [editingProduct, setEditingProduct] = React.useState<Product | null>(null);
 
     const [isBulkModalOpen, setIsBulkModalOpen] = React.useState(false);
     const [bulkFile, setBulkFile] = React.useState<File | null>(null);
@@ -77,7 +62,7 @@ export default function SupplierProductsPage() {
         try {
             const token = localStorage.getItem('bev-token') || '';
             const data = await fetchMyProducts(token);
-            setProducts(data as any);
+            setProducts(data as Product[]);
         } catch (error) {
             console.error('Failed to fetch products:', error);
         } finally {
@@ -213,7 +198,7 @@ export default function SupplierProductsPage() {
 
     const filteredProducts = products.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (p.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             p.ean?.includes(searchTerm);
         const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
         return matchesSearch && matchesCategory;
@@ -311,8 +296,8 @@ export default function SupplierProductsPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
                     { label: 'Total Listings', value: products.length, icon: Archive, color: 'text-primary' },
-                    { label: 'Active', value: products.filter(p => p.status === 'ACTIVE').length, icon: CheckCircle2, color: 'text-emerald-500' },
-                    { label: 'Pending', value: products.filter(p => p.status === 'PENDING').length, icon: Box, color: 'text-amber-500' },
+                    { label: 'Active', value: products.filter(p => p.status === ProductStatus.APPROVED).length, icon: CheckCircle2, color: 'text-emerald-500' },
+                    { label: 'Pending', value: products.filter(p => p.status === ProductStatus.PENDING).length, icon: Box, color: 'text-amber-500' },
                     { label: 'Categories', value: new Set(products.map(p => p.category)).size, icon: Tag, color: 'text-blue-500' },
                 ].map((stat, idx) => (
                     <div key={idx} className="bg-card border border-border/50 rounded-2xl p-6 shadow-sm">
@@ -485,7 +470,7 @@ export default function SupplierProductsPage() {
                 isOpen={isEditorOpen}
                 onClose={() => setIsEditorOpen(false)}
                 onSave={handleSaveProduct}
-                product={editingProduct as any || undefined}
+                product={editingProduct as any}
             />
 
             {/* Bulk Upload Modal */}

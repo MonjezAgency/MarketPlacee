@@ -14,13 +14,23 @@ export interface Product {
     unit: string;
     minOrder: number;
     image: string;
+    images: string[];
+    stock: number;
     inStock: boolean;
     category: string;
     ean?: string;
     bulkSave?: boolean;
     rating?: number;
     reviews?: number;
+    reviewsCount?: number;
+    isNew?: boolean;
+    description?: string;
+    supplier?: {
+        name: string;
+        companyName?: string;
+    };
     status: ProductStatus;
+    variants?: { name: string; values: string[] }[];
 }
 
 export const PRODUCTS: Product[] = [
@@ -32,6 +42,8 @@ export const PRODUCTS: Product[] = [
         "unit": "unit",
         "minOrder": 10,
         "image": "https://i5.walmartimages.com/asr/1d59b00e-1a8a-4366-813c-18ebc89e8732_1.e0f382fc8bab087977b36b6efd8339b6.jpeg?odnHeight=450&odnWidth=450&odnBg=ffffff",
+        "images": [],
+        "stock": 100,
         "inStock": true,
         "category": "Personal Care",
         "ean": "4005800019876",
@@ -45,6 +57,8 @@ export const PRODUCTS: Product[] = [
         "unit": "unit",
         "minOrder": 10,
         "image": "https://images.openfoodfacts.org/images/products/502/126/523/2062/front_en.14.400.jpg",
+        "images": [],
+        "stock": 50,
         "inStock": true,
         "category": "Personal Care",
         "ean": "5021265232062",

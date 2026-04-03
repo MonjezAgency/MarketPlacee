@@ -61,8 +61,9 @@ export default function AdminOrdersPage() {
                 body: JSON.stringify({ status })
             });
             if (res.ok) {
-                setOrders(prev => prev.map(o => o.id === id ? { ...o, status: status as any } : o));
-                if (selectedOrder?.id === id) setSelectedOrder(prev => prev ? { ...prev, status: status as any } : null);
+                const newStatus = status as 'PENDING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+                setOrders(prev => prev.map(o => o.id === id ? { ...o, status: newStatus } : o));
+                if (selectedOrder?.id === id) setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
             }
         } catch (err) { console.error(err); }
     };

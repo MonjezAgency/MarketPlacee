@@ -33,7 +33,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const displayPrice = isOwnProduct && product.basePrice ? product.basePrice : product.price;
 
     const rating = product.rating || 0;
-    const reviews = (product as any).reviewsCount || 0;
+    const reviews = product.reviewsCount || 0;
     const isBestSeller = index % 4 === 0;
 
     const handleAddToCart = (e: React.MouseEvent) => {

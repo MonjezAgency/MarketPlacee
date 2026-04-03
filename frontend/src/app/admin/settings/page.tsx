@@ -99,7 +99,7 @@ export default function AdminSettingsPage() {
             reader.onloadend = () => {
                 const base64String = reader.result as string;
                 setAvatar(base64String);
-                updateUser({ avatar: base64String } as any); // Type cast since avatar might not be in User interface yet but we want to store it
+                updateUser({ avatar: base64String });
                 showToast('success', 'Avatar updated!');
             };
             reader.readAsDataURL(file);

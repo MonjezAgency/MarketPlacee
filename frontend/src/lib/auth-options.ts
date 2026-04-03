@@ -1,6 +1,7 @@
 import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import type { NextAuthOptions } from 'next-auth';
+import type { GoogleProfile } from 'next-auth/providers/google';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
@@ -12,7 +13,8 @@ export const authOptions: NextAuthOptions = {
         }),
     ],
     callbacks: {
-        async jwt({ token, account, profile }) {
+        async jwt({ token, account, profile: rawProfile }) {
+            const profile = rawProfile as GoogleProfile;
             if (account?.provider === 'google' && profile) {
                 try {
                     const res = await fetch(`${API_URL}/auth/google`, {
@@ -21,8 +23,8 @@ export const authOptions: NextAuthOptions = {
                         body: JSON.stringify({
                             email: profile.email,
                             name: profile.name,
-                            avatar: (profile as any).picture,
-                            googleId: (profile as any).sub,
+                            avatar: profile.picture,
+                            googleId: profile.sub,
                         }),
                     });
                     if (res.ok) {

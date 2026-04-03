@@ -20,11 +20,14 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+type OfferType = 'Flash Sale' | 'Bundle' | 'Discount';
+type OfferSlot = 'HERO' | 'FEATURED' | 'BANNER' | 'LISTING';
+
 interface OfferPlacement {
     id: string;
     title: string;
-    type: 'Flash Sale' | 'Bundle' | 'Discount';
-    slot: 'HERO' | 'FEATURED' | 'BANNER' | 'LISTING';
+    type: OfferType;
+    slot: OfferSlot;
     price: number;
     status: 'ACTIVE' | 'PENDING' | 'REJECTED' | 'EXPIRED';
     startDate?: string;
@@ -77,14 +80,22 @@ export default function SupplierOffersPage() {
 
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [editingId, setEditingId] = React.useState<string | null>(null);
-    const [formData, setFormData] = React.useState({
+    const [formData, setFormData] = React.useState<{
+        title: string;
+        type: OfferType;
+        slot: OfferSlot;
+        startDate: string;
+        startTime: string;
+        expiry: string;
+        image: File | null;
+    }>({
         title: '',
-        type: 'Discount' as any,
-        slot: 'FEATURED' as 'HERO' | 'FEATURED' | 'BANNER' | 'LISTING',
+        type: 'Discount',
+        slot: 'FEATURED',
         startDate: '',
         startTime: '',
         expiry: '',
-        image: null as File | null
+        image: null
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -131,7 +142,7 @@ export default function SupplierOffersPage() {
     const openEditModal = (offer: OfferPlacement) => {
         setFormData({
             title: offer.title,
-            type: offer.type as any,
+            type: offer.type,
             slot: offer.slot,
             startDate: offer.startDate || '',
             startTime: offer.startTime || '',
@@ -341,7 +352,7 @@ export default function SupplierOffersPage() {
                                         <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Offer Type</label>
                                         <select
                                             value={formData.type}
-                                            onChange={e => setFormData({ ...formData, type: e.target.value as any })}
+                                            onChange={e => setFormData({ ...formData, type: e.target.value as OfferType })}
                                             className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium appearance-none"
                                         >
                                             <option value="Discount">Percentage Discount</option>
@@ -353,7 +364,7 @@ export default function SupplierOffersPage() {
                                         <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Placement Slot</label>
                                         <select
                                             value={formData.slot}
-                                            onChange={e => setFormData({ ...formData, slot: e.target.value as any })}
+                                            onChange={e => setFormData({ ...formData, slot: e.target.value as OfferSlot })}
                                             className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium appearance-none"
                                         >
                                             <option value="HERO">Hero Slot ($500)</option>

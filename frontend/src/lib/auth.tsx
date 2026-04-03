@@ -12,6 +12,8 @@ export interface User {
     company?: string;
     country?: string;
     vatNumber?: string;
+    website?: string;
+    socialLinks?: string;
     role: string;
     status: 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED' | 'BLOCKED';
 }

@@ -68,14 +68,14 @@ export default function ProductDetailClient() {
     useEffect(() => {
         if (currentProduct) {
             setLocalRating(currentProduct.rating || 0);
-            setLocalReviewsCount((currentProduct as any).reviewsCount || 0);
+            setLocalReviewsCount(currentProduct.reviewsCount || 0);
 
             if (locale !== 'en') {
                 translateText(currentProduct.name, locale).then(setTranslatedName);
-                translateText((currentProduct as any).description || '', locale).then(setTranslatedDesc);
+                translateText(currentProduct.description || '', locale).then(setTranslatedDesc);
             } else {
                 setTranslatedName(currentProduct.name);
-                setTranslatedDesc((currentProduct as any).description || '');
+                setTranslatedDesc(currentProduct.description || '');
             }
         }
     }, [locale, currentProduct]);
@@ -205,13 +205,13 @@ export default function ProductDetailClient() {
 
                             {/* Floating Badges */}
                             <div className="absolute top-8 start-8 flex flex-col gap-3 z-20">
-                                {(product as any).isNew && (
+                                {product.isNew && (
                                     <span className="bg-primary text-[#131921] text-[10px] font-black px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 tracking-widest uppercase">
                                         <Sparkles size={14} className="text-[#131921]" />
                                         Batch: New Arrival
                                     </span>
                                 )}
-                                {(product as any).bulkSave && (
+                                {product.bulkSave && (
                                     <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-4 py-2 rounded-xl shadow-lg tracking-widest uppercase flex items-center gap-2">
                                         <Truck size={14} />
                                         Wholesale Verified

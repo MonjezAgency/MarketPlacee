@@ -87,7 +87,7 @@ function KycBadge({ status }: { status: string }) {
 }
 
 // ── Stat Card ─────────────────────────────────────────────────────────────────
-function StatCard({ icon: Icon, label, value, sub, color }: any) {
+function StatCard({ icon: Icon, label, value, sub, color }: { icon: any; label: string; value: string | number; sub?: string; color: string }) {
     return (
         <div className="bg-white dark:bg-white/5 rounded-2xl p-5 border border-gray-100 dark:border-white/10 flex items-center gap-4">
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${color}`}>
@@ -103,7 +103,7 @@ function StatCard({ icon: Icon, label, value, sub, color }: any) {
 }
 
 // ── Member Permission Editor ───────────────────────────────────────────────────
-function MemberCard({ member, onSave, onSuspend, onActivate, onKycApprove, onKycReject }: any) {
+function MemberCard({ member, onSave, onSuspend, onActivate, onKycApprove, onKycReject }: { member: any; onSave: any, onSuspend: any, onActivate: any, onKycApprove: any, onKycReject: any }) {
     const [expanded, setExpanded] = useState(false);
     const [perms, setPerms] = useState<string[]>(Array.isArray(member.permissions) ? member.permissions : []);
     const [saving, setSaving] = useState(false);
@@ -390,7 +390,7 @@ export default function OwnerDashboard() {
                 ].map(tab => (
                     <button
                         key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
+                        onClick={() => setActiveTab(tab.id as 'overview' | 'team' | 'audit')}
                         className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all ${
                             activeTab === tab.id
                                 ? 'bg-white dark:bg-white/10 text-blue-600 shadow-sm'

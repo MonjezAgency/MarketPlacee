@@ -177,7 +177,7 @@ export default function AdminInvitePage() {
                                 {['supplier', 'customer'].map((r) => (
                                     <button
                                         key={r}
-                                        onClick={() => setRole(r as any)}
+                                        onClick={() => setRole(r as 'supplier' | 'customer')}
                                         className={cn(
                                             "flex-1 py-4 rounded-xl font-black text-sm border transition-all uppercase tracking-tighter",
                                             role === r

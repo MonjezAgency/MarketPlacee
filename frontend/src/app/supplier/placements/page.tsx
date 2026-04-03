@@ -190,7 +190,7 @@ export default function SupplierPlacementsPage() {
                                         <label className="text-[11px] font-black text-white/30 uppercase tracking-widest">Placement Slot</label>
                                         <select
                                             value={formData.slot}
-                                            onChange={e => setFormData({ ...formData, slot: e.target.value as any })}
+                                            onChange={e => setFormData({ ...formData, slot: e.target.value as 'HERO' | 'FEATURED' | 'BANNER' })}
                                             className="w-full h-14 bg-white/5 rounded-xl border border-white/5 px-6 outline-none focus:border-primary/50 text-white font-medium appearance-none"
                                         >
                                             <option value="HERO">Hero Slot</option>
