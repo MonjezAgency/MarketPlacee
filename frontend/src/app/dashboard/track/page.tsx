@@ -20,7 +20,7 @@ export default function TrackOrderPage() {
         setLoading(true);
         setError('');
         try {
-            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/shipments/track?number=${searchNum}`);
+            const res = await axios.get(`/api/shipments/track?number=${searchNum}`);
             setShipment(res.data);
         } catch (err) {
             setError('Shipment not found. Please check your tracking number.');

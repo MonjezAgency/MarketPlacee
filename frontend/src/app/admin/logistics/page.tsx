@@ -14,7 +14,7 @@ export default function AdminShipmentsPage() {
 
     const fetchShipments = async () => {
         try {
-            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/shipments/admin/all`, {
+            const res = await axios.get(`/api/shipments/admin/all`, {
                 headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
             });
             setShipments(res.data);
@@ -128,7 +128,7 @@ export default function AdminShipmentsPage() {
                                 key={s.id}
                                 className="hover:bg-accent/5 transition-colors group cursor-pointer"
                                 onClick={async () => {
-                                    const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/shipments/track?number=${s.trackingNumber}`);
+                                    const res = await axios.get(`/api/shipments/track?number=${s.trackingNumber}`);
                                     setSelectedShipment(res.data);
                                 }}
                             >
@@ -167,7 +167,7 @@ export default function AdminShipmentsPage() {
                                     <button
                                         onClick={async (e) => {
                                             e.stopPropagation();
-                                            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/shipments/track?number=${s.trackingNumber}`);
+                                            const res = await axios.get(`/api/shipments/track?number=${s.trackingNumber}`);
                                             setSelectedShipment(res.data);
                                         }}
                                         className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg text-xs font-bold hover:scale-105 transition-transform"

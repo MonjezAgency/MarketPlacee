@@ -75,7 +75,7 @@ export default function GoogleSyncPage() {
     return (
         <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
             <div className="text-center">
-                <div className="w-16 h-16 border-4 border-[#FF8A00]/20 border-t-[#FF8A00] rounded-full animate-spin mx-auto mb-6" />
+                <div className="w-16 h-16 border-4 border-[#1BC7C9]/20 border-t-[#1BC7C9] rounded-full animate-spin mx-auto mb-6" />
                 <p className="text-[#0A1A2F] font-black text-sm uppercase tracking-[0.3em]">Syncing Account</p>
                 <p className="text-slate-400 text-xs mt-2">Connecting to Atlantis...</p>
             </div>

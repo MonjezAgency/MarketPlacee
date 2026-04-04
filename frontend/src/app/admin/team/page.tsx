@@ -57,7 +57,7 @@ export default function AdminTeamPage() {
                 return;
             }
 
-            const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/admin/team`, {
+            const res = await axios.get(`/api/admin/team`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             const members: TeamMember[] = (res.data || []).map((u: any) => ({
@@ -92,7 +92,7 @@ export default function AdminTeamPage() {
                 return;
             }
 
-            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/admin/team/invite`, newMember, {
+            await axios.post(`/api/admin/team/invite`, newMember, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             toast.success('Invitation sent successfully!');
@@ -158,7 +158,7 @@ export default function AdminTeamPage() {
         if (!confirm(`Are you sure you want to remove ${member.name} from the team?`)) return;
         try {
             const token = localStorage.getItem('bev-token');
-            await axios.delete(`${process.env.NEXT_PUBLIC_API_URL}/admin/team/${member.id}`, {
+            await axios.delete(`/api/admin/team/${member.id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             toast.success(`${member.name} has been removed from the team`);

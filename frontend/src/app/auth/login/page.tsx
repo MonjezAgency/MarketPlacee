@@ -89,12 +89,12 @@ export default function LoginPage() {
             {/* Left Side: Brand Visual Panel */}
             <div className="hidden lg:flex lg:w-1/2 relative bg-[#0A1A2F] items-center justify-center p-12 overflow-hidden">
                 {/* Decorative Elements */}
-                <div className="absolute top-0 end-0 w-[800px] h-[800px] bg-[#FF8A00] opacity-[0.05] blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
+                <div className="absolute top-0 end-0 w-[800px] h-[800px] bg-[#1BC7C9] opacity-[0.05] blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
                 <div className="absolute bottom-0 start-0 w-[600px] h-[600px] bg-blue-500 opacity-[0.03] blur-[100px] rounded-full translate-y-1/2 -translate-x-1/2" />
 
                 <div className="relative z-10 max-w-lg">
                     <div className="mb-12">
-                        <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#FF8A00] bg-[#FF8A00]/10 px-4 py-2 rounded-full">
+                        <span className="text-[10px] font-black uppercase tracking-[0.4em] text-[#1BC7C9] bg-[#1BC7C9]/10 px-4 py-2 rounded-full">
                             {t('auth', 'enterpriseB2B')}
                         </span>
                     </div>
@@ -126,7 +126,7 @@ export default function LoginPage() {
                         <div className="space-y-4">
                             <div className="h-4 w-full bg-white/5 rounded-full" />
                             <div className="h-4 w-3/4 bg-white/5 rounded-full" />
-                            <div className="h-8 w-1/4 bg-[#FF8A00]/20 rounded-full mt-6" />
+                            <div className="h-8 w-1/4 bg-[#1BC7C9]/20 rounded-full mt-6" />
                         </div>
                     </div>
                 </div>
@@ -144,7 +144,7 @@ export default function LoginPage() {
                     <div className="lg:hidden mb-12 text-center">
                         <Link href="/" className="inline-block group">
                             <span className="font-heading font-black text-4xl tracking-tighter text-[#0A1A2F]">
-                                Atlan<span className="text-[#FF8A00]">tis</span>
+                                Atlan<span className="text-[#1BC7C9]">tis</span>
                             </span>
                         </Link>
                     </div>
@@ -188,7 +188,7 @@ export default function LoginPage() {
                                         value={twoFACode}
                                         onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ''))}
                                         placeholder="000000"
-                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] ps-14 pe-6 py-5 text-2xl text-[#0A1A2F] font-black tracking-[0.5em] text-center outline-none focus:border-[#FF8A00]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-200 placeholder:tracking-normal"
+                                        className="w-full bg-slate-50 border-2 border-slate-100 rounded-[24px] ps-14 pe-6 py-5 text-2xl text-[#0A1A2F] font-black tracking-[0.5em] text-center outline-none focus:border-[#1BC7C9]/30 focus:shadow-[0_0_0_8px_rgba(27,199,201,0.05)] transition-all placeholder:text-slate-200 placeholder:tracking-normal"
                                     />
                                 </div>
                             </div>
@@ -196,7 +196,7 @@ export default function LoginPage() {
                             <button
                                 type="submit"
                                 disabled={loading || twoFACode.length < 6}
-                                className="group relative w-full h-[72px] bg-[#0A1A2F] hover:bg-[#FF8A00] text-white rounded-[24px] font-black text-sm tracking-[0.2em] uppercase overflow-hidden transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#FF8A00]/20"
+                                className="group relative w-full h-[72px] bg-[#0A1A2F] hover:bg-[#1BC7C9] text-white rounded-[24px] font-black text-sm tracking-[0.2em] uppercase overflow-hidden transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#1BC7C9]/20"
                             >
                                 <div className="flex items-center justify-center gap-3">
                                     {loading ? (
@@ -225,14 +225,14 @@ export default function LoginPage() {
                         <div className="space-y-2">
                             <label className="block text-[10px] md:text-xs font-black text-slate-400 tracking-widest uppercase mb-2 ms-1">{t('auth', 'emailLabel')}</label>
                             <div className="relative">
-                                <Mail className="absolute start-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#FF8A00] transition-colors" size={20} />
+                                <Mail className="absolute start-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1BC7C9] transition-colors" size={20} />
                                 <input
                                     type="email"
                                     required
                                     value={email}
                                     onChange={(e) => setEmail(e.target.value)}
                                     placeholder="name@atlantis.com"
-                                    className="w-full bg-white sm:bg-slate-50 border-2 border-slate-100 rounded-xl sm:rounded-[24px] ps-14 pe-6 py-4 md:py-5 text-sm md:text-base text-[#0A1A2F] font-bold outline-none focus:border-[#FF8A00]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300"
+                                    className="w-full bg-white sm:bg-slate-50 border-2 border-slate-100 rounded-xl sm:rounded-[24px] ps-14 pe-6 py-4 md:py-5 text-sm md:text-base text-[#0A1A2F] font-bold outline-none focus:border-[#1BC7C9]/30 focus:shadow-[0_0_0_8px_rgba(27,199,201,0.05)] transition-all placeholder:text-slate-300"
                                 />
                             </div>
                         </div>
@@ -240,17 +240,17 @@ export default function LoginPage() {
                         <div className="relative group">
                             <div className="flex justify-between items-center mb-2 md:mb-3 ms-1 pe-1">
                                 <label className="block text-[10px] md:text-xs font-black text-slate-400 tracking-widest uppercase">{t('auth', 'passwordLabel')}</label>
-                                <a href="/auth/forgot-password" className="text-[10px] md:text-xs font-black text-[#FF8A00] tracking-widest uppercase hover:text-[#0A1A2F] transition-colors">{t('auth', 'recovery')}</a>
+                                <a href="/auth/forgot-password" className="text-[10px] md:text-xs font-black text-[#1BC7C9] tracking-widest uppercase hover:text-[#0A1A2F] transition-colors">{t('auth', 'recovery')}</a>
                             </div>
                             <div className="relative">
-                                <Lock className="absolute start-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#FF8A00] transition-colors" size={20} />
+                                <Lock className="absolute start-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-[#1BC7C9] transition-colors" size={20} />
                                 <input
                                     type={showPass ? 'text' : 'password'}
                                     required
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
-                                    className="w-full bg-white sm:bg-slate-50 border-2 border-slate-100 rounded-xl sm:rounded-[24px] ps-14 pe-14 py-4 md:py-5 text-sm md:text-base text-[#0A1A2F] font-bold outline-none focus:border-[#FF8A00]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300 tracking-[0.2em] focus:tracking-normal"
+                                    className="w-full bg-white sm:bg-slate-50 border-2 border-slate-100 rounded-xl sm:rounded-[24px] ps-14 pe-14 py-4 md:py-5 text-sm md:text-base text-[#0A1A2F] font-bold outline-none focus:border-[#1BC7C9]/30 focus:shadow-[0_0_0_8px_rgba(27,199,201,0.05)] transition-all placeholder:text-slate-300 tracking-[0.2em] focus:tracking-normal"
                                 />
                                 <button
                                     type="button"
@@ -265,7 +265,7 @@ export default function LoginPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="group relative w-full h-14 md:h-[72px] bg-[#0A1A2F] hover:bg-[#FF8A00] text-white rounded-xl sm:rounded-[24px] font-black text-xs md:text-sm tracking-[0.2em] uppercase overflow-hidden transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#FF8A00]/20"
+                            className="group relative w-full h-14 md:h-[72px] bg-[#0A1A2F] hover:bg-[#1BC7C9] text-white rounded-xl sm:rounded-[24px] font-black text-xs md:text-sm tracking-[0.2em] uppercase overflow-hidden transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#1BC7C9]/20"
                         >
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                             <div className="flex items-center justify-center gap-3">
@@ -307,7 +307,7 @@ export default function LoginPage() {
                     <div className="mt-8 text-center">
                         <p className="text-[#64748B] font-medium text-sm">
                             {t('auth', 'partnershipInquiry')}{' '}
-                            <Link href="/auth/register" className="text-[#FF8A00] font-black hover:underline ms-1 uppercase text-xs tracking-widest">
+                            <Link href="/auth/register" className="text-[#1BC7C9] font-black hover:underline ms-1 uppercase text-xs tracking-widest">
                                 {t('auth', 'createBrandProfile')}
                             </Link>
                         </p>

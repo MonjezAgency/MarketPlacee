@@ -156,7 +156,7 @@ function RegisterForm() {
         eu => form.country.toLowerCase().includes(eu.toLowerCase())
     );
 
-    const inputClass = "w-full bg-slate-50 border-2 border-slate-50 rounded-[20px] px-6 py-4 text-[#0A1A2F] text-sm font-bold outline-none focus:bg-white focus:border-[#FF8A00]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300";
+    const inputClass = "w-full bg-slate-50 border-2 border-slate-50 rounded-[20px] px-6 py-4 text-[#0A1A2F] text-sm font-bold outline-none focus:bg-white focus:border-[#1BC7C9]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300";
     const labelClass = "text-[10px] font-black uppercase tracking-[0.2em] text-[#0A1A2F]/40 ms-2";
 
     return (
@@ -168,17 +168,17 @@ function RegisterForm() {
                 transition={{ duration: 0.8, ease: "easeOut" }}
                 className="hidden lg:flex lg:w-[40%] relative bg-[#0A1A2F] items-center justify-center p-16 overflow-hidden"
             >
-                <div className="absolute top-0 start-0 w-full h-full bg-gradient-to-br from-[#FF8A00]/10 via-transparent to-blue-500/5" />
+                <div className="absolute top-0 start-0 w-full h-full bg-gradient-to-br from-[#1BC7C9]/10 via-transparent to-blue-500/5" />
 
                 <div className="relative z-10 space-y-12">
                     <Link href="/" className="inline-block mb-12">
                         <span className="font-heading font-black text-4xl tracking-tighter text-white">
-                            Atlan<span className="text-[#FF8A00]">tis</span>
+                            Atlan<span className="text-[#1BC7C9]">tis</span>
                         </span>
                     </Link>
 
                     <div className="space-y-6">
-                        <h2 className="text-4xl font-black text-white leading-tight">Scale Your <span className="text-[#FF8A00]">Distribution</span> Globally.</h2>
+                        <h2 className="text-4xl font-black text-white leading-tight">Scale Your <span className="text-[#1BC7C9]">Distribution</span> Globally.</h2>
                         <p className="text-[#B0B0C8] text-lg font-medium leading-relaxed">Join 500+ verified enterprise partners sourcing premium inventory through our secure B2B framework.</p>
                     </div>
 
@@ -189,7 +189,7 @@ function RegisterForm() {
                             { title: 'Net-Terms Credit', desc: 'Flexible financing for scale-up orders.' }
                         ].map((item, i) => (
                             <div key={i} className="flex gap-4">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#FF8A00] mt-2.5 shrink-0 shadow-[0_0_10px_#FF8A00]" />
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#1BC7C9] mt-2.5 shrink-0 shadow-[0_0_10px_#1BC7C9]" />
                                 <div>
                                     <h4 className="text-white font-black text-xs uppercase tracking-widest mb-1">{item.title}</h4>
                                     <p className="text-[#6B6B8D] text-sm">{item.desc}</p>
@@ -228,11 +228,11 @@ function RegisterForm() {
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-6">
-                                    <div className="w-12 h-12 rounded-2xl bg-[#FF8A00]/10 flex items-center justify-center shrink-0">
-                                        <Mail size={24} className="text-[#FF8A00]" />
+                                    <div className="w-12 h-12 rounded-2xl bg-[#1BC7C9]/10 flex items-center justify-center shrink-0">
+                                        <Mail size={24} className="text-[#1BC7C9]" />
                                     </div>
                                     <div>
-                                        <h4 className="font-black text-xs uppercase tracking-[0.2em] text-[#FF8A00]">Approval Protocol</h4>
+                                        <h4 className="font-black text-xs uppercase tracking-[0.2em] text-[#1BC7C9]">Approval Protocol</h4>
                                         <p className="text-sm text-[#64748B] font-medium mt-2 leading-relaxed">You will receive an activation encrypted link once the review phase is completed.</p>
                                     </div>
                                 </div>
@@ -245,8 +245,8 @@ function RegisterForm() {
                         <>
                             <div className="mb-8 md:mb-12">
                                 <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                                    <div className="h-1 w-12 bg-[#FF8A00] rounded-full" />
-                                    <span className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-[#FF8A00]">Onboarding Flow</span>
+                                    <div className="h-1 w-12 bg-[#1BC7C9] rounded-full" />
+                                    <span className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-[#1BC7C9]">Onboarding Flow</span>
                                 </div>
                                 <h1 className="text-3xl md:text-4xl font-black text-[#0A1A2F] tracking-tight text-center md:text-start">Register Business.</h1>
                                 <p className="text-[#64748B] text-sm md:text-base font-medium mt-2 text-center md:text-start">Professional onboarding for verified B2B partners.</p>
@@ -289,22 +289,22 @@ function RegisterForm() {
                             <form onSubmit={handleRegister} className="space-y-10">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-3">
-                                        <label className={labelClass}>Full Name <span className="text-[#FF8A00]">*</span></label>
+                                        <label className={labelClass}>Full Name <span className="text-[#1BC7C9]">*</span></label>
                                         <input className={inputClass} placeholder="Authorized Signatory" value={form.name} onChange={e => update('name', e.target.value)} />
                                     </div>
                                     <div className="space-y-3">
-                                        <label className={labelClass}>Work Email <span className="text-[#FF8A00]">*</span></label>
+                                        <label className={labelClass}>Work Email <span className="text-[#1BC7C9]">*</span></label>
                                         <input className={inputClass} placeholder="business@company.com" value={form.email} disabled={!!inviteEmail} onChange={e => update('email', e.target.value)} />
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-3">
-                                        <label className={labelClass}>Phone Context <span className="text-[#FF8A00]">*</span></label>
+                                        <label className={labelClass}>Phone Context <span className="text-[#1BC7C9]">*</span></label>
                                         <input className={inputClass} placeholder="+20..." value={form.phone} onChange={e => update('phone', e.target.value)} />
                                     </div>
                                     <div className="space-y-3">
-                                        <label className={labelClass}>Legal Entity <span className="text-[#FF8A00]">*</span></label>
+                                        <label className={labelClass}>Legal Entity <span className="text-[#1BC7C9]">*</span></label>
                                         <input className={inputClass} placeholder="Company Name" value={form.companyName} onChange={e => update('companyName', e.target.value)} />
                                     </div>
                                 </div>
@@ -339,7 +339,7 @@ function RegisterForm() {
                                                         update('swiftCode', '');
                                                     }
                                                 }}
-                                                className="w-4 h-4 rounded border-slate-300 text-[#FF8A00] focus:ring-[#FF8A00]"
+                                                className="w-4 h-4 rounded border-slate-300 text-[#1BC7C9] focus:ring-[#1BC7C9]"
                                             />
                                             <label htmlFor="noTaxId" className="text-[9px] font-black uppercase tracking-widest text-slate-400 cursor-pointer select-none">
                                                 No Tax ID / VAT
@@ -349,7 +349,7 @@ function RegisterForm() {
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div className="space-y-3">
-                                            <label className={labelClass}>Operating Country <span className="text-[#FF8A00]">*</span></label>
+                                            <label className={labelClass}>Operating Country <span className="text-[#1BC7C9]">*</span></label>
                                             <select 
                                                 className={inputClass} 
                                                 value={form.country} 
@@ -368,7 +368,7 @@ function RegisterForm() {
                                         </div>
                                         {form.taxId !== 'NOT_APPLICABLE' && (
                                             <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                                                <label className={labelClass}>Tax ID Number <span className="text-[#FF8A00]">*</span></label>
+                                                <label className={labelClass}>Tax ID Number <span className="text-[#1BC7C9]">*</span></label>
                                                 <input className={inputClass} placeholder="National Tax ID" value={form.taxId} onChange={e => update('taxId', e.target.value)} />
                                             </div>
                                         )}
@@ -412,7 +412,7 @@ function RegisterForm() {
                                     {form.taxId === 'NOT_APPLICABLE' && (
                                         <div className="p-6 bg-slate-50 border-2 border-dashed border-slate-100 rounded-[32px] flex items-center gap-4 animate-in fade-in zoom-in-95">
                                             <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shrink-0 shadow-sm">
-                                                <Tag className="text-[#FF8A00] w-6 h-6" />
+                                                <Tag className="text-[#1BC7C9] w-6 h-6" />
                                             </div>
                                             <div>
                                                 <h4 className="text-[10px] font-black uppercase tracking-widest text-[#0A1A2F]">Personal Account Mode</h4>
@@ -493,7 +493,7 @@ function RegisterForm() {
                                             <button
                                                 type="button"
                                                 onClick={() => update('role', 'supplier')}
-                                                className={`h-20 rounded-[24px] text-xs font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 ${form.role === 'supplier' ? 'bg-[#FF8A00] border-[#FF8A00] text-white shadow-xl shadow-[#FF8A00]/20' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                                className={`h-20 rounded-[24px] text-xs font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 ${form.role === 'supplier' ? 'bg-[#1BC7C9] border-[#1BC7C9] text-white shadow-xl shadow-[#1BC7C9]/20' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
                                             >
                                                 <span className="text-lg">🏢</span>
                                                 Provisioning Layer (Supplier)
@@ -514,7 +514,7 @@ function RegisterForm() {
                                         <button
                                             type="button"
                                             onClick={() => { setCaptcha(generateCaptcha()); setCaptchaAnswer(''); setCaptchaError(false); }}
-                                            className="text-slate-300 hover:text-[#FF8A00] transition-colors"
+                                            className="text-slate-300 hover:text-[#1BC7C9] transition-colors"
                                             title="Refresh challenge"
                                         >
                                             <RefreshCw size={14} />
@@ -534,7 +534,7 @@ function RegisterForm() {
                                                 "w-28 h-12 bg-white border-2 rounded-[14px] px-4 text-center text-[#0A1A2F] font-black text-sm outline-none transition-all",
                                                 captchaError
                                                     ? "border-red-300 focus:border-red-400"
-                                                    : "border-slate-100 focus:border-[#FF8A00]/40"
+                                                    : "border-slate-100 focus:border-[#1BC7C9]/40"
                                             )}
                                         />
                                     </div>
@@ -563,7 +563,7 @@ function RegisterForm() {
                             <div className="mt-16 pt-8 border-t border-slate-100 text-center">
                                 <p className="text-sm text-[#64748B] font-medium">
                                     Registered Partner?{' '}
-                                    <Link href="/auth/login" className="text-[#FF8A00] font-black uppercase tracking-widest text-xs hover:underline ms-2">
+                                    <Link href="/auth/login" className="text-[#1BC7C9] font-black uppercase tracking-widest text-xs hover:underline ms-2">
                                         Authenticate
                                     </Link>
                                 </p>
