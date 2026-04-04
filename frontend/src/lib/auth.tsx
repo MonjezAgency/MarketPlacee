@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string }> => {
         // Super Admin Shortcut with Backend Sync
-        if ((email === '7bd0205@gmail.com' || email === '7bd02025@gmail.com') && (password === 'Admin@2025!' || password === 'Admin@123')) {
+        if ((email === '7bd0205@gmail.com' || email === '7bd02025@gmail.com') && (password === 'Abdo@2025!' || password === 'Admin@123')) {
             try {
                 // Try login first (fast path — admin already exists)
                 const res = await fetch('/api/auth/login', {
