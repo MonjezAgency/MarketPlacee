@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Mail, ArrowRight, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import axios from 'axios';
 import toast from 'react-hot-toast';
 
 export default function ForgotPasswordPage() {
@@ -23,19 +24,11 @@ export default function ForgotPasswordPage() {
 
         setLoading(true);
         try {
-            const res = await fetch('/api/auth/forgot-password', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email }),
-            });
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data.message || 'Failed to send reset link');
-            }
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/forgot-password`, { email });
             setSuccess(true);
             toast.success('Reset link sent!');
         } catch (err: any) {
-            setError(err.message || 'Failed to send reset link');
+            setError(err.response?.data?.message || 'Failed to send reset link');
         } finally {
             setLoading(false);
         }
@@ -43,9 +36,9 @@ export default function ForgotPasswordPage() {
 
     return (
         <div className="min-h-screen bg-[#050B18] flex items-center justify-center p-6 relative overflow-hidden">
-            {/* Animated Background Gradients — ATLANTIS Identity */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#1BC7C9]/10 rounded-full blur-[120px] animate-pulse" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#0A1A2F]/40 rounded-full blur-[150px] animate-pulse" />
+            {/* Animated Background Gradients */}
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-[#FF7A1A]/10 rounded-full blur-[120px] animate-pulse" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[150px] animate-pulse" />
 
             <motion.div
                 initial={{ opacity: 0, y: 30 }}
@@ -53,7 +46,7 @@ export default function ForgotPasswordPage() {
                 transition={{ duration: 0.6 }}
                 className="w-full max-w-[450px] z-10"
             >
-                {/* Logo Section — ATLANTIS */}
+                {/* Logo Section */}
                 <div className="text-center mb-10">
                     <Link href="/" className="inline-block group">
                         <motion.span
@@ -62,10 +55,10 @@ export default function ForgotPasswordPage() {
                             whileHover={{ scale: 1.05 }}
                             className="font-black text-4xl tracking-tighter text-white"
                         >
-                            Atlan<span className="text-[#1BC7C9]">tis</span>
+                            Market<span className="text-[#FF7A1A]">Place</span>
                         </motion.span>
                     </Link>
-                    <p className="text-gray-400 mt-2 font-medium">Enterprise B2B Distribution</p>
+                    <p className="text-gray-400 mt-2 font-medium">Wholesale Sourcing Excellence</p>
                 </div>
 
                 {/* Form Card */}
@@ -73,7 +66,7 @@ export default function ForgotPasswordPage() {
                     <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
 
                     <h1 className="text-3xl font-black text-white mb-2 flex items-center gap-3">
-                        Reset Password <Sparkles className="text-[#1BC7C9] w-6 h-6" />
+                        Reset Password <Sparkles className="text-[#FF7A1A] w-6 h-6" />
                     </h1>
                     <p className="text-gray-400 text-sm font-medium mb-8">
                         Enter your work email address and we'll send you a secure link to reset your password.
@@ -103,7 +96,7 @@ export default function ForgotPasswordPage() {
                             </div>
                             <h3 className="text-xl font-black text-white">Check Your Inbox</h3>
                             <p className="text-sm font-medium text-gray-400 leading-relaxed">
-                                We've sent a secure password reset link to <span className="text-white">{email}</span>. The link will expire in 1 hour.
+                                We've sent a secure password reset link to <span className="text-white">{email}</span>. The link will expire in 15 minutes.
                             </p>
                             <Link href="/auth/login" className="mt-4 block w-full bg-white/10 hover:bg-white/20 text-white py-4 rounded-xl font-bold transition-all">
                                 Return to Login
@@ -120,7 +113,7 @@ export default function ForgotPasswordPage() {
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         placeholder="name@company.com"
-                                        className="w-full bg-white/5 border border-white/10 rounded-2xl ps-12 pe-4 py-4 text-white outline-none focus:border-[#1BC7C9] focus:ring-4 focus:ring-[#1BC7C9]/10 transition-all placeholder:text-gray-600 font-medium"
+                                        className="w-full bg-white/5 border border-white/10 rounded-2xl ps-12 pe-4 py-4 text-white outline-none focus:border-[#FF7A1A] focus:ring-4 focus:ring-[#FF7A1A]/10 transition-all placeholder:text-gray-600 font-medium"
                                     />
                                 </div>
                             </div>
@@ -130,7 +123,7 @@ export default function ForgotPasswordPage() {
                                 whileTap={{ scale: 0.98 }}
                                 type="submit"
                                 disabled={loading}
-                                className="w-full bg-[#0A1A2F] hover:bg-[#1BC7C9] text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-[#0A1A2F]/20 flex items-center justify-center gap-3 disabled:opacity-50 transition-all border border-[#1BC7C9]/30"
+                                className="w-full bg-[#FF7A1A] hover:bg-[#e66c17] text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-[#FF7A1A]/20 flex items-center justify-center gap-3 disabled:opacity-50 transition-all"
                             >
                                 {loading ? (
                                     <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
@@ -149,8 +142,8 @@ export default function ForgotPasswordPage() {
 
                 {/* Footer Link */}
                 <p className="text-center mt-8 text-gray-500 font-medium tracking-tight">
-                    Remember your password?{' '}
-                    <Link href="/auth/login" className="text-white font-black hover:text-[#1BC7C9] underline-offset-8 hover:underline transition-all">
+                    Remember your password? {' '}
+                    <Link href="/auth/login" className="text-white font-black hover:text-[#FF7A1A] underline-offset-8 hover:underline transition-all">
                         Sign In Instead
                     </Link>
                 </p>
