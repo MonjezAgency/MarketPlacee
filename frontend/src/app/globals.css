@@ -13,21 +13,21 @@
         --popover: 0 0% 100%;
         --popover-foreground: 222 47% 11%;
 
-        /* Primary: Orange #FF8A00 (Original Marketplace) */
-        --primary: 32 100% 50%;
+        /* Primary: Navy Blue #0A1A2F (ATLANTIS Master) */
+        --primary: 215 65% 11%;
         --primary-foreground: 210 40% 98%;
 
         /* Sidebar: Navy Blue #0A1A2F */
         --sidebar: 215 65% 11%;
         --sidebar-foreground: 210 40% 98%;
 
-        /* Secondary: Navy Blue #0A1A2F */
-        --secondary: 215 65% 11%;
-        --secondary-foreground: 210 40% 98%;
+        /* Secondary: Aqua #1BC7C9 (ATLANTIS Highlight) */
+        --secondary: 181 76% 45%;
+        --secondary-foreground: 215 65% 11%;
 
-        /* Accent: Turquoise #1BC7C9 (For highlights) */
-        --accent: 181 76% 45%;
-        --accent-foreground: 215 65% 11%;
+        /* Accent/Alert: Orange #FF8A00 (ATLANTIS Alerts/Offers) */
+        --accent: 32 100% 50%;
+        --accent-foreground: 0 0% 100%;
 
         --muted: 210 40% 96%;
         --muted-foreground: 215 16% 47%;
@@ -51,21 +51,21 @@
         --popover: 213 57% 17%;      /* #132A46 Elevated */
         --popover-foreground: 210 40% 98%;
 
-        /* Primary: Orange #FF8A00 (Official Marketplace) */
-        --primary: 32 100% 50%;
+        /* Primary: Navy Blue #0A1A2F (For Headers & Primary Buttons) */
+        --primary: 215 65% 11%;
         --primary-foreground: 210 40% 98%;
 
         /* Sidebar: Navy Blue #0A1A2F */
         --sidebar: 215 65% 11%;
         --sidebar-foreground: 210 40% 98%;
 
-        /* Secondary: Orange Shade for Buttons */
-        --secondary: 24 100% 50%;
-        --secondary-foreground: 210 40% 98%;
+        /* Secondary: Aqua #1BC7C9 (Secondary Elements) */
+        --secondary: 181 76% 45%;
+        --secondary-foreground: 215 65% 11%;
 
-        /* Accent: Turquoise #1BC7C9 */
-        --accent: 181 76% 45%;
-        --accent-foreground: 215 65% 11%;
+        /* Accent: Orange #FF8A00 (For Offers/Alerts) */
+        --accent: 32 100% 50%;
+        --accent-foreground: 0 0% 100%;
 
         --muted: 215 32% 12%;
         --muted-foreground: 215 20% 65%;

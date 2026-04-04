@@ -10,14 +10,23 @@ export class EmailService {
     // In a real app, these should comes from environment variables
     this.transporter = nodemailer.createTransport({
       host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-      port: 465,
-      secure: true, // true for 465, false for other ports
+      port: Number(process.env.EMAIL_PORT) || 465,
+      secure: true,
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
       tls: {
         rejectUnauthorized: false
+      }
+    });
+
+    // Verify connection on startup
+    this.transporter.verify((error, success) => {
+      if (error) {
+        console.error('SMTP CONNECTION ERROR:', error);
+      } else {
+        console.log('SMTP SERVER IS READY TO TAKE OUR MESSAGES');
       }
     });
   }
