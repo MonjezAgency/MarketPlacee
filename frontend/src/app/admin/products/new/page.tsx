@@ -450,9 +450,9 @@ export default function AdminNewProductPage() {
                                     onSubmit={handleBulkUpload}
                                     initial={{ scale: 0.9, y: 20 }}
                                     animate={{ scale: 1, y: 0 }}
-                                    className="bg-card w-full max-w-2xl rounded-[40px] border border-border/50 overflow-hidden shadow-2xl flex flex-col"
+                                    className="bg-card w-full max-w-2xl max-h-[90vh] rounded-[40px] border border-border/50 overflow-hidden shadow-2xl flex flex-col"
                                 >
-                                    <div className="p-8 border-b border-border/50 flex items-center justify-between">
+                                    <div className="p-8 border-b border-border/50 flex items-center justify-between shrink-0">
                                         <div>
                                             <h2 className="text-2xl font-black text-foreground tracking-tight">Bulk Upload Products</h2>
                                             <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1">Upload via Excel or CSV</p>
@@ -462,14 +462,14 @@ export default function AdminNewProductPage() {
                                         </button>
                                     </div>
 
-                                    <div className="p-8 space-y-6">
+                                    <div className="p-8 space-y-6 overflow-y-auto" dir="ltr">
                                         {!bulkResults ? (
-                                            <div className="border-2 border-dashed border-border/50 rounded-3xl p-12 flex flex-col items-center justify-center text-center relative group hover:border-primary/50 hover:bg-primary/5 transition-all">
-                                                <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                                            <div className="border-2 border-dashed border-border/50 rounded-3xl p-6 sm:p-12 flex flex-col items-center justify-center text-center relative group hover:border-primary/50 hover:bg-primary/5 transition-all">
+                                                <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-muted flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                                                     <FileSpreadsheet size={32} className="text-primary" />
                                                 </div>
-                                                <h1 className="text-xl font-black text-foreground mb-2">Drop your spreadsheet here</h1>
-                                                <p className="text-muted-foreground">Supports .xlsx and .csv files</p>
+                                                <h1 className="text-lg sm:text-xl font-black text-foreground mb-2">Drop your spreadsheet here</h1>
+                                                <p className="text-muted-foreground text-sm">Supports .xlsx and .csv files</p>
 
                                                 <div className="mt-6 text-start bg-muted/30 p-4 rounded-xl border border-border/50 max-w-md w-full relative z-20 pointer-events-auto">
                                                     <h4 className="text-xs font-black uppercase tracking-widest text-foreground mb-2 flex items-center gap-2">

@@ -261,8 +261,10 @@ export default function AdminProductsPage() {
     const fetchProducts = React.useCallback(async () => {
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(('/api') + '/products/admin/all', {
-                headers: { 'Authorization': `Bearer ${token}` }
+            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+            const res = await fetch(`${backendBase}/products/admin/all`, {
+                headers: { 'Authorization': `Bearer ${token}` },
+                cache: 'no-store'
             });
             if (res.ok) {
                 const data = await res.json();
@@ -281,7 +283,8 @@ export default function AdminProductsPage() {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${'/api'}/products/${id}/approve`, {
+            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+            const res = await fetch(`${backendBase}/products/${id}/approve`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -305,7 +308,8 @@ export default function AdminProductsPage() {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${'/api'}/products/${id}/reject`, {
+            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+            const res = await fetch(`${backendBase}/products/${id}/reject`, {
                 method: 'PATCH',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -327,7 +331,8 @@ export default function AdminProductsPage() {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${'/api'}/products/${id}`, {
+            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+            const res = await fetch(`${backendBase}/products/${id}`, {
                 method: 'DELETE',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -348,7 +353,8 @@ export default function AdminProductsPage() {
         setActionLoading(id);
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${'/api'}/products/${id}`, {
+            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+            const res = await fetch(`${backendBase}/products/${id}`, {
                 method: 'PATCH',
                 headers: { 
                     'Authorization': `Bearer ${token}`,
