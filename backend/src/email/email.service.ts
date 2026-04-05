@@ -5,37 +5,55 @@ import { getInvitationEmailHtml } from './email-templates';
 @Injectable()
 export class EmailService {
   private transporter;
+  private readonly fromName = 'Atlantis Marketplace';
 
   constructor() {
-    // In a real app, these should comes from environment variables
+    const host = process.env.EMAIL_HOST || 'smtp.hostinger.com';
+    const port = Number(process.env.EMAIL_PORT) || 465;
+    const user = process.env.EMAIL_USER || 'Info@atlantisfmcg.com';
+    const pass = process.env.EMAIL_PASS || 'AliDawara@22';
+
+    // Auto-detections: 465 usually SSL (secure:true), 587 usually STARTTLS (secure:false)
+    const secure = port === 465;
+
+    console.log(`[SMTP] Initializing transporter: ${host}:${port} (Secure: ${secure}) User: ${user}`);
+
     this.transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_HOST || 'smtp.hostinger.com',
-      port: Number(process.env.EMAIL_PORT) || 465,
-      secure: true,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
+      host,
+      port,
+      secure,
+      auth: { user, pass },
       tls: {
-        rejectUnauthorized: false
-      }
+        // Essential for some cloud providers and self-signed certs
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
+      },
+      // Increase timeouts for slower SMTP servers (like Hostinger sometimes)
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
     });
 
     // Verify connection on startup
     this.transporter.verify((error, success) => {
       if (error) {
-        console.error('SMTP CONNECTION ERROR:', error);
+        console.error('❌ SMTP CONNECTION ERROR:', error);
+        console.error('Check your EMAIL_USER/EMAIL_PASS and PORT 465/587 in Railway settings.');
       } else {
-        console.log('SMTP SERVER IS READY TO TAKE OUR MESSAGES');
+        console.log('✅ SMTP SERVER IS READY TO TAKE OUR MESSAGES');
       }
     });
+  }
+
+  private getFrom() {
+    const user = process.env.EMAIL_USER || 'Info@atlantisfmcg.com';
+    return `"${this.fromName}" <${user}>`;
   }
 
   async sendVerificationEmail(email: string, token: string) {
     const url = `${process.env.FRONTEND_URL}/auth/verify-email?token=${token}`;
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject: 'Verify your email - Atlantis Marketplace',
         html: `
@@ -68,7 +86,7 @@ export class EmailService {
     const url = `${process.env.FRONTEND_URL}/auth/reset-password?token=${token}`;
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject: 'Reset your password - Atlantis Marketplace',
         html: `
@@ -108,7 +126,7 @@ export class EmailService {
             </div>` : '';
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject: 'You have been invited to the Atlantis Team',
         html: `
@@ -152,7 +170,7 @@ export class EmailService {
 
     try {
       const info = await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: params.recipientEmail,
         subject: `🎉 You're Invited to Join Atlantis as a ${params.role === 'supplier' ? 'Supplier Partner' : 'Strategic Buyer'}`,
         html,
@@ -169,7 +187,7 @@ export class EmailService {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject: `✅ Order Confirmed #${orderId.slice(0, 8).toUpperCase()} — Atlantis`,
         html: `
@@ -211,7 +229,7 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject: `${info.title} — Order #${orderId.slice(0, 8).toUpperCase()}`,
         html: `
@@ -243,7 +261,7 @@ export class EmailService {
     if (status === 'PENDING') {
       try {
         await this.transporter.sendMail({
-          from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+          from: this.getFrom(),
           to: email,
           subject: '⏳ KYC Submitted — Under Review',
           html: `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #F59E0B;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#F59E0B;font-size:22px;margin:0 0 16px;">KYC Documents Received ⏳</h2><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Your identity documents have been submitted and are under review. We'll notify you once complete — usually within 24 hours.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p></div></div>`,
@@ -256,7 +274,7 @@ export class EmailService {
     const isApproved = status === 'VERIFIED';
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject: isApproved ? '✅ KYC Verified — Atlantis' : '❌ KYC Review Required — Atlantis',
         html: `
@@ -299,7 +317,7 @@ export class EmailService {
 
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject: `🎉 تهانينا! تم تفعيل حسابك - Welcome to Atlantis, ${name || 'Partner'}!`,
         html: `
@@ -344,7 +362,7 @@ export class EmailService {
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject: `🧾 Invoice ${invoiceNumber} — Atlantis Marketplace`,
         html: `
@@ -379,7 +397,7 @@ export class EmailService {
   async sendEmailOtp(email: string, name: string, code: string) {
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject: `🔐 Your Atlantis Verification Code: ${code}`,
         html: `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #FF9900;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#0A1A2F;font-size:22px;margin:0 0 16px;">Verification Code 🔐</h2><p style="color:#2E2E2E;font-size:15px;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;">Your one-time verification code is:</p><div style="background:#F2F4F7;border-radius:12px;padding:24px;text-align:center;margin:24px 0;"><span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#0A1A2F;font-family:monospace;">${code}</span></div><p style="color:#667085;font-size:13px;">This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p></div></div>`,
@@ -398,7 +416,7 @@ export class EmailService {
     
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to: email,
         subject,
         html: `
@@ -446,7 +464,7 @@ export class EmailService {
   async sendRawEmail(to: string, subject: string, html: string): Promise<void> {
     try {
       await this.transporter.sendMail({
-        from: '"Atlantis Marketplace" <Info@atlantisfmcg.com>',
+        from: this.getFrom(),
         to,
         subject,
         html,
