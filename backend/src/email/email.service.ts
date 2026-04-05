@@ -50,7 +50,7 @@ export class EmailService {
 
   private getFrom() {
     const user = process.env.EMAIL_USER || 'Info@atlantisfmcg.com';
-    return `"${this.fromName}" <${user}>`;
+    return user;
   }
 
   async sendVerificationEmail(email: string, token: string) {

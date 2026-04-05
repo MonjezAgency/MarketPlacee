@@ -32,12 +32,21 @@ export class TeamController {
     @Post('send-invite')
     async sendInvite(@Body() body: { email: string; role: string; inviteLink: string }, @Req() req: any) {
         const senderName = req.user?.name || 'Atlantis Admin';
-        const result = await this.emailService.sendInviteEmail({
-            recipientEmail: body.email,
-            role: body.role,
-            inviteLink: body.inviteLink,
-            senderName,
-        });
-        return { success: true, message: 'Invitation email sent!', ...result };
+        try {
+            const result = await this.emailService.sendInviteEmail({
+                recipientEmail: body.email,
+                role: body.role,
+                inviteLink: body.inviteLink,
+                senderName,
+            });
+            return { success: true, message: 'Invitation email sent!', ...result };
+        } catch (error: any) {
+            console.error('TEAM INVITE ERROR:', error);
+            return { 
+                success: false, 
+                message: 'Failed to send invitation', 
+                error: error.message || 'Unknown SMTP error' 
+            };
+        }
     }
 }
