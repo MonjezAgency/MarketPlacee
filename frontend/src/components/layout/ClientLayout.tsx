@@ -50,7 +50,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
 
         // 3. Logged in, but not active (pending, rejected, blocked)? Redirect to pending page
-        if (isLoggedIn && user?.status !== 'ACTIVE' && user?.role !== 'admin' && user?.role !== 'ADMIN') {
+        const upperRole = (user?.role || '').toUpperCase();
+        const bypassRoles = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
+        if (isLoggedIn && user?.status !== 'ACTIVE' && !bypassRoles.includes(upperRole)) {
             if (!isPendingPage) {
                 router.push('/auth/pending');
             }

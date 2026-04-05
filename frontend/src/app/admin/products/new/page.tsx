@@ -19,7 +19,7 @@ export default function AdminNewProductPage() {
     const { symbol } = getCurrencyInfo(true);
 
     const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
-    const [bulkFile, setBulkFile] = useState<File | null>(null);
+    const [bulkFiles, setBulkFiles] = useState<File[]>([]);
     const [bulkResults, setBulkResults] = useState<any>(null);
 
     const [formData, setFormData] = useState({
@@ -120,42 +120,66 @@ export default function AdminNewProductPage() {
 
     const handleBulkUpload = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!bulkFile) return;
+        if (bulkFiles.length === 0) return;
 
         setIsSubmitting(true);
+        let accumulatedResults = {
+            totalRows: 0,
+            successCount: 0,
+            errorCount: 0,
+            createdCount: 0,
+            results: [] as any[]
+        };
+
         try {
             const token = localStorage.getItem('bev-token');
             if (!token || token === 'LOCAL_ONLY') {
-                localStorage.removeItem('bev-token');
-                localStorage.removeItem('bev-user');
                 window.location.href = '/auth/login';
                 return;
             }
-            const formData = new FormData();
-            formData.append('file', bulkFile);
 
-            const res = await fetch(('/api') + '/products/bulk-upload', {
-                method: 'POST',
-                headers: {
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                },
-                body: formData,
-            });
+            for (const file of bulkFiles) {
+                const uploadData = new FormData();
+                uploadData.append('file', file);
 
-            if (!res.ok) {
-                let errMsg = 'Upload failed';
-                try {
-                    const data = await res.json();
-                    errMsg = data.message || errMsg;
-                } catch {
-                    const text = await res.text().catch(() => '');
-                    errMsg = text || `Server error (${res.status})`;
+                const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+                const apiUrl = `${backendBase}/products/bulk-upload`;
+
+                const res = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    },
+                    body: uploadData,
+                });
+
+                if (!res.ok) {
+                    let errMsg = 'Upload failed';
+                    try {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } catch {
+                        const text = await res.text().catch(() => '');
+                        errMsg = text || `Server error (${res.status})`;
+                    }
+                    throw new Error(`Failed on file ${file.name}: ${errMsg}`);
                 }
-                throw new Error(errMsg);
+
+                const report = await res.json();
+                accumulatedResults.totalRows += report.totalRows || 0;
+                accumulatedResults.successCount += report.successCount || 0;
+                accumulatedResults.errorCount += report.errorCount || 0;
+                accumulatedResults.createdCount += report.createdCount || 0;
+                
+                // Track filename in the error results for clarity
+                const fileResults = (report.results || []).map((r: any) => ({
+                    ...r,
+                    file: file.name
+                }));
+                accumulatedResults.results.push(...fileResults);
             }
 
-            const report = await res.json();
-            setBulkResults(report);
+            setBulkResults(accumulatedResults);
             setSuccess(true);
         } catch (err: any) {
             console.error('Bulk upload error:', err);
@@ -433,7 +457,7 @@ export default function AdminNewProductPage() {
                                             <h2 className="text-2xl font-black text-foreground tracking-tight">Bulk Upload Products</h2>
                                             <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1">Upload via Excel or CSV</p>
                                         </div>
-                                        <button type="button" onClick={() => { setIsBulkModalOpen(false); setBulkResults(null); setBulkFile(null); }} className="w-10 h-10 bg-muted/50 hover:bg-muted rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                                        <button type="button" onClick={() => { setIsBulkModalOpen(false); setBulkResults(null); setBulkFiles([]); }} className="w-10 h-10 bg-muted/50 hover:bg-muted rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
                                             <X size={20} />
                                         </button>
                                     </div>
@@ -462,14 +486,24 @@ export default function AdminNewProductPage() {
                                                 <input
                                                     type="file"
                                                     accept=".xlsx, .csv"
-                                                    onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
+                                                    multiple
+                                                    onChange={(e) => setBulkFiles(Array.from(e.target.files || []))}
                                                     className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                                                 />
 
-                                                {bulkFile && (
-                                                    <div className="mt-6 p-4 bg-muted/50 rounded-xl border border-border/50 flex items-center gap-3 relative z-10 w-full justify-center">
-                                                        <CheckCircle2 className="text-emerald-500" size={20} />
-                                                        <span className="font-bold text-foreground truncate max-w-[200px]">{bulkFile.name}</span>
+                                                {bulkFiles.length > 0 && (
+                                                    <div className="mt-6 p-4 bg-muted/50 rounded-xl border border-border/50 flex flex-col gap-2 relative z-10 w-full justify-center">
+                                                        <div className="flex items-center gap-3 justify-center text-emerald-500 font-bold">
+                                                            <CheckCircle2 size={20} />
+                                                            <span>{bulkFiles.length} file(s) selected</span>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 mt-2 max-h-[100px] overflow-y-auto w-full">
+                                                            {bulkFiles.map((file, i) => (
+                                                                <span key={i} className="px-2 py-1 bg-background rounded-md text-[10px] text-muted-foreground border border-border/50 truncate max-w-[200px]">
+                                                                    {file.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 )}
                                             </div>
@@ -510,13 +544,13 @@ export default function AdminNewProductPage() {
                                     </div>
 
                                     <div className="p-8 border-t border-border/50 bg-muted/10 flex gap-4">
-                                        <button type="button" onClick={() => { setIsBulkModalOpen(false); setBulkResults(null); setBulkFile(null); }} className="flex-1 h-14 bg-muted text-foreground font-bold rounded-xl border border-border/50 hover:bg-muted/80 transition-colors">
+                                        <button type="button" onClick={() => { setIsBulkModalOpen(false); setBulkResults(null); setBulkFiles([]); }} className="flex-1 h-14 bg-muted text-foreground font-bold rounded-xl border border-border/50 hover:bg-muted/80 transition-colors">
                                             {bulkResults ? 'Close' : 'Cancel'}
                                         </button>
                                         {!bulkResults && (
                                             <button
                                                 type="submit"
-                                                disabled={!bulkFile || isSubmitting}
+                                                disabled={bulkFiles.length === 0 || isSubmitting}
                                                 className="flex-[2] h-14 bg-primary text-primary-foreground font-black rounded-xl px-8 shadow-xl hover:bg-primary/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                                             >
                                                 {isSubmitting ? 'Uploading...' : <><UploadCloud size={18} /> Process Upload</>}

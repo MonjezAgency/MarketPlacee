@@ -29,7 +29,9 @@ export function UserMenu({ role }: UserMenuProps) {
 
     // Detect if we're on the admin layout (white background) vs homepage (dark navbar)
     const normalizedRole = role?.toLowerCase() || '';
-    const isAdminLayout = normalizedRole === 'admin' || normalizedRole === 'supplier';
+    const teamRoles = ['admin', 'owner', 'moderator', 'support', 'editor', 'developer', 'logistics'];
+    const isTeamMember = teamRoles.includes(normalizedRole);
+    const isAdminLayout = isTeamMember || normalizedRole === 'supplier';
 
     React.useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -41,40 +43,60 @@ export function UserMenu({ role }: UserMenuProps) {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
+    const getRoleLabel = () => {
+        switch (normalizedRole) {
+            case 'admin': return 'Super Admin';
+            case 'owner': return 'Platform Owner';
+            case 'developer': return 'Tech Team';
+            case 'moderator': return 'Moderator';
+            case 'support': return 'Support Agent';
+            case 'editor': return 'Content Editor';
+            case 'logistics': return 'Logistics';
+            case 'supplier': return 'Verified Supplier';
+            default: return 'Partner';
+        }
+    };
+
     const menuItems = [
         {
             label: 'My Profile',
             icon: User,
-            href: normalizedRole === 'admin' ? '/admin' : normalizedRole === 'supplier' ? '/supplier' : '/dashboard/customer'
+            href: isTeamMember ? '/admin' : normalizedRole === 'supplier' ? '/supplier' : '/dashboard/customer'
         },
         {
             label: 'Dashboard',
             icon: LayoutDashboard,
-            href: normalizedRole === 'admin' ? '/admin' : '/supplier',
-            hidden: normalizedRole !== 'admin' && normalizedRole !== 'supplier'
+            href: isTeamMember ? '/admin' : '/supplier',
+            hidden: !isTeamMember && normalizedRole !== 'supplier'
+        },
+        {
+            label: 'Tech Dashboard',
+            icon: Shield,
+            href: '/admin/tech',
+            hidden: normalizedRole !== 'developer'
         },
         {
             label: 'Support Center',
             icon: Shield,
             href: '/dashboard/support',
-            hidden: normalizedRole !== 'support' && normalizedRole !== 'admin'
+            hidden: normalizedRole !== 'support' && normalizedRole !== 'admin' && normalizedRole !== 'owner'
         },
         {
             label: 'Settings',
             icon: Settings,
-            href: normalizedRole === 'admin' ? '/admin/settings' : normalizedRole === 'supplier' ? '/supplier/settings' : '/dashboard/settings'
+            href: isTeamMember ? '/admin/settings' : normalizedRole === 'supplier' ? '/supplier/settings' : '/dashboard/settings'
         },
         {
             label: 'Track Order',
             icon: Truck,
             href: '/dashboard/track',
-            hidden: normalizedRole === 'admin' || normalizedRole === 'support' || normalizedRole === 'supplier'
+            hidden: isTeamMember || normalizedRole === 'supplier'
         },
         {
             label: 'Identity Verification (KYC)',
             icon: ShieldCheck,
             href: '/dashboard/kyc',
-            hidden: normalizedRole === 'admin' || normalizedRole === 'support'
+            hidden: normalizedRole === 'admin' || normalizedRole === 'owner' || normalizedRole === 'support'
         },
     ].filter(item => !item.hidden);
 
@@ -105,13 +127,13 @@ export function UserMenu({ role }: UserMenuProps) {
                         <div className="flex items-center gap-1.5">
                             <div className={cn(
                                 "w-1.5 h-1.5 rounded-full animate-pulse",
-                                normalizedRole === 'admin' ? "bg-primary" : normalizedRole === 'supplier' ? "bg-emerald-500" : "bg-blue-500"
+                                isTeamMember ? "bg-primary" : normalizedRole === 'supplier' ? "bg-emerald-500" : "bg-blue-500"
                             )} />
                             <span className={cn(
                                 "text-[9px] font-black uppercase tracking-tighter",
-                                normalizedRole === 'admin' ? "text-primary" : normalizedRole === 'supplier' ? "text-emerald-500" : "text-blue-500"
+                                isTeamMember ? "text-primary" : normalizedRole === 'supplier' ? "text-emerald-500" : "text-blue-500"
                             )}>
-                                {normalizedRole === 'admin' ? 'Super Admin' : normalizedRole === 'supplier' ? 'Verified Supplier' : 'Partner'}
+                                {getRoleLabel()}
                             </span>
                         </div>
                     </div>

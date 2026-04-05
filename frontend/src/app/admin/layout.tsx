@@ -37,6 +37,8 @@ import {
     Crown,
     KeyRound,
     ShieldAlert,
+    Code2,
+    ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -70,6 +72,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         icon: LayoutDashboard,
         links: [
             { label: 'Overview', translationKey: 'overview', href: '/admin', icon: LayoutDashboard },
+            { label: 'Tech Dashboard', translationKey: 'techDashboard', href: '/admin/tech', icon: Code2 },
             { label: 'Homepage', translationKey: 'homepage', href: '/admin/homepage', icon: Home },
         ]
     },
@@ -260,8 +263,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const [mounted, setMounted] = React.useState(false);
 
     const isOwner = user?.role === 'OWNER' || user?.role === 'owner';
+    const isDeveloper = (user?.role || '').toUpperCase() === 'DEVELOPER';
     const isTeamMember = ['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS']
         .includes((user?.role || '').toUpperCase());
+
+    // Filter sidebar groups based on role
+    const getFilteredSidebarGroups = () => {
+        if (isDeveloper) {
+            // DEVELOPER only sees Dashboard, Support, and System
+            return SIDEBAR_GROUPS.filter(g => ['Dashboard', 'Support', 'System'].includes(g.title));
+        }
+        return SIDEBAR_GROUPS;
+    };
+    const filteredSidebarGroups = getFilteredSidebarGroups();
 
     // ── KYC Gate: block team members who haven't verified ────────────────────
     React.useEffect(() => {
@@ -384,7 +398,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             <div className="my-2 mx-4 border-t border-white/10" />
                         </div>
                     )}
-                    {SIDEBAR_GROUPS.map(group => (
+                    {filteredSidebarGroups.map(group => (
                         <SidebarGroupComponent key={group.title} group={group} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} />
                     ))}
                 </nav>
@@ -415,12 +429,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         >
                             <Menu size={20} />
                         </button>
+                        <Link
+                            href="/"
+                            className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
+                            title="Back to Home"
+                        >
+                            <Home size={18} />
+                        </Link>
                         <div className="flex flex-col">
                             <h2 className="text-foreground font-black text-xl tracking-tighter uppercase leading-none">
-                                {t('admin', 'panelTitle')}
+                                {isDeveloper ? 'Tech Control Panel' : t('admin', 'panelTitle')}
                             </h2>
                             <p className="text-primary text-[10px] font-black uppercase tracking-[0.2em] mt-1 opacity-80">
-                                {t('admin', 'enterpriseAdmin')}
+                                {isDeveloper ? 'System Operations & Monitoring' : t('admin', 'enterpriseAdmin')}
                             </p>
                         </div>
                     </div>
@@ -505,7 +526,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
                         <div className="h-6 w-[1px] bg-[#DDD] dark:bg-white/10" />
 
-                        <UserMenu role="admin" />
+                        <UserMenu role={user?.role || 'admin'} />
                     </div>
                 </header>
 

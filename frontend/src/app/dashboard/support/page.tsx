@@ -31,16 +31,16 @@ function StatCard({ icon: Icon, label, value, color, onClick }: any) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             onClick={onClick}
-            className="w-full text-left bg-card border border-border/50 rounded-2xl p-5 hover:border-primary/30 transition-all group"
+            className="w-full text-left glass-card p-6 hover:border-primary/30 transition-all group hover:scale-[1.02]"
         >
             <div className="flex items-start justify-between">
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", color)}>
-                    <Icon size={18} />
+                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", color)}>
+                    <Icon size={20} />
                 </div>
                 <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-primary transition-colors mt-1" />
             </div>
-            <p className="text-2xl font-black mt-3">{value ?? '—'}</p>
-            <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1">{label}</p>
+            <p className="text-3xl font-black font-heading mt-4">{value ?? '—'}</p>
+            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-2">{label}</p>
         </motion.button>
     );
 }
@@ -177,29 +177,38 @@ export default function SupportPage() {
         <div className="space-y-6 pb-10">
             {/* Header */}
             <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-black">Support Dashboard</h1>
-                    <p className="text-sm text-muted-foreground mt-1">Manage disputes, orders, KYC, and live chat.</p>
+                <div className="flex items-center gap-4">
+                    <a
+                        href="/admin"
+                        className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
+                        title="Back to Dashboard"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                    </a>
+                    <div>
+                        <h1 className="text-2xl font-black font-heading tracking-tighter uppercase">Support Dashboard</h1>
+                        <p className="text-sm text-muted-foreground font-bold mt-0.5">Manage disputes, orders, KYC, and live chat.</p>
+                    </div>
                 </div>
                 <button onClick={() => fetchAll(true)} disabled={isRefreshing}
-                    className="h-9 px-4 flex items-center gap-2 rounded-xl bg-muted text-xs font-bold text-muted-foreground hover:bg-muted/70 disabled:opacity-50 transition-colors">
+                    className="h-10 px-5 flex items-center gap-2 rounded-2xl bg-primary text-primary-foreground text-xs font-black hover:opacity-90 disabled:opacity-50 transition-all">
                     <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
                     Refresh
                 </button>
             </div>
 
             {/* Tabs */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="flex gap-2 flex-wrap p-1.5 bg-muted/30 rounded-2xl border border-border/50 w-fit">
                 {TABS.map(t => (
                     <button key={t.id} onClick={() => setTab(t.id)}
                         className={cn(
-                            "h-9 px-4 rounded-xl text-xs font-bold flex items-center gap-2 transition-all relative",
-                            tab === t.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
+                            "h-10 px-5 rounded-xl text-xs font-black flex items-center gap-2 transition-all relative",
+                            tab === t.id ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
                         )}>
-                        <t.icon size={13} />
+                        <t.icon size={14} />
                         {t.label}
                         {t.badge ? (
-                            <span className="absolute -top-1.5 -end-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                            <span className="absolute -top-1.5 -end-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-lg">
                                 {t.badge > 9 ? '9+' : t.badge}
                             </span>
                         ) : null}

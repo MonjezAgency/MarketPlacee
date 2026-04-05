@@ -23,8 +23,10 @@ export default function LoginPage() {
     const { t } = useLanguage();
 
     const redirectByRole = (role: string) => {
-        if (role === 'admin' || role === 'ADMIN') router.push('/admin');
-        else if (role === 'supplier' || role === 'SUPPLIER') router.push('/supplier');
+        const upper = role.toUpperCase();
+        const teamRoles = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
+        if (teamRoles.includes(upper)) router.push('/admin');
+        else if (upper === 'SUPPLIER') router.push('/supplier');
         else router.push('/');
     };
 
