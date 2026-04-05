@@ -140,41 +140,74 @@ export default function SupplierDashboard() {
 
     // Bulk Upload handler
     const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
 
         setIsUploading(true);
         setUploadReport(null);
+        let accumulatedResults = {
+            totalRows: 0,
+            successCount: 0,
+            errorCount: 0,
+            createdCount: 0,
+            results: [] as any[]
+        };
 
         try {
             const token = getToken();
-            const formData = new FormData();
-            formData.append('file', file);
 
-            const res = await fetch(`${API_URL}/products/bulk-upload`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData,
-            });
+            for (const file of files) {
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+                const apiUrl = `${backendBase}/products/bulk-upload`;
 
-            if (res.ok) {
-                const report: UploadReport = await res.json();
-                setUploadReport(report);
-
-                // Refresh products
-                const prodRes = await fetch(`${API_URL}/products/my-products`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const res = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData,
                 });
-                if (prodRes.ok) {
-                    setProducts(await prodRes.json());
+
+                if (res.ok) {
+                    const report: UploadReport = await res.json();
+                    accumulatedResults.totalRows += report.totalRows || 0;
+                    accumulatedResults.successCount += report.successCount || 0;
+                    accumulatedResults.errorCount += report.errorCount || 0;
+                    accumulatedResults.createdCount += report.createdCount || 0;
+                    
+                    const fileResults = (report.results || []).map((r: any) => ({
+                        ...r,
+                        file: file.name
+                    }));
+                    accumulatedResults.results.push(...fileResults);
+                } else {
+                    let errMsg = 'Upload failed';
+                    try {
+                        const data = await res.json();
+                        errMsg = data.message || errMsg;
+                    } catch {
+                        const text = await res.text().catch(() => '');
+                        errMsg = text || `Server error (${res.status})`;
+                    }
+                    throw new Error(`Failed on file ${file.name}: ${errMsg}`);
                 }
-            } else {
-                const errData = await res.json().catch(() => ({}));
-                alert(`Upload failed: ${errData.message || 'Unknown error'}`);
             }
-        } catch (err) {
+            
+            // Set accumulated report
+            setUploadReport(accumulatedResults);
+            
+            // Refresh products
+            const prodRes = await fetch(`${API_URL}/products/my-products`, {
+                headers: { 'Authorization': `Bearer ${getToken()}` }
+            });
+            if (prodRes.ok) {
+                setProducts(await prodRes.json());
+            }
+
+        } catch (err: any) {
             console.error('Bulk upload error:', err);
-            alert('Upload failed. Check your connection.');
+            alert(`${err.message || 'Upload failed. Check your connection.'}`);
         } finally {
             setIsUploading(false);
             if (bulkFileRef.current) bulkFileRef.current.value = '';
@@ -202,6 +235,7 @@ export default function SupplierDashboard() {
                         ref={bulkFileRef}
                         type="file"
                         accept=".xlsx,.xls,.csv"
+                        multiple
                         className="hidden"
                         onChange={handleBulkUpload}
                     />
