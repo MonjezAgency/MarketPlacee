@@ -62,9 +62,17 @@ export async function fetchProducts(): Promise<Product[]> {
             throw new Error('Failed to fetch products');
         }
         const text = await response.text();
-        if (!text) return [];
         const json = JSON.parse(text);
-        const data = Array.isArray(json) ? json : (json.data || []);
+        console.log('API Fetch Success:', json);
+        
+        // Support multiple data structures
+        let data: any[] = [];
+        if (Array.isArray(json)) data = json;
+        else if (json.data && Array.isArray(json.data)) data = json.data;
+        else if (json.products && Array.isArray(json.products)) data = json.products;
+        
+        if (data.length === 0) console.warn('API returned no approved products.');
+        
         // The backend returns an array of products (possibly nested in 'data').
         // We'll map them to match our frontend Product interface if necessary
         return data.map((item: any) => ({

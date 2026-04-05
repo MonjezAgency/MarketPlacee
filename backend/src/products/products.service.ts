@@ -92,7 +92,11 @@ export class ProductsService {
 
     async findAll(status?: ProductStatus, filters?: { category?: string; brand?: string; minPrice?: string; maxPrice?: string; sort?: string; q?: string; page?: string; limit?: string }) {
         const where: any = {};
-        if (status) where.status = status;
+        if (status) {
+            // Robust case-insensitive status handling
+            const statusUpper = status.toString().toUpperCase();
+            where.status = statusUpper as ProductStatus;
+        }
 
         // Text search
         if (filters?.q) {
@@ -119,11 +123,9 @@ export class ProductsService {
         }
 
         // Safety: Only apply minimal requirements for the public marketplace (APPROVED).
-        if (status === ProductStatus.APPROVED) {
-            where.AND = [
-                ...(where.AND || []),
-                { name: { not: '' } }
-            ];
+        if (status && status.toString().toUpperCase() === 'APPROVED') {
+            // Remove all names/description checks to trust Admin approval absolutely
+            // where.AND = [...];
         }
 
         // Sort order
