@@ -254,7 +254,7 @@ export default function Navbar() {
                                     {SUPPORTED_CURRENCIES.map(c => (
                                         <button key={c.code} onClick={() => handleCurrencySelect(c.code)}
                                             className={cn(
-                                                "w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-muted/50 transition-colors",
+                                                "w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-primary/5 transition-colors text-foreground dark:text-white",
                                                 activeCurrency === c.code && "bg-primary/5 text-primary font-black"
                                             )}>
                                             <span className="font-bold">{c.name}</span>

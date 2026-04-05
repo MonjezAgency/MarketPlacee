@@ -25,15 +25,15 @@ interface Slide {
 
 const DEMO_SLIDES: Slide[] = [
     {
-        image: "https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?auto=format&fit=crop&q=80&w=2000",
+        image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?auto=format&fit=crop&q=80&w=2000",
         titleKey: "slide1Title",
         subtitleKey: "slide1Subtitle",
         badgeKey: "slide1Badge",
         ctaTextKey: "checkDeals",
-        ctaHref: "/categories"
+        ctaHref: "/categories?category=Energy Drinks"
     },
     {
-        image: "https://images.unsplash.com/photo-1550345332-09e3ac987658?auto=format&fit=crop&q=80&w=2000",
+        image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=2000",
         titleKey: "slide2Title",
         subtitleKey: "slide2Subtitle",
         badgeKey: "slide2Badge",
@@ -41,7 +41,7 @@ const DEMO_SLIDES: Slide[] = [
         ctaHref: "/suppliers"
     },
     {
-        image: "https://images.unsplash.com/photo-1543256283-42c206511a76?auto=format&fit=crop&q=80&w=2000",
+        image: "https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&q=80&w=2000",
         titleKey: "slide3Title",
         subtitleKey: "slide3Subtitle",
         badgeKey: "slide3Badge",
@@ -130,8 +130,8 @@ export default function OffersHero() {
             </AnimatePresence>
 
             {/* Content */}
-            <div className="absolute inset-0 z-10 flex flex-col justify-center px-6 md:px-20">
-                <div className="max-w-3xl">
+            <div className="absolute inset-0 z-10 flex flex-col justify-center px-6 md:px-20 items-start">
+                <div className="max-w-3xl text-start">
                     {/* Badge */}
                     <AnimatePresence mode="wait">
                         <motion.div
@@ -164,7 +164,7 @@ export default function OffersHero() {
                         animate={{ y: 0, opacity: 1 }}
                         transition={{ duration: 0.6, delay: 0.1 }}
                         className={cn(
-                            "text-4xl md:text-8xl font-black text-white mb-6 leading-[0.95] drop-shadow-2xl transition-all",
+                            "text-4xl md:text-7xl font-black text-white mb-6 leading-[0.95] drop-shadow-2xl transition-all",
                             slide.isSponsored && "tracking-tighter bg-gradient-to-r from-white via-white to-white/50 bg-clip-text text-transparent"
                         )}
                     >
