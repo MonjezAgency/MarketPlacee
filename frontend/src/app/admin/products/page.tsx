@@ -11,6 +11,18 @@ import {
 } from 'lucide-react';
 import { CATEGORIES_LIST } from '@/lib/products';
 import { useLanguage } from '@/contexts/LanguageContext';
+
+const UNITS_LIST = [
+    'Carton',
+    'Pallet',
+    'Piece',
+    'Box',
+    'Shrink',
+    'Bale',
+    'Crate',
+    'Bag',
+    'Unit'
+];
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { formatPrice } from '@/lib/currency';
@@ -313,12 +325,16 @@ function ProductDetailModal({ product, onClose, onApprove, onReject, onDelete, o
                                             
                                             {isEditing && (
                                                 <div className="flex-1">
-                                                    <p className="text-[9px] font-bold text-muted-foreground mb-1 uppercase">Unit (e.g. Carton)</p>
-                                                    <input 
-                                                        className="text-2xl font-black bg-muted p-2 rounded-xl w-full"
+                                                    <p className="text-[9px] font-bold text-muted-foreground mb-1 uppercase">Unit Type</p>
+                                                    <select 
+                                                        className="text-lg font-black bg-muted p-2 rounded-xl w-full outline-none cursor-pointer appearance-none"
                                                         value={editedData.unit}
                                                         onChange={e => setEditedData({...editedData, unit: e.target.value})}
-                                                    />
+                                                    >
+                                                        {UNITS_LIST.map(u => (
+                                                            <option key={u} value={u.toLowerCase()}>{u}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                             )}
                                         </div>
