@@ -25,6 +25,7 @@ interface AdminProduct {
     images: string[];
     brand: string;
     status: string;
+    unit: string;
     ean?: string;
     adminNotes?: string;
     createdAt: string;
@@ -57,6 +58,8 @@ function ProductDetailModal({ product, onClose, onApprove, onReject, onDelete, o
         stock: product.stock,
         category: product.category,
         brand: product.brand,
+        unit: product.unit || 'carton',
+        images: product.images || [],
     });
 
     const handleSave = async () => {
@@ -95,6 +98,23 @@ function ProductDetailModal({ product, onClose, onApprove, onReject, onDelete, o
                             />
                         </AnimatePresence>
                     </div>
+                    
+                    {isEditing && (
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Primary Image URL</label>
+                            <input 
+                                className="w-full bg-card border border-border/50 rounded-xl px-4 py-2 text-[10px] font-medium outline-none focus:border-primary/50 transition-all"
+                                value={editedData.images[activeImage] || ''}
+                                onChange={e => {
+                                    const newImages = [...editedData.images];
+                                    newImages[activeImage] = e.target.value;
+                                    setEditedData({...editedData, images: newImages});
+                                }}
+                                placeholder="Paste image URL..."
+                            />
+                        </div>
+                    )}
+
                     <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
                         {product.images.map((img, i) => (
                             <button 
@@ -166,22 +186,50 @@ function ProductDetailModal({ product, onClose, onApprove, onReject, onDelete, o
                                     </div>
                                     <div>
                                         <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-2"><Box size={12}/> Inventory</p>
-                                        {isEditing ? (
-                                            <input 
-                                                type="number"
-                                                className="text-2xl font-black bg-muted p-2 rounded-xl w-full"
-                                                value={editedData.stock}
-                                                onChange={e => setEditedData({...editedData, stock: parseInt(e.target.value)})}
-                                            />
-                                        ) : (
-                                            <p className="text-3xl font-black tracking-tighter">{product.stock} Units</p>
-                                        )}
+                                        <div className="flex items-center gap-4">
+                                            {isEditing ? (
+                                                <div className="flex-1">
+                                                    <p className="text-[9px] font-bold text-muted-foreground mb-1 uppercase">Quantity</p>
+                                                    <input 
+                                                        type="number"
+                                                        className="text-2xl font-black bg-muted p-2 rounded-xl w-full"
+                                                        value={editedData.stock}
+                                                        onChange={e => setEditedData({...editedData, stock: parseInt(e.target.value)})}
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <p className="text-3xl font-black tracking-tighter">{product.stock} {product.unit || 'Units'}</p>
+                                            )}
+                                            
+                                            {isEditing && (
+                                                <div className="flex-1">
+                                                    <p className="text-[9px] font-bold text-muted-foreground mb-1 uppercase">Unit (e.g. Carton)</p>
+                                                    <input 
+                                                        className="text-2xl font-black bg-muted p-2 rounded-xl w-full"
+                                                        value={editedData.unit}
+                                                        onChange={e => setEditedData({...editedData, unit: e.target.value})}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                                 <div className="space-y-4">
                                     <div>
                                         <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-2"><Layers size={12}/> Category</p>
-                                        <p className="text-lg font-black">{product.category}</p>
+                                        {isEditing ? (
+                                            <select 
+                                                className="w-full bg-muted border-none p-2 rounded-xl font-black text-lg outline-none focus:ring-2 focus:ring-primary/20 appearance-none cursor-pointer"
+                                                value={editedData.category}
+                                                onChange={e => setEditedData({...editedData, category: e.target.value})}
+                                            >
+                                                {CATEGORIES_LIST.map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                        ) : (
+                                            <p className="text-lg font-black">{product.category}</p>
+                                        )}
                                     </div>
                                     <div>
                                         <p className="text-[11px] font-black uppercase tracking-widest text-muted-foreground mb-2 flex items-center gap-2"><User size={12}/> Supplier</p>
@@ -562,7 +610,7 @@ export default function AdminProductsPage() {
                                     <td className="px-10 py-10">
                                         <div className="space-y-1">
                                             <p className="text-xl font-black tracking-tighter">{formatPrice(product.price)}</p>
-                                            <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">{product.stock} Units in stock</p>
+                                            <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">{product.stock} {product.unit || 'Units'} in stock</p>
                                         </div>
                                     </td>
                                     <td className="px-10 py-10">
