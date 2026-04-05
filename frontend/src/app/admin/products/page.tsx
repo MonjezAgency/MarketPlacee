@@ -379,6 +379,38 @@ export default function AdminProductsPage() {
         setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
+    const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
+        if (!selectedIds.length) return;
+        if (action === 'delete' && !confirm('Are you sure you want to delete selected products?')) return;
+        
+        setIsBulkLoading(true);
+        try {
+            const token = localStorage.getItem('bev-token');
+            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+            const endpoint = `/products/bulk-${action}`;
+            const res = await fetch(`${backendBase}${endpoint}`, {
+                method: 'POST',
+                headers: { 
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ids: selectedIds })
+            });
+            if (res.ok) {
+                showIPhoneToast(`Products ${action}d`, 'success');
+                setSelectedIds([]);
+                fetchProducts();
+            } else {
+                showIPhoneToast(`Failed to ${action} products`, 'error');
+            }
+        } catch (err) {
+            console.error(err);
+            showIPhoneToast(`Network error during bulk ${action}`, 'error');
+        } finally {
+            setIsBulkLoading(false);
+        }
+    };
+
     const filteredProducts = products.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || (p.brand?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false);
         const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
@@ -477,6 +509,17 @@ export default function AdminProductsPage() {
                 <table className="w-full text-start border-collapse">
                     <thead>
                         <tr className="border-b border-border/50">
+                            <th className="w-16 px-6 py-8 text-center">
+                                <input 
+                                    type="checkbox" 
+                                    onChange={(e) => {
+                                        if (e.target.checked) setSelectedIds(filteredProducts.map(p => p.id));
+                                        else setSelectedIds([]);
+                                    }} 
+                                    checked={selectedIds.length === filteredProducts.length && filteredProducts.length > 0} 
+                                    className="w-4 h-4 rounded border-border outline-none transition-all accent-primary cursor-pointer" 
+                                />
+                            </th>
                             <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">Entity & Data</th>
                             <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">Intelligence</th>
                             <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">Compliance</th>
@@ -494,6 +537,14 @@ export default function AdminProductsPage() {
                                     className="group hover:bg-primary/5 transition-all cursor-pointer"
                                     onClick={() => setSelectedProduct(product)}
                                 >
+                                    <td className="px-6 text-center" onClick={(e) => { e.stopPropagation(); toggleSelect(product.id); }}>
+                                        <input 
+                                            type="checkbox" 
+                                            checked={selectedIds.includes(product.id)} 
+                                            onChange={() => {}} /* Handled by td click */
+                                            className="w-4 h-4 rounded border-border outline-none transition-all accent-primary pointer-events-none" 
+                                        />
+                                    </td>
                                     <td className="px-10 py-10">
                                         <div className="flex items-center gap-6">
                                             <div className="relative group-hover:scale-110 transition-transform duration-500">
@@ -555,9 +606,19 @@ export default function AdminProductsPage() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-4">
-                                <button onClick={() => setSelectedIds([])} className="h-14 px-8 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-colors">Abort</button>
-                                <button className="h-14 px-10 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all">Execute Mass Approval</button>
-                                <button className="h-14 px-10 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-red-500 text-white shadow-xl shadow-red-500/20 hover:scale-105 active:scale-95 transition-all">Mass Deletion</button>
+                                <button disabled={isBulkLoading} onClick={() => setSelectedIds([])} className="h-14 px-8 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-colors disabled:opacity-50">Abort</button>
+                                <button disabled={isBulkLoading} onClick={() => handleBulkAction('approve')} className="h-14 px-10 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-emerald-500 text-white shadow-xl shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2">
+                                    {isBulkLoading && <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+                                    Mass Approve
+                                </button>
+                                <button disabled={isBulkLoading} onClick={() => handleBulkAction('reject')} className="h-14 px-10 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-amber-500 text-white shadow-xl shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2">
+                                    {isBulkLoading && <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+                                    Mass Reject
+                                </button>
+                                <button disabled={isBulkLoading} onClick={() => handleBulkAction('delete')} className="h-14 px-10 rounded-2xl font-black text-[10px] uppercase tracking-widest bg-red-500 text-white shadow-xl shadow-red-500/20 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2">
+                                    {isBulkLoading && <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+                                    Mass Delete
+                                </button>
                             </div>
                         </div>
                     </motion.div>

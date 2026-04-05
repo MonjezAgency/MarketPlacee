@@ -245,6 +245,13 @@ export class ProductsService {
         });
     }
 
+    async bulkReject(ids: string[]) {
+        return this.prisma.product.updateMany({
+            where: { id: { in: ids } },
+            data: { status: ProductStatus.REJECTED }
+        });
+    }
+
     async update(id: string, data: any) {
         const updateData: any = {};
         if (data.name !== undefined) updateData.name = data.name;

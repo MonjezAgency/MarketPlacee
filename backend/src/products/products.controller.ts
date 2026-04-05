@@ -223,6 +223,15 @@ export class ProductsController {
         return { message: 'Products approved', count: body.ids.length };
     }
 
+    @Post('bulk-reject')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    async rejectBulk(@Body() body: { ids: string[] }) {
+        if (!body.ids || !body.ids.length) return { message: 'No IDs provided' };
+        await this.productsService.bulkReject(body.ids);
+        return { message: 'Products rejected', count: body.ids.length };
+    }
+
     @Post(':id/rate')
     @UseGuards(JwtAuthGuard)
     async rateProduct(@Param('id') id: string, @Body() body: { rating: number }) {
