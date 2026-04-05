@@ -118,13 +118,11 @@ export class ProductsService {
             if (filters.maxPrice) where.price.lte = parseFloat(filters.maxPrice);
         }
 
-        // Safety: Only apply strict content requirements for the public marketplace (APPROVED).
+        // Safety: Only apply minimal requirements for the public marketplace (APPROVED).
         if (status === ProductStatus.APPROVED) {
             where.AND = [
                 ...(where.AND || []),
-                { images: { isEmpty: false } },
-                { name: { not: '' } },
-                { description: { not: '' } }
+                { name: { not: '' } }
             ];
         }
 
@@ -154,12 +152,8 @@ export class ProductsService {
             this.prisma.product.count({ where }),
         ]);
 
-        const filtered = status === ProductStatus.APPROVED
-            ? products.filter(p => p.name && p.name.trim() !== '' && p.images.some(img => img && img.trim() !== ''))
-            : products;
-
         return {
-            data: filtered,
+            data: products,
             total,
             page,
             limit,
