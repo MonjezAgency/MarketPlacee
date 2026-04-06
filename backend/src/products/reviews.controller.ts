@@ -1,4 +1,5 @@
-import { Controller, Post, Get, Delete, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Query, Request, UseGuards, UseInterceptors, UploadedFiles } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -16,12 +17,15 @@ export class ReviewsController {
 
     @Post()
     @UseGuards(JwtAuthGuard)
+    @UseInterceptors(FilesInterceptor('images'))
     async create(
         @Param('productId') productId: string,
         @Request() req,
-        @Body() body: { rating: number; comment?: string },
+        @UploadedFiles() files: any[],
+        @Body() body: { rating: string | number; comment?: string },
     ) {
-        return this.reviewsService.create(productId, req.user.sub, body.rating, body.comment);
+        const rating = typeof body.rating === 'string' ? parseInt(body.rating, 10) : body.rating;
+        return this.reviewsService.create(productId, req.user.sub, rating, body.comment, files);
     }
 
     @Delete(':reviewId')

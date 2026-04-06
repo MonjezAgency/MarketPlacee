@@ -488,6 +488,7 @@ model Review {
   id        String   @id @default(uuid())
   rating    Int      // 1-5
   comment   String?
+  images    String[] @default([])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

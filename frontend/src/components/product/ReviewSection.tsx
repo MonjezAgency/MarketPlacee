@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Star, ThumbsUp, Trash2 } from 'lucide-react';
+import { Star, ThumbsUp, Trash2, Camera, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 
 interface Review {
     id: string;
     rating: number;
     comment?: string;
+    images?: string[];
     createdAt: string;
     user: { id: string; name: string; companyName?: string; avatar?: string };
 }
@@ -44,6 +45,8 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
     const [loading, setLoading] = useState(true);
     const [myRating, setMyRating] = useState(0);
     const [myComment, setMyComment] = useState('');
+    const [selectedImages, setSelectedImages] = useState<File[]>([]);
+    const [previews, setPreviews] = useState<string[]>([]);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
@@ -65,10 +68,27 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
         if (mine) { setMyRating(mine.rating); setMyComment(mine.comment || ''); }
     }, [reviews, user]);
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            setSelectedImages(prev => [...prev, ...files]);
+            
+            const newPreviews = files.map(file => URL.createObjectURL(file));
+            setPreviews(prev => [...prev, ...newPreviews]);
+        }
+    };
+
+    const removeImage = (index: number) => {
+        setSelectedImages(prev => prev.filter((_, i) => i !== index));
+        setPreviews(prev => {
+            URL.revokeObjectURL(prev[index]);
+            return prev.filter((_, i) => i !== index);
+        });
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // Validation: If no rating is selected, show an error and stop.
         if (!myRating) {
             setError('يرجى اختيار تقييم بالنجوم لإرسال مراجعتك'); 
             return; 
@@ -84,10 +104,20 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                 return;
             }
 
+            const formData = new FormData();
+            formData.append('rating', myRating.toString());
+            formData.append('comment', myComment);
+            selectedImages.forEach(file => {
+                formData.append('images', file);
+            });
+
             const res = await fetch(`${API_URL}/products/${productId}/reviews`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-                body: JSON.stringify({ rating: myRating, comment: myComment }),
+                headers: { 
+                    Authorization: `Bearer ${token}` 
+                    // Note: Browser automatically sets Content-Type to multipart/form-data with boundary
+                },
+                body: formData,
             });
 
             if (!res.ok) { 
@@ -100,12 +130,11 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                 return; 
             }
 
-            // Successful submission: Reload reviews and notify parent
+            // Successful submission: Clear state
+            setSelectedImages([]);
+            setPreviews([]);
             await load();
             
-            // Re-calculate totals from current reviews list after load() finishes
-            // Note: reviews state might not be updated within the same function execution 
-            // after load() completes due to React batching, so we fetch once more to be safe.
             const updatedRes = await fetch(`${API_URL}/products/${productId}/reviews`);
             if (updatedRes.ok) {
                 const latestReviews = await updatedRes.json();
@@ -167,29 +196,74 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
 
             {/* Write Review */}
             {isLoggedIn ? (
-                <form onSubmit={handleSubmit} className="bg-white border border-slate-100 rounded-2xl p-6 mb-8 shadow-sm">
-                    <h3 className="font-black text-[#0A1A2F] mb-4">
+                <form onSubmit={handleSubmit} className="bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-2xl p-6 mb-8 shadow-sm">
+                    <h3 className="font-black text-[#0A1A2F] dark:text-white mb-4">
                         {reviews.find(r => r.user.id === user?.id) ? 'تعديل تقييمك' : 'اكتب تقييمك'}
                     </h3>
-                    {error && <p className="text-red-600 text-sm mb-3 font-bold">{error}</p>}
-                    <div className="mb-4">
-                        <label className="text-xs font-black uppercase tracking-widest text-slate-400 mb-2 block">تقييمك</label>
-                        <StarRating value={myRating} onChange={setMyRating} size={28} />
+                    {error && <p className="text-red-500 text-sm mb-4 font-bold">{error}</p>}
+                    
+                    <div className="flex flex-col md:flex-row gap-6 mb-6">
+                        <div className="shrink-0">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block text-center">تقييمك</label>
+                            <StarRating value={myRating} onChange={setMyRating} size={32} />
+                        </div>
+                        
+                        <div className="flex-1">
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block">رأيك الشخصي</label>
+                            <textarea
+                                value={myComment}
+                                onChange={e => setMyComment(e.target.value)}
+                                placeholder="شاركنا رأيك في هذا المنتج... (اختياري)"
+                                rows={2}
+                                className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm text-[#0A1A2F] dark:text-white outline-none focus:border-[#FF8A00]/40 transition resize-none"
+                            />
+                        </div>
                     </div>
-                    <textarea
-                        value={myComment}
-                        onChange={e => setMyComment(e.target.value)}
-                        placeholder="شاركنا رأيك في هذا المنتج... (اختياري)"
-                        rows={3}
-                        className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 text-sm text-[#0A1A2F] outline-none focus:border-[#FF8A00]/40 transition resize-none mb-4"
-                    />
-                    <button
-                        type="submit"
-                        disabled={submitting}
-                        className="px-8 py-3 bg-[#0A1A2F] hover:bg-[#FF8A00] text-white rounded-xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50"
-                    >
-                        {submitting ? 'جاري الإرسال...' : 'إرسال التقييم'}
-                    </button>
+
+                    {/* Image Upload UI */}
+                    <div className="mb-6">
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block">أضف صور للمنتج (اختياري)</label>
+                        <div className="flex flex-wrap gap-3">
+                            {previews.map((preview, i) => (
+                                <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 group">
+                                    <img src={preview} alt="preview" className="w-full h-full object-cover" />
+                                    <button
+                                        type="button"
+                                        onClick={() => removeImage(i)}
+                                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    >
+                                        <X size={12} />
+                                    </button>
+                                </div>
+                            ))}
+                            <button
+                                type="button"
+                                onClick={() => document.getElementById('review-images')?.click()}
+                                className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 dark:border-white/10 text-slate-400 hover:text-[#FF8A00] hover:border-[#FF8A00] transition-all"
+                            >
+                                <Camera size={20} />
+                                <span className="text-[9px] font-black uppercase tracking-tighter">رفع صورة</span>
+                            </button>
+                            <input
+                                id="review-images"
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                className="hidden"
+                                onChange={handleFileChange}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                        <button
+                            type="submit"
+                            disabled={submitting}
+                            className="px-10 py-3.5 bg-[#0A1A2F] dark:bg-[#1BC7C9] text-white dark:text-[#0A1A2F] rounded-xl font-black text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 disabled:opacity-50 shadow-lg shadow-[#0A1A2F]/10 dark:shadow-none"
+                        >
+                            {submitting ? 'جاري الإرسال...' : 'إرسال التقييم'}
+                        </button>
+                    </div>
                 </form>
             ) : (
                 <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 mb-8 text-center">
@@ -239,7 +313,16 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                                 )}
                             </div>
                             {review.comment && (
-                                <p className="mt-3 text-sm text-slate-600 leading-relaxed ps-13">{review.comment}</p>
+                                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300 leading-relaxed ps-13">{review.comment}</p>
+                            )}
+                            {review.images && review.images.length > 0 && (
+                                <div className="flex flex-wrap gap-2 mt-3 ps-13">
+                                    {review.images.map((img, i) => (
+                                        <a key={i} href={img} target="_blank" rel="noreferrer" className="w-16 h-16 rounded-lg overflow-hidden border border-slate-100 dark:border-white/5">
+                                            <img src={img} alt="review" className="w-full h-full object-cover hover:scale-110 transition-transform" />
+                                        </a>
+                                    ))}
+                                </div>
                             )}
                         </div>
                     ))}

@@ -57,7 +57,7 @@ export default function ProductDetailClient() {
         fetch(`${API_URL}/products/${id}/similar`)
             .then(r => r.ok ? r.json() : [])
             .then(data => setSimilarProducts(Array.isArray(data) ? data : []))
-            .catch(() => {});
+            .catch(() => { });
     }, [id, API_URL]);
 
     const currentProduct = products.find(p => p.id === id);
@@ -289,15 +289,15 @@ export default function ProductDetailClient() {
                                             <p className="text-foreground font-black text-lg">{product.minOrder} Units</p>
                                         </div>
                                         <div className="w-px h-10 bg-border" />
-                                         <div className="space-y-1">
-                                             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Inventory Status</p>
-                                             <p className={cn(
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Inventory Status</p>
+                                            <p className={cn(
                                                 "font-black text-lg",
                                                 product.status === ProductStatus.APPROVED ? "text-accent" : "text-amber-500"
-                                             )}>
+                                            )}>
                                                 {product.status === ProductStatus.APPROVED ? 'In Active Distribution' : 'Pending Approval'}
-                                             </p>
-                                         </div>
+                                            </p>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-6 pt-2">

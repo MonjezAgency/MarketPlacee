@@ -1,5 +1,7 @@
 import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import * as fs from 'fs';
+import { join } from 'path';
 
 @Injectable()
 export class ReviewsService {
@@ -15,13 +17,28 @@ export class ReviewsService {
         });
     }
 
-    async create(productId: string, userId: string, rating: number, comment?: string) {
+    async create(productId: string, userId: string, rating: number, comment?: string, files: any[] = []) {
         if (rating < 1 || rating > 5) throw new BadRequestException('Rating must be between 1 and 5');
+
+        const images = [];
+        if (files && files.length > 0) {
+            const uploadDir = join(process.cwd(), 'uploads', 'reviews');
+            if (!fs.existsSync(uploadDir)) {
+                fs.mkdirSync(uploadDir, { recursive: true });
+            }
+
+            for (const file of files) {
+                const fileName = `${Date.now()}-${file.originalname.replace(/\s/g, '_')}`;
+                const filePath = join(uploadDir, fileName);
+                fs.writeFileSync(filePath, file.buffer);
+                images.push(`/uploads/reviews/${fileName}`);
+            }
+        }
 
         const review = await this.prisma.review.upsert({
             where: { productId_userId: { productId, userId } },
-            update: { rating, comment },
-            create: { productId, userId, rating, comment },
+            update: { rating, comment, images },
+            create: { productId, userId, rating, comment, images },
             include: {
                 user: { select: { id: true, name: true, companyName: true, avatar: true } },
             },
