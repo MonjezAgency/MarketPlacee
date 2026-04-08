@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import {
     Package, Plus, Upload, Search, MoreHorizontal,
-    Loader2, AlertTriangle, CheckCircle2, XCircle, FileSpreadsheet
+    Loader2, AlertTriangle, CheckCircle2, XCircle, FileSpreadsheet,
+    ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -30,6 +31,12 @@ export default function SupplierDashboard() {
     const [mounted, setMounted] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const ITEMS_PER_PAGE = 20;
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [searchTerm]);
 
     useEffect(() => {
         setMounted(true);
@@ -218,6 +225,9 @@ export default function SupplierDashboard() {
         p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.category?.toLowerCase().includes(searchTerm.toLowerCase())
     );
+
+    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+    const paginatedProducts = filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
     const totalRevenue = dashboardStats?.totalRevenue ?? 0;
     const activePlacements = dashboardStats?.activePlacements ?? 0;
@@ -439,7 +449,7 @@ export default function SupplierDashboard() {
                                     </td>
                                 </tr>
                             )}
-                            {filteredProducts.map((product) => {
+                            {paginatedProducts.map((product) => {
                                 const missingFields: string[] = [];
                                 if (!product.description || product.description.trim() === '' || product.description === 'No description') missingFields.push('Description');
                                 if (!product.images || product.images.length === 0) missingFields.push('Image');
@@ -493,6 +503,36 @@ export default function SupplierDashboard() {
                         </tbody>
                     </table>
                 </div>
+
+                {/* Pagination Controls */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-between p-4 border-t border-border/50 bg-muted/10">
+                        <span className="text-sm text-foreground/60">
+                            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
+                        </span>
+                        <div className="flex gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={currentPage === 1}
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                            >
+                                <ChevronLeft className="w-4 h-4" />
+                            </Button>
+                            <span className="flex items-center px-4 text-sm font-black text-foreground">
+                                Page {currentPage} of {totalPages}
+                            </span>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={currentPage === totalPages}
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                            >
+                                <ChevronRight className="w-4 h-4" />
+                            </Button>
+                        </div>
+                    </div>
+                )}
             </div>
             <ProductEditorModal
                 isOpen={isProductModalOpen}
