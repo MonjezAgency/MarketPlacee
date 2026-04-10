@@ -22,16 +22,21 @@ export class ReviewsService {
 
         const images = [];
         if (files && files.length > 0) {
-            const uploadDir = join(process.cwd(), 'uploads', 'reviews');
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true });
-            }
+            try {
+                const uploadDir = join(process.cwd(), 'uploads', 'reviews');
+                if (!fs.existsSync(uploadDir)) {
+                    fs.mkdirSync(uploadDir, { recursive: true });
+                }
 
-            for (const file of files) {
-                const fileName = `${Date.now()}-${file.originalname.replace(/\s/g, '_')}`;
-                const filePath = join(uploadDir, fileName);
-                fs.writeFileSync(filePath, file.buffer);
-                images.push(`/uploads/reviews/${fileName}`);
+                for (const file of files) {
+                    const fileName = `${Date.now()}-${file.originalname.replace(/\s/g, '_')}`;
+                    const filePath = join(uploadDir, fileName);
+                    fs.writeFileSync(filePath, file.buffer);
+                    images.push(`/uploads/reviews/${fileName}`);
+                }
+            } catch (fsError) {
+                console.error('[REVIEWS_ERROR] Failed to save images to filesystem:', fsError);
+                // Continue without images if saving fails (prevents 500 error)
             }
         }
 

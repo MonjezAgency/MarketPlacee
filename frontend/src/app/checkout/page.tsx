@@ -103,7 +103,7 @@ export default function CheckoutPage() {
     const removeCoupon = () => { setCouponDiscount(0); setCouponApplied(''); setCouponError(''); };
 
     const discountAmount = total * (couponDiscount / 100);
-    const grandTotal = (total - discountAmount) * 0.95 + (selectedShipping?.cost || 0);
+    const grandTotal = (total - discountAmount) + (selectedShipping?.cost || 0);
 
     const handlePlaceOrder = async () => {
         if (!items || items.length === 0) {

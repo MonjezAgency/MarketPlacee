@@ -14,6 +14,10 @@ export async function POST(req: Request, { params }: { params: { productId: stri
         const headers = new Headers();
         const authHeader = req.headers.get('authorization');
         if (authHeader) headers.set('authorization', authHeader);
+        
+        // Log headers for debugging (excluding auth)
+        const contentType = req.headers.get('content-type');
+        console.log(`[Proxy] Request Content-Type: ${contentType}`);
 
         const res = await fetch(backendUrl, {
             method: 'POST',

@@ -57,7 +57,8 @@ export default function Navbar() {
     const pathname = usePathname();
     const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-    const isWhiteBackgroundPage = pathname.startsWith('/categories') || pathname.startsWith('/products') || pathname.startsWith('/cart') || pathname.startsWith('/checkout') || pathname.startsWith('/dashboard') || pathname.startsWith('/wishlist');
+    const whiteBackgroundPrefixes = ['/categories', '/products', '/cart', '/checkout', '/dashboard', '/wishlist', '/admin', '/supplier'];
+    const isWhiteBackgroundPage = whiteBackgroundPrefixes.some(prefix => pathname.startsWith(prefix));
 
     // Hide Navbar completely on auth pages, as they have their own integrated clean layout.
     if (pathname.startsWith('/auth')) {

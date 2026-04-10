@@ -37,7 +37,7 @@ async function bootstrap() {
     // ── Strict Security Headers ──────────────────────────────────────────────
     const backendHost = (process.env.BACKEND_URL || 'http://localhost:3001')
         .replace(/^https?:\/\//, '');
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = process.env.FRONTEND_URL || 'https://marketpl7ce.vercel.app';
 
     app.use(helmet({
         crossOriginResourcePolicy: { policy: 'cross-origin' },
@@ -90,9 +90,10 @@ async function bootstrap() {
 
     // Enable CORS — whitelist only known frontend origins
     const allowedOrigins = [
-        process.env.FRONTEND_URL || 'http://localhost:3000',
-        'http://127.0.0.1:3000',
+        process.env.FRONTEND_URL,
+        'https://marketpl7ce.vercel.app',
         'http://localhost:3000',
+        'http://127.0.0.1:3000',
     ].filter(Boolean);
 
     app.enableCors({
