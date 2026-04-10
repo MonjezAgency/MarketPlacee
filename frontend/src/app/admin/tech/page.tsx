@@ -16,8 +16,9 @@ import {
     Tooltip, ResponsiveContainer, BarChart, Bar,
 } from 'recharts';
 import { useAuth } from '@/lib/auth';
+import { API_BASE_URL } from '@/lib/config';
 
-const API_URL = '/api';
+const API_URL = API_BASE_URL;
 
 // ── Mock data (will be replaced with live API calls) ─────────────────────────
 

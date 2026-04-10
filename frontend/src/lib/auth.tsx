@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { API_BASE_URL } from './config';
 
 export interface User {
     id: string;
@@ -96,7 +97,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         locale?: string;
     }): Promise<boolean | string> => {
         try {
-            const res = await fetch('/api/auth/register', {
+            const baseUrl = API_BASE_URL.replace(/\/$/, '');
+            const res = await fetch(`${baseUrl}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
@@ -124,7 +126,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
         try {
-            const res = await fetch('/api/auth/login', {
+            const baseUrl = API_BASE_URL.replace(/\/$/, '');
+            const res = await fetch(`${baseUrl}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
@@ -159,7 +162,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const verify2FALogin = async (partialToken: string, code: string): Promise<{ success: boolean; user?: User; message?: string }> => {
         try {
-            const res = await fetch('/api/auth/2fa/login-verify', {
+            const baseUrl = API_BASE_URL.replace(/\/$/, '');
+            const res = await fetch(`${baseUrl}/auth/2fa/login-verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ partialToken, code }),
@@ -183,7 +187,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!user) return;
         try {
             const token = localStorage.getItem('bev-token');
-            const res = await fetch(`/api/users/${user.id}`, {
+            const baseUrl = API_BASE_URL.replace(/\/$/, '');
+            const res = await fetch(`${baseUrl}/users/${user.id}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

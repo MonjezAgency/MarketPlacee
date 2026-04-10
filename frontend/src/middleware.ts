@@ -22,7 +22,7 @@ export function middleware(request: NextRequest) {
 
     // Proxy all other /api/* routes to the backend
     const apiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
-    if (apiUrl && pathname.startsWith('/api/') && !pathname.startsWith('/api/reviews') && !pathname.startsWith('/api/shipping')) {
+    if (apiUrl && pathname.startsWith('/api/') && !pathname.startsWith('/api/auth') && !pathname.startsWith('/api/reviews') && !pathname.startsWith('/api/shipping')) {
         const backendPath = pathname.replace(/^\/api/, '');
         const backendBase = apiUrl.replace(/\/$/, '');
         const url = new URL(`${backendBase}${backendPath}${request.nextUrl.search}`);

@@ -24,7 +24,9 @@ export default function ForgotPasswordPage() {
 
         setLoading(true);
         try {
-            await axios.post(`/api/auth/forgot-password`, { email });
+            const { API_BASE_URL } = await import('@/lib/config');
+            const baseUrl = API_BASE_URL.replace(/\/$/, '');
+            await axios.post(`${baseUrl}/auth/forgot-password`, { email });
             setSuccess(true);
             toast.success('Reset link sent!');
         } catch (err: any) {
