@@ -118,16 +118,16 @@ export default function Navbar() {
                             )}
                         >
                             <Menu size={20} className={cn("transition-transform", isCategoriesOpen ? "rotate-90" : "group-hover:rotate-90")} />
-                            <span>{t('navbar', 'categories')}</span>
+                            <span>{t('navbar', 'categories') || 'Categories'}</span>
                             <ChevronDown size={16} className={cn("transition-transform", isCategoriesOpen ? "rotate-180" : "")} />
                         </button>
 
                         {isCategoriesOpen && (
                             <div className="absolute top-full -mt-1 pt-4 start-0 w-72 z-[100] animate-in fade-in slide-in-from-top-2 duration-200">
-                                <div className="bg-card border border-border/50 rounded-xl shadow-2xl py-3 whitespace-nowrap overflow-hidden">
+                                <div className="bg-card border border-border/50 rounded-xl shadow-2xl py-3 whitespace-nowrap overflow-hidden text-foreground">
                                 <div className="px-4 pb-2 mb-2 border-b border-border/50">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                        {t('navbar', 'browseCategories') || 'Browse Categories'}
+                                        {t('footer', 'browseCategories') || 'Browse Categories'}
                                     </span>
                                 </div>
                                 <div className="max-h-[60vh] overflow-y-auto no-scrollbar py-1">
