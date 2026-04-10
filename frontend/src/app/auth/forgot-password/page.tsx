@@ -24,7 +24,7 @@ export default function ForgotPasswordPage() {
 
         setLoading(true);
         try {
-            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/forgot-password`, { email });
+            await axios.post(`/api/auth/forgot-password`, { email });
             setSuccess(true);
             toast.success('Reset link sent!');
         } catch (err: any) {

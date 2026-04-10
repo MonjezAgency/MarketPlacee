@@ -46,9 +46,9 @@ export class AuthController {
 
     @Post('login')
     @Throttle({ default: { limit: 6, ttl: 60000 } })
-    async login(@Body() loginDto: any, @Req() req: any) {
+    async login(@Body('email') email: string, @Body('password') password: string, @Req() req: any) {
         const ip = req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress;
-        const user = await this.authService.validateUser(loginDto.email, loginDto.password, ip);
+        const user = await this.authService.validateUser(email, password, ip);
         if (!user) {
             throw new UnauthorizedException('البريد الإلكتروني أو كلمة المرور غير صحيحة');
         }
@@ -59,8 +59,8 @@ export class AuthController {
     }
 
     @Post('2fa/login-verify')
-    async loginVerify2FA(@Body() body: { partialToken: string; code: string }) {
-        return this.authService.loginVerify2FA(body.partialToken, body.code);
+    async loginVerify2FA(@Body('partialToken') partialToken: string, @Body('code') code: string) {
+        return this.authService.loginVerify2FA(partialToken, code);
     }
 
     @Post('refresh')
@@ -95,8 +95,8 @@ export class AuthController {
     }
 
     @Post('reset-password')
-    async resetPassword(@Body() body: any) {
-        await this.authService.resetPassword(body.token, body.password);
+    async resetPassword(@Body('token') token: string, @Body('password') password: string) {
+        await this.authService.resetPassword(token, password);
         return { message: 'Password reset successfully' };
     }
 
@@ -153,32 +153,37 @@ export class AuthController {
     }
 
     @Post('google')
-    async googleLogin(@Body() body: { email: string; name: string; avatar?: string; googleId?: string }) {
-        return this.authService.googleLogin(body);
+    async googleLogin(@Body('email') email: string, @Body('name') name: string, @Body('avatar') avatar?: string, @Body('googleId') googleId?: string) {
+        return this.authService.googleLogin({ email, name, avatar, googleId });
     }
 
     @Post('seed-admin')
-    async seedAdmin(@Body() body: any) {
+    async seedAdmin(
+        @Body('email') email: string, 
+        @Body('password') password: string, 
+        @Body('name') name: string, 
+        @Body('secret') secret: string
+    ) {
         // Protected by a secret key — use environment variable or a secure hardcoded fallback for production stability
         const expectedSecret = process.env.SEED_ADMIN_SECRET || 'atlantis_seed_2025_secure';
-        if (body.secret !== expectedSecret) {
+        if (secret !== expectedSecret) {
             throw new ForbiddenException('Unauthorized seed attempt');
         }
         try {
-            const existing = await this.authService.findByEmail(body.email);
+            const existing = await this.authService.findByEmail(email);
             if (existing) {
                 // If already ACTIVE admin, no need to re-hash password
                 if (existing.role === 'ADMIN' && existing.status === 'ACTIVE' && existing.emailVerified) {
                     return { message: 'Admin already exists', userId: existing.id };
                 }
                 // Update the password hash and ensure ACTIVE status
-                await this.authService.updateAdmin(existing.id, body.password);
+                await this.authService.updateAdmin(existing.id, password);
                 return { message: 'Admin updated', userId: existing.id };
             }
             const user = await this.authService.register({
-                email: body.email,
-                password: body.password,
-                name: body.name || 'Super Admin',
+                email: email,
+                password: password,
+                name: name || 'Super Admin',
                 role: 'ADMIN',
                 status: 'ACTIVE',
                 emailVerified: true // Critical: Ensure seeded admin can login

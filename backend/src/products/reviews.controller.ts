@@ -22,10 +22,11 @@ export class ReviewsController {
         @Param('productId') productId: string,
         @Request() req,
         @UploadedFiles() files: any[],
-        @Body() body: { rating: string | number; comment?: string },
+        @Body('rating') ratingStr: string,
+        @Body('comment') comment?: string,
     ) {
-        const rating = typeof body.rating === 'string' ? parseInt(body.rating, 10) : body.rating;
-        return this.reviewsService.create(productId, req.user.sub, rating, body.comment, files);
+        const rating = typeof ratingStr === 'string' ? parseInt(ratingStr, 10) : ratingStr;
+        return this.reviewsService.create(productId, req.user.sub, rating, comment, files);
     }
 
     @Delete(':reviewId')

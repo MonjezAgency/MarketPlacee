@@ -46,7 +46,8 @@ export class EmailService {
   }
 
   async sendVerificationEmail(email: string, token: string) {
-    const url = `${process.env.FRONTEND_URL}/auth/verify-email?token=${token}`;
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const url = `${baseUrl}/auth/verify-email?token=${token}`;
     try {
       await this.transporter.sendMail({
         from: this.getFrom(),
@@ -79,7 +80,8 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(email: string, token: string) {
-    const url = `${process.env.FRONTEND_URL}/auth/reset-password?token=${token}`;
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const url = `${baseUrl}/auth/reset-password?token=${token}`;
     try {
       await this.transporter.sendMail({
         from: this.getFrom(),
@@ -112,7 +114,8 @@ export class EmailService {
   }
 
   async sendTeamInvitation(email: string, name: string, role: string, tempPassword?: string) {
-    const url = `${process.env.FRONTEND_URL}/auth/login`;
+    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const url = `${baseUrl}/auth/login`;
     const credentialsBlock = tempPassword ? `
             <div style="background: #F2F4F7; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #1BC7C9;">
               <p style="margin: 0 0 8px 0; font-size: 13px; color: #667085; font-weight: 600;">Your login credentials:</p>
