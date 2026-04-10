@@ -3,8 +3,8 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request, { params }: { params: { productId: string } }) {
     try {
         const formData = await req.formData();
-        // Force local backend URL for stability in development
-        const apiUrl = 'http://localhost:3005';
+        // Use BACKEND_URL (server-side variable) or NEXT_PUBLIC_API_URL (client-side fallback)
+        const apiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-dfc2.up.railway.app';
         
         const backendUrl = `${apiUrl}/products/${params.productId}/reviews`;
         const headers = new Headers();
