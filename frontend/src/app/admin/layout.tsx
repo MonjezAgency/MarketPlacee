@@ -247,7 +247,7 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-    const [isOpen, setIsOpen] = React.useState(true);
+    const [isOpen, setIsOpen] = React.useState(false); // Default to closed for mobile
     const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
     const [notifications, setNotifications] = React.useState<NotificationCounts>({
         pendingUsers: 0,
@@ -295,8 +295,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             .catch(() => {}); // في حالة network error — مش نحجب
     }, [user]);
 
+    // Auto-open on mount for desktop
     React.useEffect(() => {
         setMounted(true);
+        if (typeof window !== 'undefined' && window.innerWidth > 1024) {
+            setIsOpen(true);
+        }
         const fetchNotifications = async () => {
             if (user?.role !== 'admin' && user?.role !== 'ADMIN' && !isOwner) return;
             try {
@@ -360,8 +364,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <aside
                 style={{ backgroundColor: '#0A1A2F', color: '#F5F7FA' }}
                 className={cn(
-                    "transition-all duration-500 flex flex-col z-50 m-4 rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5",
-                    isOpen ? "w-72" : "w-24"
+                    "transition-all duration-500 flex flex-col z-[60] shrink-0",
+                    "fixed h-[calc(100vh-2rem)] lg:h-auto lg:relative m-4 rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5",
+                    isOpen ? "translate-x-0 w-72" : "-translate-x-[120%] lg:translate-x-0 w-0 lg:w-24"
                 )}>
                 {/* Sidebar Header */}
                 <div className="h-24 flex items-center justify-between px-8">
@@ -429,6 +434,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         >
                             <Menu size={20} />
                         </button>
+
+                        {/* Mobile Overlay / Backdrop */}
+                        {isOpen && (
+                            <div 
+                                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
+                                onClick={() => setIsOpen(false)}
+                            />
+                        )}
+
                         <Link
                             href="/"
                             className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
