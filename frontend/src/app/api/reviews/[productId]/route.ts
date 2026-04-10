@@ -3,12 +3,12 @@ import { NextResponse } from 'next/server';
 export async function POST(req: Request, { params }: { params: { productId: string } }) {
     try {
         const formData = await req.formData();
-        const apiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL;
+        // Force local backend URL for stability in development
+        const apiUrl = 'http://localhost:3005';
         
         const backendUrl = `${apiUrl}/products/${params.productId}/reviews`;
         const headers = new Headers();
         
-        // Pass the auth header
         const authHeader = req.headers.get('authorization');
         if (authHeader) headers.set('authorization', authHeader);
 
@@ -16,7 +16,6 @@ export async function POST(req: Request, { params }: { params: { productId: stri
             method: 'POST',
             headers,
             body: formData,
-            // Disable default fetch rewrite by node if needed
         });
 
         if (!res.ok) {

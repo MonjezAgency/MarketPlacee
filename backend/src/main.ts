@@ -105,7 +105,7 @@ async function bootstrap() {
     // Enable Socket.io adapter
     app.useWebSocketAdapter(new IoAdapter(app));
 
-    await app.listen(process.env.PORT ?? 3001, '0.0.0.0');
+    await app.listen(process.env.PORT ?? 3005, '0.0.0.0');
     console.log(`Backend is running on: ${await app.getUrl()}`);
 }
 bootstrap();

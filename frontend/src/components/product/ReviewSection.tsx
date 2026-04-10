@@ -103,6 +103,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
             const token = localStorage.getItem('bev-token');
             if (!token) {
                 setError('يجب تسجيل الدخول لإضافة تقييم');
+                setSubmitting(false);
                 return;
             }
 
@@ -113,15 +114,13 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                 formData.append('images', file);
             });
 
-            // Use direct backend URL for multipart uploads — Next.js middleware
-            // rewrite drops the FormData body, causing the POST to fail.
-            const postUrl = `${BACKEND_URL}/products/${productId}/reviews`;
+            // Use the Next.js API route proxy to handle multipart/form-data stably
+            const postUrl = `/api/reviews/${productId}`;
 
             const res = await fetch(postUrl, {
                 method: 'POST',
                 headers: { 
                     Authorization: `Bearer ${token}` 
-                    // Note: Browser automatically sets Content-Type to multipart/form-data with boundary
                 },
                 body: formData,
             });
