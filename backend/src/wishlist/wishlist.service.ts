@@ -19,7 +19,11 @@ export class WishlistService {
             },
             orderBy: { createdAt: 'desc' },
         });
-        return items.map(i => ({ id: i.id, addedAt: i.createdAt, ...i.product }));
+        return items.map(i => ({ 
+            wishlistItemId: i.id, 
+            addedAt: i.createdAt, 
+            ...i.product 
+        }));
     }
 
     async add(userId: string, productId: string) {

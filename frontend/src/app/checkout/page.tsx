@@ -449,10 +449,11 @@ export default function CheckoutPage() {
                                             <span className="text-accent font-heading font-black">-{formatPrice(discountAmount, false)}</span>
                                         </div>
                                     )}
-                                    <div className="flex justify-between items-center">
+                                    {/* Sourcing Credit Hidden for Buyers */}
+                                    {/* <div className="flex justify-between items-center">
                                         <span className="text-muted-foreground font-medium">Sourcing Credit (5%)</span>
                                         <span className="text-accent font-heading font-black">-{formatPrice((total - discountAmount) * 0.05, false)}</span>
-                                    </div>
+                                    </div> */}
                                     <div className="flex justify-between items-center">
                                         <span className="text-muted-foreground font-medium">Logistics Allocation</span>
                                         <span className="font-heading font-bold text-base">{selectedShipping ? formatPrice(selectedShipping.cost, false) : 'Pending'}</span>

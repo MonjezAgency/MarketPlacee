@@ -99,7 +99,17 @@ async function bootstrap() {
         origin: true,
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'stripe-signature'],
+        allowedHeaders: [
+            'Content-Type', 
+            'Authorization', 
+            'X-Requested-With', 
+            'Accept', 
+            'Cache-Control', 
+            'Pragma', 
+            'Expires', 
+            'stripe-signature'
+        ],
+        exposedHeaders: ['Set-Cookie'], // Useful for session-based auth if needed
     });
 
     // Enable Socket.io adapter
