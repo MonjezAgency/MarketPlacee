@@ -114,7 +114,7 @@ export default function Navbar() {
                             onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}
                             className={cn(
                                 "hidden lg:flex items-center gap-2 text-sm font-bold transition-all group",
-                                (isCategoriesOpen || scrolled || isWhiteBackgroundPage) ? "text-primary hover:text-secondary" : "text-white hover:text-secondary"
+                                (isCategoriesOpen || scrolled || isWhiteBackgroundPage) ? "text-secondary hover:text-primary" : "text-white hover:text-secondary"
                             )}
                         >
                             <Menu size={20} className={cn("transition-transform", isCategoriesOpen ? "rotate-90" : "group-hover:rotate-90")} />
