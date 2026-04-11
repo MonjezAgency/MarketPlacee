@@ -148,11 +148,13 @@ export default function StripeCheckout({ orderId, amount, onSuccess, onCancel }:
                         appearance: {
                             theme: 'night',
                             variables: {
-                                colorPrimary: '#FF8A00',
-                                colorBackground: '#131921',
+                                colorPrimary: '#1BC7C9',
+                                colorBackground: '#0A1A2F',
                                 colorText: '#ffffff',
-                                borderRadius: '12px',
-                                fontFamily: '"Segoe UI", sans-serif',
+                                colorDanger: '#FF4D4D',
+                                fontFamily: '"Cairo", sans-serif',
+                                spacingUnit: '4px',
+                                borderRadius: '16px',
                             },
                         },
                     }}
