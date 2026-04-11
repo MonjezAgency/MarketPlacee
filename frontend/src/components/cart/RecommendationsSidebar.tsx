@@ -1,19 +1,57 @@
-'use client';
+import { apiFetch } from '@/lib/api';
 
-import { useState, useEffect } from 'react';
-import { useCart, CartItem } from '@/lib/cart';
-import { Sparkles, ShoppingCart, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { formatPrice } from '@/lib/currency';
+interface RecommendedProduct {
+    id: string;
+    name: string;
+    price: number;
+    images: string[];
+    supplierId: string;
+    brand?: string;
+    category: string;
+}
+
+function ProductCardSmall({ product, onAdd, t }: { 
+    product: RecommendedProduct; 
+    onAdd: (p: RecommendedProduct) => void;
+    t: any;
+}) {
+    return (
+        <div className="flex gap-4 p-4 rounded-3xl border border-border/50 bg-background/50 hover:bg-muted/20 hover:border-primary/30 transition-all group">
+            <div className="w-20 h-20 bg-white rounded-2xl flex-shrink-0 border border-border/50 overflow-hidden p-2 flex items-center justify-center">
+                {product.images?.length > 0 ? (
+                    <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300" />
+                ) : (
+                    <div className="w-full h-full bg-muted rounded-xl" />
+                )}
+            </div>
+            <div className="flex flex-col justify-between flex-1 min-w-0">
+                <div>
+                    <h4 className="font-bold text-sm leading-tight truncate px-1">{product.name}</h4>
+                    <p className="text-xs font-bold text-primary mt-1">{formatPrice(product.price, false)}</p>
+                </div>
+                <Button
+                    size="sm"
+                    onClick={() => onAdd(product)}
+                    className="h-8 rounded-full text-xs font-black gap-2 w-full mt-2"
+                    variant="outline"
+                >
+                    <ShoppingCart size={14} /> {t('cart', 'add')}
+                </Button>
+            </div>
+        </div>
+    );
+}
 
 export default function RecommendationsSidebar({ items }: { items: CartItem[] }) {
     const { addItem } = useCart();
     const { t } = useLanguage();
-    const [recommendations, setRecommendations] = useState<any[]>([]);
+    const [recommendations, setRecommendations] = useState<RecommendedProduct[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // [FIX] 5s hard timeout to prevent blocking cart rendering
+
         const fetchRecommendations = async () => {
             if (items.length === 0) {
                 setRecommendations([]);
@@ -21,8 +59,6 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
                 return;
             }
 
-            // Extract unique categories and all product IDs from current cart
-            // Filter out undefined categories to prevent invalid API requests
             const categories = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
             const excludeIds = items.map(item => item.id);
 
@@ -32,19 +68,28 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
                 params.append('categories', categories.join(','));
                 params.append('excludeIds', excludeIds.join(','));
 
-                const res = await fetch(`${'/api'}/products/cart/recommendations?${params.toString()}`);
+                const res = await apiFetch(`/products/cart/recommendations?${params.toString()}`, {
+                    signal: controller.signal
+                });
+                
                 if (res.ok) {
                     const data = await res.json();
                     setRecommendations(data);
                 }
-            } catch (error) {
-                console.error("Failed to fetch recommendations:", error);
+            } catch (error: any) {
+                if (error.name === 'AbortError') {
+                    console.warn("[RECOMMENDATIONS] Fetch timed out or aborted.");
+                } else {
+                    console.error("Failed to fetch recommendations:", error);
+                }
             } finally {
+                clearTimeout(timeoutId);
                 setIsLoading(false);
             }
         };
 
         fetchRecommendations();
+        return () => controller.abort();
     }, [items]);
 
     if (items.length === 0 || (!isLoading && recommendations.length === 0)) {

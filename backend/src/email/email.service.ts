@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
+import axios from 'axios';
 import { getInvitationEmailHtml } from './email-templates';
 
 @Injectable()
@@ -20,14 +21,14 @@ export class EmailService {
     this.transporter = nodemailer.createTransport({
       host,
       port,
-      secure: true, // Port 465 must use secure: true
-      pool: true, 
+      secure: true, 
+      pool: false, // [FIX] Disabled pooling to avoid stale connection errors on Railway
       auth: { user, pass },
       tls: {
         rejectUnauthorized: false
       },
-      connectionTimeout: 20000,
-      greetingTimeout: 20000,
+      connectionTimeout: 10000, // Shorter timeout for faster failover
+      greetingTimeout: 10000,
     } as any);
 
     this.transporter.verify((error, success) => {
@@ -40,9 +41,76 @@ export class EmailService {
   }
 
   private getFrom() {
-    const user = process.env.EMAIL_USER || 'Info@atlantisfmcg.com';
-    // Strict From: No Alias, just the email to avoid rejection
-    return user;
+    return process.env.EMAIL_FROM || 'Info@atlantisfmcg.com';
+  }
+
+  /**
+   * Primary mail sender with retry and fallback
+   */
+  async sendMail(to: string, subject: string, html: string, retries = 1): Promise<any> {
+    const retryableErrors = ['ETIMEDOUT', 'ECONNREFUSED', 'ESOCKET', 'ENOTFOUND'];
+    const configErrors = ['EAUTH', 'EENVELOPE', 'ESTREAM'];
+
+    try {
+        const info = await this.transporter.sendMail({
+            from: this.getFrom(),
+            to,
+            subject,
+            html,
+        });
+        console.log(`[SMTP_PRIMARY_SUCCESS] Message sent to ${to}: ${info.messageId}`);
+        return info;
+    } catch (error: any) {
+        const isRetryable = retryableErrors.includes(error.code);
+        
+        if (isRetryable && retries > 0) {
+            console.warn(`[SMTP_RETRYABLE_ERROR] ${error.code} for ${to}. Retrying...`);
+            await new Promise(res => setTimeout(res, 2000));
+            return this.sendMail(to, subject, html, retries - 1);
+        }
+
+        if (isRetryable && retries === 0) {
+            console.error(`[SMTP_RETRY_EXHAUSTED] code: ${error.code}, falling back to Resend for: ${to}`);
+        }
+
+        if (configErrors.includes(error.code)) {
+            console.error(`[SMTP_CONFIG_ERROR] ${error.code}: SMTP auth or stream failed for ${to}. Falling back.`);
+        }
+
+        return this.sendViaResend(to, subject, html);
+    }
+  }
+
+  private async sendViaResend(to: string, subject: string, html: string) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+        console.error('[RESEND_FAIL] Missing RESEND_API_KEY env variable.');
+        return null;
+    }
+
+    try {
+        console.log(`[RESEND_FALLBACK] Sending email to ${to} via Resend API...`);
+        const response = await axios.post(
+            'https://api.resend.com/emails',
+            {
+                from: `Atlantis Marketplace <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`,
+                to: [to],
+                subject,
+                html,
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
+        console.log(`[RESEND_SUCCESS] Email sent to ${to}: ${response.data.id}`);
+        return response.data;
+    } catch (error: any) {
+        console.error(`[RESEND_ERROR] Critical failure sending to ${to}:`, error.response?.data || error.message);
+        return null;
+    }
   }
 
   async sendVerificationEmail(email: string, token: string) {
@@ -83,11 +151,7 @@ export class EmailService {
     const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
     const url = `${baseUrl}/auth/reset-password?token=${token}`;
     try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: 'Reset your password - Atlantis Marketplace',
-        html: `
+      await this.sendMail(email, 'Reset your password - Atlantis Marketplace', `
           <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
               <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
@@ -105,8 +169,7 @@ export class EmailService {
               <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
             </div>
           </div>
-        `,
-      });
+        `);
     } catch (error) {
       console.error('SMTP ERROR [sendPasswordResetEmail]:', error);
       throw error;

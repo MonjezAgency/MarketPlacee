@@ -112,6 +112,8 @@ model User {
 
   kycStatus     KYCStatus @default(UNVERIFIED)
   kycDocuments  KYCDocument[]
+
+  onboardingCompleted Boolean @default(false)
 }
 
 model KYCDocument {
@@ -330,7 +332,7 @@ model Notification {
   userId    String
   title     String
   message   String
-  type      String   @default("INFO") // INFO, SUCCESS, WARNING, ERROR
+  type      String   @default("INFO") // INFO, SUCCESS, WARNING, ERROR, NEW_REGISTRATION, NEW_REVIEW, SYSTEM_ALERT
   data      Json?    // Store exact errors array or other structured data
   read      Boolean  @default(false)
   createdAt DateTime @default(now())

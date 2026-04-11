@@ -9,6 +9,20 @@ import { Logger } from '@nestjs/common';
 
 import { PrismaService } from '../common/prisma.service';
 
+interface AuthUser {
+    id: string;
+    email: string;
+    role: string;
+    onboardingCompleted: boolean;
+    name?: string;
+    avatar?: string;
+    status?: string;
+    companyName?: string;
+    phone?: string;
+    country?: string;
+    emailVerified?: boolean;
+}
+
 @Injectable()
 export class AuthService {
     private readonly logger = new Logger(AuthService.name);
@@ -267,6 +281,20 @@ export class AuthService {
         return rawToken;
     }
 
+    private async generateTokens(user: AuthUser) {
+        const payload = { 
+            sub: user.id, 
+            email: user.email, 
+            role: user.role,
+            onboardingCompleted: !!user.onboardingCompleted 
+        };
+        
+        return {
+            access_token: await this.jwtService.signAsync(payload),
+            refresh_token: await this.issueRefreshToken(user.id),
+        };
+    }
+
     async refreshTokens(rawRefreshToken: string) {
         const tokenHash = this.hashToken(rawRefreshToken);
 
@@ -282,18 +310,15 @@ export class AuthService {
 
         const user = await this.prisma.user.findUnique({
             where: { id: stored.userId },
-            select: { id: true, email: true, role: true, status: true, name: true,
+            select: { id: true, email: true, role: true, status: true, name: true, onboardingCompleted: true,
                       avatar: true, companyName: true, phone: true, country: true, emailVerified: true },
         });
         if (!user || user.status === 'BLOCKED' || user.status === 'REJECTED') {
             throw new UnauthorizedException('Account is not active');
         }
 
-        // Issue new access token + new refresh token
-        const accessToken = this.jwtService.sign({ email: user.email, sub: user.id, role: user.role });
-        const newRefreshToken = await this.issueRefreshToken(user.id);
-
-        return { access_token: accessToken, refresh_token: newRefreshToken, user };
+        const tokens = await this.generateTokens(user as AuthUser);
+        return { ...tokens, user };
     }
 
     async revokeRefreshToken(rawRefreshToken: string): Promise<void> {
@@ -306,12 +331,9 @@ export class AuthService {
     }
 
     async login(user: any) {
-        const payload = { email: user.email, sub: user.id, role: user.role };
-        const accessToken = this.jwtService.sign(payload);
-        const refreshToken = await this.issueRefreshToken(user.id);
+        const tokens = await this.generateTokens(user);
         return {
-            access_token: accessToken,
-            refresh_token: refreshToken,
+            ...tokens,
             user,
         };
     }
@@ -324,7 +346,7 @@ export class AuthService {
 
         if (record?.twoFactorEnabled) {
             const partialToken = this.jwtService.sign(
-                { sub: user.id, email: user.email, role: user.role, twoFactorPending: true },
+                { sub: user.id, email: user.email, role: user.role, onboardingCompleted: !!user.onboardingCompleted, twoFactorPending: true },
                 { expiresIn: '5m' },
             );
             return { requiresTwoFactor: true, partialToken };
@@ -348,7 +370,7 @@ export class AuthService {
         const user = await this.prisma.user.findUnique({
             where: { id: payload.sub },
             select: {
-                id: true, email: true, role: true, name: true, status: true,
+                id: true, email: true, role: true, name: true, status: true, onboardingCompleted: true,
                 avatar: true, companyName: true, phone: true, country: true,
                 twoFactorEnabled: true, twoFactorSecret: true,
             },
@@ -432,5 +454,14 @@ export class AuthService {
         } = user;
 
         return this.login(safeUser);
+    }
+
+    async completeOnboarding(userId: string) {
+        const user = await this.prisma.user.update({
+            where: { id: userId },
+            data: { onboardingCompleted: true }
+        });
+        
+        return this.generateTokens(user as AuthUser);
     }
 }

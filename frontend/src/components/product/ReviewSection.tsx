@@ -14,9 +14,7 @@ interface Review {
     user: { id: string; name: string; companyName?: string; avatar?: string };
 }
 
-const API_URL = '/api';
-// Direct backend URL for multipart uploads (middleware rewrite drops FormData body)
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-dfc2.up.railway.app';
+import { apiFetch } from '@/lib/api';
 
 function StarRating({ value, onChange, size = 20 }: { value: number; onChange?: (v: number) => void; size?: number }) {
     const [hovered, setHovered] = useState(0);
@@ -57,7 +55,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
 
     const load = useCallback(async () => {
         try {
-            const res = await fetch(`${API_URL}/products/${productId}/reviews`);
+            const res = await apiFetch(`/products/${productId}/reviews`);
             if (res.ok) setReviews(await res.json());
         } finally {
             setLoading(false);
@@ -103,13 +101,6 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
         setSubmitting(true);
         
         try {
-            const token = localStorage.getItem('bev-token');
-            if (!token) {
-                setError(t('reviews', 'loginRequired'));
-                setSubmitting(false);
-                return;
-            }
-
             const formData = new FormData();
             formData.append('rating', myRating.toString());
             formData.append('comment', myComment);
@@ -117,18 +108,17 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                 formData.append('images', file);
             });
 
-            // Use the Next.js API route proxy to handle multipart/form-data stably
-            const postUrl = `/api/products/${productId}/reviews`;
-
-            const res = await fetch(postUrl, {
+            // [FINAL FIX]: Direct backend call with FormData via apiFetch
+            const res = await apiFetch(`/products/${productId}/reviews`, {
                 method: 'POST',
-                headers: { 
-                    Authorization: `Bearer ${token}` 
-                },
                 body: formData,
             });
 
             if (!res.ok) { 
+                if (res.status === 409) {
+                    setError(t('reviews', 'duplicateReview') || 'You have already reviewed this product.');
+                    return;
+                }
                 let msg = t('reviews', 'submitFailed');
                 try {
                     const errorData = await res.json();
@@ -143,7 +133,8 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
             setPreviews([]);
             await load();
             
-            const updatedRes = await fetch(`${API_URL}/products/${productId}/reviews`);
+            // Refresh parent summary
+            const updatedRes = await apiFetch(`/products/${productId}/reviews`);
             if (updatedRes.ok) {
                 const latestReviews = await updatedRes.json();
                 const avg = latestReviews.length > 0 
@@ -161,10 +152,8 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
     };
 
     const handleDelete = async (reviewId: string) => {
-        const token = localStorage.getItem('bev-token');
-        await fetch(`${API_URL}/products/${productId}/reviews/${reviewId}`, {
+        await apiFetch(`/products/${productId}/reviews/${reviewId}`, {
             method: 'DELETE',
-            headers: { Authorization: `Bearer ${token}` },
         });
         await load();
     };

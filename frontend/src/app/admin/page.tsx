@@ -16,6 +16,8 @@ import {
     PieChart, Pie, Cell
 } from 'recharts';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { apiFetch } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 const REVENUE_DATA = [
     { name: 'Jan', revenue: 45000, items: 1200 },
@@ -79,38 +81,71 @@ export default function AdminOverviewPage() {
         totalSales: 1284584,
         loading: true 
     });
+    const [showConfirm, setShowConfirm] = React.useState(false);
+    const [approving, setApproving] = React.useState(false);
+
+    const fetchStats = React.useCallback(async () => {
+        try {
+            setStats(prev => ({ ...prev, loading: true }));
+            const [usersRes, productsRes] = await Promise.all([
+                apiFetch('/users?status=PENDING_APPROVAL&limit=1'),
+                apiFetch('/products?limit=1')
+            ]);
+
+            if (usersRes.ok && productsRes.ok) {
+                const usersData = await usersRes.json();
+                const productsData = await productsRes.json();
+
+                setStats({
+                    pendingUsers: usersData.total || 0,
+                    activeProducts: productsData.total || 0,
+                    totalSales: 1284584,
+                    loading: false
+                });
+            }
+        } catch (err) {
+            console.error("Failed to fetch admin stats:", err);
+            setStats(prev => ({ ...prev, loading: false }));
+        }
+    }, [isAr]);
+
+    const executeApproveAll = async () => {
+        setShowConfirm(false);
+        setApproving(true);
+        const tid = toast.loading(isAr ? 'جاري تفعيل الحسابات...' : 'Approving users...');
+        
+        try {
+            const res = await apiFetch('/users/approve-all', { method: 'POST' });
+            const result = await res.json();
+
+            if (res.ok) {
+                if (result.failed > 0) {
+                    toast.error(
+                        isAr 
+                            ? `تم تفعيل ${result.approved}، وفشل ${result.failed}`
+                            : `Approved ${result.approved}, failed ${result.failed}`, 
+                        { id: tid }
+                    );
+                } else {
+                    toast.success(
+                        isAr ? `تم تفعيل جميع المستخدمين (${result.approved})` : `Successfully approved all ${result.approved} users`,
+                        { id: tid }
+                    );
+                }
+                fetchStats();
+            } else {
+                toast.error(isAr ? 'فشلت العملية' : 'Bulk approval failed', { id: tid });
+            }
+        } catch (err) {
+            toast.error(isAr ? 'خطأ في الاتصال' : 'Connection error', { id: tid });
+        } finally {
+            setApproving(false);
+        }
+    };
 
     React.useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const token = localStorage.getItem('bev-token');
-                if (!token) return;
-
-                const headers = { 'Authorization': `Bearer ${token}` };
-                const apiBase = '/api';
-
-                const [usersRes, productsRes] = await Promise.all([
-                    fetch(`${apiBase}/users`, { headers }),
-                    fetch(`${apiBase}/products`, { headers })
-                ]);
-
-                if (usersRes.ok && productsRes.ok) {
-                    const users = await usersRes.json();
-                    const products = await productsRes.json();
-
-                    setStats({
-                        pendingUsers: users.filter((u: any) => u.status === 'PENDING_APPROVAL').length,
-                        activeProducts: products.length,
-                        totalSales: 1284584, // Keep mock for now or fetch from orders
-                        loading: false
-                    });
-                }
-            } catch (err) {
-                console.error("Failed to fetch admin stats:", err);
-            }
-        };
         fetchStats();
-    }, []);
+    }, [fetchStats]);
 
     return (
         <div className="space-y-10 animate-in fade-in duration-700 pb-20">
@@ -149,11 +184,15 @@ export default function AdminOverviewPage() {
                             </div>
                             <div className="glass p-6 rounded-3xl border-secondary/10 hover:border-secondary/30 transition-all group/stat relative overflow-hidden">
                                 {stats.pendingUsers > 0 && (
-                                    <div className="absolute top-0 end-0 w-8 h-8 bg-orange-500 flex items-center justify-center text-white text-[10px] font-black rounded-es-xl animate-pulse">
-                                        !
-                                    </div>
+                                    <button 
+                                        onClick={() => setShowConfirm(true)}
+                                        disabled={approving}
+                                        className="absolute top-0 end-0 px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black rounded-es-xl transition-colors active:scale-95 disabled:opacity-50"
+                                    >
+                                        {approving ? '...' : (isAr ? 'تفعيل الكل' : 'APPROVE ALL')}
+                                    </button>
                                 )}
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{t('admin', 'pendingApprovals') || 'Pending Approvals'}</p>
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{t('admin', 'pendingApprovals')}</p>
                                 <p className="text-2xl font-black font-heading group-hover:text-secondary transition-colors">
                                     {stats.loading ? '...' : stats.pendingUsers}
                                 </p>
@@ -418,6 +457,42 @@ export default function AdminOverviewPage() {
                     </div>
                 </div>
             </div>
+            {/* [FINAL FIX]: Confirmation Modal */}
+            {showConfirm && (
+                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-6">
+                    <motion.div 
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="glass-card-strong max-w-md w-full p-10 text-center space-y-6"
+                    >
+                        <div className="w-20 h-20 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <UserCheck size={40} />
+                        </div>
+                        <h3 className="text-2xl font-black font-heading uppercase tracking-tighter">
+                            {isAr ? `تفعيل ${stats.pendingUsers} مستخدم؟` : `Approve ${stats.pendingUsers} Users?`}
+                        </h3>
+                        <p className="text-sm text-muted-foreground font-bold leading-relaxed">
+                            {isAr 
+                                ? 'سيتم تفعيل جميع الحسابات المعلقة التي أكملت بيانات الشركة. سيصلهم بريد إلكتروني ترحيبي فوراً.' 
+                                : 'This will activate all pending accounts that have completed their company details. Welcome emails will be sent immediately.'}
+                        </p>
+                        <div className="flex gap-4 pt-4">
+                            <button 
+                                onClick={() => setShowConfirm(false)}
+                                className="flex-1 py-4 glass hover:bg-muted/50 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
+                            >
+                                {t('common', 'cancel')}
+                            </button>
+                            <button 
+                                onClick={executeApproveAll}
+                                className="flex-1 py-4 bg-primary text-primary-foreground rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20"
+                            >
+                                {isAr ? 'تأكيد التفعيل' : 'CONFIRM APPROVAL'}
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
         </div>
     );
 }

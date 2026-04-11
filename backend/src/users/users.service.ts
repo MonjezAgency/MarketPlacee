@@ -42,7 +42,7 @@ export class UsersService {
         });
     }
 
-    async findAll(status?: any) {
+    async findAll(status?: any, page = 1, limit = 20) {
         const whereCondition: any = status ? { status } : {};
         
         // Strict Business Logic: Do not show Google SSO users to Admins for approval until they fill out onboarding
@@ -51,21 +51,56 @@ export class UsersService {
             whereCondition.phone = { not: null };
         }
 
-        return this.prisma.user.findMany({
-            where: whereCondition,
-            orderBy: { createdAt: 'desc' },
-        });
+        const skip = (page - 1) * limit;
+
+        const [users, total] = await Promise.all([
+            this.prisma.user.findMany({
+                where: whereCondition,
+                orderBy: { createdAt: 'desc' },
+                skip,
+                take: limit,
+            }),
+            this.prisma.user.count({ where: whereCondition }),
+        ]);
+
+        return { users, total, page, lastPage: Math.ceil(total / limit) };
     }
 
     // Explicit method for Admin reconciliation, decrypts sensitive billing fields
-    async findDecryptedAll(status?: any) {
-        const users = await this.findAll(status);
-        return users.map(user => {
+    async findDecryptedAll(status?: any, page = 1, limit = 20) {
+        const { users, total, lastPage } = await this.findAll(status, page, limit);
+        const decryptedUsers = users.map(user => {
             if (user.iban) user.iban = this.cryptoService.decrypt(user.iban);
             if (user.swiftCode) user.swiftCode = this.cryptoService.decrypt(user.swiftCode);
             if (user.taxId) user.taxId = this.cryptoService.decrypt(user.taxId);
             return user;
         });
+        return { users: decryptedUsers, total, page, lastPage };
+    }
+
+    async approveAllPending() {
+        const pending = await this.prisma.user.findMany({
+            where: { 
+                status: 'PENDING_APPROVAL',
+                companyName: { not: null },
+                phone: { not: null }
+            }
+        });
+
+        let approved = 0;
+        let failed = 0;
+
+        for (const user of pending) {
+            try {
+                await this.updateStatus(user.id, 'ACTIVE');
+                approved++;
+            } catch (err) {
+                console.error(`[ADMIN_BULK_APPROVE_ERROR] Failed for user ${user.id}:`, err.message);
+                failed++;
+            }
+        }
+
+        return { approved, failed, total: pending.length };
     }
 
     async updateStatus(id: string, status: any) {

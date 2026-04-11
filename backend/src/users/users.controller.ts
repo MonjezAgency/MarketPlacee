@@ -15,9 +15,22 @@ export class UsersController {
 
     @Get()
     @Roles(Role.ADMIN)
-    async findAll(@Query('status') status?: string) {
-        const users = await this.usersService.findAll(status);
-        return plainToInstance(UserDto, users);
+    async findAll(
+        @Query('status') status?: string,
+        @Query('page') page: string = '1',
+        @Query('limit') limit: string = '20'
+    ) {
+        const result = await this.usersService.findAll(status, parseInt(page), parseInt(limit));
+        return {
+            ...result,
+            users: plainToInstance(UserDto, result.users)
+        };
+    }
+
+    @Post('approve-all')
+    @Roles(Role.ADMIN)
+    async approveAll() {
+        return this.usersService.approveAllPending();
     }
 
     @Post(':id/status')

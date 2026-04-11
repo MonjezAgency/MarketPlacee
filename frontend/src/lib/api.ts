@@ -1,183 +1,36 @@
-import { Product, ProductStatus } from './products';
-import { API_BASE_URL } from './config';
+// frontend/src/lib/api.ts
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
-const API_URL = API_BASE_URL;
-
-export interface ProductFilters {
-    q?: string;
-    category?: string;
-    brand?: string;
-    minPrice?: string;
-    maxPrice?: string;
-    sort?: 'newest' | 'price_asc' | 'price_desc' | 'name_asc';
+if (!BASE_URL && typeof window !== 'undefined') {
+    console.error(
+        "NEXT_PUBLIC_API_URL is not defined in environment variables. " +
+        "API calls will fail. Please check your Vercel or local .env configuration."
+    );
 }
 
-function mapProduct(item: any): Product {
-    return {
-        id: item.id,
-        name: item.name,
-        brand: item.brand || item.supplier?.companyName || item.supplier?.name || 'Parallel Broker',
-        price: item.price,
-        basePrice: item.basePrice || null,
-        supplierId: item.supplierId || null,
-        unit: item.unit || 'unit',
-        minOrder: item.minOrder || 10,
-        image: (item.images && item.images.length > 0) ? item.images[0] : '',
-        images: item.images || [],
-        stock: item.stock || 0,
-        inStock: item.stock > 0,
-        category: item.category,
-        ean: item.ean,
-        rating: item.rating || 0,
-        reviews: item.reviewsCount || 0,
-        status: item.status || ProductStatus.APPROVED,
+export const apiUrl = BASE_URL || '';
+
+/**
+ * Standardized fetch wrapper for the Marketplace platform.
+ * - Automatically prepends the base URL.
+ * - Enforces credentials: 'include' for httpOnly cookie support.
+ * - Adds default JSON headers.
+ */
+export async function apiFetch(path: string, options: RequestInit = {}) {
+    const url = path.startsWith('http') ? path : `${apiUrl}${path}`;
+    
+    // [FINAL FIX]: Modern headers handling — don't manual set Content-Type for FormData
+    const headers: Record<string, string> = {
+        ...(options.headers as Record<string, string>),
     };
-}
 
-export async function fetchProductsWithFilters(filters: ProductFilters = {}): Promise<Product[]> {
-    try {
-        const params = new URLSearchParams({ status: 'APPROVED' });
-        if (filters.q) params.set('q', filters.q);
-        if (filters.category) params.set('category', filters.category);
-        if (filters.brand) params.set('brand', filters.brand);
-        if (filters.minPrice) params.set('minPrice', filters.minPrice);
-        if (filters.maxPrice) params.set('maxPrice', filters.maxPrice);
-        if (filters.sort) params.set('sort', filters.sort);
-        const response = await fetch(`${API_URL}/products?${params.toString()}`, { cache: 'no-store' });
-        if (!response.ok) return [];
-        const text = await response.text();
-        if (!text) return [];
-        const json = JSON.parse(text);
-        const products = Array.isArray(json) ? json : (json.data || []);
-        return products.map(mapProduct);
-    } catch (error) {
-        console.error('Error fetching products with filters:', error);
-        return [];
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
     }
-}
 
-export async function fetchProducts(): Promise<Product[]> {
-    try {
-        const response = await fetch(`${API_URL}/products?status=APPROVED`, { cache: 'no-store' });
-        if (!response.ok) {
-            throw new Error('Failed to fetch products');
-        }
-        const text = await response.text();
-        const json = JSON.parse(text);
-        console.log('--- MARKETPLACE DATA DIAGNOSTICS ---');
-        
-        // Support multiple data structures
-        let data: any[] = [];
-        if (Array.isArray(json)) data = json;
-        else if (json.data && Array.isArray(json.data)) data = json.data;
-        else if (json.products && Array.isArray(json.products)) data = json.products;
-        
-        console.table(data.map(p => ({ id: p.id, name: p.name, status: p.status, stock: p.stock })));
-        
-        if (data.length === 0) console.warn('API returned no approved products.');
-        
-        // The backend returns an array of products (possibly nested in 'data').
-        // We'll map them to match our frontend Product interface if necessary
-        return data.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            brand: item.supplier?.companyName || item.supplier?.name || 'Parallel Broker',
-            price: item.price,
-            basePrice: item.basePrice || null,
-            supplierId: item.supplierId || null,
-            unit: item.unit || 'unit',
-            minOrder: item.minOrder || 10,
-            image: (item.images && item.images.length > 0) ? item.images[0] : '',
-            images: item.images || [],
-            stock: item.stock || 0,
-            inStock: item.stock > 0,
-            category: item.category,
-            ean: item.ean,
-            rating: item.rating || 0,
-            reviews: item.reviewsCount || 0,
-            status: item.status || ProductStatus.APPROVED,
-        }));
-    } catch (error) {
-        console.error('Error fetching products:', error);
-        return [];
-    }
-}
-
-export async function fetchMyProducts(token: string): Promise<Product[]> {
-    try {
-        const response = await fetch(`${API_URL}/products/my-products`, {
-            cache: 'no-store',
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!response.ok) {
-            throw new Error('Failed to fetch my products');
-        }
-        const text = await response.text();
-        if (!text) return [];
-        const data = JSON.parse(text);
-        return data.map((item: any) => ({
-            id: item.id,
-            name: item.name,
-            brand: item.supplier?.companyName || item.supplier?.name || 'My Product',
-            price: item.price, // This is basePrice for suppliers (mapped by backend)
-            supplierId: item.supplierId || null,
-            unit: item.unit || 'unit',
-            minOrder: item.minOrder || 10,
-            image: (item.images && item.images.length > 0) ? item.images[0] : '',
-            images: item.images || [],
-            stock: item.stock || 0,
-            inStock: item.stock > 0,
-            category: item.category,
-            ean: item.ean,
-            rating: item.rating || 0,
-            reviews: item.reviewsCount || 0,
-            status: item.status || ProductStatus.APPROVED,
-        }));
-    } catch (error) {
-        console.error('Error fetching my products:', error);
-        return [];
-    }
-}
-
-export async function getHomepageCategories(): Promise<any> {
-    try {
-        const response = await fetch(`${API_URL}/config/homepage-categories`, { cache: 'no-store' });
-        if (!response.ok) return [];
-        const text = await response.text();
-        if (!text) return [];
-        return JSON.parse(text);
-    } catch (error) {
-        console.error('Error fetching homepage categories:', error);
-        return [];
-    }
-}
-
-export async function setHomepageCategories(token: string, data: any): Promise<boolean> {
-    try {
-        const response = await fetch(`${API_URL}/admin/config/homepage-categories`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(data),
-        });
-        return response.ok;
-    } catch (error) {
-        console.error('Error setting homepage categories:', error);
-        return false;
-    }
-}
-
-export async function fetchImageByEan(ean: string): Promise<string | null> {
-    if (!ean) return null;
-    try {
-        const response = await fetch(`${API_URL}/products/ean/${ean}`, { cache: 'no-store' });
-        if (!response.ok) return null;
-        const data = await response.json();
-        return data.imageUrl || null;
-    } catch (error) {
-        console.error('Error fetching image by EAN:', error);
-        return null;
-    }
+    return fetch(url, {
+        ...options,
+        credentials: 'include',
+        headers,
+    });
 }
