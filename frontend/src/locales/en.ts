@@ -16,7 +16,6 @@ export const en = {
     },
     navbar: {
         home: "Home",
-        browseCatalog: "Inventory",
         dashboard: "Dashboard",
         marketplace: "Atlantis",
         admin: "Admin",

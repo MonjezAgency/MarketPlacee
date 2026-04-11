@@ -16,7 +16,6 @@ export const ar = {
     },
     navbar: {
         home: "الرئيسية",
-        browseCatalog: "المخزون",
         dashboard: "لوحة التحكم",
         marketplace: "أتلانتس",
         admin: "المدير",
