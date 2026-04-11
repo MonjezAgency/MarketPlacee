@@ -223,8 +223,8 @@ export default function SupplierDashboard() {
     };
 
     const filteredProducts = products.filter(p =>
-        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.category?.toLowerCase().includes(searchTerm.toLowerCase())
+        (p.name?.toLowerCase() ?? '').includes(searchTerm.toLowerCase()) ||
+        (p.category?.toLowerCase() ?? '').includes(searchTerm.toLowerCase())
     );
 
     const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));

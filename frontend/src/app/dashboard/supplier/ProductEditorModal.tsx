@@ -43,7 +43,8 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         name: '', brand: '', price: 0, stock: 0, image: '', images: [],
         category: 'Beverages', description: '', unit: 'Case (24 units)',
         minOrder: 1, ean: '', variants: [], inStock: true,
-        status: ProductStatus.PENDING
+        status: ProductStatus.PENDING,
+        isNew: false, bulkSave: false
     };
 
     const [formData, setFormData] = useState<Product>(defaultData);
@@ -130,10 +131,11 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         const value = newVariantValue[groupIndex]?.trim();
         if (!value) return;
         const updated = [...(formData.variants || [])];
-        if (!updated[groupIndex].values.includes(value)) {
+        const values = updated[groupIndex].values || [];
+        if (!values.includes(value)) {
             updated[groupIndex] = {
                 ...updated[groupIndex],
-                values: [...updated[groupIndex].values, value]
+                values: [...values, value]
             };
             setFormData({ ...formData, variants: updated });
         }
@@ -142,9 +144,10 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
 
     const removeVariantValue = (groupIndex: number, valueIndex: number) => {
         const updated = [...(formData.variants || [])];
+        const values = updated[groupIndex].values || [];
         updated[groupIndex] = {
             ...updated[groupIndex],
-            values: updated[groupIndex].values.filter((_: any, i: number) => i !== valueIndex)
+            values: values.filter((_: any, i: number) => i !== valueIndex)
         };
         setFormData({ ...formData, variants: updated });
     };

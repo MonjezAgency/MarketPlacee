@@ -401,7 +401,7 @@ export default function AdminDashboard() {
                                     <div className="p-6 bg-muted/20 border border-border/50 rounded-2xl">
                                         <p className="text-[10px] font-black uppercase tracking-widest text-foreground/40 mb-1">Active Categories</p>
                                         <p className="text-2xl font-black">
-                                            {Array.from(new Set([...pendingProducts, ...approvedProducts].map(p => p.category))).length}
+                                            {Array.from(new Set([...pendingProducts, ...approvedProducts].map(p => p.category).filter(Boolean))).length}
                                         </p>
                                     </div>
                                     <div className="p-6 bg-muted/20 border border-border/50 rounded-2xl">

@@ -48,10 +48,10 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
         addItem({
             id: product.id,
             name: product.name,
-            brand: product.brand,
+            brand: product.brand || 'Premium',
             price: product.price,
-            image: product.image,
-            unit: product.unit,
+            image: product.image || '',
+            unit: product.unit || 'units',
         });
 
         setIsAdded(true);

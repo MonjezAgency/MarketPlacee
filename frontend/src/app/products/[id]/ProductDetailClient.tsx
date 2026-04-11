@@ -90,7 +90,7 @@ export default function ProductDetailClient() {
     // Prefer server-side similar products; fall back to local filter if API hasn't loaded yet
     const relatedProducts = similarProducts.length > 0
         ? similarProducts
-        : products.filter(p => p.id !== id && p.category === product?.category).slice(0, 4);
+        : products.filter(p => p.id !== id && p.category !== undefined && p.category === product?.category).slice(0, 4);
 
 
     if (!product) {
@@ -120,11 +120,11 @@ export default function ProductDetailClient() {
         addItem({
             id: product.id,
             name: product.name,
-            brand: product.brand,
+            brand: product.brand || 'Premium',
             price: product.price,
-            image: product.image,
-            unit: product.unit,
-            category: product.category,
+            image: product.image || '',
+            unit: product.unit || 'units',
+            category: product.category || 'Uncategorized',
         }, quantity);
         setIsAdded(true);
         setTimeout(() => setIsAdded(false), 2500);

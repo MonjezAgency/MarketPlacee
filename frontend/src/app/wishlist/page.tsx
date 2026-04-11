@@ -16,10 +16,10 @@ interface WishlistProduct {
     id: string;
     name: string;
     price: number;
-    images: string[];
-    brand: string;
-    category: string;
-    supplier: { name: string };
+    images?: string[];
+    brand?: string;
+    category?: string;
+    supplier?: { name: string };
     addedAt: string;
 }
 
@@ -60,7 +60,14 @@ export default function WishlistPage() {
     };
 
     const handleAddToCart = (item: WishlistProduct) => {
-        addItem({ id: item.id, name: item.name, brand: item.brand, price: item.price, image: item.images?.[0] || '', unit: 'unit' }, 1);
+        addItem({ 
+            id: item.id, 
+            name: item.name, 
+            brand: item.brand || 'Premium', 
+            price: item.price, 
+            image: item.images?.[0] || '', 
+            unit: 'unit' 
+        }, 1);
         setAddedToCart(item.id);
         setTimeout(() => setAddedToCart(null), 2000);
     };

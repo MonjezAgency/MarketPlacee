@@ -48,7 +48,7 @@ export default function Home() {
     const popularProducts = useMemo(() => {
         let filtered = products.slice(0, 20); // Initial set of popular products
         if (selectedPopularBrand) {
-            filtered = filtered.filter(p => p.brand === selectedPopularBrand);
+            filtered = filtered.filter(p => p.brand !== undefined && p.brand === selectedPopularBrand);
         }
         return filtered.slice(0, 8); // Show up to 8
     }, [products, selectedPopularBrand]);

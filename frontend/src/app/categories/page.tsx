@@ -94,12 +94,12 @@ function CategoriesContent() {
         let result = [...products];
 
         // Multi-select filtering (client-side for multiple selections since backend handles single values)
-        if (selectedBrands.length > 1) result = result.filter((p) => selectedBrands.includes(p.brand));
-        if (selectedCategories.length > 1) result = result.filter((p) => selectedCategories.includes(p.category));
+        if (selectedBrands.length > 1) result = result.filter((p) => p.brand !== undefined && selectedBrands.includes(p.brand));
+        if (selectedCategories.length > 1) result = result.filter((p) => p.category !== undefined && selectedCategories.includes(p.category));
 
         if (selectedAudience.length > 0) {
             result = result.filter(p => {
-                const searchStr = (p.name + ' ' + p.brand).toLowerCase();
+                const searchStr = (p.name + ' ' + (p.brand ?? '')).toLowerCase();
                 const isMen = searchStr.includes('homme') || searchStr.includes('men') || searchStr.includes('boy') || searchStr.includes('bulldog') || searchStr.includes('diesel') || searchStr.includes('nautica') || searchStr.includes('(m)');
                 const isWomen = searchStr.includes('femme') || searchStr.includes('women') || searchStr.includes('girl') || searchStr.includes('pregnacare') || searchStr.includes('lady') || searchStr.includes('her') || searchStr.includes('(w)') || searchStr.includes('beauty') || searchStr.includes('makeup') || searchStr.includes('mascara') || searchStr.includes('lipstick');
                 if (selectedAudience.includes('Men') && isMen) return true;

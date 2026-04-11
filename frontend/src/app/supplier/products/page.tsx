@@ -225,7 +225,7 @@ export default function SupplierProductsPage() {
     const filteredProducts = products.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (p.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-            p.ean?.includes(searchTerm);
+            (p.ean || '').includes(searchTerm);
         const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
         return matchesSearch && matchesCategory;
     });
@@ -322,9 +322,9 @@ export default function SupplierProductsPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
                     { label: 'Total Listings', value: products.length, icon: Archive, color: 'text-primary' },
-                    { label: 'Active', value: products.filter(p => p.status === ProductStatus.APPROVED).length, icon: CheckCircle2, color: 'text-emerald-500' },
-                    { label: 'Pending', value: products.filter(p => p.status === ProductStatus.PENDING).length, icon: Box, color: 'text-amber-500' },
-                    { label: 'Categories', value: new Set(products.map(p => p.category)).size, icon: Tag, color: 'text-blue-500' },
+                    { label: 'Active', value: products.filter(p => p.status === ProductStatus.APPROVED || p.status === 'APPROVED').length, icon: CheckCircle2, color: 'text-emerald-500' },
+                    { label: 'Pending', value: products.filter(p => p.status === ProductStatus.PENDING || p.status === 'PENDING').length, icon: Box, color: 'text-amber-500' },
+                    { label: 'Categories', value: new Set(products.map(p => p.category).filter(Boolean)).size, icon: Tag, color: 'text-blue-500' },
                 ].map((stat, idx) => (
                     <div key={idx} className="bg-card border border-border/50 rounded-2xl p-6 shadow-sm">
                         <div className="flex items-center justify-between">

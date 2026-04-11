@@ -41,6 +41,7 @@ export interface Product {
     stock?: number;
     inStock?: boolean;
     moq?: number;
+    minOrder?: number; // UI Alias for moq
     status?: ProductStatus | string;
     
     // Advanced Data
@@ -48,8 +49,10 @@ export interface Product {
     variants?: ProductVariant[];
     adminNotes?: string;
     rating?: number;
-    reviews?: number;
+    reviews?: any; // Can be a count or an array depending on context
     reviewsCount?: number;
+    isNew?: boolean;
+    bulkSave?: boolean;
 
     // Timestamps
     createdAt?: string;
