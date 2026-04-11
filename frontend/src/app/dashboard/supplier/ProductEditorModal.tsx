@@ -7,7 +7,7 @@ import { createPortal } from 'react-dom';
 import { getCurrencyInfo } from '@/lib/currency';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
-import { Product, ProductStatus } from '@/lib/products';
+import { Product, ProductStatus } from '@/lib/types';
 
 interface VariantGroup {
     name: string;

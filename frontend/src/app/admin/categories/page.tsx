@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { fetchProducts } from '@/lib/api';
 import { PRODUCTS } from '@/lib/products';
+import { Product } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { showIPhoneToast } from '@/components/ui/IPhoneToast';
 
@@ -47,12 +48,12 @@ export default function AdminCategoriesPage() {
     const loadCategories = React.useCallback(async () => {
         setLoading(true);
         try {
-            let products = await fetchProducts();
+            let products: Product[] = await fetchProducts();
             if (!products || products.length === 0) products = PRODUCTS;
             
             const categoryMap: Record<string, number> = {};
             MASTER_CATEGORIES.forEach(cat => { categoryMap[cat] = 0; });
-            products.forEach((p: any) => {
+            products.forEach((p: Product) => {
                 const cat = p.category || 'Uncategorized';
                 categoryMap[cat] = (categoryMap[cat] || 0) + 1;
             });

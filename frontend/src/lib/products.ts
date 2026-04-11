@@ -1,37 +1,6 @@
-export enum ProductStatus {
-    PENDING = 'PENDING',
-    APPROVED = 'APPROVED',
-    REJECTED = 'REJECTED'
-}
+import { Product, ProductStatus } from '@/lib/types';
 
-export interface Product {
-    id: string;
-    name: string;
-    brand: string;
-    price: number;
-    basePrice?: number;
-    supplierId?: string;
-    unit: string;
-    minOrder: number;
-    image: string;
-    images: string[];
-    stock: number;
-    inStock: boolean;
-    category: string;
-    ean?: string;
-    bulkSave?: boolean;
-    rating?: number;
-    reviews?: number;
-    reviewsCount?: number;
-    isNew?: boolean;
-    description?: string;
-    supplier?: {
-        name: string;
-        companyName?: string;
-    };
-    status: ProductStatus;
-    variants?: { name: string; values: string[] }[];
-}
+export { ProductStatus };
 
 export const PRODUCTS: Product[] = [
     {

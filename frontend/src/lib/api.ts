@@ -1,3 +1,5 @@
+import { Product, ProductStatus, Filters } from '@/lib/types';
+
 // frontend/src/lib/api.ts
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -36,42 +38,6 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 }
 
 // ─── LEGACY EXPORTS (RE-ADDED TO FIX BUILD FAILURES) ───────────────────────
-
-export enum ProductStatus {
-    PENDING_APPROVAL = 'PENDING_APPROVAL',
-    APPROVED = 'APPROVED',
-    REJECTED = 'REJECTED',
-    BLOCKED = 'BLOCKED',
-}
-
-export interface Product {
-    id: string;
-    name: string;
-    brand: string;
-    price: number;
-    basePrice?: number | null;
-    supplierId: string;
-    unit: string;
-    minOrder: number;
-    image: string;
-    images: string[];
-    stock: number;
-    inStock: boolean;
-    category: string;
-    ean?: string;
-    rating: number;
-    reviews: number;
-    status: ProductStatus;
-}
-
-export interface Filters {
-    q?: string;
-    category?: string;
-    brand?: string;
-    minPrice?: string;
-    maxPrice?: string;
-    sort?: string;
-}
 
 function mapProduct(item: any): Product {
     return {

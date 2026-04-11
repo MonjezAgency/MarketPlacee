@@ -13,6 +13,8 @@ import { useAuth } from '@/lib/auth';
 const API_URL = '/api';
 
 // ── Types ──────────────────────────────────────────────────
+import { Product } from '@/lib/types';
+
 interface TierRow { id: string; minQty: number; maxQty: number | null; discountPercent: number; }
 interface PriceGroup { id: string; name: string; discountPercent: number; description: string | null; _count: { members: number }; members: any[]; }
 interface ProductOption { id: string; name: string; price: number; basePrice: number | null; }
