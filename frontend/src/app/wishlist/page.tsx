@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useCart } from '@/lib/cart';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/currency';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const API_URL = '/api';
 
@@ -24,6 +25,7 @@ interface WishlistProduct {
 
 export default function WishlistPage() {
     const { user } = useAuth();
+    const { t } = useLanguage();
     const { addItem } = useCart();
     const [items, setItems] = React.useState<WishlistProduct[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -66,8 +68,8 @@ export default function WishlistPage() {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-muted-foreground pt-20">
                 <Heart className="w-12 h-12 opacity-20" />
-                <p className="font-bold">Sign in to view your wishlist</p>
-                <Link href="/auth/login" className="text-primary font-black text-sm hover:underline">Sign In →</Link>
+                <p className="font-bold">{t('wishlist', 'signInRequired')}</p>
+                <Link href="/auth/login" className="text-primary font-black text-sm hover:underline">{t('wishlist', 'signIn')}</Link>
             </div>
         );
     }
@@ -82,10 +84,10 @@ export default function WishlistPage() {
                     </Link>
                     <div>
                         <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
-                            <Heart size={22} className="text-primary" fill="currentColor" /> Wishlist
+                            <Heart size={22} className="text-primary" fill="currentColor" /> {t('wishlist', 'title')}
                         </h1>
                         <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
-                            {items.length} saved {items.length === 1 ? 'item' : 'items'}
+                            {items.length} {items.length === 1 ? t('wishlist', 'savedItem') : t('wishlist', 'savedItems')}
                         </p>
                     </div>
                 </div>
@@ -95,7 +97,7 @@ export default function WishlistPage() {
                         className="h-10 px-5 bg-primary text-white font-black text-xs rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 uppercase tracking-wide"
                     >
                         <ShoppingCart size={14} />
-                        Add All to Cart
+                        {t('wishlist', 'addAllToCart')}
                     </button>
                 )}
             </div>
@@ -111,13 +113,13 @@ export default function WishlistPage() {
                     className="flex flex-col items-center gap-4 py-24 text-muted-foreground"
                 >
                     <Heart className="w-16 h-16 opacity-10" />
-                    <p className="font-black text-lg">Your wishlist is empty</p>
-                    <p className="text-sm">Save products to review or purchase later</p>
+                    <p className="font-black text-lg">{t('wishlist', 'empty')}</p>
+                    <p className="text-sm">{t('wishlist', 'emptyDesc')}</p>
                     <Link
                         href="/categories"
                         className="mt-4 h-11 px-6 bg-primary text-white font-black text-xs rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 uppercase tracking-widest"
                     >
-                        Browse Products
+                        {t('wishlist', 'browseProducts')}
                     </Link>
                 </motion.div>
             ) : (
@@ -170,7 +172,7 @@ export default function WishlistPage() {
                                             )}
                                         >
                                             <ShoppingCart size={12} />
-                                            {addedToCart === item.id ? 'Added!' : 'Add to Cart'}
+                                            {addedToCart === item.id ? t('product', 'added') : t('wishlist', 'addToCart')}
                                         </button>
                                         <button
                                             onClick={() => handleRemove(item.id)}

@@ -45,7 +45,10 @@ export class AdminService {
             },
         });
 
-        await this.emailService.sendTeamInvitation(user.email, user.name, user.role, tempPassword);
+        // Non-blocking email: don't let SMTP failures prevent user creation
+        this.emailService.sendTeamInvitation(user.email, user.name, user.role, tempPassword).catch((err) => {
+            console.error(`[TEAM] Failed to send invitation email to ${user.email}:`, err.message);
+        });
 
         return {
             message: 'Invitation sent successfully',

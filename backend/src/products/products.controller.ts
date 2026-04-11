@@ -61,11 +61,7 @@ export class ProductsController {
         }));
     }
 
-    @Get(':id')
-    async findOne(@Param('id') id: string) {
-        const product = await this.productsService.findOne(id);
-        return plainToInstance(ProductDto, product);
-    }
+    // ─── Static routes MUST come before :id param routes ───────────────────
 
     @Get('admin/all')
     @UseGuards(JwtAuthGuard, RolesGuard)
@@ -74,24 +70,27 @@ export class ProductsController {
         return this.productsService.findAllAdmin();
     }
 
-    @Patch(':id/approve')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.ADMIN)
-    async approve(@Param('id') id: string) {
-        return this.productsService.updateStatus(id, ProductStatus.APPROVED);
-    }
+    @Get('cart/recommendations')
+    async getRecommendations(@Request() req) {
+        const categories = req.query.categories ? req.query.categories.split(',').filter(Boolean) : [];
+        const excludeIds = req.query.excludeIds ? req.query.excludeIds.split(',').filter(Boolean) : [];
 
-    @Patch(':id/reject')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.ADMIN)
-    async reject(@Param('id') id: string) {
-        return this.productsService.updateStatus(id, ProductStatus.REJECTED);
+        const recommendations = await this.productsService.findRecommendations(categories, excludeIds);
+        return plainToInstance(ProductDto, recommendations);
     }
 
     @Get('ean/:ean')
     async findImageByEan(@Param('ean') ean: string) {
         const imageUrl = await this.eanService.fetchImageUrlByEan(ean);
         return { imageUrl };
+    }
+
+    // ─── Parameterized :id routes ──────────────────────────────────────────
+
+    @Get(':id')
+    async findOne(@Param('id') id: string) {
+        const product = await this.productsService.findOne(id);
+        return plainToInstance(ProductDto, product);
     }
 
     @Get(':id/similar')
@@ -106,13 +105,18 @@ export class ProductsController {
         return plainToInstance(ProductDto, recs);
     }
 
-    @Get('cart/recommendations')
-    async getRecommendations(@Body() body: any, @Request() req) {
-        const categories = req.query.categories ? req.query.categories.split(',') : [];
-        const excludeIds = req.query.excludeIds ? req.query.excludeIds.split(',') : [];
+    @Patch(':id/approve')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    async approve(@Param('id') id: string) {
+        return this.productsService.updateStatus(id, ProductStatus.APPROVED);
+    }
 
-        const recommendations = await this.productsService.findRecommendations(categories, excludeIds);
-        return plainToInstance(ProductDto, recommendations);
+    @Patch(':id/reject')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    async reject(@Param('id') id: string) {
+        return this.productsService.updateStatus(id, ProductStatus.REJECTED);
     }
 
     @Post()

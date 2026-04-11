@@ -4,9 +4,12 @@ import { useState, useEffect } from 'react';
 import { useCart, CartItem } from '@/lib/cart';
 import { Sparkles, ShoppingCart, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatPrice } from '@/lib/currency';
 
 export default function RecommendationsSidebar({ items }: { items: CartItem[] }) {
     const { addItem } = useCart();
+    const { t } = useLanguage();
     const [recommendations, setRecommendations] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
@@ -19,7 +22,8 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
             }
 
             // Extract unique categories and all product IDs from current cart
-            const categories = Array.from(new Set(items.map(item => item.category)));
+            // Filter out undefined categories to prevent invalid API requests
+            const categories = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
             const excludeIds = items.map(item => item.id);
 
             setIsLoading(true);
@@ -51,13 +55,13 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
         <div className="bg-card rounded-[40px] border border-border/50 p-8 premium-shadow space-y-6 mt-8">
             <h3 className="font-heading font-bold text-xl flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-highlight" />
-                Frequently Bought Together
+                {t('cart', 'frequentlyBought')}
             </h3>
 
             {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-8 space-y-4">
                     <Loader2 className="w-8 h-8 text-primary animate-spin" />
-                    <p className="text-sm font-bold text-muted-foreground animate-pulse">Analyzing cart contents...</p>
+                    <p className="text-sm font-bold text-muted-foreground animate-pulse">{t('cart', 'analyzingCart')}</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -73,9 +77,9 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
                             <div className="flex flex-col justify-between flex-1 min-w-0">
                                 <div>
                                     <h4 className="font-bold text-sm leading-tight truncate px-1">{product.name}</h4>
-                                    <p className="text-xs font-bold text-primary mt-1">${product.price.toFixed(2)}</p>
+                                    <p className="text-xs font-bold text-primary mt-1">{formatPrice(product.price, false)}</p>
                                 </div>
-                                <Button
+                                    <Button
                                     size="sm"
                                     onClick={() => addItem({
                                         id: product.id,
@@ -90,7 +94,7 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
                                     className="h-8 rounded-full text-xs font-black gap-2 w-full mt-2"
                                     variant="outline"
                                 >
-                                    <ShoppingCart size={14} /> Add
+                                    <ShoppingCart size={14} /> {t('cart', 'add')}
                                 </Button>
                             </div>
                         </div>

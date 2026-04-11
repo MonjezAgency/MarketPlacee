@@ -151,6 +151,29 @@ export class AuthService {
                         console.error('[AUTH] Background email sending failed:', emailError.message);
                     }
                 })();
+
+                // Notify all admins about the new pending registration
+                (async () => {
+                    try {
+                        const admins = await this.prisma.user.findMany({
+                            where: { role: { in: ['ADMIN', 'OWNER'] }, status: 'ACTIVE' },
+                            select: { id: true },
+                        });
+                        for (const admin of admins) {
+                            await this.prisma.notification.create({
+                                data: {
+                                    userId: admin.id,
+                                    title: 'New Registration Pending Approval',
+                                    message: `${user.name} (${user.email}) has registered as ${data.role} and is awaiting your approval.`,
+                                    type: 'WARNING',
+                                    data: { userId: user.id, email: user.email, role: data.role },
+                                },
+                            });
+                        }
+                    } catch (notifError: any) {
+                        console.error('[AUTH] Failed to create admin notification:', notifError.message);
+                    }
+                })();
             } else if (user.status === 'ACTIVE') {
                  // Background email sending for active users
                  this.emailService.sendWelcomeEmail(user.email, user.name, user.role).catch((err: any) => {
@@ -361,10 +384,37 @@ export class AuthService {
                     emailVerified: true, // Google verified the email
                 },
             });
-            try {
-                await this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, 'en');
-            } catch { }
-            return { pendingApproval: true, email: user.email };
+
+            // Non-blocking: Send registration email and notify admins
+            this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, 'en').catch((err) => {
+                console.error('[AUTH] Google registration email failed:', err.message);
+            });
+
+            // Notify admins about new Google registration
+            const googleUser = user;
+            (async () => {
+                try {
+                    const admins = await this.prisma.user.findMany({
+                        where: { role: { in: ['ADMIN', 'OWNER'] }, status: 'ACTIVE' },
+                        select: { id: true },
+                    });
+                    for (const admin of admins) {
+                        await this.prisma.notification.create({
+                            data: {
+                                userId: admin.id,
+                                title: 'New Google Registration Pending',
+                                message: `${googleUser.name} (${googleUser.email}) signed up via Google and needs approval.`,
+                                type: 'WARNING',
+                                data: { userId: googleUser.id, email: googleUser.email, role: 'CUSTOMER', provider: 'google' },
+                            },
+                        });
+                    }
+                } catch (err: any) {
+                    console.error('[AUTH] Google reg admin notification failed:', err.message);
+                }
+            })();
+
+            return { pendingApproval: true, email: user.email, needsCompanyDetails: true };
         }
 
         if (user.status === 'BLOCKED' || user.status === 'REJECTED') {

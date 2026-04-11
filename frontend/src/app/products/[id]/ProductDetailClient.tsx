@@ -80,7 +80,7 @@ export default function ProductDetailClient() {
     if (isLoading) {
         return (
             <div className="min-h-screen flex text-muted-foreground font-medium items-center justify-center p-6 pt-20">
-                Loading product details...
+                {t('common', 'loading')}
             </div>
         );
     }
@@ -99,11 +99,11 @@ export default function ProductDetailClient() {
                     <div className="w-24 h-24 bg-muted rounded-[32px] flex items-center justify-center mx-auto mb-8">
                         <Package className="text-muted-foreground" size={40} />
                     </div>
-                    <h2 className="text-3xl font-heading font-black mb-4">Product Not Found</h2>
-                    <p className="text-muted-foreground mb-8 text-lg">The product you're looking for might have been moved or discontinued.</p>
+                    <h2 className="text-3xl font-heading font-black mb-4">{t('product', 'notFound')}</h2>
+                    <p className="text-muted-foreground mb-8 text-lg">{t('product', 'notFound')}</p>
                     <Link href="/categories">
                         <Button size="lg" className="rounded-2xl font-black">
-                            Back to Inventory
+                            {t('product', 'backToInventory')}
                         </Button>
                     </Link>
                 </div>
@@ -123,6 +123,7 @@ export default function ProductDetailClient() {
             price: product.price,
             image: product.image,
             unit: product.unit,
+            category: product.category,
         }, quantity);
         setIsAdded(true);
         setTimeout(() => setIsAdded(false), 2500);
@@ -134,9 +135,9 @@ export default function ProductDetailClient() {
             <div className="bg-card border-b border-border/50">
                 <div className="container mx-auto px-6 py-4 flex items-center justify-between">
                     <nav className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em]">
-                        <Link href="/" className="hover:text-primary transition-colors">Home</Link>
+                        <Link href="/" className="hover:text-primary transition-colors">{t('navbar', 'home') || 'Home'}</Link>
                         <ChevronRight size={10} className="text-muted-foreground/30" />
-                        <Link href="/categories" className="hover:text-primary transition-colors">Inventory</Link>
+                        <Link href="/categories" className="hover:text-primary transition-colors">{t('navbar', 'browseCatalog') || 'Inventory'}</Link>
                         <ChevronRight size={10} className="text-muted-foreground/30" />
                         <span className="text-foreground truncate max-w-[150px]">{translatedName || product.name}</span>
                     </nav>
@@ -145,7 +146,7 @@ export default function ProductDetailClient() {
                         className="flex items-center gap-2 text-[10px] font-bold text-foreground uppercase tracking-widest hover:text-primary transition-colors group"
                     >
                         <ArrowLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-                        Back to browsing
+                        {t('product', 'backToBrowsing')}
                     </button>
                 </div>
             </div>
@@ -183,13 +184,13 @@ export default function ProductDetailClient() {
                                 {product.isNew && (
                                     <span className="bg-primary text-[#131921] text-[10px] font-black px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 tracking-widest uppercase">
                                         <Sparkles size={14} className="text-[#131921]" />
-                                        Batch: New Arrival
+                                        {t('home', 'hero').slide3Badge || 'New Arrival'}
                                     </span>
                                 )}
                                 {product.bulkSave && (
                                     <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-4 py-2 rounded-xl shadow-lg tracking-widest uppercase flex items-center gap-2">
                                         <Truck size={14} />
-                                        Wholesale Verified
+                                        {t('home', 'hero').slide2Badge || 'B2B Exclusive'}
                                     </span>
                                 )}
                             </div>
@@ -240,7 +241,7 @@ export default function ProductDetailClient() {
                             <div className="space-y-4">
                                 <div className="flex items-center gap-3">
                                     <div className="bg-primary/10 px-3 py-1 rounded-xl flex items-center gap-2 border border-primary/20">
-                                        <span className="text-primary font-black text-[9px] uppercase tracking-widest">Global Sourcing</span>
+                                        <span className="text-primary font-black text-[9px] uppercase tracking-widest">{t('product', 'globalSourcing')}</span>
                                         <ShieldCheck size={12} className="text-primary" />
                                     </div>
                                 </div>
@@ -251,17 +252,17 @@ export default function ProductDetailClient() {
 
                                 <div className="flex flex-wrap items-center gap-4 text-[11px] font-bold text-muted-foreground tracking-widest uppercase">
                                     <span className="flex items-center gap-2 text-primary">
-                                        {product.brand} • Authorized Partner
+                                        {product.brand} • {t('product', 'authorizedPartner')}
                                     </span>
                                     {((localRating) > 0) ? (
                                         <>
                                             <span className="w-1 h-1 rounded-full bg-border" />
-                                            <span className="flex items-center gap-1.5"><Star size={14} className="fill-amber-400 text-amber-400" /> <span className="text-foreground">{localRating.toFixed(1)}</span> ({localReviewsCount} Rated)</span>
+                                            <span className="flex items-center gap-1.5"><Star size={14} className="fill-amber-400 text-amber-400" /> <span className="text-foreground">{localRating.toFixed(1)}</span> ({localReviewsCount} {t('product', 'rated')})</span>
                                         </>
                                     ) : (
                                         <>
                                             <span className="w-1 h-1 rounded-full bg-border" />
-                                            <span className="flex items-center gap-1.5"><Star size={14} className="text-muted-foreground" /> <span className="text-foreground">0</span> (0 Rated)</span>
+                                            <span className="flex items-center gap-1.5"><Star size={14} className="text-muted-foreground" /> <span className="text-foreground">0</span> (0 {t('product', 'rated')})</span>
                                         </>
                                     )}
                                 </div>
@@ -285,17 +286,17 @@ export default function ProductDetailClient() {
 
                                     <div className="flex items-center gap-10 py-6 border-y border-border/50">
                                         <div className="space-y-1">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Min. Sourcing</p>
-                                            <p className="text-foreground font-black text-lg">{product.minOrder} Units</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('product', 'minSourcing')}</p>
+                                            <p className="text-foreground font-black text-lg">{product.minOrder} {t('product', 'units')}</p>
                                         </div>
                                         <div className="w-px h-10 bg-border" />
                                         <div className="space-y-1">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Inventory Status</p>
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{t('product', 'inventoryStatus')}</p>
                                             <p className={cn(
                                                 "font-black text-lg",
                                                 product.status === ProductStatus.APPROVED ? "text-accent" : "text-amber-500"
                                             )}>
-                                                {product.status === ProductStatus.APPROVED ? 'In Active Distribution' : 'Pending Approval'}
+                                                {product.status === ProductStatus.APPROVED ? t('product', 'inActiveDistribution') : t('product', 'pendingApproval')}
                                             </p>
                                         </div>
                                     </div>
@@ -319,7 +320,7 @@ export default function ProductDetailClient() {
                                             </div>
                                             <button className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-primary transition-colors uppercase tracking-widest group">
                                                 <Share2 size={20} className="group-hover:rotate-12 transition-transform" />
-                                                <span>Share SKU</span>
+                                                <span>{t('product', 'shareSKU')}</span>
                                             </button>
                                         </div>
 
@@ -332,9 +333,9 @@ export default function ProductDetailClient() {
                                             )}
                                         >
                                             {isAdded ? (
-                                                <><Check size={28} /> Added to Procurement</>
+                                                <><Check size={28} /> {t('product', 'addedToProcurement')}</>
                                             ) : (
-                                                <><ShoppingCart size={28} /> {isLoggedIn ? 'Get Wholesale Quote' : 'Login to Order'}</>
+                                                <><ShoppingCart size={28} /> {isLoggedIn ? t('product', 'getWholesaleQuote') : t('product', 'loginToOrder')}</>
                                             )}
                                         </Button>
                                     </div>
@@ -347,8 +348,8 @@ export default function ProductDetailClient() {
                                         <Truck size={20} />
                                     </div>
                                     <div className="space-y-1">
-                                        <h4 className="text-[10px] font-black text-foreground uppercase tracking-widest">Express Transit</h4>
-                                        <p className="text-[10px] text-muted-foreground font-medium leading-relaxed max-w-[120px]">Distribution center arrival in 48-72h via cold chain.</p>
+                                        <h4 className="text-[10px] font-black text-foreground uppercase tracking-widest">{t('product', 'expressTransit')}</h4>
+                                        <p className="text-[10px] text-muted-foreground font-medium leading-relaxed max-w-[120px]">{isAr ? 'وصول مركز التوزيع في غضون 48-72 ساعة عبر سلسلة تبريد' : 'Distribution center arrival in 48-72h via cold chain.'}</p>
                                     </div>
                                 </div>
                                 <div className="p-4 bg-white dark:bg-[#131921] rounded-2xl border border-border shadow-sm flex flex-col gap-3 group hover:border-amber-400/50 transition-colors">
@@ -356,8 +357,8 @@ export default function ProductDetailClient() {
                                         <RotateCcw size={20} />
                                     </div>
                                     <div className="space-y-1">
-                                        <h4 className="text-[10px] font-black text-foreground uppercase tracking-widest">Returns Audit</h4>
-                                        <p className="text-[10px] text-muted-foreground font-medium leading-relaxed max-w-[120px]">30-day corporate return policy for damaged SKUs.</p>
+                                        <h4 className="text-[10px] font-black text-foreground uppercase tracking-widest">{t('product', 'returnsAudit')}</h4>
+                                        <p className="text-[10px] text-muted-foreground font-medium leading-relaxed max-w-[120px]">{isAr ? 'سياسة إرجاع الشركات لمدة 30 يومًا للمواد التالفة' : '30-day corporate return policy for damaged SKUs.'}</p>
                                     </div>
                                 </div>
                             </div>
@@ -365,7 +366,7 @@ export default function ProductDetailClient() {
                             {/* About Product */}
                             <div className="space-y-6 pt-6 border-t border-border">
                                 <h3 className="text-xl font-black text-foreground font-heading">
-                                    SKU Optimization Details
+                                    {t('product', 'skuDetails')}
                                 </h3>
                                 <ul className="grid grid-cols-1 md:grid-cols-2 gap-y-5 gap-x-10">
                                     {[
@@ -399,12 +400,12 @@ export default function ProductDetailClient() {
                 {/* Related Products */}
                 <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 mb-16 px-6 mt-16">
                     <div className="space-y-2">
-                        <h2 className="text-3xl lg:text-4xl font-heading font-black text-foreground tracking-tight">Expand Your Batch</h2>
-                        <p className="text-muted-foreground font-medium text-sm">Compatible inventory from the same logistics hub</p>
+                        <h2 className="text-3xl lg:text-4xl font-heading font-black text-foreground tracking-tight">{t('product', 'expandBatch')}</h2>
+                        <p className="text-muted-foreground font-medium text-sm">{isAr ? 'مخزون متوافق من نفس المركز اللوجستي' : 'Compatible inventory from the same logistics hub'}</p>
                     </div>
                     <Link href="/categories">
                         <Button variant="outline" className="rounded-xl gap-2 font-black border-border shadow-sm bg-white dark:bg-[#131921] hover:bg-primary hover:text-white hover:border-primary transition-all">
-                            View Full Inventory
+                            {t('product', 'viewFullInventory')}
                             <ChevronRight size={16} />
                         </Button>
                     </Link>

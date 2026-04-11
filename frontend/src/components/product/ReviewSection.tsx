@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Star, ThumbsUp, Trash2, Camera, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Review {
     id: string;
@@ -43,6 +44,8 @@ function StarRating({ value, onChange, size = 20 }: { value: number; onChange?: 
 
 export default function ReviewSection({ productId, onReviewSubmitted }: { productId: string; onReviewSubmitted?: (newRating: number, newCount: number) => void }) {
     const { user, isLoggedIn } = useAuth();
+    const { t, locale } = useLanguage();
+    const isAr = locale === 'ar';
     const [reviews, setReviews] = useState<Review[]>([]);
     const [loading, setLoading] = useState(true);
     const [myRating, setMyRating] = useState(0);
@@ -92,7 +95,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
         e.preventDefault();
         
         if (!myRating) {
-            setError('يرجى اختيار تقييم بالنجوم لإرسال مراجعتك'); 
+            setError(t('reviews', 'ratingRequired')); 
             return; 
         }
         
@@ -102,7 +105,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
         try {
             const token = localStorage.getItem('bev-token');
             if (!token) {
-                setError('يجب تسجيل الدخول لإضافة تقييم');
+                setError(t('reviews', 'loginRequired'));
                 setSubmitting(false);
                 return;
             }
@@ -115,7 +118,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
             });
 
             // Use the Next.js API route proxy to handle multipart/form-data stably
-            const postUrl = `/api/reviews/${productId}`;
+            const postUrl = `/api/products/${productId}/reviews`;
 
             const res = await fetch(postUrl, {
                 method: 'POST',
@@ -126,7 +129,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
             });
 
             if (!res.ok) { 
-                let msg = 'فشل إرسال التقييم';
+                let msg = t('reviews', 'submitFailed');
                 try {
                     const errorData = await res.json();
                     msg = errorData.message || msg;
@@ -151,7 +154,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
             
         } catch (err) {
             console.error('Review submission error:', err);
-            setError('حدث خطأ في الاتصال، يرجى المحاولة مرة أخرى');
+            setError(t('reviews', 'connectionError'));
         } finally {
             setSubmitting(false);
         }
@@ -171,15 +174,15 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
 
     return (
         <div className="mt-12 border-t border-slate-100 pt-10">
-            <h2 className="text-2xl font-black text-[#0A1A2F] mb-8">التقييمات والمراجعات</h2>
+            <h2 className="text-2xl font-black text-[#0A1A2F] dark:text-white mb-8">{t('reviews', 'title')}</h2>
 
             {/* Summary */}
             {reviews.length > 0 && (
                 <div className="flex gap-10 mb-10 p-6 bg-slate-50 rounded-2xl">
                     <div className="text-center">
-                        <div className="text-5xl font-black text-[#0A1A2F]">{avgRating.toFixed(1)}</div>
+                        <div className="text-5xl font-black text-[#0A1A2F] dark:text-white">{avgRating.toFixed(1)}</div>
                         <StarRating value={Math.round(avgRating)} size={16} />
-                        <div className="text-xs text-slate-400 mt-1">{reviews.length} تقييم</div>
+                        <div className="text-xs text-slate-400 mt-1">{reviews.length} {reviews.length === 1 ? t('reviews', 'review') : t('reviews', 'reviews')}</div>
                     </div>
                     <div className="flex-1 space-y-1.5">
                         {dist.map(({ star, count }) => (
@@ -203,22 +206,22 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
             {isLoggedIn ? (
                 <form onSubmit={handleSubmit} className="bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-2xl p-6 mb-8 shadow-sm">
                     <h3 className="font-black text-[#0A1A2F] dark:text-white mb-4">
-                        {reviews.find(r => r.user.id === user?.id) ? 'تعديل تقييمك' : 'اكتب تقييمك'}
+                        {reviews.find(r => r.user.id === user?.id) ? t('reviews', 'editReview') : t('reviews', 'writeReview')}
                     </h3>
                     {error && <p className="text-red-500 text-sm mb-4 font-bold">{error}</p>}
                     
                     <div className="flex flex-col md:flex-row gap-6 mb-6">
                         <div className="shrink-0">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block text-center">تقييمك</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block text-center">{t('reviews', 'yourRating')}</label>
                             <StarRating value={myRating} onChange={setMyRating} size={32} />
                         </div>
                         
                         <div className="flex-1">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block">رأيك الشخصي</label>
+                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block">{t('reviews', 'yourOpinion')}</label>
                             <textarea
                                 value={myComment}
                                 onChange={e => setMyComment(e.target.value)}
-                                placeholder="شاركنا رأيك في هذا المنتج... (اختياري)"
+                                placeholder={t('reviews', 'commentPlaceholder')}
                                 rows={2}
                                 className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm text-[#0A1A2F] dark:text-white outline-none focus:border-[#FF8A00]/40 transition resize-none"
                             />
@@ -227,7 +230,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
 
                     {/* Image Upload UI */}
                     <div className="mb-6">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block">أضف صور للمنتج (اختياري)</label>
+                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block">{t('reviews', 'addPhotos')}</label>
                         <div className="flex flex-wrap gap-3">
                             {previews.map((preview, i) => (
                                 <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 group">
@@ -247,7 +250,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                                 className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 dark:border-white/10 text-slate-400 hover:text-[#FF8A00] hover:border-[#FF8A00] transition-all"
                             >
                                 <Camera size={20} />
-                                <span className="text-[9px] font-black uppercase tracking-tighter">رفع صورة</span>
+                                <span className="text-[9px] font-black uppercase tracking-tighter">{t('reviews', 'uploadPhoto')}</span>
                             </button>
                             <input
                                 id="review-images"
@@ -266,18 +269,18 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                             disabled={submitting}
                             className="px-10 py-3.5 bg-[#0A1A2F] dark:bg-[#1BC7C9] text-white dark:text-[#0A1A2F] rounded-xl font-black text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 disabled:opacity-50 shadow-lg shadow-[#0A1A2F]/10 dark:shadow-none"
                         >
-                            {submitting ? 'جاري الإرسال...' : 'إرسال التقييم'}
+                            {submitting ? t('reviews', 'submitting') : t('reviews', 'submitReview')}
                         </button>
                     </div>
                 </form>
             ) : (
-                <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 mb-8 text-center">
-                    <p className="text-slate-600 font-bold mb-4">يرجى تسجيل الدخول لتتمكن من إضافة تقييم لهذا المنتج</p>
+                <div className="bg-slate-50 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl p-8 mb-8 text-center">
+                    <p className="text-slate-600 dark:text-slate-400 font-bold mb-4">{t('reviews', 'loginToReview')}</p>
                     <button
                         onClick={() => window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)}
-                        className="px-6 py-2 bg-[#0A1A2F] text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#FF8A00] transition-all"
+                        className="px-6 py-2 bg-[#0A1A2F] dark:bg-[#1BC7C9] text-white dark:text-[#0A1A2F] rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#FF8A00] transition-all"
                     >
-                        تسجيل الدخول
+                        {t('navbar', 'login')}
                     </button>
                 </div>
             )}
@@ -290,7 +293,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
             ) : reviews.length === 0 ? (
                 <div className="text-center py-12 text-slate-400">
                     <ThumbsUp size={40} className="mx-auto mb-3 opacity-30" />
-                    <p className="font-bold">لا توجد تقييمات بعد — كن أول من يقيّم!</p>
+                    <p className="font-bold">{t('reviews', 'noReviews')}</p>
                 </div>
             ) : (
                 <div className="space-y-4">
@@ -306,7 +309,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                                         <div className="flex items-center gap-2 mt-0.5">
                                             <StarRating value={review.rating} size={13} />
                                             <span className="text-xs text-slate-400">
-                                                {new Date(review.createdAt).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                                {new Date(review.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                             </span>
                                         </div>
                                     </div>

@@ -26,17 +26,19 @@ export default function GoogleSyncPage() {
                 return;
             }
 
-            if (s.pendingApproval) {
-                router.push('/auth/pending');
-                return;
-            }
-
-            const backendToken = s.backendToken || '';
-            const backendUser = s.backendUser;
-
-            if (backendToken && backendUser) {
                 localStorage.setItem('bev-token', backendToken);
                 localStorage.setItem('bev-user', JSON.stringify(backendUser));
+
+                // Check if user needs onboarding (e.g. registered via Google and lacks company details)
+                if (!backendUser.companyName || !backendUser.phone) {
+                    router.push('/auth/onboarding');
+                    return;
+                }
+
+                if (s.pendingApproval) {
+                    router.push('/auth/pending');
+                    return;
+                }
 
                 const role = (backendUser.role || '').toUpperCase();
                 if (role === 'ADMIN' || role === 'MODERATOR' || role === 'SUPPORT' || role === 'EDITOR') {

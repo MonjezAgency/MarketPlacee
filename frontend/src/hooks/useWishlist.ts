@@ -2,9 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
-import { API_BASE_URL } from '@/lib/config';
 
-const API_URL = API_BASE_URL;
+// Use '/api' to ensure all requests go through the Next.js middleware proxy
+// (API_BASE_URL can resolve to the direct backend URL, causing CORS issues)
+const API_URL = '/api';
 
 export function useWishlist() {
     const { user } = useAuth();
