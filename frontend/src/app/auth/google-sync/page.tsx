@@ -19,18 +19,19 @@ export default function GoogleSyncPage() {
         }
 
         if (status === 'authenticated' && session) {
-            const s = session;
+            const s = session as any;
 
             if (s.authError) {
                 setErrorMsg(s.authError);
                 return;
             }
 
-                localStorage.setItem('bev-token', backendToken);
-                localStorage.setItem('bev-user', JSON.stringify(backendUser));
+            if (s.backendToken && s.backendUser) {
+                localStorage.setItem('bev-token', s.backendToken);
+                localStorage.setItem('bev-user', JSON.stringify(s.backendUser));
 
                 // Check if user needs onboarding (e.g. registered via Google and lacks company details)
-                if (!backendUser.companyName || !backendUser.phone) {
+                if (!s.backendUser.companyName || !s.backendUser.phone) {
                     router.push('/auth/onboarding');
                     return;
                 }
@@ -40,7 +41,7 @@ export default function GoogleSyncPage() {
                     return;
                 }
 
-                const role = (backendUser.role || '').toUpperCase();
+                const role = (s.backendUser.role || '').toUpperCase();
                 if (role === 'ADMIN' || role === 'MODERATOR' || role === 'SUPPORT' || role === 'EDITOR') {
                     router.push('/admin');
                 } else if (role === 'SUPPLIER') {
