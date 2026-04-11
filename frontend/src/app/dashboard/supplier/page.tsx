@@ -14,6 +14,7 @@ import { useAuth } from '@/lib/auth';
 import { formatPrice } from '@/lib/currency';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, TrendingUp } from 'lucide-react';
+import { Product, ProductStatus } from '@/lib/types';
 
 const API_URL = '/api';
 
@@ -41,8 +42,8 @@ export default function SupplierDashboard() {
     useEffect(() => {
         setMounted(true);
     }, []);
-    const [editingProduct, setEditingProduct] = useState<any>(null);
-    const [products, setProducts] = useState<any[]>([]);
+    const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+    const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [dashboardStats, setDashboardStats] = useState<any>(null);
 

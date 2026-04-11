@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/currency';
+import { Product, ProductStatus } from '@/lib/types';
 
 const MOCK_PLATFORM_STATS = [
     { label: 'Total Users', value: '1,280', delta: '+45 this week', icon: Users, color: 'text-primary' },
@@ -23,8 +24,8 @@ const MOCK_PLATFORM_STATS = [
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState('users');
     const [pendingUsers, setPendingUsers] = useState<any[]>([]);
-    const [pendingProducts, setPendingProducts] = useState<any[]>([]);
-    const [approvedProducts, setApprovedProducts] = useState<any[]>([]);
+    const [pendingProducts, setPendingProducts] = useState<Product[]>([]);
+    const [approvedProducts, setApprovedProducts] = useState<Product[]>([]);
     const [markup, setMarkup] = useState<number>(1.05);
     const [brands, setBrands] = useState<string[]>([]);
     const [newBrand, setNewBrand] = useState('');

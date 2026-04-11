@@ -2,35 +2,64 @@
 
 export enum ProductStatus {
     PENDING = 'PENDING',
-    PENDING_APPROVAL = 'PENDING_APPROVAL', // Frontend usage/fallback
+    PENDING_APPROVAL = 'PENDING_APPROVAL',
     APPROVED = 'APPROVED',
     REJECTED = 'REJECTED',
-    BLOCKED = 'BLOCKED',    // For restricted items
+    BLOCKED = 'BLOCKED',
+    ACTIVE = 'ACTIVE',     // UI-specific state
+    INACTIVE = 'INACTIVE', // UI-specific state
+}
+
+export interface ProductVariant {
+    id?: string;
+    name: string;
+    value?: string;
+    values?: string[]; // Supporting existing JSON structure in some components
+    price?: number;
+    stock?: number;
 }
 
 export interface Product {
-    id: string;
-    name: string;
-    brand: string;
-    price: number;
-    basePrice?: number | null;
-    supplierId?: string;    // MUST be optional per refactor requirement
-    unit: string;
-    minOrder: number;
-    image: string;
-    images: string[];
-    stock: number;
-    inStock: boolean;
-    category: string;
-    ean?: string;
-    rating: number;
-    reviews: number;
-    status: ProductStatus;
+    id: string;        // Required
+    name: string;      // Required
+    price: number;     // Required
     
-    // Additional optional fields from refactor recommendation
-    categoryId?: string;
-    createdAt?: string;
+    // Core Metadata
+    ean?: string;
+    brand?: string;
+    supplierId?: string;
+    unit?: string;
     description?: string;
+    category?: string;
+    categoryId?: string;
+
+    // Media
+    image?: string;
+    images?: string[];
+
+    // Inventory & Status
+    stock?: number;
+    inStock?: boolean;
+    moq?: number;
+    status?: ProductStatus | string;
+    
+    // Advanced Data
+    basePrice?: number | null;
+    variants?: ProductVariant[];
+    adminNotes?: string;
+    rating?: number;
+    reviews?: number;
+    reviewsCount?: number;
+
+    // Timestamps
+    createdAt?: string;
+    updatedAt?: string;
+
+    // Relations (Optional UI data)
+    supplier?: {
+        name: string;
+        companyName?: string;
+    };
 }
 
 export interface Category {
