@@ -185,13 +185,13 @@ export default function ProductDetailClient() {
                                 {product.isNew && (
                                     <span className="bg-primary text-[#131921] text-[10px] font-black px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 tracking-widest uppercase">
                                         <Sparkles size={14} className="text-[#131921]" />
-                                        {t('home', 'hero').slide3Badge || 'New Arrival'}
+                                        {t('home', 'hero.slide3Badge') || 'New Arrival'}
                                     </span>
                                 )}
                                 {product.bulkSave && (
                                     <span className="bg-amber-400 text-amber-950 text-[10px] font-black px-4 py-2 rounded-xl shadow-lg tracking-widest uppercase flex items-center gap-2">
                                         <Truck size={14} />
-                                        {t('home', 'hero').slide2Badge || 'B2B Exclusive'}
+                                        {t('home', 'hero.slide2Badge') || 'B2B Exclusive'}
                                     </span>
                                 )}
                             </div>
