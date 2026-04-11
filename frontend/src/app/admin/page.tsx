@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { 
@@ -209,14 +210,14 @@ export default function AdminOverviewPage() {
                         </div>
                         <p className={cn("text-[10px] font-black uppercase mb-4 text-muted-foreground", !isAr && "tracking-[0.2em]")}>{t('admin', 'quickActionTerminal')}</p>
                         <div className="space-y-3">
-                            <button onClick={() => window.location.href = '/admin/billing'} className="w-full py-3 bg-primary text-primary-foreground font-black rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                            <Link href="/admin/billing" className="w-full py-3 bg-primary text-primary-foreground font-black rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                                 <Briefcase size={14} />
                                 {t('admin', 'auditFullLedger')}
-                            </button>
-                            <button onClick={() => window.location.href = '/admin/orders'} className="w-full py-3 bg-accent text-accent-foreground font-black rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                            </Link>
+                            <Link href="/admin/orders" className="w-full py-3 bg-accent text-accent-foreground font-black rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                                 <ShoppingCart size={14} />
                                 {t('admin', 'settlePendingInvoices')}
-                            </button>
+                            </Link>
                         </div>
                     </div>
                 </div>

@@ -43,8 +43,16 @@ export class UsersService {
     }
 
     async findAll(status?: any) {
+        const whereCondition: any = status ? { status } : {};
+        
+        // Strict Business Logic: Do not show Google SSO users to Admins for approval until they fill out onboarding
+        if (status === 'PENDING_APPROVAL') {
+            whereCondition.companyName = { not: null };
+            whereCondition.phone = { not: null };
+        }
+
         return this.prisma.user.findMany({
-            where: status ? { status } : {},
+            where: whereCondition,
             orderBy: { createdAt: 'desc' },
         });
     }

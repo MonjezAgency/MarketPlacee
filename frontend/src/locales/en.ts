@@ -15,6 +15,8 @@ export const en = {
         back: "Back"
     },
     navbar: {
+        home: "Home",
+        browseCatalog: "Inventory",
         dashboard: "Dashboard",
         marketplace: "Atlantis",
         admin: "Admin",
@@ -280,7 +282,8 @@ export const en = {
         specifications: "Specifications",
         saved: "Saved",
         save: "Save",
-        noDescription: "No description available."
+        noDescription: "No description available.",
+        defaultDesc: "High-grade wholesale variant natively optimized for B2B procurement pipelines. Features an extended shelf-life, bulk-ready packaging, and full compliance documentation required for enterprise distribution."
     },
     admin: {
         panelTitle: "Control Panel",

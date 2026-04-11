@@ -15,6 +15,8 @@ export const ar = {
         back: "رجوع"
     },
     navbar: {
+        home: "الرئيسية",
+        browseCatalog: "المخزون",
         dashboard: "لوحة التحكم",
         marketplace: "أتلانتس",
         admin: "المدير",
@@ -280,7 +282,8 @@ export const ar = {
         specifications: "المواصفات",
         saved: "محفوظ",
         save: "حفظ",
-        noDescription: "لا يوجد وصف متاح."
+        noDescription: "لا يوجد وصف متاح.",
+        defaultDesc: "نسخة جملة عالية الجودة مجهزة خصيصاً لعمليات الشراء B2B. تتميز بصلاحية ممتدة، وتعبئة مخصصة للكميات الكبيرة، ووثائق مطابقة كاملة مطلوبة للتوزيع المؤسسي."
     },
     admin: {
         panelTitle: "لوحة التحكم",

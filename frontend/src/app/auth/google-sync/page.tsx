@@ -30,9 +30,8 @@ export default function GoogleSyncPage() {
                 localStorage.setItem('bev-token', s.backendToken);
                 localStorage.setItem('bev-user', JSON.stringify(s.backendUser));
 
-                // Check if user needs onboarding (e.g. registered via Google and lacks company details)
                 if (!s.backendUser.companyName || !s.backendUser.phone) {
-                    router.push('/auth/onboarding');
+                    router.replace('/auth/onboarding');
                     return;
                 }
 

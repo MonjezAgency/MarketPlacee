@@ -21,6 +21,7 @@ export function useWishlist() {
         try {
             const res = await fetch(`${API_URL}/wishlist`, {
                 headers: { Authorization: `Bearer ${token}` },
+                cache: 'no-store',
             });
             if (res.ok) {
                 const data = await res.json();

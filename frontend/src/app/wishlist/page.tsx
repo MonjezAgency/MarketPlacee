@@ -39,6 +39,7 @@ export default function WishlistPage() {
         try {
             const res = await fetch(`${API_URL}/wishlist`, {
                 headers: { Authorization: `Bearer ${getToken()}` },
+                cache: 'no-store',
             });
             if (res.ok) setItems(await res.json());
         } catch { /* offline */ }

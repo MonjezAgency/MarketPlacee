@@ -270,7 +270,7 @@ export default function ProductDetailClient() {
                             </div>
 
                             <div className="text-sm text-muted-foreground leading-relaxed">
-                                {translatedDesc || `High-grade wholesale variant of ${product.name} natively optimized for B2B procurement pipelines. Features an extended shelf-life, bulk-ready packaging, and full compliance documentation required for enterprise distribution.`}
+                                {translatedDesc || t('product', 'defaultDesc')}
                             </div>
 
                             {/* Pricing Card */}
