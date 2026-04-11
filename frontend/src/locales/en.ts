@@ -1,4 +1,7 @@
 export const en = {
+    common: {
+        loading: "Loading..."
+    },
     navbar: {
         dashboard: "Dashboard",
         marketplace: "Atlantis",

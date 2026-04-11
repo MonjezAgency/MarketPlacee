@@ -29,7 +29,7 @@ export default function ProductDetailClient() {
     const [quantity, setQuantity] = useState(1);
     const [isAdded, setIsAdded] = useState(false);
     const router = useRouter();
-    const { locale } = useLanguage();
+    const { t, locale } = useLanguage();
     const { user, isLoggedIn } = useAuth();
     const [localRating, setLocalRating] = useState(0);
     const [localReviewsCount, setLocalReviewsCount] = useState(0);

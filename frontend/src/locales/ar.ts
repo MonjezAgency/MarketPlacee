@@ -1,4 +1,7 @@
 export const ar = {
+    common: {
+        loading: "جاري التحميل..."
+    },
     navbar: {
         dashboard: "لوحة التحكم",
         marketplace: "أتلانتس",
