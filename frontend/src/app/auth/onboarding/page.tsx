@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function OnboardingPage() {
-    const { user, updateProfile } = useAuth();
+    const { user, updateUser } = useAuth();
     const { t, locale } = useLanguage();
     const router = useRouter();
     const isAr = locale === 'ar';
