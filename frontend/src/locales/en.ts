@@ -1,6 +1,18 @@
 export const en = {
     common: {
-        loading: "Loading..."
+        loading: "Loading...",
+        search: "Search",
+        approve: "Approve",
+        reject: "Reject",
+        cancel: "Cancel",
+        save: "Save",
+        active: "Active",
+        pending: "Pending",
+        blocked: "Blocked",
+        add: "Add",
+        edit: "Edit",
+        delete: "Delete",
+        back: "Back"
     },
     navbar: {
         dashboard: "Dashboard",
@@ -424,20 +436,5 @@ export const en = {
         redBullSubtitle: "Keep your inventory energized. Buy 10 cases, get 1 free.",
         coffeeTitle: "Premium Coffee Selection",
         coffeeSubtitle: "Arabica beans starting from $45/kg for wholesale."
-    },
-    common: {
-        search: "Search",
-        approve: "Approve",
-        reject: "Reject",
-        cancel: "Cancel",
-        save: "Save",
-        active: "Active",
-        pending: "Pending",
-        blocked: "Blocked",
-        loading: "Loading...",
-        add: "Add",
-        edit: "Edit",
-        delete: "Delete",
-        back: "Back"
     }
 };

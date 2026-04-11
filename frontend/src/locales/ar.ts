@@ -1,6 +1,18 @@
 export const ar = {
     common: {
-        loading: "جاري التحميل..."
+        loading: "جاري التحميل...",
+        search: "بحث",
+        approve: "موافقة",
+        reject: "رفض",
+        cancel: "إلغاء",
+        save: "حفظ",
+        active: "نشط",
+        pending: "قيد الانتظار",
+        blocked: "محظور",
+        add: "إضافة",
+        edit: "تعديل",
+        delete: "حذف",
+        back: "رجوع"
     },
     navbar: {
         dashboard: "لوحة التحكم",
@@ -424,20 +436,5 @@ export const ar = {
         redBullSubtitle: "حافظ على مخزونك بالطاقة. اشتري 10 صناديق واحصل على واحدة مجاناً.",
         coffeeTitle: "تشكيلة قهوة فاخرة",
         coffeeSubtitle: "حبوب أرابيكا تبدأ من 45$/كجم للجملة."
-    },
-    common: {
-        search: "بحث",
-        approve: "موافقة",
-        reject: "رفض",
-        cancel: "إلغاء",
-        save: "حفظ",
-        active: "نشط",
-        pending: "قيد الانتظار",
-        blocked: "محظور",
-        loading: "جاري التحميل...",
-        add: "إضافة",
-        edit: "تعديل",
-        delete: "حذف",
-        back: "رجوع"
     }
 };
