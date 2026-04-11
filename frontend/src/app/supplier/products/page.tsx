@@ -23,8 +23,9 @@ import {
     ShieldAlert
 } from 'lucide-react';
 import Link from 'next/link';
-import { CATEGORIES_LIST, Product, ProductStatus } from '@/lib/products';
+import { CATEGORIES_LIST } from '@/lib/products';
 import { fetchMyProducts } from '@/lib/api';
+import { Product, ProductStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import ProductEditorModal from '@/app/dashboard/supplier/ProductEditorModal';
 

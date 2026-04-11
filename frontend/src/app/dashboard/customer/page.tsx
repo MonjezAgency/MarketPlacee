@@ -9,8 +9,8 @@ import {
     Loader2, XCircle, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { type Product } from '@/lib/products';
 import { fetchProducts } from '@/lib/api';
+import type { Product } from '@/lib/types';
 import ProductCard from '@/components/product/ProductCard';
 import { cn } from '@/lib/utils';
 

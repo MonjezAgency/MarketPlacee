@@ -4,7 +4,7 @@ import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutList, Send, Clock, CheckCircle, XCircle, AlertCircle, Plus, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { type Product } from '@/lib/products';
+import { type Product } from '@/lib/types';
 import { fetchProducts } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 

@@ -8,7 +8,7 @@ import {
     ShieldCheck, RotateCcw, ChevronRight, Share2,
     Heart, Info, Package, Sparkles, ArrowLeft, ShoppingCart
 } from 'lucide-react';
-import { type Product, ProductStatus } from '@/lib/products';
+import { type Product, ProductStatus } from '@/lib/types';
 import { fetchProducts } from '@/lib/api';
 import { useEffect } from 'react';
 import { useCart } from '@/lib/cart';

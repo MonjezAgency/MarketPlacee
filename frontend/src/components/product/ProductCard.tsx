@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useCart } from '@/lib/cart';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
-import { type Product } from '@/lib/products';
+import { type Product } from '@/lib/types';
 import { useAuth } from '@/lib/auth';
 import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';

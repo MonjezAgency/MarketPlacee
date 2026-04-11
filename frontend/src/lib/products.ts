@@ -1,4 +1,5 @@
 import { Product, ProductStatus } from '@/lib/types';
+export type { Product, Category } from './types';
 
 export { ProductStatus };
 
