@@ -41,8 +41,8 @@ if (enKeys.size < 10) {
   );
 }
 
-const missingInAr = [...enKeys].filter(k => !arKeys.has(k));
-const missingInEn = [...arKeys].filter(k => !enKeys.has(k));
+const missingInAr = Array.from(enKeys).filter(k => !arKeys.has(k as string));
+const missingInEn = Array.from(arKeys).filter(k => !enKeys.has(k as string));
 
 if (missingInAr.length > 0) {
   console.error(`\n❌ ${missingInAr.length} keys missing in ar.ts:`);
