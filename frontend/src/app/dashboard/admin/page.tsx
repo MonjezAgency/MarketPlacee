@@ -311,7 +311,7 @@ export default function AdminDashboard() {
                             <div key={product.id} className="p-8 flex flex-col md:flex-row md:items-center justify-between hover:bg-muted/10 transition-colors group relative gap-4">
                                 <div className="flex items-start gap-4">
                                     <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center overflow-hidden border border-border/50 bg-white">
-                                        {(product.images?.length ?? 0) > 0 ? (
+                                        {product.images && product.images.length > 0 ? (
                                             <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain mix-blend-multiply" />
                                         ) : (
                                             <Package className="w-6 h-6 text-foreground/20" />
@@ -346,7 +346,7 @@ export default function AdminDashboard() {
                             <div key={product.id} className="p-8 flex flex-col md:flex-row md:items-center justify-between hover:bg-muted/10 transition-colors group relative gap-4">
                                 <div className="flex items-start gap-4">
                                     <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center overflow-hidden border border-border/50 bg-white">
-                                        {(product.images?.length ?? 0) > 0 ? (
+                                        {product.images && product.images.length > 0 ? (
                                             <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain mix-blend-multiply" />
                                         ) : (
                                             <Package className="w-6 h-6 text-foreground/20" />

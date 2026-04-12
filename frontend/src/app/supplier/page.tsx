@@ -191,7 +191,7 @@ export default function SupplierOverviewPage() {
                                     </td>
                                 </tr>
                             )}
-                            {dashboardStats?.topProducts?.length === 0 && (
+                            {(!dashboardStats?.topProducts || dashboardStats.topProducts.length === 0) && (
                                 <tr>
                                     <td colSpan={3} className="px-8 py-10 text-center text-muted-foreground text-sm font-bold">
                                         No sales data available yet.

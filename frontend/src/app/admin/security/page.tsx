@@ -227,7 +227,7 @@ export default function SecurityDashboard() {
                         <UserX size={80} className="text-red-500" />
                     </div>
                     <p className="text-muted-foreground text-xs font-black uppercase tracking-widest">Blocked Threats</p>
-                    <h3 className="text-4xl font-black text-foreground mt-2">{status?.blockedIps?.length || 0}</h3>
+                    <h3 className="text-4xl font-black text-foreground mt-2">{status?.blockedIps ? status.blockedIps.length : 0}</h3>
                     <p className="text-red-400 text-[10px] font-bold mt-2 uppercase">Active IP Blocks</p>
                 </div>
 
@@ -288,7 +288,7 @@ export default function SecurityDashboard() {
                     })()}
 
                     <div className="flex-1 overflow-y-auto max-h-[500px] no-scrollbar">
-                        {!status?.recentLogs || status?.recentLogs?.length === 0 ? (
+                        {!status?.recentLogs || status.recentLogs.length === 0 ? (
                             <div className="h-full flex items-center justify-center p-12 text-muted-foreground/50 italic">
                                 No threats detected in the last session.
                             </div>
@@ -415,7 +415,7 @@ export default function SecurityDashboard() {
                                     </button>
                                 </div>
                             ))}
-                            {(!status?.blockedIps || status?.blockedIps?.length === 0) && (
+                            {(!status?.blockedIps || status.blockedIps.length === 0) && (
                                 <div className="text-center py-8 text-muted-foreground/50 italic text-sm">No active embargoes.</div>
                             )}
                         </div>

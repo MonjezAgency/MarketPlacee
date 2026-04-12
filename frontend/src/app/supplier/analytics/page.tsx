@@ -24,7 +24,7 @@ const PERIODS: { label: string; days: number }[] = [
 ];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
+    if (!active || !payload || payload.length === 0) return null;
     return (
         <div className="bg-card border border-border rounded-xl px-4 py-3 shadow-xl text-sm">
             <p className="font-black text-foreground mb-1">{label}</p>
@@ -166,7 +166,7 @@ export default function SupplierAnalyticsPage() {
                     </div>
 
                     {/* Revenue Chart */}
-                    {(data.monthlyData?.length ?? 0) > 0 && (
+                    {data.monthlyData && data.monthlyData.length > 0 && (
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -207,7 +207,7 @@ export default function SupplierAnalyticsPage() {
                     {/* Bottom Row */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Category Pie */}
-                        {(data.categoryBreakdown?.length ?? 0) > 0 && (
+                        {data.categoryBreakdown && data.categoryBreakdown.length > 0 && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -239,7 +239,7 @@ export default function SupplierAnalyticsPage() {
                         )}
 
                         {/* Top Products Bar */}
-                        {(data.topProducts?.length ?? 0) > 0 && (
+                        {data.topProducts && data.topProducts.length > 0 && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}

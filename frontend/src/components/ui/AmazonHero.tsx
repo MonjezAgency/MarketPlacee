@@ -50,7 +50,7 @@ export default function AmazonHero() {
             if (stored) {
                 const slots = JSON.parse(stored);
                 const heroSlot = slots.find((s: any) => s.id === 'hero-banner');
-                if ((heroSlot?.ads?.length ?? 0) > 0) {
+                if (heroSlot?.ads && heroSlot.ads.length > 0) {
                     const adminSlides: Slide[] = heroSlot.ads.map((ad: any) => ({
                         image: ad.image,
                         title: ad.title,

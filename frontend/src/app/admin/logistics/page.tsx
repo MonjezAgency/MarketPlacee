@@ -149,7 +149,7 @@ export default function AdminShipmentsPage() {
                                     </span>
                                 </td>
                                 <td className="px-6 py-4">
-                                    <p className="text-sm font-black">{s.order?.items?.length ?? '—'}</p>
+                                    <p className="text-sm font-black">{s.order?.items ? s.order.items.length : '—'}</p>
                                 </td>
                                 <td className="px-6 py-4">
                                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
