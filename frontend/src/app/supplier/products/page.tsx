@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { CATEGORIES_LIST } from '@/lib/products';
-import { fetchMyProducts } from '@/lib/api';
+import { fetchMyProducts, apiFetch, apiUrl } from '@/lib/api';
 import { Product, ProductStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import ProductEditorModal from '@/app/dashboard/supplier/ProductEditorModal';
@@ -50,19 +50,16 @@ export default function SupplierProductsPage() {
 
     React.useEffect(() => {
         loadProducts();
-        // Fetch KYC status
-        const token = localStorage.getItem('bev-token');
-        if (token) {
-            fetch(('/api') + '/kyc/status', {
-                headers: { Authorization: `Bearer ${token}` }
-            }).then(r => r.json()).then(d => setKycStatus(d.kycStatus || 'UNVERIFIED')).catch(() => {});
-        }
+        // Fetch KYC status via apiFetch (httpOnly cookie handles auth)
+        apiFetch('/kyc/status')
+            .then(r => r.json())
+            .then(d => setKycStatus(d.kycStatus || 'UNVERIFIED'))
+            .catch(() => {});
     }, []);
 
     const loadProducts = async () => {
         try {
-            const token = localStorage.getItem('bev-token') || '';
-            const data = await fetchMyProducts(token);
+            const data = await fetchMyProducts();
             setProducts(data as Product[]);
         } catch (error) {
             console.error('Failed to fetch products:', error);
@@ -85,26 +82,12 @@ export default function SupplierProductsPage() {
         };
 
         try {
-            const token = localStorage.getItem('bev-token');
-            if (!token || token === 'LOCAL_ONLY') {
-                localStorage.removeItem('bev-token');
-                localStorage.removeItem('bev-user');
-                window.location.href = '/auth/login';
-                return;
-            }
-
             for (const file of bulkFiles) {
                 const formData = new FormData();
                 formData.append('file', file);
 
-                const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-                const apiUrl = `${backendBase}/products/bulk-upload`;
-
-                const res = await fetch(apiUrl, {
+                const res = await apiFetch('/products/bulk-upload', {
                     method: 'POST',
-                    headers: {
-                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                    },
                     body: formData,
                 });
 
@@ -149,19 +132,9 @@ export default function SupplierProductsPage() {
 
         setIsDeletingBulk(true);
         try {
-            const token = localStorage.getItem('bev-token');
-            if (!token || token === 'LOCAL_ONLY') {
-                localStorage.removeItem('bev-token'); localStorage.removeItem('bev-user');
-                window.location.href = '/auth/login'; return;
-            }
-
-            const res = await fetch(('/api') + '/products/bulk-delete', {
+            const res = await apiFetch('/products/bulk-delete', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ ids: Array.from(selectedProducts) })
+                body: JSON.stringify({ ids: Array.from(selectedProducts) }),
             });
 
             if (!res.ok) {
@@ -181,15 +154,9 @@ export default function SupplierProductsPage() {
 
     const handleSaveProduct = async (formData: any) => {
         try {
-            const token = localStorage.getItem('bev-token');
-            if (!token || token === 'LOCAL_ONLY') {
-                localStorage.removeItem('bev-token'); localStorage.removeItem('bev-user');
-                window.location.href = '/auth/login'; return;
-            }
-
-            const url = ('/api') + 
-                (editingProduct ? `/products/${editingProduct.id}` : '/products');
-            
+            const endpoint = editingProduct
+                ? `/products/${editingProduct.id}`
+                : '/products';
             const method = editingProduct ? 'PATCH' : 'POST';
 
             // Map image to images for backend schema compatibility
@@ -199,12 +166,8 @@ export default function SupplierProductsPage() {
                 delete payload.image;
             }
 
-            const res = await fetch(url, {
+            const res = await apiFetch(endpoint, {
                 method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
                 body: JSON.stringify(payload),
             });
 
@@ -451,8 +414,8 @@ export default function SupplierProductsPage() {
                                             <p className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground flex items-center gap-1">
                                                 <Archive size={8} /> Stock
                                             </p>
-                                            <p className={cn("text-base font-black", product.stock < 10 ? "text-destructive" : "text-foreground")}>
-                                                {product.stock} <span className="text-[10px]">{product.unit || 'units'}</span>
+                                            <p className={cn("text-base font-black", (product.stock ?? 0) < 10 ? "text-destructive" : "text-foreground")}>
+                                                {product.stock ?? 0} <span className="text-[10px]">{product.unit || 'units'}</span>
                                             </p>
                                         </div>
                                     </div>
