@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import {
     Camera,
     Save,
@@ -207,9 +208,12 @@ export default function SupplierSettingsPage() {
                                 </div>
                             </div>
                             
-                            <button className="w-full h-12 mt-4 bg-secondary text-secondary-foreground flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest rounded-xl border border-border hover:bg-secondary/80 transition-all">
+                            <Link 
+                                href="/supplier/settings/payout"
+                                className="w-full h-12 mt-4 bg-secondary text-secondary-foreground flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest rounded-xl border border-border hover:bg-secondary/80 transition-all"
+                            >
                                 <CreditCard size={14} /> Update Financials Securely
-                            </button>
+                            </Link>
                         </div>
                     </div>
 

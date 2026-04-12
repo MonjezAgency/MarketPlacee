@@ -26,7 +26,7 @@ function AdminFinanceContent() {
     const { user } = useAuth();
     const { t } = useLanguage();
     const searchParams = useSearchParams();
-    const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : null;
+    
     const initialTab = (searchParams.get('tab') as Tab) || 'invoices';
     const [tab, setTab] = React.useState<Tab>(initialTab);
     const [toast, setToast] = React.useState<{ type: 'success' | 'error'; msg: string } | null>(null);
@@ -64,7 +64,7 @@ function AdminFinanceContent() {
     React.useEffect(() => {
         const fetchUsers = async () => {
             try {
-                const res = await fetch(`${API_URL}/admin/users`, { headers: { Authorization: `Bearer ${token}` } });
+                const res = await fetch(`${API_URL}/admin/users`, { headers: {  } });
                 if (res.ok) {
                     const data = await res.json();
                     const list = Array.isArray(data) ? data : data.data || [];
@@ -80,7 +80,7 @@ function AdminFinanceContent() {
     const fetchInvoices = async () => {
         setIsLoadingInvoices(true);
         try {
-            const res = await fetch(`${API_URL}/invoices`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${API_URL}/invoices`, { headers: {  } });
             if (res.ok) setInvoices(await res.json());
         } catch (e) { console.error(e); }
         setIsLoadingInvoices(false);
@@ -89,7 +89,7 @@ function AdminFinanceContent() {
 
     const markPaid = async (id: string) => {
         try {
-            const res = await fetch(`${API_URL}/invoices/${id}/pay`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${API_URL}/invoices/${id}/pay`, { method: 'POST', headers: {  } });
             if (res.ok) { showToast('success', t('admin', 'markedAsPaid')); fetchInvoices(); }
         } catch { showToast('error', 'Failed'); }
     };
@@ -97,7 +97,7 @@ function AdminFinanceContent() {
     // ── Credit Terms ───────────────────────────────────────
     const fetchCredits = async () => {
         try {
-            const res = await fetch(`${API_URL}/finance/credit-terms`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${API_URL}/finance/credit-terms`, { headers: {  } });
             if (res.ok) setCredits(await res.json());
         } catch (e) { console.error(e); }
     };
@@ -107,7 +107,7 @@ function AdminFinanceContent() {
         try {
             const res = await fetch(`${API_URL}/finance/credit-terms`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify(newCredit),
             });
             if (res.ok) { showToast('success', t('admin', 'creditTermSet')); fetchCredits(); setShowNewCredit(false); }
@@ -117,7 +117,7 @@ function AdminFinanceContent() {
 
     const deleteCredit = async (id: string) => {
         try {
-            await fetch(`${API_URL}/finance/credit-terms/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+            await fetch(`${API_URL}/finance/credit-terms/${id}`, { method: 'DELETE', headers: {  } });
             showToast('success', 'Deleted'); fetchCredits();
         } catch { showToast('error', 'Failed'); }
     };
@@ -125,7 +125,7 @@ function AdminFinanceContent() {
     // ── Tax Exemptions ─────────────────────────────────────
     const fetchExemptions = async () => {
         try {
-            const res = await fetch(`${API_URL}/finance/tax-exemptions`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${API_URL}/finance/tax-exemptions`, { headers: {  } });
             if (res.ok) setExemptions(await res.json());
         } catch (e) { console.error(e); }
     };
@@ -135,7 +135,7 @@ function AdminFinanceContent() {
         try {
             const res = await fetch(`${API_URL}/finance/tax-exemptions/${id}/review`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify({ status }),
             });
             if (res.ok) { showToast('success', `${status === 'APPROVED' ? 'Approved' : 'Rejected'}`); fetchExemptions(); }
@@ -145,7 +145,7 @@ function AdminFinanceContent() {
     // ── Warehouses ─────────────────────────────────────────
     const fetchWarehouses = async () => {
         try {
-            const res = await fetch(`${API_URL}/finance/warehouses`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await fetch(`${API_URL}/finance/warehouses`, { headers: {  } });
             if (res.ok) setWarehouses(await res.json());
         } catch (e) { console.error(e); }
     };
@@ -155,7 +155,7 @@ function AdminFinanceContent() {
         try {
             const res = await fetch(`${API_URL}/finance/warehouses`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify(newWarehouse),
             });
             if (res.ok) { showToast('success', t('admin', 'warehouseCreated')); fetchWarehouses(); setShowNewWarehouse(false); }
@@ -165,7 +165,7 @@ function AdminFinanceContent() {
 
     const deleteWarehouse = async (id: string) => {
         try {
-            await fetch(`${API_URL}/finance/warehouses/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+            await fetch(`${API_URL}/finance/warehouses/${id}`, { method: 'DELETE', headers: {  } });
             showToast('success', 'Deleted'); fetchWarehouses();
         } catch { showToast('error', 'Failed'); }
     };

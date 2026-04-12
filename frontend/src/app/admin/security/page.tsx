@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -88,12 +90,12 @@ export default function SecurityDashboard() {
     };
     const fetchStatus = async () => {
         try {
-            const token = localStorage.getItem('bev-token');
-            const headers: Record<string, string> = token ? { 'Authorization': `Bearer ${token}` } : {};
+            
+            
 
             const [statusRes, agentRes] = await Promise.all([
-                fetch(`${'/api'}/admin/security/status`, { headers }),
-                fetch(`${'/api'}/admin/security/agent-status`, { headers })
+                apiFetch('/admin/security/status'),
+                apiFetch('/admin/security/agent-status')
             ]);
 
             if (statusRes.ok) {
@@ -128,10 +130,9 @@ export default function SecurityDashboard() {
         if (agentState !== 'IDLE' && agentState !== 'RESOLVED') return;
         setAgentState('ANALYZING');
         try {
-            const token = localStorage.getItem('bev-token');
+            
             await fetch(`${'/api'}/admin/security/agent-fix`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` }
+                method: 'POST'
             });
             fetchStatus();
         } catch (error) {
@@ -143,12 +144,12 @@ export default function SecurityDashboard() {
         if (!status) return;
         setLocking(true);
         try {
-            const token = localStorage.getItem('bev-token');
+            
             await fetch(`${'/api'}/admin/security/lockdown`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    
                 },
                 body: JSON.stringify({ enabled: !status.isLockedDown }),
             });
@@ -162,12 +163,12 @@ export default function SecurityDashboard() {
 
     const unblockIp = async (ip: string) => {
         try {
-            const token = localStorage.getItem('bev-token');
+            
             await fetch(`${'/api'}/admin/security/unblock`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    
                 },
                 body: JSON.stringify({ ip }),
             });

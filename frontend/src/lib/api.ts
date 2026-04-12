@@ -30,12 +30,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
         headers['Content-Type'] = 'application/json';
     }
 
-    if (typeof window !== 'undefined') {
-        const token = localStorage.getItem('bev-token');
-        if (token && !headers['Authorization']) {
-            headers['Authorization'] = `Bearer ${token}`;
-        }
-    }
+    // Standardized headers: JWT is now in HttpOnly cookie
 
     return fetch(url, {
         ...options,
@@ -45,6 +40,12 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 }
 
 // ─── LEGACY EXPORTS (RE-ADDED TO FIX BUILD FAILURES) ───────────────────────
+
+/**
+ * [AUTOSYNC FIX]: getToken stub to unblock build. 
+ * Real session management is now handled via apiFetch/httpOnly cookies.
+ */
+export const getToken = () => undefined;
 
 function mapProduct(item: any): Product {
     return {

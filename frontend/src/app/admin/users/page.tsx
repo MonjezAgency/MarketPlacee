@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,9 +37,8 @@ export default function AdminUsersPage() {
 
     const loadUsers = async () => {
         try {
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(('/api') + '/users', {
-                headers: { 'Authorization': `Bearer ${token}` }
+            
+            const res = await apiFetch('/users', {
             });
             if (res.ok) {
                 const data = await res.json();
@@ -56,12 +57,12 @@ export default function AdminUsersPage() {
 
     const updateStatus = async (id: string, status: UserStatus) => {
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`${'/api'}/users/${id}/status`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    
                 },
                 body: JSON.stringify({ status })
             });

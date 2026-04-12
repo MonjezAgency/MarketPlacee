@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import React, { useEffect, useState } from 'react';
 import { Sparkles, Plus, Search, Ticket, Trash2, Box, Calendar } from 'lucide-react';
@@ -30,12 +32,7 @@ export default function AdminCouponsPage() {
     useEffect(() => {
         const fetchCoupons = async () => {
             try {
-                const token = localStorage.getItem('bev-token');
-                if (!token) return;
-
-                const res = await fetch(('/api') + '/coupons', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const res = await apiFetch('/coupons');
 
                 if (res.ok) {
                     const data = await res.json();

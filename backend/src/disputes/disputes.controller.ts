@@ -63,7 +63,7 @@ export class DisputesController {
     async findOne(@Param('id') id: string, @Request() req) {
         const dispute = await this.disputesService.findOne(id);
         const isAdmin = [Role.ADMIN, Role.SUPPORT, Role.MODERATOR].includes(req.user.role);
-        if (!isAdmin && dispute.buyerId !== req.user.sub) throw new ForbiddenException();
+        if (!isAdmin && dispute.customerId !== req.user.sub) throw new ForbiddenException();
         return dispute;
     }
 

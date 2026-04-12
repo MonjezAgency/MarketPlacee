@@ -54,9 +54,9 @@ export default function CustomerDashboard() {
     const fetchOrders = React.useCallback(async () => {
         setIsLoadingOrders(true);
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`${API_URL}/orders/my-orders`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {  },
             });
             if (res.ok) setOrders(await res.json());
         } catch { /* offline */ }

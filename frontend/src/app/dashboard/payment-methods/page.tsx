@@ -27,8 +27,8 @@ export default function CustomerPaymentMethodsPage() {
     const [saving, setSaving] = React.useState(false);
     const [toast, setToast] = React.useState<{ type: 'success' | 'error'; msg: string } | null>(null);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : '';
-    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    
+    const headers = { 'Content-Type': 'application/json' };
 
     const showToast = (type: 'success' | 'error', msg: string) => {
         setToast({ type, msg });
@@ -36,8 +36,7 @@ export default function CustomerPaymentMethodsPage() {
     };
 
     React.useEffect(() => {
-        if (!token) return;
-        fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_URL}/auth/me`, { headers: {  } })
             .then(r => r.json())
             .then(profile => {
                 if (profile?.iban) { setSavedIban(maskIban(profile.iban)); setHasBank(true); }

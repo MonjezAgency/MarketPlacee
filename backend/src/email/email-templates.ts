@@ -10,7 +10,7 @@ export function getInvitationEmailHtml(params: {
     senderName?: string;
 }): string {
     const { recipientEmail, role, inviteLink, senderName } = params;
-    const roleName = role === 'supplier' ? 'Supplier Partner' : 'Strategic Buyer';
+    const roleName = role === 'supplier' ? 'Supplier Partner' : 'Strategic Customer';
 
     return `
 <!DOCTYPE html>

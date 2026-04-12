@@ -55,7 +55,7 @@ export class DiscountsService {
      * Calculate the final price for a product based on quantity tiers
      * and optional customer group discount.
      */
-    async calculateDiscountedPrice(productId: string, quantity: number, buyerId?: string) {
+    async calculateDiscountedPrice(productId: string, quantity: number, customerId?: string) {
         const product = await this.prisma.product.findUnique({
             where: { id: productId },
             include: { tieredPrices: { orderBy: { minQty: 'asc' } } },
@@ -74,9 +74,9 @@ export class DiscountsService {
 
         // Check for customer group discount
         let groupDiscount = 0;
-        if (buyerId) {
+        if (customerId) {
             const membership = await this.prisma.customerGroupMember.findFirst({
-                where: { userId: buyerId },
+                where: { userId: customerId },
                 include: { group: true },
             });
             if (membership) {

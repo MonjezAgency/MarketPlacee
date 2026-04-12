@@ -42,7 +42,7 @@ export class ShipmentService {
         updates: { orderBy: { createdAt: 'desc' } },
         order: {
           include: {
-            buyer: { select: { name: true, email: true } }
+            customer: { select: { name: true, email: true } }
           }
         }
       }
@@ -57,7 +57,7 @@ export class ShipmentService {
       include: {
         order: {
           include: {
-            buyer: { select: { name: true } }
+            customer: { select: { name: true } }
           }
         },
         updates: { take: 1, orderBy: { createdAt: 'desc' } }

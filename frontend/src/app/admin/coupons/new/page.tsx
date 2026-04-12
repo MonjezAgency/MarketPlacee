@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -36,12 +38,7 @@ export default function CreateCouponPage() {
     useEffect(() => {
         const fetchPlacements = async () => {
             try {
-                const token = localStorage.getItem('bev-token');
-                if (!token) return;
-
-                const res = await fetch(('/api') + '/placements', {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+                const res = await apiFetch('/placements');
 
                 if (res.ok) {
                     const data = await res.json();
@@ -72,12 +69,12 @@ export default function CreateCouponPage() {
         setIsSubmitting(true);
 
         try {
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(('/api') + '/coupons', {
+            
+            const res = await apiFetch('/coupons', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    
                 },
                 body: JSON.stringify({
                     placementId: selectedPlacementId,

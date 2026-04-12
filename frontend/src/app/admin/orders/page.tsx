@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,10 +37,8 @@ export default function AdminOrdersPage() {
     React.useEffect(() => {
         const fetchOrders = async () => {
             try {
-                const token = localStorage.getItem('bev-token');
-                if (!token) return;
-                const res = await fetch(('/api') + '/orders', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                
+                const res = await apiFetch('/orders', {
                 });
                 if (!res.ok) throw new Error('Failed to fetch');
                 const data = await res.json();
@@ -54,10 +54,10 @@ export default function AdminOrdersPage() {
 
     const handleUpdateStatus = async (id: string, status: string) => {
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`${'/api'}/orders/${id}/status`, {
                 method: 'PATCH',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify({ status })
             });
             if (res.ok) {

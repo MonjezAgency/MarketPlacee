@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch, getToken } from "@/lib/api";
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
@@ -53,15 +54,15 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                 : `${API_URL}/chat/messages`;
 
             const res = await axios.get(url, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('bev-token')}` }
+                
             });
             setMessages(res.data);
             setHasLoadedMessages(true);
         } catch (err: any) {
             setHasLoadedMessages(true);
             if (err.response?.status === 401) {
-                localStorage.removeItem('bev-token');
-                localStorage.removeItem('bev-user');
+                
+                
                 window.location.href = '/auth/login';
             }
         }
@@ -69,13 +70,12 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
 
     // Setup WebSocket connection
     React.useEffect(() => {
-        const token = localStorage.getItem('bev-token');
-        if (!token) return;
+        
 
         fetchMessages();
 
         const socket = io(`${API_URL}/chat`, {
-            auth: { token },
+            auth: { token: getToken() },
             transports: ['websocket', 'polling'],
         });
 
@@ -147,7 +147,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                     content: greetingText,
                     receiverId: null
                 }, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('bev-token')}` }
+                    
                 });
                 fetchMessages();
             } catch (err: any) {
@@ -195,13 +195,13 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                     imageUrl: image,
                     receiverId,
                 }, {
-                    headers: { Authorization: `Bearer ${localStorage.getItem('bev-token')}` }
+                    
                 });
                 fetchMessages();
             } catch (err: any) {
                 if (err.response?.status === 401) {
-                    localStorage.removeItem('bev-token');
-                    localStorage.removeItem('bev-user');
+                    
+                    
                     alert("انتهت صلاحية الجلسة. سيتم تحويلك لصفحة الدخول.");
                     window.location.href = '/auth/login';
                 }

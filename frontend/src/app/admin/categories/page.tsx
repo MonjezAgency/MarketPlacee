@@ -8,7 +8,7 @@ import {
     ChevronRight, ArrowRight, Activity, Tag,
     Database, Box
 } from 'lucide-react';
-import { fetchProducts } from '@/lib/api';
+import { apiFetch, fetchProducts } from '@/lib/api';
 import { PRODUCTS } from '@/lib/products';
 import { Product } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -97,9 +97,8 @@ export default function AdminCategoriesPage() {
         setSaving(true);
         try {
             // Logic for updating products remains same but with better UI
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(('/api') + '/products', {
-                headers: { 'Authorization': `Bearer ${token}` }
+            
+            const res = await apiFetch('/products', {
             });
             if (res.ok) {
                 const products = await res.json();
@@ -107,7 +106,7 @@ export default function AdminCategoriesPage() {
                 for (const product of toUpdate) {
                     await fetch(`${'/api'}/products/${product.id}`, {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        headers: { 'Content-Type': 'application/json',  },
                         body: JSON.stringify({ category: trimmed })
                     });
                 }

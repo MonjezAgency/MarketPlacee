@@ -16,7 +16,7 @@ export class DashboardService {
         const recentOrders = await this.prisma.order.findMany({
             take: 5,
             orderBy: { createdAt: 'desc' },
-            include: { buyer: { select: { name: true } } },
+            include: { customer: { select: { name: true } } },
         });
 
         return {
@@ -85,14 +85,14 @@ export class DashboardService {
             })
         );
 
-        // ── Buyer Demographics (by country) ──────────
-        const buyerOrders = await this.prisma.order.findMany({
+        // ── Customer Demographics (by country) ──────────
+        const customerOrders = await this.prisma.order.findMany({
             where: { items: { some: { product: { supplierId } } } },
-            select: { buyer: { select: { country: true } } },
+            select: { customer: { select: { country: true } } },
         });
         const countryMap: Record<string, number> = {};
-        buyerOrders.forEach(o => {
-            const c = o.buyer.country || 'Unknown';
+        customerOrders.forEach(o => {
+            const c = o.customer.country || 'Unknown';
             countryMap[c] = (countryMap[c] || 0) + 1;
         });
         const demographics = Object.entries(countryMap)

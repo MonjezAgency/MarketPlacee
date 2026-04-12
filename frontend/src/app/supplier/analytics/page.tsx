@@ -12,8 +12,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/currency';
+import { apiFetch } from '@/lib/api';
 
-const API_URL = '/api';
 const PIE_COLORS = ['#FF9900', '#1BC7C9', '#10b981', '#3b82f6', '#8b5cf6', '#f43f5e'];
 
 const PERIODS: { label: string; days: number }[] = [
@@ -45,10 +45,7 @@ export default function SupplierAnalyticsPage() {
     const fetchAnalytics = React.useCallback(async (days: number) => {
         setIsLoading(true);
         try {
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${API_URL}/orders/supplier/analytics?days=${days}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const res = await apiFetch(`/orders/supplier/analytics?days=${days}`);
             if (res.ok) setData(await res.json());
         } catch { /* offline */ }
         finally { setIsLoading(false); }

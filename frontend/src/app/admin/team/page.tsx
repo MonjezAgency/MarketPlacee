@@ -3,6 +3,8 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { apiFetch } from '@/lib/api';
+// axios is not used anymore but keeping for potential legacy usage if needed elsewhere
 import axios from 'axios';
 import {
     Users,
@@ -51,16 +53,11 @@ export default function AdminTeamPage() {
 
     const fetchTeam = React.useCallback(async () => {
         try {
-            const token = localStorage.getItem('bev-token');
-            if (!token || token === 'LOCAL_ONLY') {
-                console.warn("Fetch team: No valid token found (Local-Only mode)");
-                return;
-            }
-
-            const res = await axios.get(`/api/admin/team`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            const members: TeamMember[] = (res.data || []).map((u: any) => ({
+            const res = await apiFetch(`/admin/team`);
+            if (!res.ok) throw new Error('Failed to fetch team');
+            
+            const data = await res.json();
+            const members: TeamMember[] = (data || []).map((u: any) => ({
                 id: u.id,
                 name: u.name || 'Unknown',
                 email: u.email,
@@ -71,11 +68,7 @@ export default function AdminTeamPage() {
             }));
             setTeam(members);
         } catch (err: any) {
-            if (err.response?.status === 401) {
-                console.error('Session expired when fetching team');
-            } else {
-                console.error('Failed to fetch team:', err);
-            }
+            console.error('Failed to fetch team:', err);
         }
     }, []);
 
@@ -85,26 +78,23 @@ export default function AdminTeamPage() {
         if (!newMember.name || !newMember.email) { toast.error('Please fill in all fields'); return; }
         setIsInviting(true);
         try {
-            const token = localStorage.getItem('bev-token');
-            if (!token || token === 'LOCAL_ONLY') {
-                toast.error('Your current session is in "Local-Only" mode. To invite team members, please log out and sign in with a real administrator account.');
-                setIsInviting(false);
-                return;
+            const res = await apiFetch(`/admin/team/invite`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newMember)
+            });
+
+            if (!res.ok) {
+                const errorData = await res.json().catch(() => ({}));
+                throw new Error(errorData.message || 'Failed to send invitation');
             }
 
-            await axios.post(`/api/admin/team/invite`, newMember, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
             toast.success('Invitation sent successfully!');
             setIsAddModalOpen(false);
             setNewMember({ name: '', email: '', role: 'Admin', permissions: [] });
             fetchTeam();
         } catch (error: any) {
-            if (error.response?.status === 401) {
-                toast.error('Your session has expired. Please log out and sign in again.');
-            } else {
-                toast.error(error.response?.data?.message || 'Failed to send invitation');
-            }
+            toast.error(error.message || 'Failed to send invitation');
         } finally {
             setIsInviting(false);
         }
@@ -157,9 +147,9 @@ export default function AdminTeamPage() {
         if (member.email === SUPER_ADMIN_EMAIL) return;
         if (!confirm(`Are you sure you want to remove ${member.name} from the team?`)) return;
         try {
-            const token = localStorage.getItem('bev-token');
+            
             await axios.delete(`/api/admin/team/${member.id}`, {
-                headers: { Authorization: `Bearer ${token}` }
+                headers: {  }
             });
             toast.success(`${member.name} has been removed from the team`);
             fetchTeam();

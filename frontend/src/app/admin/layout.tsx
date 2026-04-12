@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import * as React from 'react';
 import Link from 'next/link';
@@ -282,9 +284,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         if (!user) return;
         if (isOwner) { setKycBlocked(false); return; }
         if (!isTeamMember) return;
-        const token = localStorage.getItem('bev-token');
-        fetch(('/api') + '/kyc/status', {
-            headers: { Authorization: `Bearer ${token}` },
+        
+        apiFetch('/kyc/status', {
+            headers: {  },
         })
             .then(r => r.ok ? r.json() : null)
             .then(data => {
@@ -304,9 +306,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const fetchNotifications = async () => {
             if (user?.role !== 'admin' && user?.role !== 'ADMIN' && !isOwner) return;
             try {
-                const token = localStorage.getItem('bev-token');
-                const res = await fetch(('/api') + '/dashboard/admin/notifications', {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                
+                const res = await apiFetch('/dashboard/admin/notifications', {
                 });
                 if (res.ok) {
                     const data = await res.json();

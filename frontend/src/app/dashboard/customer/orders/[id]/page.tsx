@@ -10,8 +10,7 @@ import {
     Download, AlertTriangle, ChevronDown, ChevronUp, Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const API_URL = '/api';
+import { apiFetch } from '@/lib/api';
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -127,15 +126,15 @@ export default function OrderTrackingPage() {
     const [disputeError, setDisputeError] = React.useState('');
     const [existingDispute, setExistingDispute] = React.useState<any>(null);
 
+    const [isConfirming, setIsConfirming] = React.useState(false);
+
     const fetchOrder = React.useCallback(async () => {
         setIsLoading(true);
         setError('');
         try {
-            const token = localStorage.getItem('bev-token');
-            const headers = { Authorization: `Bearer ${token}` };
             const [orderRes, disputesRes] = await Promise.all([
-                fetch(`${API_URL}/orders/${id}`, { headers }),
-                fetch(`${API_URL}/disputes/my`, { headers }),
+                apiFetch(`/orders/${id}`),
+                apiFetch(`/disputes/my`),
             ]);
             if (!orderRes.ok) { setError('Order not found'); return; }
             setOrder(await orderRes.json());
@@ -154,8 +153,7 @@ export default function OrderTrackingPage() {
         if (!order) return;
         setIsDownloading(true);
         try {
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${API_URL}/invoices/my`, { headers: { Authorization: `Bearer ${token}` } });
+            const res = await apiFetch(`/invoices/my`);
             if (!res.ok) { alert('Invoice not available yet. It is generated after delivery.'); return; }
             const invoices: any[] = await res.json();
             const invoice = invoices.find((inv: any) => inv.orderId === order.id);
@@ -184,10 +182,8 @@ export default function OrderTrackingPage() {
         setIsSubmittingDispute(true);
         setDisputeError('');
         try {
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(`${API_URL}/disputes`, {
+            const res = await apiFetch(`/disputes`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ orderId: id, reason: disputeReason, description: disputeDescription.trim() }),
             });
             if (!res.ok) {
@@ -244,6 +240,33 @@ export default function OrderTrackingPage() {
                     <span className={cn('px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border', STATUS_COLORS[order.status])}>
                         {order.status}
                     </span>
+                    {order.status === 'SHIPPED' && (
+                        <button 
+                            onClick={async () => {
+                                if (!window.confirm('Confirm that you have received all items in good condition? This will release the payment to the supplier.')) return;
+                                setIsConfirming(true);
+                                try {
+                                    const res = await apiFetch(`/orders/${id}/confirm-delivery`, { method: 'POST' });
+                                    if (res.ok) {
+                                        await fetchOrder();
+                                        alert('Delivery confirmed. Thank you!');
+                                    } else {
+                                        const err = await res.json();
+                                        alert(err.message || 'Confirmation failed');
+                                    }
+                                } catch (err) {
+                                    alert('Failed to connect to server');
+                                } finally {
+                                    setIsConfirming(false);
+                                }
+                            }}
+                            disabled={isConfirming}
+                            className="h-9 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs rounded-xl border border-emerald-600 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                        >
+                            {isConfirming ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
+                            Confirm Delivery
+                        </button>
+                    )}
                     {order.status === 'DELIVERED' && (
                         <button onClick={handleDownloadInvoice} disabled={isDownloading}
                             className="h-9 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-black text-xs rounded-xl border border-primary/20 transition-all flex items-center gap-1.5 disabled:opacity-50">

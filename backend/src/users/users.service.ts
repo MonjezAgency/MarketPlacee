@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, ForbiddenException } from '@nestjs/common';
 import { PrismaClient, Role } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -18,6 +18,10 @@ export class UsersService {
         return this.prisma.user.findUnique({ where: { email } });
     }
 
+    async findById(id: string) {
+        return this.prisma.user.findUnique({ where: { id } });
+    }
+
     async create(data: any) {
         const existing = await this.findOne(data.email);
         if (existing) {
@@ -31,6 +35,7 @@ export class UsersService {
         if (encryptedData.iban) encryptedData.iban = this.cryptoService.encrypt(encryptedData.iban);
         if (encryptedData.swiftCode) encryptedData.swiftCode = this.cryptoService.encrypt(encryptedData.swiftCode);
         if (encryptedData.taxId) encryptedData.taxId = this.cryptoService.encrypt(encryptedData.taxId);
+        if (encryptedData.vatNumber) encryptedData.vatNumber = this.cryptoService.encrypt(encryptedData.vatNumber);
 
         return this.prisma.user.create({
             data: {
@@ -74,6 +79,7 @@ export class UsersService {
             if (user.iban) user.iban = this.cryptoService.decrypt(user.iban);
             if (user.swiftCode) user.swiftCode = this.cryptoService.decrypt(user.swiftCode);
             if (user.taxId) user.taxId = this.cryptoService.decrypt(user.taxId);
+            if (user.vatNumber) user.vatNumber = this.cryptoService.decrypt(user.vatNumber);
             return user;
         });
         return { users: decryptedUsers, total, page, lastPage };
@@ -131,6 +137,7 @@ export class UsersService {
         if (updateData.iban) updateData.iban = this.cryptoService.encrypt(updateData.iban);
         if (updateData.swiftCode) updateData.swiftCode = this.cryptoService.encrypt(updateData.swiftCode);
         if (updateData.taxId) updateData.taxId = this.cryptoService.encrypt(updateData.taxId);
+        if (updateData.vatNumber) updateData.vatNumber = this.cryptoService.encrypt(updateData.vatNumber);
 
         return this.prisma.user.update({
             where: { id },
@@ -150,6 +157,28 @@ export class UsersService {
         return this.prisma.notification.update({
             where: { id },
             data: { read: true }
+        });
+    }
+
+    async updatePayoutSettings(userId: string, dto: any) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw new ConflictException('User not found');
+        
+        if (user.kycStatus !== 'VERIFIED') {
+            throw new ForbiddenException('KYC verification required before updating payment details');
+        }
+
+        const data: any = {};
+        if (dto.iban) data.iban = this.cryptoService.encrypt(dto.iban);
+        if (dto.swiftCode) data.swiftCode = this.cryptoService.encrypt(dto.swiftCode);
+        if (dto.vatNumber) data.vatNumber = this.cryptoService.encrypt(dto.vatNumber);
+        if (dto.bankName) data.bankName = dto.bankName;
+        if (dto.accountHolderName) data.accountHolderName = dto.accountHolderName;
+        if (dto.countryCode) data.country = dto.countryCode;
+
+        return this.prisma.user.update({
+            where: { id: userId },
+            data
         });
     }
 }

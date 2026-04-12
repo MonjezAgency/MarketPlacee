@@ -33,8 +33,8 @@ type FilterStatus = 'ALL' | 'PENDING' | 'VERIFIED' | 'REJECTED';
 
 export default function AdminKycPage() {
     const API_URL = '/api';
-    const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : '';
-    const headers = { Authorization: `Bearer ${token}` };
+    
+    const headers = {  };
 
     const [docs, setDocs] = React.useState<KycDoc[]>([]);
     const [stats, setStats] = React.useState<Stats | null>(null);

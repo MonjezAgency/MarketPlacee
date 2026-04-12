@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import { useState, useEffect } from 'react';
 import {
@@ -50,9 +52,8 @@ export default function SupplierPlacement() {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const token = localStorage.getItem('bev-token') || '';
-                const res = await fetch(`${API_URL}/products/my-products`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                
+                const res = await apiFetch(`/products/my-products`, {
                 });
                 if (res.ok) {
                     const data = await res.json();

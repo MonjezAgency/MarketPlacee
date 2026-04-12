@@ -271,8 +271,8 @@ export default function OwnerDashboard() {
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : null;
-    const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+    
+    const headers = { 'Content-Type': 'application/json',  };
 
     useEffect(() => {
         if (user && user.role !== 'OWNER') router.replace('/admin');

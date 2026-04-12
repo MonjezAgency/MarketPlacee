@@ -25,7 +25,7 @@ export class InvoiceService {
     async createInvoiceForOrder(orderId: string) {
         const order = await this.prisma.order.findUnique({
             where: { id: orderId },
-            include: { buyer: true, items: { include: { product: true } } },
+            include: { customer: true, items: { include: { product: true } } },
         });
         if (!order) throw new NotFoundException('Order not found');
 
@@ -33,9 +33,9 @@ export class InvoiceService {
         const existing = await this.prisma.invoice.findFirst({ where: { orderId } });
         if (existing) return existing;
 
-        // Check for buyer credit terms to set due date
+        // Check for customer credit terms to set due date
         const creditTerm = await this.prisma.creditTerm.findUnique({
-            where: { userId: order.buyerId },
+            where: { userId: order.customerId },
         });
 
         const dueDate = creditTerm
@@ -44,7 +44,7 @@ export class InvoiceService {
 
         // Check for tax exemption
         const exemption = await this.prisma.taxExemption.findFirst({
-            where: { userId: order.buyerId, status: 'APPROVED' },
+            where: { userId: order.customerId, status: 'APPROVED' },
         });
 
         const subtotal = order.totalAmount;
@@ -58,7 +58,7 @@ export class InvoiceService {
             data: {
                 invoiceNumber,
                 orderId,
-                buyerId: order.buyerId,
+                customerId: order.customerId,
                 amount: subtotal,
                 tax,
                 totalAmount,
@@ -70,7 +70,7 @@ export class InvoiceService {
         await this.audit.log({
             eventType: 'INVOICE_GENERATED',
             orderId,
-            userId:   order.buyerId,
+            userId:   order.customerId,
             amount:   totalAmount,
             metadata: { invoiceNumber, invoiceId: invoice.id, tax, taxExempt: taxRate === 0 },
         });
@@ -78,9 +78,9 @@ export class InvoiceService {
         return invoice;
     }
 
-    async getInvoicesByBuyer(buyerId: string) {
+    async getInvoicesByBuyer(customerId: string) {
         return this.prisma.invoice.findMany({
-            where: { buyerId },
+            where: { customerId },
             include: { order: true },
             orderBy: { createdAt: 'desc' },
         });
@@ -88,7 +88,7 @@ export class InvoiceService {
 
     async getAllInvoices() {
         return this.prisma.invoice.findMany({
-            include: { order: { include: { buyer: { select: { id: true, name: true, email: true, companyName: true } } } } },
+            include: { order: { include: { customer: { select: { id: true, name: true, email: true, companyName: true } } } } },
             orderBy: { createdAt: 'desc' },
         });
     }
@@ -99,7 +99,7 @@ export class InvoiceService {
 
         // Update credit term used amount if applicable
         const creditTerm = await this.prisma.creditTerm.findUnique({
-            where: { userId: invoice.buyerId },
+            where: { userId: invoice.customerId },
         });
         if (creditTerm) {
             await this.prisma.creditTerm.update({
@@ -120,7 +120,7 @@ export class InvoiceService {
             include: {
                 order: {
                     include: {
-                        buyer: { select: { id: true, name: true, email: true, companyName: true, country: true } },
+                        customer: { select: { id: true, name: true, email: true, companyName: true, country: true } },
                         items: { include: { product: { select: { name: true, unit: true } } } },
                     },
                 },

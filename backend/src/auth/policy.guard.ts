@@ -53,9 +53,9 @@ export class PolicyGuard implements CanActivate {
             case 'ORDER':
                 const order = await this.prisma.order.findUnique({
                     where: { id: resourceId },
-                    select: { buyerId: true },
+                    select: { customerId: true },
                 });
-                isOwner = order?.buyerId === user.sub;
+                isOwner = order?.customerId === user.sub;
                 break;
             // Add more resources as needed
         }

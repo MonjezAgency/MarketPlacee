@@ -22,7 +22,7 @@ export default function SupportPage() {
         try {
             const API_URL = '/api';
             const res = await axios.get(`${API_URL}/chat/admin/conversations`, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('bev-token')}` }
+                
             });
             setConversations(res.data);
         } catch (err) {

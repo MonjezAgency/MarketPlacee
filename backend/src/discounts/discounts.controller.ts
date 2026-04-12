@@ -47,12 +47,12 @@ export class DiscountsController {
     calculatePrice(
         @Query('productId') productId: string,
         @Query('quantity') quantity: string,
-        @Query('buyerId') buyerId?: string,
+        @Query('customerId') customerId?: string,
     ) {
         return this.discountsService.calculateDiscountedPrice(
             productId,
             parseInt(quantity, 10) || 1,
-            buyerId,
+            customerId,
         );
     }
 

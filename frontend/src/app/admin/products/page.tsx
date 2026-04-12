@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import * as React from 'react';
 import { 
@@ -434,10 +436,8 @@ export default function AdminProductsPage() {
 
     const fetchProducts = React.useCallback(async () => {
         try {
-            const token = localStorage.getItem('bev-token');
-            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-            const res = await fetch(`${backendBase}/products/admin/all`, {
-                headers: { 'Authorization': `Bearer ${token}` },
+            
+            const res = await apiFetch('/products/admin/all', {
                 cache: 'no-store'
             });
             if (res.ok) {
@@ -456,11 +456,9 @@ export default function AdminProductsPage() {
     const handleApprove = async (id: string) => {
         setActionLoading(id);
         try {
-            const token = localStorage.getItem('bev-token');
-            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-            const res = await fetch(`${backendBase}/products/${id}/approve`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
+            
+            const res = await apiFetch(`/products/${id}/approve`, {
+                method: 'PATCH'
             });
             if (res.ok) {
                 showIPhoneToast('Product approved', 'success');
@@ -481,11 +479,9 @@ export default function AdminProductsPage() {
     const handleReject = async (id: string) => {
         setActionLoading(id);
         try {
-            const token = localStorage.getItem('bev-token');
-            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-            const res = await fetch(`${backendBase}/products/${id}/reject`, {
-                method: 'PATCH',
-                headers: { 'Authorization': `Bearer ${token}` }
+            
+            const res = await apiFetch(`/products/${id}/reject`, {
+                method: 'PATCH'
             });
             if (res.ok) {
                 showIPhoneToast('Product rejected', 'info');
@@ -504,11 +500,9 @@ export default function AdminProductsPage() {
         if (!confirm('Delete this product permanently?')) return;
         setActionLoading(id);
         try {
-            const token = localStorage.getItem('bev-token');
-            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-            const res = await fetch(`${backendBase}/products/${id}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
+            
+            const res = await apiFetch(`/products/${id}`, {
+                method: 'DELETE'
             });
             if (res.ok) {
                 showIPhoneToast('Product deleted', 'info');
@@ -526,14 +520,9 @@ export default function AdminProductsPage() {
     const handleUpdate = async (id: string, data: Partial<AdminProduct>) => {
         setActionLoading(id);
         try {
-            const token = localStorage.getItem('bev-token');
-            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-            const res = await fetch(`${backendBase}/products/${id}`, {
+            
+            const res = await apiFetch(`/products/${id}`, {
                 method: 'PATCH',
-                headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify(data)
             });
             if (res.ok) {
@@ -559,15 +548,9 @@ export default function AdminProductsPage() {
         
         setIsBulkLoading(true);
         try {
-            const token = localStorage.getItem('bev-token');
-            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-            const endpoint = `/products/bulk-${action}`;
-            const res = await fetch(`${backendBase}${endpoint}`, {
+            
+            const res = await apiFetch(`/products/bulk-${action}`, {
                 method: 'POST',
-                headers: { 
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
                 body: JSON.stringify({ ids: selectedIds })
             });
             if (res.ok) {

@@ -36,8 +36,8 @@ export default function AdminDisputesPage() {
     const [isResolving, setIsResolving] = React.useState(false);
     const [resolveError, setResolveError] = React.useState('');
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : '';
-    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    
+    const headers = { 'Content-Type': 'application/json' };
 
     const fetchData = React.useCallback(async () => {
         setIsLoading(true);
@@ -46,13 +46,13 @@ export default function AdminDisputesPage() {
                 ? `${API_URL}/disputes?status=${filterStatus}&limit=50`
                 : `${API_URL}/disputes?limit=50`;
             const [disputesRes, statsRes] = await Promise.all([
-                fetch(url, { headers: { Authorization: `Bearer ${token}` } }),
-                fetch(`${API_URL}/disputes/stats`, { headers: { Authorization: `Bearer ${token}` } }),
+                fetch(url, { headers: {  } }),
+                fetch(`${API_URL}/disputes/stats`, { headers: {  } }),
             ]);
             if (disputesRes.ok) setDisputes((await disputesRes.json()).data || []);
             if (statsRes.ok) setStats(await statsRes.json());
         } finally { setIsLoading(false); }
-    }, [filterStatus, token]);
+    }, [filterStatus]);
 
     React.useEffect(() => { fetchData(); }, [fetchData]);
 

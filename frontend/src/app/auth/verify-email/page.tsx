@@ -15,11 +15,6 @@ function VerifyEmailContent() {
     const [message, setMessage] = useState('');
 
     useEffect(() => {
-        if (!token) {
-            setStatus('error');
-            setMessage(t('auth', 'invalidLink'));
-            return;
-        }
 
         const verify = async () => {
             try {

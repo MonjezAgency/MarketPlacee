@@ -103,17 +103,21 @@ model User {
   updatedAt DateTime @updatedAt
 
   products     Product[]
-  orders       Order[]
+  customerOrders    Order[] @relation("CustomerOrders")
+  supplierOrders    Order[] @relation("SupplierOrders")
   adminActions AdminActionLog[] @relation("AdminActions")
   notifications Notification[]
   sentMessages  SupportMessage[] @relation("SentMessages")
-  reviews      Review[]
-  wishlist     WishlistItem[]
+  reviews          Review[]
+  wishlist         WishlistItem[]
+  customerDisputes Dispute[] @relation("CustomerDisputes")
+  customerInvoices Invoice[] @relation("CustomerInvoices")
 
   kycStatus     KYCStatus @default(UNVERIFIED)
   kycDocuments  KYCDocument[]
 
   onboardingCompleted Boolean @default(false)
+  stripeOnboarded     Boolean @default(false)
 }
 
 model KYCDocument {
@@ -221,8 +225,11 @@ model Order {
   shippingCompany String?
   shippingCost    Float?
 
-  buyerId String
-  buyer   User   @relation(fields: [buyerId], references: [id])
+  customerId String
+  customer   User   @relation("CustomerOrders", fields: [customerId], references: [id])
+
+  supplierId String?
+  supplier   User?   @relation("SupplierOrders", fields: [supplierId], references: [id])
 
   items   OrderItem[]
   history OrderStatusHistory[]
@@ -232,6 +239,8 @@ model Order {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  escrow    EscrowTransaction?
 }
 
 model OrderStatusHistory {
@@ -385,7 +394,8 @@ model Invoice {
   invoiceNumber String   @unique
   orderId       String
   order         Order    @relation(fields: [orderId], references: [id])
-  buyerId       String
+  customerId    String
+  customer      User     @relation("CustomerInvoices", fields: [customerId], references: [id])
   amount        Float
   tax           Float    @default(0)
   totalAmount   Float
@@ -515,7 +525,8 @@ model Dispute {
   id          String        @id @default(uuid())
   orderId     String
   order       Order         @relation(fields: [orderId], references: [id])
-  buyerId     String
+  customerId  String
+  customer    User          @relation("CustomerDisputes", fields: [customerId], references: [id])
   reason      String        // e.g. "Item not received", "Wrong item", "Damaged"
   description String
   evidence    String[]      // uploaded image URLs
@@ -606,3 +617,31 @@ model LoginAttempt {
   @@index([email])
   @@index([createdAt])
 }
+
+// ===== ESCROW SYSTEM =====
+
+enum EscrowStatus {
+  HOLDING      // Payment authorized, not captured
+  CAPTURED     // Payment confirmed, funds held
+  RELEASED     // Paid out to supplier
+  REFUNDED     // Returned to customer
+  DISPUTED     // Under review
+}
+
+model EscrowTransaction {
+  id               String       @id @default(cuid())
+  orderId          String       @unique
+  order            Order        @relation(fields: [orderId], references: [id])
+  amount           Float
+  currency         String       @default("USD")
+  platformFee      Float
+  supplierAmount   Float
+  status           EscrowStatus @default(HOLDING)
+  stripeIntentId   String?
+  stripeTransferId String?
+  capturedAt       DateTime?
+  releasedAt       DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+

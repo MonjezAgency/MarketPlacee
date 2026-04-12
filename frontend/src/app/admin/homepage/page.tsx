@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getHomepageCategories, setHomepageCategories, fetchImageByEan } from '@/lib/api';
+import { apiFetch, getHomepageCategories, setHomepageCategories, fetchImageByEan } from '@/lib/api';
 import { Plus, Trash2, Save, Upload, Search, Link as LinkIcon, Image as ImageIcon, Loader2 } from 'lucide-react';
 
 export default function AdminHomepageConfig() {
@@ -77,29 +77,19 @@ export default function AdminHomepageConfig() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const token = localStorage.getItem('bev-token') || '';
-            console.log('Token present:', !!token, 'Length:', token.length, 'First 20:', token.substring(0, 20));
+            
 
-            if (!token) {
-                alert('No auth token found. Please log in again.');
-                window.location.href = '/auth/login';
-                return;
-            }
 
-            const res = await fetch(('/api') + '/admin/config/homepage-categories', {
+            const res = await apiFetch('/admin/config/homepage-categories', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`,
-                },
                 body: JSON.stringify({ categories }),
             });
             if (res.ok) {
                 alert('Homepage categories saved successfully!');
             } else if (res.status === 401) {
                 alert('Session expired. Please log in again.');
-                localStorage.removeItem('bev-token');
-                localStorage.removeItem('bev-user');
+                
+                
                 window.location.href = '/auth/login';
             } else {
                 const errText = await res.text();

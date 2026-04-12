@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch, getToken } from "@/lib/api";
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
@@ -76,13 +77,13 @@ export default function SupportPage() {
     const [isRefreshing, setIsRefreshing] = React.useState(false);
     const [disputeFilter, setDisputeFilter] = React.useState<string>('OPEN');
 
-    const token = () => localStorage.getItem('bev-token');
+    
 
     const fetchAll = React.useCallback(async (silent = false) => {
         if (!silent) setIsLoading(true);
         else setIsRefreshing(true);
         try {
-            const headers = { Authorization: `Bearer ${token()}` };
+            const headers = {  };
             const [disputeStats, disputeData, orderData, kycData, chatData] = await Promise.allSettled([
                 fetch(`${API_URL}/disputes/stats`, { headers }).then(r => r.json()),
                 fetch(`${API_URL}/disputes?page=1&limit=50`, { headers }).then(r => r.json()),
@@ -104,7 +105,7 @@ export default function SupportPage() {
 
     // ── Real-time WebSocket for conversation list updates ─────────────────────
     React.useEffect(() => {
-        const tok = token();
+        const tok = getToken();
         if (!tok) return;
         const socket = io(`${API_URL}/chat`, {
             auth: { token: tok },
@@ -121,7 +122,7 @@ export default function SupportPage() {
     }, [fetchAll]);
 
     const handleDisputeAction = async (id: string, action: 'review' | 'refund' | 'no_refund') => {
-        const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` };
+        const headers = { 'Content-Type': 'application/json',  };
         if (action === 'review') {
             await fetch(`${API_URL}/disputes/${id}/status`, {
                 method: 'PATCH', headers, body: JSON.stringify({ status: 'UNDER_REVIEW' }),
@@ -141,7 +142,7 @@ export default function SupportPage() {
         try {
             await fetch(`${API_URL}/chat/admin/switch/${userId}`, {
                 method: 'PATCH',
-                headers: { Authorization: `Bearer ${token()}` },
+                headers: {  },
             });
             await fetchAll(true);
             // Auto-open this conversation after switching

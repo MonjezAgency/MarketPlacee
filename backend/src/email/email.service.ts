@@ -232,7 +232,7 @@ export class EmailService {
       const info = await this.transporter.sendMail({
         from: this.getFrom(),
         to: params.recipientEmail,
-        subject: `🎉 Invitation: Join Atlantis as a ${params.role === 'supplier' ? 'Supplier' : 'Strategic Buyer'}`,
+        subject: `🎉 Invitation: Join Atlantis as a ${params.role === 'supplier' ? 'Supplier' : 'Strategic Customer'}`,
         text, // Adding plain text fallback for better deliverability
         html,
       });
@@ -374,7 +374,7 @@ export class EmailService {
       ? `${frontendUrl}/dashboard/supplier`
       : `${frontendUrl}/`;
     
-    const roleNameEn = role === 'SUPPLIER' ? 'Supplier Partner' : 'Strategic Buyer';
+    const roleNameEn = role === 'SUPPLIER' ? 'Supplier Partner' : 'Strategic Customer';
     const roleNameAr = role === 'SUPPLIER' ? 'مورد معتمد' : 'مشتري استراتيجي';
 
     try {

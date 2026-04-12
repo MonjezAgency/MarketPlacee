@@ -47,8 +47,8 @@ export default function AdminSettingsPage() {
     const [isSavingMarkup, setIsSavingMarkup] = React.useState(false);
 
     React.useEffect(() => {
-        const token = localStorage.getItem('bev-token');
-        fetch(`${API_URL}/admin/config/markup`, { headers: { Authorization: `Bearer ${token}` } })
+        
+        fetch(`${API_URL}/admin/config/markup`, { headers: {  } })
             .then(r => r.json())
             .then(data => {
                 if (data?.markup) {
@@ -65,7 +65,7 @@ export default function AdminSettingsPage() {
     const handleSaveMarkup = async () => {
         setIsSavingMarkup(true);
         try {
-            const token = localStorage.getItem('bev-token');
+            
             // Convert percentage → multiplier: "10" → 1.10
             const payload = {
                 piece:     1 + (parseFloat(markupPiece) || 0) / 100,
@@ -74,7 +74,7 @@ export default function AdminSettingsPage() {
             };
             const res = await fetch(`${API_URL}/admin/config/markup`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify(payload),
             });
             if (res.ok) showToast('success', 'Markup percentages saved. New products will use the updated rates.');

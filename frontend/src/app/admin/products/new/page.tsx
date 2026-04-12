@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import React, { useState } from 'react';
 import { ArrowLeft, Save, Sparkles, Image as ImageIcon, LinkIcon, Upload, Package, UploadCloud, CheckCircle2, X, FileSpreadsheet } from 'lucide-react';
@@ -73,18 +75,10 @@ export default function AdminNewProductPage() {
         setIsSubmitting(true);
 
         try {
-            const token = localStorage.getItem('bev-token');
-            if (!token || token === 'LOCAL_ONLY') {
-                localStorage.removeItem('bev-token');
-                localStorage.removeItem('bev-user');
-                window.location.href = '/auth/login';
-                return;
-            }
-            const res = await fetch(('/api') + '/products', {
+            const res = await apiFetch('/products', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                 },
                 body: JSON.stringify({
                     name: formData.name,
@@ -132,12 +126,6 @@ export default function AdminNewProductPage() {
         };
 
         try {
-            const token = localStorage.getItem('bev-token');
-            if (!token || token === 'LOCAL_ONLY') {
-                window.location.href = '/auth/login';
-                return;
-            }
-
             for (const file of bulkFiles) {
                 const uploadData = new FormData();
                 uploadData.append('file', file);
@@ -148,7 +136,6 @@ export default function AdminNewProductPage() {
                 const res = await fetch(apiUrl, {
                     method: 'POST',
                     headers: {
-                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                     },
                     body: uploadData,
                 });

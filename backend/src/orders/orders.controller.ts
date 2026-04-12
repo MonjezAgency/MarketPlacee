@@ -101,4 +101,11 @@ export class OrdersController {
         );
         return plainToInstance(OrderDto, order);
     }
+
+    @Post(':id/confirm-delivery')
+    @Roles(Role.CUSTOMER)
+    async confirmDelivery(@Param('id') id: string, @Request() req) {
+        const order = await this.ordersService.confirmDelivery(id, req.user.sub);
+        return plainToInstance(OrderDto, order);
+    }
 }

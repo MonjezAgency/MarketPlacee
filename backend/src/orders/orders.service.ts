@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
@@ -24,10 +24,10 @@ export class OrdersService {
         private escrowService: EscrowService,
     ) { }
 
-    async create(buyerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number) {
+    async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number) {
         const order = await this.prisma.order.create({
             data: {
-                buyerId,
+                customerId,
                 totalAmount,
                 shippingCompany: shippingCompany ?? null,
                 shippingCost: shippingCost ?? null,
@@ -42,7 +42,7 @@ export class OrdersService {
                 history: {
                     create: {
                         newStatus: OrderStatus.PENDING,
-                        changedById: buyerId,
+                        changedById: customerId,
                         reason: 'Order created',
                     },
                 },
@@ -50,23 +50,23 @@ export class OrdersService {
             include: {
                 items: true,
                 history: true,
-                buyer: { select: { email: true, name: true } },
+                customer: { select: { email: true, name: true } },
             },
         });
 
         // Send order confirmation email (non-blocking)
-        if (order.buyer?.email) {
+        if (order.customer?.email) {
             this.emailService.sendOrderConfirmationEmail(
-                order.buyer.email,
-                order.buyer.name || 'Partner',
+                order.customer.email,
+                order.customer.name || 'Partner',
                 order.id,
                 totalAmount,
             ).catch(() => {});
         }
 
-        // Notify buyer
+        // Notify customer
         this.notificationsService.create(
-            buyerId,
+            customerId,
             'Order Placed',
             `Your order #${order.id.slice(-8).toUpperCase()} has been placed successfully.`,
             'SUCCESS',
@@ -95,7 +95,7 @@ export class OrdersService {
     async findAll() {
         const orders = await this.prisma.order.findMany({
             include: {
-                buyer: {
+                customer: {
                     select: { id: true, name: true, email: true, phone: true }
                 },
                 items: {
@@ -125,7 +125,7 @@ export class OrdersService {
 
             return {
                 id: order.id,
-                customer: order.buyer.name,
+                customer: order.customer.name,
                 supplier: supplierNames,
                 total: order.totalAmount,
                 supplierProfit,
@@ -143,11 +143,11 @@ export class OrdersService {
         });
     }
 
-    async findByBuyer(buyerId: string, page = 1, limit = 20) {
+    async findByBuyer(customerId: string, page = 1, limit = 20) {
         const skip = (page - 1) * limit;
         const [orders, total] = await Promise.all([
             this.prisma.order.findMany({
-                where: { buyerId },
+                where: { customerId },
                 include: {
                     items: {
                         include: {
@@ -159,14 +159,14 @@ export class OrdersService {
                 skip,
                 take: limit,
             }),
-            this.prisma.order.count({ where: { buyerId } }),
+            this.prisma.order.count({ where: { customerId } }),
         ]);
         return { data: orders, total, page, limit, totalPages: Math.ceil(total / limit) };
     }
 
-    async findByIdForBuyer(orderId: string, buyerId: string) {
+    async findByIdForBuyer(orderId: string, customerId: string) {
         const order = await this.prisma.order.findFirst({
-            where: { id: orderId, buyerId },
+            where: { id: orderId, customerId },
             include: {
                 items: {
                     include: {
@@ -186,7 +186,7 @@ export class OrdersService {
                 items: { some: { product: { supplierId } } },
             },
             include: {
-                buyer: { select: { id: true, name: true, email: true } },
+                customer: { select: { id: true, name: true, email: true } },
                 items: {
                     where: { product: { supplierId } },
                     include: { product: { select: { id: true, name: true, images: true, supplierId: true } } },
@@ -201,9 +201,9 @@ export class OrdersService {
             totalAmount: order.totalAmount,
             shippingCompany: order.shippingCompany,
             createdAt: order.createdAt,
-            buyer: {
-                name: order.buyer?.name ? order.buyer.name.split(' ').map((p, i) => i === 0 ? p[0] + '***' : p[0] + '***').join(' ') : 'Customer',
-                email: order.buyer?.email ? order.buyer.email.replace(/^(.{2}).*@/, '$1***@') : '',
+            customer: {
+                name: order.customer?.name ? order.customer.name.split(' ').map((p, i) => i === 0 ? p[0] + '***' : p[0] + '***').join(' ') : 'Customer',
+                email: order.customer?.email ? order.customer.email.replace(/^(.{2}).*@/, '$1***@') : '',
             },
             items: order.items.map(item => ({
                 id: item.id,
@@ -219,7 +219,7 @@ export class OrdersService {
     async updateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string) {
         const order = await this.prisma.order.findUnique({
             where: { id: orderId },
-            include: { buyer: { select: { email: true, name: true } } },
+            include: { customer: { select: { email: true, name: true } } },
         });
         if (!order) throw new NotFoundException('Order not found');
 
@@ -241,18 +241,18 @@ export class OrdersService {
         });
 
         // Send status update email (non-blocking)
-        if (order.buyer?.email) {
+        if (order.customer?.email) {
             this.emailService.sendOrderStatusUpdateEmail(
-                order.buyer.email,
-                order.buyer.name || 'Partner',
+                order.customer.email,
+                order.customer.name || 'Partner',
                 orderId,
                 status,
             ).catch(() => {});
         }
 
-        // Notify buyer of status change
+        // Notify customer of status change
         this.notificationsService.create(
-            order.buyerId,
+            order.customerId,
             'Order Status Updated',
             `Your order #${orderId.slice(-8).toUpperCase()} is now ${STATUS_LABELS[status]}.`,
             status === 'CANCELLED' ? 'ERROR' : status === 'DELIVERED' ? 'SUCCESS' : 'INFO',
@@ -260,11 +260,11 @@ export class OrdersService {
         ).catch(() => {});
 
         // Auto-generate invoice on delivery + send email
-        if (status === OrderStatus.DELIVERED && order.buyer?.email) {
+        if (status === OrderStatus.DELIVERED && order.customer?.email) {
             this.invoiceService.createInvoiceForOrder(orderId).then(invoice => {
                 this.emailService.sendInvoiceEmail(
-                    order.buyer.email,
-                    order.buyer.name || 'Partner',
+                    order.customer.email,
+                    order.customer.name || 'Partner',
                     invoice.invoiceNumber,
                     orderId,
                     invoice.totalAmount,
@@ -359,5 +359,48 @@ export class OrdersService {
             topProducts,
             categoryBreakdown,
         };
+    }
+
+    async findByIdWithItems(orderId: string) {
+        const order = await this.prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                items: {
+                    include: {
+                        product: {
+                            select: {
+                                id: true,
+                                name: true,
+                                images: true,
+                                price: true,
+                            }
+                        }
+                    }
+                },
+                customer: {
+                    select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                    }
+                },
+                supplier: {
+                    select: {
+                        id: true,
+                        name: true,
+                        stripeAccountId: true,
+                        stripeOnboarded: true,
+                    }
+                }
+            }
+        });
+
+        if (!order) {
+            throw new NotFoundException(
+                `Order ${orderId} not found`
+            );
+        }
+
+        return order;
     }
 }

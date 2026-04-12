@@ -1,5 +1,7 @@
 import * as fs from 'fs';
 import { join } from 'path';
+import cookieParser from 'cookie-parser';
+import * as express from 'express';
 
 try {
   const envContent = fs.readFileSync(join(process.cwd(), '.env'), 'utf-8');
@@ -30,9 +32,15 @@ async function bootstrap() {
     // Serve uploaded KYC files as static assets
     app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
+    // 1. FIRST: Raw body for Stripe webhooks
+    app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
+
+    // 2. SECOND: Cookie parser
+    app.use(cookieParser());
+
     // Increase JSON body limit to 50mb for base64 image uploads
-    app.use(require('express').json({ limit: '50mb' }));
-    app.use(require('express').urlencoded({ limit: '50mb', extended: true }));
+    app.use(express.json({ limit: '50mb' }));
+    app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
     // ── Strict Security Headers ──────────────────────────────────────────────
     const backendHost = (process.env.BACKEND_URL || 'http://localhost:3001')
@@ -97,7 +105,11 @@ async function bootstrap() {
     ].filter(Boolean);
 
     app.enableCors({
-        origin: true,
+        origin: [
+            'https://marketpl7ce.vercel.app',
+            'http://localhost:3000',
+            'http://127.0.0.1:3000',
+        ],
         credentials: true,
         methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
         allowedHeaders: [

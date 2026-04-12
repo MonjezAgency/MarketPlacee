@@ -47,13 +47,13 @@ export default function SupplierOrdersPage() {
     const [expandedId, setExpandedId] = React.useState<string | null>(null);
     const [updatingId, setUpdatingId] = React.useState<string | null>(null);
 
-    const getToken = () => (typeof window !== 'undefined' ? localStorage.getItem('bev-token') || '' : '');
+    
 
     const fetchOrders = React.useCallback(async () => {
         setIsLoading(true);
         try {
             const res = await fetch(`${API_URL}/orders/my-orders`, {
-                headers: { Authorization: `Bearer ${getToken()}` },
+                headers: {  },
             });
             if (res.ok) setOrders(await res.json());
         } catch { /* ignore */ }
@@ -67,7 +67,7 @@ export default function SupplierOrdersPage() {
         try {
             const res = await fetch(`${API_URL}/orders/${orderId}/status`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
+                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify({ status }),
             });
             if (res.ok) setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));

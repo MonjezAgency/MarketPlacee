@@ -15,7 +15,7 @@ export default function AdminShipmentsPage() {
     const fetchShipments = async () => {
         try {
             const res = await axios.get(`/api/shipments/admin/all`, {
-                headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                
             });
             setShipments(res.data);
         } catch (err) {

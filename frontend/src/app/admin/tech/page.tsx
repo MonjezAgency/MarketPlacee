@@ -156,9 +156,8 @@ export default function TechDashboardPage() {
     React.useEffect(() => {
         const fetchHealth = async () => {
             try {
-                const token = localStorage.getItem('bev-token');
-                if (!token) return;
-                const headers = { Authorization: `Bearer ${token}` };
+                
+                const headers = {  };
 
                 // Try to fetch from health endpoint
                 const [healthRes] = await Promise.allSettled([

@@ -1,14 +1,17 @@
-import { Module } from '@nestjs/common';
-import { PaymentsService } from './payments.service';
+import { Module, Logger, forwardRef } from '@nestjs/common';
 import { PaymentsController } from './payments.controller';
+import { PaymentsService } from './payments.service';
 import { EscrowService } from './escrow.service';
+import { StripeGateway } from './stripe.gateway';
+import { StripeWebhookController } from './stripe-webhook.controller';
 import { PrismaModule } from '../common/prisma.module';
-import { NotificationsModule } from '../notifications/notifications.module';
+import { UsersModule } from '../users/users.module';
+import { OrdersModule } from '../orders/orders.module';
 
 @Module({
-    imports: [PrismaModule, NotificationsModule],
-    providers: [PaymentsService, EscrowService],
-    controllers: [PaymentsController],
+    imports: [PrismaModule, UsersModule, forwardRef(() => OrdersModule)],
+    controllers: [PaymentsController, StripeWebhookController],
+    providers: [PaymentsService, EscrowService, StripeGateway, Logger],
     exports: [PaymentsService, EscrowService],
 })
 export class PaymentsModule {}

@@ -1,7 +1,8 @@
 'use client';
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { API_BASE_URL } from './config';
+import { apiFetch } from './api';
+import { useRouter } from 'next/navigation';
 
 export interface User {
     id: string;
@@ -17,6 +18,7 @@ export interface User {
     socialLinks?: string;
     role: string;
     status: 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED' | 'BLOCKED';
+    kycStatus?: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
 }
 
 interface AuthContextType {
@@ -62,20 +64,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [isAuthReady, setIsAuthReady] = useState(false);
 
-    // Load from localStorage on mount
+    // Load from backend /auth/me on mount
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        const checkAuth = async () => {
             try {
-                const saved = localStorage.getItem('bev-user');
-                if (saved) {
-                    setUser(JSON.parse(saved));
+                const res = await apiFetch('/auth/me');
+                if (res.ok) {
+                    const userData = await res.json();
+                    setUser(userData);
+                } else {
+                    setUser(null);
                 }
             } catch (err) {
-                console.error("Failed to parse auth user:", err);
-                localStorage.removeItem('bev-user');
+                console.error("Auth hydration failed:", err);
+                setUser(null);
+            } finally {
+                setIsAuthReady(true);
             }
-            setIsAuthReady(true);
-        }
+        };
+        checkAuth();
     }, []);
 
     const register = async (data: {
@@ -97,10 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         locale?: string;
     }): Promise<boolean | string> => {
         try {
-            const baseUrl = API_BASE_URL.replace(/\/$/, '');
-            const res = await fetch(`${baseUrl}/auth/register`, {
+            const res = await apiFetch('/auth/register', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),
             });
             if (!res.ok) {
@@ -126,10 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
         try {
-            const baseUrl = API_BASE_URL.replace(/\/$/, '');
-            const res = await fetch(`${baseUrl}/auth/login`, {
+            const res = await apiFetch('/auth/login', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
             });
 
@@ -145,14 +148,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { success: true, requiresTwoFactor: true, partialToken: result.partialToken };
             }
 
-            if (!result.user || !result.access_token) {
-                console.error("Login response missing user or token:", result);
+            if (!result.user) {
+                console.error("Login response missing user:", result);
                 return { success: false, message: 'Invalid response from server.' };
             }
             const userData = result.user;
             setUser(userData);
-            localStorage.setItem('bev-user', JSON.stringify(userData));
-            localStorage.setItem('bev-token', result.access_token);
             return { success: true, user: userData };
         } catch (err) {
             console.error("Login failed:", err);
@@ -162,10 +163,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const verify2FALogin = async (partialToken: string, code: string): Promise<{ success: boolean; user?: User; message?: string }> => {
         try {
-            const baseUrl = API_BASE_URL.replace(/\/$/, '');
-            const res = await fetch(`${baseUrl}/auth/2fa/login-verify`, {
+            const res = await apiFetch('/auth/2fa/login-verify', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ partialToken, code }),
             });
             if (!res.ok) {
@@ -175,8 +174,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const result = await res.json();
             const userData = result.user;
             setUser(userData);
-            localStorage.setItem('bev-user', JSON.stringify(userData));
-            localStorage.setItem('bev-token', result.access_token);
             return { success: true, user: userData };
         } catch (err) {
             return { success: false, message: 'Server connection failed.' };
@@ -186,41 +183,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const updateUser = async (data: Partial<User>) => {
         if (!user) return;
         try {
-            const token = localStorage.getItem('bev-token');
-            const baseUrl = API_BASE_URL.replace(/\/$/, '');
-            const res = await fetch(`${baseUrl}/users/${user.id}`, {
+            const res = await apiFetch(`/users/${user.id}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
                 body: JSON.stringify(data),
             });
 
             if (res.ok) {
                 const updatedUser = { ...user, ...data };
                 setUser(updatedUser);
-                if (typeof window !== 'undefined') {
-                    localStorage.setItem('bev-user', JSON.stringify(updatedUser));
-                }
             }
         } catch (err) {
             console.error("Failed to update user profile on server:", err);
-            // Fallback to local only if server fails, or show error
+            // Optional: fallback to local optimization
             const updatedUser = { ...user, ...data };
             setUser(updatedUser);
-            if (typeof window !== 'undefined') {
-                localStorage.setItem('bev-user', JSON.stringify(updatedUser));
-            }
         }
     };
 
-    const logout = () => {
-        setUser(null);
-        if (typeof window !== 'undefined') {
-            localStorage.removeItem('bev-user');
-            localStorage.removeItem('bev-token');
+    const logout = async () => {
+        try {
+            await apiFetch('/auth/logout', { method: 'POST' });
+        } catch (err) {
+            console.error("Logout request failed:", err);
         }
+        setUser(null);
     };
 
     return (

@@ -94,8 +94,8 @@ export default function KycPage() {
     const videoRef = React.useRef<HTMLVideoElement>(null);
     const streamRef = React.useRef<MediaStream | null>(null);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : '';
-    const headers = { Authorization: `Bearer ${token}` };
+    
+    const headers = {  };
 
     React.useEffect(() => { fetchStatus(); }, []);
 

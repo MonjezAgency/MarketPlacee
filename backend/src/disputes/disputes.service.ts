@@ -12,8 +12,8 @@ export class DisputesService {
         private escrow: EscrowService,
     ) {}
 
-    async create(buyerId: string, orderId: string, reason: string, description: string, evidence: string[] = []) {
-        const order = await this.prisma.order.findFirst({ where: { id: orderId, buyerId } });
+    async create(customerId: string, orderId: string, reason: string, description: string, evidence: string[] = []) {
+        const order = await this.prisma.order.findFirst({ where: { id: orderId, customerId } });
         if (!order) throw new NotFoundException('Order not found');
 
         if (['PENDING', 'CANCELLED'].includes(order.status)) {
@@ -21,12 +21,12 @@ export class DisputesService {
         }
 
         const existing = await this.prisma.dispute.findFirst({
-            where: { orderId, buyerId, status: { in: [DisputeStatus.OPEN, DisputeStatus.UNDER_REVIEW] } },
+            where: { orderId, customerId, status: { in: [DisputeStatus.OPEN, DisputeStatus.UNDER_REVIEW] } },
         });
         if (existing) throw new BadRequestException('An active dispute already exists for this order');
 
         const dispute = await this.prisma.dispute.create({
-            data: { orderId, buyerId, reason, description, evidence },
+            data: { orderId, customerId, reason, description, evidence },
         });
 
         // Notify admins/support
@@ -35,7 +35,7 @@ export class DisputesService {
             this.notifications.create(
                 admin.id,
                 'New Dispute Opened',
-                `Buyer opened a dispute on order #${orderId.slice(-8).toUpperCase()}. Reason: ${reason}`,
+                `Customer opened a dispute on order #${orderId.slice(-8).toUpperCase()}. Reason: ${reason}`,
                 'WARNING',
                 { disputeId: dispute.id, orderId },
             ).catch(() => {});
@@ -54,7 +54,7 @@ export class DisputesService {
                 include: {
                     order: {
                         include: {
-                            buyer: { select: { id: true, name: true, email: true } },
+                            customer: { select: { id: true, name: true, email: true } },
                             items: {
                                 take: 1,
                                 include: { product: { select: { name: true } } },
@@ -72,9 +72,9 @@ export class DisputesService {
         return { data: disputes, total, page, limit, totalPages: Math.ceil(total / limit) };
     }
 
-    async findMyDisputes(buyerId: string) {
+    async findMyDisputes(customerId: string) {
         return this.prisma.dispute.findMany({
-            where: { buyerId },
+            where: { customerId },
             include: {
                 order: { select: { id: true, totalAmount: true, status: true } },
             },
@@ -88,7 +88,7 @@ export class DisputesService {
             include: {
                 order: {
                     include: {
-                        buyer: { select: { id: true, name: true, email: true } },
+                        customer: { select: { id: true, name: true, email: true } },
                         items: { include: { product: { select: { name: true, images: true } } } },
                     },
                 },
@@ -113,14 +113,14 @@ export class DisputesService {
             },
         });
 
-        // If refund decision → trigger escrow refund (Stripe refund to buyer)
+        // If refund decision → trigger escrow refund (Stripe refund to customer)
         if (decision === 'RESOLVED_REFUND') {
-            this.escrow.refundEscrow(dispute.orderId, dispute.buyerId).catch(() => {});
+            this.escrow.refundEscrow(dispute.orderId, dispute.customerId).catch(() => {});
         }
 
-        // Notify buyer
+        // Notify customer
         this.notifications.create(
-            dispute.buyerId,
+            dispute.customerId,
             'Dispute Resolved',
             decision === 'RESOLVED_REFUND'
                 ? `Your dispute on order #${dispute.orderId.slice(-8).toUpperCase()} has been resolved. A refund will be issued.`

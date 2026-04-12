@@ -39,9 +39,9 @@ export default function AdminPricingPage() {
     const fetchMarkup = async () => {
         setIsLoading(true);
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`${API_URL}/admin/config/markup`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {  },
             });
             if (res.ok) {
                 const data = await res.json();
@@ -71,12 +71,11 @@ export default function AdminPricingPage() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`${API_URL}/admin/config/markup`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify(newMarkup),
             });

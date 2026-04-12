@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import { useState, useEffect, useRef } from 'react';
 import {
@@ -52,14 +54,13 @@ export default function SupplierDashboard() {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadReport, setUploadReport] = useState<UploadReport | null>(null);
 
-    const getToken = () => localStorage.getItem('bev-token') || '';
+    
 
     // Fetch supplier products
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await fetch(`${API_URL}/products/my-products`, {
-                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                const res = await apiFetch(`/products/my-products`, {
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -75,8 +76,7 @@ export default function SupplierDashboard() {
         // Fetch dashboard stats
         const fetchStats = async () => {
             try {
-                const res = await fetch(`${API_URL}/dashboard/supplier`, {
-                    headers: { 'Authorization': `Bearer ${getToken()}` }
+                const res = await apiFetch(`/dashboard/supplier`, {
                 });
                 if (res.ok) {
                     const data = await res.json();
@@ -112,7 +112,6 @@ export default function SupplierDashboard() {
 
     const handleSaveProduct = async (data: any) => {
         try {
-            const token = getToken();
             const payload = {
                 name: data.name,
                 description: data.description || 'No description',
@@ -123,11 +122,10 @@ export default function SupplierDashboard() {
                 ean: data.ean || undefined,
             };
 
-            const res = await fetch(`${API_URL}/products`, {
+            const res = await apiFetch(`/products`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
                 },
                 body: JSON.stringify(payload)
             });
@@ -162,8 +160,6 @@ export default function SupplierDashboard() {
         };
 
         try {
-            const token = getToken();
-
             for (const file of files) {
                 const formData = new FormData();
                 formData.append('file', file);
@@ -173,7 +169,6 @@ export default function SupplierDashboard() {
 
                 const res = await fetch(apiUrl, {
                     method: 'POST',
-                    headers: { 'Authorization': `Bearer ${token}` },
                     body: formData,
                 });
 
@@ -206,8 +201,7 @@ export default function SupplierDashboard() {
             setUploadReport(accumulatedResults);
             
             // Refresh products
-            const prodRes = await fetch(`${API_URL}/products/my-products`, {
-                headers: { 'Authorization': `Bearer ${getToken()}` }
+            const prodRes = await apiFetch(`/products/my-products`, {
             });
             if (prodRes.ok) {
                 setProducts(await prodRes.json());

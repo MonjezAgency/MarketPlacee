@@ -41,8 +41,8 @@ export default function PaymentMethodsPage() {
     const [connectStatus, setConnectStatus] = React.useState<any>(null);
     const [isConnecting, setIsConnecting] = React.useState(false);
 
-    const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : '';
-    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    
+    const headers = { 'Content-Type': 'application/json' };
 
     const showToast = (type: 'success' | 'error', msg: string) => {
         setToast({ type, msg });
@@ -50,11 +50,10 @@ export default function PaymentMethodsPage() {
     };
 
     React.useEffect(() => {
-        if (!token) return;
         Promise.all([
-            fetch(`${API_URL}/kyc/status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-            fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-            fetch(`${API_URL}/payments/connect/status`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.ok ? r.json() : null),
+            fetch(`${API_URL}/kyc/status`, { headers: {  } }).then(r => r.json()),
+            fetch(`${API_URL}/auth/me`, { headers: {  } }).then(r => r.json()),
+            fetch(`${API_URL}/payments/connect/status`, { headers: {  } }).then(r => r.ok ? r.json() : null),
         ]).then(([kyc, profile, connect]) => {
             setKycStatus(kyc.kycStatus || 'UNVERIFIED');
             if (profile?.iban) { setSavedIban(maskIban(profile.iban)); setHasBank(true); }
@@ -67,7 +66,7 @@ export default function PaymentMethodsPage() {
         try {
             const res = await fetch(`${API_URL}/payments/connect/onboard`, {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {  },
             });
             if (!res.ok) { showToast('error', 'Failed to start Stripe Connect onboarding'); return; }
             const { url } = await res.json();

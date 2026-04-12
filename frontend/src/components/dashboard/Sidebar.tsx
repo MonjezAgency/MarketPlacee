@@ -11,6 +11,8 @@ import { Button } from '../ui/Button';
 import { useTheme } from 'next-themes';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
+import { apiFetch } from '@/lib/api';
+import { DollarSign } from 'lucide-react';
 
 interface SidebarItem {
     name: string;
@@ -24,6 +26,7 @@ const SUPPLIER_ITEMS: SidebarItem[] = [
     { name: 'My Products', icon: Package, href: '/supplier/products' },
     { name: 'Placements', icon: Star, href: '/supplier/placements', badge: 'New' },
     { name: 'Orders', icon: ShoppingCart, href: '/supplier/orders' },
+    { name: 'Earnings', icon: DollarSign, href: '/supplier/earnings' },
     { name: 'Analytics', icon: TrendingUp, href: '/supplier/analytics' },
     { name: 'Support', icon: MessageCircle, href: '/supplier/support' },
     { name: 'Settings', icon: Settings, href: '/supplier/settings' },
@@ -61,12 +64,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
         if (role === 'supplier' && user?.id) {
             const fetchNotifications = async () => {
                 try {
-                    const token = localStorage.getItem('bev-token');
-                    if (!token) return;
-
-                    const res = await fetch(`${'/api'}/users/${user.id}/notifications`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
+                    const res = await apiFetch(`/users/${user.id}/notifications`);
 
                     if (res.ok) {
                         const notifications = await res.json();
@@ -94,10 +92,6 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                                     );
                                 });
                                 sessionStorage.setItem(shownKey, 'true');
-
-                                // Mark as read so badge eventually clears when user clicks or views them (we can just mark it read here or let the products page do it)
-                                // We will leave it unread so the badge persists until they fix it, but let's just mark it read so it stops popping up. Wait, the requirement says "shows the number of errors on the tab".
-                                // Let's keep it unread but stop popup via sessionStorage.
                             }
                         } else {
                             // Clear badge

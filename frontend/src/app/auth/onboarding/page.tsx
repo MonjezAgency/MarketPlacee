@@ -46,12 +46,12 @@ export default function OnboardingPage() {
         setError('');
 
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`/api/users/${user?.id}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    
                 },
                 body: JSON.stringify(form)
             });
@@ -59,7 +59,7 @@ export default function OnboardingPage() {
             if (res.ok) {
                 // Update local user state
                 const updatedUser = await res.json();
-                localStorage.setItem('bev-user', JSON.stringify(updatedUser));
+                
                 // Force auth context refresh if necessary, or just redirect
                 router.push('/auth/pending');
             } else {

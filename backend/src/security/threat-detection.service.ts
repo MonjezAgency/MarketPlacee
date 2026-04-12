@@ -117,9 +117,9 @@ export class ThreatDetectionService implements OnModuleInit {
         let flagged = 0;
 
         try {
-            // ── Pattern 1: Velocity — buyer places >5 orders in 1 hour ──────
+            // ── Pattern 1: Velocity — customer places >5 orders in 1 hour ──────
             const velocityGroups = await this.prisma.order.groupBy({
-                by: ['buyerId'],
+                by: ['customerId'],
                 where: { createdAt: { gte: oneHourAgo } },
                 _count: { id: true },
             });
@@ -127,13 +127,13 @@ export class ThreatDetectionService implements OnModuleInit {
             for (const g of velocityGroups) {
                 if (g._count.id > 5) {
                     flagged++;
-                    const msg = `Order velocity fraud: buyer ${g.buyerId} placed ${g._count.id} orders in 1 hour`;
+                    const msg = `Order velocity fraud: customer ${g.customerId} placed ${g._count.id} orders in 1 hour`;
                     patterns.push(msg);
                     await this.securityService.logEvent({
                         level: 'WARN',
                         eventType: 'FRAUD_ORDER_VELOCITY',
                         description: msg,
-                        userId: g.buyerId,
+                        userId: g.customerId,
                     });
                 }
             }
@@ -145,26 +145,26 @@ export class ThreatDetectionService implements OnModuleInit {
                     totalAmount: { gt: 10000 },
                     paymentStatus: { not: 'PAID' },
                 },
-                select: { id: true, buyerId: true, totalAmount: true },
+                select: { id: true, customerId: true, totalAmount: true },
             });
 
             for (const o of largeOrders) {
                 flagged++;
-                const msg = `Large unpaid order: #${o.id.slice(-8)} — $${o.totalAmount.toFixed(2)} by buyer ${o.buyerId}`;
+                const msg = `Large unpaid order: #${o.id.slice(-8)} — $${o.totalAmount.toFixed(2)} by customer ${o.customerId}`;
                 patterns.push(msg);
                 await this.securityService.logEvent({
                     level: 'WARN',
                     eventType: 'FRAUD_LARGE_ORDER',
                     description: msg,
-                    userId: o.buyerId,
+                    userId: o.customerId,
                     metadata: { orderId: o.id, amount: o.totalAmount },
                 });
             }
 
-            // ── Pattern 3: High dispute rate for a single buyer (>2 in 7 days) ─
+            // ── Pattern 3: High dispute rate for a single customer (>2 in 7 days) ─
             const sevenDaysAgo = new Date(Date.now() - 7 * 86_400_000);
             const disputeGroups = await this.prisma.dispute.groupBy({
-                by: ['buyerId'],
+                by: ['customerId'],
                 where: { createdAt: { gte: sevenDaysAgo } },
                 _count: { id: true },
             });
@@ -172,20 +172,20 @@ export class ThreatDetectionService implements OnModuleInit {
             for (const g of disputeGroups) {
                 if (g._count.id > 2) {
                     flagged++;
-                    const msg = `High dispute rate: buyer ${g.buyerId} opened ${g._count.id} disputes in 7 days`;
+                    const msg = `High dispute rate: customer ${g.customerId} opened ${g._count.id} disputes in 7 days`;
                     patterns.push(msg);
                     await this.securityService.logEvent({
                         level: 'WARN',
                         eventType: 'FRAUD_DISPUTE_ABUSE',
                         description: msg,
-                        userId: g.buyerId,
+                        userId: g.customerId,
                     });
                 }
             }
 
-            // ── Pattern 4: Same buyer cancels >3 orders in 24 hours ──────────
+            // ── Pattern 4: Same customer cancels >3 orders in 24 hours ──────────
             const cancelGroups = await this.prisma.order.groupBy({
-                by: ['buyerId'],
+                by: ['customerId'],
                 where: {
                     status: 'CANCELLED',
                     updatedAt: { gte: oneDayAgo },
@@ -196,13 +196,13 @@ export class ThreatDetectionService implements OnModuleInit {
             for (const g of cancelGroups) {
                 if (g._count.id > 3) {
                     flagged++;
-                    const msg = `Cancellation abuse: buyer ${g.buyerId} cancelled ${g._count.id} orders in 24 hours`;
+                    const msg = `Cancellation abuse: customer ${g.customerId} cancelled ${g._count.id} orders in 24 hours`;
                     patterns.push(msg);
                     await this.securityService.logEvent({
                         level: 'WARN',
                         eventType: 'FRAUD_CANCEL_ABUSE',
                         description: msg,
-                        userId: g.buyerId,
+                        userId: g.customerId,
                     });
                 }
             }

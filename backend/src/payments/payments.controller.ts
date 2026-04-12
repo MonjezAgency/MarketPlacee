@@ -1,93 +1,74 @@
-import {
-    Controller, Post, Get, Body, Param,
-    UseGuards, Request, Headers, RawBodyRequest,
-    Req, HttpCode, Query,
-} from '@nestjs/common';
-import { PaymentsService } from './payments.service';
+import { Controller, Post, Get, Patch, UseGuards, Request, Body, Res } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '@prisma/client';
+import { PaymentsService } from './payments.service';
+import { UsersService } from '../users/users.service';
+import { UpdatePayoutSettingsDto } from './dto/update-payout-settings.dto';
+import { CreatePaymentIntentDto } from './dto/create-payment-intent.dto';
 
 @Controller('payments')
+@UseGuards(JwtAuthGuard)
 export class PaymentsController {
-    constructor(private readonly paymentsService: PaymentsService) {}
+    constructor(
+        private readonly paymentsService: PaymentsService,
+        private readonly usersService: UsersService,
+    ) {}
 
-    /**
-     * Create a payment intent for an order.
-     * Frontend gets clientSecret → passes to Stripe.js → card charged → webhook fires.
-     */
     @Post('create-intent')
-    @UseGuards(JwtAuthGuard)
-    createIntent(@Body('orderId') orderId: string, @Request() req) {
-        return this.paymentsService.createPaymentIntent(orderId, req.user.sub);
-    }
-
-    /**
-     * Stripe webhook endpoint — must be public (Stripe calls it, not the browser).
-     * Raw body required for signature verification — do NOT parse as JSON.
-     */
-    @Post('webhook')
-    @HttpCode(200)
-    async webhook(
-        @Req() req: RawBodyRequest<Request>,
-        @Headers('stripe-signature') sig: string,
+    @Roles(Role.CUSTOMER)
+    @UseGuards(RolesGuard)
+    async createPaymentIntent(
+      @Body() dto: CreatePaymentIntentDto,
+      @Request() req,
     ) {
-        return this.paymentsService.handleWebhook(req.rawBody as Buffer, sig);
+      return this.paymentsService.createPaymentIntent(
+        dto.orderId,
+        req.user.sub,
+      );
     }
 
-    /**
-     * Issue refund (CUSTOMER can request, ADMIN executes).
-     */
-    @Post('refund/:orderId')
-    @UseGuards(JwtAuthGuard)
-    refund(
-        @Param('orderId') orderId: string,
-        @Body('amountCents') amountCents: number,
-        @Request() req,
-    ) {
-        return this.paymentsService.refund(orderId, req.user.sub, amountCents);
-    }
-
-    /**
-     * Get payment status for an order.
-     */
-    @Get('status/:orderId')
-    @UseGuards(JwtAuthGuard)
-    getStatus(@Param('orderId') orderId: string, @Request() req) {
-        return this.paymentsService.getPaymentStatus(orderId, req.user.sub);
-    }
-
-    /**
-     * Supplier: start Stripe Connect onboarding.
-     */
     @Post('connect/onboard')
-    @UseGuards(JwtAuthGuard)
-    connectOnboard(
-        @Request() req,
-        @Query('returnUrl') returnUrl: string,
-        @Query('refreshUrl') refreshUrl: string,
-    ) {
-        const base = process.env.FRONTEND_URL || 'http://localhost:3000';
-        return this.paymentsService.createConnectOnboardingLink(
-            req.user.sub,
-            returnUrl || `${base}/supplier/payment-methods?connected=true`,
-            refreshUrl || `${base}/supplier/payment-methods?refresh=true`,
-        );
+    @Roles(Role.SUPPLIER)
+    @UseGuards(RolesGuard)
+    async onboardConnect(@Request() req) {
+        return this.paymentsService.createConnectOnboardingUrl(req.user.sub);
     }
 
-    /**
-     * Supplier: get Stripe Connect account status.
-     */
+    @Get('my-earnings')
+    @Roles(Role.SUPPLIER)
+    @UseGuards(RolesGuard)
+    async getMyEarnings(@Request() req) {
+        return this.paymentsService.getSupplierEarnings(req.user.sub);
+    }
+
+    @Patch('payout-settings')
+    @Roles(Role.SUPPLIER)
+    @UseGuards(RolesGuard)
+    async updatePayoutSettings(@Request() req, @Body() dto: UpdatePayoutSettingsDto) {
+        return this.usersService.updatePayoutSettings(req.user.sub, dto);
+    }
+
+    @Get('admin/revenue')
+    @Roles(Role.ADMIN)
+    @UseGuards(RolesGuard)
+    async getAdminRevenue() {
+        return this.paymentsService.getAdminRevenue();
+    }
+
     @Get('connect/status')
-    @UseGuards(JwtAuthGuard)
-    connectStatus(@Request() req) {
-        return this.paymentsService.getConnectStatus(req.user.sub);
-    }
-
-    /**
-     * Admin: manually trigger supplier payout for a delivered order.
-     */
-    @Post('payout/:orderId')
-    @UseGuards(JwtAuthGuard)
-    payout(@Param('orderId') orderId: string) {
-        return this.paymentsService.payoutSupplier(orderId);
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPPLIER)
+    async getConnectStatus(@Request() req) {
+        const user = await this.usersService
+            .findById(req.user.sub);
+        return {
+            connected: !!user.stripeAccountId,
+            onboarded: user.stripeOnboarded ?? false,
+            accountId: user.stripeAccountId
+                ? '****' + user.stripeAccountId.slice(-4)
+                : null,
+        };
     }
 }

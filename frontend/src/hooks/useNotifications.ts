@@ -13,7 +13,7 @@ export interface AppNotification {
     data?: any;
 }
 
-import { apiFetch } from '@/lib/api';
+import { apiFetch, getToken } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
@@ -22,7 +22,7 @@ export function useNotifications() {
     const [unreadCount, setUnreadCount] = useState(0);
     const socketRef = useRef<Socket | null>(null);
 
-    const getToken = () => (typeof window !== 'undefined' ? localStorage.getItem('bev-token') : null);
+    
 
     const fetchNotifications = useCallback(async () => {
         try {
@@ -42,10 +42,9 @@ export function useNotifications() {
     // gateway to read from socket.handshake.headers.cookie instead.
     // This is deferred to a separate task.
     // 
-    // Current workaround: read legacy 'bev-token' purely for WebSocket connection.
+    // Current workaround: read token via getToken() purely for WebSocket connection.
     useEffect(() => {
         const token = getToken();
-        if (!token) return;
 
         const socket = io(`${API_URL}/chat`, {
             auth: { token },

@@ -11,15 +11,18 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { formatPrice } from '@/lib/currency';
 import { cn } from '@/lib/utils';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import Link from 'next/link';
+import { apiFetch } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
-import StripeCheckout from '@/components/payment/StripeCheckout';
+
 
 const ADDR_KEY = 'bev-checkout-address';
 
 export default function CheckoutPage() {
+    const router = useRouter();
     const [step, setStep] = useState(1);
     const [isProcessing, setIsProcessing] = useState(false);
     const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
@@ -53,7 +56,7 @@ export default function CheckoutPage() {
         const fetchRates = async () => {
             setIsLoadingRates(true);
             try {
-                const res = await fetch(`${'/api'}/shipping/rates?cartTotal=${total}&destination=Dubai`);
+                const res = await apiFetch(`/shipping/rates?cartTotal=${total}&destination=Dubai`);
                 if (res.ok) {
                     const data = await res.json();
                     setShippingRates(data);
@@ -86,11 +89,8 @@ export default function CheckoutPage() {
         setCouponError('');
         setIsValidatingCoupon(true);
         try {
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(
-                `${'/api'}/coupons/validate/${couponCode.trim()}`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
+            
+            const res = await apiFetch(`/coupons/validate/${couponCode.trim()}`);
             const data = await res.json();
             if (!res.ok) { setCouponError(data.message || 'Invalid coupon'); return; }
             setCouponDiscount(data.discountPercent);
@@ -116,13 +116,8 @@ export default function CheckoutPage() {
         }
         setIsProcessing(true);
         try {
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(('/api') + '/orders', {
+            const res = await apiFetch('/orders', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-                },
                 body: JSON.stringify({
                     items: items.map(i => ({ productId: i.id, quantity: i.quantity, price: i.price })),
                     totalAmount: grandTotal,
@@ -140,8 +135,8 @@ export default function CheckoutPage() {
 
             if (res.ok) {
                 const order = await res.json();
-                setCreatedOrderId(order.id);
-                setStep(3); // → Stripe payment step
+                clearCart();
+                router.push(`/checkout/payment?orderId=${order.id}`);
             } else {
                 const err = await res.json().catch(() => ({}));
                 alert(err?.message || 'Failed to place order. Please try again.');
@@ -371,29 +366,6 @@ export default function CheckoutPage() {
                                     </motion.div>
                                 )}
 
-                                {/* Step 3: Stripe Payment */}
-                                {step === 3 && createdOrderId && (
-                                    <motion.div
-                                        key="step3"
-                                        initial={{ opacity: 0, x: -20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: 20 }}
-                                        className="bg-card border border-border/50 p-10 sm:p-12 rounded-[40px] premium-shadow"
-                                    >
-                                        <div className="flex items-center gap-4 mb-8">
-                                            <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center">
-                                                <CreditCard className="text-primary" size={24} />
-                                            </div>
-                                            <h2 className="text-3xl font-heading font-bold">Secure Payment</h2>
-                                        </div>
-                                        <StripeCheckout
-                                            orderId={createdOrderId}
-                                            amount={grandTotal}
-                                            onSuccess={() => { clearCart(); setStep(4); }}
-                                            onCancel={handleBack}
-                                        />
-                                    </motion.div>
-                                )}
                             </AnimatePresence>
                         </div>
 

@@ -21,9 +21,6 @@ function ResetPasswordContent() {
     const [error, setError] = useState('');
 
     useEffect(() => {
-        if (!token) {
-            setError('Invalid or missing reset token.');
-        }
     }, [token]);
 
     const handleReset = async (e: React.FormEvent) => {

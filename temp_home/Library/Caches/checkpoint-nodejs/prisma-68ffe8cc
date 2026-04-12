@@ -1,0 +1,53 @@
+{
+  "last_reminder": 1776010634041,
+  "cached_at": 1776010414139,
+  "version": "6.19.3",
+  "cli_path": "/Users/abdelrhman/Downloads/MarketPlace-main/node_modules/b2b-marketplace-backend/node_modules/.bin/prisma",
+  "output": {
+    "product": "prisma",
+    "previous_version": "6.19.3",
+    "checkpoint_version": 4,
+    "local_timestamp_without_timezone": "2026-04-12T18:13:33Z",
+    "current_version": "7.7.0",
+    "current_release_date": 1775577373,
+    "client_event_id": "0f4a2957-ba84-44b3-889a-9b47445e0b0f",
+    "current_download_url": "https://github.com/prisma/prisma",
+    "package": "prisma",
+    "release_tag": "latest",
+    "install_command": "npm install --save-dev prisma",
+    "schema_providers": [
+      "postgresql"
+    ],
+    "schema_preview_features": [],
+    "schema_generators_providers": [
+      "prisma-client-js"
+    ],
+    "current_changelog_url": "https://github.com/prisma/prisma",
+    "outdated": true,
+    "project_website": "https://prisma.io",
+    "alerts": []
+  },
+  "product": "prisma",
+  "cli_install_type": "local",
+  "local_timestamp": "2026-04-12T18:24:52+02:00",
+  "project_hash": "c19c7c5b",
+  "cli_path_hash": "68ffe8cc",
+  "endpoint": "https://checkpoint.prisma.io",
+  "arch": "arm64",
+  "os": "darwin",
+  "node_version": "v24.14.1",
+  "command": "generate",
+  "schema_providers": [
+    "postgresql"
+  ],
+  "schema_preview_features": [],
+  "schema_generators_providers": [
+    "prisma-client-js"
+  ],
+  "cache_file": "/Users/abdelrhman/Downloads/MarketPlace-main/temp_home/Library/Caches/checkpoint-nodejs/prisma-68ffe8cc",
+  "cache_duration": 43200000,
+  "remind_duration": 172800000,
+  "timeout": 5000,
+  "unref": true,
+  "child_path": "/Users/abdelrhman/Downloads/MarketPlace-main/backend/node_modules/prisma/build/child"
+}

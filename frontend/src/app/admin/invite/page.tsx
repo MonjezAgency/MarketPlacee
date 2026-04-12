@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -82,21 +84,11 @@ export default function AdminInvitePage() {
         setEmailResult(null);
 
         try {
-            const token = localStorage.getItem('bev-token') || '';
-            if (!token || token === 'LOCAL_ONLY') {
-                setEmailResult({
-                    success: false,
-                    message: 'Your current session is in "Local-Only" mode. To send invitations, please log out and sign in with a real administrator account.',
-                });
-                setIsSendingEmail(false);
-                return;
-            }
-
-            const res = await fetch(`${API_URL}/admin/team/send-invite`, {
+            const res = await apiFetch(`/admin/team/send-invite`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
+                    
                 },
                 body: JSON.stringify({
                     email,

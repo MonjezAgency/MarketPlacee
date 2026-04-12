@@ -7,6 +7,7 @@ import { Tag, Package, ArrowRight, Loader2, Percent, Clock, Flame } from 'lucide
 import { useCart } from '@/lib/cart';
 import { formatPrice } from '@/lib/currency';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
 
 const API_URL = '/api';
 
@@ -21,14 +22,12 @@ export default function DealsPage() {
         const fetchDeals = async () => {
             setIsLoading(true);
             try {
-                const token = localStorage.getItem('bev-token');
-                const authHeader: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+                
+                
 
                 const [productsRes, couponsRes] = await Promise.all([
-                    fetch(`${API_URL}/products?status=APPROVED&sort=newest&limit=48`),
-                    token
-                        ? fetch(`${API_URL}/coupons`, { headers: authHeader })
-                        : Promise.resolve(null),
+                    apiFetch('/products?status=APPROVED&sort=newest&limit=48'),
+                    apiFetch('/coupons')
                 ]);
 
                 if (productsRes.ok) {

@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import * as React from 'react';
 import { motion } from 'framer-motion';
@@ -32,10 +34,9 @@ export default function SupplierOverviewPage() {
     React.useEffect(() => {
         const fetchStats = async () => {
             try {
-                const token = localStorage.getItem('bev-token') || '';
+                
                 const API_URL = '/api';
-                const res = await fetch(`${API_URL}/dashboard/supplier`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const res = await apiFetch(`/dashboard/supplier`, {
                 });
                 if (res.ok) {
                     const data = await res.json();

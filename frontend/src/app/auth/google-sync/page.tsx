@@ -27,8 +27,8 @@ export default function GoogleSyncPage() {
             }
 
             if (s.backendToken && s.backendUser) {
-                localStorage.setItem('bev-token', s.backendToken);
-                localStorage.setItem('bev-user', JSON.stringify(s.backendUser));
+                
+                
 
                 if (!s.backendUser.companyName || !s.backendUser.phone) {
                     router.replace('/auth/onboarding');

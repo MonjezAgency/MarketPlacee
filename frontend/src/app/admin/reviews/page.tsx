@@ -43,11 +43,11 @@ export default function AdminReviewsPage() {
     const fetchReviews = React.useCallback(async (p = 1, mr?: number) => {
         setIsLoading(true);
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const params = new URLSearchParams({ page: String(p), limit: String(limit) });
             if (mr !== undefined) params.set('maxRating', String(mr));
             const res = await fetch(`${API_URL}/admin/reviews?${params}`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {  },
             });
             if (res.ok) {
                 const data = await res.json();
@@ -65,10 +65,10 @@ export default function AdminReviewsPage() {
         if (!confirm('Delete this review permanently?')) return;
         setDeletingId(reviewId);
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`${API_URL}/admin/reviews/${reviewId}`, {
                 method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {  },
             });
             if (res.ok) {
                 setReviews(prev => prev.filter(r => r.id !== reviewId));

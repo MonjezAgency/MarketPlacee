@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -34,9 +36,8 @@ export default function AdminBuyersPage() {
 
     const loadBuyers = async () => {
         try {
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(('/api') + '/users', {
-                headers: { 'Authorization': `Bearer ${token}` }
+            
+            const res = await apiFetch('/users', {
             });
             if (res.ok) {
                 const data = await res.json();

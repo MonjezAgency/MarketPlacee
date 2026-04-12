@@ -12,8 +12,8 @@ import Image from 'next/image';
 const API_URL = '/api';
 
 export default function SecuritySettingsPage() {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('bev-token') : '';
-    const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+    
+    const headers = { 'Content-Type': 'application/json' };
 
     // Status
     const [twoFactorEnabled, setTwoFactorEnabled] = React.useState(false);
@@ -46,7 +46,7 @@ export default function SecuritySettingsPage() {
     };
 
     React.useEffect(() => {
-        fetch(`${API_URL}/auth/2fa/status`, { headers: { Authorization: `Bearer ${token}` } })
+        fetch(`${API_URL}/auth/2fa/status`, { headers: {  } })
             .then(r => r.json())
             .then(d => { setTwoFactorEnabled(d.twoFactorEnabled); setLoading(false); })
             .catch(() => setLoading(false));

@@ -39,8 +39,8 @@ export default function AdminDashboard() {
     const fetchDashboardData = async () => {
         setIsLoading(true);
         try {
-            const token = localStorage.getItem('bev-token');
-            const headers = { Authorization: `Bearer ${token}` };
+            
+            const headers = {  };
 
             const [usersP, productsP, markupP, brandsP, adsP] = await Promise.allSettled([
                 fetch(('/api') + '/users?status=PENDING_APPROVAL', { headers }),
@@ -85,10 +85,10 @@ export default function AdminDashboard() {
     const handleUpdateMarkup = async () => {
         if (!confirm(`Update global markup rating to ${markup}?`)) return;
         try {
-            const token = localStorage.getItem('bev-token');
+            
             await fetch(('/api') + '/admin/config/markup', {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ percentage: markup })
             });
             alert('Markup updated successfully');
@@ -100,10 +100,10 @@ export default function AdminDashboard() {
     const handleSaveBrands = async () => {
         setBrandsLoading(true);
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(('/api') + '/admin/config/allowed-brands', {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ brands })
             });
             if (res.ok) {
@@ -133,10 +133,10 @@ export default function AdminDashboard() {
 
     const handleApproveProduct = async (id: string) => {
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`${'/api'}/admin/config/products/${id}/approve`, {
                 method: 'PUT',
-                headers: { Authorization: `Bearer ${token}` }
+                headers: {  }
             });
             if (res.ok) {
                 const updatedProduct = pendingProducts.find(p => p.id === id);
@@ -152,10 +152,10 @@ export default function AdminDashboard() {
         const reason = prompt('Reason for rejection:');
         if (!reason) return;
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`${'/api'}/admin/config/products/${id}/reject`, {
                 method: 'PUT',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason })
             });
             if (res.ok) {
@@ -169,10 +169,10 @@ export default function AdminDashboard() {
     const handleCreateAd = async () => {
         if (!adProductId) return alert("Enter Product ID");
         try {
-            const token = localStorage.getItem('bev-token');
+            
             const res = await fetch(`${'/api'}/ads/admin/create`, {
                 method: 'POST',
-                headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ productId: adProductId, placement: adPlacement })
             });
             if (res.ok) {
@@ -189,10 +189,10 @@ export default function AdminDashboard() {
 
     const handleRemoveAd = async (id: string) => {
         try {
-            const token = localStorage.getItem('bev-token');
+            
             await fetch(`${'/api'}/ads/admin/${id}`, {
                 method: 'DELETE',
-                headers: { Authorization: `Bearer ${token}` }
+                headers: {  }
             });
             fetchDashboardData();
         } catch (e) {

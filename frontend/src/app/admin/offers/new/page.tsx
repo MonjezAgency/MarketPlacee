@@ -1,4 +1,6 @@
 'use client';
+import { apiFetch } from '@/lib/api';
+
 
 import React, { useState } from 'react';
 import { Sparkles, ArrowLeft, Save, Tag, CalendarClock, Hash } from 'lucide-react';
@@ -30,12 +32,12 @@ export default function AdminNewOfferPage() {
         setIsSubmitting(true);
 
         try {
-            const token = localStorage.getItem('bev-token');
-            const res = await fetch(('/api') + '/placements/request', {
+            
+            const res = await apiFetch('/placements/request', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    
                 },
                 body: JSON.stringify({
                     productId: formData.productId,
