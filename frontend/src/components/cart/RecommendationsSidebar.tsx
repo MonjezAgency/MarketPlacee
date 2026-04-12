@@ -1,4 +1,12 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { ShoppingCart, Sparkles, Loader2 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { Button } from '@/components/ui/Button';
+import { useCart, CartItem } from '@/lib/cart';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { formatPrice } from '@/lib/currency';
 
 interface RecommendedProduct {
     id: string;
