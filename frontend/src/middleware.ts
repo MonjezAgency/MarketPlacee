@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { jwtVerify } from 'jose';
 
-const PROTECTED_PATHS = ['/dashboard', '/admin', '/profile', '/orders', '/settings', '/checkout'];
+const PROTECTED_PATHS = ['/dashboard', '/admin', '/profile', '/orders', '/settings', '/checkout', '/supplier'];
 const AUTH_PATH = '/auth/';
 
 export async function middleware(request: NextRequest) {

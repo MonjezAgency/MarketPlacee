@@ -10,7 +10,8 @@ import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 
-const API_URL = '/api';
+import { apiFetch } from '@/lib/api';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 interface WishlistProduct {
     id: string;
@@ -32,15 +33,15 @@ export default function WishlistPage() {
     const [removing, setRemoving] = React.useState<string | null>(null);
     const [addedToCart, setAddedToCart] = React.useState<string | null>(null);
 
-    const getToken = () => (typeof window !== 'undefined' ? localStorage.getItem('bev-token') : '');
-
+    
     const fetchWishlist = React.useCallback(async () => {
         if (!user) { setIsLoading(false); return; }
         try {
-            const res = await fetch(`${API_URL}/wishlist`, {
-                headers: { Authorization: `Bearer ${getToken()}` },
-                cache: 'no-store',
-            });
+            const res = await apiFetch(`/wishlist`, { cache: 'no-store' });
+            if (res.status === 401) {
+                 setItems([]);
+                 return;
+            }
             if (res.ok) setItems(await res.json());
         } catch { /* offline */ }
         finally { setIsLoading(false); }
@@ -51,10 +52,7 @@ export default function WishlistPage() {
     const handleRemove = async (productId: string) => {
         setRemoving(productId);
         try {
-            await fetch(`${API_URL}/wishlist/${productId}`, {
-                method: 'DELETE',
-                headers: { Authorization: `Bearer ${getToken()}` },
-            });
+            await apiFetch(`/wishlist/${productId}`, { method: 'DELETE' });
             setItems(prev => prev.filter(i => i.id !== productId));
         } finally { setRemoving(null); }
     };
@@ -111,8 +109,17 @@ export default function WishlistPage() {
             </div>
 
             {isLoading ? (
-                <div className="flex items-center justify-center py-20">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {[1, 2, 3, 4, 5, 6].map(i => (
+                        <div key={i} className="bg-card border border-border/50 rounded-3xl overflow-hidden animate-pulse">
+                            <div className="w-full aspect-square bg-muted/40" />
+                            <div className="p-5 space-y-3">
+                                <div className="h-3 bg-muted/40 rounded w-1/3" />
+                                <div className="h-4 bg-muted/40 rounded w-3/4" />
+                                <div className="h-6 bg-muted/40 rounded w-1/2 mt-4" />
+                            </div>
+                        </div>
+                    ))}
                 </div>
             ) : items.length === 0 ? (
                 <motion.div

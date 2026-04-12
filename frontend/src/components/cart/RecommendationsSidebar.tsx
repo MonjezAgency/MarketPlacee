@@ -100,7 +100,7 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
         return () => controller.abort();
     }, [items]);
 
-    if (items.length === 0 || (!isLoading && recommendations.length === 0)) {
+    if (items.length === 0) {
         return null;
     }
 
@@ -115,6 +115,12 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
                 <div className="flex flex-col items-center justify-center py-8 space-y-4">
                     <Loader2 className="w-8 h-8 text-primary animate-spin" />
                     <p className="text-sm font-bold text-muted-foreground animate-pulse">{t('cart', 'analyzingCart')}</p>
+                </div>
+            ) : recommendations.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center space-y-3">
+                    <Sparkles className="w-8 h-8 text-muted-foreground/30" />
+                    <p className="text-sm font-bold text-muted-foreground">No recommendations right now</p>
+                    <p className="text-xs text-muted-foreground/60">Add more items to see what pairs well.</p>
                 </div>
             ) : (
                 <div className="space-y-4">

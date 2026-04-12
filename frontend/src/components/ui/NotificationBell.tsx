@@ -5,6 +5,25 @@ import { Bell, CheckCheck, Package, ShoppingCart, Info, AlertCircle, CheckCircle
 import { cn } from '@/lib/utils';
 import { useNotifications, AppNotification } from '@/hooks/useNotifications';
 import { useAuth } from '@/lib/auth';
+import { NOTIFICATION_TYPES } from '@/lib/types';
+import { useRouter } from 'next/navigation';
+
+function getNotificationLink(n: AppNotification): string | null {
+  switch (n.type) {
+    case NOTIFICATION_TYPES.NEW_REGISTRATION:
+    case NOTIFICATION_TYPES.GOOGLE_REGISTRATION:
+      return '/admin/users?status=PENDING_APPROVAL';
+    case NOTIFICATION_TYPES.NEW_REVIEW:
+      return '/admin/reviews';
+    case NOTIFICATION_TYPES.NEW_ORDER:
+      return '/dashboard/supplier/orders';
+    case NOTIFICATION_TYPES.KYC_SUBMITTED:
+      return '/admin/kyc';
+    default:
+      return null;
+  }
+}
+
 
 function NotificationIcon({ type }: { type: AppNotification['type'] }) {
     if (type === 'SUCCESS') return <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />;
@@ -26,6 +45,7 @@ function timeAgo(date: string) {
 export default function NotificationBell({ isLight }: { isLight?: boolean }) {
     const { user } = useAuth();
     const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+    const router = useRouter();
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
 
@@ -85,7 +105,14 @@ export default function NotificationBell({ isLight }: { isLight?: boolean }) {
                         {notifications.map(n => (
                             <button
                                 key={n.id}
-                                onClick={() => !n.read && markRead(n.id)}
+                                onClick={() => {
+                                    if (!n.read) markRead(n.id);
+                                    const link = getNotificationLink(n);
+                                    if (link) {
+                                        setOpen(false);
+                                        router.push(link);
+                                    }
+                                }}
                                 className={cn(
                                     'w-full flex items-start gap-3 px-4 py-3 text-start hover:bg-muted/40 transition-colors',
                                     !n.read && 'bg-primary/5'

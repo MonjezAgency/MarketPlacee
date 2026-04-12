@@ -49,6 +49,7 @@ export class UsersService {
         if (status === 'PENDING_APPROVAL') {
             whereCondition.companyName = { not: null };
             whereCondition.phone = { not: null };
+            whereCondition.onboardingCompleted = true;
         }
 
         const skip = (page - 1) * limit;

@@ -16,6 +16,10 @@ export function useWishlist() {
         if (!user) return;
         try {
             const res = await apiFetch('/wishlist');
+            if (res.status === 401) {
+                setWishlistIds(new Set());
+                return;
+            }
             if (res.ok) {
                 const data = await res.json();
                 setWishlistIds(new Set(data.map((item: any) => item.product?.id || item.id)));

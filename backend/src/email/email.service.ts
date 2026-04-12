@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import axios from 'axios';
 import { getInvitationEmailHtml } from './email-templates';
@@ -47,7 +47,7 @@ export class EmailService {
   /**
    * Primary mail sender with retry and fallback
    */
-  async sendMail(to: string, subject: string, html: string, retries = 1): Promise<any> {
+  async sendMail(to: string, subject: string, html: string, retries = 1): Promise<boolean> {
     const retryableErrors = ['ETIMEDOUT', 'ECONNREFUSED', 'ESOCKET', 'ENOTFOUND'];
     const configErrors = ['EAUTH', 'EENVELOPE', 'ESTREAM'];
 
@@ -58,45 +58,42 @@ export class EmailService {
             subject,
             html,
         });
-        console.log(`[SMTP_PRIMARY_SUCCESS] Message sent to ${to}: ${info.messageId}`);
-        return info;
+        console.log(`[SMTP_SUCCESS] Sent to ${to}`);
+        return true;
     } catch (error: any) {
         const isRetryable = retryableErrors.includes(error.code);
         
         if (isRetryable && retries > 0) {
-            console.warn(`[SMTP_RETRYABLE_ERROR] ${error.code} for ${to}. Retrying...`);
+            console.warn(`[SMTP_RETRYABLE] ${error.code} — retrying in 2s...`);
             await new Promise(res => setTimeout(res, 2000));
             return this.sendMail(to, subject, html, retries - 1);
         }
 
         if (isRetryable && retries === 0) {
-            console.error(`[SMTP_RETRY_EXHAUSTED] code: ${error.code}, falling back to Resend for: ${to}`);
+            console.error(`[SMTP_RETRY_EXHAUSTED] ${error.code} — falling back to Resend for ${to}`);
+        } else {
+            console.error(`[SMTP_CONFIG_ERROR] ${error.code} — skipping retry, falling back to Resend`);
         }
 
-        if (configErrors.includes(error.code)) {
-            console.error(`[SMTP_CONFIG_ERROR] ${error.code}: SMTP auth or stream failed for ${to}. Falling back.`);
-        }
-
-        return this.sendViaResend(to, subject, html);
+        return this.sendViaResend({ to, subject, html });
     }
   }
 
-  private async sendViaResend(to: string, subject: string, html: string) {
+  private async sendViaResend(options: { to: string; subject: string; html: string; }): Promise<boolean> {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
         console.error('[RESEND_FAIL] Missing RESEND_API_KEY env variable.');
-        return null;
+        return false;
     }
 
     try {
-        console.log(`[RESEND_FALLBACK] Sending email to ${to} via Resend API...`);
         const response = await axios.post(
             'https://api.resend.com/emails',
             {
                 from: `Atlantis Marketplace <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`,
-                to: [to],
-                subject,
-                html,
+                to: [options.to],
+                subject: options.subject,
+                html: options.html,
             },
             {
                 headers: {
@@ -105,11 +102,11 @@ export class EmailService {
                 },
             }
         );
-        console.log(`[RESEND_SUCCESS] Email sent to ${to}: ${response.data.id}`);
-        return response.data;
-    } catch (error: any) {
-        console.error(`[RESEND_ERROR] Critical failure sending to ${to}:`, error.response?.data || error.message);
-        return null;
+        console.log(`[RESEND_SUCCESS] Sent to ${options.to}`);
+        return true;
+    } catch (err: any) {
+        console.error(`[RESEND_FAIL] Both SMTP and Resend failed for ${options.to}:`, err);
+        return false;
     }
   }
 
@@ -527,16 +524,47 @@ export class EmailService {
 
   /** Generic raw email — used by ReportsService and other internal senders */
   async sendRawEmail(to: string, subject: string, html: string): Promise<void> {
-    try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to,
-        subject,
-        html,
-      });
-    } catch (error) {
-      console.error(`SMTP ERROR [sendRawEmail → ${to}]:`, error);
-      // Don't throw — report emails are non-critical
-    }
+    await this.sendMail(to, subject, html);
+  }
+  async sendAdminSignupAlert(userData: {
+      name: string;
+      email: string;
+      role: string;
+      companyName?: string;
+      registeredAt: Date;
+  }): Promise<void> {
+      const adminEmail = process.env.ADMIN_EMAIL;
+      if (!adminEmail) {
+          console.warn('[EMAIL] ADMIN_EMAIL not set — skipping admin signup alert');
+          return;
+      }
+      
+      const subject = `🆕 New Registration Pending Review — ${userData.name}`;
+      const html = `
+        <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+          <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid #F59E0B;">
+            <h1 style="color:#fff; font-size:28px; margin:0; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+            <p style="color:#B0BCCF; font-size:14px; margin:8px 0 0;">Admin Alert</p>
+          </div>
+          <div style="padding:40px 30px; background:#fff;">
+            <h2 style="color:#F59E0B; font-size:20px; margin:0 0 16px;">New Registration Pending 🔔</h2>
+            <div style="background:#F2F4F7; padding:20px; border-radius:12px; margin:16px 0;">
+              <p style="margin:4px 0; font-size:14px;"><strong>Name:</strong> ${userData.name}</p>
+              <p style="margin:4px 0; font-size:14px;"><strong>Email:</strong> ${userData.email}</p>
+              <p style="margin:4px 0; font-size:14px;"><strong>Role:</strong> ${userData.role}</p>
+              ${userData.companyName ? `<p style="margin:4px 0; font-size:14px;"><strong>Company:</strong> ${userData.companyName}</p>` : ''}
+              <p style="margin:4px 0; font-size:14px;"><strong>Time:</strong> ${userData.registeredAt.toISOString()}</p>
+            </div>
+            <div style="text-align:center; margin:30px 0;">
+              <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/admin/users?status=PENDING_APPROVAL" style="display:inline-block; padding:14px 36px; background:#1BC7C9; color:#fff; text-decoration:none; border-radius:12px; font-weight:800; font-size:13px;">Review Pending Users →</a>
+            </div>
+          </div>
+          <div style="background:#0A1A2F; padding:20px; text-align:center;">
+            <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace</p>
+          </div>
+        </div>
+      `;
+      
+      await this.sendMail(adminEmail, subject, html);
   }
 }

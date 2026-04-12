@@ -169,6 +169,13 @@ export class AuthService {
                 // Notify all admins about the new pending registration
                 (async () => {
                     try {
+                        await this.emailService.sendAdminSignupAlert({
+                            name: user.name || 'N/A',
+                            email: user.email,
+                            role: data.role,
+                            companyName: data.companyName,
+                            registeredAt: user.createdAt || new Date(),
+                        });
                         const admins = await this.prisma.user.findMany({
                             where: { role: { in: ['ADMIN', 'OWNER'] }, status: 'ACTIVE' },
                             select: { id: true },
@@ -179,7 +186,7 @@ export class AuthService {
                                     userId: admin.id,
                                     title: 'New Registration Pending Approval',
                                     message: `${user.name} (${user.email}) has registered as ${data.role} and is awaiting your approval.`,
-                                    type: 'WARNING',
+                                    type: 'NEW_REGISTRATION',
                                     data: { userId: user.id, email: user.email, role: data.role },
                                 },
                             });
@@ -416,6 +423,12 @@ export class AuthService {
             const googleUser = user;
             (async () => {
                 try {
+                    await this.emailService.sendAdminSignupAlert({
+                        name: googleUser.name || 'N/A',
+                        email: googleUser.email,
+                        role: 'CUSTOMER',
+                        registeredAt: googleUser.createdAt || new Date(),
+                    });
                     const admins = await this.prisma.user.findMany({
                         where: { role: { in: ['ADMIN', 'OWNER'] }, status: 'ACTIVE' },
                         select: { id: true },
@@ -426,7 +439,7 @@ export class AuthService {
                                 userId: admin.id,
                                 title: 'New Google Registration Pending',
                                 message: `${googleUser.name} (${googleUser.email}) signed up via Google and needs approval.`,
-                                type: 'WARNING',
+                                type: 'GOOGLE_REGISTRATION',
                                 data: { userId: googleUser.id, email: googleUser.email, role: 'CUSTOMER', provider: 'google' },
                             },
                         });

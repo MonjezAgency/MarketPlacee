@@ -17,7 +17,18 @@ export class ReviewsController {
 
     @Post()
     @UseGuards(JwtAuthGuard)
-    @UseInterceptors(FilesInterceptor('images'))
+    @UseInterceptors(FilesInterceptor('images', 5, {
+        fileFilter: (req: any, file: Express.Multer.File, cb: any): void => {
+            const ALLOWED_MIMETYPES = ['image/jpeg', 'image/png', 'image/webp'];
+            if (!ALLOWED_MIMETYPES.includes(file.mimetype)) {
+                const { BadRequestException } = require('@nestjs/common');
+                cb(new BadRequestException(`Invalid file type: ${file.mimetype}. Allowed: JPEG, PNG, WebP`), false);
+                return;
+            }
+            cb(null, true);
+        },
+        limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    }))
     async create(
         @Param('productId') productId: string,
         @Request() req,

@@ -88,3 +88,18 @@ export interface Filters {
     maxPrice?: string;
     sort?: string;
 }
+
+export const NOTIFICATION_TYPES = {
+  NEW_REGISTRATION: 'NEW_REGISTRATION',
+  GOOGLE_REGISTRATION: 'GOOGLE_REGISTRATION', 
+  NEW_REVIEW: 'NEW_REVIEW',
+  NEW_ORDER: 'NEW_ORDER',
+  KYC_SUBMITTED: 'KYC_SUBMITTED',
+  TEAM_INVITE_FAILED: 'TEAM_INVITE_FAILED',
+  INFO: 'INFO',
+  SUCCESS: 'SUCCESS',
+  WARNING: 'WARNING',
+  ERROR: 'ERROR',
+} as const;
+
+export type NotificationType = typeof NOTIFICATION_TYPES[keyof typeof NOTIFICATION_TYPES];
