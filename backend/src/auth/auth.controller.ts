@@ -19,7 +19,17 @@ export class AuthController {
 
     @Post('login')
     async login(@Body() loginDto: any, @Res({ passthrough: true }) res: any) {
-        const result = await this.authService.login(loginDto);
+        // Step 1: Validate credentials → returns user object or null
+        const user = await this.authService.validateUser(
+            loginDto.email,
+            loginDto.password,
+        );
+        if (!user) {
+            throw new UnauthorizedException('Invalid email or password');
+        }
+
+        // Step 2: Handle 2FA check + token generation
+        const result = await this.authService.loginStep1(user);
         if (result && 'access_token' in result) {
             res.cookie('token', result.access_token, this.getCookieOptions(15 * 60 * 1000));
             res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(7 * 24 * 60 * 60 * 1000));
