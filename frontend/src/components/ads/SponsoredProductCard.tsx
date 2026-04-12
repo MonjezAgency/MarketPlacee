@@ -62,7 +62,7 @@ export default function SponsoredProductCard({ product, index }: SponsoredProduc
                     <span className="text-xl font-medium text-[#0F1111]">{formatPrice(product.price, false)}</span>
                 </div>
 
-                {product.stock > 0 ? (
+                {(product.stock ?? 0) > 0 ? (
                     <div className="text-[#007185] text-xs mb-3">In Stock</div>
                 ) : (
                     <div className="text-[#B12704] text-xs mb-3">Currently unavailable.</div>

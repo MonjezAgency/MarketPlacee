@@ -279,7 +279,7 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
                                                     </p>
                                                     <p className="text-[9px] text-muted-foreground uppercase tracking-widest">your price</p>
                                                 </div>
-                                                {formData.minOrder > 0 && (
+                                                {(formData.minOrder ?? 0) > 0 && (
                                                     <div className="bg-secondary/10 text-secondary text-[9px] font-black px-2 py-1 rounded-full uppercase tracking-widest">
                                                         MOQ {formData.minOrder}
                                                     </div>

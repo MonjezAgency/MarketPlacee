@@ -430,7 +430,7 @@ export default function OwnerDashboard() {
                                 </div>
                                 <div className="flex items-center justify-between">
                                     <span className="text-sm text-gray-500 flex items-center gap-1"><ShieldX size={14} className="text-red-500" /> بدون KYC</span>
-                                    <span className={`font-black ${stats.kyc.teamUnverified > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
+                                    <span className={`font-black ${(stats.kyc?.teamUnverified ?? 0) > 0 ? 'text-red-500' : 'text-emerald-500'}`}>
                                         {stats.kyc.teamUnverified}
                                     </span>
                                 </div>

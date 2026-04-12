@@ -52,7 +52,7 @@ function mapProduct(item: any): Product {
         image: (item.images && item.images.length > 0) ? item.images[0] : '',
         images: item.images || [],
         stock: item.stock || 0,
-        inStock: item.stock > 0,
+        inStock: (item.stock ?? 0) > 0,
         category: item.category,
         ean: item.ean,
         rating: item.rating || 0,

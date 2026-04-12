@@ -303,7 +303,7 @@ function AdminFinanceContent() {
                         <div className="space-y-3">
                             {credits.map(c => {
                                 const buyer = buyers.find(b => b.id === c.userId);
-                                const usedPercent = c.creditLimit > 0 ? (c.usedCredit / c.creditLimit) * 100 : 0;
+                                const usedPercent = (c.creditLimit ?? 0) > 0 ? (c.usedCredit / c.creditLimit) * 100 : 0;
                                 return (
                                     <div key={c.id} className="bg-white dark:bg-[#131921] border border-[#DDD] dark:border-white/10 rounded-2xl p-6 flex items-center justify-between group">
                                         <div className="flex items-center gap-4">

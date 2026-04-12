@@ -255,7 +255,7 @@ export default function ProductDetailClient() {
                                     <span className="flex items-center gap-2 text-primary">
                                         {product.brand} • {t('product', 'authorizedPartner')}
                                     </span>
-                                    {((localRating) > 0) ? (
+                                    {((localRating ?? 0) > 0) ? (
                                         <>
                                             <span className="w-1 h-1 rounded-full bg-border" />
                                             <span className="flex items-center gap-1.5"><Star size={14} className="fill-amber-400 text-amber-400" /> <span className="text-foreground">{localRating.toFixed(1)}</span> ({localReviewsCount} {t('product', 'rated')})</span>
