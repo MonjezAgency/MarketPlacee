@@ -114,7 +114,7 @@ export default function ProductDetailClient() {
 
     const handleAdd = () => {
         if (!isLoggedIn) {
-            router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
+            router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname));
             return;
         }
         addItem({
@@ -200,7 +200,7 @@ export default function ProductDetailClient() {
                                 <button
                                     onClick={() => {
                                         if (!isLoggedIn) {
-                                            router.push('/login?redirect=' + encodeURIComponent(window.location.pathname));
+                                            router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname));
                                         } else {
                                             toggleWishlist(product.id);
                                         }

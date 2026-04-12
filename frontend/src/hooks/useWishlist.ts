@@ -53,7 +53,7 @@ export function useWishlist() {
                     if (isSaved) next.add(productId); else next.delete(productId);
                     return next;
                 });
-                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname);
                 return isSaved;
             }
 

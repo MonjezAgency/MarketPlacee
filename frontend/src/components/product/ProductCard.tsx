@@ -40,7 +40,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
         e.preventDefault();
         e.stopPropagation();
         if (!isLoggedIn) {
-            window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+            window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname);
             return;
         }
         if (isAdded) return;

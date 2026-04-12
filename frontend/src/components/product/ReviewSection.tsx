@@ -266,7 +266,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                 <div className="bg-slate-50 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl p-8 mb-8 text-center">
                     <p className="text-slate-600 dark:text-slate-400 font-bold mb-4">{t('reviews', 'loginToReview')}</p>
                     <button
-                        onClick={() => window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)}
+                        onClick={() => window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname)}
                         className="px-6 py-2 bg-[#0A1A2F] dark:bg-[#1BC7C9] text-white dark:text-[#0A1A2F] rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#FF8A00] transition-all"
                     >
                         {t('navbar', 'login')}
