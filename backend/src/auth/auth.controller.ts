@@ -7,30 +7,28 @@ import { JwtAuthGuard } from './jwt-auth.guard';
 export class AuthController {
     constructor(private authService: AuthService) { }
 
+    private getCookieOptions(maxAgeMs: number) {
+        return {
+            httpOnly: true,
+            secure: true,   // Always true — Railway uses HTTPS
+            sameSite: 'none' as const,
+            path: '/',
+            maxAge: maxAgeMs,
+        };
+    }
+
     @Post('login')
-        async login(@Body() loginDto: any, @Res({ passthrough: true }) res: any) {
+    async login(@Body() loginDto: any, @Res({ passthrough: true }) res: any) {
         const result = await this.authService.login(loginDto);
-        if ('access_token' in result) {
-            res.cookie('token', result.access_token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'none',
-                maxAge: 15 * 60 * 1000,
-                path: '/',
-            });
-            res.cookie('refreshToken', result.refresh_token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'none',
-                maxAge: 7 * 24 * 60 * 60 * 1000,
-                path: '/auth/refresh',
-            });
+        if (result && 'access_token' in result) {
+            res.cookie('token', result.access_token, this.getCookieOptions(15 * 60 * 1000));
+            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(7 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
 
     @Post('register')
-        async register(@Body() registerDto: any) {
+    async register(@Body() registerDto: any) {
         return this.authService.register(registerDto);
     }
 
@@ -41,35 +39,33 @@ export class AuthController {
         if (!refreshToken) throw new UnauthorizedException('No refresh token provided');
         
         const result = await this.authService.refreshTokens(refreshToken);
-        if ('access_token' in result) {
-            res.cookie('token', result.access_token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'none',
-                maxAge: 15 * 60 * 1000,
-                path: '/',
-            });
-            res.cookie('refreshToken', result.refresh_token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'none',
-                maxAge: 7 * 24 * 60 * 60 * 1000,
-                path: '/auth/refresh',
-            });
+        if (result && 'access_token' in result) {
+            res.cookie('token', result.access_token, this.getCookieOptions(15 * 60 * 1000));
+            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(7 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
 
     @UseGuards(JwtAuthGuard)
     @Get('me')
-        async getProfile(@Request() req: any) {
+    async getMe(@Request() req: any) {
         return this.authService.getUserProfile(req.user.sub);
     }
 
     @Post('logout')
-        async logout(@Res({ passthrough: true }) res: any) {
-        res.clearCookie('token');
-        res.clearCookie('refreshToken');
+    async logout(@Res({ passthrough: true }) res: any) {
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            path: '/',
+        });
+        res.clearCookie('refreshToken', {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'none',
+            path: '/auth/refresh',
+        });
         return { message: 'Logged out successfully' };
     }
 
@@ -77,20 +73,8 @@ export class AuthController {
     async googleLogin(@Body('email') email: string, @Body('name') name: string, @Body('avatar') avatar: string, @Res({ passthrough: true }) res: any) {
         const result = await this.authService.googleLogin({ email, name, avatar });
         if (result && 'access_token' in result) {
-            res.cookie('token', result.access_token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'none',
-                maxAge: 15 * 60 * 1000,
-                path: '/',
-            });
-            res.cookie('refreshToken', result.refresh_token, {
-                httpOnly: true,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'none',
-                maxAge: 7 * 24 * 60 * 60 * 1000,
-                path: '/auth/refresh',
-            });
+            res.cookie('token', result.access_token, this.getCookieOptions(15 * 60 * 1000));
+            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(7 * 24 * 60 * 60 * 1000));
         }
         return result;
     }

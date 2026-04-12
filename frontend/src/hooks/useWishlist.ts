@@ -2,15 +2,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
-
-// Use '/api' to ensure all requests go through the Next.js middleware proxy
-// (API_BASE_URL can resolve to the direct backend URL, causing CORS issues)
 import { apiFetch } from '@/lib/api';
 
 export function useWishlist() {
     const { user } = useAuth();
     const [wishlistIds, setWishlistIds] = useState<Set<string>>(new Set());
     const [isLoading, setIsLoading] = useState(false);
+    const [isSessionExpired, setIsSessionExpired] = useState(false);
 
     const fetchWishlist = useCallback(async () => {
         if (!user) return;
@@ -33,7 +31,7 @@ export function useWishlist() {
         if (!user) return false;
         const isSaved = wishlistIds.has(productId);
         
-        // [FINAL FIX]: Optimistic update
+        // Optimistic update
         setWishlistIds(prev => {
             const next = new Set(prev);
             if (isSaved) next.delete(productId); else next.add(productId);
@@ -47,13 +45,29 @@ export function useWishlist() {
             });
 
             if (res.status === 401) {
-                // Auth failed — rollback and redirect
+                // Session expired — rollback optimistic update
                 setWishlistIds(prev => {
                     const next = new Set(prev);
                     if (isSaved) next.add(productId); else next.delete(productId);
                     return next;
                 });
-                window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname);
+                setIsSessionExpired(true);
+                console.warn('[WISHLIST] Session expired — 401');
+                // Soft redirect after short delay (prevents flash/404)
+                setTimeout(() => {
+                    window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }, 100);
+                return isSaved;
+            }
+
+            if (res.status === 403) {
+                // Permission denied — rollback, don't redirect
+                setWishlistIds(prev => {
+                    const next = new Set(prev);
+                    if (isSaved) next.add(productId); else next.delete(productId);
+                    return next;
+                });
+                console.warn('[WISHLIST] Permission denied — 403');
                 return isSaved;
             }
 
@@ -67,12 +81,12 @@ export function useWishlist() {
                 if (isSaved) next.add(productId); else next.delete(productId);
                 return next;
             });
-            return isSaved; // Return original state on fail
+            return isSaved;
         } finally {
             setIsLoading(false);
         }
         return !isSaved;
     }, [user, wishlistIds]);
 
-    return { wishlistIds, toggle, isLoading, isSaved: (id: string) => wishlistIds.has(id) };
+    return { wishlistIds, toggle, isLoading, isSaved: (id: string) => wishlistIds.has(id), isSessionExpired };
 }

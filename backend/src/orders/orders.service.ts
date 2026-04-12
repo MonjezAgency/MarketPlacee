@@ -403,4 +403,20 @@ export class OrdersService {
 
         return order;
     }
+
+    async confirmDelivery(orderId: string, customerId: string) {
+        const order = await this.prisma.order.findUnique({
+            where: { id: orderId },
+        });
+        if (!order) throw new NotFoundException('Order not found');
+        if (order.customerId !== customerId) {
+            throw new ForbiddenException('This order does not belong to you');
+        }
+        if (order.status !== OrderStatus.SHIPPED) {
+            throw new BadRequestException(
+                `Order must be SHIPPED to confirm delivery. Current status: ${order.status}`
+            );
+        }
+        return this.updateStatus(orderId, OrderStatus.DELIVERED, customerId, 'Customer confirmed delivery');
+    }
 }

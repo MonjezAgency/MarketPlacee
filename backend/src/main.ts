@@ -1,134 +1,127 @@
 import * as fs from 'fs';
 import { join } from 'path';
-import cookieParser from 'cookie-parser';
+import * as cookieParser from 'cookie-parser';
 import * as express from 'express';
-
-try {
-  const envContent = fs.readFileSync(join(process.cwd(), '.env'), 'utf-8');
-  envContent.split('\n').filter(line => line.trim() && !line.startsWith('#')).forEach(line => {
-    const [key, ...values] = line.split('=');
-    if (key && !process.env[key.trim()]) {
-      process.env[key.trim()] = values.join('=').trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
-    }
-  });
-} catch (e) {
-  console.log('No .env file found or failed to parse');
-}
-
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 import { SecurityExceptionFilter } from './security/security.exception-filter';
 import { SecurityService } from './security/security.service';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap() {
+    // try to load .env if it exists (for local development)
+    try {
+        if (fs.existsSync(join(process.cwd(), '.env'))) {
+            const envContent = fs.readFileSync(join(process.cwd(), '.env'), 'utf-8');
+            envContent.split('\n').filter(line => line.trim() && !line.startsWith('#')).forEach(line => {
+                const [key, ...values] = line.split('=');
+                if (key && !process.env[key.trim()]) {
+                    process.env[key.trim()] = values.join('=').trim().replace(/^"|"$/g, '').replace(/^'|'$/g, '');
+                }
+            });
+        }
+    } catch (e) {
+        console.log('Failed to parse .env file');
+    }
+
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
         rawBody: true, // Required for Stripe webhook signature verification
     });
 
+    // 1. FIRST: Trust proxy for Railway/SSL termination
+    // Required to read X-Forwarded-Proto for Secure cookies
+    app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
     // Serve uploaded KYC files as static assets
     app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
-    // 1. FIRST: Raw body for Stripe webhooks
+    // 2. SECOND: Raw body for Stripe webhooks (must be before regular parsers)
     app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
-    // 2. SECOND: Cookie parser
+    // 3. THIRD: Cookie parser
     app.use(cookieParser());
 
-    // Increase JSON body limit to 50mb for base64 image uploads
-    app.use(express.json({ limit: '50mb' }));
-    app.use(express.urlencoded({ limit: '50mb', extended: true }));
+    // 4. FOURTH: Dynamic CORS matching
+    const frontendUrl = process.env.FRONTEND_URL;
+    
+    app.enableCors({
+        origin: (origin: string | undefined, callback: Function) => {
+            const allowedOrigins = [
+                frontendUrl,
+                'https://marketpl7ce.vercel.app',
+                'http://localhost:3000',
+                'http://127.0.0.1:3000',
+            ].filter(Boolean) as string[];
 
-    // ── Strict Security Headers ──────────────────────────────────────────────
-    const backendHost = (process.env.BACKEND_URL || 'http://localhost:3001')
-        .replace(/^https?:\/\//, '');
-    const frontendUrl = process.env.FRONTEND_URL || 'https://marketpl7ce.vercel.app';
+            // Allow requests with no origin (mobile apps, Postman, server-to-server)
+            if (!origin) return callback(null, true);
 
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+
+            console.error(`[CORS BLOCKED] Origin: ${origin}`);
+            return callback(new Error(`CORS blocked: ${origin}`));
+        },
+        credentials: true,
+        methods: 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+        allowedHeaders: [
+            'Content-Type',
+            'Authorization',
+            'X-Requested-With',
+            'Accept',
+            'Cache-Control',
+            'Pragma',
+            'Expires',
+            'stripe-signature'
+        ],
+        exposedHeaders: ['Set-Cookie'],
+    });
+
+    // Security headers
     app.use(helmet({
-        crossOriginResourcePolicy: { policy: 'cross-origin' },
-        hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
-        frameguard: { action: 'deny' },
-        referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
-        permittedCrossDomainPolicies: { permittedPolicies: 'none' },
+        crossOriginEmbedderPolicy: false,
+        crossOriginResourcePolicy: { policy: "cross-origin" },
         contentSecurityPolicy: process.env.NODE_ENV === 'production'
             ? {
                   directives: {
-                      defaultSrc:  ["'self'"],
-                      // Scripts: self + Stripe.js only
-                      scriptSrc:   ["'self'", 'https://js.stripe.com'],
-                      // Frames: Stripe 3DS / payment iframes
-                      frameSrc:    ["'self'", 'https://js.stripe.com', 'https://hooks.stripe.com'],
-                      // API + WebSocket connections
+                      defaultSrc: ["'self'"],
+                      scriptSrc: ["'self'", "'unsafe-inline'", "https://js.stripe.com"],
+                      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+                      imgSrc: ["'self'", "data:", "blob:", "https://*.stripe.com", "https://*.shoppy.gg"],
                       connectSrc: [
-                          "'self'",
-                          frontendUrl,
-                          // Stripe API
-                          'https://api.stripe.com',
-                          'https://js.stripe.com',
-                          // Socket.io WebSocket (ws + wss)
-                          `ws://${backendHost}`,
-                          `wss://${backendHost}`,
-                      ],
-                      imgSrc:      ["'self'", 'data:', 'https:', 'blob:'],
-                      styleSrc:    ["'self'", "'unsafe-inline'"],
-                      fontSrc:     ["'self'", 'data:'],
-                      objectSrc:   ["'none'"],
-                      baseUri:     ["'self'"],
-                      formAction:  ["'self'"],
-                      // Force HTTPS for all sub-resources
+                          "'self'", 
+                          frontendUrl, 
+                          "https://api.stripe.com",
+                          "https://checkout.stripe.com",
+                          "wss://marketplace-backend-production-dfc2.up.railway.app",
+                          "https://marketplace-backend-production-dfc2.up.railway.app"
+                      ].filter(Boolean) as string[],
+                      frameSrc: ["'self'", "https://js.stripe.com", "https://checkout.stripe.com"],
+                      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+                      objectSrc: ["'none'"],
                       upgradeInsecureRequests: [],
                   },
               }
             : false,
     }));
 
-    // Enable global validation pipes for DTOs
-    app.useGlobalPipes(new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-    }));
-
-    // Global Security Exception Filter
     const securityService = app.get(SecurityService);
     app.useGlobalFilters(new SecurityExceptionFilter(securityService));
+    app.useGlobalPipes(new ValidationPipe({
+        whitelist: true,
+        transform: true,
+        forbidNonWhitelisted: false,
+    }));
 
-    // Enable CORS — whitelist only known frontend origins
-    const allowedOrigins = [
-        process.env.FRONTEND_URL,
-        'https://marketpl7ce.vercel.app',
-        'http://localhost:3000',
-        'http://127.0.0.1:3000',
-    ].filter(Boolean);
-
-    app.enableCors({
-        origin: [
-            'https://marketpl7ce.vercel.app',
-            'http://localhost:3000',
-            'http://127.0.0.1:3000',
-        ],
-        credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: [
-            'Content-Type', 
-            'Authorization', 
-            'X-Requested-With', 
-            'Accept', 
-            'Cache-Control', 
-            'Pragma', 
-            'Expires', 
-            'stripe-signature'
-        ],
-        exposedHeaders: ['Set-Cookie'], // Useful for session-based auth if needed
-    });
-
-    // Enable Socket.io adapter
+    // WebSocket support
     app.useWebSocketAdapter(new IoAdapter(app));
 
-    await app.listen(process.env.PORT ?? 3001, '0.0.0.0');
-    console.log(`Backend is running on: ${await app.getUrl()}`);
+    const port = process.env.PORT || 3005;
+    await app.listen(port, '0.0.0.0');
+    console.log(`[BOOTSTRAP] Server running on port ${port}`);
 }
 bootstrap();

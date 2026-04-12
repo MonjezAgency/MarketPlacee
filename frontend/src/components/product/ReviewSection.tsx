@@ -114,6 +114,19 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                 body: formData,
             });
 
+            if (res.status === 401) {
+                setError('Your session has expired. Please log in again.');
+                setTimeout(() => {
+                    window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname);
+                }, 2000);
+                return;
+            }
+
+            if (res.status === 403) {
+                setError('You do not have permission to review this product. Only verified buyers can leave reviews.');
+                return;
+            }
+
             if (!res.ok) { 
                 if (res.status === 409) {
                     setError(t('reviews', 'duplicateReview') || 'You have already reviewed this product.');

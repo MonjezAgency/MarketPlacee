@@ -2,7 +2,7 @@ import { Injectable, Logger, ForbiddenException, NotFoundException, BadRequestEx
 import { PrismaService } from '../common/prisma.service';
 import { UsersService } from '../users/users.service';
 import { StripeGateway } from './stripe.gateway';
-import { EscrowStatus } from '@prisma/client';
+import { EscrowStatus, Role } from '@prisma/client';
 import { OrdersService } from '../orders/orders.service';
 
 @Injectable()
@@ -105,6 +105,7 @@ export class PaymentsService {
     async createPaymentIntent(
         orderId: string,
         customerId: string,
+        userRole: string,
     ): Promise<{
         clientSecret: string;
         order: any;
@@ -112,7 +113,10 @@ export class PaymentsService {
         const order = await this.ordersService
             .findByIdWithItems(orderId);
 
-        if (order.customerId !== customerId) {
+        // [ADMIN BYPASS]: Allow Admins or Owners to test payments/checkout
+        const isAdmin = userRole === Role.ADMIN || userRole === 'OWNER' || userRole === 'DEVELOPER';
+        
+        if (!isAdmin && order.customerId !== customerId) {
             throw new ForbiddenException(
                 'This order does not belong to you'
             );
