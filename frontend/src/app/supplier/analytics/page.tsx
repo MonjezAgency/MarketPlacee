@@ -166,7 +166,7 @@ export default function SupplierAnalyticsPage() {
                     </div>
 
                     {/* Revenue Chart */}
-                    {data.monthlyData?.length > 0 && (
+                    {(data.monthlyData?.length ?? 0) > 0 && (
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -207,7 +207,7 @@ export default function SupplierAnalyticsPage() {
                     {/* Bottom Row */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Category Pie */}
-                        {data.categoryBreakdown?.length > 0 && (
+                        {(data.categoryBreakdown?.length ?? 0) > 0 && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
@@ -239,7 +239,7 @@ export default function SupplierAnalyticsPage() {
                         )}
 
                         {/* Top Products Bar */}
-                        {data.topProducts?.length > 0 && (
+                        {(data.topProducts?.length ?? 0) > 0 && (
                             <motion.div
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}

@@ -17,13 +17,13 @@ function ProductCardSmall({ product, onAdd, t }: {
 }) {
     return (
         <div className="flex gap-4 p-4 rounded-3xl border border-border/50 bg-background/50 hover:bg-muted/20 hover:border-primary/30 transition-all group">
-            <div className="w-20 h-20 bg-white rounded-2xl flex-shrink-0 border border-border/50 overflow-hidden p-2 flex items-center justify-center">
-                {product.images?.length > 0 ? (
-                    <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300" />
-                ) : (
-                    <div className="w-full h-full bg-muted rounded-xl" />
-                )}
-            </div>
+                            <div className="w-20 h-20 bg-white rounded-2xl flex-shrink-0 border border-border/50 overflow-hidden p-2 flex items-center justify-center">
+                                {(product.images?.length ?? 0) > 0 ? (
+                                    <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300" />
+                                ) : (
+                                    <div className="w-full h-full bg-muted rounded-xl" />
+                                )}
+                            </div>
             <div className="flex flex-col justify-between flex-1 min-w-0">
                 <div>
                     <h4 className="font-bold text-sm leading-tight truncate px-1">{product.name}</h4>
@@ -113,7 +113,7 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
                     {recommendations.map(product => (
                         <div key={product.id} className="flex gap-4 p-4 rounded-3xl border border-border/50 bg-background/50 hover:bg-muted/20 hover:border-primary/30 transition-all group">
                             <div className="w-20 h-20 bg-white rounded-2xl flex-shrink-0 border border-border/50 overflow-hidden p-2 flex items-center justify-center">
-                                {product.images?.length > 0 ? (
+                                {(product.images?.length ?? 0) > 0 ? (
                                     <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain mix-blend-multiply group-hover:scale-110 transition-transform duration-300" />
                                 ) : (
                                     <div className="w-full h-full bg-muted rounded-xl" />

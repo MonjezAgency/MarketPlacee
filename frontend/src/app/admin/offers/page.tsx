@@ -141,7 +141,7 @@ export default function AdminOffersPage() {
             const res2 = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${ean}`);
             if (res2.ok) {
                 const data2 = await res2.json();
-                if (data2?.items?.length > 0 && data2.items[0].images?.length > 0) {
+                if ((data2?.items?.length ?? 0) > 0 && (data2.items[0].images?.length ?? 0) > 0) {
                     setForm(f => ({ ...f, image: data2.items[0].images[0] }));
                     showMsg('success', `Product image found via UPC for ${ean}!`);
                     setEanLoading(false);
