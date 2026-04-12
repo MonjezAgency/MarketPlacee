@@ -30,6 +30,13 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
         headers['Content-Type'] = 'application/json';
     }
 
+    if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('bev-token');
+        if (token && !headers['Authorization']) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+    }
+
     return fetch(url, {
         ...options,
         credentials: 'include',
