@@ -33,7 +33,7 @@ async function bootstrap() {
     app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
 
     // 1. FIRST: Raw body for Stripe webhooks
-    app.use('/webhooks/stripe', express.raw({ type: 'application/json' }));
+    app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
 
     // 2. SECOND: Cookie parser
     app.use(cookieParser());

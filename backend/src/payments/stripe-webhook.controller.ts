@@ -4,7 +4,7 @@ import { PrismaService } from '../common/prisma.service';
 import { EscrowStatus } from '@prisma/client';
 import Stripe from 'stripe';
 
-@Controller('webhooks/stripe')
+@Controller('api/payments/webhook')
 export class StripeWebhookController {
     private readonly logger = new Logger(StripeWebhookController.name);
     private stripe: Stripe;
