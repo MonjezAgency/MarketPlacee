@@ -42,10 +42,20 @@ export function useWishlist() {
 
         try {
             setIsLoading(true);
-            const res = await apiFetch(`/wishlist/toggle`, {
-                method: 'POST',
-                body: JSON.stringify({ productId }),
+            const res = await apiFetch(`/wishlist/${productId}`, {
+                method: isSaved ? 'DELETE' : 'POST',
             });
+
+            if (res.status === 401) {
+                // Auth failed — rollback and redirect
+                setWishlistIds(prev => {
+                    const next = new Set(prev);
+                    if (isSaved) next.add(productId); else next.delete(productId);
+                    return next;
+                });
+                window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname);
+                return isSaved;
+            }
 
             if (!res.ok) throw new Error('Failed to toggle wishlist');
             
