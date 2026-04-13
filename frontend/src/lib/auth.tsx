@@ -131,8 +131,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
 
         try {
-            const res = await apiFetch('/auth/login', {
+            // Use local API proxy to handle cross-domain cookies
+            const res = await fetch('/api/auth/login', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
             });
 
@@ -163,8 +165,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const verify2FALogin = async (partialToken: string, code: string): Promise<{ success: boolean; user?: User; message?: string }> => {
         try {
-            const res = await apiFetch('/auth/2fa/login-verify', {
+            // Use local API proxy for 2FA
+            const res = await fetch('/api/auth/2fa/login-verify', {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ partialToken, code }),
             });
             if (!res.ok) {
@@ -200,9 +204,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const logout = async () => {
         try {
-            await apiFetch('/auth/logout', { method: 'POST' });
+            await fetch('/api/auth/logout', { method: 'POST' });
         } catch (err) {
             console.error("Logout request failed:", err);
         }

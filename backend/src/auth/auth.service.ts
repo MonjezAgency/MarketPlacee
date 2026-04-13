@@ -124,9 +124,10 @@ export class AuthService {
             return safeResult;
         }
 
-        this.logger.warn(`[AUTH] Invalid password for: ${email}`);
-        // Wrong password — record failure
-        await this.recordLoginAttempt(email, false, ip);
+        // Wrong password — record failure (non-blocking)
+        this.recordLoginAttempt(email, false, ip).catch(err => 
+            this.logger.error(`[AUTH] Failed to record login attempt: ${err.message}`)
+        );
         return null;
     }
 
