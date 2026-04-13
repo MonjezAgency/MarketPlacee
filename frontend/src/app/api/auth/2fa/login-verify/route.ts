@@ -44,6 +44,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, user });
   } catch (error: any) {
     console.error('[PROXY_2FA_ERROR]', error);
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ 
+      message: 'Authentication Proxy Error (2FA)', 
+      details: error.message 
+    }, { status: 500 });
   }
 }
