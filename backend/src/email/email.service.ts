@@ -9,25 +9,27 @@ export class EmailService {
   private readonly fromName = 'Atlantis Marketplace';
 
   constructor() {
-    // Explicit configuration for Hostinger based on user provided settings
-    // Returning to Port 465 with SSL as it's the primary recommendation for Hostinger
     const host = process.env.EMAIL_HOST || 'smtp.hostinger.com';
-    const port = 465; 
-    const user = process.env.EMAIL_USER || 'Info@atlantisfmcg.com';
-    const pass = process.env.EMAIL_PASS || 'AliDawara@22';
+    const port = parseInt(process.env.EMAIL_PORT || '465');
+    const user = process.env.EMAIL_USER;
+    const pass = process.env.EMAIL_PASS;
 
-    console.log(`[SMTP] Initializing for Hostinger: ${host}:${port} (Implicit SSL)`);
+    if (!user || !pass) {
+        console.warn('⚠️ SMTP Credentials missing in .env. Email delivery will depend on Resend fallback.');
+    }
+
+    console.log(`[SMTP] Initializing for ${host}:${port}`);
 
     this.transporter = nodemailer.createTransport({
       host,
       port,
-      secure: true, 
-      pool: false, // [FIX] Disabled pooling to avoid stale connection errors on Railway
+      secure: port === 465, 
+      pool: false,
       auth: { user, pass },
       tls: {
         rejectUnauthorized: false
       },
-      connectionTimeout: 10000, // Shorter timeout for faster failover
+      connectionTimeout: 10000,
       greetingTimeout: 10000,
     } as any);
 
@@ -41,7 +43,7 @@ export class EmailService {
   }
 
   private getFrom() {
-    return process.env.EMAIL_FROM || 'Info@atlantisfmcg.com';
+    return process.env.EMAIL_FROM || process.env.EMAIL_USER || 'no-reply@atlantis.com';
   }
 
   private getFrontendUrl() {
@@ -53,10 +55,13 @@ export class EmailService {
    */
   async sendMail(to: string, subject: string, html: string, retries = 1): Promise<boolean> {
     const retryableErrors = ['ETIMEDOUT', 'ECONNREFUSED', 'ESOCKET', 'ENOTFOUND'];
-    const configErrors = ['EAUTH', 'EENVELOPE', 'ESTREAM'];
 
     try {
-        const info = await this.transporter.sendMail({
+        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            throw new Error('MISSING_SMTP_CONFIG');
+        }
+
+        await this.transporter.sendMail({
             from: this.getFrom(),
             to,
             subject,
@@ -73,13 +78,15 @@ export class EmailService {
             return this.sendMail(to, subject, html, retries - 1);
         }
 
-        if (isRetryable && retries === 0) {
-            console.error(`[SMTP_RETRY_EXHAUSTED] ${error.code} — falling back to Resend for ${to}`);
-        } else {
-            console.error(`[SMTP_CONFIG_ERROR] ${error.code} — skipping retry, falling back to Resend`);
-        }
+        console.error(`[SMTP_FAIL] ${error.code || error.message} — falling back to Resend for ${to}`);
 
-        return this.sendViaResend({ to, subject, html });
+        const result = await this.sendViaResend({ to, subject, html });
+        
+        if (!result) {
+            throw new InternalServerErrorException(`Email delivery failed for ${to} across all transports.`);
+        }
+        
+        return true;
     }
   }
 
@@ -91,7 +98,7 @@ export class EmailService {
     }
 
     try {
-        const response = await axios.post(
+        await axios.post(
             'https://api.resend.com/emails',
             {
                 from: `Atlantis Marketplace <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`,
@@ -109,7 +116,7 @@ export class EmailService {
         console.log(`[RESEND_SUCCESS] Sent to ${options.to}`);
         return true;
     } catch (err: any) {
-        console.error(`[RESEND_FAIL] Both SMTP and Resend failed for ${options.to}:`, err);
+        console.error(`[RESEND_FAIL] Failed for ${options.to}:`, err.response?.data || err.message);
         return false;
     }
   }

@@ -441,7 +441,7 @@ export class AuthService {
     async forgotPassword(email: string) {
         const user = await this.prisma.user.findUnique({ where: { email } });
 
-        // Always return success to prevent email enumeration attacks
+        // Security: Always return success for non-existent users to prevent enumeration
         if (!user) {
             return { success: true, message: 'If that email exists, a reset link was sent.' };
         }
@@ -457,6 +457,7 @@ export class AuthService {
             },
         });
 
+        // This will now throw InternalServerErrorException if delivery fails
         await this.emailService.sendPasswordResetEmail(user.email, user.name, token);
 
         return { success: true, message: 'If that email exists, a reset link was sent.' };
