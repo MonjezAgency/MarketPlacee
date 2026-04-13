@@ -1,78 +1,69 @@
-import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
+
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/auth-server';
 import { cookies } from 'next/headers';
 
-export async function GET(req: Request) {
-    try {
-        const { searchParams } = new URL(req.url);
-        const productId = searchParams.get('productId');
-        
-        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
-        const apiUrl = rawApiUrl.replace(/\/$/, '');
-        
-        // If specific productId is provided, we fetch for that, else generic list
-        const backendUrl = productId 
-            ? `${apiUrl}/products/${productId}/reviews`
-            : `${apiUrl}/reviews`;
+const getBackendUrl = () =>
+  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').replace(/\/$/, '');
 
-        const res = await fetch(backendUrl, {
-            method: 'GET',
-            cache: 'no-store'
-        });
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const productId = searchParams.get('productId');
 
-        if (!res.ok) {
-            return NextResponse.json({ message: 'Error fetching reviews' }, { status: res.status });
-        }
+  const backendUrl = productId
+    ? `${getBackendUrl()}/products/${productId}/reviews`
+    : `${getBackendUrl()}/reviews`;
 
-        const data = await res.json();
-        return NextResponse.json(data);
-    } catch (error: any) {
-        return NextResponse.json({ message: error.message }, { status: 500 });
-    }
+  try {
+    const res = await fetch(backendUrl, { method: 'GET', cache: 'no-store' });
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal error';
+    return NextResponse.json({ message }, { status: 500 });
+  }
 }
 
-export async function POST(req: Request) {
-    try {
-        const session = await getServerSession();
-        if (!session) {
-            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-        }
+export async function POST(req: NextRequest) {
+  const session = await getServerSession();
+  if (!session) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
 
-        if (session.status !== 'ACTIVE') {
-            return NextResponse.json({ message: 'Account must be approved to post reviews' }, { status: 403 });
-        }
+  if (session.status !== 'ACTIVE') {
+    return NextResponse.json(
+      { message: 'Account must be approved to post reviews' },
+      { status: 403 }
+    );
+  }
 
-        const body = await req.json();
-        const cookieStore = cookies();
-        const token = cookieStore.get('token')?.value;
+  const token = cookies().get('token')?.value;
+  if (!token) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
 
-        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
-        const apiUrl = rawApiUrl.replace(/\/$/, '');
-        
-        // This expects the body to contain productId if posting to base route
-        const productId = body.productId;
-        if (!productId) {
-            return NextResponse.json({ message: 'Missing productId in request body' }, { status: 400 });
-        }
+  try {
+    const body = await req.json();
+    const { productId } = body;
 
-        const backendUrl = `${apiUrl}/products/${productId}/reviews`;
-
-        const res = await fetch(backendUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cookie': `token=${token}`,
-            },
-            body: JSON.stringify(body),
-        });
-
-        if (!res.ok) {
-            return NextResponse.json({ message: 'Error from backend' }, { status: res.status });
-        }
-
-        const data = await res.json();
-        return NextResponse.json(data);
-    } catch (error: any) {
-        return NextResponse.json({ message: error.message }, { status: 500 });
+    if (!productId) {
+      return NextResponse.json({ message: 'Missing productId' }, { status: 400 });
     }
+
+    const res = await fetch(`${getBackendUrl()}/products/${productId}/reviews`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': `token=${token}`,
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal error';
+    return NextResponse.json({ message }, { status: 500 });
+  }
 }

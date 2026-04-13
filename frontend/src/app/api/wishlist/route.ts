@@ -1,73 +1,64 @@
-import { NextResponse } from 'next/server';
+export const dynamic = 'force-dynamic';
+
+import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from '@/lib/auth-server';
 import { cookies } from 'next/headers';
 
+const getBackendUrl = () =>
+  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').replace(/\/$/, '');
+
 export async function GET() {
-    try {
-        const session = await getServerSession();
-        if (!session) {
-            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-        }
+  const session = await getServerSession();
+  if (!session) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
 
-        const cookieStore = cookies();
-        const token = cookieStore.get('token')?.value;
+  const token = cookies().get('token')?.value;
+  if (!token) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
 
-        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
-        const apiUrl = rawApiUrl.replace(/\/$/, '');
-        const backendUrl = `${apiUrl}/wishlist`;
+  try {
+    const res = await fetch(`${getBackendUrl()}/wishlist`, {
+      method: 'GET',
+      headers: { 'Cookie': `token=${token}` },
+      cache: 'no-store',
+    });
 
-        const res = await fetch(backendUrl, {
-            method: 'GET',
-            headers: {
-                'Cookie': `token=${token}`,
-            },
-            cache: 'no-store'
-        });
-
-        if (!res.ok) {
-            const status = res.status;
-            return NextResponse.json({ message: 'Backend error' }, { status });
-        }
-
-        const data = await res.json();
-        return NextResponse.json(data);
-    } catch (error: any) {
-        return NextResponse.json({ message: error.message }, { status: 500 });
-    }
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal error';
+    return NextResponse.json({ message }, { status: 500 });
+  }
 }
 
-export async function POST(req: Request) {
-    try {
-        const session = await getServerSession();
-        if (!session) {
-            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-        }
+export async function POST(req: NextRequest) {
+  const session = await getServerSession();
+  if (!session) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
 
-        const body = await req.json();
-        const cookieStore = cookies();
-        const token = cookieStore.get('token')?.value;
+  const token = cookies().get('token')?.value;
+  if (!token) {
+    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  }
 
-        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
-        const apiUrl = rawApiUrl.replace(/\/$/, '');
-        const backendUrl = `${apiUrl}/wishlist`;
+  try {
+    const body = await req.json();
+    const res = await fetch(`${getBackendUrl()}/wishlist`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Cookie': `token=${token}`,
+      },
+      body: JSON.stringify(body),
+    });
 
-        const res = await fetch(backendUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Cookie': `token=${token}`,
-            },
-            body: JSON.stringify(body),
-        });
-
-        if (!res.ok) {
-            const status = res.status;
-            return NextResponse.json({ message: 'Backend error' }, { status });
-        }
-
-        const data = await res.json();
-        return NextResponse.json(data);
-    } catch (error: any) {
-        return NextResponse.json({ message: error.message }, { status: 500 });
-    }
+    const data = await res.json();
+    return NextResponse.json(data, { status: res.status });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Internal error';
+    return NextResponse.json({ message }, { status: 500 });
+  }
 }
