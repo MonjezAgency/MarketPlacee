@@ -4,7 +4,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Mail, ArrowRight, ShieldCheck, Sparkles, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import axios from 'axios';
 import toast from 'react-hot-toast';
 
 export default function ForgotPasswordPage() {
@@ -24,13 +23,16 @@ export default function ForgotPasswordPage() {
 
         setLoading(true);
         try {
-            const { API_BASE_URL } = await import('@/lib/config');
-            const baseUrl = API_BASE_URL.replace(/\/$/, '');
-            await axios.post(`${baseUrl}/auth/forgot-password`, { email });
+            const { apiFetch } = await import('@/lib/api');
+            await apiFetch('/auth/forgot-password', {
+                method: 'POST',
+                body: JSON.stringify({ email }),
+            });
             setSuccess(true);
             toast.success('Reset link sent!');
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to send reset link');
+            setError(err.message || 'Failed to send reset link');
+            toast.error('Something went wrong. Please try again.');
         } finally {
             setLoading(false);
         }

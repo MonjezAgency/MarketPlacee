@@ -50,11 +50,12 @@ export class UsersService {
     async findAll(status?: any, page = 1, limit = 20) {
         const whereCondition: any = status ? { status } : {};
         
-        // Strict Business Logic: Do not show Google SSO users to Admins for approval until they fill out onboarding
+        // Phase 2 Fix: Primary filter is status, secondary signals are companyName + phone
         if (status === 'PENDING_APPROVAL') {
             whereCondition.companyName = { not: null };
             whereCondition.phone = { not: null };
-            whereCondition.onboardingCompleted = true;
+            // Note: We no longer strictly filter by onboardingCompleted: true here 
+            // to ensure no legitimate request is missed if the flag was failed to set.
         }
 
         const skip = (page - 1) * limit;

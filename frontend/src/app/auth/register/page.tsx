@@ -80,6 +80,13 @@ function RegisterForm() {
         }
     };
 
+    const hasUppercase = /[A-Z]/.test(form.password);
+    const hasLowercase = /[a-z]/.test(form.password);
+    const hasNumber = /[0-9]/.test(form.password);
+    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password);
+    const hasMinLength = form.password.length >= 8;
+    const isStrong = hasUppercase && hasLowercase && hasNumber && hasSpecialChar && hasMinLength;
+
     const handleRegister = (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
@@ -95,9 +102,6 @@ function RegisterForm() {
             return;
         }
 
-        if (form.password.length < 6) { setError('Passwords must be at least 6 characters.'); return; }
-
-        const isStrong = form.password.length >= 8 && /[A-Z]/.test(form.password) && /[a-z]/.test(form.password) && /[0-9]/.test(form.password) && /[^A-Za-z0-9]/.test(form.password);
         if (!isStrong) { setError('Please meet all password requirements before submitting.'); return; }
 
         // CAPTCHA validation
@@ -467,9 +471,11 @@ function RegisterForm() {
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {[
-                                            { label: '8+ Characters', met: form.password.length >= 8 },
-                                            { label: 'Uppercase & Lowercase', met: /[A-Z]/.test(form.password) && /[a-z]/.test(form.password) },
-                                            { label: 'Global Symbol', met: /[0-9]/.test(form.password) || /[^A-Za-z0-9]/.test(form.password) }
+                                            { label: 'Min 8 characters', met: form.password.length >= 8 },
+                                            { label: 'Uppercase', met: /[A-Z]/.test(form.password) },
+                                            { label: 'Lowercase', met: /[a-z]/.test(form.password) },
+                                            { label: 'Number', met: /[0-9]/.test(form.password) },
+                                            { label: 'Special Character', met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) }
                                         ].map((req, idx) => (
                                             <span key={idx} className={`text-[9px] font-black uppercase tracking-wider px-4 py-2 rounded-full border transition-all ${req.met ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
                                                 {req.met && <CheckCircle2 size={10} className="inline me-1.5 -mt-0.5" />}
@@ -546,7 +552,7 @@ function RegisterForm() {
 
                                 <button
                                     type="submit"
-                                    disabled={loading}
+                                    disabled={loading || !isStrong}
                                     className="w-full h-14 md:h-20 bg-[#0A1A2F] hover:bg-[#162a44] text-white rounded-xl md:rounded-[24px] font-black uppercase tracking-[0.4em] text-[10px] md:text-xs transition-all shadow-2xl shadow-[#0A1A2F]/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-4 mt-8 group/btn relative overflow-hidden"
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />

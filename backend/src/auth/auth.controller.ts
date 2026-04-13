@@ -42,6 +42,16 @@ export class AuthController {
         return this.authService.register(registerDto);
     }
 
+    @Post('forgot-password')
+    async forgotPassword(@Body('email') email: string) {
+        return this.authService.forgotPassword(email);
+    }
+
+    @Post('reset-password')
+    async resetPassword(@Body() body: { token: string; newPassword: any }) {
+        return this.authService.resetPassword(body.token, body.newPassword);
+    }
+
     @Post('refresh')
     @SkipThrottle()
     async refresh(@Req() req: any, @Res({ passthrough: true }) res: any) {

@@ -44,6 +44,10 @@ export class EmailService {
     return process.env.EMAIL_FROM || 'Info@atlantisfmcg.com';
   }
 
+  private getFrontendUrl() {
+    return process.env.FRONTEND_URL || 'http://localhost:3000';
+  }
+
   /**
    * Primary mail sender with retry and fallback
    */
@@ -111,7 +115,7 @@ export class EmailService {
   }
 
   async sendVerificationEmail(email: string, token: string) {
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = this.getFrontendUrl();
     const url = `${baseUrl}/auth/verify-email?token=${token}`;
     try {
       await this.transporter.sendMail({
@@ -144,11 +148,11 @@ export class EmailService {
     }
   }
 
-  async sendPasswordResetEmail(email: string, token: string) {
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const url = `${baseUrl}/auth/reset-password?token=${token}`;
+  async sendPasswordResetEmail(email: string, name: string, token: string) {
+    const frontendUrl = this.getFrontendUrl();
+    const url = `${frontendUrl}/auth/reset-password?token=${token}`;
     try {
-      await this.sendMail(email, 'Reset your password - Atlantis Marketplace', `
+      await this.sendMail(email, 'Atlantis — Password Reset Request 🔐', `
           <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
               <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
@@ -156,11 +160,11 @@ export class EmailService {
             </div>
             <div style="padding: 40px 30px; background: #FFFFFF;">
               <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Password Reset Request 🔐</h2>
-              <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">You requested to reset your password. Click the button below to proceed.</p>
+              <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Hi ${name}, you requested to reset your password. Click the button below to proceed. This link expires in 1 hour.</p>
               <div style="text-align: center; margin: 30px 0;">
                 <a href="${url}" style="display: inline-block; padding: 16px 40px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Reset Password →</a>
               </div>
-              <p style="margin-top: 20px; font-size: 12px; color: #667085; text-align: center;">This link will expire in 1 hour. If you didn't request this, please ignore this email.</p>
+              <p style="margin-top: 20px; font-size: 12px; color: #667085; text-align: center;">If you didn't request this, please ignore this email.</p>
             </div>
             <div style="background: #0A1A2F; padding: 20px; text-align: center;">
               <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
@@ -174,7 +178,7 @@ export class EmailService {
   }
 
   async sendTeamInvitation(email: string, name: string, role: string, tempPassword?: string) {
-    const baseUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const baseUrl = this.getFrontendUrl();
     const url = `${baseUrl}/auth/login`;
     const credentialsBlock = tempPassword ? `
             <div style="background: #F2F4F7; padding: 20px; border-radius: 12px; margin: 20px 0; border-left: 4px solid #1BC7C9;">
@@ -246,7 +250,7 @@ export class EmailService {
   }
 
   async sendOrderConfirmationEmail(email: string, name: string, orderId: string, total: number) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = this.getFrontendUrl();
     try {
       await this.transporter.sendMail({
         from: this.getFrom(),
@@ -365,63 +369,74 @@ export class EmailService {
     }
   }
 
-  /**
-   * Send a branded welcome email to a newly activated user
-   */
   async sendWelcomeEmail(email: string, name: string, role: string) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const dashboardUrl = role === 'SUPPLIER'
+    const frontendUrl = this.getFrontendUrl();
+    const ctaUrl = role.toUpperCase() === 'SUPPLIER'
       ? `${frontendUrl}/dashboard/supplier`
-      : `${frontendUrl}/`;
-    
-    const roleNameEn = role === 'SUPPLIER' ? 'Supplier Partner' : 'Strategic Customer';
-    const roleNameAr = role === 'SUPPLIER' ? 'مورد معتمد' : 'مشتري استراتيجي';
+      : `${frontendUrl}/dashboard/buyer`;
 
-    try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: `🎉 تهانينا! تم تفعيل حسابك - Welcome to Atlantis, ${name || 'Partner'}!`,
-        html: `
-          <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
-            <div style="background: #0A1A2F; padding: 50px 40px; text-align: center;">
-               <div style="font-size: 60px; margin-bottom: 20px;">✨</div>
-               <h1 style="color: white; font-size: 32px; margin: 0 0 10px; font-weight: 900; letter-spacing: -1px;">تم تفعيل الحساب بنجاح!</h1>
-               <p style="color: #1BC7C9; font-size: 18px; margin: 0; font-weight: 600;">Your Account is Now Fully Active</p>
-            </div>
-            
-            <div style="padding: 50px 40px; background: #FFFFFF; text-align: right;">
-              <p style="font-size: 20px; line-height: 1.6; color: #2E2E2E; margin-bottom: 25px;">مرحباً <strong style="color: #1BC7C9;">${name || 'شريكنا العزيز'}</strong>،</p>
-              <p style="font-size: 16px; line-height: 1.8; color: #667085;">نود إعلامك بأنه قد تمت الموافقة على طلب انضمامك إلى منصة <strong>Atlantis</strong> كـ <strong style="color: #0A1A2F;">${roleNameAr}</strong>. حسابك الآن مفعل بالكامل وجاهز للاستخدام.</p>
-              
-              <div style="background: #F2F4F7; border-radius: 16px; padding: 30px; margin: 40px 0; border: 1px solid #E5E7EB; text-align: center;">
-                <p style="font-size: 12px; color: #667085; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; font-weight: 700;">الوصول السريع للوحة التحكم</p>
-                <a href="${dashboardUrl}" style="display: inline-block; padding: 18px 50px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 14px; font-weight: 900; font-size: 15px; text-transform: uppercase; letter-spacing: 1px;">
-                  ${role === 'SUPPLIER' ? 'دخول لوحة تحكم المورد ←' : 'دخول الماركت بليس ←'}
-                </a>
-              </div>
-              
-              <p style="font-size: 14px; color: #667085; text-align: center; line-height: 1.6;">
-                يمكنك الآن إضافة منتجاتك، متابعة طلباتك، والاستفادة من كافة مميزات المنصة.<br/>
-                نحن متحمسون للعمل معك!
-              </p>
-            </div>
+    await this.sendMail(email, 'Welcome to Atlantis — Your account is approved! 🎉', `
+      <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0A1A2F; padding: 50px 40px; text-align: center;">
+          <h1 style="color: white; font-size: 32px; margin: 0 0 10px; font-weight: 900;">Welcome, ${name}! 👋</h1>
+          <p style="color: #1BC7C9; font-size: 18px; margin: 0;">Your account has been approved.</p>
+        </div>
+        <div style="padding: 40px 30px; background: #fff; text-align: center;">
+          <p style="font-size: 16px; color: #2E2E2E; margin-bottom: 25px;">Excellent news! Our team has verified your business profile. You can now access the full power of the Atlantis marketplace.</p>
+          <a href="${ctaUrl}" style="display: inline-block; background:#f97316; color:#fff; padding:16px 32px; border-radius:12px; text-decoration:none; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
+            Go to Your Dashboard →
+          </a>
+        </div>
+        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+        </div>
+      </div>
+    `);
+  }
 
-            <div style="background: #0A1A2F; padding: 25px; text-align: center;">
-              <p style="color: #FFFFFF; font-size: 16px; font-weight: 900; margin: 0 0 4px;">Atlan<span style="color: #1BC7C9;">tis</span></p>
-              <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 ATLANTIS FMCG MARKETPLACE. ALL RIGHTS RESERVED.</p>
-            </div>
+  async sendPendingReviewEmail(email: string, name: string) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    await this.sendMail(email, 'Atlantis — Your application is under review ⏳', `
+      <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
+          <h1 style="color: white; font-size: 26px; margin: 0; font-weight: 900;">Thank You, ${name}!</h1>
+        </div>
+        <div style="padding: 40px 30px; background: #fff; text-align: center;">
+          <p style="font-size: 16px; color: #2E2E2E; margin-bottom: 25px;">Your registration is being reviewed by our team. We'll notify you once approved (usually within 24 hours).</p>
+          <a href="${frontendUrl}/auth/pending" style="display: inline-block; background:#1BC7C9; color:#fff; padding:14px 28px; border-radius:12px; text-decoration:none; font-weight: 800;">
+            Check Status
+          </a>
+        </div>
+        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+        </div>
+      </div>
+    `);
+  }
+
+  async sendAdminNewUserNotification(userEmail: string, companyName: string) {
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@atlantis.com';
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    await this.sendMail(adminEmail, 'Atlantis Admin — New Registration Pending 🔔', `
+      <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0A1A2F; padding: 30px; text-align: center;">
+          <h1 style="color: #fff; font-size: 20px; margin: 0;">New User Registration</h1>
+        </div>
+        <div style="padding: 30px; background: #fff;">
+          <p><strong>Company:</strong> ${companyName}</p>
+          <p><strong>Email:</strong> ${userEmail}</p>
+          <div style="margin-top: 25px; text-align: center;">
+            <a href="${frontendUrl}/admin/verifications" style="display: inline-block; background:#1BC7C9; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight: bold;">
+              Review Application
+            </a>
           </div>
-        `,
-      });
-    } catch (error) {
-      console.error('SMTP ERROR [sendWelcomeEmail]:', error);
-      throw error;
-    }
+        </div>
+      </div>
+    `);
   }
 
   async sendInvoiceEmail(email: string, name: string, invoiceNumber: string, orderId: string, totalAmount: number, dueDate: Date) {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+    const frontendUrl = this.getFrontendUrl();
     try {
       await this.transporter.sendMail({
         from: this.getFrom(),

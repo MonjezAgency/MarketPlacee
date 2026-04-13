@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
@@ -147,7 +147,8 @@ export class AuthService {
                     role: data.role.toUpperCase(),
                     status,
                     verificationToken: isInvited ? null : verificationToken,
-                    emailVerified: isInvited || data.status === 'ACTIVE'
+                    emailVerified: isInvited || data.status === 'ACTIVE',
+                    onboardingCompleted: true, // Email signup collects all business data in the form
                 },
             });
 
@@ -227,51 +228,9 @@ export class AuthService {
         });
     }
 
-    async forgotPassword(email: string) {
-        const user = await this.prisma.user.findUnique({ where: { email } });
-        if (!user) {
-            console.log(`[AUTH] forgotPassword: no user found for email ${email} — silently ignoring`);
-            return; // Don't reveal user existence
-        }
 
-        const resetToken = crypto.randomBytes(32).toString('hex');
-        const resetExpires = new Date(Date.now() + 3600000); // 1 hour
 
-        await this.prisma.user.update({
-            where: { id: user.id },
-            data: { resetPasswordToken: resetToken, resetPasswordExpires: resetExpires },
-        });
 
-        console.log(`[AUTH] forgotPassword: token generated for ${email}, sending reset email (background)...`);
-        
-        // Background email sending
-        this.emailService.sendPasswordResetEmail(user.email, resetToken).catch((err: any) => {
-            console.error(`[AUTH] forgotPassword: background error for ${email}:`, err.message);
-        });
-    }
-
-    async resetPassword(token: string, newPass: string) {
-        const user = await this.prisma.user.findFirst({
-            where: {
-                resetPasswordToken: token,
-                resetPasswordExpires: { gt: new Date() },
-            },
-        });
-
-        if (!user) throw new UnauthorizedException('Invalid or expired reset token');
-
-        const hashedPassword = await bcrypt.hash(newPass, 10);
-        const isTeamRole = ['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR'].includes(user.role);
-        return this.prisma.user.update({
-            where: { id: user.id },
-            data: {
-                password: hashedPassword,
-                resetPasswordToken: null,
-                resetPasswordExpires: null,
-                ...(isTeamRole ? { status: 'ACTIVE', emailVerified: true } : {}),
-            },
-        });
-    }
 
     // ─── Refresh Token Rotation ───────────────────────────────────────────────
 
@@ -411,6 +370,7 @@ export class AuthService {
                     role: 'CUSTOMER',
                     status: 'PENDING_APPROVAL',
                     emailVerified: true, // Google verified the email
+                    onboardingCompleted: false, // Must finish details flow
                 },
             });
 
@@ -476,6 +436,62 @@ export class AuthService {
         });
         
         return this.generateTokens(user as AuthUser);
+    }
+
+    async forgotPassword(email: string) {
+        const user = await this.prisma.user.findUnique({ where: { email } });
+
+        // Always return success to prevent email enumeration attacks
+        if (!user) {
+            return { success: true, message: 'If that email exists, a reset link was sent.' };
+        }
+
+        const token = crypto.randomBytes(32).toString('hex');
+        const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour expiry
+
+        await this.prisma.user.update({
+            where: { email },
+            data: {
+                resetPasswordToken: token,
+                resetPasswordExpires: expires,
+            },
+        });
+
+        await this.emailService.sendPasswordResetEmail(user.email, user.name, token);
+
+        return { success: true, message: 'If that email exists, a reset link was sent.' };
+    }
+
+    async resetPassword(token: string, newPassword: string) {
+        const user = await this.prisma.user.findFirst({
+            where: {
+                resetPasswordToken: token,
+                resetPasswordExpires: { gt: new Date() }, // Token must not be expired
+            },
+        });
+
+        if (!user) {
+            throw new BadRequestException('Invalid or expired reset token.');
+        }
+
+        // Validate new password strength on backend too
+        const isStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/.test(newPassword);
+        if (!isStrong) {
+            throw new BadRequestException('Password does not meet security requirements.');
+        }
+
+        const hashed = await bcrypt.hash(newPassword, 12);
+
+        await this.prisma.user.update({
+            where: { id: user.id },
+            data: {
+                password: hashed,
+                resetPasswordToken: null,
+                resetPasswordExpires: null,
+            },
+        });
+
+        return { success: true, message: 'Password reset successfully. You can now log in.' };
     }
 
     async getUserProfile(userId: string) {

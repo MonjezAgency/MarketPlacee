@@ -1,24 +1,30 @@
 import { NextResponse } from 'next/server';
+import { getServerSession } from '@/lib/auth';
 
 export async function POST(req: Request, { params }: { params: { productId: string } }) {
     try {
+        const session = await getServerSession();
+        if (!session) {
+            return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+        }
+
+        // Only ACTIVE users can post reviews
+        if (session.status !== 'ACTIVE') {
+            return NextResponse.json({ message: 'Account must be approved to post reviews' }, { status: 403 });
+        }
+
         const formData = await req.formData();
+        const cookieStore = await import('next/headers').then(m => m.cookies());
+        const token = cookieStore().get('token')?.value;
         
-        // Sanitize API URL to avoid double slashes
-        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-dfc2.up.railway.app';
+        // Sanitize API URL
+        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
         const apiUrl = rawApiUrl.replace(/\/$/, '');
-        
         const backendUrl = `${apiUrl}/products/${params.productId}/reviews`;
-        console.log(`[Proxy] Forwarding review for product ${params.productId} to: ${backendUrl}`);
 
         const headers = new Headers();
-        const authHeader = req.headers.get('authorization');
-        if (authHeader) headers.set('authorization', authHeader);
+        if (token) headers.set('Cookie', `token=${token}`);
         
-        // Log headers for debugging (excluding auth)
-        const contentType = req.headers.get('content-type');
-        console.log(`[Proxy] Request Content-Type: ${contentType}`);
-
         const res = await fetch(backendUrl, {
             method: 'POST',
             headers,
