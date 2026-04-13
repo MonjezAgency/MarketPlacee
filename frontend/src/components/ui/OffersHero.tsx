@@ -76,7 +76,7 @@ export default function OffersHero() {
                 }
             }
             setAllSlides(DEMO_SLIDES);
-        } catch {
+        } catch (_e) {
             setAllSlides(DEMO_SLIDES);
         }
     }, []);

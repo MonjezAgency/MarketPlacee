@@ -143,7 +143,7 @@ export default function OrderTrackingPage() {
                 const found = disputes.find((d: any) => d.orderId === id);
                 if (found) setExistingDispute(found);
             }
-        } catch { setError('Failed to load order'); }
+        } catch (_e) { setError('Failed to load order'); }
         finally { setIsLoading(false); }
     }, [id]);
 
@@ -195,7 +195,7 @@ export default function OrderTrackingPage() {
             setExistingDispute(dispute);
             setDisputeSuccess(true);
             setShowDisputeForm(false);
-        } catch { setDisputeError('Connection error. Please try again.'); }
+        } catch (_e) { setDisputeError('Connection error. Please try again.'); }
         finally { setIsSubmittingDispute(false); }
     };
 

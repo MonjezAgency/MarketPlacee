@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from '@/lib/auth';
+import { getServerSession } from '@/lib/auth-server';
+import { cookies } from 'next/headers';
 
 export async function GET() {
     try {
@@ -8,8 +9,8 @@ export async function GET() {
             return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
         }
 
-        const cookieStore = await import('next/headers').then(m => m.cookies());
-        const token = cookieStore().get('token')?.value;
+        const cookieStore = cookies();
+        const token = cookieStore.get('token')?.value;
 
         const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
         const apiUrl = rawApiUrl.replace(/\/$/, '');
@@ -43,8 +44,8 @@ export async function POST(req: Request) {
         }
 
         const body = await req.json();
-        const cookieStore = await import('next/headers').then(m => m.cookies());
-        const token = cookieStore().get('token')?.value;
+        const cookieStore = cookies();
+        const token = cookieStore.get('token')?.value;
 
         const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
         const apiUrl = rawApiUrl.replace(/\/$/, '');

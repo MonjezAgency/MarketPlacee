@@ -47,7 +47,7 @@ export default function SupplierAnalyticsPage() {
         try {
             const res = await apiFetch(`/orders/supplier/analytics?days=${days}`);
             if (res.ok) setData(await res.json());
-        } catch { /* offline */ }
+        } catch (_e) { /* offline */ }
         finally { setIsLoading(false); }
     }, []);
 

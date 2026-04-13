@@ -32,7 +32,7 @@ export function useNotifications() {
                 setNotifications(data);
                 setUnreadCount(data.filter(n => !n.read).length);
             }
-        } catch { /* offline or no auth */ }
+        } catch (_e) { /* offline or no auth */ }
     }, []);
 
     // Connect WebSocket and listen for real-time notifications

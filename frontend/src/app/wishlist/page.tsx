@@ -43,7 +43,7 @@ export default function WishlistPage() {
                  return;
             }
             if (res.ok) setItems(await res.json());
-        } catch { /* offline */ }
+        } catch (_e) { /* offline */ }
         finally { setIsLoading(false); }
     }, [user]);
 

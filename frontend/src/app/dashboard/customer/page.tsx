@@ -55,7 +55,7 @@ export default function CustomerDashboard() {
         try {
             const res = await apiFetch(`/orders/my-orders`);
             if (res.ok) setOrders(await res.json());
-        } catch { /* offline */ }
+        } catch (_e) { /* offline */ }
         finally { setIsLoadingOrders(false); }
     }, []);
 

@@ -112,7 +112,7 @@ export default function AdminDiscountsPage() {
                 const err = await res.json();
                 showToast('error', err.message || 'Failed to add tier');
             }
-        } catch { showToast('error', 'Network error'); }
+        } catch (_e) { showToast('error', 'Network error'); }
     };
 
     // ── Delete Tier ────────────────────────────────────────
@@ -120,7 +120,7 @@ export default function AdminDiscountsPage() {
         try {
             const res = await apiFetch(`/discounts/tiers/${id}`, { method: 'DELETE' });
             if (res.ok) { showToast('success', 'Tier deleted'); fetchTiers(selectedProduct); }
-        } catch { showToast('error', 'Failed to delete tier'); }
+        } catch (_e) { showToast('error', 'Failed to delete tier'); }
     };
 
     // ── Calculate Price ────────────────────────────────────
@@ -128,7 +128,7 @@ export default function AdminDiscountsPage() {
         try {
             const res = await apiFetch(`/discounts/calculate?productId=${selectedProduct}&quantity=${calcQty}`);
             if (res.ok) setCalcResult(await res.json());
-        } catch { showToast('error', 'Calculation failed'); }
+        } catch (_e) { showToast('error', 'Calculation failed'); }
     };
 
     // ── Fetch Groups ───────────────────────────────────────
@@ -152,7 +152,7 @@ export default function AdminDiscountsPage() {
             });
             if (res.ok) { showToast('success', 'Group created!'); fetchGroups(); setShowNewGroupForm(false); setNewGroup({ name: '', discountPercent: 5, description: '' }); }
             else { const err = await res.json(); showToast('error', err.message || 'Failed'); }
-        } catch { showToast('error', 'Network error'); }
+        } catch (_e) { showToast('error', 'Network error'); }
     };
 
     // ── Delete Group ───────────────────────────────────────
@@ -160,7 +160,7 @@ export default function AdminDiscountsPage() {
         try {
             const res = await apiFetch(`/discounts/groups/${id}`, { method: 'DELETE' });
             if (res.ok) { showToast('success', 'Group deleted'); fetchGroups(); }
-        } catch { showToast('error', 'Failed to delete group'); }
+        } catch (_e) { showToast('error', 'Failed to delete group'); }
     };
 
     // ── Add Member ─────────────────────────────────────────
@@ -173,7 +173,7 @@ export default function AdminDiscountsPage() {
             });
             if (res.ok) { showToast('success', 'Member added!'); fetchGroups(); setAddMemberGroupId(null); setMemberUserId(''); }
             else { const err = await res.json(); showToast('error', err.message || 'Failed'); }
-        } catch { showToast('error', 'Network error'); }
+        } catch (_e) { showToast('error', 'Network error'); }
     };
 
     // ── Remove Member ──────────────────────────────────────
@@ -181,7 +181,7 @@ export default function AdminDiscountsPage() {
         try {
             const res = await apiFetch(`/discounts/groups/${groupId}/members/${userId}`, { method: 'DELETE' });
             if (res.ok) { showToast('success', 'Member removed'); fetchGroups(); }
-        } catch { showToast('error', 'Failed to remove member'); }
+        } catch (_e) { showToast('error', 'Failed to remove member'); }
     };
 
     const filteredProducts = products.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase()));

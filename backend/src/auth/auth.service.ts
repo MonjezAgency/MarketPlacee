@@ -325,7 +325,7 @@ export class AuthService {
         let payload: any;
         try {
             payload = this.jwtService.verify(partialToken);
-        } catch {
+        } catch (_e) {
             throw new UnauthorizedException('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى');
         }
 

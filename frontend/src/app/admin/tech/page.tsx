@@ -163,7 +163,7 @@ export default function TechDashboardPage() {
                 if (healthRes.status === 'fulfilled' && healthRes.value) {
                     // Update system stats if available
                 }
-            } catch {
+            } catch (_e) {
                 // Use mock data
             }
         };

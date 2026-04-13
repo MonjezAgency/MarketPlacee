@@ -38,7 +38,7 @@ export default function DealsPage() {
                     const data = await couponsRes.json();
                     setCoupons((Array.isArray(data) ? data : []).filter((c: any) => c.isActive));
                 }
-            } catch { /* ignore */ }
+            } catch (_e) { /* ignore */ }
             finally { setIsLoading(false); }
         };
         fetchDeals();

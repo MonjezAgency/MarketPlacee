@@ -82,9 +82,8 @@ export default function SupportPage() {
     const fetchAll = React.useCallback(async (silent = false) => {
         if (!silent) setIsLoading(true);
         else setIsRefreshing(true);
+        
         try {
-        try {
-
             const [disputeStats, disputeData, orderData, kycData, chatData] = await Promise.allSettled([
                 apiFetch(`/disputes/stats`).then(r => r.json()),
                 apiFetch(`/disputes?page=1&limit=50`).then(r => r.json()),
@@ -98,8 +97,12 @@ export default function SupportPage() {
             if (orderData.status === 'fulfilled') setOrders(orderData.value?.data || orderData.value || []);
             if (kycData.status === 'fulfilled') setKycList(Array.isArray(kycData.value) ? kycData.value : []);
             if (chatData.status === 'fulfilled') setConversations(Array.isArray(chatData.value) ? chatData.value : []);
-        } catch { /* ignore */ }
-        finally { setIsLoading(false); setIsRefreshing(false); }
+        } catch (_e) {
+            // silently ignore fetch errors — Promise.allSettled handles partial failures
+        } finally {
+            setIsLoading(false);
+            setIsRefreshing(false);
+        }
     }, []);
 
     React.useEffect(() => { fetchAll(); }, [fetchAll]);

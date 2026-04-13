@@ -96,7 +96,7 @@ export default function CheckoutPage() {
             setCouponDiscount(data.discountPercent);
             setCouponApplied(data.code);
             setCouponCode('');
-        } catch { setCouponError('Could not validate coupon'); }
+        } catch (_e) { setCouponError('Could not validate coupon'); }
         finally { setIsValidatingCoupon(false); }
     };
 

@@ -63,7 +63,7 @@ export default function AmazonHero() {
                 }
             }
             setAllSlides(DEMO_SLIDES);
-        } catch {
+        } catch (_e) {
             setAllSlides(DEMO_SLIDES);
         }
     }, []);

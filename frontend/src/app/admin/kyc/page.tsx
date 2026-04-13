@@ -54,7 +54,7 @@ export default function AdminKycPage() {
             ]);
             setDocs(docsRes.data);
             setStats(statsRes.data);
-        } catch {
+        } catch (_e) {
             /* handle silently */
         } finally {
             setLoading(false);

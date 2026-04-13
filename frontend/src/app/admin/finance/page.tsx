@@ -91,7 +91,7 @@ function AdminFinanceContent() {
         try {
             const res = await apiFetch(`/invoices/${id}/pay`, { method: 'POST' });
             if (res.ok) { showToast('success', t('admin', 'markedAsPaid')); fetchInvoices(); }
-        } catch { showToast('error', 'Failed'); }
+        } catch (_e) { showToast('error', 'Failed'); }
     };
 
     // ── Credit Terms ───────────────────────────────────────
@@ -111,14 +111,14 @@ function AdminFinanceContent() {
             });
             if (res.ok) { showToast('success', t('admin', 'creditTermSet')); fetchCredits(); setShowNewCredit(false); }
             else { const e = await res.json(); showToast('error', e.message || 'Failed'); }
-        } catch { showToast('error', 'Network error'); }
+        } catch (_e) { showToast('error', 'Network error'); }
     };
 
     const deleteCredit = async (id: string) => {
         try {
             await apiFetch(`/finance/credit-terms/${id}`, { method: 'DELETE' });
             showToast('success', 'Deleted'); fetchCredits();
-        } catch { showToast('error', 'Failed'); }
+        } catch (_e) { showToast('error', 'Failed'); }
     };
 
     // ── Tax Exemptions ─────────────────────────────────────
@@ -137,7 +137,7 @@ function AdminFinanceContent() {
                 body: JSON.stringify({ status }),
             });
             if (res.ok) { showToast('success', `${status === 'APPROVED' ? 'Approved' : 'Rejected'}`); fetchExemptions(); }
-        } catch { showToast('error', 'Failed'); }
+        } catch (_e) { showToast('error', 'Failed'); }
     };
 
     // ── Warehouses ─────────────────────────────────────────
@@ -157,14 +157,14 @@ function AdminFinanceContent() {
             });
             if (res.ok) { showToast('success', t('admin', 'warehouseCreated')); fetchWarehouses(); setShowNewWarehouse(false); }
             else { const e = await res.json(); showToast('error', e.message || 'Failed'); }
-        } catch { showToast('error', 'Network error'); }
+        } catch (_e) { showToast('error', 'Network error'); }
     };
 
     const deleteWarehouse = async (id: string) => {
         try {
             await apiFetch(`/finance/warehouses/${id}`, { method: 'DELETE' });
             showToast('success', 'Deleted'); fetchWarehouses();
-        } catch { showToast('error', 'Failed'); }
+        } catch (_e) { showToast('error', 'Failed'); }
     };
 
     const statusColor = (s: string) => {

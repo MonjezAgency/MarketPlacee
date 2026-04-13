@@ -66,7 +66,7 @@ export default function PaymentMethodsPage() {
             if (!res.ok) { showToast('error', 'Failed to start Stripe Connect onboarding'); return; }
             const { url } = await res.json();
             if (url) window.location.href = url;
-        } catch { showToast('error', 'Connection error. Please try again.'); }
+        } catch (_e) { showToast('error', 'Connection error. Please try again.'); }
         finally { setIsConnecting(false); }
     };
 

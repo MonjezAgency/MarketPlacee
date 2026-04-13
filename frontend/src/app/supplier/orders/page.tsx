@@ -53,7 +53,7 @@ export default function SupplierOrdersPage() {
         try {
             const res = await apiFetch(`/orders/my-orders`);
             if (res.ok) setOrders(await res.json());
-        } catch { /* ignore */ }
+        } catch (_e) { /* ignore */ }
         finally { setIsLoading(false); }
     }, []);
 
@@ -67,7 +67,7 @@ export default function SupplierOrdersPage() {
                 body: JSON.stringify({ status }),
             });
             if (res.ok) setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-        } catch { /* ignore */ }
+        } catch (_e) { /* ignore */ }
         finally { setUpdatingId(null); }
     };
 

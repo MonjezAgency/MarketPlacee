@@ -65,7 +65,7 @@ export function getActiveCurrency(): string {
         if (tz.startsWith('Europe/'))        return 'EUR';
         if (tz.startsWith('Asia/Kolkata'))   return 'INR';
         if (tz.startsWith('Europe/Istanbul')) return 'TRY';
-    } catch { /* ignore */ }
+    } catch (_e) { /* ignore */ }
 
     return 'USD';
 }
@@ -101,7 +101,7 @@ export function formatPrice(amountUSD: number, forceEuro: boolean = false): stri
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         }).format(converted);
-    } catch {
+    } catch (_e) {
         // Fallback if browser doesn't support the currency
         return `${info?.symbol ?? '$'}${converted.toFixed(2)}`;
     }

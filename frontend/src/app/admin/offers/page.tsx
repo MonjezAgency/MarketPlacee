@@ -45,7 +45,7 @@ function loadOffers(): Offer[] {
     try {
         const stored = localStorage.getItem(STORAGE_KEY);
         return stored ? JSON.parse(stored) : [];
-    } catch { return []; }
+    } catch (_e) { return []; }
 }
 
 function saveOffers(offers: Offer[]) {

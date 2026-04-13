@@ -85,7 +85,7 @@ function loadSlots(): PlacementSlot[] {
     try {
         const stored = localStorage.getItem(STORAGE_KEY);
         return stored ? JSON.parse(stored) : DEFAULT_SLOTS;
-    } catch { return DEFAULT_SLOTS; }
+    } catch (_e) { return DEFAULT_SLOTS; }
 }
 
 function saveSlots(slots: PlacementSlot[]) {

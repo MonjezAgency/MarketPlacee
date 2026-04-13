@@ -54,7 +54,7 @@ export default function AdminReviewsPage() {
                 setTotal(data.total || 0);
                 setTotalPages(data.totalPages || 1);
             }
-        } catch { /* ignore */ }
+        } catch (_e) { /* ignore */ }
         finally { setIsLoading(false); }
     }, []);
 
@@ -72,7 +72,7 @@ export default function AdminReviewsPage() {
                 setReviews(prev => prev.filter(r => r.id !== reviewId));
                 setTotal(prev => prev - 1);
             }
-        } catch { /* ignore */ }
+        } catch (_e) { /* ignore */ }
         finally { setDeletingId(null); }
     };
 

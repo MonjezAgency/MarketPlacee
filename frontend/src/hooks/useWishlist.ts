@@ -22,7 +22,7 @@ export function useWishlist() {
                 const data = await res.json();
                 setWishlistIds(new Set(data.map((item: any) => item.product?.id || item.id)));
             }
-        } catch { /* offline */ }
+        } catch (_e) { /* offline */ }
     }, [user]);
 
     useEffect(() => { fetchWishlist(); }, [fetchWishlist]);

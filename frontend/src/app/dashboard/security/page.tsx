@@ -57,7 +57,7 @@ export default function SecuritySettingsPage() {
             setQrCode(data.qrCodeUrl);
             setSecret(data.secret);
             setTotpStep('setup');
-        } catch { showToast('error', 'Failed to start 2FA setup'); }
+        } catch (_e) { showToast('error', 'Failed to start 2FA setup'); }
         setBusy(false);
     };
 
@@ -104,7 +104,7 @@ export default function SecuritySettingsPage() {
             if (!res.ok) throw new Error();
             setEmailOtpStep('sent');
             showToast('success', 'Verification code sent to your email');
-        } catch { showToast('error', 'Failed to send code'); }
+        } catch (_e) { showToast('error', 'Failed to send code'); }
         setSendingOtp(false);
     };
 

@@ -60,7 +60,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       }
 
       this.logger.log(`User ${userId} (${payload.role}) connected via WebSocket`);
-    } catch {
+    } catch (_e) {
       client.disconnect();
     }
   }

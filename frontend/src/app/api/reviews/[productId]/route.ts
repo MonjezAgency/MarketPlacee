@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getServerSession } from '@/lib/auth';
+import { getServerSession } from '@/lib/auth-server';
+import { cookies } from 'next/headers';
 
 export async function POST(req: Request, { params }: { params: { productId: string } }) {
     try {
@@ -14,8 +15,8 @@ export async function POST(req: Request, { params }: { params: { productId: stri
         }
 
         const formData = await req.formData();
-        const cookieStore = await import('next/headers').then(m => m.cookies());
-        const token = cookieStore().get('token')?.value;
+        const cookieStore = cookies();
+        const token = cookieStore.get('token')?.value;
         
         // Sanitize API URL
         const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';

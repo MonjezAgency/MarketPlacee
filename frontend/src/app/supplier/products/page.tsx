@@ -96,7 +96,7 @@ export default function SupplierProductsPage() {
                     try {
                         const data = await res.json();
                         errMsg = data.message || errMsg;
-                    } catch {
+                    } catch (_e) {
                         const text = await res.text().catch(() => '');
                         errMsg = text || `Server error (${res.status})`;
                     }

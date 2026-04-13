@@ -128,7 +128,7 @@ export default function KycPage() {
         try {
             const res = await axios.get(`${API_URL}/kyc/status`, { headers });
             setKycStatus(res.data);
-        } catch {}
+        } catch (_e) {}
         setLoading(false);
     };
 
@@ -156,7 +156,7 @@ export default function KycPage() {
             });
             streamRef.current = stream;
             setCameraActive(true); // triggers useEffect above to attach srcObject
-        } catch {
+        } catch (_e) {
             setError('Camera access denied. Please allow camera permissions in your browser settings.');
         }
     };

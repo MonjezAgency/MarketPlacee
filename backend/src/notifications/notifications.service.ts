@@ -21,7 +21,7 @@ export class NotificationsService {
         // Push in real-time via WebSocket
         try {
             this.chatGateway.emitToUser(userId, 'new_notification', notification);
-        } catch {
+        } catch (_e) {
             this.logger.warn(`Could not push notification to user ${userId} — offline`);
         }
 

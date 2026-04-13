@@ -285,7 +285,7 @@ export default function OwnerDashboard() {
             setStats(s);
             setTeam(Array.isArray(t) ? t : []);
             setAuditLog(Array.isArray(a) ? a : []);
-        } catch { }
+        } catch (_e) { }
         setLoading(false);
     };
 
@@ -310,7 +310,7 @@ export default function OwnerDashboard() {
             }
             showToast('تم حفظ التغييرات بنجاح ✅');
             load();
-        } catch { showToast('حدث خطأ أثناء الحفظ', 'error'); }
+        } catch (_e) { showToast('حدث خطأ أثناء الحفظ', 'error'); }
     };
 
     const handleSuspend = async (userId: string) => {

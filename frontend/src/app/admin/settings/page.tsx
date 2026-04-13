@@ -75,7 +75,7 @@ export default function AdminSettingsPage() {
             });
             if (res.ok) showToast('success', 'Markup percentages saved. New products will use the updated rates.');
             else showToast('error', 'Failed to save markup settings.');
-        } catch {
+        } catch (_e) {
             showToast('error', 'Network error. Please try again.');
         } finally {
             setIsSavingMarkup(false);
