@@ -56,9 +56,8 @@ export async function POST(request: Request) {
   } catch (error: any) {
     console.error('[PROXY_LOGIN_ERROR]', error);
     return NextResponse.json({ 
-      message: 'Authentication Proxy Error', 
-      details: error.message,
-      hint: 'Ensure BACKEND_URL is set in Vercel environment variables.'
+      message: `Proxy Error: ${error.message}. URL: ${process.env.BACKEND_URL || 'fallbacked'}. Hint: Check Vercel Env Vars.`,
+      details: error.message
     }, { status: 500 });
   }
 }
