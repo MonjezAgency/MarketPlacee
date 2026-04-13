@@ -8,12 +8,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-
-const API_URL = '/api';
+import { apiFetch } from '@/lib/api';
 
 export default function SecuritySettingsPage() {
-    
-    const headers = { 'Content-Type': 'application/json' };
 
     // Status
     const [twoFactorEnabled, setTwoFactorEnabled] = React.useState(false);
@@ -46,7 +43,7 @@ export default function SecuritySettingsPage() {
     };
 
     React.useEffect(() => {
-        fetch(`${API_URL}/auth/2fa/status`, { headers: {  } })
+        apiFetch(`/auth/2fa/status`)
             .then(r => r.json())
             .then(d => { setTwoFactorEnabled(d.twoFactorEnabled); setLoading(false); })
             .catch(() => setLoading(false));
@@ -55,7 +52,7 @@ export default function SecuritySettingsPage() {
     const startTotpSetup = async () => {
         setBusy(true);
         try {
-            const res = await fetch(`${API_URL}/auth/2fa/setup`, { method: 'POST', headers });
+            const res = await apiFetch(`/auth/2fa/setup`, { method: 'POST' });
             const data = await res.json();
             setQrCode(data.qrCodeUrl);
             setSecret(data.secret);
@@ -68,8 +65,8 @@ export default function SecuritySettingsPage() {
         if (totpToken.length !== 6) { showToast('error', 'Enter the 6-digit code from your authenticator app'); return; }
         setBusy(true);
         try {
-            const res = await fetch(`${API_URL}/auth/2fa/enable`, {
-                method: 'POST', headers,
+            const res = await apiFetch(`/auth/2fa/enable`, {
+                method: 'POST',
                 body: JSON.stringify({ token: totpToken }),
             });
             if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
@@ -86,8 +83,8 @@ export default function SecuritySettingsPage() {
         if (!disableToken.trim()) { showToast('error', 'Enter your current 2FA code'); return; }
         setDisabling(true);
         try {
-            const res = await fetch(`${API_URL}/auth/2fa/disable`, {
-                method: 'POST', headers,
+            const res = await apiFetch(`/auth/2fa/disable`, {
+                method: 'POST',
                 body: JSON.stringify({ token: disableToken }),
             });
             if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
@@ -103,7 +100,7 @@ export default function SecuritySettingsPage() {
     const sendEmailOtp = async () => {
         setSendingOtp(true);
         try {
-            const res = await fetch(`${API_URL}/auth/email-otp/send`, { method: 'POST', headers });
+            const res = await apiFetch(`/auth/email-otp/send`, { method: 'POST' });
             if (!res.ok) throw new Error();
             setEmailOtpStep('sent');
             showToast('success', 'Verification code sent to your email');
@@ -114,8 +111,8 @@ export default function SecuritySettingsPage() {
     const verifyEmailOtp = async () => {
         if (emailOtpCode.length !== 6) { showToast('error', 'Enter the 6-digit code'); return; }
         try {
-            const res = await fetch(`${API_URL}/auth/email-otp/verify`, {
-                method: 'POST', headers,
+            const res = await apiFetch(`/auth/email-otp/verify`, {
+                method: 'POST',
                 body: JSON.stringify({ code: emailOtpCode }),
             });
             if (!res.ok) { const e = await res.json(); throw new Error(e.message); }

@@ -104,9 +104,8 @@ export default function AdminCategoriesPage() {
                 const products = await res.json();
                 const toUpdate = products.filter((p: any) => p.category === categories[index].name);
                 for (const product of toUpdate) {
-                    await fetch(`${'/api'}/products/${product.id}`, {
+                    await apiFetch(`/products/${product.id}`, {
                         method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json',  },
                         body: JSON.stringify({ category: trimmed })
                     });
                 }

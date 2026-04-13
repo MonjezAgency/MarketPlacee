@@ -9,7 +9,7 @@ import {
     Heart, Info, Package, Sparkles, ArrowLeft, ShoppingCart
 } from 'lucide-react';
 import { type Product, ProductStatus } from '@/lib/types';
-import { fetchProducts } from '@/lib/api';
+import { fetchProducts, apiFetch } from '@/lib/api';
 import { useEffect } from 'react';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
@@ -55,11 +55,11 @@ export default function ProductDetailClient() {
     // Fetch similar products from the dedicated endpoint once id is known
     useEffect(() => {
         if (!id) return;
-        fetch(`${API_URL}/products/${id}/similar`)
+        apiFetch(`/products/${id}/similar`)
             .then(r => r.ok ? r.json() : [])
             .then(data => setSimilarProducts(Array.isArray(data) ? data : []))
             .catch(() => { });
-    }, [id, API_URL]);
+    }, [id]);
 
     const currentProduct = products.find(p => p.id === id);
 

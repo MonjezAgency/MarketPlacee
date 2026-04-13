@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Building2, Phone, Globe, Briefcase, ArrowRight, Loader2, ShieldCheck } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
 
@@ -47,12 +48,8 @@ export default function OnboardingPage() {
 
         try {
             
-            const res = await fetch(`/api/users/${user?.id}`, {
+            const res = await apiFetch(`/users/${user?.id}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    
-                },
                 body: JSON.stringify(form)
             });
 

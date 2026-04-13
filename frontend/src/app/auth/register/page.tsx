@@ -12,6 +12,7 @@ import {
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { apiFetch } from '@/lib/api';
 import { signIn } from 'next-auth/react';
 import { Suspense } from 'react';
 import { cn } from '@/lib/utils';
@@ -63,7 +64,7 @@ function RegisterForm() {
             const countryCode = vat.substring(0, 2).toUpperCase();
             const vatNumber = vat.substring(2);
 
-            const response = await fetch(`${'/api'}/auth/validate-vat?countryCode=${countryCode}&vatNumber=${vatNumber}`);
+            const response = await apiFetch(`/auth/validate-vat?countryCode=${countryCode}&vatNumber=${vatNumber}`);
             const data = await response.json();
 
             if (data.valid) {

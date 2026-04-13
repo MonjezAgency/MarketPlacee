@@ -18,8 +18,6 @@ import { useTheme } from 'next-themes';
 import { Sun, Moon, TrendingUp } from 'lucide-react';
 import { Product, ProductStatus } from '@/lib/types';
 
-const API_URL = '/api';
-
 interface UploadReport {
     totalRows: number;
     successCount: number;
@@ -164,10 +162,7 @@ export default function SupplierDashboard() {
                 const formData = new FormData();
                 formData.append('file', file);
                 
-                const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-                const apiUrl = `${backendBase}/products/bulk-upload`;
-
-                const res = await fetch(apiUrl, {
+                const res = await apiFetch(`/products/bulk-upload`, {
                     method: 'POST',
                     body: formData,
                 });

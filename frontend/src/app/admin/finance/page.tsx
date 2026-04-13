@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { apiFetch } from '@/lib/api';
 
-const API_URL = '/api';
 type Tab = 'invoices' | 'credit' | 'tax' | 'warehouses';
 
 export default function AdminFinancePage() {
@@ -64,7 +64,7 @@ function AdminFinanceContent() {
     React.useEffect(() => {
         const fetchUsers = async () => {
             try {
-                const res = await fetch(`${API_URL}/admin/users`, { headers: {  } });
+                const res = await apiFetch(`/admin/users`);
                 if (res.ok) {
                     const data = await res.json();
                     const list = Array.isArray(data) ? data : data.data || [];
@@ -80,7 +80,7 @@ function AdminFinanceContent() {
     const fetchInvoices = async () => {
         setIsLoadingInvoices(true);
         try {
-            const res = await fetch(`${API_URL}/invoices`, { headers: {  } });
+            const res = await apiFetch(`/invoices`);
             if (res.ok) setInvoices(await res.json());
         } catch (e) { console.error(e); }
         setIsLoadingInvoices(false);
@@ -89,7 +89,7 @@ function AdminFinanceContent() {
 
     const markPaid = async (id: string) => {
         try {
-            const res = await fetch(`${API_URL}/invoices/${id}/pay`, { method: 'POST', headers: {  } });
+            const res = await apiFetch(`/invoices/${id}/pay`, { method: 'POST' });
             if (res.ok) { showToast('success', t('admin', 'markedAsPaid')); fetchInvoices(); }
         } catch { showToast('error', 'Failed'); }
     };
@@ -97,7 +97,7 @@ function AdminFinanceContent() {
     // ── Credit Terms ───────────────────────────────────────
     const fetchCredits = async () => {
         try {
-            const res = await fetch(`${API_URL}/finance/credit-terms`, { headers: {  } });
+            const res = await apiFetch(`/finance/credit-terms`);
             if (res.ok) setCredits(await res.json());
         } catch (e) { console.error(e); }
     };
@@ -105,9 +105,8 @@ function AdminFinanceContent() {
 
     const createCredit = async () => {
         try {
-            const res = await fetch(`${API_URL}/finance/credit-terms`, {
+            const res = await apiFetch(`/finance/credit-terms`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify(newCredit),
             });
             if (res.ok) { showToast('success', t('admin', 'creditTermSet')); fetchCredits(); setShowNewCredit(false); }
@@ -117,7 +116,7 @@ function AdminFinanceContent() {
 
     const deleteCredit = async (id: string) => {
         try {
-            await fetch(`${API_URL}/finance/credit-terms/${id}`, { method: 'DELETE', headers: {  } });
+            await apiFetch(`/finance/credit-terms/${id}`, { method: 'DELETE' });
             showToast('success', 'Deleted'); fetchCredits();
         } catch { showToast('error', 'Failed'); }
     };
@@ -125,7 +124,7 @@ function AdminFinanceContent() {
     // ── Tax Exemptions ─────────────────────────────────────
     const fetchExemptions = async () => {
         try {
-            const res = await fetch(`${API_URL}/finance/tax-exemptions`, { headers: {  } });
+            const res = await apiFetch(`/finance/tax-exemptions`);
             if (res.ok) setExemptions(await res.json());
         } catch (e) { console.error(e); }
     };
@@ -133,9 +132,8 @@ function AdminFinanceContent() {
 
     const reviewExemption = async (id: string, status: string) => {
         try {
-            const res = await fetch(`${API_URL}/finance/tax-exemptions/${id}/review`, {
+            const res = await apiFetch(`/finance/tax-exemptions/${id}/review`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify({ status }),
             });
             if (res.ok) { showToast('success', `${status === 'APPROVED' ? 'Approved' : 'Rejected'}`); fetchExemptions(); }
@@ -145,7 +143,7 @@ function AdminFinanceContent() {
     // ── Warehouses ─────────────────────────────────────────
     const fetchWarehouses = async () => {
         try {
-            const res = await fetch(`${API_URL}/finance/warehouses`, { headers: {  } });
+            const res = await apiFetch(`/finance/warehouses`);
             if (res.ok) setWarehouses(await res.json());
         } catch (e) { console.error(e); }
     };
@@ -153,9 +151,8 @@ function AdminFinanceContent() {
 
     const createWarehouse = async () => {
         try {
-            const res = await fetch(`${API_URL}/finance/warehouses`, {
+            const res = await apiFetch(`/finance/warehouses`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify(newWarehouse),
             });
             if (res.ok) { showToast('success', t('admin', 'warehouseCreated')); fetchWarehouses(); setShowNewWarehouse(false); }
@@ -165,7 +162,7 @@ function AdminFinanceContent() {
 
     const deleteWarehouse = async (id: string) => {
         try {
-            await fetch(`${API_URL}/finance/warehouses/${id}`, { method: 'DELETE', headers: {  } });
+            await apiFetch(`/finance/warehouses/${id}`, { method: 'DELETE' });
             showToast('success', 'Deleted'); fetchWarehouses();
         } catch { showToast('error', 'Failed'); }
     };

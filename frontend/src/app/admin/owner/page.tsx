@@ -9,8 +9,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-
-const API = '/api';
+import { apiFetch } from '@/lib/api';
 
 // ── Permission groups for the UI ──────────────────────────────────────────────
 const PERMISSION_GROUPS = [
@@ -271,9 +270,6 @@ export default function OwnerDashboard() {
     const [loading, setLoading] = useState(true);
     const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-    
-    const headers = { 'Content-Type': 'application/json',  };
-
     useEffect(() => {
         if (user && user.role !== 'OWNER') router.replace('/admin');
     }, [user]);
@@ -282,9 +278,9 @@ export default function OwnerDashboard() {
         setLoading(true);
         try {
             const [s, t, a] = await Promise.all([
-                fetch(`${API}/owner/dashboard`, { headers }).then(r => r.json()),
-                fetch(`${API}/owner/team`, { headers }).then(r => r.json()),
-                fetch(`${API}/owner/audit-log?limit=30`, { headers }).then(r => r.json()),
+                apiFetch(`/owner/dashboard`).then(r => r.json()),
+                apiFetch(`/owner/team`).then(r => r.json()),
+                apiFetch(`/owner/audit-log?limit=30`).then(r => r.json()),
             ]);
             setStats(s);
             setTeam(Array.isArray(t) ? t : []);
@@ -302,13 +298,13 @@ export default function OwnerDashboard() {
 
     const handleSave = async (userId: string, perms: string[], newRole: string | null) => {
         try {
-            await fetch(`${API}/owner/team/${userId}/permissions`, {
-                method: 'PATCH', headers,
+            await apiFetch(`/owner/team/${userId}/permissions`, {
+                method: 'PATCH',
                 body: JSON.stringify({ permissions: perms }),
             });
             if (newRole) {
-                await fetch(`${API}/owner/team/${userId}/role`, {
-                    method: 'PATCH', headers,
+                await apiFetch(`/owner/team/${userId}/role`, {
+                    method: 'PATCH',
                     body: JSON.stringify({ role: newRole }),
                 });
             }
@@ -318,25 +314,25 @@ export default function OwnerDashboard() {
     };
 
     const handleSuspend = async (userId: string) => {
-        await fetch(`${API}/owner/team/${userId}/suspend`, { method: 'PATCH', headers });
+        await apiFetch(`/owner/team/${userId}/suspend`, { method: 'PATCH' });
         showToast('تم تعليق الحساب'); load();
     };
 
     const handleActivate = async (userId: string) => {
-        await fetch(`${API}/owner/team/${userId}/activate`, { method: 'PATCH', headers });
+        await apiFetch(`/owner/team/${userId}/activate`, { method: 'PATCH' });
         showToast('تم تفعيل الحساب'); load();
     };
 
     const handleKycApprove = async (userId: string) => {
-        await fetch(`${API}/owner/team/${userId}/kyc/approve`, { method: 'PATCH', headers });
+        await apiFetch(`/owner/team/${userId}/kyc/approve`, { method: 'PATCH' });
         showToast('تم التحقق من الهوية ✅'); load();
     };
 
     const handleKycReject = async (userId: string) => {
         const reason = prompt('سبب الرفض:');
         if (!reason) return;
-        await fetch(`${API}/owner/team/${userId}/kyc/reject`, {
-            method: 'PATCH', headers,
+        await apiFetch(`/owner/team/${userId}/kyc/reject`, {
+            method: 'PATCH',
             body: JSON.stringify({ reason }),
         });
         showToast('تم رفض KYC'); load();

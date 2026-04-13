@@ -57,13 +57,8 @@ export default function AdminUsersPage() {
 
     const updateStatus = async (id: string, status: UserStatus) => {
         try {
-            
-            const res = await fetch(`${'/api'}/users/${id}/status`, {
+            const res = await apiFetch(`/users/${id}/status`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    
-                },
                 body: JSON.stringify({ status })
             });
 

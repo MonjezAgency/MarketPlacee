@@ -2,8 +2,7 @@ import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import type { NextAuthOptions } from 'next-auth';
 import type { GoogleProfile } from 'next-auth/providers/google';
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+import { apiFetch } from '@/lib/api';
 
 export const authOptions: NextAuthOptions = {
     providers: [
@@ -17,9 +16,8 @@ export const authOptions: NextAuthOptions = {
             const profile = rawProfile as GoogleProfile;
             if (account?.provider === 'google' && profile) {
                 try {
-                    const res = await fetch(`${API_URL}/auth/google`, {
+                    const res = await apiFetch(`/auth/google`, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             email: profile.email,
                             name: profile.name,

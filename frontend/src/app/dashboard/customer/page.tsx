@@ -9,12 +9,11 @@ import {
     Loader2, XCircle, RefreshCw,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { fetchProducts } from '@/lib/api';
+import { fetchProducts, apiFetch } from '@/lib/api';
 import type { Product } from '@/lib/types';
 import ProductCard from '@/components/product/ProductCard';
 import { cn } from '@/lib/utils';
 
-const API_URL = '/api';
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 interface Order {
@@ -54,10 +53,7 @@ export default function CustomerDashboard() {
     const fetchOrders = React.useCallback(async () => {
         setIsLoadingOrders(true);
         try {
-            
-            const res = await fetch(`${API_URL}/orders/my-orders`, {
-                headers: {  },
-            });
+            const res = await apiFetch(`/orders/my-orders`);
             if (res.ok) setOrders(await res.json());
         } catch { /* offline */ }
         finally { setIsLoadingOrders(false); }

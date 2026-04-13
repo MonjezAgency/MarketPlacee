@@ -130,8 +130,7 @@ export default function SecurityDashboard() {
         if (agentState !== 'IDLE' && agentState !== 'RESOLVED') return;
         setAgentState('ANALYZING');
         try {
-            
-            await fetch(`${'/api'}/admin/security/agent-fix`, {
+            await apiFetch(`/admin/security/agent-fix`, {
                 method: 'POST'
             });
             fetchStatus();
@@ -144,13 +143,8 @@ export default function SecurityDashboard() {
         if (!status) return;
         setLocking(true);
         try {
-            
-            await fetch(`${'/api'}/admin/security/lockdown`, {
+            await apiFetch(`/admin/security/lockdown`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    
-                },
                 body: JSON.stringify({ enabled: !status.isLockedDown }),
             });
             await fetchStatus();
@@ -163,13 +157,8 @@ export default function SecurityDashboard() {
 
     const unblockIp = async (ip: string) => {
         try {
-            
-            await fetch(`${'/api'}/admin/security/unblock`, {
+            await apiFetch(`/admin/security/unblock`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    
-                },
                 body: JSON.stringify({ ip }),
             });
             await fetchStatus();

@@ -83,13 +83,14 @@ export default function SupportPage() {
         if (!silent) setIsLoading(true);
         else setIsRefreshing(true);
         try {
-            const headers = {  };
+        try {
+
             const [disputeStats, disputeData, orderData, kycData, chatData] = await Promise.allSettled([
-                fetch(`${API_URL}/disputes/stats`, { headers }).then(r => r.json()),
-                fetch(`${API_URL}/disputes?page=1&limit=50`, { headers }).then(r => r.json()),
-                fetch(`${API_URL}/orders?page=1&limit=30`, { headers }).then(r => r.json()),
-                fetch(`${API_URL}/kyc/pending`, { headers }).then(r => r.json()),
-                fetch(`${API_URL}/chat/admin/conversations`, { headers }).then(r => r.json()),
+                apiFetch(`/disputes/stats`).then(r => r.json()),
+                apiFetch(`/disputes?page=1&limit=50`).then(r => r.json()),
+                apiFetch(`/orders?page=1&limit=30`).then(r => r.json()),
+                apiFetch(`/kyc/pending`).then(r => r.json()),
+                apiFetch(`/chat/admin/conversations`).then(r => r.json()),
             ]);
 
             if (disputeStats.status === 'fulfilled') setStats(disputeStats.value);
@@ -122,16 +123,15 @@ export default function SupportPage() {
     }, [fetchAll]);
 
     const handleDisputeAction = async (id: string, action: 'review' | 'refund' | 'no_refund') => {
-        const headers = { 'Content-Type': 'application/json',  };
         if (action === 'review') {
-            await fetch(`${API_URL}/disputes/${id}/status`, {
-                method: 'PATCH', headers, body: JSON.stringify({ status: 'UNDER_REVIEW' }),
+            await apiFetch(`/disputes/${id}/status`, {
+                method: 'PATCH', body: JSON.stringify({ status: 'UNDER_REVIEW' }),
             });
         } else {
             const decision = action === 'refund' ? 'RESOLVED_REFUND' : 'RESOLVED_NO_REFUND';
             const resolution = action === 'refund' ? 'Refund approved after review.' : 'No refund issued after review.';
-            await fetch(`${API_URL}/disputes/${id}/resolve`, {
-                method: 'PATCH', headers, body: JSON.stringify({ decision, resolution }),
+            await apiFetch(`/disputes/${id}/resolve`, {
+                method: 'PATCH', body: JSON.stringify({ decision, resolution }),
             });
         }
         fetchAll(true);
@@ -140,9 +140,8 @@ export default function SupportPage() {
     const handleSwitch = async (userId: string) => {
         setSwitchingId(userId);
         try {
-            await fetch(`${API_URL}/chat/admin/switch/${userId}`, {
+            await apiFetch(`/chat/admin/switch/${userId}`, {
                 method: 'PATCH',
-                headers: {  },
             });
             await fetchAll(true);
             // Auto-open this conversation after switching

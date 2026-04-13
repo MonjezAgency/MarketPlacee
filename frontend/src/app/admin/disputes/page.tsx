@@ -7,8 +7,7 @@ import {
     Loader2, RefreshCw, ChevronDown, Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const API_URL = '/api';
+import { apiFetch } from '@/lib/api';
 
 const STATUS_STYLES: Record<string, string> = {
     OPEN: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
@@ -43,11 +42,11 @@ export default function AdminDisputesPage() {
         setIsLoading(true);
         try {
             const url = filterStatus
-                ? `${API_URL}/disputes?status=${filterStatus}&limit=50`
-                : `${API_URL}/disputes?limit=50`;
+                ? `/disputes?status=${filterStatus}&limit=50`
+                : `/disputes?limit=50`;
             const [disputesRes, statsRes] = await Promise.all([
-                fetch(url, { headers: {  } }),
-                fetch(`${API_URL}/disputes/stats`, { headers: {  } }),
+                apiFetch(url),
+                apiFetch(`/disputes/stats`),
             ]);
             if (disputesRes.ok) setDisputes((await disputesRes.json()).data || []);
             if (statsRes.ok) setStats(await statsRes.json());
@@ -57,9 +56,8 @@ export default function AdminDisputesPage() {
     React.useEffect(() => { fetchData(); }, [fetchData]);
 
     const handleMarkUnderReview = async (id: string) => {
-        await fetch(`${API_URL}/disputes/${id}/status`, {
+        await apiFetch(`/disputes/${id}/status`, {
             method: 'PATCH',
-            headers,
             body: JSON.stringify({ status: 'UNDER_REVIEW' }),
         });
         fetchData();
@@ -71,9 +69,8 @@ export default function AdminDisputesPage() {
         setIsResolving(true);
         setResolveError('');
         try {
-            const res = await fetch(`${API_URL}/disputes/${selected.id}/resolve`, {
+            const res = await apiFetch(`/disputes/${selected.id}/resolve`, {
                 method: 'PATCH',
-                headers,
                 body: JSON.stringify({ decision, resolution: resolution.trim() }),
             });
             if (!res.ok) {

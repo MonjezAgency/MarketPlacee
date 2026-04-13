@@ -6,7 +6,7 @@ import ProductFilters from '@/components/product/ProductFilters';
 import SponsoredProductCard from '@/components/ads/SponsoredProductCard';
 import SponsoredBrandBanner from '@/components/ads/SponsoredBrandBanner';
 import { BRANDS, CATEGORIES_LIST } from '@/lib/products';
-import { fetchProductsWithFilters } from '@/lib/api';
+import { fetchProductsWithFilters, apiFetch } from '@/lib/api';
 import type { Product } from '@/lib/types';
 import { SlidersHorizontal, X, ChevronRight, Package, Search } from 'lucide-react';
 import Link from 'next/link';
@@ -61,8 +61,8 @@ function CategoriesContent() {
                     maxPrice: appliedPrice.max || undefined,
                     sort: sortMap[sortBy] || 'newest',
                 }),
-                fetch(('/api') + '/ads?placement=SPONSORED_BRAND').then(res => res.json()),
-                fetch(('/api') + '/ads?placement=SPONSORED_PRODUCT').then(res => res.json())
+                apiFetch(`/ads?placement=SPONSORED_BRAND`).then(res => res.json()),
+                apiFetch(`/ads?placement=SPONSORED_PRODUCT`).then(res => res.json())
             ]);
 
             if (productsP.status === 'fulfilled') setProducts(productsP.value);

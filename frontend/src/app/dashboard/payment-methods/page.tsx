@@ -8,8 +8,7 @@ import { motion } from 'framer-motion';
 import { CreditCard, Lock, Landmark, Eye, EyeOff, Save, Loader2, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
-
-const API_URL = '/api';
+import { apiFetch } from '@/lib/api';
 
 function maskIban(iban: string) {
     if (!iban || iban.length < 8) return iban;
@@ -36,7 +35,7 @@ export default function CustomerPaymentMethodsPage() {
     };
 
     React.useEffect(() => {
-        fetch(`${API_URL}/auth/me`, { headers: {  } })
+        apiFetch(`/auth/me`)
             .then(r => r.json())
             .then(profile => {
                 if (profile?.iban) { setSavedIban(maskIban(profile.iban)); setHasBank(true); }
@@ -49,8 +48,8 @@ export default function CustomerPaymentMethodsPage() {
         if (!user?.id) return;
         setSaving(true);
         try {
-            const res = await fetch(`${API_URL}/users/${user.id}`, {
-                method: 'POST', headers,
+            const res = await apiFetch(`/users/${user.id}`, {
+                method: 'POST',
                 body: JSON.stringify({ iban: iban.trim(), swiftCode: swiftCode.trim() }),
             });
             if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Failed to save');

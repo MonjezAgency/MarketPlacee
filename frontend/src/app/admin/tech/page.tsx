@@ -16,9 +16,7 @@ import {
     Tooltip, ResponsiveContainer, BarChart, Bar,
 } from 'recharts';
 import { useAuth } from '@/lib/auth';
-import { API_BASE_URL } from '@/lib/config';
-
-const API_URL = API_BASE_URL;
+import { apiFetch } from '@/lib/api';
 
 // ── Mock data (will be replaced with live API calls) ─────────────────────────
 
@@ -156,12 +154,9 @@ export default function TechDashboardPage() {
     React.useEffect(() => {
         const fetchHealth = async () => {
             try {
-                
-                const headers = {  };
-
                 // Try to fetch from health endpoint
                 const [healthRes] = await Promise.allSettled([
-                    fetch(`${API_URL}/health`, { headers }).then(r => r.json()),
+                    apiFetch(`/health`).then(r => r.json()),
                 ]);
 
                 // If we get data, use it

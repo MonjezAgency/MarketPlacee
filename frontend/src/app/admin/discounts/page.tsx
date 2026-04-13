@@ -9,8 +9,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-
-const API_URL = '/api';
+import { apiFetch } from '@/lib/api';
 
 // ── Types ──────────────────────────────────────────────────
 import { Product } from '@/lib/types';
@@ -55,7 +54,7 @@ export default function AdminDiscountsPage() {
     React.useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await fetch(`${API_URL}/products?status=APPROVED`, { headers: {  } });
+                const res = await apiFetch(`/products?status=APPROVED`);
                 if (res.ok) {
                     const data = await res.json();
                     const list = Array.isArray(data) ? data : data.data || [];
@@ -70,7 +69,7 @@ export default function AdminDiscountsPage() {
     React.useEffect(() => {
         const fetchBuyers = async () => {
             try {
-                const res = await fetch(`${API_URL}/admin/users`, { headers: {  } });
+                const res = await apiFetch(`/admin/users`);
                 if (res.ok) {
                     const data = await res.json();
                     const list = Array.isArray(data) ? data : data.data || [];
@@ -85,7 +84,7 @@ export default function AdminDiscountsPage() {
     const fetchTiers = async (productId: string) => {
         setIsLoadingTiers(true);
         try {
-            const res = await fetch(`${API_URL}/discounts/tiers/${productId}`, { headers: {  } });
+            const res = await apiFetch(`/discounts/tiers/${productId}`);
             if (res.ok) setTiers(await res.json());
         } catch (e) { console.error(e); }
         setIsLoadingTiers(false);
@@ -96,9 +95,8 @@ export default function AdminDiscountsPage() {
     // ── Add Tier ───────────────────────────────────────────
     const handleAddTier = async () => {
         try {
-            const res = await fetch(`${API_URL}/discounts/tiers`, {
+            const res = await apiFetch(`/discounts/tiers`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify({
                     productId: selectedProduct,
                     minQty: newTier.minQty,
@@ -120,7 +118,7 @@ export default function AdminDiscountsPage() {
     // ── Delete Tier ────────────────────────────────────────
     const handleDeleteTier = async (id: string) => {
         try {
-            const res = await fetch(`${API_URL}/discounts/tiers/${id}`, { method: 'DELETE', headers: {  } });
+            const res = await apiFetch(`/discounts/tiers/${id}`, { method: 'DELETE' });
             if (res.ok) { showToast('success', 'Tier deleted'); fetchTiers(selectedProduct); }
         } catch { showToast('error', 'Failed to delete tier'); }
     };
@@ -128,7 +126,7 @@ export default function AdminDiscountsPage() {
     // ── Calculate Price ────────────────────────────────────
     const handleCalcPrice = async () => {
         try {
-            const res = await fetch(`${API_URL}/discounts/calculate?productId=${selectedProduct}&quantity=${calcQty}`, { headers: {  } });
+            const res = await apiFetch(`/discounts/calculate?productId=${selectedProduct}&quantity=${calcQty}`);
             if (res.ok) setCalcResult(await res.json());
         } catch { showToast('error', 'Calculation failed'); }
     };
@@ -137,7 +135,7 @@ export default function AdminDiscountsPage() {
     const fetchGroups = async () => {
         setIsLoadingGroups(true);
         try {
-            const res = await fetch(`${API_URL}/discounts/groups`, { headers: {  } });
+            const res = await apiFetch(`/discounts/groups`);
             if (res.ok) setGroups(await res.json());
         } catch (e) { console.error(e); }
         setIsLoadingGroups(false);
@@ -148,9 +146,8 @@ export default function AdminDiscountsPage() {
     // ── Create Group ───────────────────────────────────────
     const handleCreateGroup = async () => {
         try {
-            const res = await fetch(`${API_URL}/discounts/groups`, {
+            const res = await apiFetch(`/discounts/groups`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify(newGroup),
             });
             if (res.ok) { showToast('success', 'Group created!'); fetchGroups(); setShowNewGroupForm(false); setNewGroup({ name: '', discountPercent: 5, description: '' }); }
@@ -161,7 +158,7 @@ export default function AdminDiscountsPage() {
     // ── Delete Group ───────────────────────────────────────
     const handleDeleteGroup = async (id: string) => {
         try {
-            const res = await fetch(`${API_URL}/discounts/groups/${id}`, { method: 'DELETE', headers: {  } });
+            const res = await apiFetch(`/discounts/groups/${id}`, { method: 'DELETE' });
             if (res.ok) { showToast('success', 'Group deleted'); fetchGroups(); }
         } catch { showToast('error', 'Failed to delete group'); }
     };
@@ -170,9 +167,8 @@ export default function AdminDiscountsPage() {
     const handleAddMember = async () => {
         if (!addMemberGroupId || !memberUserId) return;
         try {
-            const res = await fetch(`${API_URL}/discounts/groups/${addMemberGroupId}/members`, {
+            const res = await apiFetch(`/discounts/groups/${addMemberGroupId}/members`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify({ userId: memberUserId }),
             });
             if (res.ok) { showToast('success', 'Member added!'); fetchGroups(); setAddMemberGroupId(null); setMemberUserId(''); }
@@ -183,7 +179,7 @@ export default function AdminDiscountsPage() {
     // ── Remove Member ──────────────────────────────────────
     const handleRemoveMember = async (groupId: string, userId: string) => {
         try {
-            const res = await fetch(`${API_URL}/discounts/groups/${groupId}/members/${userId}`, { method: 'DELETE', headers: {  } });
+            const res = await apiFetch(`/discounts/groups/${groupId}/members/${userId}`, { method: 'DELETE' });
             if (res.ok) { showToast('success', 'Member removed'); fetchGroups(); }
         } catch { showToast('error', 'Failed to remove member'); }
     };

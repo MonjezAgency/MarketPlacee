@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, Loader2, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { apiFetch } from '@/lib/api';
 
 function VerifyEmailContent() {
     const searchParams = useSearchParams();
@@ -18,8 +19,7 @@ function VerifyEmailContent() {
 
         const verify = async () => {
             try {
-                const apiUrl = '/api';
-                const res = await fetch(`${apiUrl}/auth/verify-email?token=${token}`);
+                const res = await apiFetch(`/auth/verify-email?token=${token}`);
                 const data = await res.json();
 
                 if (res.ok) {

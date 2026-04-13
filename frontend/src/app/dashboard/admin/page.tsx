@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/currency';
 import { Product, ProductStatus } from '@/lib/types';
+import { apiFetch } from '@/lib/api';
 
 const MOCK_PLATFORM_STATS = [
     { label: 'Total Users', value: '1,280', delta: '+45 this week', icon: Users, color: 'text-primary' },
@@ -40,14 +41,12 @@ export default function AdminDashboard() {
         setIsLoading(true);
         try {
             
-            const headers = {  };
-
             const [usersP, productsP, markupP, brandsP, adsP] = await Promise.allSettled([
-                fetch(('/api') + '/users?status=PENDING_APPROVAL', { headers }),
-                fetch(('/api') + '/admin/config/all-products', { headers }),
-                fetch(('/api') + '/admin/config/markup', { headers }),
-                fetch(('/api') + '/admin/config/allowed-brands', { headers }),
-                fetch(('/api') + '/ads/admin/all', { headers })
+                apiFetch(`/users?status=PENDING_APPROVAL`),
+                apiFetch(`/admin/config/all-products`),
+                apiFetch(`/admin/config/markup`),
+                apiFetch(`/admin/config/allowed-brands`),
+                apiFetch(`/ads/admin/all`)
             ]);
 
             if (usersP.status === 'fulfilled' && usersP.value.ok) {
@@ -86,9 +85,8 @@ export default function AdminDashboard() {
         if (!confirm(`Update global markup rating to ${markup}?`)) return;
         try {
             
-            await fetch(('/api') + '/admin/config/markup', {
+            await apiFetch(`/admin/config/markup`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ percentage: markup })
             });
             alert('Markup updated successfully');
@@ -101,9 +99,8 @@ export default function AdminDashboard() {
         setBrandsLoading(true);
         try {
             
-            const res = await fetch(('/api') + '/admin/config/allowed-brands', {
+            const res = await apiFetch(`/admin/config/allowed-brands`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ brands })
             });
             if (res.ok) {
@@ -134,9 +131,8 @@ export default function AdminDashboard() {
     const handleApproveProduct = async (id: string) => {
         try {
             
-            const res = await fetch(`${'/api'}/admin/config/products/${id}/approve`, {
-                method: 'PUT',
-                headers: {  }
+            const res = await apiFetch(`/admin/config/products/${id}/approve`, {
+                method: 'PUT'
             });
             if (res.ok) {
                 const updatedProduct = pendingProducts.find(p => p.id === id);
@@ -153,9 +149,8 @@ export default function AdminDashboard() {
         if (!reason) return;
         try {
             
-            const res = await fetch(`${'/api'}/admin/config/products/${id}/reject`, {
+            const res = await apiFetch(`/admin/config/products/${id}/reject`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason })
             });
             if (res.ok) {
@@ -170,9 +165,8 @@ export default function AdminDashboard() {
         if (!adProductId) return alert("Enter Product ID");
         try {
             
-            const res = await fetch(`${'/api'}/ads/admin/create`, {
+            const res = await apiFetch(`/ads/admin/create`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ productId: adProductId, placement: adPlacement })
             });
             if (res.ok) {
@@ -190,9 +184,8 @@ export default function AdminDashboard() {
     const handleRemoveAd = async (id: string) => {
         try {
             
-            await fetch(`${'/api'}/ads/admin/${id}`, {
-                method: 'DELETE',
-                headers: {  }
+            await apiFetch(`/ads/admin/${id}`, {
+                method: 'DELETE'
             });
             fetchDashboardData();
         } catch (e) {

@@ -130,13 +130,8 @@ export default function AdminNewProductPage() {
                 const uploadData = new FormData();
                 uploadData.append('file', file);
 
-                const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-                const apiUrl = `${backendBase}/products/bulk-upload`;
-
-                const res = await fetch(apiUrl, {
+                const res = await apiFetch(`/products/bulk-upload`, {
                     method: 'POST',
-                    headers: {
-                    },
                     body: uploadData,
                 });
 

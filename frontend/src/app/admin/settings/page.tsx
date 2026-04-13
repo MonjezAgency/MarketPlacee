@@ -18,9 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-
-const API_URL = '/api';
-
+import { apiFetch } from '@/lib/api';
 export default function AdminSettingsPage() {
     const { user, updateUser } = useAuth();
     const [avatar, setAvatar] = React.useState<string | null>(null);
@@ -47,8 +45,7 @@ export default function AdminSettingsPage() {
     const [isSavingMarkup, setIsSavingMarkup] = React.useState(false);
 
     React.useEffect(() => {
-        
-        fetch(`${API_URL}/admin/config/markup`, { headers: {  } })
+        apiFetch(`/admin/config/markup`)
             .then(r => r.json())
             .then(data => {
                 if (data?.markup) {
@@ -72,9 +69,8 @@ export default function AdminSettingsPage() {
                 pallet:    1 + (parseFloat(markupPallet) || 0) / 100,
                 container: 1 + (parseFloat(markupContainer) || 0) / 100,
             };
-            const res = await fetch(`${API_URL}/admin/config/markup`, {
+            const res = await apiFetch(`/admin/config/markup`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify(payload),
             });
             if (res.ok) showToast('success', 'Markup percentages saved. New products will use the updated rates.');

@@ -9,8 +9,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
-
-const API_URL = '/api';
+import { apiFetch } from '@/lib/api';
 
 function maskIban(iban: string) {
     if (!iban || iban.length < 8) return iban;
@@ -41,9 +40,6 @@ export default function PaymentMethodsPage() {
     const [connectStatus, setConnectStatus] = React.useState<any>(null);
     const [isConnecting, setIsConnecting] = React.useState(false);
 
-    
-    const headers = { 'Content-Type': 'application/json' };
-
     const showToast = (type: 'success' | 'error', msg: string) => {
         setToast({ type, msg });
         setTimeout(() => setToast(null), 4000);
@@ -51,9 +47,9 @@ export default function PaymentMethodsPage() {
 
     React.useEffect(() => {
         Promise.all([
-            fetch(`${API_URL}/kyc/status`, { headers: {  } }).then(r => r.json()),
-            fetch(`${API_URL}/auth/me`, { headers: {  } }).then(r => r.json()),
-            fetch(`${API_URL}/payments/connect/status`, { headers: {  } }).then(r => r.ok ? r.json() : null),
+            apiFetch(`/kyc/status`).then(r => r.json()),
+            apiFetch(`/auth/me`).then(r => r.json()),
+            apiFetch(`/payments/connect/status`).then(r => r.ok ? r.json() : null),
         ]).then(([kyc, profile, connect]) => {
             setKycStatus(kyc.kycStatus || 'UNVERIFIED');
             if (profile?.iban) { setSavedIban(maskIban(profile.iban)); setHasBank(true); }
@@ -64,9 +60,8 @@ export default function PaymentMethodsPage() {
     const handleStripeConnect = async () => {
         setIsConnecting(true);
         try {
-            const res = await fetch(`${API_URL}/payments/connect/onboard`, {
+            const res = await apiFetch(`/payments/connect/onboard`, {
                 method: 'POST',
-                headers: {  },
             });
             if (!res.ok) { showToast('error', 'Failed to start Stripe Connect onboarding'); return; }
             const { url } = await res.json();
@@ -85,9 +80,8 @@ export default function PaymentMethodsPage() {
 
         setSaving(true);
         try {
-            const res = await fetch(`${API_URL}/users/${user.id}`, {
+            const res = await apiFetch(`/users/${user.id}`, {
                 method: 'POST',
-                headers,
                 body: JSON.stringify({ iban: iban.trim(), swiftCode: swiftCode.trim(), bankAddress: bankAddress.trim() }),
             });
             if (!res.ok) {

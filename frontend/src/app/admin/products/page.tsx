@@ -143,8 +143,7 @@ function ProductDetailModal({ product, onClose, onApprove, onReject, onDelete, o
 
         setIsFetchingEan(true);
         try {
-            const backendBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-            const res = await fetch(`${backendBase}/products/ean/${editedData.ean}`);
+            const res = await apiFetch(`/products/ean/${editedData.ean}`);
             if (res.ok) {
                 const { imageUrl } = await res.json();
                 if (imageUrl) {

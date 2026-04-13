@@ -7,8 +7,7 @@ import {
     ShieldCheck, Loader2, RefreshCw, CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-const API_URL = '/api';
+import { apiFetch } from '@/lib/api';
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -52,9 +51,7 @@ export default function SupplierOrdersPage() {
     const fetchOrders = React.useCallback(async () => {
         setIsLoading(true);
         try {
-            const res = await fetch(`${API_URL}/orders/my-orders`, {
-                headers: {  },
-            });
+            const res = await apiFetch(`/orders/my-orders`);
             if (res.ok) setOrders(await res.json());
         } catch { /* ignore */ }
         finally { setIsLoading(false); }
@@ -65,9 +62,8 @@ export default function SupplierOrdersPage() {
     const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
         setUpdatingId(orderId);
         try {
-            const res = await fetch(`${API_URL}/orders/${orderId}/status`, {
+            const res = await apiFetch(`/orders/${orderId}/status`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json',  },
                 body: JSON.stringify({ status }),
             });
             if (res.ok) setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));

@@ -18,8 +18,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
-
-const API_URL = '/api';
+import { apiFetch } from '@/lib/api';
 
 type MarkupData = { pallet: number; container: number };
 
@@ -40,9 +39,7 @@ export default function AdminPricingPage() {
         setIsLoading(true);
         try {
             
-            const res = await fetch(`${API_URL}/admin/config/markup`, {
-                headers: {  },
-            });
+            const res = await apiFetch(`/admin/config/markup`);
             if (res.ok) {
                 const data = await res.json();
                 if (data.markup && typeof data.markup === 'object') {
@@ -72,11 +69,8 @@ export default function AdminPricingPage() {
         setIsSaving(true);
         try {
             
-            const res = await fetch(`${API_URL}/admin/config/markup`, {
+            const res = await apiFetch(`/admin/config/markup`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
                 body: JSON.stringify(newMarkup),
             });
             if (res.ok) {

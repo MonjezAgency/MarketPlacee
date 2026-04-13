@@ -4,6 +4,7 @@ import * as React from 'react';
 import { motion } from 'framer-motion';
 import { Star, Trash2, Search, Filter, Loader2, MessageSquare } from 'lucide-react';
 import { User } from '@/lib/auth';
+import { apiFetch } from '@/lib/api';
 
 interface Review {
     id: string;
@@ -16,7 +17,7 @@ interface Review {
     };
 }
 
-const API_URL = '/api';
+
 
 function StarRating({ rating }: { rating: number }) {
     return (
@@ -46,9 +47,7 @@ export default function AdminReviewsPage() {
             
             const params = new URLSearchParams({ page: String(p), limit: String(limit) });
             if (mr !== undefined) params.set('maxRating', String(mr));
-            const res = await fetch(`${API_URL}/admin/reviews?${params}`, {
-                headers: {  },
-            });
+            const res = await apiFetch(`/admin/reviews?${params}`);
             if (res.ok) {
                 const data = await res.json();
                 setReviews(data.data || []);
@@ -66,9 +65,8 @@ export default function AdminReviewsPage() {
         setDeletingId(reviewId);
         try {
             
-            const res = await fetch(`${API_URL}/admin/reviews/${reviewId}`, {
+            const res = await apiFetch(`/admin/reviews/${reviewId}`, {
                 method: 'DELETE',
-                headers: {  },
             });
             if (res.ok) {
                 setReviews(prev => prev.filter(r => r.id !== reviewId));
