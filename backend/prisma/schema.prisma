@@ -614,7 +614,7 @@ model LoginAttempt {
   success   Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  @@index([email])
+  @@index([email, success, createdAt])
   @@index([createdAt])
 }
 

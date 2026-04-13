@@ -69,32 +69,51 @@ export class AuthService {
     }
 
     async validateUser(email: string, pass: string, ip?: string): Promise<any> {
+        const startTime = Date.now();
+        this.logger.log(`[AUTH] Validating user: ${email} from IP: ${ip}`);
+
         // ── Account lockout check ─────────────────────────────────────────────
+        const lockoutStart = Date.now();
         if (await this.isAccountLocked(email)) {
+            this.logger.warn(`[AUTH] Account locked for email: ${email}`);
             throw new UnauthorizedException(
                 'تم تجاوز الحد المسموح من المحاولات. حاول مرة أخرى بعد 15 دقيقة.',
             );
         }
+        this.logger.debug(`[AUTH] Lockout check took: ${Date.now() - lockoutStart}ms`);
 
+        const dbStart = Date.now();
         const user = await this.prisma.user.findUnique({ where: { email } });
+        this.logger.debug(`[AUTH] User DB fetch took: ${Date.now() - dbStart}ms`);
+        
         if (!user) {
+            this.logger.warn(`[AUTH] User not found: ${email}`);
             // Record failed attempt even for non-existent accounts (prevent enumeration timing)
             await this.recordLoginAttempt(email, false, ip);
             return null;
         }
 
         // Check password
-        if (await bcrypt.compare(pass, user.password)) {
+        const bcryptStart = Date.now();
+        const isMatch = await bcrypt.compare(pass, user.password);
+        this.logger.debug(`[AUTH] Bcrypt compare took: ${Date.now() - bcryptStart}ms`);
+        
+        if (isMatch) {
             // Clear recent failed attempts on successful login
             await this.recordLoginAttempt(email, true, ip);
 
             // Check status
             if (user.status === 'PENDING_APPROVAL') {
+                this.logger.warn(`[AUTH] Login blocked: User ${email} pending approval`);
                 throw new UnauthorizedException('حسابك قيد المراجعة في انتظار موافقة الإدارة');
             }
             if (user.status === 'REJECTED' || user.status === 'BLOCKED') {
+                this.logger.warn(`[AUTH] Login blocked: User ${email} status is ${user.status}`);
                 throw new UnauthorizedException(`حسابك موقوف أو مرفوض: ${user.status}`);
             }
+
+            this.logger.log(`[AUTH] User ${email} validated successfully in ${Date.now() - startTime}ms`);
+            
             // Strict scrubbing: NEVER expose passwords or billing data to the frontend
             const {
                 password, iban, swiftCode, taxId, bankAddress, vatNumber,
@@ -105,6 +124,7 @@ export class AuthService {
             return safeResult;
         }
 
+        this.logger.warn(`[AUTH] Invalid password for: ${email}`);
         // Wrong password — record failure
         await this.recordLoginAttempt(email, false, ip);
         return null;
