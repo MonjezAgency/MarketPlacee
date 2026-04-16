@@ -23,17 +23,20 @@ export async function middleware(request: NextRequest) {
   // ✅ Logged in + validate token
   if (isProtectedRoute && token) {
     try {
-      // Decode JWT payload safely using jose to handle Base64Url encoding
-      // We don't verify the signature here to avoid mismatching secrets between Vercel and Railway
-      const payload = decodeJwt(token);
+      // Safely decode Base64Url manually to avoid any edge runtime errors with jose or standard atob
+      let base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      while (base64.length % 4) {
+        base64 += '=';
+      }
+      const payload = JSON.parse(atob(base64));
       const onboardingCompleted = payload.onboardingCompleted as boolean;
 
       if (onboardingCompleted === false && pathname !== '/auth/onboarding') {
         return NextResponse.redirect(new URL('/auth/onboarding', request.url));
       }
     } catch (e) {
-      // Only delete cookie and redirect if the token is completely malformed
-      console.error('Middleware token decode error:', e);
+      console.error('Terminal Token Decode Error:', e);
+      // Only fail if completely corrupted
       const response = NextResponse.redirect(new URL('/auth/login', request.url));
       response.cookies.delete(process.env.JWT_COOKIE_NAME || 'token');
       return response;
