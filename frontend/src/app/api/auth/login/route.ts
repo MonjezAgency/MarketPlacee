@@ -12,7 +12,7 @@ export async function POST(request: Request) {
     const backendUrl = `${BACKEND_BASE()}/auth/login`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout
+    const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
 
     const res = await fetch(backendUrl, {
       method: 'POST',
@@ -67,11 +67,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, user });
   } catch (error: any) {
     console.error('[PROXY_LOGIN_ERROR]', error);
-    const isNetworkError = error.cause?.code === 'ECONNREFUSED' || error.message?.includes('fetch failed');
+    const isNetworkError =
+      error.cause?.code === 'ECONNREFUSED' ||
+      error.message?.includes('fetch failed') ||
+      error.message?.includes('aborted') ||
+      error.name === 'AbortError';
     return NextResponse.json(
       {
         message: isNetworkError
-          ? 'Cannot connect to backend service. Please try again in a moment.'
+          ? 'Backend service is temporarily unavailable. Please try again in a moment.'
           : `Login failed: ${error.message}`,
       },
       { status: 503 }
