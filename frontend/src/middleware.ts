@@ -23,9 +23,9 @@ export async function middleware(request: NextRequest) {
   // ✅ Logged in + validate token
   if (isProtectedRoute && token) {
     try {
-      // Decode JWT payload manually to avoid signature mismatch or jose Edge runtime issues
-      const payloadBase64 = token.split('.')[1];
-      const payload = JSON.parse(atob(payloadBase64));
+      // Decode JWT payload safely using jose to handle Base64Url encoding
+      // We don't verify the signature here to avoid mismatching secrets between Vercel and Railway
+      const payload = decodeJwt(token);
       const onboardingCompleted = payload.onboardingCompleted as boolean;
 
       if (onboardingCompleted === false && pathname !== '/auth/onboarding') {
