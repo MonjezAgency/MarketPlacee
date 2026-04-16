@@ -10,6 +10,7 @@ import helmet from 'helmet';
 import { SecurityExceptionFilter } from './security/security.exception-filter';
 import { SecurityService } from './security/security.service';
 import { IoAdapter } from '@nestjs/platform-socket.io';
+import { SupabaseStorageService } from './storage/supabase-storage.service';
 
 async function bootstrap() {
     // try to load .env if it exists (for local development)
@@ -35,8 +36,12 @@ async function bootstrap() {
     // Required to read X-Forwarded-Proto for Secure cookies
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
-    // Serve uploaded KYC files as static assets
-    app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
+    // Note: KYC files are now stored in Supabase Storage (not local disk).
+    // Local /uploads/ serving kept only for any legacy files already in the DB.
+    // New uploads never touch the local filesystem.
+    if (require('fs').existsSync(join(process.cwd(), 'uploads'))) {
+        app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
+    }
 
     // 2. SECOND: Raw body for Stripe webhooks (must be before regular parsers)
     app.use('/api/payments/webhook', express.raw({ type: 'application/json' }));
@@ -114,11 +119,19 @@ async function bootstrap() {
     app.useGlobalPipes(new ValidationPipe({
         whitelist: true,
         transform: true,
-        forbidNonWhitelisted: false,
+        forbidNonWhitelisted: process.env.NODE_ENV === 'production',
     }));
 
     // WebSocket support
     app.useWebSocketAdapter(new IoAdapter(app));
+
+    // Ensure Supabase KYC bucket exists on startup
+    try {
+        const storage = app.get(SupabaseStorageService);
+        await storage.ensureBucketExists();
+    } catch (e) {
+        console.warn('[BOOTSTRAP] Supabase bucket check skipped:', e.message);
+    }
 
     const port = process.env.PORT || 3005;
     await app.listen(port, '0.0.0.0');

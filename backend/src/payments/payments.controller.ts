@@ -62,14 +62,6 @@ export class PaymentsController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.SUPPLIER)
     async getConnectStatus(@Request() req) {
-        const user = await this.usersService
-            .findById(req.user.sub);
-        return {
-            connected: !!user.stripeAccountId,
-            onboarded: user.stripeOnboarded ?? false,
-            accountId: user.stripeAccountId
-                ? '****' + user.stripeAccountId.slice(-4)
-                : null,
-        };
+        return this.paymentsService.getConnectStatus(req.user.sub);
     }
 }

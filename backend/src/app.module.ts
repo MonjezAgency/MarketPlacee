@@ -30,6 +30,8 @@ import { WishlistModule } from './wishlist/wishlist.module';
 import { PaymentsModule } from './payments/payments.module';
 import { DisputesModule } from './disputes/disputes.module';
 import { OwnerModule } from './owner/owner.module';
+import { HealthModule } from './health/health.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
     imports: [
@@ -59,6 +61,8 @@ import { OwnerModule } from './owner/owner.module';
         InvoiceModule,
         FinanceModule,
         OwnerModule,
+        HealthModule,
+        StorageModule,
     ],
     controllers: [AppController],
     providers: [

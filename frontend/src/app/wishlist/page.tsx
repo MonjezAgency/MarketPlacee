@@ -37,7 +37,8 @@ export default function WishlistPage() {
     const fetchWishlist = React.useCallback(async () => {
         if (!user) { setIsLoading(false); return; }
         try {
-            const res = await apiFetch(`/wishlist`, { cache: 'no-store' });
+            // Use Next.js proxy — httpOnly cookie forwarded server-side
+            const res = await fetch('/api/wishlist', { cache: 'no-store' });
             if (res.status === 401) {
                  setItems([]);
                  return;
@@ -52,7 +53,7 @@ export default function WishlistPage() {
     const handleRemove = async (productId: string) => {
         setRemoving(productId);
         try {
-            await apiFetch(`/wishlist/${productId}`, { method: 'DELETE' });
+            await fetch(`/api/wishlist/${productId}`, { method: 'DELETE' });
             setItems(prev => prev.filter(i => i.id !== productId));
         } finally { setRemoving(null); }
     };

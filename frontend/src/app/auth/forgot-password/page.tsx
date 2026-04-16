@@ -24,14 +24,18 @@ export default function ForgotPasswordPage() {
         setLoading(true);
         try {
             const { apiFetch } = await import('@/lib/api');
-            await apiFetch('/auth/forgot-password', {
+            const res = await apiFetch('/auth/forgot-password', {
                 method: 'POST',
                 body: JSON.stringify({ email }),
             });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.message || 'Failed to send reset link');
+            }
             setSuccess(true);
             toast.success('Reset link sent!');
         } catch (err: any) {
-            setError(err.message || 'Failed to send reset link');
+            setError(err.message || 'Failed to send reset link. Please try again.');
             toast.error('Something went wrong. Please try again.');
         } finally {
             setLoading(false);

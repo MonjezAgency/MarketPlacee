@@ -9,6 +9,38 @@ import {
 import axios from 'axios';
 import { cn } from '@/lib/utils';
 
+/**
+ * Resolves a KYC image URL.
+ * - If it's a supabase:// path → fetches a signed URL from the backend
+ * - Otherwise → returns as-is (legacy /uploads/ paths or external URLs)
+ */
+function KycImage({ storagePath, alt, className }: { storagePath: string; alt: string; className?: string }) {
+    const [src, setSrc] = React.useState<string | null>(null);
+    const [error, setError] = React.useState(false);
+
+    React.useEffect(() => {
+        if (!storagePath) return;
+        if (!storagePath.startsWith('supabase://')) {
+            setSrc(storagePath);
+            return;
+        }
+        // Fetch signed URL from backend
+        fetch(`/api/proxy/kyc/admin/signed-url?path=${encodeURIComponent(storagePath)}`, { credentials: 'same-origin' })
+            .then(r => r.ok ? r.json() : Promise.reject())
+            .then(data => setSrc(data.url))
+            .catch(() => setError(true));
+    }, [storagePath]);
+
+    if (error) return <div className={cn("flex items-center justify-center bg-muted rounded-xl text-xs text-muted-foreground", className)}>Failed to load</div>;
+    if (!src) return <div className={cn("flex items-center justify-center bg-muted rounded-xl animate-pulse", className)} />;
+
+    return (
+        <a href={src} target="_blank" rel="noreferrer">
+            <img src={src} alt={alt} className={cn("object-cover rounded-xl border border-border hover:opacity-80 transition-opacity", className)} />
+        </a>
+    );
+}
+
 interface KycDoc {
     id: string;
     documentType: string;
@@ -297,25 +329,19 @@ export default function AdminKycPage() {
                                     {selected.frontImageUrl && (
                                         <div className="space-y-1">
                                             <p className="text-xs font-bold text-muted-foreground">Front Side</p>
-                                            <a href={selected.frontImageUrl} target="_blank" rel="noreferrer">
-                                                <img src={selected.frontImageUrl} alt="Front" className="w-full h-32 object-cover rounded-xl border border-border hover:opacity-80 transition-opacity" />
-                                            </a>
+                                            <KycImage storagePath={selected.frontImageUrl} alt="Front" className="w-full h-32" />
                                         </div>
                                     )}
                                     {selected.backImageUrl && (
                                         <div className="space-y-1">
                                             <p className="text-xs font-bold text-muted-foreground">Back Side</p>
-                                            <a href={selected.backImageUrl} target="_blank" rel="noreferrer">
-                                                <img src={selected.backImageUrl} alt="Back" className="w-full h-32 object-cover rounded-xl border border-border hover:opacity-80 transition-opacity" />
-                                            </a>
+                                            <KycImage storagePath={selected.backImageUrl} alt="Back" className="w-full h-32" />
                                         </div>
                                     )}
                                     {selected.selfieUrl && (
                                         <div className="space-y-1">
                                             <p className="text-xs font-bold text-muted-foreground">Selfie</p>
-                                            <a href={selected.selfieUrl} target="_blank" rel="noreferrer">
-                                                <img src={selected.selfieUrl} alt="Selfie" className="w-full h-32 object-cover rounded-xl border border-border hover:opacity-80 transition-opacity" />
-                                            </a>
+                                            <KycImage storagePath={selected.selfieUrl} alt="Selfie" className="w-full h-32" />
                                         </div>
                                     )}
                                 </div>

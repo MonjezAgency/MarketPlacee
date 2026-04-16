@@ -13,7 +13,8 @@ export function useWishlist() {
     const fetchWishlist = useCallback(async () => {
         if (!user) return;
         try {
-            const res = await apiFetch('/wishlist');
+            // Use Next.js proxy so the httpOnly cookie is forwarded server-side
+            const res = await fetch('/api/wishlist', { cache: 'no-store' });
             if (res.status === 401) {
                 setWishlistIds(new Set());
                 return;
@@ -40,7 +41,8 @@ export function useWishlist() {
 
         try {
             setIsLoading(true);
-            const res = await apiFetch(`/wishlist/${productId}`, {
+            // Use Next.js proxy — cookies are forwarded server-side
+            const res = await fetch(`/api/wishlist/${productId}`, {
                 method: isSaved ? 'DELETE' : 'POST',
             });
 

@@ -75,6 +75,17 @@ export class AdminService {
         });
     }
 
+    /** Set KYC status to VERIFIED for a team member (OWNER only) */
+    async verifyTeamMemberKyc(userId: string) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw new NotFoundException('User not found');
+        return this.prisma.user.update({
+            where: { id: userId },
+            data: { kycStatus: 'VERIFIED' },
+            select: { id: true, email: true, kycStatus: true },
+        });
+    }
+
     async deleteTeamMember(id: string) {
         const user = await this.prisma.user.findUnique({ where: { id } });
         if (!user) throw new NotFoundException('User not found');

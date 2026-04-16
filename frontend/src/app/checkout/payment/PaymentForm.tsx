@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, Lock, AlertCircle } from 'lucide-react';
+import { formatPrice } from '@/lib/currency';
 
 interface Props {
   orderId: string;
@@ -102,7 +103,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
         ) : (
           <>
             <Lock className="w-4 h-4 group-hover:-translate-y-0.5 transition-transform" />
-            <span>Pay £{totalAmount.toLocaleString()}</span>
+            <span>Pay {formatPrice(totalAmount)}</span>
           </>
         )}
       </button>

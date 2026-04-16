@@ -7,9 +7,11 @@ import { StripeWebhookController } from './stripe-webhook.controller';
 import { PrismaModule } from '../common/prisma.module';
 import { UsersModule } from '../users/users.module';
 import { OrdersModule } from '../orders/orders.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { EmailModule } from '../email/email.module';
 
 @Module({
-    imports: [PrismaModule, UsersModule, forwardRef(() => OrdersModule)],
+    imports: [PrismaModule, UsersModule, forwardRef(() => OrdersModule), NotificationsModule, EmailModule],
     controllers: [PaymentsController, StripeWebhookController],
     providers: [PaymentsService, EscrowService, StripeGateway, Logger],
     exports: [PaymentsService, EscrowService],

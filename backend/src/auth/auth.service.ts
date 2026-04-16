@@ -478,8 +478,9 @@ export class AuthService {
             },
         });
 
-        // This will now throw InternalServerErrorException if delivery fails
-        await this.emailService.sendPasswordResetEmail(user.email, user.name, token);
+        // Fire-and-forget email — never reveal delivery status to prevent enumeration
+        this.emailService.sendPasswordResetEmail(user.email, user.name, token)
+            .catch(err => this.logger.error(`[FORGOT_PASSWORD] Email delivery failed for ${user.email}: ${err.message}`));
 
         return { success: true, message: 'If that email exists, a reset link was sent.' };
     }

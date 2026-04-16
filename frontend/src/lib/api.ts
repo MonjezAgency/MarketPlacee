@@ -14,36 +14,47 @@ export const apiUrl = BASE_URL || '';
 
 /**
  * Standardized fetch wrapper for the Marketplace platform.
- * - Automatically prepends the base URL.
- * - Enforces credentials: 'include' for httpOnly cookie support.
- * - Safely prunes empty Authorization headers to prevent preflight failures.
- * - Never sets Content-Type for FormData (preserves multipart boundary).
+ *
+ * In the browser: routes through /api/proxy/[path] (Next.js server-side route)
+ * which reads the httpOnly `token` cookie and forwards it to Railway.
+ * This solves the cross-domain cookie problem where Vercel-scoped cookies
+ * are not sent by the browser on cross-origin requests to Railway.
+ *
+ * On the server (SSR/RSC): calls the Railway backend directly.
  */
 export async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
-    const url = path.startsWith('http') ? path : `${apiUrl}${path}`;
-    
+    // Absolute URLs (e.g. health checks) are passed through as-is
+    if (path.startsWith('http')) {
+        return fetch(path, { ...options, credentials: 'include' });
+    }
+
+    const isClient = typeof window !== 'undefined';
+
+    // In the browser, route through the authenticated Next.js proxy so the
+    // Vercel-domain httpOnly cookie gets forwarded to the Railway backend.
+    const url = isClient
+        ? `/api/proxy${path.startsWith('/') ? path : `/${path}`}`
+        : `${apiUrl}${path}`;
+
     // Build headers safely
     const headers: Record<string, string> = {
         ...(options.headers as Record<string, string>),
     };
 
-    // Only set Content-Type for non-FormData, non-GET/DELETE requests
-    if (
-        !(options.body instanceof FormData) &&
-        !headers['Content-Type']
-    ) {
+    // Only set Content-Type for non-FormData bodies
+    if (!(options.body instanceof FormData) && !headers['Content-Type']) {
         headers['Content-Type'] = 'application/json';
     }
 
-    // Remove empty/undefined Authorization header
-    // (prevents failed CORS preflight on OPTIONS)
+    // Remove empty Authorization header (prevents CORS preflight failures)
     if (!headers['Authorization']) {
         delete headers['Authorization'];
     }
 
     return fetch(url, {
         ...options,
-        credentials: 'include',
+        // credentials: 'include' is still needed for server-side direct calls
+        credentials: isClient ? 'same-origin' : 'include',
         headers,
     });
 }

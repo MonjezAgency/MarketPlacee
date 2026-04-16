@@ -29,7 +29,20 @@ function PayoutSettingsContent() {
     
     const [isLoading, setIsLoading] = React.useState(false);
     const [isOnboarding, setIsOnboarding] = React.useState(false);
-    const [status, setStatus] = React.useState<{ type: 'success' | 'error', msg: string } | null>(null);
+    const [status, setStatus] = React.useState<{ type: 'success' | 'error', msg: string } | null>(() => {
+        return null;
+    });
+
+    // Handle Stripe Connect return URLs
+    React.useEffect(() => {
+        const successParam = searchParams.get('success');
+        const refreshParam = searchParams.get('refresh');
+        if (successParam === 'true') {
+            setStatus({ type: 'success', msg: 'Stripe account connected successfully! You can now receive payouts.' });
+        } else if (refreshParam === 'true') {
+            setStatus({ type: 'error', msg: 'Stripe onboarding session expired. Please try connecting again.' });
+        }
+    }, [searchParams]);
 
     // Form states
     const [formData, setFormData] = React.useState({

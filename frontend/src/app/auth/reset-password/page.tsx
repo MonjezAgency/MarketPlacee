@@ -21,6 +21,9 @@ function ResetPasswordContent() {
     const [error, setError] = useState('');
 
     useEffect(() => {
+        if (!token) {
+            setError('Invalid reset link. Please request a new password reset.');
+        }
     }, [token]);
 
     const handleReset = async (e: React.FormEvent) => {

@@ -13,29 +13,13 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
-import { extname, join } from 'path';
-import { existsSync, mkdirSync } from 'fs';
+import { memoryStorage } from 'multer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role, KYCStatus } from '@prisma/client';
 import { KycService } from './kyc.service';
-
-const uploadDir = join(process.cwd(), 'uploads', 'kyc');
-
-// Ensure upload directory exists
-if (!existsSync(uploadDir)) {
-  mkdirSync(uploadDir, { recursive: true });
-}
-
-const multerStorage = diskStorage({
-  destination: uploadDir,
-  filename: (req, file, cb) => {
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `kyc-${uniqueSuffix}${extname(file.originalname)}`);
-  },
-});
+import { SupabaseStorageService } from '../storage/supabase-storage.service';
 
 const imageFilter = (req: any, file: Express.Multer.File, cb: any) => {
   if (!file.mimetype.match(/^image\/(jpeg|jpg|png|webp)$/)) {
@@ -48,9 +32,12 @@ const imageFilter = (req: any, file: Express.Multer.File, cb: any) => {
 @Controller('kyc')
 @UseGuards(JwtAuthGuard)
 export class KycController {
-  constructor(private readonly kycService: KycService) {}
+  constructor(
+    private readonly kycService: KycService,
+    private readonly storage: SupabaseStorageService,
+  ) {}
 
-  /** Submit KYC with base64 images (JSON body) */
+  /** Submit KYC with base64 / external image URLs (JSON body) */
   @Post('submit')
   async submitKyc(
     @Request() req,
@@ -65,9 +52,19 @@ export class KycController {
     return this.kycService.submitKyc(req.user.sub, body);
   }
 
-  /** Submit KYC with file uploads (multipart) */
+  /**
+   * Submit KYC with file uploads (multipart/form-data).
+   * Files are stored in memory and uploaded directly to Supabase Storage.
+   * No files ever touch the local disk.
+   */
   @Post('upload')
-  @UseInterceptors(FilesInterceptor('files', 3, { storage: multerStorage, fileFilter: imageFilter }))
+  @UseInterceptors(
+    FilesInterceptor('files', 3, {
+      storage: memoryStorage(),
+      fileFilter: imageFilter,
+      limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB per file
+    }),
+  )
   async uploadKycFiles(
     @Request() req,
     @UploadedFiles() files: Express.Multer.File[],
@@ -77,14 +74,27 @@ export class KycController {
       throw new BadRequestException('At least one file is required');
     }
 
-    const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
+    const userId = req.user.sub;
     const [frontFile, backFile, selfieFile] = files;
 
-    return this.kycService.submitKyc(req.user.sub, {
+    // Upload all files to Supabase in parallel
+    const [frontPath, backPath, selfiePath] = await Promise.all([
+      frontFile
+        ? this.storage.uploadKycFile(userId, frontFile.buffer, frontFile.originalname, frontFile.mimetype)
+        : Promise.resolve(''),
+      backFile
+        ? this.storage.uploadKycFile(userId, backFile.buffer, backFile.originalname, backFile.mimetype)
+        : Promise.resolve(undefined),
+      selfieFile
+        ? this.storage.uploadKycFile(userId, selfieFile.buffer, selfieFile.originalname, selfieFile.mimetype)
+        : Promise.resolve(undefined),
+    ]);
+
+    return this.kycService.submitKyc(userId, {
       documentType: body.documentType,
-      frontImageUrl: frontFile ? `${backendUrl}/uploads/kyc/${frontFile.filename}` : '',
-      backImageUrl: backFile ? `${backendUrl}/uploads/kyc/${backFile.filename}` : undefined,
-      selfieUrl: selfieFile ? `${backendUrl}/uploads/kyc/${selfieFile.filename}` : undefined,
+      frontImageUrl: frontPath,
+      backImageUrl: backPath,
+      selfieUrl: selfiePath,
       livenessScore: body.livenessScore ? parseFloat(body.livenessScore) : undefined,
     });
   }
@@ -93,6 +103,21 @@ export class KycController {
   @Get('status')
   async getMyStatus(@Request() req) {
     return this.kycService.getMyKycStatus(req.user.sub);
+  }
+
+  /**
+   * Get a temporary signed URL for a KYC file (admin only).
+   * URLs expire after 1 hour for security.
+   */
+  @Get('admin/signed-url')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.MODERATOR)
+  async getSignedUrl(@Query('path') path: string) {
+    if (!path?.startsWith('supabase://')) {
+      throw new BadRequestException('Invalid storage path');
+    }
+    const url = await this.storage.getSignedUrl(path);
+    return { url };
   }
 
   /** Admin: get all pending submissions */

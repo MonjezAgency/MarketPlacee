@@ -3,6 +3,7 @@
 import React from 'react';
 import { ShieldCheck, Truck, Package, CheckCircle2 } from 'lucide-react';
 import Image from 'next/image';
+import { formatPrice } from '@/lib/currency';
 
 interface OrderItem {
   id: string;
@@ -81,7 +82,7 @@ export default function OrderSummary({ order }: Props) {
                   <h3 className="text-sm font-semibold text-white line-clamp-2 leading-snug">{item.product.name}</h3>
                   <p className="text-xs text-muted-foreground mt-1">Qty: {item.quantity}</p>
                 </div>
-                <p className="text-sm font-bold text-white">£{item.price.toLocaleString()}</p>
+                <p className="text-sm font-bold text-white">{formatPrice(item.price)}</p>
               </div>
             </div>
           ))}
@@ -90,18 +91,18 @@ export default function OrderSummary({ order }: Props) {
         <div className="p-6 bg-muted/30 space-y-4 border-t border-border/50">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Subtotal</span>
-            <span className="text-white">£{subtotal.toLocaleString()}</span>
+            <span className="text-white">{formatPrice(subtotal)}</span>
           </div>
           <div className="flex justify-between text-sm group">
             <div className="flex items-center gap-1.5 text-muted-foreground">
                 <span>Platform Protection</span>
                 <ShieldCheck className="w-3.5 h-3.5 text-primary" />
             </div>
-            <span className="text-primary font-medium">£{platformFee.toLocaleString()}</span>
+            <span className="text-primary font-medium">{formatPrice(platformFee)}</span>
           </div>
           <div className="pt-4 border-t border-border/50 flex justify-between">
             <span className="text-lg font-bold text-white">Total</span>
-            <span className="text-2xl font-black text-white">£{order.totalAmount.toLocaleString()}</span>
+            <span className="text-2xl font-black text-white">{formatPrice(order.totalAmount)}</span>
           </div>
         </div>
       </div>

@@ -451,6 +451,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         >
                             <Home size={18} />
                         </Link>
+                        {pathname !== '/admin' && (
+                            <Link
+                                href="/admin"
+                                className="w-10 h-10 rounded-xl bg-accent text-accent-foreground flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
+                                title="Back to Dashboard"
+                            >
+                                <LayoutDashboard size={18} />
+                            </Link>
+                        )}
                         <div className="flex flex-col">
                             <h2 className="text-foreground font-black text-xl tracking-tighter uppercase leading-none">
                                 {isDeveloper ? 'Tech Control Panel' : t('admin', 'panelTitle')}

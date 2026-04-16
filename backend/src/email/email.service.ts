@@ -124,35 +124,25 @@ export class EmailService {
   async sendVerificationEmail(email: string, token: string) {
     const baseUrl = this.getFrontendUrl();
     const url = `${baseUrl}/auth/verify-email?token=${token}`;
-    try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: 'Verify your email - Atlantis Marketplace',
-        html: `
-          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
-            <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
-              <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
-              <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
-            </div>
-            <div style="padding: 40px 30px; background: #FFFFFF;">
-              <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Welcome to Atlantis! 👋</h2>
-              <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Please click the button below to verify your email address and activate your account.</p>
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${url}" style="display: inline-block; padding: 16px 40px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Verify Email →</a>
-              </div>
-              <p style="margin-top: 20px; font-size: 12px; color: #667085; text-align: center;">If the button doesn't work, copy and paste this link into your browser: <br/> ${url}</p>
-            </div>
-            <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-              <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
-            </div>
+    await this.sendMail(email, 'Verify your email - Atlantis Marketplace', `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
+          <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
+          <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
+        </div>
+        <div style="padding: 40px 30px; background: #FFFFFF;">
+          <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Welcome to Atlantis! 👋</h2>
+          <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Please click the button below to verify your email address and activate your account.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${url}" style="display: inline-block; padding: 16px 40px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Verify Email →</a>
           </div>
-        `,
-      });
-    } catch (error) {
-      console.error('SMTP ERROR [sendVerificationEmail]:', error);
-      throw error;
-    }
+          <p style="margin-top: 20px; font-size: 12px; color: #667085; text-align: center;">If the button doesn't work, copy and paste this link into your browser: <br/> ${url}</p>
+        </div>
+        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+        </div>
+      </div>
+    `);
   }
 
   async sendPasswordResetEmail(email: string, name: string, token: string) {

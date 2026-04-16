@@ -3,9 +3,6 @@
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { apiFetch } from '@/lib/api';
-// axios is not used anymore but keeping for potential legacy usage if needed elsewhere
-import axios from 'axios';
 import {
     Users,
     Shield,
@@ -53,7 +50,7 @@ export default function AdminTeamPage() {
 
     const fetchTeam = React.useCallback(async () => {
         try {
-            const res = await apiFetch(`/admin/team`);
+            const res = await fetch(`/api/admin/team`, { cache: 'no-store' });
             if (!res.ok) throw new Error('Failed to fetch team');
             
             const data = await res.json();
@@ -78,7 +75,7 @@ export default function AdminTeamPage() {
         if (!newMember.name || !newMember.email) { toast.error('Please fill in all fields'); return; }
         setIsInviting(true);
         try {
-            const res = await apiFetch(`/admin/team/invite`, {
+            const res = await fetch(`/api/admin/team`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newMember)
@@ -147,14 +144,15 @@ export default function AdminTeamPage() {
         if (member.email === SUPER_ADMIN_EMAIL) return;
         if (!confirm(`Are you sure you want to remove ${member.name} from the team?`)) return;
         try {
-            
-            await axios.delete(`/api/admin/team/${member.id}`, {
-                headers: {  }
-            });
+            const res = await fetch(`/api/admin/team/${member.id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to remove team member');
+            }
             toast.success(`${member.name} has been removed from the team`);
             fetchTeam();
         } catch (error: any) {
-            toast.error(error.response?.data?.message || 'Failed to remove team member');
+            toast.error(error.message || 'Failed to remove team member');
         }
     };
 

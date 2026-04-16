@@ -151,10 +151,12 @@ export class PaymentsService {
         const supplierAmount =
             order.totalAmount - platformFee;
 
+        const currency = (process.env.DEFAULT_CURRENCY || 'eur').toLowerCase();
+
         // Create Stripe payment intent
         const intent = await this.stripe.stripe.paymentIntents.create({
             amount: Math.round(order.totalAmount * 100),
-            currency: 'gbp',
+            currency,
             capture_method: 'manual',
             metadata: {
                 orderId: order.id,
@@ -169,7 +171,7 @@ export class PaymentsService {
             data: {
                 orderId,
                 amount: order.totalAmount,
-                currency: 'gbp',
+                currency,
                 platformFee,
                 supplierAmount,
                 status: 'HOLDING',
@@ -189,6 +191,47 @@ export class PaymentsService {
             clientSecret: intent.client_secret!,
             order,
         };
+    }
+
+    async getConnectStatus(userId: string) {
+        const user = await this.usersService.findById(userId);
+        const connected = !!user.stripeAccountId;
+
+        if (!connected) {
+            return { connected: false, onboarded: false, chargesEnabled: false, accountId: null };
+        }
+
+        try {
+            // Verify actual status with Stripe (not just the DB flag)
+            const account = await this.stripe.stripe.accounts.retrieve(user.stripeAccountId);
+            const chargesEnabled = account.charges_enabled ?? false;
+            const payoutsEnabled = account.payouts_enabled ?? false;
+
+            // Sync the DB if Stripe says onboarding is complete
+            if (chargesEnabled && !user.stripeOnboarded) {
+                await this.prisma.user.update({
+                    where: { id: userId },
+                    data: { stripeOnboarded: true },
+                });
+            }
+
+            return {
+                connected: true,
+                onboarded: chargesEnabled,
+                chargesEnabled,
+                payoutsEnabled,
+                accountId: '****' + user.stripeAccountId.slice(-4),
+            };
+        } catch (err: any) {
+            this.logger.error(`[STRIPE STATUS] Failed to retrieve account: ${err.message}`);
+            return {
+                connected: true,
+                onboarded: user.stripeOnboarded ?? false,
+                chargesEnabled: user.stripeOnboarded ?? false,
+                payoutsEnabled: false,
+                accountId: '****' + user.stripeAccountId.slice(-4),
+            };
+        }
     }
 
     private getPlatformFeePercent(): number {

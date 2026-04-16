@@ -108,8 +108,8 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                 formData.append('images', file);
             });
 
-            // [FINAL FIX]: Direct backend call with FormData via apiFetch
-            const res = await apiFetch(`/products/${productId}/reviews`, {
+            // Route through Next.js proxy so the httpOnly cookie is forwarded to backend
+            const res = await fetch(`/api/reviews/${productId}`, {
                 method: 'POST',
                 body: formData,
             });

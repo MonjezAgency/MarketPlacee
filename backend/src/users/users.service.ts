@@ -161,6 +161,85 @@ export class UsersService {
         });
     }
 
+    // ─── GDPR: Data Export ─────────────────────────────────────────────
+    async exportMyData(userId: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            include: {
+                customerOrders: {
+                    include: { items: true },
+                    orderBy: { createdAt: 'desc' },
+                },
+                reviews: true,
+                wishlist: true,
+                notifications: { take: 100, orderBy: { createdAt: 'desc' } },
+            },
+        });
+
+        if (!user) throw new ForbiddenException('User not found');
+
+        // Strip sensitive encrypted fields & passwords before export
+        const {
+            password, iban, swiftCode, taxId, vatNumber,
+            resetPasswordToken, resetPasswordExpires,
+            verificationToken, twoFactorSecret,
+            stripeAccountId,
+            ...safeProfile
+        } = user as any;
+
+        return {
+            exportedAt: new Date().toISOString(),
+            profile: safeProfile,
+            orders: user.customerOrders,
+            reviews: user.reviews,
+            wishlist: user.wishlist,
+            notificationsCount: user.notifications.length,
+        };
+    }
+
+    // ─── GDPR: Right to Erasure ────────────────────────────────────────
+    async deleteMyAccount(userId: string) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw new ForbiddenException('User not found');
+
+        // Check for active orders (PENDING/PROCESSING/SHIPPED) — block deletion
+        const activeOrders = await this.prisma.order.count({
+            where: {
+                OR: [{ customerId: userId }, { supplierId: userId }],
+                status: { in: ['PENDING', 'PROCESSING', 'SHIPPED'] },
+            },
+        });
+
+        if (activeOrders > 0) {
+            throw new ForbiddenException(
+                `Cannot delete account with ${activeOrders} active order(s). ` +
+                'Wait for all orders to complete or contact support.'
+            );
+        }
+
+        // Anonymise instead of hard-delete to preserve audit/financial records
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                email: `deleted_${userId}@removed.invalid`,
+                name: 'Deleted User',
+                password: '',
+                phone: null,
+                avatar: null,
+                companyName: null,
+                iban: null,
+                swiftCode: null,
+                taxId: null,
+                vatNumber: null,
+                stripeAccountId: null,
+                twoFactorSecret: null,
+                status: 'BLOCKED',
+            },
+        });
+
+        return { message: 'Your account data has been anonymised in compliance with GDPR.' };
+    }
+
     async updatePayoutSettings(userId: string, dto: any) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (!user) throw new ConflictException('User not found');

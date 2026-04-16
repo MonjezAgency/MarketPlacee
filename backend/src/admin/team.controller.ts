@@ -29,6 +29,12 @@ export class TeamController {
         return this.adminService.deleteTeamMember(id);
     }
 
+    @Post(':id/verify-kyc')
+    @Roles('OWNER', 'ADMIN')
+    async verifyKyc(@Param('id') id: string) {
+        return this.adminService.verifyTeamMemberKyc(id);
+    }
+
     @Post('send-invite')
     async sendInvite(@Body() body: { email: string; role: string; inviteLink: string }, @Req() req: any) {
         const senderName = req.user?.name || 'Atlantis Admin';
