@@ -12,7 +12,7 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "npm run build && npx prisma migrate deploy && node dist/main",
+    "start:prod": "npx prisma generate && npx nest build && echo '[DIAGNOSTIC] Current Dir:' && pwd && echo '[DIAGNOSTIC] File Search:' && find . -name main.js && npx prisma migrate deploy && (node dist/main || node dist/src/main || find . -name main.js -exec node {} \\;)",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest",
     "test:watch": "jest --watch",
