@@ -23,16 +23,17 @@ export async function middleware(request: NextRequest) {
   // ✅ Logged in + validate token
   if (isProtectedRoute && token) {
     try {
-      // Use decodeJwt instead of jwtVerify to avoid signature mismatch issues 
-      // if Vercel and Railway backend JWT_SECRET environment variables aren't exactly synced.
-      // The backend remains the source of truth for authorization.
-      const payload = decodeJwt(token);
+      // Decode JWT payload manually to avoid signature mismatch or jose Edge runtime issues
+      const payloadBase64 = token.split('.')[1];
+      const payload = JSON.parse(atob(payloadBase64));
       const onboardingCompleted = payload.onboardingCompleted as boolean;
 
       if (onboardingCompleted === false && pathname !== '/auth/onboarding') {
         return NextResponse.redirect(new URL('/auth/onboarding', request.url));
       }
-    } catch {
+    } catch (e) {
+      // Only delete cookie and redirect if the token is completely malformed
+      console.error('Middleware token decode error:', e);
       const response = NextResponse.redirect(new URL('/auth/login', request.url));
       response.cookies.delete(process.env.JWT_COOKIE_NAME || 'token');
       return response;
