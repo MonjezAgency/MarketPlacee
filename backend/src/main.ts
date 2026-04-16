@@ -145,5 +145,23 @@ async function bootstrap() {
     const port = process.env.PORT || 3005;
     await app.listen(port, '0.0.0.0');
     console.log(`[BOOTSTRAP] Server running on port ${port}`);
+    console.log(`[BOOTSTRAP] NODE_ENV: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`[BOOTSTRAP] FRONTEND_URL: ${process.env.FRONTEND_URL || 'not set'}`);
+    console.log(`[BOOTSTRAP] DATABASE_URL: ${process.env.DATABASE_URL ? '***set***' : '!!! NOT SET !!!'}`);
 }
-bootstrap();
+
+// Catch bootstrap errors (DB connection, missing modules, etc.)
+bootstrap().catch((err) => {
+    console.error('[FATAL] Bootstrap failed:', err);
+    process.exit(1);
+});
+
+// Catch unhandled rejections so Railway logs the real error instead of silently crashing
+process.on('unhandledRejection', (reason) => {
+    console.error('[FATAL] Unhandled Rejection:', reason);
+});
+
+process.on('uncaughtException', (err) => {
+    console.error('[FATAL] Uncaught Exception:', err);
+    process.exit(1);
+});
