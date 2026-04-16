@@ -84,22 +84,26 @@ export class AuthService {
 
         const dbStart = Date.now();
         const user = await this.prisma.user.findUnique({ where: { email } });
-        this.logger.debug(`[AUTH] User DB fetch took: ${Date.now() - dbStart}ms`);
+        const dbDuration = Date.now() - dbStart;
+        this.logger.debug(`[AUTH_STEP] User DB fetch took: ${dbDuration}ms`);
         
         if (!user) {
-            this.logger.warn(`[AUTH] User not found: ${email}`);
+            this.logger.warn(`[AUTH_STEP] User not found: ${email}`);
             // Record failed attempt even for non-existent accounts (prevent enumeration timing)
             await this.recordLoginAttempt(email, false, ip);
             return null;
         }
 
         // Check password
+        this.logger.debug(`[AUTH_STEP] Password verification starting for: ${email}`);
         const bcryptStart = Date.now();
         const isMatch = await bcrypt.compare(pass, user.password);
+        this.logger.debug(`[AUTH_STEP] Password verification result: ${isMatch}`);
         this.logger.debug(`[AUTH] Bcrypt compare took: ${Date.now() - bcryptStart}ms`);
         
         if (isMatch) {
             // Clear recent failed attempts on successful login
+            this.logger.debug(`[AUTH_STEP] Recording successful login attempt for: ${email}`);
             await this.recordLoginAttempt(email, true, ip);
 
             // Check status

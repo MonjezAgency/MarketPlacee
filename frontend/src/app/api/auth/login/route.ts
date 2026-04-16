@@ -11,12 +11,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     const backendUrl = `${BACKEND_BASE()}/auth/login`;
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 12000); // 12s timeout
+
     const res = await fetch(backendUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
-      redirect: 'manual', // never follow redirects — Railway error pages redirect and break URL parsing
-    });
+      redirect: 'manual',
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeout));
 
     // A redirect here means the backend is down / returning an error page
     if (res.status >= 300 && res.status < 400) {

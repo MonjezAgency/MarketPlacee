@@ -33,8 +33,17 @@ async function bootstrap() {
     });
 
     // 1. FIRST: Trust proxy for Railway/SSL termination
-    // Required to read X-Forwarded-Proto for Secure cookies
     app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
+    // Diagnostic Request Logger
+    app.use((req, res, next) => {
+        const start = Date.now();
+        res.on('finish', () => {
+            const duration = Date.now() - start;
+            console.log(`[REQUEST] ${req.method} ${req.originalUrl} - ${res.statusCode} (${duration}ms)`);
+        });
+        next();
+    });
 
     // Note: KYC files are now stored in Supabase Storage (not local disk).
     // Local /uploads/ serving kept only for any legacy files already in the DB.
