@@ -128,6 +128,18 @@ export async function fetchProducts(): Promise<Product[]> {
     }
 }
 
+export async function fetchProductById(id: string): Promise<Product | null> {
+    try {
+        const res = await apiFetch(`/products/${id}`, { cache: 'no-store' });
+        if (!res.ok) return null;
+        const item = await res.json();
+        return mapProduct(item);
+    } catch (error) {
+        console.error('Error fetching product by id:', error);
+        return null;
+    }
+}
+
 export async function fetchMyProducts(): Promise<Product[]> {
     try {
         const res = await apiFetch(`/products/my-products`, { cache: 'no-store' });

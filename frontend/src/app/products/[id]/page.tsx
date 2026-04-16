@@ -1,11 +1,7 @@
 import ProductDetailClient from './ProductDetailClient';
-import { PRODUCTS } from '@/lib/products';
 
-export function generateStaticParams() {
-    return PRODUCTS.map((product) => ({
-        id: product.id,
-    }));
-}
+// Dynamic page — no static params needed since products come from the backend
+export const dynamic = 'force-dynamic';
 
 export default function ProductPage() {
     return <ProductDetailClient />;

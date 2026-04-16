@@ -9,7 +9,7 @@ import {
     Heart, Info, Package, Sparkles, ArrowLeft, ShoppingCart
 } from 'lucide-react';
 import { type Product, ProductStatus } from '@/lib/types';
-import { fetchProducts, apiFetch } from '@/lib/api';
+import { fetchProductById, apiFetch } from '@/lib/api';
 import { useEffect } from 'react';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
@@ -39,18 +39,19 @@ export default function ProductDetailClient() {
     const [translatedName, setTranslatedName] = useState('');
     const [translatedDesc, setTranslatedDesc] = useState('');
 
-    const [products, setProducts] = useState<Product[]>([]);
+    const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
     const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const API_URL = '/api';
-
+    // Fetch the specific product by ID directly — no need to load all products
     useEffect(() => {
-        fetchProducts().then(data => {
-            setProducts(data);
+        if (!id) return;
+        setIsLoading(true);
+        fetchProductById(id as string).then(data => {
+            setCurrentProduct(data);
             setIsLoading(false);
         });
-    }, []);
+    }, [id]);
 
     // Fetch similar products from the dedicated endpoint once id is known
     useEffect(() => {
@@ -60,8 +61,6 @@ export default function ProductDetailClient() {
             .then(data => setSimilarProducts(Array.isArray(data) ? data : []))
             .catch(() => { });
     }, [id]);
-
-    const currentProduct = products.find(p => p.id === id);
 
     useEffect(() => {
         if (currentProduct) {
@@ -87,10 +86,8 @@ export default function ProductDetailClient() {
     }
 
     const product = currentProduct;
-    // Prefer server-side similar products; fall back to local filter if API hasn't loaded yet
-    const relatedProducts = similarProducts.length > 0
-        ? similarProducts
-        : products.filter(p => p.id !== id && p.category !== undefined && p.category === product?.category).slice(0, 4);
+    // Use server-side similar products only
+    const relatedProducts = similarProducts;
 
 
     if (!product) {

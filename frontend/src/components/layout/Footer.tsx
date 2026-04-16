@@ -11,24 +11,24 @@ const FOOTER_COLUMNS = [
         links: [
             { name: 'browseCategories', href: '/categories' },
             { name: 'dailyDeals', href: '/deals' },
-            { name: 'brandSpotlights', href: '/suppliers' },
             { name: 'bulkWholesale', href: '/wholesale' },
+            { name: 'howItWorks', href: '/how-it-works' },
         ],
     },
     {
         title: 'forSuppliers',
         links: [
             { name: 'registerSupplier', href: '/auth/register' },
-            { name: 'partnerProgram', href: '/auth/partner' },
             { name: 'supplierDashboard', href: '/supplier' },
             { name: 'marketingTools', href: '/marketing' },
+            { name: 'aboutUs', href: '/about' },
         ],
     },
     {
         title: 'support',
         links: [
             { name: 'helpCenter', href: '/help' },
-            { name: 'trackOrder', href: '/orders' },
+            { name: 'contactUs', href: '/contact' },
             { name: 'shippingPolicy', href: '/shipping' },
             { name: 'returnsRefunds', href: '/returns' },
         ],
@@ -91,9 +91,9 @@ export default function Footer() {
                         {t('footer', 'copyright')}
                     </p>
                     <div className="flex items-center gap-6 text-xs font-semibold text-white/60">
-                        <Link href="#" className="hover:text-white transition-colors">{t('footer', 'privacy')}</Link>
-                        <Link href="#" className="hover:text-white transition-colors">{t('footer', 'terms')}</Link>
-                        <Link href="#" className="hover:text-white transition-colors">{t('footer', 'cookies')}</Link>
+                        <Link href="/privacy-policy" className="hover:text-white transition-colors">{t('footer', 'privacy')}</Link>
+                        <Link href="/terms" className="hover:text-white transition-colors">{t('footer', 'terms')}</Link>
+                        <Link href="/cookie-policy" className="hover:text-white transition-colors">{t('footer', 'cookies')}</Link>
                     </div>
                 </div>
             </div>
