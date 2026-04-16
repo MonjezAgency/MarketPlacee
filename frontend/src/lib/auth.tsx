@@ -128,35 +128,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     const login = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string }> => {
-
-
-        try {
-            // Use local API proxy to handle cross-domain cookies
+        const attemptLogin = async () => {
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password }),
             });
 
-            if (!res.ok) {
-                const error = await res.json();
-                return { success: false, message: error.message || 'Invalid email or password.' };
+            let data: any;
+            try {
+                data = await res.json();
+            } catch {
+                return { ok: false, data: { message: 'Server connection failed.' } };
+            }
+            return { ok: res.ok, status: res.status, data };
+        };
+
+        try {
+            let { ok, status, data } = await attemptLogin();
+
+            // If we hit a cold-start timeout (503 with gateway-style message), retry once automatically
+            const isColdStart =
+                !ok &&
+                status === 503 &&
+                (data?.message?.includes('starting up') ||
+                 data?.message?.includes('temporarily unavailable') ||
+                 data?.message?.includes('Application failed') ||
+                 data?.message?.includes('aborted'));
+
+            if (isColdStart) {
+                console.warn('[AUTH] Cold start detected — retrying login in 4s...');
+                await new Promise((r) => setTimeout(r, 4000));
+                ({ ok, status, data } = await attemptLogin());
             }
 
-            const result = await res.json();
+            if (!ok) {
+                return { success: false, message: data?.message || 'Invalid email or password.' };
+            }
 
             // 2FA challenge
-            if (result.requiresTwoFactor) {
-                return { success: true, requiresTwoFactor: true, partialToken: result.partialToken };
+            if (data.requiresTwoFactor) {
+                return { success: true, requiresTwoFactor: true, partialToken: data.partialToken };
             }
 
-            if (!result.user) {
-                console.error("Login response missing user:", result);
+            if (!data.user) {
+                console.error("Login response missing user:", data);
                 return { success: false, message: 'Invalid response from server.' };
             }
-            const userData = result.user;
-            setUser(userData);
-            return { success: true, user: userData };
+            setUser(data.user);
+            return { success: true, user: data.user };
         } catch (err) {
             console.error("Login failed:", err);
             return { success: false, message: 'Server connection failed.' };

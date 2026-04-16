@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/internal/keep-warm",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

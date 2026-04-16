@@ -13,6 +13,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState('');
     const [showPass, setShowPass] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [loadingMsg, setLoadingMsg] = useState('Authenticating...');
     const [error, setError] = useState('');
     // 2FA step state
     const [step, setStep] = useState<1 | 2>(1);
@@ -36,8 +37,12 @@ export default function LoginPage() {
         if (!email || !password) { setError(t('auth', 'errorFillFields')); return; }
 
         setLoading(true);
+        setLoadingMsg('Authenticating...');
+        // Show "waking up" message after 6s so the user knows it's not frozen
+        const slowTimer = setTimeout(() => setLoadingMsg('Waking up the server… please wait'), 6000);
         try {
             const result = await login(email, password);
+            clearTimeout(slowTimer);
 
             if (result.requiresTwoFactor && result.partialToken) {
                 setPartialToken(result.partialToken);
@@ -60,6 +65,7 @@ export default function LoginPage() {
 
             redirectByRole(result.user.role);
         } catch (err: any) {
+            clearTimeout(slowTimer);
             setError(err.message || t('auth', 'errorUnexpected'));
             setLoading(false);
         }
@@ -272,7 +278,10 @@ export default function LoginPage() {
                             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                             <div className="flex items-center justify-center gap-3">
                                 {loading ? (
-                                    <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                    <span className="flex items-center gap-2.5">
+                                        <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0" />
+                                        <span className="text-xs tracking-wide">{loadingMsg}</span>
+                                    </span>
                                 ) : (
                                     <>
                                         <span>{t('auth', 'authenticate')}</span>

@@ -72,21 +72,20 @@ export class AuthService {
         const startTime = Date.now();
         this.logger.log(`[AUTH] Validating user: ${email} from IP: ${ip}`);
 
-        // ── Account lockout check ─────────────────────────────────────────────
-        const lockoutStart = Date.now();
-        if (await this.isAccountLocked(email)) {
+        // ── Run lockout check and user fetch in parallel to save ~500ms ────────
+        const [locked, user] = await Promise.all([
+            this.isAccountLocked(email),
+            this.prisma.user.findUnique({ where: { email } }),
+        ]);
+        this.logger.debug(`[AUTH] Parallel lockout+fetch took: ${Date.now() - startTime}ms`);
+
+        if (locked) {
             this.logger.warn(`[AUTH] Account locked for email: ${email}`);
             throw new UnauthorizedException(
                 'تم تجاوز الحد المسموح من المحاولات. حاول مرة أخرى بعد 15 دقيقة.',
             );
         }
-        this.logger.debug(`[AUTH] Lockout check took: ${Date.now() - lockoutStart}ms`);
 
-        const dbStart = Date.now();
-        const user = await this.prisma.user.findUnique({ where: { email } });
-        const dbDuration = Date.now() - dbStart;
-        this.logger.debug(`[AUTH_STEP] User DB fetch took: ${dbDuration}ms`);
-        
         if (!user) {
             this.logger.warn(`[AUTH_STEP] User not found: ${email}`);
             // Record failed attempt even for non-existent accounts (prevent enumeration timing)

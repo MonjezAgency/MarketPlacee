@@ -1,28 +1,54 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+// Extend Vercel function timeout to 60s (works on Pro; Hobby is capped at 10s but doesn't error the config)
+export const maxDuration = 60;
+
 const BACKEND_BASE = () =>
   (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-dfc2.up.railway.app')
     .trim()
     .replace(/\/+$/, '');
+
+async function callBackend(backendUrl: string, body: any, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(backendUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      redirect: 'manual',
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const backendUrl = `${BACKEND_BASE()}/auth/login`;
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout
+    let res: Response;
+    try {
+      // First attempt — 25s timeout
+      res = await callBackend(backendUrl, body, 25000);
+    } catch (firstError: any) {
+      const isTimeout =
+        firstError.name === 'AbortError' ||
+        firstError.message?.includes('aborted') ||
+        firstError.message?.includes('fetch failed');
 
-    const res = await fetch(backendUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      redirect: 'manual',
-      signal: controller.signal,
-    }).finally(() => clearTimeout(timeout));
+      if (!isTimeout) throw firstError;
 
-    // A redirect here means the backend is down / returning an error page
+      // Railway was cold-starting — wait 3s then retry once
+      console.warn('[PROXY_LOGIN] First attempt timed out (cold start likely) — retrying in 3s...');
+      await new Promise((r) => setTimeout(r, 3000));
+      res = await callBackend(backendUrl, body, 30000);
+    }
+
+    // A redirect means the backend is returning an error page (down / misconfigured)
     if (res.status >= 300 && res.status < 400) {
       return NextResponse.json(
         { message: 'Backend service is temporarily unavailable. Please try again in a moment.' },
@@ -30,7 +56,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const data = await res.json();
+    let data: any;
+    try {
+      data = await res.json();
+    } catch {
+      // Backend returned non-JSON (HTML error page from Railway/proxy)
+      console.error('[PROXY_LOGIN] Backend returned non-JSON response, status:', res.status);
+      return NextResponse.json(
+        { message: 'Backend service is temporarily unavailable. Please try again in a moment.' },
+        { status: 503 }
+      );
+    }
 
     if (!res.ok) {
       return NextResponse.json(data, { status: res.status });
@@ -75,7 +111,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         message: isNetworkError
-          ? 'Backend service is temporarily unavailable. Please try again in a moment.'
+          ? 'The service is starting up — please try again in a few seconds.'
           : `Login failed: ${error.message}`,
       },
       { status: 503 }
