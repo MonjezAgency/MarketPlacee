@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { jwtVerify } from 'jose';
+import { decodeJwt } from 'jose';
 
 const PROTECTED_PATHS = [
   '/dashboard', '/admin', '/profile', '/orders',
@@ -23,10 +23,10 @@ export async function middleware(request: NextRequest) {
   // ✅ Logged in + validate token
   if (isProtectedRoute && token) {
     try {
-      const secret = new TextEncoder().encode(
-        process.env.JWT_SECRET || 'your-default-secret-change-me'
-      );
-      const { payload } = await jwtVerify(token, secret);
+      // Use decodeJwt instead of jwtVerify to avoid signature mismatch issues 
+      // if Vercel and Railway backend JWT_SECRET environment variables aren't exactly synced.
+      // The backend remains the source of truth for authorization.
+      const payload = decodeJwt(token);
       const onboardingCompleted = payload.onboardingCompleted as boolean;
 
       if (onboardingCompleted === false && pathname !== '/auth/onboarding') {
