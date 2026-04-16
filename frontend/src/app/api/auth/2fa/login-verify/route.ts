@@ -1,16 +1,28 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+const BACKEND_BASE = () =>
+  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-dfc2.up.railway.app')
+    .trim()
+    .replace(/\/+$/, '');
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-dfc2.up.railway.app';
-    
-    const res = await fetch(`${backendUrl}/auth/2fa/login-verify`, {
+
+    const res = await fetch(`${BACKEND_BASE()}/auth/2fa/login-verify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      redirect: 'manual',
     });
+
+    if (res.status >= 300 && res.status < 400) {
+      return NextResponse.json(
+        { message: 'Backend service is temporarily unavailable. Please try again in a moment.' },
+        { status: 503 }
+      );
+    }
 
     const data = await res.json();
 
@@ -20,7 +32,7 @@ export async function POST(request: Request) {
 
     const { access_token, refresh_token, user } = data;
     const cookieStore = cookies();
-    
+
     if (access_token) {
       cookieStore.set('token', access_token, {
         httpOnly: true,
@@ -44,9 +56,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true, user });
   } catch (error: any) {
     console.error('[PROXY_2FA_ERROR]', error);
-    return NextResponse.json({ 
-      message: 'Authentication Proxy Error (2FA)', 
-      details: error.message 
-    }, { status: 500 });
+    const isNetworkError = error.cause?.code === 'ECONNREFUSED' || error.message?.includes('fetch failed');
+    return NextResponse.json(
+      {
+        message: isNetworkError
+          ? 'Cannot connect to backend service. Please try again in a moment.'
+          : `2FA verification failed: ${error.message}`,
+      },
+      { status: 503 }
+    );
   }
 }

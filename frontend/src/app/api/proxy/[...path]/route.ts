@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
 const getBackendUrl = () =>
-  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').replace(/\/$/, '');
+  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').trim().replace(/\/+$/, '');
 
 async function handler(
   req: NextRequest,

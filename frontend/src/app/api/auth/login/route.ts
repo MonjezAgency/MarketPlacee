@@ -1,17 +1,30 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 
+const BACKEND_BASE = () =>
+  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-dfc2.up.railway.app')
+    .trim()
+    .replace(/\/+$/, '');
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-dfc2.up.railway.app';
-    
-    // 1. Forward login request to backend
-    const res = await fetch(`${backendUrl}/auth/login`, {
+    const backendUrl = `${BACKEND_BASE()}/auth/login`;
+
+    const res = await fetch(backendUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      redirect: 'manual', // never follow redirects — Railway error pages redirect and break URL parsing
     });
+
+    // A redirect here means the backend is down / returning an error page
+    if (res.status >= 300 && res.status < 400) {
+      return NextResponse.json(
+        { message: 'Backend service is temporarily unavailable. Please try again in a moment.' },
+        { status: 503 }
+      );
+    }
 
     const data = await res.json();
 
@@ -19,26 +32,21 @@ export async function POST(request: Request) {
       return NextResponse.json(data, { status: res.status });
     }
 
-    // 2. Extract tokens from backend response
     const { access_token, refresh_token, user, requiresTwoFactor, partialToken } = data;
 
-    // Handle 2FA case
     if (requiresTwoFactor) {
-        return NextResponse.json({ requiresTwoFactor, partialToken });
+      return NextResponse.json({ requiresTwoFactor, partialToken });
     }
 
-    // 3. Set cookies on the FRONTEND domain (not HttpOnly for now to allow middleware visibility if needed, 
-    // but HttpOnly is safer. Middleware CAN read HttpOnly cookies from same-domain).
-    const isProd = process.env.NODE_ENV === 'production';
     const cookieStore = cookies();
-    
+
     if (access_token) {
       cookieStore.set('token', access_token, {
         httpOnly: true,
         secure: true,
-        sameSite: 'lax', // Use lax for same-domain
+        sameSite: 'lax',
         path: '/',
-        maxAge: 15 * 60, // 15 mins
+        maxAge: 15 * 60,
       });
     }
 
@@ -48,16 +56,21 @@ export async function POST(request: Request) {
         secure: true,
         sameSite: 'lax',
         path: '/',
-        maxAge: 7 * 24 * 60 * 60, // 7 days
+        maxAge: 7 * 24 * 60 * 60,
       });
     }
 
     return NextResponse.json({ success: true, user });
   } catch (error: any) {
     console.error('[PROXY_LOGIN_ERROR]', error);
-    return NextResponse.json({ 
-      message: `Proxy Error: ${error.message}. URL: ${process.env.BACKEND_URL || 'fallbacked'}. Hint: Check Vercel Env Vars.`,
-      details: error.message
-    }, { status: 500 });
+    const isNetworkError = error.cause?.code === 'ECONNREFUSED' || error.message?.includes('fetch failed');
+    return NextResponse.json(
+      {
+        message: isNetworkError
+          ? 'Cannot connect to backend service. Please try again in a moment.'
+          : `Login failed: ${error.message}`,
+      },
+      { status: 503 }
+    );
   }
 }
