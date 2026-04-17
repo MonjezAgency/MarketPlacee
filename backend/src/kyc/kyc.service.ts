@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { KYCStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
@@ -10,6 +11,8 @@ import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class KycService {
+  private readonly logger = new Logger(KycService.name);
+
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,

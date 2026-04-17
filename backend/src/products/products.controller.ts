@@ -12,7 +12,8 @@ import {
     Request,
     UseInterceptors,
     UploadedFile,
-    BadRequestException
+    BadRequestException,
+    Logger
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ProductsService } from './products.service';
@@ -35,6 +36,8 @@ export class ProductsController {
         private readonly excelService: ExcelService,
         private readonly eanService: EanService
     ) { }
+
+    private readonly logger = new Logger(ProductsController.name);
 
     @Get()
     async findAll(@Request() req) {
@@ -139,9 +142,7 @@ export class ProductsController {
     @Roles(Role.SUPPLIER, Role.ADMIN)
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
     async bulkUpload(@UploadedFile() file: any, @Request() req) {
-        console.log('[BulkUpload] === METHOD CALLED ===');
-        console.log('[BulkUpload] File:', file ? { name: file.originalname, size: file.size, mimetype: file.mimetype } : 'NO FILE');
-        console.log('[BulkUpload] User:', req.user?.sub, req.user?.role);
+        this.logger.log(`[BulkUpload] User=${req.user?.sub} role=${req.user?.role} file=${file ? file.originalname : 'MISSING'}`);
         try {
             if (!file) throw new Error('File is required');
 
@@ -176,7 +177,7 @@ export class ProductsController {
 
             return { ...report, createdCount: createdProducts.length };
         } catch (error) {
-            console.error('[BulkUpload] Error:', error);
+            this.logger.error(`[BulkUpload] Error: ${error?.message}`);
             return { totalRows: 0, successCount: 0, errorCount: 0, createdCount: 0, results: [], error: error.message || 'Unknown error processing file' };
         }
     }

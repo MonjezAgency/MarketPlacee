@@ -135,7 +135,7 @@ export class AuthService {
     }
 
     async register(data: any) {
-        console.log(`[AUTH] Registration attempt for email: ${data.email}, role: ${data.role}`);
+        this.logger.log(`[AUTH] Registration attempt for email: ${data.email}, role: ${data.role}`);
         
         const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
         if (existing) {
@@ -152,7 +152,7 @@ export class AuthService {
         const status = (isInvited || data.status === 'ACTIVE') ? 'ACTIVE' : (data.status || 'PENDING_APPROVAL');
 
         try {
-            console.log(`[AUTH] Attempting database creation for ${data.email}`);
+            this.logger.log(`[AUTH] Attempting database creation for ${data.email}`);
             const user = await this.prisma.user.create({
                 data: {
                     email: data.email,
@@ -176,7 +176,7 @@ export class AuthService {
                 },
             });
 
-            console.log(`[AUTH] User created successfully: ${user.id} (${user.email})`);
+            this.logger.log(`[AUTH] User created successfully: ${user.id} (${user.email})`);
 
             if (user.status === 'PENDING_APPROVAL') {
                 // Background email sending to prevent slow SMTP response from hanging the API
@@ -187,7 +187,7 @@ export class AuthService {
                         }
                         await this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, data.locale);
                     } catch (emailError: any) {
-                        console.error('[AUTH] Background email sending failed:', emailError.message);
+                        this.logger.error('[AUTH] Background email sending failed:', emailError.message);
                     }
                 })();
 
@@ -217,13 +217,13 @@ export class AuthService {
                             });
                         }
                     } catch (notifError: any) {
-                        console.error('[AUTH] Failed to create admin notification:', notifError.message);
+                        this.logger.error('[AUTH] Failed to create admin notification:', notifError.message);
                     }
                 })();
             } else if (user.status === 'ACTIVE') {
                  // Background email sending for active users
                  this.emailService.sendWelcomeEmail(user.email, user.name, user.role).catch((err: any) => {
-                     console.error('[AUTH] Welcome email background error:', err.message);
+                     this.logger.error('[AUTH] Welcome email background error:', err.message);
                  });
             }
 
@@ -236,7 +236,7 @@ export class AuthService {
 
             return { ...safeUser, isInvited };
         } catch (error) {
-            console.error('[AUTH] Registration database error:', error);
+            this.logger.error('[AUTH] Registration database error:', error);
             require('fs').appendFileSync('/tmp/auth_errors.log', `[${new Date().toISOString()}] Database error for ${data.email}: ${error.message}\n`);
             throw error;
         }
@@ -400,7 +400,7 @@ export class AuthService {
 
             // Non-blocking: Send registration email and notify admins
             this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, 'en').catch((err) => {
-                console.error('[AUTH] Google registration email failed:', err.message);
+                this.logger.error('[AUTH] Google registration email failed:', err.message);
             });
 
             // Notify admins about new Google registration
@@ -429,7 +429,7 @@ export class AuthService {
                         });
                     }
                 } catch (err: any) {
-                    console.error('[AUTH] Google reg admin notification failed:', err.message);
+                    this.logger.error('[AUTH] Google reg admin notification failed:', err.message);
                 }
             })();
 
