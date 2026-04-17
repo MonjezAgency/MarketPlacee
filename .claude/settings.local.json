@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(curl -s -w \"\\\\nHTTP %{http_code}\" http://127.0.0.1:3001/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"\"email\"\":\"\"a@a.com\"\",\"\"password\"\":\"\"x\"\"}')",
-      "Bash(docker --version)"
+      "Bash(docker --version)",
+      "Bash(npx tsc *)"
     ]
   }
 }

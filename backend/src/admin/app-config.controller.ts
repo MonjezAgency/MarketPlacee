@@ -43,6 +43,11 @@ export class AppConfigController {
         return this.appConfigService.rejectProduct(id, reason);
     }
 
+    @Get('homepage-categories')
+    async getHomepageCategories() {
+        return this.appConfigService.getHomepageCategories?.() ?? [];
+    }
+
     @Post('homepage-categories')
     @UsePipes(new ValidationPipe({ transform: false, whitelist: false, forbidNonWhitelisted: false }))
     async setHomepageCategories(@Body() data: any) {

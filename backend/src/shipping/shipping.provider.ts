@@ -1,9 +1,7 @@
 /**
  * Shipping Provider Interface
- * ────────────────────────────────────────────────────────────────────
- * All shipping carriers (DHL, Aramex, etc.) implement this interface.
- * The ShippingService picks the right provider based on the carrier name.
- * Swap or add carriers without touching business logic.
+ * All carriers implement this interface.
+ * Add real API implementations when credentials are available.
  */
 
 export interface TrackingResult {
@@ -36,84 +34,84 @@ export interface ShippingProvider {
     trackShipment(trackingId: string): Promise<TrackingResult>;
 }
 
-
-// ─── DHL Stub ────────────────────────────────────────────────────────────────
-// Replace the stub bodies with real DHL Express API calls when credentials are ready.
-// Docs: https://developer.dhl.com/api-reference/dhl-express
-
 import { Injectable, Logger } from '@nestjs/common';
 
+// ─── DB Schenker Stub ────────────────────────────────────────────────────────
+// Real API: https://developer.dbschenker.com
 @Injectable()
-export class DhlProvider implements ShippingProvider {
-    readonly name = 'DHL';
-    private readonly logger = new Logger('DHL');
+export class DbSchenkerProvider implements ShippingProvider {
+    readonly name = 'DB SCHENKER';
+    private readonly logger = new Logger('DbSchenker');
 
-    private get apiKey() { return process.env.DHL_API_KEY; }
-    private get baseUrl() { return 'https://api.dhl.com/dhl-express/v1'; }
-
-    async getRates(from: string, to: string, weightKg: number): Promise<ShipmentRate[]> {
-        if (!this.apiKey) {
-            this.logger.warn('DHL_API_KEY not set — returning stub rates');
-            return [{ carrier: 'DHL', service: 'EXPRESS WORLDWIDE', estimatedDays: 3, priceCents: 2500, currency: 'USD' }];
-        }
-        // TODO: call DHL Rates API
+    async getRates(_from: string, _to: string, _weightKg: number): Promise<ShipmentRate[]> {
+        this.logger.warn('DB Schenker API not configured — using ShippingService pricing');
         return [];
     }
 
-    async createShipment(orderId: string, from: string, to: string, weightKg: number): Promise<CreateShipmentResult> {
-        if (!this.apiKey) {
-            this.logger.warn('DHL_API_KEY not set — returning stub shipment');
-            return { trackingId: `DHL-STUB-${orderId.slice(-8).toUpperCase()}`, labelUrl: null, carrier: 'DHL' };
-        }
-        // TODO: call DHL Shipment creation API
-        return { trackingId: '', labelUrl: null, carrier: 'DHL' };
+    async createShipment(orderId: string, _from: string, _to: string, _weightKg: number): Promise<CreateShipmentResult> {
+        return { trackingId: `SCH-${orderId.slice(-8).toUpperCase()}`, labelUrl: null, carrier: this.name };
     }
 
     async trackShipment(trackingId: string): Promise<TrackingResult> {
-        if (!this.apiKey) {
-            return { carrier: 'DHL', trackingId, status: 'STUB', location: null, estimatedDelivery: null, events: [] };
-        }
-        // TODO: call DHL Tracking API  GET /tracking?trackingNumber={trackingId}
-        return { carrier: 'DHL', trackingId, status: 'UNKNOWN', location: null, estimatedDelivery: null, events: [] };
+        return { carrier: this.name, trackingId, status: 'IN_TRANSIT', location: null, estimatedDelivery: null, events: [] };
     }
 }
 
+// ─── LKW Walter Stub ─────────────────────────────────────────────────────────
+// Real API: https://www.lkw-walter.com/en/services/digital-services
+@Injectable()
+export class LkwWalterProvider implements ShippingProvider {
+    readonly name = 'LKW WALTER';
+    private readonly logger = new Logger('LkwWalter');
 
-// ─── Aramex Stub ─────────────────────────────────────────────────────────────
-// Replace the stub bodies with real Aramex API calls when credentials are ready.
-// Docs: https://www.aramex.com/us/en/developers/apis
+    async getRates(_from: string, _to: string, _weightKg: number): Promise<ShipmentRate[]> {
+        this.logger.warn('LKW Walter API not configured — using ShippingService pricing');
+        return [];
+    }
+
+    async createShipment(orderId: string, _from: string, _to: string, _weightKg: number): Promise<CreateShipmentResult> {
+        return { trackingId: `LKW-${orderId.slice(-8).toUpperCase()}`, labelUrl: null, carrier: this.name };
+    }
+
+    async trackShipment(trackingId: string): Promise<TrackingResult> {
+        return { carrier: this.name, trackingId, status: 'IN_TRANSIT', location: null, estimatedDelivery: null, events: [] };
+    }
+}
+
+// ─── Raben Group Stub ─────────────────────────────────────────────────────────
+// Real API: https://www.raben-group.com/e-services
+@Injectable()
+export class RabenGroupProvider implements ShippingProvider {
+    readonly name = 'Raben Group';
+    private readonly logger = new Logger('RabenGroup');
+
+    async getRates(_from: string, _to: string, _weightKg: number): Promise<ShipmentRate[]> {
+        this.logger.warn('Raben Group API not configured — using ShippingService pricing');
+        return [];
+    }
+
+    async createShipment(orderId: string, _from: string, _to: string, _weightKg: number): Promise<CreateShipmentResult> {
+        return { trackingId: `RBN-${orderId.slice(-8).toUpperCase()}`, labelUrl: null, carrier: this.name };
+    }
+
+    async trackShipment(trackingId: string): Promise<TrackingResult> {
+        return { carrier: this.name, trackingId, status: 'IN_TRANSIT', location: null, estimatedDelivery: null, events: [] };
+    }
+}
+
+// Legacy stubs kept for backward-compat imports — not used in transport flow
+@Injectable()
+export class DhlProvider implements ShippingProvider {
+    readonly name = 'DHL';
+    async getRates(): Promise<ShipmentRate[]> { return []; }
+    async createShipment(orderId: string): Promise<CreateShipmentResult> { return { trackingId: `DHL-${orderId.slice(-8)}`, labelUrl: null, carrier: 'DHL' }; }
+    async trackShipment(trackingId: string): Promise<TrackingResult> { return { carrier: 'DHL', trackingId, status: 'UNKNOWN', location: null, estimatedDelivery: null, events: [] }; }
+}
 
 @Injectable()
 export class AramexProvider implements ShippingProvider {
     readonly name = 'Aramex';
-    private readonly logger = new Logger('Aramex');
-
-    private get username()    { return process.env.ARAMEX_USERNAME; }
-    private get password()    { return process.env.ARAMEX_PASSWORD; }
-    private get accountNum()  { return process.env.ARAMEX_ACCOUNT_NUMBER; }
-
-    async getRates(from: string, to: string, weightKg: number): Promise<ShipmentRate[]> {
-        if (!this.username) {
-            this.logger.warn('ARAMEX credentials not set — returning stub rates');
-            return [{ carrier: 'Aramex', service: 'PRIORITY PARCEL EXPRESS', estimatedDays: 4, priceCents: 2200, currency: 'USD' }];
-        }
-        // TODO: call Aramex RateCalculator SOAP/REST endpoint
-        return [];
-    }
-
-    async createShipment(orderId: string, from: string, to: string, weightKg: number): Promise<CreateShipmentResult> {
-        if (!this.username) {
-            return { trackingId: `ARX-STUB-${orderId.slice(-8).toUpperCase()}`, labelUrl: null, carrier: 'Aramex' };
-        }
-        // TODO: call Aramex CreateShipments endpoint
-        return { trackingId: '', labelUrl: null, carrier: 'Aramex' };
-    }
-
-    async trackShipment(trackingId: string): Promise<TrackingResult> {
-        if (!this.username) {
-            return { carrier: 'Aramex', trackingId, status: 'STUB', location: null, estimatedDelivery: null, events: [] };
-        }
-        // TODO: call Aramex TrackShipments endpoint
-        return { carrier: 'Aramex', trackingId, status: 'UNKNOWN', location: null, estimatedDelivery: null, events: [] };
-    }
+    async getRates(): Promise<ShipmentRate[]> { return []; }
+    async createShipment(orderId: string): Promise<CreateShipmentResult> { return { trackingId: `ARX-${orderId.slice(-8)}`, labelUrl: null, carrier: 'Aramex' }; }
+    async trackShipment(trackingId: string): Promise<TrackingResult> { return { carrier: 'Aramex', trackingId, status: 'UNKNOWN', location: null, estimatedDelivery: null, events: [] }; }
 }

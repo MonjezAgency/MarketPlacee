@@ -314,7 +314,7 @@ function AdminFinanceContent() {
                                                     <div className="w-32 h-2 bg-[#EAEDED] dark:bg-white/10 rounded-full overflow-hidden">
                                                         <div className={cn("h-full rounded-full transition-all", usedPercent > 80 ? "bg-red-500" : "bg-emerald-500")} style={{ width: `${Math.min(usedPercent, 100)}%` }} />
                                                     </div>
-                                                    <span className="text-[10px] font-bold text-[#888]">${c.usedCredit.toFixed(0)} / ${c.creditLimit.toFixed(0)}</span>
+                                                    <span className="text-[10px] font-bold text-[#888]">€${c.usedCredit.toFixed(0)} / €${c.creditLimit.toFixed(0)}</span>
                                                 </div>
                                             </div>
                                         </div>

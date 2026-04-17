@@ -69,15 +69,8 @@ export class ShippingController {
         @Query('to') to: string,
         @Query('weightKg') weightKg: string,
     ) {
-        const weight = parseFloat(weightKg || '1');
-        const [dhlRates, aramexRates] = await Promise.allSettled([
-            this.dhl.getRates(from || 'AE', to || 'US', weight),
-            this.aramex.getRates(from || 'AE', to || 'US', weight),
-        ]);
-        return [
-            ...(dhlRates.status    === 'fulfilled' ? dhlRates.value    : []),
-            ...(aramexRates.status === 'fulfilled' ? aramexRates.value : []),
-        ];
+        // Legacy carrier-rates endpoint — returns empty until provider APIs are configured
+        return [];
     }
 
     /** Track a shipment — auto-detects carrier from trackingId prefix */

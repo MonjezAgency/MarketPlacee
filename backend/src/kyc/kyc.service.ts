@@ -109,7 +109,7 @@ export class KycService {
       ).catch(() => {});
     }
     // Trigger Smart AI Verification (Background)
-    this.runSmartVerification(doc.id).catch(err => console.error('[KYC_PROCESSOR_FAIL]:', err.message));
+    this.runSmartVerification(doc.id).catch(err => this.logger.error(`[KYC_PROCESSOR_FAIL]: ${err.message}`));
 
     return doc;
   }
@@ -119,7 +119,7 @@ export class KycService {
    * This is what fulfilling the "actually verify" requirement involves.
    */
   private async runSmartVerification(docId: string) {
-    console.log(`[KYC_AI_PROCESSOR] Starting analysis for doc: ${docId}`);
+    this.logger.log(`[KYC_AI_PROCESSOR] Starting analysis for doc: ${docId}`);
     
     // Simulate processing delay (5 seconds)
     await new Promise(resolve => setTimeout(resolve, 5000));
@@ -137,10 +137,10 @@ export class KycService {
     const hasFrontImage = !!doc.frontImageUrl;
     
     if (isLivenessValid && hasFrontImage) {
-      console.log(`[KYC_AI_PROCESSOR] PASS: Automating approval for user ${doc.userId}`);
+      this.logger.log(`[KYC_AI_PROCESSOR] PASS: Automating approval for user ${doc.userId}`);
       await this.verifyKyc(doc.id, 'Automated AI Verification Passed (Liveness Verified)');
     } else {
-      console.log(`[KYC_AI_PROCESSOR] FAIL: Automatic flags raised for user ${doc.userId}`);
+      this.logger.log(`[KYC_AI_PROCESSOR] FAIL: Automatic flags raised for user ${doc.userId}`);
       // Don't auto-reject yet, leave for manual admin review if flags are yellow
     }
   }
