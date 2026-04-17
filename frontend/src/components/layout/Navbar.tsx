@@ -25,7 +25,7 @@ export default function Navbar() {
     const [scrolled, setScrolled] = React.useState(false);
     const [isCategoriesOpen, setIsCategoriesOpen] = React.useState(false);
     const [isCurrencyOpen, setIsCurrencyOpen] = React.useState(false);
-    const [activeCurrency, setActiveCurrencyState] = React.useState('USD');
+    const [activeCurrency, setActiveCurrencyState] = React.useState('EUR');
     const categoriesRef = React.useRef<HTMLDivElement>(null);
     const currencyRef = React.useRef<HTMLDivElement>(null);
 

@@ -12,17 +12,16 @@ export function Providers({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // Fetch global platform currency configuration from Admin settings
         fetch(('/api') + '/config/currency')
-            .then(res => res.json())
+            .then(res => res.ok ? res.json() : null)
             .then(data => {
                 if (data && data.currency) {
                     localStorage.setItem('platform-currency', data.currency);
                 } else {
                     localStorage.removeItem('platform-currency');
                 }
-                // Notify Navbar + any components listening for currency changes
                 window.dispatchEvent(new Event('currency-changed'));
             })
-            .catch(err => console.error('Failed to fetch platform currency', err));
+            .catch(() => {/* non-critical — silently ignore */});
     }, []);
     return (
         <SessionProvider>

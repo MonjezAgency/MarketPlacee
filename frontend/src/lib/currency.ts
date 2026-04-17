@@ -49,7 +49,7 @@ export function convertFromUSD(amountUSD: number, toCurrency: string): number {
  * Priority: localStorage override → timezone heuristic → USD fallback.
  */
 export function getActiveCurrency(): string {
-    if (typeof window === 'undefined') return 'USD';
+    if (typeof window === 'undefined') return 'EUR';
     const saved = localStorage.getItem('platform-currency');
     if (saved && USD_RATES[saved]) return saved;
 
@@ -67,7 +67,7 @@ export function getActiveCurrency(): string {
         if (tz.startsWith('Europe/Istanbul')) return 'TRY';
     } catch (_e) { /* ignore */ }
 
-    return 'USD';
+    return 'EUR';
 }
 
 /**

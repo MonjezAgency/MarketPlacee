@@ -1,6 +1,25 @@
-import { Controller, Get, Query, Param, NotFoundException } from '@nestjs/common';
-import { ShippingService } from './shipping.service';
+import { Controller, Get, Post, Query, Param, Body, NotFoundException, BadRequestException } from '@nestjs/common';
+import { IsString, IsOptional, IsArray, IsObject } from 'class-validator';
+import { ShippingService, ShippingAgentInput } from './shipping.service';
 import { DhlProvider, AramexProvider } from './shipping.provider';
+
+class AgentRatesDto {
+    @IsArray()
+    productIds: string[];
+
+    @IsObject()
+    quantities: Record<string, number>;
+
+    @IsString()
+    destinationCity: string;
+
+    @IsString()
+    destinationCountry: string;
+
+    @IsString()
+    @IsOptional()
+    destinationPostalCode?: string;
+}
 
 @Controller('shipping')
 export class ShippingController {
@@ -10,7 +29,7 @@ export class ShippingController {
         private readonly aramex: AramexProvider,
     ) { }
 
-    /** Platform shipping rates (used at checkout) */
+    /** Platform shipping rates (used at checkout — legacy) */
     @Get('rates')
     async getRates(
         @Query('cartTotal') cartTotal: string,
@@ -19,6 +38,28 @@ export class ShippingController {
         const total = parseFloat(cartTotal) || 100;
         const dest = destination || 'Default';
         return this.shippingService.getRates(total, dest);
+    }
+
+    /**
+     * Agent-powered shipping rates — uses real product list + destination country
+     * to calculate weight-aware quotes from DB Schenker, LKW Walter, Raben Group.
+     *
+     * POST /shipping/agent-rates
+     * Body: { productIds, quantities, destinationCity, destinationCountry }
+     */
+    @Post('agent-rates')
+    async getAgentRates(@Body() body: AgentRatesDto) {
+        if (!body.destinationCountry) {
+            throw new BadRequestException('destinationCountry is required');
+        }
+        const input: ShippingAgentInput = {
+            productIds: body.productIds || [],
+            quantities: body.quantities || {},
+            destinationCity: body.destinationCity || '',
+            destinationCountry: body.destinationCountry,
+            destinationPostalCode: body.destinationPostalCode,
+        };
+        return this.shippingService.getAgentRates(input);
     }
 
     /** Carrier rates — returns live quotes from DHL + Aramex */
@@ -49,7 +90,6 @@ export class ShippingController {
         if (upper.startsWith('ARX') || upper.startsWith('6')) {
             return this.aramex.trackShipment(trackingId);
         }
-        // Try both, return whichever responds
         const [dhlResult, aramexResult] = await Promise.allSettled([
             this.dhl.trackShipment(trackingId),
             this.aramex.trackShipment(trackingId),

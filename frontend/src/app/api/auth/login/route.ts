@@ -32,8 +32,8 @@ export async function POST(request: Request) {
 
     let res: Response;
     try {
-      // First attempt — 25s timeout
-      res = await callBackend(backendUrl, body, 25000);
+      // First attempt — 15s timeout
+      res = await callBackend(backendUrl, body, 15000);
     } catch (firstError: any) {
       const isTimeout =
         firstError.name === 'AbortError' ||
@@ -42,10 +42,10 @@ export async function POST(request: Request) {
 
       if (!isTimeout) throw firstError;
 
-      // Railway was cold-starting — wait 3s then retry once
-      console.warn('[PROXY_LOGIN] First attempt timed out (cold start likely) — retrying in 3s...');
-      await new Promise((r) => setTimeout(r, 3000));
-      res = await callBackend(backendUrl, body, 30000);
+      // Railway was cold-starting — wait 2s then retry once
+      console.warn('[PROXY_LOGIN] First attempt timed out (cold start likely) — retrying in 2s...');
+      await new Promise((r) => setTimeout(r, 2000));
+      res = await callBackend(backendUrl, body, 15000);
     }
 
     // A redirect means the backend is returning an error page (down / misconfigured)

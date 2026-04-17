@@ -61,7 +61,7 @@ const DISPUTE_REASONS = [
 
 function buildInvoiceHtml(invoice: any, order: OrderDetail): string {
     const itemRows = order.items
-        .map(i => `<tr><td>${i.product.name}</td><td>${i.quantity}</td><td>$${i.price.toFixed(2)}</td><td>$${(i.price * i.quantity).toFixed(2)}</td></tr>`)
+        .map(i => `<tr><td>${i.product.name}</td><td>${i.quantity}</td><td>€${i.price.toFixed(2)}</td><td>€${(i.price * i.quantity).toFixed(2)}</td></tr>`)
         .join('');
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
@@ -93,7 +93,7 @@ td{padding:12px;border-bottom:1px solid #F2F4F7;font-size:14px}
   <div class="meta-box"><label>Order Reference</label><p>#${order.id.slice(-8).toUpperCase()}</p></div>
   <div class="meta-box"><label>Due Date</label><p>${new Date(invoice.dueDate).toLocaleDateString()}</p></div>
   <div class="meta-box"><label>Payment Status</label><p>${invoice.status}</p></div>
-  <div class="meta-box"><label>Currency</label><p>${invoice.currency || 'USD'}</p></div>
+  <div class="meta-box"><label>Currency</label><p>${invoice.currency || 'EUR'}</p></div>
 </div>
 <h2 style="font-size:18px">Order Items</h2>
 <table>
@@ -101,9 +101,9 @@ td{padding:12px;border-bottom:1px solid #F2F4F7;font-size:14px}
   <tbody>${itemRows}</tbody>
 </table>
 <div class="totals">
-  <div class="total-row"><span>Subtotal</span><span>$${invoice.amount.toFixed(2)}</span></div>
-  <div class="total-row"><span>Tax</span><span>$${invoice.tax.toFixed(2)}</span></div>
-  <div class="total-final"><span>Total</span><span>$${invoice.totalAmount.toFixed(2)}</span></div>
+  <div class="total-row"><span>Subtotal</span><span>€${invoice.amount.toFixed(2)}</span></div>
+  <div class="total-row"><span>Tax</span><span>€${invoice.tax.toFixed(2)}</span></div>
+  <div class="total-final"><span>Total</span><span>€${invoice.totalAmount.toFixed(2)}</span></div>
 </div>
 <div class="footer">© 2026 Atlantis Marketplace — atlantisfmcg.com</div>
 </body></html>`;

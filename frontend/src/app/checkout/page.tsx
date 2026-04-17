@@ -51,25 +51,55 @@ export default function CheckoutPage() {
     const [couponError, setCouponError] = useState('');
     const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
 
-    // Fetch Rates on Mount
-    React.useEffect(() => {
-        const fetchRates = async () => {
-            setIsLoadingRates(true);
+    // Fetch rates from Shipping Agent — re-runs when address country/city changes
+    const fetchShippingRates = React.useCallback(async (country: string, city: string) => {
+        if (!country && !city) return;
+        setIsLoadingRates(true);
+        try {
+            const quantities: Record<string, number> = {};
+            items.forEach(i => { quantities[i.id] = i.quantity; });
+
+            const res = await apiFetch('/shipping/agent-rates', {
+                method: 'POST',
+                body: JSON.stringify({
+                    productIds: items.map(i => i.id),
+                    quantities,
+                    destinationCity: city || 'Unknown',
+                    destinationCountry: country || 'Romania',
+                }),
+            });
+            if (res.ok) {
+                const data = await res.json();
+                setShippingRates(data);
+                if (data.length > 0) setSelectedShipping(data[0]);
+            }
+        } catch (e) {
+            // Fallback to legacy endpoint
             try {
-                const res = await apiFetch(`/shipping/rates?cartTotal=${total}&destination=Dubai`);
+                const res = await apiFetch(`/shipping/rates?cartTotal=${total}&destination=${city || 'Romania'}`);
                 if (res.ok) {
                     const data = await res.json();
                     setShippingRates(data);
-                    if (data.length > 0) setSelectedShipping(data[0]); // default
+                    if (data.length > 0) setSelectedShipping(data[0]);
                 }
-            } catch (e) {
-                console.error("Failed to load shipping rates", e);
-            } finally {
-                setIsLoadingRates(false);
-            }
-        };
-        fetchRates();
-    }, [total]);
+            } catch (_) {}
+        } finally {
+            setIsLoadingRates(false);
+        }
+    }, [items, total]);
+
+    // Initial fetch on mount with default Romania (EU client)
+    React.useEffect(() => {
+        fetchShippingRates('Romania', '');
+    }, []);
+
+    // Re-fetch rates when user finishes typing the country (debounced)
+    const [addrCountry, setAddrCountry] = React.useState<string>(savedAddr.country || '');
+    React.useEffect(() => {
+        if (!addrCountry) return;
+        const timeout = setTimeout(() => fetchShippingRates(addrCountry, addrCity), 800);
+        return () => clearTimeout(timeout);
+    }, [addrCountry, addrCity]);
 
     const handleNext = () => {
         // Persist address so next checkout is pre-filled
@@ -79,6 +109,7 @@ export default function CheckoutPage() {
             street: addrStreet,
             city: addrCity,
             postal: addrPostal,
+            country: addrCountry,
         }));
         setStep(s => s + 1);
     };
@@ -129,6 +160,7 @@ export default function CheckoutPage() {
                         street: addrStreet,
                         city: addrCity,
                         postal: addrPostal,
+                        country: addrCountry,
                     },
                 })
             });
@@ -264,7 +296,10 @@ export default function CheckoutPage() {
                                                                 </div>
                                                                 <div>
                                                                     <p className="font-heading font-bold text-lg">{rate.name}</p>
-                                                                    <p className="text-sm text-muted-foreground font-medium">Estimated Transit: <span className="text-foreground">{rate.estimatedDays} Days</span></p>
+                                                                    <p className="text-sm text-muted-foreground font-medium">{rate.serviceType || 'Road Freight'}</p>
+                                                                    <p className="text-xs text-muted-foreground mt-0.5">Transit: <span className="text-foreground font-semibold">{rate.estimatedDays} days</span>
+                                                                        {rate.note && <span className="ml-2 text-primary/70">• {rate.note}</span>}
+                                                                    </p>
                                                                 </div>
                                                             </div>
                                                             <div className="text-end">
@@ -289,10 +324,13 @@ export default function CheckoutPage() {
                                                     value={addrCompany} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrCompany(e.target.value)} />
                                                 <Input label="Street Address" placeholder="Pier 42, Marine Drive" className="md:col-span-2"
                                                     value={addrStreet} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrStreet(e.target.value)} />
-                                                <Input label="City / Zone" placeholder="Dubai Logistics Center"
+                                                <Input label="City" placeholder="Bucharest"
                                                     value={addrCity} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrCity(e.target.value)} />
-                                                <Input label="Postal / Warehouse Code" placeholder="7720-DXB"
+                                                <Input label="Postal Code" placeholder="010000"
                                                     value={addrPostal} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrPostal(e.target.value)} />
+                                                <Input label="Country" placeholder="Romania"
+                                                    value={addrCountry} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrCountry(e.target.value)}
+                                                    className="md:col-span-2" />
                                             </div>
                                         </div>
 

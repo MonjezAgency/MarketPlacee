@@ -39,7 +39,7 @@ export default function LoginPage() {
         setLoading(true);
         setLoadingMsg('Authenticating...');
         // Show "waking up" message after 6s so the user knows it's not frozen
-        const slowTimer = setTimeout(() => setLoadingMsg('Waking up the server… please wait'), 6000);
+        const slowTimer = setTimeout(() => setLoadingMsg('Waking up the server… please wait'), 3000);
         try {
             const result = await login(email, password);
             clearTimeout(slowTimer);

@@ -162,6 +162,12 @@ export class PaymentsService {
                 orderId: order.id,
                 customerId: customerId,
                 supplierId: order.supplierId ?? '',
+                shippingCompany: order.shippingCompany ?? '',
+                // estimatedDays and destinationAddress are stored on the order notes field if available
+                estimatedDays: (order as any).shippingEstimatedDays ?? '3-5',
+                destinationAddress: (order as any).shippingAddress
+                    ? `${(order as any).shippingAddress}`
+                    : 'See dashboard',
             },
             description: `Atlantis B2B Order ${orderId}`,
         });

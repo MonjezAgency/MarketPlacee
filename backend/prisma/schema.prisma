@@ -118,6 +118,10 @@ model User {
 
   onboardingCompleted Boolean @default(false)
   stripeOnboarded     Boolean @default(false)
+
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
 }
 
 model KYCDocument {
@@ -172,6 +176,11 @@ model Product {
   tieredPrices TieredPrice[]
   reviews      Review[]
   wishlistItems WishlistItem[]
+
+  @@index([supplierId])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
 }
 
 model ProductPlacement {
@@ -241,6 +250,12 @@ model Order {
   updatedAt DateTime @updatedAt
 
   escrow    EscrowTransaction?
+
+  @@index([customerId])
+  @@index([supplierId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([paymentStatus])
 }
 
 model OrderStatusHistory {

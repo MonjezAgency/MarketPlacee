@@ -468,6 +468,131 @@ export class EmailService {
     }
   }
 
+  async sendShippingConfirmationWithInvoice(
+    email: string,
+    name: string,
+    orderId: string,
+    invoiceNumber: string,
+    orderItems: { name: string; quantity: number; price: number }[],
+    shippingCompany: string,
+    shippingCost: number,
+    estimatedDays: string,
+    destinationAddress: string,
+    subtotal: number,
+    totalAmount: number,
+    currency: string = 'EUR',
+  ) {
+    const frontendUrl = this.getFrontendUrl();
+    const currencySymbol = currency.toUpperCase() === 'EUR' ? '€' : currency.toUpperCase() === 'GBP' ? '£' : '$';
+    const fmt = (n: number) => `${currencySymbol}${n.toFixed(2)}`;
+
+    const itemRows = orderItems.map(i => `
+      <tr>
+        <td style="padding:10px 8px; font-size:13px; color:#2E2E2E; border-bottom:1px solid #EEF0F2;">${i.name}</td>
+        <td style="padding:10px 8px; font-size:13px; color:#2E2E2E; text-align:center; border-bottom:1px solid #EEF0F2;">${i.quantity}</td>
+        <td style="padding:10px 8px; font-size:13px; color:#2E2E2E; text-align:right; border-bottom:1px solid #EEF0F2; font-weight:700;">${fmt(i.price * i.quantity)}</td>
+      </tr>
+    `).join('');
+
+    const carrierLogos: Record<string, string> = {
+      'DB SCHENKER':  '#C8102E',
+      'LKW WALTER':   '#FF6600',
+      'Raben Group':  '#003DA5',
+    };
+    const carrierColor = carrierLogos[shippingCompany] || '#1BC7C9';
+
+    try {
+      await this.transporter.sendMail({
+        from: this.getFrom(),
+        to: email,
+        subject: `✅ Order Confirmed + Invoice ${invoiceNumber} — ${shippingCompany} | Atlantis`,
+        html: `
+          <div style="font-family:'Segoe UI',Arial,sans-serif; max-width:620px; margin:0 auto; background:#F2F4F7; border-radius:16px; overflow:hidden;">
+
+            <!-- Header -->
+            <div style="background:#0A1A2F; padding:36px 30px; text-align:center; border-bottom:4px solid #1BC7C9;">
+              <h1 style="color:#fff; font-size:30px; margin:0 0 4px; font-weight:900; letter-spacing:-1px;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+              <p style="color:#B0BCCF; font-size:12px; margin:0; letter-spacing:2px; text-transform:uppercase;">B2B Marketplace</p>
+            </div>
+
+            <!-- Hero -->
+            <div style="background:#fff; padding:36px 30px 0;">
+              <div style="background:#E8FFF5; border:1.5px solid #10B981; border-radius:12px; padding:16px 20px; display:flex; align-items:center; margin-bottom:24px;">
+                <span style="font-size:24px; margin-right:12px;">✅</span>
+                <div>
+                  <p style="margin:0; font-size:16px; font-weight:800; color:#065F46;">Payment Received & Order Confirmed</p>
+                  <p style="margin:4px 0 0; font-size:13px; color:#065F46;">Order <strong>#${orderId.slice(0,8).toUpperCase()}</strong> — Invoice <strong>${invoiceNumber}</strong></p>
+                </div>
+              </div>
+              <p style="color:#2E2E2E; font-size:15px; line-height:1.7; margin:0 0 24px;">Dear <strong>${name}</strong>, your order has been confirmed and payment processed. Below you will find your invoice and shipping details.</p>
+            </div>
+
+            <!-- Invoice Table -->
+            <div style="background:#fff; padding:0 30px 24px;">
+              <h3 style="font-size:14px; font-weight:800; color:#0A1A2F; margin:0 0 12px; text-transform:uppercase; letter-spacing:1px;">Invoice ${invoiceNumber}</h3>
+              <table style="width:100%; border-collapse:collapse; background:#FAFAFA; border-radius:8px; overflow:hidden;">
+                <thead>
+                  <tr style="background:#0A1A2F;">
+                    <th style="padding:10px 8px; font-size:12px; color:#B0BCCF; text-align:left; font-weight:700; text-transform:uppercase;">Product</th>
+                    <th style="padding:10px 8px; font-size:12px; color:#B0BCCF; text-align:center; font-weight:700; text-transform:uppercase;">Qty</th>
+                    <th style="padding:10px 8px; font-size:12px; color:#B0BCCF; text-align:right; font-weight:700; text-transform:uppercase;">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemRows}
+                  <tr style="background:#F2F4F7;">
+                    <td colspan="2" style="padding:10px 8px; font-size:13px; color:#667085;">Subtotal</td>
+                    <td style="padding:10px 8px; font-size:13px; text-align:right; color:#667085;">${fmt(subtotal)}</td>
+                  </tr>
+                  <tr style="background:#F2F4F7;">
+                    <td colspan="2" style="padding:10px 8px; font-size:13px; color:#667085;">Shipping (${shippingCompany})</td>
+                    <td style="padding:10px 8px; font-size:13px; text-align:right; color:#667085;">${fmt(shippingCost)}</td>
+                  </tr>
+                  <tr style="background:#0A1A2F;">
+                    <td colspan="2" style="padding:12px 8px; font-size:15px; font-weight:900; color:#fff;">TOTAL DUE</td>
+                    <td style="padding:12px 8px; font-size:15px; font-weight:900; text-align:right; color:#1BC7C9;">${fmt(totalAmount)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Shipping Partner -->
+            <div style="background:#fff; padding:0 30px 30px;">
+              <div style="background:#F8F9FF; border:1.5px solid ${carrierColor}; border-radius:12px; padding:18px 20px;">
+                <p style="margin:0 0 4px; font-size:11px; color:#667085; text-transform:uppercase; letter-spacing:1px; font-weight:700;">Logistics Partner</p>
+                <p style="margin:0 0 8px; font-size:18px; font-weight:900; color:${carrierColor};">${shippingCompany}</p>
+                <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                  <div>
+                    <p style="margin:0; font-size:11px; color:#667085; text-transform:uppercase; letter-spacing:1px;">Estimated Delivery</p>
+                    <p style="margin:4px 0 0; font-size:14px; font-weight:700; color:#0A1A2F;">${estimatedDays} business days</p>
+                  </div>
+                  <div>
+                    <p style="margin:0; font-size:11px; color:#667085; text-transform:uppercase; letter-spacing:1px;">Destination</p>
+                    <p style="margin:4px 0 0; font-size:14px; font-weight:700; color:#0A1A2F;">${destinationAddress}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- CTA -->
+            <div style="background:#fff; padding:0 30px 36px; text-align:center;">
+              <a href="${frontendUrl}/dashboard/customer" style="display:inline-block; padding:16px 48px; background:#1BC7C9; color:#fff; text-decoration:none; border-radius:12px; font-weight:800; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Track Order →</a>
+              <p style="margin:16px 0 0; font-size:12px; color:#667085;">Questions? Reply to this email or visit our support center.</p>
+            </div>
+
+            <!-- Footer -->
+            <div style="background:#0A1A2F; padding:20px 30px; text-align:center;">
+              <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+              <p style="color:#4A5568; font-size:10px; margin:6px 0 0;">This is a transaction confirmation. Secure payment processed via Stripe.</p>
+            </div>
+          </div>
+        `,
+      });
+    } catch (error) {
+      console.error('SMTP ERROR [sendShippingConfirmationWithInvoice]:', error);
+    }
+  }
+
   async sendEmailOtp(email: string, name: string, code: string) {
     try {
       await this.transporter.sendMail({

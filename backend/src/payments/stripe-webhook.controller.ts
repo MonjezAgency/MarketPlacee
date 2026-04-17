@@ -100,6 +100,46 @@ export class StripeWebhookController {
 
         this.logger.log(`[PAYMENT AUTHORIZED] Order: ${orderId} — escrow CAPTURED, order PROCESSING`);
 
+        // ─── Send confirmation + invoice email to customer ────────────────
+        if (order?.customer?.email) {
+            const fullOrder = await this.prisma.order.findUnique({
+                where: { id: orderId },
+                include: {
+                    items: { include: { product: { select: { name: true } } } },
+                    invoices: { orderBy: { createdAt: 'desc' }, take: 1 },
+                },
+            });
+
+            if (fullOrder) {
+                const invoiceNumber = fullOrder.invoices[0]?.invoiceNumber
+                    ?? `INV-${orderId.slice(0, 8).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+                const subtotal = fullOrder.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+                const shippingCost = fullOrder.shippingCost ?? 0;
+                const destination = intent.metadata?.destinationAddress ?? 'See account dashboard';
+
+                this.emailService.sendShippingConfirmationWithInvoice(
+                    order.customer.email,
+                    order.customer.name,
+                    orderId,
+                    invoiceNumber,
+                    fullOrder.items.map(i => ({
+                        name: i.product?.name ?? 'Product',
+                        quantity: i.quantity,
+                        price: i.price,
+                    })),
+                    fullOrder.shippingCompany ?? 'Selected Carrier',
+                    shippingCost,
+                    intent.metadata?.estimatedDays ?? '3-5',
+                    destination,
+                    subtotal,
+                    fullOrder.totalAmount,
+                    process.env.DEFAULT_CURRENCY ?? 'EUR',
+                ).catch(err => this.logger.error(`[EMAIL_CUSTOMER_INVOICE] ${err.message}`));
+
+                this.logger.log(`[EMAIL_CUSTOMER_INVOICE] Sent to ${order.customer.email} for order ${orderId}`);
+            }
+        };
+
         // ─── Notify supplier (in-app + email) ────────────────────────────
         if (order?.supplierId) {
             const amount = `${(intent.amount / 100).toLocaleString('en-GB', { minimumFractionDigits: 2 })} ${intent.currency.toUpperCase()}`;
