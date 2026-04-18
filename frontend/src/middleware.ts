@@ -23,21 +23,30 @@ export async function middleware(request: NextRequest) {
   // ✅ Logged in + validate token
   if (isProtectedRoute && token) {
     try {
-      // Safely decode Base64Url manually to avoid any edge runtime errors with jose or standard atob
-      let base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-      while (base64.length % 4) {
-        base64 += '=';
+      let payload: any;
+      try {
+        payload = decodeJwt(token);
+      } catch (joseError) {
+        // Fallback to manual decode if jose fails
+        let base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        while (base64.length % 4) {
+          base64 += '=';
+        }
+        try {
+          payload = JSON.parse(decodeURIComponent(escape(atob(base64))));
+        } catch (atobError) {
+          throw new Error('Fallback decode failed');
+        }
       }
-      const payload = JSON.parse(atob(base64));
-      const onboardingCompleted = payload.onboardingCompleted as boolean;
-      const role = payload.role as string;
+
+      const onboardingCompleted = payload?.onboardingCompleted as boolean;
+      const role = payload?.role as string;
 
       if (onboardingCompleted === false && role !== 'ADMIN' && pathname !== '/auth/onboarding') {
         return NextResponse.redirect(new URL('/auth/onboarding', request.url));
       }
     } catch (e) {
       console.error('Terminal Token Decode Error:', e);
-      // Only fail if completely corrupted
       const response = NextResponse.redirect(new URL('/auth/login', request.url));
       response.cookies.delete(process.env.JWT_COOKIE_NAME || 'token');
       return response;
