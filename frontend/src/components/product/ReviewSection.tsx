@@ -300,30 +300,30 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
             ) : (
                 <div className="space-y-4">
                     {reviews.map(review => (
-                        <div key={review.id} className="bg-white border border-slate-100 rounded-2xl p-5 shadow-sm">
+                        <div key={review.id} className="bg-card border border-border rounded-2xl p-5 shadow-sm">
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-[#0A1A2F]/10 flex items-center justify-center font-black text-[#0A1A2F] text-sm shrink-0">
+                                    <div className="w-10 h-10 rounded-full bg-foreground/10 flex items-center justify-center font-black text-foreground text-sm shrink-0">
                                         {review.user.name?.[0]?.toUpperCase() || '?'}
                                     </div>
                                     <div>
-                                        <p className="font-black text-[#0A1A2F] text-sm">{review.user.companyName || review.user.name}</p>
+                                        <p className="font-black text-foreground text-sm">{review.user.companyName || review.user.name}</p>
                                         <div className="flex items-center gap-2 mt-0.5">
                                             <StarRating value={review.rating} size={13} />
-                                            <span className="text-xs text-slate-400">
+                                            <span className="text-xs text-muted-foreground">
                                                 {new Date(review.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                             </span>
                                         </div>
                                     </div>
                                 </div>
                                 {user?.id === review.user.id && (
-                                    <button onClick={() => handleDelete(review.id)} className="text-slate-300 hover:text-red-500 transition-colors shrink-0">
+                                    <button onClick={() => handleDelete(review.id)} className="text-muted-foreground/50 hover:text-red-500 transition-colors shrink-0">
                                         <Trash2 size={16} />
                                     </button>
                                 )}
                             </div>
                             {review.comment && (
-                                <p className="mt-3 text-sm text-slate-600 dark:text-slate-300 leading-relaxed ps-13">{review.comment}</p>
+                                <p className="mt-3 text-sm text-foreground leading-relaxed ps-13">{review.comment}</p>
                             )}
                             {review.images && review.images.length > 0 && (
                                 <div className="flex flex-wrap gap-2 mt-3 ps-13">

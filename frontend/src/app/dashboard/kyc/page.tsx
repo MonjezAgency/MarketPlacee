@@ -7,7 +7,7 @@ import {
     AlertCircle, ChevronRight, FileText, User, Loader2, Eye,
     ArrowUp, ArrowDown, ArrowLeft, ArrowRight
 } from 'lucide-react';
-import axios from 'axios';
+import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -72,8 +72,6 @@ function LivenessDot({ dir, done, active }: { dir: typeof LIVENESS_DIRECTIONS[0]
 export default function KycPage() {
     const { user } = useAuth();
     const router = useRouter();
-    const API_URL = '/api';
-
     const [step, setStep] = React.useState<Step>('status');
     const [kycStatus, setKycStatus] = React.useState<KycStatus | null>(null);
     const [loading, setLoading] = React.useState(true);
@@ -93,9 +91,6 @@ export default function KycPage() {
 
     const videoRef = React.useRef<HTMLVideoElement>(null);
     const streamRef = React.useRef<MediaStream | null>(null);
-
-    
-    const headers = {  };
 
     React.useEffect(() => { fetchStatus(); }, []);
 
@@ -126,9 +121,17 @@ export default function KycPage() {
 
     const fetchStatus = async () => {
         try {
-            const res = await axios.get(`${API_URL}/kyc/status`, { headers });
-            setKycStatus(res.data);
-        } catch (_e) {}
+            const res = await apiFetch('/kyc/status');
+            if (res.ok) {
+                const data = await res.json();
+                // Normalize null/missing kycStatus to UNVERIFIED
+                setKycStatus({ ...data, kycStatus: data.kycStatus || 'UNVERIFIED' });
+            } else {
+                setKycStatus({ kycStatus: 'UNVERIFIED', document: null });
+            }
+        } catch (_e) {
+            setKycStatus({ kycStatus: 'UNVERIFIED', document: null });
+        }
         setLoading(false);
     };
 
@@ -195,17 +198,24 @@ export default function KycPage() {
         setSubmitting(true);
         setError('');
         try {
-            await axios.post(`${API_URL}/kyc/submit`, {
-                documentType: docType,
-                frontImageUrl: frontImage,
-                backImageUrl: backImage || undefined,
-                selfieUrl: selfieImage,
-                livenessScore: 0.97,
-            }, { headers });
+            const res = await apiFetch('/kyc/submit', {
+                method: 'POST',
+                body: JSON.stringify({
+                    documentType: docType,
+                    frontImageUrl: frontImage,
+                    backImageUrl: backImage || undefined,
+                    selfieUrl: selfieImage,
+                    livenessScore: 0.97,
+                }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Submission failed');
+            }
             setStep('submitted');
             fetchStatus();
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Submission failed. Please try again.');
+            setError(err.message || 'Submission failed. Please try again.');
         } finally {
             setSubmitting(false);
         }
@@ -217,7 +227,7 @@ export default function KycPage() {
 
     if (loading) return (
         <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Loader2 className="w-8 h-8 animate-spin text-secondary" />
         </div>
     );
 
@@ -225,8 +235,8 @@ export default function KycPage() {
         <div className="max-w-2xl mx-auto p-6 space-y-6">
             {/* Header */}
             <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
-                    <ShieldCheck className="w-6 h-6 text-primary" />
+                <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center">
+                    <ShieldCheck className="w-6 h-6 text-secondary" />
                 </div>
                 <div>
                     <h1 className="text-2xl font-black">Identity Verification (KYC)</h1>
@@ -274,8 +284,8 @@ export default function KycPage() {
                         )}
                         {kycStatus.kycStatus === 'UNVERIFIED' && (
                             <div className="space-y-4">
-                                <div className="flex items-center gap-4 p-5 bg-primary/5 border border-primary/20 rounded-2xl">
-                                    <AlertCircle className="w-10 h-10 text-primary shrink-0" />
+                                <div className="flex items-center gap-4 p-5 bg-secondary/10 border border-secondary/30 rounded-2xl">
+                                    <AlertCircle className="w-10 h-10 text-secondary shrink-0" />
                                     <div>
                                         <p className="font-black text-foreground">Verification Required</p>
                                         <p className="text-sm text-muted-foreground">Complete KYC to unlock payments and full platform access.</p>
@@ -288,13 +298,13 @@ export default function KycPage() {
                                         { icon: Camera, label: 'Live Check', sub: 'Camera required' },
                                     ].map(item => (
                                         <div key={item.label} className="p-4 bg-card border border-border rounded-xl text-center">
-                                            <item.icon className="w-6 h-6 mx-auto mb-2 text-primary" />
-                                            <p className="text-xs font-black">{item.label}</p>
+                                            <item.icon className="w-6 h-6 mx-auto mb-2 text-secondary" />
+                                            <p className="text-xs font-black text-foreground">{item.label}</p>
                                             <p className="text-[10px] text-muted-foreground mt-0.5">{item.sub}</p>
                                         </div>
                                     ))}
                                 </div>
-                                <button onClick={() => setStep('doc-type')} className="w-full py-4 bg-primary text-primary-foreground rounded-xl font-black text-sm hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                                <button onClick={() => setStep('doc-type')} className="w-full py-4 bg-secondary text-secondary-foreground rounded-xl font-black text-sm hover:bg-secondary/90 transition-colors flex items-center justify-center gap-2">
                                     Start Verification <ChevronRight size={18} />
                                 </button>
                             </div>

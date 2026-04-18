@@ -186,7 +186,7 @@ export default function Navbar() {
                             href="/how-it-works"
                             className={cn(
                                 "text-xs font-bold px-4 py-2 rounded-lg border transition-all hover:bg-secondary hover:text-white hover:border-secondary",
-                                (scrolled || isWhiteBackgroundPage) ? "border-primary text-primary" : "border-white/20 text-white"
+                                (scrolled || isWhiteBackgroundPage) ? "border-secondary text-secondary dark:border-secondary dark:text-secondary" : "border-white/40 text-white"
                             )}
                         >
                             {t('navbar', 'howToUse')}

@@ -17,7 +17,7 @@ export class PaymentsController {
     ) {}
 
     @Post('create-intent')
-    @Roles(Role.CUSTOMER, Role.ADMIN, Role.OWNER)
+    @Roles(Role.CUSTOMER, Role.ADMIN, Role.OWNER, Role.SUPPLIER)
     @UseGuards(RolesGuard)
     async createPaymentIntent(
       @Body() dto: CreatePaymentIntentDto,
