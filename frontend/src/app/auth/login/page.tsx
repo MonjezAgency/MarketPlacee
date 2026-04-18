@@ -26,9 +26,9 @@ export default function LoginPage() {
     const redirectByRole = (role: string) => {
         const upper = role.toUpperCase();
         const teamRoles = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
-        if (teamRoles.includes(upper)) router.push('/admin');
-        else if (upper === 'SUPPLIER') router.push('/supplier');
-        else router.push('/');
+        if (teamRoles.includes(upper)) window.location.href = '/admin';
+        else if (upper === 'SUPPLIER') window.location.href = '/supplier';
+        else window.location.href = '/';
     };
 
     const handleLogin = async (e: React.FormEvent) => {

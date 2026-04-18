@@ -30,8 +30,9 @@ export async function middleware(request: NextRequest) {
       }
       const payload = JSON.parse(atob(base64));
       const onboardingCompleted = payload.onboardingCompleted as boolean;
+      const role = payload.role as string;
 
-      if (onboardingCompleted === false && pathname !== '/auth/onboarding') {
+      if (onboardingCompleted === false && role !== 'ADMIN' && pathname !== '/auth/onboarding') {
         return NextResponse.redirect(new URL('/auth/onboarding', request.url));
       }
     } catch (e) {
