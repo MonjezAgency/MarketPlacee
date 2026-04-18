@@ -42,10 +42,15 @@ function ResetPasswordContent() {
 
         setLoading(true);
         try {
-            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/auth/reset-password`, {
-                token,
-                password
+            const { apiFetch } = await import('@/lib/api');
+            const res = await apiFetch('/auth/reset-password', {
+                method: 'POST',
+                body: JSON.stringify({ token, newPassword: password }),
             });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw { response: { data } };
+            }
             setSuccess(true);
             toast.success('Password reset successful!');
             setTimeout(() => router.push('/auth/login'), 3000);

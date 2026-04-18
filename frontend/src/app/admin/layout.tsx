@@ -41,6 +41,7 @@ import {
     ShieldAlert,
     Code2,
     ExternalLink,
+    Bot,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -74,6 +75,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         icon: LayoutDashboard,
         links: [
             { label: 'Overview', translationKey: 'overview', href: '/admin', icon: LayoutDashboard },
+            { label: 'AI Agent', translationKey: 'aiAgent', href: '/admin/ai-agent', icon: Bot },
             { label: 'Tech Dashboard', translationKey: 'techDashboard', href: '/admin/tech', icon: Code2 },
             { label: 'Homepage', translationKey: 'homepage', href: '/admin/homepage', icon: Home },
         ]
@@ -346,7 +348,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         لا يمكنك الوصول للوحة التحكم قبل إكمال التحقق من هويتك (KYC).
                         يرجى رفع وثائقك وانتظار موافقة المالك.
                     </p>
-                    <a href="/kyc/upload"
+                    <a href="/dashboard/kyc"
                         className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-3 rounded-2xl text-sm transition-all">
                         رفع وثائق KYC
                     </a>

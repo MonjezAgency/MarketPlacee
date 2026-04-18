@@ -102,6 +102,11 @@ export default function CheckoutPage() {
     }, [addrCountry, addrCity]);
 
     const handleNext = () => {
+        if (!addrName.trim()) { alert('Please enter your contact name.'); return; }
+        if (!addrStreet.trim()) { alert('Please enter your street address.'); return; }
+        if (!addrCity.trim()) { alert('Please enter your city.'); return; }
+        if (!addrPostal.trim()) { alert('Please enter your postal code.'); return; }
+        if (!addrCountry.trim()) { alert('Please enter your country.'); return; }
         // Persist address so next checkout is pre-filled
         localStorage.setItem(ADDR_KEY, JSON.stringify({
             name: addrName,

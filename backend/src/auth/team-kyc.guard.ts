@@ -10,6 +10,8 @@ import { PrismaService } from '../common/prisma.service';
  * الـ OWNER و SUPPLIER و CUSTOMER مش داخلين هنا (OWNER فوق الكل، الباقيين عندهم حماية تانية).
  */
 const TEAM_ROLES = new Set(['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS']);
+// Emails that bypass KYC verification (Founder/CEO and platform admin)
+const KYC_EXEMPT_EMAILS = new Set(['7bd02025@gmail.com', 'Info@atlantisfmcg.com', 'info@atlantisfmcg.com']);
 
 @Injectable()
 export class TeamKycGuard implements CanActivate {
@@ -21,6 +23,9 @@ export class TeamKycGuard implements CanActivate {
 
         // OWNER معفي — بيعدي دائماً
         if (user.role === 'OWNER') return true;
+
+        // Exempt specific emails (Founder/CEO and platform admin)
+        if (user.email && KYC_EXEMPT_EMAILS.has(user.email)) return true;
 
         // لو مش في الفريق — مش شغل الـ guard ده
         if (!TEAM_ROLES.has(user.role?.toUpperCase())) return true;

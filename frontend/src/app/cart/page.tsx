@@ -90,7 +90,7 @@ export default function CartPage() {
                                                 <ShieldCheck size={14} className="text-accent" />
                                                 <span className="font-bold">{t('cart', 'verifiedSKU')}</span>
                                             </div>
-                                            <p className="font-heading font-bold text-xl text-primary">{formatPrice(item.price, false)}<span className="text-muted-foreground text-xs font-medium ms-1">/ {item.unit}</span></p>
+                                            <p className="font-heading font-bold text-xl text-secondary">{formatPrice(item.price, false)}<span className="text-muted-foreground text-xs font-medium ms-1">/ {item.unit}</span></p>
                                         </div>
                                     </div>
 
@@ -131,7 +131,7 @@ export default function CartPage() {
 
                     {/* Order Summary */}
                     <aside className="lg:w-[400px]">
-                        <div className="bg-card rounded-[40px] border border-border/50 p-8 sticky top-32 premium-shadow space-y-8">
+                        <div className="bg-card rounded-[40px] border border-border/50 p-8 lg:sticky lg:top-32 premium-shadow space-y-8">
                             <h3 className="font-heading font-bold text-2xl">{t('cart', 'logisticsSummary')}</h3>
 
                             <div className="space-y-4">
@@ -156,7 +156,7 @@ export default function CartPage() {
                                 <div className="flex justify-between items-end mb-8">
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('cart', 'totalPayable')}</span>
-                                        <p className="font-heading font-black text-3xl text-primary">{formatPrice(total + (total >= 500 ? 0 : 25), false)}</p>
+                                        <p className="font-heading font-black text-3xl text-secondary">{formatPrice(total + (total >= 500 ? 0 : 25), false)}</p>
                                     </div>
                                     <span className="text-xs text-muted-foreground font-medium mb-1">{t('cart', 'exclTax')}</span>
                                 </div>
@@ -178,10 +178,11 @@ export default function CartPage() {
                             </div>
                         </div>
 
-                        {/* Recommendations Sidebar Extension */}
-                        <RecommendationsSidebar items={items} />
                     </aside>
                 </div>
+
+                {/* Recommendations Section */}
+                <RecommendationsSidebar items={items} />
             </div>
         </div>
     );

@@ -169,7 +169,7 @@ export default function ProductDetailClient() {
                                     layoutId={`product-img-${product.id}`}
                                     src={product.image}
                                     alt={product.name}
-                                    className="max-w-full max-h-[550px] object-contain relative z-10 transition-transform duration-1000 group-hover:scale-110 drop-shadow-2xl"
+                                    className="w-full max-w-[480px] max-h-[500px] min-h-[200px] object-contain relative z-10 transition-transform duration-1000 group-hover:scale-110 drop-shadow-2xl"
                                 />
                             ) : (
                                 <div className="max-w-full max-h-[550px] w-full h-[300px] relative z-10 flex items-center justify-center text-muted-foreground/30">

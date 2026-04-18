@@ -99,7 +99,7 @@ export default function Navbar() {
                     <Link href="/" className="flex items-center gap-2 group">
                         <span className={cn(
                             "font-heading font-black text-2xl tracking-tighter",
-                            (scrolled || isWhiteBackgroundPage) ? "text-primary" : "text-white"
+                            (scrolled || isWhiteBackgroundPage) ? "text-primary dark:text-foreground" : "text-white"
                         )}>
                             Atlan<span className="text-secondary">tis</span>
                         </span>

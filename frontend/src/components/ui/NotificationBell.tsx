@@ -19,6 +19,14 @@ function getNotificationLink(n: AppNotification): string | null {
       return '/dashboard/supplier/orders';
     case NOTIFICATION_TYPES.KYC_SUBMITTED:
       return '/admin/kyc';
+    case NOTIFICATION_TYPES.ERROR:
+    case NOTIFICATION_TYPES.WARNING: {
+      // Product approval failure → go to supplier products to fix
+      const productId = (n as any).data?.productId;
+      if (productId) return `/supplier/products?highlight=${productId}`;
+      if (n.title?.toLowerCase().includes('product')) return '/supplier/products';
+      return null;
+    }
     default:
       return null;
   }

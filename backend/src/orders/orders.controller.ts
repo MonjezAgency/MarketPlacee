@@ -26,7 +26,7 @@ export class OrdersController {
     constructor(private readonly ordersService: OrdersService) { }
 
     @Post()
-    @Roles(Role.CUSTOMER)
+    @Roles(Role.CUSTOMER, Role.ADMIN, Role.OWNER)
     async create(@Body() data: any, @Request() req) {
         const order = await this.ordersService.create(
             req.user.sub,

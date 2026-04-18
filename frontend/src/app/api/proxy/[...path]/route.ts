@@ -18,23 +18,35 @@ import { cookies } from 'next/headers';
 const getBackendUrl = () =>
   (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').trim().replace(/\/+$/, '');
 
+const PUBLIC_PATHS = [
+  'auth/login',
+  'auth/register',
+  'auth/forgot-password',
+  'auth/reset-password',
+  'auth/verify-email',
+  'auth/google-login',
+  'auth/refresh',
+];
+
 async function handler(
   req: NextRequest,
   { params }: { params: { path: string[] } }
 ) {
+  const backendPath = params.path.join('/');
+  const isPublic = PUBLIC_PATHS.some(p => backendPath === p || backendPath.startsWith(p + '?'));
+
   const token = cookies().get('token')?.value;
-  if (!token) {
+  if (!token && !isPublic) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
-
-  const backendPath = params.path.join('/');
   const search = req.nextUrl.search; // includes the '?' and query string
   const backendUrl = `${getBackendUrl()}/${backendPath}${search}`;
 
   // Build forwarded headers
-  const forwardHeaders: Record<string, string> = {
-    Cookie: `token=${token}`,
-  };
+  const forwardHeaders: Record<string, string> = {};
+  if (token) {
+    forwardHeaders['Cookie'] = `token=${token}`;
+  }
 
   // Forward Content-Type if present (needed for JSON/FormData bodies)
   const contentType = req.headers.get('content-type');
