@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { decodeJwt } from 'jose';
+
 
 const PROTECTED_PATHS = [
   '/dashboard', '/admin', '/profile', '/orders',
@@ -25,18 +25,19 @@ export async function middleware(request: NextRequest) {
     try {
       let payload: any;
       try {
-        payload = decodeJwt(token);
-      } catch (joseError) {
-        // Fallback to manual decode if jose fails
         let base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
         while (base64.length % 4) {
           base64 += '=';
         }
-        try {
-          payload = JSON.parse(decodeURIComponent(escape(atob(base64))));
-        } catch (atobError) {
-          throw new Error('Fallback decode failed');
+        
+        // Use Buffer (native in Next.js Edge) or safely fallback to atob
+        if (typeof Buffer !== 'undefined') {
+          payload = JSON.parse(Buffer.from(base64, 'base64').toString('utf-8'));
+        } else {
+          payload = JSON.parse(atob(base64));
         }
+      } catch (decodeError) {
+        throw new Error('Failed to decode the JWT correctly');
       }
 
       const onboardingCompleted = payload?.onboardingCompleted as boolean;
