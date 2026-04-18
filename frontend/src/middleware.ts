@@ -47,10 +47,10 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(new URL('/auth/onboarding', request.url));
       }
     } catch (e) {
-      console.error('Terminal Token Decode Error:', e);
-      const response = NextResponse.redirect(new URL('/auth/login', request.url));
-      response.cookies.delete(process.env.JWT_COOKIE_NAME || 'token');
-      return response;
+      console.error('Edge Runtime Token Decode Warning: Unable to parse JWT payload. Proceeding to route to let backend validate authentication.', e);
+      // Soft-fail: Do not aggressively delete the session or force redirect.
+      // If the token is truly invalid, the backend will return 401 when the client fetches data.
+      return NextResponse.next();
     }
   }
 
