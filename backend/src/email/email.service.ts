@@ -18,19 +18,23 @@ export class EmailService {
         console.warn('⚠️ SMTP Credentials missing in .env. Email delivery will depend on Resend fallback.');
     }
 
-    console.log(`[SMTP] Initializing for ${host}:${port}`);
+    console.log(`[SMTP] Initializing for ${host}:${port} (secure: ${port === 465})`);
 
     this.transporter = nodemailer.createTransport({
       host,
       port,
-      secure: port === 465, 
+      secure: port === 465, // true for 465 (SSL), false for 587 (STARTTLS)
       pool: false,
       auth: { user, pass },
       tls: {
-        rejectUnauthorized: false
+        rejectUnauthorized: false, // Allow self-signed certs (dev only)
+        minVersion: 'TLSv1.2', // Enforce modern TLS
       },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
+      connectionTimeout: 15000, // Increased to 15s for slow connections
+      greetingTimeout: 15000,
+      socketTimeout: 20000, // Added socket timeout
+      logger: false, // Disable verbose nodemailer logging
+      debug: false,
     } as any);
 
     this.transporter.verify((error, success) => {
@@ -148,30 +152,27 @@ export class EmailService {
   async sendPasswordResetEmail(email: string, name: string, token: string) {
     const frontendUrl = this.getFrontendUrl();
     const url = `${frontendUrl}/auth/reset-password?token=${token}`;
-    try {
-      await this.sendMail(email, 'Atlantis — Password Reset Request 🔐', `
-          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
-            <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
-              <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
-              <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
-            </div>
-            <div style="padding: 40px 30px; background: #FFFFFF;">
-              <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Password Reset Request 🔐</h2>
-              <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Hi ${name}, you requested to reset your password. Click the button below to proceed. This link expires in 1 hour.</p>
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${url}" style="display: inline-block; padding: 16px 40px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Reset Password →</a>
-              </div>
-              <p style="margin-top: 20px; font-size: 12px; color: #667085; text-align: center;">If you didn't request this, please ignore this email.</p>
-            </div>
-            <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-              <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
-            </div>
+
+    // sendMail already has try/catch with retry logic — don't double-wrap
+    return this.sendMail(email, 'Atlantis — Password Reset Request 🔐', `
+      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
+          <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
+          <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
+        </div>
+        <div style="padding: 40px 30px; background: #FFFFFF;">
+          <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Password Reset Request 🔐</h2>
+          <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Hi ${name}, you requested to reset your password. Click the button below to proceed. This link expires in 1 hour.</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${url}" style="display: inline-block; padding: 16px 40px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Reset Password →</a>
           </div>
-        `);
-    } catch (error) {
-      console.error('SMTP ERROR [sendPasswordResetEmail]:', error);
-      throw error;
-    }
+          <p style="margin-top: 20px; font-size: 12px; color: #667085; text-align: center;">If you didn't request this, please ignore this email.</p>
+        </div>
+        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+        </div>
+      </div>
+    `);
   }
 
   async sendTeamInvitation(email: string, name: string, role: string, tempPassword?: string) {

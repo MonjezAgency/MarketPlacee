@@ -320,7 +320,37 @@ export default function CheckoutPage() {
                                         </div>
 
                                         <div className="pt-6 border-t border-border/50">
-                                            <h3 className="text-lg font-bold mb-2">Delivery Address</h3>
+                                            <div className="flex items-center justify-between mb-2">
+                                                <h3 className="text-lg font-bold">Delivery Address</h3>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={async () => {
+                                                        try {
+                                                            const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+                                                                navigator.geolocation.getCurrentPosition(resolve, reject);
+                                                            });
+                                                            const { latitude, longitude } = position.coords;
+
+                                                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
+                                                            const data = await res.json();
+
+                                                            if (data.address) {
+                                                                setAddrStreet(data.address.road || data.address.street || '');
+                                                                setAddrCity(data.address.city || data.address.town || data.address.village || '');
+                                                                setAddrPostal(data.address.postcode || '');
+                                                                setAddrCountry(data.address.country || '');
+                                                            }
+                                                        } catch (err) {
+                                                            console.error('Location error:', err);
+                                                            alert('Could not detect location. Please enter your address manually.');
+                                                        }
+                                                    }}
+                                                    className="text-xs"
+                                                >
+                                                    📍 Auto-fill from Location
+                                                </Button>
+                                            </div>
                                             <p className="text-xs text-muted-foreground mb-6">Saved automatically for your next order.</p>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                                 <Input label="Contact Name" placeholder="Alex Sterling"
@@ -330,7 +360,7 @@ export default function CheckoutPage() {
                                                 <Input label="Street Address" placeholder="Pier 42, Marine Drive" className="md:col-span-2"
                                                     value={addrStreet} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrStreet(e.target.value)} />
                                                 <Input label="City" placeholder="Bucharest"
-                                                    value={addrCity} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrCity(e.target.value)} />
+                                                    value={addrCity} onChange=(e: React.ChangeEvent<HTMLInputElement>) => setAddrCity(e.target.value)} />
                                                 <Input label="Postal Code" placeholder="010000"
                                                     value={addrPostal} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrPostal(e.target.value)} />
                                                 <Input label="Country" placeholder="Romania"

@@ -482,8 +482,12 @@ export class AuthService {
         });
 
         // Fire-and-forget email — never reveal delivery status to prevent enumeration
+        // BUT log errors with full stack for debugging
         this.emailService.sendPasswordResetEmail(user.email, user.name, token)
-            .catch(err => this.logger.error(`[FORGOT_PASSWORD] Email delivery failed for ${user.email}: ${err.message}`));
+            .catch(err => {
+                this.logger.error(`[FORGOT_PASSWORD] Email delivery failed for ${user.email}: ${err.message}`);
+                this.logger.error(`[FORGOT_PASSWORD] Full error:`, err);
+            });
 
         return { success: true, message: 'If that email exists, a reset link was sent.' };
     }

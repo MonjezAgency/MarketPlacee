@@ -268,4 +268,48 @@ export class KycService {
     ]);
     return { pending, verified, rejected, unverified };
   }
+
+  /** Quick verify multiple users by email (dev/admin utility) */
+  async quickVerifyByEmails(emails: string[]) {
+    const results = [];
+    for (const email of emails) {
+      try {
+        const user = await this.prisma.user.findUnique({ where: { email } });
+        if (!user) {
+          results.push({ email, status: 'USER_NOT_FOUND' });
+          continue;
+        }
+
+        let doc = await this.prisma.kYCDocument.findFirst({ where: { userId: user.id } });
+
+        if (doc) {
+          await this.prisma.kYCDocument.update({
+            where: { id: doc.id },
+            data: { status: KYCStatus.VERIFIED, livenessScore: 1.0 },
+          });
+        } else {
+          doc = await this.prisma.kYCDocument.create({
+            data: {
+              userId: user.id,
+              documentType: 'PASSPORT',
+              frontImageUrl: 'admin-quick-verified',
+              livenessScore: 1.0,
+              status: KYCStatus.VERIFIED,
+            },
+          });
+        }
+
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { kycStatus: KYCStatus.VERIFIED },
+        });
+
+        results.push({ email, status: 'VERIFIED', userId: user.id, docId: doc.id });
+        this.logger.log(`[QUICK_VERIFY] User ${email} (${user.id}) verified`);
+      } catch (err) {
+        results.push({ email, status: 'ERROR', error: err.message });
+      }
+    }
+    return results;
+  }
 }

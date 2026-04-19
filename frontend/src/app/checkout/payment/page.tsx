@@ -11,7 +11,13 @@ import OrderSummary from './OrderSummary';
 import { ShoppingBag, ShieldCheck, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
+// Guard: Do not initialize Stripe with empty key
+if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+    console.error('[Stripe Init Error] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set');
+}
+const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+    ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
+    : null;
 
 function PaymentContent() {
     const searchParams = useSearchParams();
@@ -24,12 +30,6 @@ function PaymentContent() {
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [mounted, setMounted] = useState(false);
-
-    // Wait for theme hydration before rendering Stripe Elements
-    useEffect(() => {
-        setMounted(true);
-    }, []);
 
     useEffect(() => {
         if (!orderId) {
@@ -64,12 +64,38 @@ function PaymentContent() {
         initializePayment();
     }, [orderId]);
 
-    if (loading || !mounted) {
+    if (loading) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-12 h-12 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div>
                     <p className="text-muted-foreground animate-pulse">Initializing secure checkout...</p>
+                </div>
+            </div>
+        );
+    }
+
+    // Check for Stripe configuration error
+    if (!stripePromise) {
+        return (
+            <div className="min-h-screen bg-background flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-card border border-red-500/20 rounded-3xl p-8 text-center">
+                    <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <ShoppingBag className="w-8 h-8 text-red-500" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-foreground mb-2">Payment Configuration Error</h1>
+                    <p className="text-muted-foreground mb-4">
+                        Stripe payment system is not properly configured.
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-8">
+                        ⚠️ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing or invalid.
+                    </p>
+                    <Link
+                        href="/cart"
+                        className="inline-flex items-center justify-center w-full py-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-xl transition-all"
+                    >
+                        Back to Cart
+                    </Link>
                 </div>
             </div>
         );
@@ -150,9 +176,13 @@ function PaymentContent() {
                         </Link>
                         <div className="h-4 w-px bg-border"></div>
                         <nav className="hidden md:flex items-center gap-2 text-sm">
-                            <span className="text-muted-foreground">Cart</span>
+                            <Link href="/cart" className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                                Cart
+                            </Link>
                             <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-muted-foreground">Details</span>
+                            <Link href={`/checkout?orderId=${orderId}`} className="text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
+                                Details
+                            </Link>
                             <ChevronRight className="w-4 h-4 text-muted-foreground" />
                             <span className="text-foreground font-medium">Payment</span>
                         </nav>

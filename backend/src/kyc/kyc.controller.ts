@@ -167,4 +167,12 @@ export class KycController {
   async reject(@Param('id') id: string, @Body() body: { adminNotes: string }) {
     return this.kycService.rejectKyc(id, body.adminNotes);
   }
+
+  /** Admin: quick verify users by email (dev utility) */
+  @Post('admin/quick-verify')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  async quickVerify(@Body() body: { emails: string[] }) {
+    return this.kycService.quickVerifyByEmails(body.emails);
+  }
 }
