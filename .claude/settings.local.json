@@ -1,4 +1,16 @@
 {
+   "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
+    "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
+    "ANTHROPIC_AUTH_TOKEN": "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",
+    "ANTHROPIC_API_KEY": "",
+    "ANTHROPIC_MODEL": "anthropic/claude-opus-4.7",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "anthropic/claude-opus-4.7",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "anthropic/claude-opus-4.7",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "anthropic/claude-opus-4.7",
+    "ANTHROPIC_SMALL_FAST_MODEL": "anthropic/claude-opus-4.7",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "anthropic/claude-opus-4.7"
+  },
   "permissions": {
     "allow": [
       "Bash(curl -s -w \"\\\\nHTTP %{http_code}\" http://127.0.0.1:3001/auth/login -X POST -H \"Content-Type: application/json\" -d '{\"\"email\"\":\"\"a@a.com\"\",\"\"password\"\":\"\"x\"\"}')",

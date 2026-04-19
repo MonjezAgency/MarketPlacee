@@ -1,20 +1,25 @@
 /**
- * One-time script: Set KYC as VERIFIED for a specific email.
+ * One-time script: Set KYC as VERIFIED for specific emails.
  * Usage: npx ts-node prisma/verify-kyc-user.ts
  */
 import { PrismaClient, KYCStatus } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const TARGET_EMAIL = '7bd02025@gmail.com';
 
-async function main() {
-    const user = await prisma.user.findUnique({ where: { email: TARGET_EMAIL } });
+// Add any emails that should be auto-verified
+const TARGET_EMAILS = [
+    '7bd02025@gmail.com',
+    'abdelrhmanhany840@gmail.com',
+    'Info@atlantisfmcg.com',
+];
+
+async function verifyEmail(email: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
     if (!user) {
-        console.error(`User not found: ${TARGET_EMAIL}`);
-        process.exit(1);
+        console.warn(`⚠️  User not found: ${email}`);
+        return;
     }
 
-    // Find existing KYC document
     const existing = await prisma.kYCDocument.findFirst({ where: { userId: user.id } });
 
     if (existing) {
@@ -27,7 +32,7 @@ async function main() {
             data: {
                 userId: user.id,
                 documentType: 'PASSPORT',
-                frontImageUrl: 'admin-verified',
+                frontImageUrl: 'admin-auto-verified',
                 livenessScore: 1.0,
                 status: KYCStatus.VERIFIED,
             },
@@ -39,7 +44,13 @@ async function main() {
         data: { kycStatus: KYCStatus.VERIFIED },
     });
 
-    console.log(`✅ KYC verified for ${TARGET_EMAIL} (userId: ${user.id})`);
+    console.log(`✅ KYC verified for ${email} (userId: ${user.id})`);
+}
+
+async function main() {
+    for (const email of TARGET_EMAILS) {
+        await verifyEmail(email);
+    }
 }
 
 main()

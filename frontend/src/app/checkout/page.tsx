@@ -288,8 +288,8 @@ export default function CheckoutPage() {
                                                             className={cn(
                                                                 "p-6 border-2 rounded-3xl flex items-center justify-between cursor-pointer transition-all duration-300",
                                                                 selectedShipping?.id === rate.id
-                                                                    ? "border-primary bg-primary/5 shadow-md scale-[1.02]"
-                                                                    : "border-border hover:border-primary/50 hover:bg-muted/30"
+                                                                    ? "border-secondary bg-secondary/10 shadow-md scale-[1.02]"
+                                                                    : "border-border hover:border-secondary/50 hover:bg-muted/30"
                                                             )}
                                                         >
                                                             <div className="flex items-center gap-6">
@@ -308,9 +308,9 @@ export default function CheckoutPage() {
                                                                 </div>
                                                             </div>
                                                             <div className="text-end">
-                                                                <p className="font-heading font-black text-xl text-primary">{formatPrice(rate.cost, false)}</p>
+                                                                <p className="font-heading font-black text-xl text-foreground">{formatPrice(rate.cost, false)}</p>
                                                                 <div className="mt-2 w-6 h-6 rounded-full border-2 border-border mx-auto flex items-center justify-center">
-                                                                    {selectedShipping?.id === rate.id && <div className="w-3 h-3 bg-primary rounded-full animate-in zoom-in" />}
+                                                                    {selectedShipping?.id === rate.id && <div className="w-3 h-3 bg-secondary rounded-full animate-in zoom-in" />}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -377,7 +377,7 @@ export default function CheckoutPage() {
                                                         <p className="text-sm font-bold truncate">{item.name}</p>
                                                         <p className="text-xs text-muted-foreground">{item.brand} • Qty: {item.quantity}</p>
                                                     </div>
-                                                    <p className="text-sm font-black text-primary shrink-0">{formatPrice(item.price * item.quantity, false)}</p>
+                                                    <p className="text-sm font-black text-foreground shrink-0">{formatPrice(item.price * item.quantity, false)}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -393,7 +393,7 @@ export default function CheckoutPage() {
                                             </div>
                                             <div className="flex justify-between text-base font-black pt-2 border-t border-border/50">
                                                 <span>Total Due</span>
-                                                <span className="text-primary">{formatPrice(grandTotal, false)}</span>
+                                                <span className="text-secondary">{formatPrice(grandTotal, false)}</span>
                                             </div>
                                         </div>
 

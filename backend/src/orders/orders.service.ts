@@ -54,24 +54,9 @@ export class OrdersService {
             },
         });
 
-        // Send order confirmation email (non-blocking)
-        if (order.customer?.email) {
-            this.emailService.sendOrderConfirmationEmail(
-                order.customer.email,
-                order.customer.name || 'Partner',
-                order.id,
-                totalAmount,
-            ).catch(() => {});
-        }
-
-        // Notify customer
-        this.notificationsService.create(
-            customerId,
-            'Order Placed',
-            `Your order #${order.id.slice(-8).toUpperCase()} has been placed successfully.`,
-            'SUCCESS',
-            { orderId: order.id },
-        ).catch(() => {});
+        // NOTE: Customer notification + confirmation email are sent AFTER payment
+        // is confirmed via Stripe webhook (payment_intent.succeeded/amount_capturable_updated)
+        // to avoid showing "Order Placed" before funds are actually captured.
 
         // Notify each supplier
         const supplierIds = [...new Set(

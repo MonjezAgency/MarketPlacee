@@ -152,6 +152,17 @@ export class StripeWebhookController {
                 { orderId, amount },
             ).catch(err => this.logger.error(`[NOTIFY_SUPPLIER] ${err.message}`));
 
+        // ─── Notify customer (in-app) after payment confirmed ────────────
+        if (order?.customerId) {
+            this.notifications.create(
+                order.customerId,
+                'Order Placed Successfully',
+                `Your order #${orderId.slice(-8).toUpperCase()} has been confirmed and payment received. Check your email for the invoice.`,
+                'SUCCESS',
+                { orderId },
+            ).catch(err => this.logger.error(`[NOTIFY_CUSTOMER] ${err.message}`));
+        }
+
             if (order.supplier?.email) {
                 this.emailService.sendMail(
                     order.supplier.email,

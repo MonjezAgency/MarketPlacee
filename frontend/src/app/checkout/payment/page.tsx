@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { apiFetch } from '@/lib/api';
@@ -15,6 +16,8 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY 
 function PaymentContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const { resolvedTheme } = useTheme();
+    const isDark = resolvedTheme === 'dark';
     const orderId = searchParams.get('orderId');
     
     const [clientSecret, setClientSecret] = useState<string | null>(null);
@@ -57,9 +60,9 @@ function PaymentContent() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-[#06090B] flex items-center justify-center">
+            <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                    <div className="w-12 h-12 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div>
                     <p className="text-muted-foreground animate-pulse">Initializing secure checkout...</p>
                 </div>
             </div>
@@ -68,16 +71,16 @@ function PaymentContent() {
 
     if (error || !clientSecret) {
         return (
-            <div className="min-h-screen bg-[#06090B] flex items-center justify-center p-4">
-                <div className="max-w-md w-full bg-card border border-red-500/20 rounded-3xl p-8 text-center shadow-premium">
+            <div className="min-h-screen bg-background flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-card border border-red-500/20 rounded-3xl p-8 text-center">
                     <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                         <ShoppingBag className="w-8 h-8 text-red-500" />
                     </div>
-                    <h1 className="text-2xl font-bold text-white mb-2">Checkout Error</h1>
+                    <h1 className="text-2xl font-bold text-foreground mb-2">Checkout Error</h1>
                     <p className="text-muted-foreground mb-8">{error || 'Could not initialize payment session.'}</p>
-                    <Link 
+                    <Link
                         href="/cart"
-                        className="inline-flex items-center justify-center w-full py-4 bg-[#21262D] hover:bg-[#30363D] text-white font-semibold rounded-xl transition-all"
+                        className="inline-flex items-center justify-center w-full py-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-xl transition-all"
                     >
                         Back to Cart
                     </Link>
@@ -86,34 +89,61 @@ function PaymentContent() {
         );
     }
 
-    const appearance = {
-        theme: 'night' as const,
-        variables: {
-            colorPrimary: '#1BC7C9',
-            colorBackground: '#0D1117',
-            colorText: '#E2E8F0',
-            colorDanger: '#EF4444',
-            fontFamily: 'system-ui, sans-serif',
-            borderRadius: '12px',
-        },
-    };
+    const appearance = isDark
+        ? {
+            theme: 'night' as const,
+            variables: {
+                colorPrimary: '#1BC7C9',
+                colorBackground: '#1A2332',
+                colorText: '#E2E8F0',
+                colorDanger: '#EF4444',
+                fontFamily: 'system-ui, sans-serif',
+                borderRadius: '12px',
+            },
+        }
+        : {
+            theme: 'flat' as const,
+            variables: {
+                colorPrimary: '#1BC7C9',
+                colorBackground: '#ffffff',
+                colorText: '#0A1A2F',
+                colorTextSecondary: '#64748b',
+                colorDanger: '#EF4444',
+                fontFamily: 'system-ui, sans-serif',
+                borderRadius: '12px',
+            },
+            rules: {
+                '.Input': {
+                    border: '1.5px solid #e2e8f0',
+                    boxShadow: 'none',
+                    backgroundColor: '#f8fafc',
+                    color: '#0A1A2F',
+                },
+                '.Input:focus': {
+                    border: '1.5px solid #1BC7C9',
+                    boxShadow: '0 0 0 3px rgba(27,199,201,0.15)',
+                },
+                '.Label': { color: '#374151', fontWeight: '600' },
+                '.Block': { border: 'none', boxShadow: 'none' },
+            },
+        };
 
     return (
-        <div className="min-h-screen bg-[#0D1117]">
+        <div className="min-h-screen bg-background">
             {/* Sticky Header */}
-            <header className="sticky top-0 z-50 bg-[#0D1117]/80 backdrop-blur-md border-b border-[#30363D]">
+            <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
                 <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/cart" className="text-muted-foreground hover:text-white transition-colors">
+                        <Link href="/cart" className="text-muted-foreground hover:text-foreground transition-colors">
                             <ShoppingBag className="w-6 h-6" />
                         </Link>
-                        <div className="h-4 w-px bg-[#30363D]"></div>
+                        <div className="h-4 w-px bg-border"></div>
                         <nav className="hidden md:flex items-center gap-2 text-sm">
                             <span className="text-muted-foreground">Cart</span>
                             <ChevronRight className="w-4 h-4 text-muted-foreground" />
                             <span className="text-muted-foreground">Details</span>
                             <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-white font-medium">Payment</span>
+                            <span className="text-foreground font-medium">Payment</span>
                         </nav>
                     </div>
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded-full">
@@ -128,10 +158,10 @@ function PaymentContent() {
                     {/* Left Column: Payment Elements */}
                     <div className="lg:col-span-12 xl:col-span-7">
                         <div className="mb-8">
-                            <h1 className="text-3xl font-bold text-white mb-2">Secure Payment</h1>
+                            <h1 className="text-3xl font-bold text-foreground mb-2">Secure Payment</h1>
                             <p className="text-muted-foreground">Complete your B2B order with full escrow protection.</p>
                         </div>
-                        
+
                         <Elements stripe={stripePromise} options={{ clientSecret, appearance }}>
                             <PaymentForm orderId={orderId!} totalAmount={order.totalAmount} />
                         </Elements>
@@ -152,8 +182,8 @@ function PaymentContent() {
 export default function PaymentPage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-[#0D1117] flex items-center justify-center">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <div className="min-h-screen bg-background flex items-center justify-center">
+                <div className="w-12 h-12 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div>
             </div>
         }>
             <PaymentContent />
