@@ -187,11 +187,20 @@ export class PaymentsService {
 
         this.logger.log(
             `[ESCROW CREATED] Order: ${orderId} | ` +
-            `Total: £${order.totalAmount} | ` +
-            `Platform: £${platformFee} | ` +
-            `Supplier: £${supplierAmount}`,
+            `Total: ${currency.toUpperCase()} ${order.totalAmount} | ` +
+            `Platform: ${currency.toUpperCase()} ${platformFee} | ` +
+            `Supplier: ${currency.toUpperCase()} ${supplierAmount} | ` +
+            `Intent ID: ${intent.id}`,
             'PaymentsService'
         );
+
+        if (!intent.client_secret) {
+            this.logger.error(
+                `[PAYMENT INTENT ERROR] clientSecret is NULL for intent ${intent.id}`,
+                'PaymentsService'
+            );
+            throw new BadRequestException('Payment intent created but clientSecret is missing');
+        }
 
         return {
             clientSecret: intent.client_secret!,

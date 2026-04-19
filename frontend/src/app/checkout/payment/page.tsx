@@ -19,11 +19,17 @@ function PaymentContent() {
     const { resolvedTheme } = useTheme();
     const isDark = resolvedTheme === 'dark';
     const orderId = searchParams.get('orderId');
-    
+
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [mounted, setMounted] = useState(false);
+
+    // Wait for theme hydration before rendering Stripe Elements
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     useEffect(() => {
         if (!orderId) {
@@ -58,7 +64,7 @@ function PaymentContent() {
         initializePayment();
     }, [orderId]);
 
-    if (loading) {
+    if (loading || !mounted) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
@@ -77,7 +83,12 @@ function PaymentContent() {
                         <ShoppingBag className="w-8 h-8 text-red-500" />
                     </div>
                     <h1 className="text-2xl font-bold text-foreground mb-2">Checkout Error</h1>
-                    <p className="text-muted-foreground mb-8">{error || 'Could not initialize payment session.'}</p>
+                    <p className="text-muted-foreground mb-4">{error || 'Could not initialize payment session.'}</p>
+                    {!clientSecret && (
+                        <p className="text-xs text-muted-foreground mb-8">
+                            ⚠️ Debug: clientSecret is missing. Check Backend logs and STRIPE_SECRET_KEY.
+                        </p>
+                    )}
                     <Link
                         href="/cart"
                         className="inline-flex items-center justify-center w-full py-4 bg-muted hover:bg-muted/80 text-foreground font-semibold rounded-xl transition-all"
