@@ -360,7 +360,7 @@ export default function CheckoutPage() {
                                                 <Input label="Street Address" placeholder="Pier 42, Marine Drive" className="md:col-span-2"
                                                     value={addrStreet} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrStreet(e.target.value)} />
                                                 <Input label="City" placeholder="Bucharest"
-                                                    value={addrCity} onChange=(e: React.ChangeEvent<HTMLInputElement>) => setAddrCity(e.target.value)} />
+                                                    value={addrCity} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrCity(e.target.value)} />
                                                 <Input label="Postal Code" placeholder="010000"
                                                     value={addrPostal} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrPostal(e.target.value)} />
                                                 <Input label="Country" placeholder="Romania"
