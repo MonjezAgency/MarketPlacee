@@ -41,6 +41,8 @@ export default function ProductDetailClient() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [selectedImage, setSelectedImage] = useState<string>('');
+    const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+    const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
     const [bundleProducts, setBundleProducts] = useState<Product[]>([]);
 
     // Fetch the specific product by ID directly — no need to load all products
