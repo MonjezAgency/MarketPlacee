@@ -9,6 +9,7 @@ import { formatPrice } from '@/lib/currency';
 interface Props {
   orderId: string;
   totalAmount: number;
+  clientSecret?: string;
 }
 
 export default function PaymentForm({ orderId, totalAmount }: Props) {
@@ -18,6 +19,23 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Diagnosing silent rendering failures
+  const [isElementReady, setIsElementReady] = useState(false);
+  const [showDiagnosticWarning, setShowDiagnosticWarning] = useState(false);
+
+  React.useEffect(() => {
+    // If Stripe iframe doesn't mount within 5 seconds, it probably crashed silently due to Key mismatch
+    const timer = setTimeout(() => {
+      if (!isElementReady) {
+        setShowDiagnosticWarning(true);
+      }
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [isElementReady]);
+
+  const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
+  const isLiveKey = publishableKey.startsWith('pk_live_');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +98,32 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
           <CreditCard className="w-5 h-5 text-primary" />
           <h3 className="font-bold text-foreground text-sm uppercase tracking-wider">Enter Payment Details</h3>
         </div>
-        <PaymentElement />
+
+        {/* Diagnostics Box when Stripe fails silently */}
+        {showDiagnosticWarning && !isElementReady && (
+            <div className="mb-6 p-4 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-400">
+                <div className="flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+                    <div className="text-sm">
+                        <p className="font-bold text-base mb-1">Payment Fields Failed to Load</p>
+                        <p className="mb-2">Stripe is blocking the payment form. This happens 99% of the time when there is a mismatch between your Frontend and Backend keys.</p>
+                        <ul className="list-disc pl-5 space-y-1 mt-2 text-xs">
+                            <li>Frontend Key Mode: <strong className="text-white bg-[#0D1117] px-1 rounded">{isLiveKey ? 'LIVE (pk_live_...)' : 'TEST (pk_test_...)'}</strong></li>
+                            <li>You must ensure the <code className="bg-[#0D1117] px-1 rounded">STRIPE_SECRET_KEY</code> in your Railway Backend is ALSO in <strong className="text-white bg-[#0D1117] px-1 rounded">{isLiveKey ? 'LIVE' : 'TEST'}</strong> mode.</li>
+                            <li>If they do not match, Stripe aborts silently. Fix your .env variables and redeploy to fix this.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        )}
+
+        {/* Render PaymentElement with onReady hook */}
+        <div className={showDiagnosticWarning && !isElementReady ? "opacity-30 pointer-events-none" : ""}>
+            <PaymentElement onReady={() => {
+                setIsElementReady(true);
+                setShowDiagnosticWarning(false);
+            }} />
+        </div>
       </div>
 
       {errorMessage && (

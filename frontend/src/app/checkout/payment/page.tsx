@@ -169,7 +169,7 @@ function PaymentContent() {
                         </div>
 
                         <Elements stripe={stripePromise} options={{ clientSecret, appearance }}>
-                            <PaymentForm orderId={orderId!} totalAmount={order.totalAmount} />
+                            <PaymentForm orderId={orderId!} totalAmount={order.totalAmount} clientSecret={clientSecret} />
                         </Elements>
                     </div>
 
