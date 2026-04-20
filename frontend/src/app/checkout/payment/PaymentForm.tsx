@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Lock, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Lock, AlertCircle, CreditCard } from 'lucide-react';
 import { formatPrice } from '@/lib/currency';
 
 interface Props {
@@ -18,6 +18,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isElementReady, setIsElementReady] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,11 +49,6 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
       });
 
       if (error) {
-          // This point will only be reached if there is an immediate error when
-          // confirming the payment. Otherwise, the customer will be redirected to
-          // your `return_url`. For some payment methods like iDEAL, your customer will
-          // be redirected to an intermediate site first to authorize the payment, then
-          // redirected to the `return_url`.
           if (error.type === "card_error" || error.type === "validation_error") {
             setErrorMessage(error.message || 'An error occurred');
           } else {
@@ -62,7 +58,6 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
           // Success! In manual capture mode (escrow), status is 'requires_capture'
           router.push(`/checkout/confirmation?orderId=${orderId}&payment_intent=${paymentIntent.id}`);
       } else if (paymentIntent && paymentIntent.status === 'succeeded') {
-          // This might happen if capture_method was different, but for our case we expect manual
           router.push(`/checkout/confirmation?orderId=${orderId}&payment_intent=${paymentIntent.id}`);
       }
     } catch (err: any) {
@@ -83,8 +78,35 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
         </div>
       </div>
 
-      <div className="bg-card border border-border/50 rounded-3xl p-6 shadow-premium">
-        <PaymentElement options={{ layout: 'tabs' }} />
+      {/* Payment Card Section */}
+      <div className="bg-card border border-border/50 rounded-2xl overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border/50 flex items-center gap-3">
+          <CreditCard className="w-5 h-5 text-primary" />
+          <h3 className="font-bold text-foreground text-sm uppercase tracking-wider">Card Details</h3>
+        </div>
+
+        {/* Stripe Payment Element Container */}
+        <div className="p-6 relative" style={{ minHeight: '200px' }}>
+          {/* Loading indicator shown until Stripe Element is ready */}
+          {!isElementReady && (
+            <div className="absolute inset-0 flex items-center justify-center bg-card z-10">
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-8 h-8 border-3 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                <p className="text-xs text-muted-foreground font-medium">Loading payment form...</p>
+              </div>
+            </div>
+          )}
+          <PaymentElement
+            options={{
+              layout: {
+                type: 'tabs',
+                defaultCollapsed: false,
+              },
+            }}
+            onReady={() => setIsElementReady(true)}
+          />
+        </div>
       </div>
 
       {errorMessage && (
@@ -95,7 +117,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
       )}
 
       <button
-        disabled={isProcessing || !stripe || !elements}
+        disabled={isProcessing || !stripe || !elements || !isElementReady}
         className="w-full py-4 bg-primary hover:bg-primary/90 disabled:bg-[#21262D] disabled:text-muted-foreground text-[#0D1117] font-bold rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 group"
       >
         {isProcessing ? (

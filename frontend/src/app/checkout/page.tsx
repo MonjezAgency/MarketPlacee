@@ -172,7 +172,7 @@ export default function CheckoutPage() {
 
             if (res.ok) {
                 const order = await res.json();
-                clearCart();
+                // Don't clear cart here — it will be cleared after successful payment on the confirmation page
                 router.push(`/checkout/payment?orderId=${order.id}`);
             } else {
                 const err = await res.json().catch(() => ({}));

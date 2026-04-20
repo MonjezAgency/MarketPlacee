@@ -5,14 +5,23 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle2, ShoppingBag, ArrowRight, ShieldCheck, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { useCart } from '@/lib/cart';
 
 function ConfirmationContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
+    const { clearCart } = useCart();
     const orderId = searchParams.get('orderId');
     const paymentIntent = searchParams.get('payment_intent');
     
     const [countdown, setCountdown] = useState(10);
+
+    // Clear the cart once payment is confirmed
+    useEffect(() => {
+        if (orderId) {
+            clearCart();
+        }
+    }, [orderId]);
 
     useEffect(() => {
         if (!orderId) {
