@@ -129,7 +129,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
                     setShowDiagnosticWarning(false);
                     setStripeMountError(null);
                 }}
-                onChange={(event) => {
+                onChange={(event: any) => {
                     if (event.error) {
                         setStripeMountError(event.error.message);
                     } else {
