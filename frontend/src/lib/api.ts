@@ -190,3 +190,8 @@ export async function fetchImagesByEan(ean: string, limit: number = 3): Promise<
         return [];
     }
 }
+
+export async function fetchImageByEan(ean: string): Promise<string | null> {
+    const images = await fetchImagesByEan(ean, 1);
+    return images.length > 0 ? images[0] : null;
+}
