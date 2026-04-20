@@ -45,12 +45,12 @@ export class ProductsService {
         const markupPercentage = config && config.value ? parseFloat(config.value) : defaultMarkup;
         const finalMarkup = isNaN(markupPercentage) ? defaultMarkup : markupPercentage;
 
-        // Fetch EAN image if ean is provided and no images are uploaded
+        // Fetch EAN images if ean is provided and no images are uploaded
         let productImages = createProductDto.images || [];
         if (createProductDto.ean && productImages.length === 0) {
-            const fetchedImage = await this.eanService.fetchImageUrlByEan(createProductDto.ean);
-            if (fetchedImage) {
-                productImages = [fetchedImage];
+            const fetchedImages = await this.eanService.fetchImagesByEan(createProductDto.ean, 3);
+            if (fetchedImages && fetchedImages.length > 0) {
+                productImages = fetchedImages;
             }
         }
 

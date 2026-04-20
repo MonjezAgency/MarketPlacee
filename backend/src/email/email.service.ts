@@ -47,7 +47,8 @@ export class EmailService {
   }
 
   private getFrom() {
-    return process.env.EMAIL_FROM || process.env.EMAIL_USER || 'no-reply@atlantis.com';
+    const fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'no-reply@atlantis.com';
+    return `"${this.fromName}" <${fromEmail}>`;
   }
 
   private getFrontendUrl() {
@@ -153,8 +154,9 @@ export class EmailService {
     const frontendUrl = this.getFrontendUrl();
     const url = `${frontendUrl}/auth/reset-password?token=${token}`;
 
-    // sendMail already has try/catch with retry logic — don't double-wrap
-    return this.sendMail(email, 'Atlantis — Password Reset Request 🔐', `
+    console.log(`[EMAIL] Preparing password reset for ${email} with token: ${token.substring(0, 8)}...`);
+
+    const html = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
         <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
           <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
@@ -172,7 +174,17 @@ export class EmailService {
           <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
         </div>
       </div>
-    `);
+    `;
+
+    const text = `Hi ${name}, \n\nYou requested a password reset for your Atlantis account. \n\nPlease use the following link to reset your password: \n${url} \n\nThis link expires in 1 hour. \n\nIf you did not request this, please ignore this email.`;
+
+    try {
+        await this.sendMail(email, 'Atlantis — Password Reset Request 🔐', html);
+        return true;
+    } catch (err: any) {
+        console.error(`[EMAIL_ERROR] sendPasswordResetEmail failed for ${email}:`, err.message);
+        return false;
+    }
   }
 
   async sendTeamInvitation(email: string, name: string, role: string, tempPassword?: string) {

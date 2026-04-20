@@ -30,8 +30,8 @@ function RegisterForm() {
     const inviteToken = searchParams.get('invite') || '';
     const inviteRole = searchParams.get('role') || '';
     const [form, setForm] = useState({
-        name: '', email: inviteEmail, phone: '', companyName: '', website: '', socialLinks: '', password: '', role: inviteRole || 'customer',
-        vatNumber: '', taxId: '', country: '', bankAddress: '', iban: '', swiftCode: ''
+        name: '', email: inviteEmail, phone: '', phoneCode: '+20', companyName: '', website: '', socialLinks: '', password: '', confirmPassword: '', role: inviteRole || 'customer',
+        vatNumber: '', taxId: '', country: 'Egypt', bankAddress: '', iban: '', swiftCode: ''
     });
     const [viesStatus, setViesStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
     const [viesInfo, setViesInfo] = useState<{ name?: string, address?: string }>({});
@@ -97,8 +97,14 @@ function RegisterForm() {
             return;
         }
 
-        if (form.taxId !== 'NOT_APPLICABLE' && !form.taxId) {
-            setError('Please provide a Tax ID or check "No Tax ID/VAT"');
+        if (form.password !== form.confirmPassword) {
+            setError('Passwords do not match. Please verify your security sequence.');
+            return;
+        }
+
+        const isTaxRequired = form.country !== 'OTHER' && !['USA'].includes(form.country);
+        if (isTaxRequired && form.taxId !== 'NOT_APPLICABLE' && !form.taxId) {
+            setError(`Please provide a Tax ID for ${form.country}.`);
             return;
         }
 
@@ -305,8 +311,28 @@ function RegisterForm() {
 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-3">
-                                        <label className={labelClass}>Phone Context <span className="text-[#1BC7C9]">*</span></label>
-                                        <input className={inputClass} placeholder="+20..." value={form.phone} onChange={e => update('phone', e.target.value)} />
+                                        <label className={labelClass}>Business Phone <span className="text-[#1BC7C9]">*</span></label>
+                                        <div className="flex gap-2">
+                                            <select 
+                                                className={cn(inputClass, "w-[120px] px-3 text-center")}
+                                                value={form.phoneCode}
+                                                onChange={e => update('phoneCode', e.target.value)}
+                                            >
+                                                <option value="+20">🇪🇬 +20</option>
+                                                <option value="+966">🇸🇦 +966</option>
+                                                <option value="+971">🇦🇪 +971</option>
+                                                <option value="+49">🇩🇪 +49</option>
+                                                <option value="+33">🇫🇷 +33</option>
+                                                <option value="+44">🇬🇧 +44</option>
+                                                <option value="+1">🇺🇸 +1</option>
+                                            </select>
+                                            <input 
+                                                className={inputClass} 
+                                                placeholder="100..." 
+                                                value={form.phone} 
+                                                onChange={e => update('phone', e.target.value)} 
+                                            />
+                                        </div>
                                     </div>
                                     <div className="space-y-3">
                                         <label className={labelClass}>Legal Entity <span className="text-[#1BC7C9]">*</span></label>
@@ -455,34 +481,49 @@ function RegisterForm() {
                                     </div>
                                 )}
 
-                                <div className="space-y-4">
-                                    <label className={labelClass}>Account Security</label>
-                                    <div className="relative group">
-                                        <input
-                                            type={showPass ? 'text' : 'password'}
-                                            className={inputClass + ' pe-16'}
-                                            placeholder="Complexity-compliant password"
-                                            value={form.password}
-                                            onChange={e => update('password', e.target.value)}
-                                        />
-                                        <button type="button" onClick={() => setShowPass(!showPass)} className="absolute end-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-[#0A1A2F] transition-colors">
-                                            {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
-                                        </button>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-4">
+                                        <label className={labelClass}>Account Security</label>
+                                        <div className="relative group">
+                                            <input
+                                                type={showPass ? 'text' : 'password'}
+                                                className={inputClass + ' pe-16'}
+                                                placeholder="New Password"
+                                                value={form.password}
+                                                onChange={e => update('password', e.target.value)}
+                                            />
+                                            <button type="button" onClick={() => setShowPass(!showPass)} className="absolute end-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-[#0A1A2F] transition-colors">
+                                                {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {[
-                                            { label: 'Min 8 characters', met: form.password.length >= 8 },
-                                            { label: 'Uppercase', met: /[A-Z]/.test(form.password) },
-                                            { label: 'Lowercase', met: /[a-z]/.test(form.password) },
-                                            { label: 'Number', met: /[0-9]/.test(form.password) },
-                                            { label: 'Special Character', met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) }
-                                        ].map((req, idx) => (
-                                            <span key={idx} className={`text-[9px] font-black uppercase tracking-wider px-4 py-2 rounded-full border transition-all ${req.met ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
-                                                {req.met && <CheckCircle2 size={10} className="inline me-1.5 -mt-0.5" />}
-                                                {req.label}
-                                            </span>
-                                        ))}
+                                    <div className="space-y-4">
+                                        <label className={labelClass}>Confirm Sequence</label>
+                                        <div className="relative group">
+                                            <input
+                                                type={showPass ? 'text' : 'password'}
+                                                className={cn(inputClass, form.confirmPassword && form.password !== form.confirmPassword && "border-red-200 bg-red-50/20")}
+                                                placeholder="Repeat Password"
+                                                value={form.confirmPassword}
+                                                onChange={e => update('confirmPassword', e.target.value)}
+                                            />
+                                        </div>
                                     </div>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { label: 'Min 8 characters', met: form.password.length >= 8 },
+                                        { label: 'Uppercase', met: /[A-Z]/.test(form.password) },
+                                        { label: 'Lowercase', met: /[a-z]/.test(form.password) },
+                                        { label: 'Number', met: /[0-9]/.test(form.password) },
+                                        { label: 'Special Character', met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) },
+                                        { label: 'Passwords Match', met: form.password && form.confirmPassword && form.password === form.confirmPassword }
+                                    ].map((req, idx) => (
+                                        <span key={idx} className={`text-[9px] font-black uppercase tracking-wider px-4 py-2 rounded-full border transition-all ${req.met ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                                            {req.met && <CheckCircle2 size={10} className="inline me-1.5 -mt-0.5" />}
+                                            {req.label}
+                                        </span>
+                                    ))}
                                 </div>
 
                                 {!inviteToken && (

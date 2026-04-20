@@ -5,54 +5,66 @@ import axios from 'axios';
 export class EanService {
     private readonly logger = new Logger(EanService.name);
 
-    async fetchImageUrlByEan(ean: string): Promise<string | null> {
+    async fetchImagesByEan(ean: string, limit: number = 3): Promise<string[]> {
+        const uniqueImages = new Set<string>();
+
         try {
             // 1. Try Open Food Facts (Best for FMCG/Food)
-            const offResponse = await axios.get(`https://world.openfoodfacts.org/api/v0/product/${ean}.json`, {
-                timeout: 3000,
-                headers: { 'User-Agent': 'MarketplaceApp/1.0' }
-            });
+            try {
+                const offResponse = await axios.get(`https://world.openfoodfacts.org/api/v0/product/${ean}.json`, {
+                    timeout: 3000,
+                    headers: { 'User-Agent': 'AtlantisMarketplace/1.0' }
+                });
 
-            if (offResponse.data?.status === 1 && offResponse.data?.product?.image_url) {
-                return offResponse.data.product.image_url;
+                if (offResponse.data?.status === 1 && offResponse.data?.product?.image_url) {
+                    uniqueImages.add(offResponse.data.product.image_url);
+                    if (offResponse.data.product.image_front_url) uniqueImages.add(offResponse.data.product.image_front_url);
+                    if (offResponse.data.product.image_ingredients_url) uniqueImages.add(offResponse.data.product.image_ingredients_url);
+                }
+            } catch (offError) {
+                this.logger.debug(`Open Food Facts failed for EAN ${ean}`);
             }
+
+            if (uniqueImages.size >= limit) return Array.from(uniqueImages).slice(0, limit);
 
             // 2. Try UPCItemDB (Good general coverage)
-            const upcResponse = await axios.get(`https://api.upcitemdb.com/prod/trial/lookup?upc=${ean}`, {
-                timeout: 3000,
-            });
+            try {
+                const upcResponse = await axios.get(`https://api.upcitemdb.com/prod/trial/lookup?upc=${ean}`, {
+                    timeout: 3000,
+                });
 
-            if (upcResponse.data?.items?.[0]?.images?.[0]) {
-                // Return the first image but prefer high-res if possible
-                const images = upcResponse.data.items[0].images;
-                return images.find((img: string) => img.includes('https')) || images[0];
+                if (upcResponse.data?.items?.[0]?.images) {
+                    const images = upcResponse.data.items[0].images;
+                    images.forEach((img: string) => {
+                        if (img.startsWith('http')) uniqueImages.add(img);
+                    });
+                }
+            } catch (upcError) {
+                this.logger.debug(`UPCItemDB failed for EAN ${ean}`);
             }
+
+            if (uniqueImages.size >= limit) return Array.from(uniqueImages).slice(0, limit);
 
             // 3. Fallback: Search BarcodeSpider (User Requested)
             try {
                 const bsResponse = await axios.get(`https://www.barcodespider.com/${ean}`, {
                     timeout: 4000,
-                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+                    headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36' }
                 });
 
-                // Extremely simple regex to find the main product image if available
-                // e.g., <img ... src="https://images.barcodespider.com/bcs/barcode/image/..." >
-                const match = bsResponse.data.match(/<img[^>]+src=["'](https:\/\/images\.barcodespider\.com\/[^"']+)["']/i);
-                if (match && match[1]) {
-                    return match[1];
+                const matches = bsResponse.data.matchAll(/<img[^>]+src=["'](https:\/\/images\.barcodespider\.com\/[^"']+)["']/gi);
+                for (const match of matches) {
+                    if (match[1]) uniqueImages.add(match[1]);
+                    if (uniqueImages.size >= limit) break;
                 }
             } catch (bsError) {
-                this.logger.warn(`BarcodeSpider fallback failed for EAN ${ean}: ${bsError.message}`);
+                this.logger.debug(`BarcodeSpider fallback failed for EAN ${ean}`);
             }
 
-            // 3. Fallback: Search-based lookup (Mocking a slightly better generic source)
-            // In a real prod environment, we would use a dedicated API like SerpApi or Brandfetch
-            // For now, let's try one more reliable public source: Barcode Lookup (Requires key usually, so we stick to robust public ones)
-
-            return null;
+            return Array.from(uniqueImages).slice(0, limit);
         } catch (error) {
-            this.logger.warn(`Failed to fetch image for EAN ${ean}: ${error.message}`);
-            return null;
+            this.logger.warn(`Failed to fetch images for EAN ${ean}: ${error.message}`);
+            return Array.from(uniqueImages);
         }
     }
 }

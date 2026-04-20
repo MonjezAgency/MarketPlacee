@@ -178,15 +178,15 @@ export async function setHomepageCategories(data: any): Promise<boolean> {
     }
 }
 
-export async function fetchImageByEan(ean: string): Promise<string | null> {
-    if (!ean) return null;
+export async function fetchImagesByEan(ean: string, limit: number = 3): Promise<string[]> {
+    if (!ean) return [];
     try {
-        const res = await apiFetch(`/products/ean/${ean}`, { cache: 'no-store' });
-        if (!res.ok) return null;
+        const res = await apiFetch(`/products/ean/${ean}?limit=${limit}`, { cache: 'no-store' });
+        if (!res.ok) return [];
         const data = await res.json();
-        return data.imageUrl || null;
+        return data.imageUrls || [];
     } catch (error) {
-        console.error('Error fetching image by EAN:', error);
-        return null;
+        console.error('Error fetching images by EAN:', error);
+        return [];
     }
 }

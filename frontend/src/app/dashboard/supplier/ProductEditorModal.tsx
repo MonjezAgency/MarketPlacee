@@ -75,8 +75,10 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
     };
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        files.forEach(file => {
             const reader = new FileReader();
             reader.onloadend = () => {
                 const img = new globalThis.Image();
@@ -99,16 +101,68 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
                     if (ctx) {
                         ctx.drawImage(img, 0, 0, width, height);
                         const compressedDataUrl = canvas.toDataURL('image/webp', 0.8);
-                        // Use functional update to avoid stale closure overwriting other fields
-                        setFormData((prev: Product) => ({ ...prev, image: compressedDataUrl }));
+                        setFormData((prev: Product) => {
+                            const newImages = [...(prev.images || [])];
+                            if (!newImages.includes(compressedDataUrl)) {
+                                newImages.push(compressedDataUrl);
+                            }
+                            return { ...prev, images: newImages, image: newImages[0] };
+                        });
                     } else {
-                        setFormData((prev: Product) => ({ ...prev, image: reader.result as string }));
+                        setFormData((prev: Product) => {
+                            const newImages = [...(prev.images || [])];
+                            const result = reader.result as string;
+                            if (!newImages.includes(result)) {
+                                newImages.push(result);
+                            }
+                            return { ...prev, images: newImages, image: newImages[0] };
+                        });
                     }
                 };
                 img.src = reader.result as string;
             };
             reader.readAsDataURL(file);
+        });
+    };
+
+    const [isFetchingEan, setIsFetchingEan] = useState(false);
+    const [eanLimit, setEanLimit] = useState(3);
+
+    const fetchEanImages = async () => {
+        if (!formData.ean || isFetchingEan) return;
+        setIsFetchingEan(true);
+        try {
+            const { fetchImagesByEan } = await import('@/lib/api');
+            const images = await fetchImagesByEan(formData.ean, eanLimit);
+            if (images.length > 0) {
+                setFormData(prev => {
+                    const existing = prev.images || [];
+                    const combined = [...existing];
+                    images.forEach(img => {
+                        if (!combined.includes(img)) combined.push(img);
+                    });
+                    return { ...prev, images: combined, image: combined[0] };
+                });
+            }
+        } catch (err) {
+            console.error("EAN fetch failed:", err);
+        } finally {
+            setIsFetchingEan(false);
         }
+    };
+
+    const removeImage = (index: number) => {
+        const newImages = (formData.images || []).filter((_, i) => i !== index);
+        setFormData({ ...formData, images: newImages, image: newImages[0] || '' });
+    };
+
+    const addImageUrl = (url: string) => {
+        if (!url.trim()) return;
+        setFormData(prev => {
+            const newImages = [...(prev.images || [])];
+            if (!newImages.includes(url)) newImages.push(url);
+            return { ...prev, images: newImages, image: newImages[0] };
+        });
     };
 
     const addVariantGroup = () => {
@@ -190,33 +244,54 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
 
                             {/* Left Column: Visuals */}
                             <div className="lg:col-span-5 space-y-8">
-                                <div className="bg-card rounded-[40px] p-8 border border-border/50 flex flex-col items-center justify-center relative group min-h-[400px] overflow-hidden">
-                                    <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                                    {formData.image ? (
-                                        <img src={formData.image} alt="Preview" className="max-w-full max-h-[300px] object-contain relative z-10" />
-                                    ) : (
-                                        <div className="text-muted-foreground flex flex-col items-center gap-4 relative z-10">
-                                            <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center">
-                                                <ImageIcon size={32} />
+                                    <div className="w-full flex-1 flex flex-col gap-6 overflow-y-auto max-h-[400px] mb-20 scrollbar-hide">
+                                        {(formData.images || []).length > 0 ? (
+                                            <div className="grid grid-cols-2 gap-4 w-full relative z-10">
+                                                {(formData.images || []).map((img, idx) => (
+                                                    <div key={idx} className="relative group/img aspect-square bg-white rounded-2xl border border-border/50 overflow-hidden shadow-sm">
+                                                        <img src={img} alt={`Preview ${idx}`} className="w-full h-full object-contain p-2" />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeImage(idx)}
+                                                            className="absolute top-2 right-2 w-8 h-8 bg-destructive/10 hover:bg-destructive text-destructive hover:text-white rounded-full flex items-center justify-center backdrop-blur-md opacity-0 group-hover/img:opacity-100 transition-all shadow-lg"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                        {idx === 0 && (
+                                                            <div className="absolute bottom-2 left-2 bg-primary text-white text-[8px] font-black uppercase px-2 py-1 rounded-full shadow-lg">Main</div>
+                                                        )}
+                                                    </div>
+                                                ))}
                                             </div>
-                                            <span className="font-bold text-sm uppercase tracking-widest">No Image Selected</span>
-                                        </div>
-                                    )}
+                                        ) : (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground gap-4 relative z-10 py-10">
+                                                <div className="w-20 h-20 bg-muted rounded-full flex items-center justify-center">
+                                                    <ImageIcon size={32} />
+                                                </div>
+                                                <span className="font-bold text-sm uppercase tracking-widest text-center px-4">No Images in Gallery</span>
+                                            </div>
+                                        )}
+                                    </div>
 
                                     <div className="absolute bottom-6 start-0 end-0 px-6 z-20">
                                         <div className="bg-background/80 backdrop-blur-md rounded-2xl p-2 flex items-center border border-border/50 shadow-xl">
                                             <input
                                                 type="text"
-                                                placeholder="Paste Image URL here..."
-                                                value={formData.image}
-                                                onChange={e => setFormData({ ...formData, image: e.target.value })}
+                                                placeholder="Paste Image URL..."
+                                                onKeyDown={e => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        addImageUrl((e.target as HTMLInputElement).value);
+                                                        (e.target as HTMLInputElement).value = '';
+                                                    }
+                                                }}
                                                 className="flex-1 bg-transparent px-4 py-2 outline-none text-sm font-medium min-w-0"
                                             />
                                             <input
                                                 ref={fileInputRef}
                                                 type="file"
                                                 accept="image/*"
+                                                multiple
                                                 className="hidden"
                                                 onChange={handleImageUpload}
                                             />
@@ -334,15 +409,47 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
                                         />
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">EAN / Barcode</label>
-                                        <input
-                                            type="text"
-                                            placeholder="e.g. 5449000000996"
-                                            value={formData.ean}
-                                            onChange={e => setFormData({ ...formData, ean: e.target.value })}
-                                            className="w-full bg-card border border-border/50 rounded-2xl px-6 py-4 outline-none focus:border-primary/50 text-foreground font-bold transition-all"
-                                        />
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">EAN / Barcode</label>
+                                            <input
+                                                type="text"
+                                                placeholder="e.g. 5449000000996"
+                                                value={formData.ean}
+                                                onChange={e => setFormData({ ...formData, ean: e.target.value })}
+                                                className="w-full bg-card border border-border/50 rounded-2xl px-6 py-4 outline-none focus:border-primary/50 text-foreground font-bold transition-all"
+                                            />
+                                        </div>
+                                        <div className="space-y-2 flex flex-col">
+                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">EAN Auto-Fetch</label>
+                                            <div className="flex gap-2">
+                                                <div className="relative flex-1 group/ean">
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="10"
+                                                        value={eanLimit}
+                                                        onChange={e => setEanLimit(parseInt(e.target.value) || 1)}
+                                                        className="w-full bg-card border border-border/50 rounded-2xl px-4 py-4 outline-none focus:border-primary/50 text-foreground font-bold transition-all text-center"
+                                                        placeholder="Qty"
+                                                    />
+                                                    <span className="absolute -top-2 left-4 bg-background px-2 text-[8px] font-black uppercase text-primary border border-border/50 rounded-full">Images</span>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    disabled={!formData.ean || isFetchingEan}
+                                                    onClick={fetchEanImages}
+                                                    className="rounded-2xl px-6 flex-1 gap-2 font-black uppercase tracking-widest shadow-lg shadow-primary/10"
+                                                >
+                                                    {isFetchingEan ? (
+                                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                                    ) : (
+                                                        <Sparkles size={16} />
+                                                    )}
+                                                    Fetch
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     <div className="space-y-2">

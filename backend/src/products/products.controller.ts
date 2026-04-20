@@ -83,9 +83,9 @@ export class ProductsController {
     }
 
     @Get('ean/:ean')
-    async findImageByEan(@Param('ean') ean: string) {
-        const imageUrl = await this.eanService.fetchImageUrlByEan(ean);
-        return { imageUrl };
+    async findImagesByEan(@Param('ean') ean: string, @Query('limit') limit?: string) {
+        const images = await this.eanService.fetchImagesByEan(ean, limit ? parseInt(limit) : 3);
+        return { imageUrls: images };
     }
 
     // ─── Parameterized :id routes ──────────────────────────────────────────

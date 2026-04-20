@@ -31,8 +31,9 @@ export class AuthController {
         // Step 2: Handle 2FA check + token generation
         const result = await this.authService.loginStep1(user);
         if (result && 'access_token' in result) {
-            res.cookie('token', result.access_token, this.getCookieOptions(15 * 60 * 1000));
-            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(7 * 24 * 60 * 60 * 1000));
+            // Persistent sessions: 2h for access token, 30d for refresh token
+            res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
+            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
@@ -60,8 +61,8 @@ export class AuthController {
         
         const result = await this.authService.refreshTokens(refreshToken);
         if (result && 'access_token' in result) {
-            res.cookie('token', result.access_token, this.getCookieOptions(15 * 60 * 1000));
-            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(7 * 24 * 60 * 60 * 1000));
+            res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
+            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
@@ -93,8 +94,8 @@ export class AuthController {
     async googleLogin(@Body('email') email: string, @Body('name') name: string, @Body('avatar') avatar: string, @Res({ passthrough: true }) res: any) {
         const result = await this.authService.googleLogin({ email, name, avatar });
         if (result && 'access_token' in result) {
-            res.cookie('token', result.access_token, this.getCookieOptions(15 * 60 * 1000));
-            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(7 * 24 * 60 * 60 * 1000));
+            res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
+            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
