@@ -8,7 +8,7 @@ import { useAuth } from '@/lib/auth';
 import {
     MessageCircle, ShieldCheck, Search, AlertCircle,
     ShoppingCart, Users, Clock, CheckCircle2, XCircle,
-    Eye, ChevronRight, Star, Package, RefreshCw,
+    Eye, ChevronRight, Star, Package, RefreshCw, Receipt,
     Loader2, UserCheck, Filter, Bot, UserCheck2, Zap,
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
