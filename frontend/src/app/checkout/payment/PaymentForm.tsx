@@ -18,7 +18,6 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
 
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [isElementReady, setIsElementReady] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,7 +44,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
         confirmParams: {
           return_url: `${window.location.origin}/checkout/confirmation?orderId=${orderId}`,
         },
-        redirect: 'if_required', // Handle redirect-based methods automatically
+        redirect: 'if_required',
       });
 
       if (error) {
@@ -54,10 +53,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
           } else {
             setErrorMessage("An unexpected error occurred.");
           }
-      } else if (paymentIntent && paymentIntent.status === 'requires_capture') {
-          // Success! In manual capture mode (escrow), status is 'requires_capture'
-          router.push(`/checkout/confirmation?orderId=${orderId}&payment_intent=${paymentIntent.id}`);
-      } else if (paymentIntent && paymentIntent.status === 'succeeded') {
+      } else if (paymentIntent && (paymentIntent.status === 'requires_capture' || paymentIntent.status === 'succeeded')) {
           router.push(`/checkout/confirmation?orderId=${orderId}&payment_intent=${paymentIntent.id}`);
       }
     } catch (err: any) {
@@ -78,35 +74,13 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
         </div>
       </div>
 
-      {/* Payment Card Section */}
-      <div className="bg-card border border-border/50 rounded-2xl overflow-hidden">
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-border/50 flex items-center gap-3">
+      {/* Payment Element - NO overlay blocking the Stripe iframe */}
+      <div className="bg-white dark:bg-[#1A2332] border border-border/50 rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-5 pb-4 border-b border-border/30">
           <CreditCard className="w-5 h-5 text-primary" />
-          <h3 className="font-bold text-foreground text-sm uppercase tracking-wider">Card Details</h3>
+          <h3 className="font-bold text-foreground text-sm uppercase tracking-wider">Enter Payment Details</h3>
         </div>
-
-        {/* Stripe Payment Element Container */}
-        <div className="p-6 relative" style={{ minHeight: '200px' }}>
-          {/* Loading indicator shown until Stripe Element is ready */}
-          {!isElementReady && (
-            <div className="absolute inset-0 flex items-center justify-center bg-card z-10">
-              <div className="flex flex-col items-center gap-3">
-                <div className="w-8 h-8 border-3 border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                <p className="text-xs text-muted-foreground font-medium">Loading payment form...</p>
-              </div>
-            </div>
-          )}
-          <PaymentElement
-            options={{
-              layout: {
-                type: 'tabs',
-                defaultCollapsed: false,
-              },
-            }}
-            onReady={() => setIsElementReady(true)}
-          />
-        </div>
+        <PaymentElement />
       </div>
 
       {errorMessage && (
@@ -117,7 +91,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
       )}
 
       <button
-        disabled={isProcessing || !stripe || !elements || !isElementReady}
+        disabled={isProcessing || !stripe || !elements}
         className="w-full py-4 bg-primary hover:bg-primary/90 disabled:bg-[#21262D] disabled:text-muted-foreground text-[#0D1117] font-bold rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 group"
       >
         {isProcessing ? (
