@@ -371,11 +371,32 @@ export default function SupportPage() {
             {/* ── Orders ── */}
             {tab === 'orders' && (
                 <div className="space-y-3">
-                    <div className="relative mb-4">
-                        <Search size={14} className="absolute start-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                            placeholder="Search by order ID or buyer name..."
-                            className="w-full h-11 bg-muted rounded-2xl ps-10 pe-4 text-sm outline-none border border-border/50 focus:border-primary/50" />
+                    <div className="flex gap-3 mb-4">
+                        <div className="relative flex-1">
+                            <Search size={14} className="absolute start-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                            <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+                                placeholder="Search by order ID or buyer name..."
+                                className="w-full h-11 bg-muted rounded-2xl ps-10 pe-4 text-sm outline-none border border-border/50 focus:border-primary/50" />
+                        </div>
+                        <button
+                            onClick={async () => {
+                                const res = await apiFetch('/orders/export/excel');
+                                if (res.ok) {
+                                    const blob = await res.blob();
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `orders-support-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    a.remove();
+                                }
+                            }}
+                            className="h-11 px-6 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
+                        >
+                            <Receipt size={14} />
+                            Export
+                        </button>
                     </div>
                     {orders
                         .filter(o => !searchTerm ||

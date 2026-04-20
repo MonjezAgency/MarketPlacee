@@ -59,10 +59,11 @@ export class EmailService {
    * Primary mail sender with retry and fallback
    */
   async sendMail(to: string, subject: string, html: string, retries = 1): Promise<boolean> {
-    const retryableErrors = ['ETIMEDOUT', 'ECONNREFUSED', 'ESOCKET', 'ENOTFOUND'];
+    const retryableErrors = ['ETIMEDOUT', 'ECONNREFUSED', 'ESOCKET', 'ENOTFOUND', 'EAI_AGAIN'];
 
     try {
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+            console.error('[SMTP_ERROR] Missing EMAIL_USER or EMAIL_PASS in .env');
             throw new Error('MISSING_SMTP_CONFIG');
         }
 
@@ -75,24 +76,57 @@ export class EmailService {
         console.log(`[SMTP_SUCCESS] Sent to ${to}`);
         return true;
     } catch (error: any) {
-        const isRetryable = retryableErrors.includes(error.code);
+        // Structured error logging for easier debugging
+        const errorCode = error.code || 'UNKNOWN';
+        const errorMsg = error.message || 'No message';
+        
+        this.logSmtpError(errorCode, errorMsg, to, subject);
+
+        const isRetryable = retryableErrors.includes(errorCode);
         
         if (isRetryable && retries > 0) {
-            console.warn(`[SMTP_RETRYABLE] ${error.code} — retrying in 2s...`);
+            console.warn(`[SMTP_RETRY] Attempting retry for ${to} due to ${errorCode}...`);
             await new Promise(res => setTimeout(res, 2000));
             return this.sendMail(to, subject, html, retries - 1);
         }
 
-        console.error(`[SMTP_FAIL] ${error.code || error.message} — falling back to Resend for ${to}`);
+        // Only fallback to Resend if it's a connection issue or SMTP-specific failure
+        // We don't fallback for invalid recipient errors (550, etc.)
+        if (errorCode.startsWith('55') || errorCode === 'EENVELOPE') {
+            console.error(`[SMTP_FATAL] Invalid recipient or envelope error for ${to}. Skipping fallback.`);
+            return false;
+        }
 
+        console.error(`[SMTP_FAIL] Falling back to Resend for ${to}`);
         const result = await this.sendViaResend({ to, subject, html });
         
         if (!result) {
-            throw new InternalServerErrorException(`Email delivery failed for ${to} across all transports.`);
+            // Log final failure after all transports failed
+            console.error(`[EMAIL_SYSTEM_FATAL] All delivery methods failed for ${to}`);
+            return false; // Return false instead of throwing to allow app to continue gracefully
         }
         
         return true;
     }
+  }
+
+  private logSmtpError(code: string, message: string, to: string, subject: string) {
+    const timestamp = new Date().toISOString();
+    console.error(`--- [SMTP ERROR DIAGNOSTIC] ---`);
+    console.error(`Time: ${timestamp}`);
+    console.error(`Code: ${code}`);
+    console.error(`Message: ${message}`);
+    console.error(`Target: ${to}`);
+    console.error(`Subject: ${subject}`);
+    
+    if (code === 'EAUTH') {
+        console.error(`Analysis: SMTP Authentication failed. Verify EMAIL_USER/EMAIL_PASS.`);
+    } else if (code === 'ETIMEDOUT') {
+        console.error(`Analysis: Connection timed out. Check firewall, port (465 vs 587), and EMAIL_HOST.`);
+    } else if (code === 'ECONNREFUSED') {
+        console.error(`Analysis: Connection refused. Verify host and port.`);
+    }
+    console.error(`-------------------------------`);
   }
 
   private async sendViaResend(options: { to: string; subject: string; html: string; }): Promise<boolean> {
@@ -198,11 +232,7 @@ export class EmailService {
               <p style="margin: 10px 0 0 0; font-size: 11px; color: #667085;">Please change your password after first login.</p>
             </div>` : '';
     try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: 'You have been invited to the Atlantis Team',
-        html: `
+      await this.sendMail(email, 'You have been invited to the Atlantis Team', `
           <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
               <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
@@ -222,10 +252,9 @@ export class EmailService {
               <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
             </div>
           </div>
-        `,
-      });
+        `);
     } catch (error) {
-      console.error('SMTP ERROR [sendTeamInvitation]:', error);
+      console.error('ERROR [sendTeamInvitation]:', error);
       throw error;
     }
   }
@@ -243,18 +272,10 @@ export class EmailService {
     const text = `🎉 You're invited to join Atlantis as a ${params.role}! \n\nClick here to join: ${params.inviteLink}`;
 
     try {
-      const info = await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: params.recipientEmail,
-        subject: `🎉 Invitation: Join Atlantis as a ${params.role === 'supplier' ? 'Supplier' : 'Strategic Customer'}`,
-        text, // Adding plain text fallback for better deliverability
-        html,
-      });
-
-      console.log(`[SMTP] SENT SUCCESS: ${info.messageId} Accepted: ${info.accepted}`);
-      return { messageId: info.messageId, accepted: info.accepted };
+      const result = await this.sendMail(params.recipientEmail, `🎉 Invitation: Join Atlantis as a ${params.role === 'supplier' ? 'Supplier' : 'Strategic Customer'}`, html);
+      return { success: result };
     } catch (error) {
-      console.error('SMTP ERROR [sendInviteEmail]:', error);
+      console.error('ERROR [sendInviteEmail]:', error);
       throw error;
     }
   }
@@ -262,11 +283,7 @@ export class EmailService {
   async sendOrderConfirmationEmail(email: string, name: string, orderId: string, total: number) {
     const frontendUrl = this.getFrontendUrl();
     try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: `✅ Order Confirmed #${orderId.slice(0, 8).toUpperCase()} — Atlantis`,
-        html: `
+      await this.sendMail(email, `✅ Order Confirmed #${orderId.slice(0, 8).toUpperCase()} — Atlantis`, `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
               <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
@@ -287,10 +304,9 @@ export class EmailService {
               <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
             </div>
           </div>
-        `,
-      });
+        `);
     } catch (error) {
-      console.error('SMTP ERROR [sendOrderConfirmationEmail]:', error);
+      console.error('ERROR [sendOrderConfirmationEmail]:', error);
     }
   }
 
@@ -304,11 +320,7 @@ export class EmailService {
     const info = statusMessages[newStatus] || { title: `Order Status Updated`, body: `Your order status changed to ${newStatus}.`, color: '#1BC7C9' };
 
     try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: `${info.title} — Order #${orderId.slice(0, 8).toUpperCase()}`,
-        html: `
+      await this.sendMail(email, `${info.title} — Order #${orderId.slice(0, 8).toUpperCase()}`, `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid ${info.color};">
               <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
@@ -326,34 +338,24 @@ export class EmailService {
               <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
             </div>
           </div>
-        `,
-      });
+        `);
     } catch (error) {
-      console.error('SMTP ERROR [sendOrderStatusUpdateEmail]:', error);
+      console.error('ERROR [sendOrderStatusUpdateEmail]:', error);
     }
   }
 
   async sendKycStatusEmail(email: string, name: string, status: 'VERIFIED' | 'REJECTED' | 'PENDING', adminNotes?: string) {
     if (status === 'PENDING') {
       try {
-        await this.transporter.sendMail({
-          from: this.getFrom(),
-          to: email,
-          subject: '⏳ KYC Submitted — Under Review',
-          html: `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #F59E0B;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#F59E0B;font-size:22px;margin:0 0 16px;">KYC Documents Received ⏳</h2><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Your identity documents have been submitted and are under review. We'll notify you once complete — usually within 24 hours.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p></div></div>`,
-        });
+        await this.sendMail(email, '⏳ KYC Submitted — Under Review', `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #F59E0B;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#F59E0B;font-size:22px;margin:0 0 16px;">KYC Documents Received ⏳</h2><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Your identity documents have been submitted and are under review. We'll notify you once complete — usually within 24 hours.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p></div></div>`);
       } catch (err) {
-        console.error('SMTP ERROR [sendKycStatusEmail PENDING]:', err);
+        console.error('ERROR [sendKycStatusEmail PENDING]:', err);
       }
       return;
     }
     const isApproved = status === 'VERIFIED';
     try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: isApproved ? '✅ KYC Verified — Atlantis' : '❌ KYC Review Required — Atlantis',
-        html: `
+      await this.sendMail(email, isApproved ? '✅ KYC Verified — Atlantis' : '❌ KYC Review Required — Atlantis', `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid ${isApproved ? '#10B981' : '#EF4444'};">
               <h1 style="color:#fff; font-size:28px; margin:0; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
@@ -368,14 +370,13 @@ export class EmailService {
               </p>
               ${adminNotes ? `<div style="background:#FEF2F2; padding:16px; border-radius:12px; margin:20px 0; border-left:4px solid #EF4444;"><p style="margin:0; font-size:14px; color:#991B1B;"><strong>Notes:</strong> ${adminNotes}</p></div>` : ''}
             </div>
-            <div style="background:#0A1A2F; padding:20px; text-align:center;">
+            <div style="background:#0A1A2F; padding:20px; text-align: center;">
               <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
             </div>
           </div>
-        `,
-      });
+        `);
     } catch (error) {
-      console.error('SMTP ERROR [sendKycStatusEmail]:', error);
+      console.error('ERROR [sendKycStatusEmail]:', error);
     }
   }
 
@@ -448,11 +449,7 @@ export class EmailService {
   async sendInvoiceEmail(email: string, name: string, invoiceNumber: string, orderId: string, totalAmount: number, dueDate: Date) {
     const frontendUrl = this.getFrontendUrl();
     try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: `🧾 Invoice ${invoiceNumber} — Atlantis Marketplace`,
-        html: `
+      await this.sendMail(email, `🧾 Invoice ${invoiceNumber} — Atlantis Marketplace`, `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid #1BC7C9;">
               <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
@@ -474,10 +471,9 @@ export class EmailService {
               <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
             </div>
           </div>
-        `,
-      });
+        `);
     } catch (error) {
-      console.error('SMTP ERROR [sendInvoiceEmail]:', error);
+      console.error('ERROR [sendInvoiceEmail]:', error);
     }
   }
 
@@ -515,13 +511,8 @@ export class EmailService {
     const carrierColor = carrierLogos[shippingCompany] || '#1BC7C9';
 
     try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: `✅ Order Confirmed + Invoice ${invoiceNumber} — ${shippingCompany} | Atlantis`,
-        html: `
+      await this.sendMail(email, `✅ Order Confirmed + Invoice ${invoiceNumber} — ${shippingCompany} | Atlantis`, `
           <div style="font-family:'Segoe UI',Arial,sans-serif; max-width:620px; margin:0 auto; background:#F2F4F7; border-radius:16px; overflow:hidden;">
-
             <!-- Header -->
             <div style="background:#0A1A2F; padding:36px 30px; text-align:center; border-bottom:4px solid #1BC7C9;">
               <h1 style="color:#fff; font-size:30px; margin:0 0 4px; font-weight:900; letter-spacing:-1px;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
@@ -599,23 +590,17 @@ export class EmailService {
               <p style="color:#4A5568; font-size:10px; margin:6px 0 0;">This is a transaction confirmation. Secure payment processed via Stripe.</p>
             </div>
           </div>
-        `,
-      });
+        `);
     } catch (error) {
-      console.error('SMTP ERROR [sendShippingConfirmationWithInvoice]:', error);
+      console.error('ERROR [sendShippingConfirmationWithInvoice]:', error);
     }
   }
 
   async sendEmailOtp(email: string, name: string, code: string) {
     try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject: `🔐 Your Atlantis Verification Code: ${code}`,
-        html: `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #FF9900;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#0A1A2F;font-size:22px;margin:0 0 16px;">Verification Code 🔐</h2><p style="color:#2E2E2E;font-size:15px;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;">Your one-time verification code is:</p><div style="background:#F2F4F7;border-radius:12px;padding:24px;text-align:center;margin:24px 0;"><span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#0A1A2F;font-family:monospace;">${code}</span></div><p style="color:#667085;font-size:13px;">This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p></div></div>`,
-      });
+      await this.sendMail(email, `🔐 Your Atlantis Verification Code: ${code}`, `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #FF9900;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#0A1A2F;font-size:22px;margin:0 0 16px;">Verification Code 🔐</h2><p style="color:#2E2E2E;font-size:15px;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;">Your one-time verification code is:</p><div style="background:#F2F4F7;border-radius:12px;padding:24px;text-align:center;margin:24px 0;"><span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#0A1A2F;font-family:monospace;">${code}</span></div><p style="color:#667085;font-size:13px;">This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p></div></div>`);
     } catch (err) {
-      console.error('SMTP ERROR [sendEmailOtp]:', err);
+      console.error('ERROR [sendEmailOtp]:', err);
     }
   }
 
@@ -627,12 +612,8 @@ export class EmailService {
     const subject = isAr ? 'تم استلام طلب التسجيل - Atlantis Marketplace Onboarding' : 'Registration Received - Atlantis Marketplace Onboarding';
     
     try {
-      await this.transporter.sendMail({
-        from: this.getFrom(),
-        to: email,
-        subject,
-        html: `
-          <div dir="${isAr ? 'rtl' : 'ltr'}" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+      await this.sendMail(email, subject, `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 50px 30px; text-align: center; border-bottom: 4px solid #1BC7C9;">
               <h1 style="color: white; font-size: 28px; margin: 0 0 10px; font-weight: 900;">${isAr ? 'شكراً لتسجيلك! 👋' : 'Thank You for Registering! 👋'}</h1>
               <p style="color: #1BC7C9; font-size: 16px; font-weight: bold; margin: 0;">${isAr ? 'طلبك قيد المراجعة الآن' : 'Your request is now under review'}</p>
@@ -664,10 +645,9 @@ export class EmailService {
               <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
             </div>
           </div>
-        `,
-      });
+        `);
     } catch (error) {
-      console.error('SMTP ERROR [sendRegistrationConfirmationEmail]:', error);
+      console.error('ERROR [sendRegistrationConfirmationEmail]:', error);
       throw error;
     }
   }

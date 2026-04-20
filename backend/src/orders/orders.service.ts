@@ -201,66 +201,24 @@ export class OrdersService {
         }));
     }
 
-    async updateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string) {
-        const order = await this.prisma.order.findUnique({
-            where: { id: orderId },
-            include: { customer: { select: { email: true, name: true } } },
-        });
-        if (!order) throw new NotFoundException('Order not found');
-
-        const previousStatus = order.status;
-
-        const updated = await this.prisma.order.update({
-            where: { id: orderId },
-            data: {
-                status,
-                history: {
-                    create: {
-                        previousStatus,
-                        newStatus: status,
-                        changedById,
-                        reason,
-                    },
-                },
-            },
-        });
-
-        // Send status update email (non-blocking)
-        if (order.customer?.email) {
-            this.emailService.sendOrderStatusUpdateEmail(
-                order.customer.email,
-                order.customer.name || 'Partner',
-                orderId,
-                status,
-            ).catch(() => {});
-        }
-
-        // Notify customer of status change
-        this.notificationsService.create(
-            order.customerId,
-            'Order Status Updated',
-            `Your order #${orderId.slice(-8).toUpperCase()} is now ${STATUS_LABELS[status]}.`,
-            status === 'CANCELLED' ? 'ERROR' : status === 'DELIVERED' ? 'SUCCESS' : 'INFO',
-            { orderId, status },
-        ).catch(() => {});
-
-        // Auto-generate invoice on delivery + send email
-        if (status === OrderStatus.DELIVERED && order.customer?.email) {
-            this.invoiceService.createInvoiceForOrder(orderId).then(invoice => {
-                this.emailService.sendInvoiceEmail(
-                    order.customer.email,
-                    order.customer.name || 'Partner',
-                    invoice.invoiceNumber,
-                    orderId,
-                    invoice.totalAmount,
-                    invoice.dueDate,
-                ).catch(() => {});
-            }).catch(() => {});
-
-            // Release escrow → triggers supplier payout
-            this.escrowService.releaseEscrow(orderId).catch(err =>
-                console.error(`Escrow release failed for ${orderId}:`, err.message)
-            );
+        // Handle Escrow Void/Refund on Cancellation
+        if (status === OrderStatus.CANCELLED) {
+            try {
+                const escrow = await this.prisma.escrowTransaction.findUnique({ where: { orderId } });
+                if (escrow) {
+                    if (escrow.status === 'HOLDING') {
+                        await this.escrowService.voidEscrow(orderId, reason || 'Order cancelled by admin/supplier');
+                    } else if (escrow.status === 'RELEASED' || escrow.status === 'CAPTURED') {
+                        // If funds were already released (unlikely for cancellation but possible for returns)
+                        // we trigger a refund.
+                        await this.escrowService.refundEscrow(orderId, reason || 'Order cancelled/refunded');
+                    }
+                }
+            } catch (err: any) {
+                console.error(`[ORDER_CANCEL_ESCROW_ERROR] Failed for ${orderId}:`, err.message);
+                // We log but don't block order status update if escrow fails, 
+                // though usually we want consistency.
+            }
         }
 
         return updated;

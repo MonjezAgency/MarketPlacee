@@ -8,9 +8,13 @@ import {
     Query,
     UseGuards,
     Request,
+    Res,
+    StreamableFile,
     ForbiddenException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { OrdersService } from './orders.service';
+import { ExcelService } from '../admin/excel.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { PolicyGuard } from '../auth/policy.guard';
@@ -23,7 +27,10 @@ import { plainToInstance } from 'class-transformer';
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OrdersController {
-    constructor(private readonly ordersService: OrdersService) { }
+    constructor(
+        private readonly ordersService: OrdersService,
+        private readonly excelService: ExcelService,
+    ) { }
 
     @Post()
     @Roles(Role.CUSTOMER, Role.ADMIN, Role.OWNER, Role.SUPPLIER)
@@ -62,6 +69,21 @@ export class OrdersController {
         } else if (req.user.role === Role.SUPPLIER) {
             return this.ordersService.findBySupplier(req.user.sub);
         }
+    }
+
+    @Get('export/excel')
+    @Roles(Role.ADMIN)
+    async exportOrdersExcel(@Res({ passthrough: true }) res: Response) {
+        const orders = await this.ordersService.findAll();
+        const buffer = await this.excelService.generateOrdersExcel(orders);
+        
+        res.set({
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename="orders-export-${new Date().toISOString().split('T')[0]}.xlsx"`,
+            'Content-Length': buffer.length,
+        });
+
+        return new StreamableFile(buffer);
     }
 
     @Get()

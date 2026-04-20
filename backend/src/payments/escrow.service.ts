@@ -126,4 +126,26 @@ export class EscrowService {
 
         this.logger.log(`[ESCROW REFUNDED] Order: ${orderId} Reason: ${reason}`);
     }
+
+    async voidEscrow(orderId: string, reason: string) {
+        const escrow = await this.prisma.escrowTransaction.findUnique({
+            where: { orderId },
+        });
+
+        if (!escrow) throw new NotFoundException('Escrow not found');
+        
+        if (escrow.status !== EscrowStatus.HOLDING) {
+            throw new BadRequestException('Only escrow in HOLDING status can be voided (canceled). Use refund if already captured.');
+        }
+
+        // Void (cancel) the Stripe payment intent
+        await this.stripe.cancelPaymentIntent(escrow.stripeIntentId);
+
+        await this.prisma.escrowTransaction.update({
+            where: { orderId },
+            data: { status: EscrowStatus.CANCELLED },
+        });
+
+        this.logger.log(`[ESCROW VOIDED] Order: ${orderId} Reason: ${reason}`);
+    }
 }

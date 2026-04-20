@@ -89,6 +89,25 @@ export default function AdminOrdersPage() {
                 </div>
                 
                 <div className="flex items-center gap-4">
+                    <button
+                        onClick={async () => {
+                            const res = await apiFetch('/orders/export/excel');
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `orders-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                            }
+                        }}
+                        className="h-16 px-8 bg-emerald-500 text-white rounded-[2rem] font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-xl shadow-emerald-500/20 flex items-center gap-3"
+                    >
+                        <Receipt size={18} />
+                        Export Ledger
+                    </button>
                     <div className="relative group">
                         <Search className="absolute start-6 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={20} />
                         <input

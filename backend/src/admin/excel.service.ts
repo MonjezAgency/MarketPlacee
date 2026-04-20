@@ -328,4 +328,26 @@ export class ExcelService {
             return {};
         }
     }
+
+    async generateOrdersExcel(orders: any[]): Promise<Buffer> {
+        const data = orders.map(order => ({
+            'Order ID': order.id,
+            'Date': order.date,
+            'Customer': order.customer,
+            'Supplier': order.supplier,
+            'Total Amount': order.total,
+            'Supplier Profit': order.supplierProfit,
+            'Admin Profit': order.adminProfit,
+            'Status': order.status,
+            'Shipping Company': order.shippingCompany || 'N/A',
+            'Shipping Cost': order.shippingCost || 0,
+            'Items': order.items.map((i: any) => `${i.product} (x${i.quantity})`).join(', ')
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(data);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Orders');
+        
+        return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    }
 }

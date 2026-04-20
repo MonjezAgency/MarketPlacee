@@ -41,4 +41,8 @@ export class StripeGateway {
             reason: reason as Stripe.RefundCreateParams.Reason,
         });
     }
+
+    async cancelPaymentIntent(intentId: string) {
+        return this.stripe.paymentIntents.cancel(intentId);
+    }
 }

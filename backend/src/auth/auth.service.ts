@@ -467,6 +467,7 @@ export class AuthService {
 
         // Security: Always return success for non-existent users to prevent enumeration
         if (!user) {
+            this.logger.debug(`[FORGOT_PASSWORD] Attempt for non-existent email: ${email}`);
             return { success: true, message: 'If that email exists, a reset link was sent.' };
         }
 
@@ -481,13 +482,18 @@ export class AuthService {
             },
         });
 
-        // Fire-and-forget email — never reveal delivery status to prevent enumeration
-        // BUT log errors with full stack for debugging
-        this.emailService.sendPasswordResetEmail(user.email, user.name, token)
-            .catch(err => {
-                this.logger.error(`[FORGOT_PASSWORD] Email delivery failed for ${user.email}: ${err.message}`);
-                this.logger.error(`[FORGOT_PASSWORD] Full error:`, err);
-            });
+        // We await the email result to ensure we know if it was at least queued/sent successfully
+        // but we still return a generic success message to the client for security.
+        try {
+            const sent = await this.emailService.sendPasswordResetEmail(user.email, user.name, token);
+            if (sent) {
+                this.logger.log(`[FORGOT_PASSWORD] Reset email sent to ${user.email}`);
+            } else {
+                this.logger.error(`[FORGOT_PASSWORD] Email reported failure for ${user.email}`);
+            }
+        } catch (err: any) {
+            this.logger.error(`[FORGOT_PASSWORD] Fatal error delivering to ${user.email}: ${err.message}`);
+        }
 
         return { success: true, message: 'If that email exists, a reset link was sent.' };
     }

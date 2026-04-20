@@ -47,16 +47,20 @@ export class UsersService {
         });
     }
 
-    async findAll(status?: any, page = 1, limit = 20) {
+    async findAll(status?: any, page = 1, limit = 20, search?: string) {
         const whereCondition: any = status ? { status } : {};
         
-        // Phase 2 Fix: Primary filter is status, secondary signals are companyName + phone
-        if (status === 'PENDING_APPROVAL') {
-            whereCondition.companyName = { not: null };
-            whereCondition.phone = { not: null };
-            // Note: We no longer strictly filter by onboardingCompleted: true here 
-            // to ensure no legitimate request is missed if the flag was failed to set.
+        if (search) {
+            whereCondition.OR = [
+                { name: { contains: search, mode: 'insensitive' } },
+                { email: { contains: search, mode: 'insensitive' } },
+                { companyName: { contains: search, mode: 'insensitive' } },
+                { phone: { contains: search, mode: 'insensitive' } },
+            ];
         }
+
+        // We no longer strictly filter PENDING_APPROVAL by companyName/phone here
+        // to ensure Google signups (who haven't finished onboarding) are visible to admins.
 
         const skip = (page - 1) * limit;
 
@@ -74,8 +78,8 @@ export class UsersService {
     }
 
     // Explicit method for Admin reconciliation, decrypts sensitive billing fields
-    async findDecryptedAll(status?: any, page = 1, limit = 20) {
-        const { users, total, lastPage } = await this.findAll(status, page, limit);
+    async findDecryptedAll(status?: any, page = 1, limit = 20, search?: string) {
+        const { users, total, lastPage } = await this.findAll(status, page, limit, search);
         const decryptedUsers = users.map(user => {
             if (user.iban) user.iban = this.cryptoService.decrypt(user.iban);
             if (user.swiftCode) user.swiftCode = this.cryptoService.decrypt(user.swiftCode);
@@ -90,8 +94,8 @@ export class UsersService {
         const pending = await this.prisma.user.findMany({
             where: { 
                 status: 'PENDING_APPROVAL',
-                companyName: { not: null },
-                phone: { not: null }
+                // For bulk approval, we still prefer they have a name at least
+                name: { not: null }
             }
         });
 
