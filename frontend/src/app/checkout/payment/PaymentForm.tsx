@@ -23,6 +23,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
   // Diagnosing silent rendering failures
   const [isElementReady, setIsElementReady] = useState(false);
   const [showDiagnosticWarning, setShowDiagnosticWarning] = useState(false);
+  const [stripeMountError, setStripeMountError] = useState<string | null>(null);
 
   React.useEffect(() => {
     // If Stripe iframe doesn't mount within 5 seconds, it probably crashed silently due to Key mismatch
@@ -105,13 +106,16 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
                 <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                     <div className="text-sm">
-                        <p className="font-bold text-base mb-1">Payment Fields Failed to Load</p>
-                        <p className="mb-2">Stripe is blocking the payment form. This happens 99% of the time when there is a mismatch between your Frontend and Backend keys.</p>
-                        <ul className="list-disc pl-5 space-y-1 mt-2 text-xs">
-                            <li>Frontend Key Mode: <strong className="text-white bg-[#0D1117] px-1 rounded">{isLiveKey ? 'LIVE (pk_live_...)' : 'TEST (pk_test_...)'}</strong></li>
-                            <li>You must ensure the <code className="bg-[#0D1117] px-1 rounded">STRIPE_SECRET_KEY</code> in your Railway Backend is ALSO in <strong className="text-white bg-[#0D1117] px-1 rounded">{isLiveKey ? 'LIVE' : 'TEST'}</strong> mode.</li>
-                            <li>If they do not match, Stripe aborts silently. Fix your .env variables and redeploy to fix this.</li>
+                        <p className="font-bold text-base mb-1">Payment Fields Failed to Mount</p>
+                        <p className="mb-2">Stripe's Elements library is refusing to render the card inputs. This typically happens because:</p>
+                        <ul className="list-disc pl-5 space-y-1 mb-3 text-xs leading-relaxed">
+                            <li><strong>Incompatible Config:</strong> The PaymentIntent (currency/amount/methods) is incompatible with your Stripe Account permissions.</li>
+                            <li><strong>Key Mismatch:</strong> Your Backend Secret Key environment (Test vs Live) doesn't perfectly match the Frontend Publishable Key.</li>
+                            <li><strong>Ad-Blockers:</strong> The browser is actively blocking Stripe's JavaScript.</li>
                         </ul>
+                        <p className="font-semibold text-xs text-white bg-red-500/20 p-2 rounded border border-red-500/30">
+                            Action required: Check your Browser Console (F12) right now. Stripe usually prints a red explicit "IntegrationError" explaining exactly what parameter it rejected.
+                        </p>
                     </div>
                 </div>
             </div>
@@ -119,17 +123,27 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
 
         {/* Render PaymentElement with onReady hook */}
         <div className={showDiagnosticWarning && !isElementReady ? "opacity-30 pointer-events-none" : ""}>
-            <PaymentElement onReady={() => {
-                setIsElementReady(true);
-                setShowDiagnosticWarning(false);
-            }} />
+            <PaymentElement 
+                onReady={() => {
+                    setIsElementReady(true);
+                    setShowDiagnosticWarning(false);
+                    setStripeMountError(null);
+                }}
+                onChange={(event) => {
+                    if (event.error) {
+                        setStripeMountError(event.error.message);
+                    } else {
+                        setStripeMountError(null);
+                    }
+                }}
+            />
         </div>
       </div>
 
-      {errorMessage && (
+      {(errorMessage || stripeMountError) && (
         <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl flex items-center gap-3 text-red-500">
           <AlertCircle className="w-5 h-5 shrink-0" />
-          <p className="text-sm">{errorMessage}</p>
+          <p className="text-sm">{errorMessage || stripeMountError}</p>
         </div>
       )}
 

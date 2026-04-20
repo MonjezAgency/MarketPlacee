@@ -11,13 +11,7 @@ import OrderSummary from './OrderSummary';
 import { ShoppingBag, ShieldCheck, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
-// Guard: Do not initialize Stripe with empty key
-if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-    console.error('[Stripe Init Error] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is not set');
-}
-const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
-    ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY)
-    : null;
+// Initialize inside component to secure SSR boundary
 
 function PaymentContent() {
     const searchParams = useSearchParams();
@@ -26,10 +20,22 @@ function PaymentContent() {
     const isDark = resolvedTheme === 'dark';
     const orderId = searchParams.get('orderId');
 
+    const [stripePromise, setStripePromise] = useState<any>(null);
+    const [stripeInitError, setStripeInitError] = useState(false);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Initialize Stripe JS gracefully strictly in client environment
+    useEffect(() => {
+        if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+            setStripePromise(loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY));
+        } else if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+            console.error('[Stripe Init Error] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing');
+            setStripeInitError(true);
+        }
+    }, []);
 
     useEffect(() => {
         if (!orderId) {
@@ -64,7 +70,7 @@ function PaymentContent() {
         initializePayment();
     }, [orderId]);
 
-    if (loading) {
+    if (loading || (!stripePromise && !stripeInitError)) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
@@ -76,7 +82,7 @@ function PaymentContent() {
     }
 
     // Check for Stripe configuration error
-    if (!stripePromise) {
+    if (stripeInitError) {
         return (
             <div className="min-h-screen bg-background flex items-center justify-center p-4">
                 <div className="max-w-md w-full bg-card border border-red-500/20 rounded-3xl p-8 text-center">
