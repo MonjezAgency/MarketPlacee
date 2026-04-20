@@ -158,12 +158,12 @@ export class PaymentsService {
             amount: Math.round(order.totalAmount * 100),
             currency,
             capture_method: 'manual',
+            payment_method_types: ['card'], // FORCE card method so Stripe doesn't render a blank element
             metadata: {
                 orderId: order.id,
                 customerId: customerId,
                 supplierId: order.supplierId ?? '',
                 shippingCompany: order.shippingCompany ?? '',
-                // estimatedDays and destinationAddress are stored on the order notes field if available
                 estimatedDays: (order as any).shippingEstimatedDays ?? '3-5',
                 destinationAddress: (order as any).shippingAddress
                     ? `${(order as any).shippingAddress}`
