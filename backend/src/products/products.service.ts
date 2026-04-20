@@ -98,15 +98,20 @@ export class ProductsService {
             where.status = statusUpper as ProductStatus;
         }
 
-        // Text search
+        // Text search (Tokenized for better eCommerce exact/partial matching)
         if (filters?.q) {
-            where.OR = [
-                { name: { contains: filters.q, mode: 'insensitive' } },
-                { description: { contains: filters.q, mode: 'insensitive' } },
-                { category: { contains: filters.q, mode: 'insensitive' } },
-                { brand: { contains: filters.q, mode: 'insensitive' } },
-                { ean: { contains: filters.q, mode: 'insensitive' } },
-            ];
+            const terms = filters.q.trim().split(/\s+/).filter(t => t.length > 0);
+            if (terms.length > 0) {
+                where.AND = terms.map(term => ({
+                    OR: [
+                        { name: { contains: term, mode: 'insensitive' } },
+                        { description: { contains: term, mode: 'insensitive' } },
+                        { category: { contains: term, mode: 'insensitive' } },
+                        { brand: { contains: term, mode: 'insensitive' } },
+                        { ean: { contains: term, mode: 'insensitive' } },
+                    ]
+                }));
+            }
         }
 
         // Category filter

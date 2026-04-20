@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -21,6 +21,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 function CategoriesContent() {
     const { t } = useLanguage();
     const searchParams = useSearchParams();
+    const router = useRouter();
     // ... rest of the state
     const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
     const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
@@ -223,7 +224,7 @@ function CategoriesContent() {
                                     </button>
                                 ))}
                                 <button
-                                    onClick={() => { setSelectedBrands([]); setSelectedCategories([]); setSelectedAudience([]); setLocalQuery(''); }}
+                                    onClick={() => { setSelectedBrands([]); setSelectedCategories([]); setSelectedAudience([]); setLocalQuery(''); router.push('/categories'); }}
                                     className="text-[11px] text-primary hover:underline ms-2 font-medium"
                                 >
                                     {t('categories', 'clearAll')}
@@ -278,7 +279,7 @@ function CategoriesContent() {
                                 <h3 className="text-lg font-bold">{t('categories', 'noProducts')}</h3>
                                 <p className="text-muted-foreground text-sm max-w-xs mt-1 mb-6">{t('categories', 'noProductsBroad')}</p>
                                 <Button
-                                    onClick={() => { setSelectedBrands([]); setSelectedCategories([]); setSelectedAudience([]); setLocalQuery(''); }}
+                                    onClick={() => { setSelectedBrands([]); setSelectedCategories([]); setSelectedAudience([]); setLocalQuery(''); router.push('/categories'); }}
                                     className="h-10 px-6 rounded-md font-bold"
                                 >
                                     {t('categories', 'clearFilters')}
