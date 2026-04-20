@@ -161,7 +161,7 @@ export default function Navbar() {
                 </div>
 
                 {/* Main Search Bar */}
-                <form onSubmit={handleSearch} className="flex-1 max-w-2xl hidden md:flex relative group h-11">
+                <form onSubmit={handleSearch} className="flex-1 max-w-4xl hidden md:flex relative group h-11">
                     <input
                         type="text"
                         value={searchTerm}
@@ -179,13 +179,13 @@ export default function Navbar() {
                 </form>
 
                 {/* Actions */}
-                <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3 md:gap-5">
                     {/* How to use button */}
-                    <div className="hidden lg:flex items-center gap-2">
+                    <div className="hidden xl:flex items-center">
                         <Link
                             href="/how-it-works"
                             className={cn(
-                                "text-xs font-bold px-4 py-2 rounded-lg border transition-all hover:bg-secondary hover:text-white hover:border-secondary",
+                                "text-[11px] font-bold px-3 py-1.5 rounded-lg border transition-all hover:bg-secondary hover:text-white hover:border-secondary",
                                 (scrolled || isWhiteBackgroundPage) ? "border-secondary text-secondary dark:border-secondary dark:text-secondary" : "border-white/40 text-white"
                             )}
                         >
@@ -193,13 +193,15 @@ export default function Navbar() {
                         </Link>
                     </div>
 
+                    <div className={cn("w-px h-6 hidden xl:block", (scrolled || isWhiteBackgroundPage) ? "bg-border" : "bg-white/10")} />
+
                     {/* Language Switcher */}
-                    <div className="hidden lg:flex items-center gap-2">
+                    <div className="hidden lg:flex items-center">
                         <select
                             value={locale}
                             onChange={(e) => setLocale(e.target.value as Locale)}
                             className={cn(
-                                "bg-transparent text-xs font-bold outline-none cursor-pointer uppercase",
+                                "bg-transparent text-[11px] font-bold outline-none cursor-pointer uppercase",
                                 (scrolled || isWhiteBackgroundPage) ? "text-foreground" : "text-white"
                             )}
                         >
@@ -215,15 +217,7 @@ export default function Navbar() {
 
                     <ThemeToggle />
 
-                    <div className={cn(
-                        "hidden xl:flex flex-col items-end text-[10px] font-bold uppercase tracking-widest",
-                        (scrolled || isWhiteBackgroundPage) ? "text-muted-foreground" : "text-white/50"
-                    )}>
-                        <span>{t('navbar', 'logisticsHelp')}</span>
-                        <span className={(scrolled || isWhiteBackgroundPage) ? "text-foreground" : "text-white"}>{t('navbar', 'supplyPartners')}</span>
-                    </div>
-
-                    <div className={cn("w-px h-8 mx-2 hidden lg:block", (scrolled || isWhiteBackgroundPage) ? "bg-border" : "bg-white/10")} />
+                    <div className={cn("w-px h-6 mx-1 hidden lg:block", (scrolled || isWhiteBackgroundPage) ? "bg-border" : "bg-white/10")} />
 
                     <Link
                         href={user ? (user.role?.toLowerCase() === 'admin' ? '/admin' : user.role?.toLowerCase() === 'supplier' ? '/supplier' : '/dashboard/customer') : '/auth/login'}
