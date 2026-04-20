@@ -26,13 +26,27 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
   const [stripeMountError, setStripeMountError] = useState<string | null>(null);
 
   React.useEffect(() => {
-    // If Stripe iframe doesn't mount within 5 seconds, it probably crashed silently due to Key mismatch
+    // Intercept console.error to catch Stripe IntegrationErrors which fail silently without triggering onChange
+    const originalConsoleError = console.error;
+    console.error = (...args: any[]) => {
+      const errorMsg = args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ');
+      if (errorMsg.includes('IntegrationError') || errorMsg.includes('Stripe')) {
+        setStripeMountError((prev) => prev ? prev + " | " + errorMsg : "Stripe Console Error: " + errorMsg);
+      }
+      originalConsoleError.apply(console, args);
+    };
+
+    // If Stripe iframe doesn't mount within 5 seconds, surface warning
     const timer = setTimeout(() => {
       if (!isElementReady) {
         setShowDiagnosticWarning(true);
       }
     }, 5000);
-    return () => clearTimeout(timer);
+
+    return () => {
+      clearTimeout(timer);
+      console.error = originalConsoleError;
+    };
   }, [isElementReady]);
 
   const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
