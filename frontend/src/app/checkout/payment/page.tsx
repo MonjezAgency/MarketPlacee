@@ -127,43 +127,8 @@ function PaymentContent() {
     }
 
     const appearance = isDark
-        ? {
-            theme: 'night' as const,
-            variables: {
-                colorPrimary: '#1BC7C9',
-                colorBackground: '#1A2332',
-                colorText: '#E2E8F0',
-                colorDanger: '#EF4444',
-                fontFamily: 'system-ui, sans-serif',
-                borderRadius: '12px',
-            },
-        }
-        : {
-            theme: 'flat' as const,
-            variables: {
-                colorPrimary: '#1BC7C9',
-                colorBackground: '#ffffff',
-                colorText: '#0A1A2F',
-                colorTextSecondary: '#64748b',
-                colorDanger: '#EF4444',
-                fontFamily: 'system-ui, sans-serif',
-                borderRadius: '12px',
-            },
-            rules: {
-                '.Input': {
-                    border: '1.5px solid #e2e8f0',
-                    boxShadow: 'none',
-                    backgroundColor: '#f8fafc',
-                    color: '#0A1A2F',
-                },
-                '.Input:focus': {
-                    border: '1.5px solid #1BC7C9',
-                    boxShadow: '0 0 0 3px rgba(27,199,201,0.15)',
-                },
-                '.Label': { color: '#374151', fontWeight: '600' },
-                '.Block': { border: 'none', boxShadow: 'none' },
-            },
-        };
+        ? { theme: 'night' as const }
+        : { theme: 'stripe' as const };
 
     return (
         <div className="min-h-screen bg-background">
