@@ -2,14 +2,14 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-    "ANTHROPIC_AUTH_TOKEN": "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",
+    "ANTHROPIC_AUTH_TOKEN": "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",
     "ANTHROPIC_API_KEY": "",
-    "ANTHROPIC_MODEL": "google/gemma-4-31b-it:free",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "google/gemma-4-31b-it:free",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "google/gemma-4-31b-it:free",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "google/gemma-4-31b-it:free",
-    "ANTHROPIC_SMALL_FAST_MODEL":  "google/gemma-4-31b-it:free",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "google/gemma-4-31b-it:free"
+    "ANTHROPIC_MODEL": "qwen/qwen3-coder:free",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "qwen/qwen3-coder:free",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "qwen/qwen3-coder:free",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "qwen/qwen3-coder:free",
+    "ANTHROPIC_SMALL_FAST_MODEL": "qwen/qwen3-coder:free",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "qwen/qwen3-coder:free"
   },
   "permissions": {
     "allow": [
@@ -23,6 +23,9 @@
       "Bash(docker-compose ps *)",
       "Bash(curl -s http://localhost:3005/health)",
       "Bash(npm run *)"
+    ],
+    "deny": [
+      "Skills"
     ]
   }
 }
