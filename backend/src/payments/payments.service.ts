@@ -129,33 +129,47 @@ export class PaymentsService {
             );
         }
 
-        // Return existing intent if already created
-        const existing = await this.prisma
-            .escrowTransaction.findUnique({
-                where: { orderId }
-            });
-
-        if (existing?.stripeIntentId) {
-            const intent = await this.stripe.stripe.paymentIntents
-                .retrieve(existing.stripeIntentId);
-            return {
-                clientSecret: intent.client_secret!,
-                order,
-            };
-        }
-
         // Calculate split
         const feePercent = this.getPlatformFeePercent();
-        const platformFee =
-            order.totalAmount * (feePercent / 100);
-        const supplierAmount =
-            order.totalAmount - platformFee;
+        const platformFee = order.totalAmount * (feePercent / 100);
+        const supplierAmount = order.totalAmount - platformFee;
 
         const currency = (process.env.DEFAULT_CURRENCY || 'eur').toLowerCase();
+        const expectedAmount = Math.round(order.totalAmount * 100);
+
+        // Check for existing Escrow & Intent
+        const existing = await this.prisma.escrowTransaction.findUnique({
+            where: { orderId }
+        });
+
+        if (existing?.stripeIntentId) {
+            try {
+                const intent = await this.stripe.stripe.paymentIntents.retrieve(existing.stripeIntentId);
+                
+                // Diagnostics to determine if intent is still valid (especially against the old automatic_payment_methods bug)
+                const isAmountCorrect = intent.amount === expectedAmount;
+                const isCurrencyCorrect = intent.currency.toLowerCase() === currency;
+                const isNotCanceled = intent.status !== 'canceled';
+                const hasCardMethod = Array.isArray(intent.payment_method_types) && intent.payment_method_types.includes('card');
+                const noAutomaticMethods = !intent.automatic_payment_methods?.enabled;
+
+                if (isAmountCorrect && isCurrencyCorrect && isNotCanceled && hasCardMethod && noAutomaticMethods) {
+                    return {
+                        clientSecret: intent.client_secret!,
+                        order,
+                    };
+                }
+
+                console.warn(`[Payment] Stale or invalid PaymentIntent detected for Order ${orderId}. Replacing with fresh intent.`);
+                console.warn(`[Payment] Diagnostics -> amount:${isAmountCorrect}, cur:${isCurrencyCorrect}, status:${intent.status}, card:${hasCardMethod}, noAuto:${noAutomaticMethods}`);
+            } catch (err) {
+                console.error(`[Payment] Failed to retrieve or validate existing PaymentIntent for Order ${orderId}. Will create a new one.`);
+            }
+        }
 
         // Create Stripe payment intent
         const intent = await this.stripe.stripe.paymentIntents.create({
-            amount: Math.round(order.totalAmount * 100),
+            amount: expectedAmount,
             currency,
             capture_method: 'manual',
             payment_method_types: ['card'], // FORCE card method so Stripe doesn't render a blank element
@@ -172,18 +186,30 @@ export class PaymentsService {
             description: `Atlantis B2B Order ${orderId}`,
         });
 
-        // Initialize escrow record
-        await this.prisma.escrowTransaction.create({
-            data: {
-                orderId,
-                amount: order.totalAmount,
-                currency,
-                platformFee,
-                supplierAmount,
-                status: 'HOLDING',
-                stripeIntentId: intent.id,
-            },
-        });
+        // Initialize or Update escrow record safely
+        if (existing) {
+            await this.prisma.escrowTransaction.update({
+                where: { id: existing.id },
+                data: {
+                    amount: order.totalAmount,
+                    currency,
+                    stripeIntentId: intent.id,
+                    status: 'HOLDING'
+                }
+            });
+        } else {
+            await this.prisma.escrowTransaction.create({
+                data: {
+                    orderId,
+                    amount: order.totalAmount,
+                    currency,
+                    platformFee,
+                    supplierAmount,
+                    status: 'HOLDING',
+                    stripeIntentId: intent.id,
+                },
+            });
+        }
 
         this.logger.log(
             `[ESCROW CREATED] Order: ${orderId} | ` +
