@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Upload, Save, Image as ImageIcon, Sparkles, DollarSign, Package, Plus, Trash2 } from 'lucide-react';
 import { createPortal } from 'react-dom';
@@ -209,8 +209,9 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
     if (typeof window === 'undefined') return null;
 
     return createPortal(
-        <AnimatePresence>
-            {isOpen && (
+        (
+            <AnimatePresence mode="wait">
+                {isOpen && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen overflow-hidden">
                 <motion.div
                     initial={{ opacity: 0 }}
@@ -589,7 +590,8 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
                 </motion.div>
                 </div>
             )}
-        </AnimatePresence>,
+        </AnimatePresence>
+        ),
         document.body
     );
 }
