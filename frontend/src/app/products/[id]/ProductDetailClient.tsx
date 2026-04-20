@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -10,7 +10,6 @@ import {
 } from 'lucide-react';
 import { type Product, ProductStatus } from '@/lib/types';
 import { fetchProductById, apiFetch } from '@/lib/api';
-import { useEffect } from 'react';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import ProductCard from '@/components/product/ProductCard';
