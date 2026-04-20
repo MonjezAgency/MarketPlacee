@@ -110,6 +110,20 @@ export async function fetchProductsWithFilters(filters: Filters): Promise<Produc
     }
 }
 
+export async function fetchSearchSuggestions(query: string): Promise<Product[]> {
+    try {
+        if (!query || query.trim() === '') return [];
+        const res = await apiFetch(`/products/search?q=${encodeURIComponent(query)}`, { cache: 'no-store' });
+        if (!res.ok) return [];
+        const json = await res.json();
+        const data = Array.isArray(json) ? json : (json.data || []);
+        return data.map(mapProduct);
+    } catch (error) {
+        console.error('Error fetching search suggestions:', error);
+        return [];
+    }
+}
+
 export async function fetchProducts(): Promise<Product[]> {
     try {
         const res = await apiFetch(`/products?status=APPROVED`, { cache: 'no-store' });

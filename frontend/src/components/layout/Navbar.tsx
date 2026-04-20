@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCart } from '@/lib/cart';
-import { Search, ShoppingCart, User, Menu, PackageSearch, Moon, Sun, ChevronRight, ChevronDown, Heart, Globe } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, PackageSearch, Moon, Sun, ChevronRight, ChevronDown, Heart, Globe, Loader2 } from 'lucide-react';
 import NotificationBell from '@/components/ui/NotificationBell';
 import { SUPPORTED_CURRENCIES, getActiveCurrency, setActiveCurrency } from '@/lib/currency';
 import Link from 'next/link';
@@ -15,6 +15,8 @@ import { Locale } from '@/locales';
 import { usePathname } from 'next/navigation';
 import { CATEGORIES_LIST } from '@/lib/products';
 import { ThemeToggle } from '../ui/ThemeToggle';
+import { fetchSearchSuggestions } from '@/lib/api';
+import type { Product } from '@/lib/types';
 
 export default function Navbar() {
     const { items } = useCart();
@@ -26,8 +28,15 @@ export default function Navbar() {
     const [isCategoriesOpen, setIsCategoriesOpen] = React.useState(false);
     const [isCurrencyOpen, setIsCurrencyOpen] = React.useState(false);
     const [activeCurrency, setActiveCurrencyState] = React.useState('EUR');
+    
+    // Autocomplete states
+    const [suggestions, setSuggestions] = React.useState<Product[]>([]);
+    const [showSuggestions, setShowSuggestions] = React.useState(false);
+    const [isSearching, setIsSearching] = React.useState(false);
+
     const categoriesRef = React.useRef<HTMLDivElement>(null);
     const currencyRef = React.useRef<HTMLDivElement>(null);
+    const searchRef = React.useRef<HTMLFormElement>(null);
 
     // Load saved currency on mount + react to changes
     React.useEffect(() => {
@@ -71,6 +80,9 @@ export default function Navbar() {
             if (categoriesRef.current && !categoriesRef.current.contains(e.target as Node)) {
                 setIsCategoriesOpen(false);
             }
+            if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+                setShowSuggestions(false);
+            }
         };
 
         window.addEventListener('scroll', handleScroll);
@@ -81,11 +93,45 @@ export default function Navbar() {
         };
     }, []);
 
+    React.useEffect(() => {
+        if (!searchTerm.trim()) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+
+        setIsSearching(true);
+        setShowSuggestions(true);
+
+        const timer = setTimeout(async () => {
+            try {
+                const results = await fetchSearchSuggestions(searchTerm);
+                setSuggestions(results);
+            } catch (err) {
+                console.error(err);
+            } finally {
+                setIsSearching(false);
+            }
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         if (searchTerm.trim()) {
+            setShowSuggestions(false);
             router.push(`/categories?q=${encodeURIComponent(searchTerm)}`);
         }
+    };
+
+    const highlightMatch = (text: string, query: string) => {
+        if (!query.trim()) return text;
+        const regex = new RegExp(`(${query.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+        const parts = text.split(regex);
+        return parts.map((part, i) => 
+            regex.test(part) ? <span key={i} className="text-secondary font-black">{part}</span> : part
+        );
     };
 
     return (
@@ -161,11 +207,12 @@ export default function Navbar() {
                 </div>
 
                 {/* Main Search Bar */}
-                <form onSubmit={handleSearch} className="flex-1 max-w-4xl hidden md:flex relative group h-11">
+                <form ref={searchRef} onSubmit={handleSearch} className="flex-1 max-w-4xl hidden md:flex relative group h-11">
                     <input
                         type="text"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
+                        onFocus={() => { if (searchTerm.trim()) setShowSuggestions(true); }}
                         placeholder={t('navbar', 'searchPlaceholder')}
                         className="w-full h-full bg-white text-black rounded-s-lg px-12 text-sm font-medium outline-none border-none"
                     />
@@ -176,6 +223,82 @@ export default function Navbar() {
                     >
                         {t('common', 'search')}
                     </button>
+
+                    {/* Autocomplete Dropdown */}
+                    {showSuggestions && searchTerm.trim() && (
+                        <div className="absolute top-full mt-2 w-full bg-card border border-border/50 rounded-xl shadow-2xl overflow-hidden z-[100] animate-in fade-in slide-in-from-top-2 duration-200 text-foreground">
+                            {isSearching ? (
+                                <div className="flex items-center justify-center py-8 text-muted-foreground">
+                                    <Loader2 className="w-5 h-5 animate-spin me-2" />
+                                    <span className="text-sm font-medium">Searching...</span>
+                                </div>
+                            ) : suggestions.length > 0 ? (
+                                <div>
+                                    <div className="px-4 py-2 border-b border-border/50">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                            Suggestions
+                                        </span>
+                                    </div>
+                                    <ul className="max-h-80 overflow-y-auto no-scrollbar">
+                                        {suggestions.map((product) => (
+                                            <li key={product.id}>
+                                                <Link
+                                                    href={`/products/${product.id}`}
+                                                    onClick={() => {
+                                                        setShowSuggestions(false);
+                                                        setSearchTerm(product.name);
+                                                    }}
+                                                    className="flex items-center gap-3 px-4 py-3 hover:bg-primary/5 transition-colors border-b border-border/50 last:border-0 group/item"
+                                                >
+                                                    {product.images && product.images.length > 0 ? (
+                                                        <img
+                                                            src={product.images[0]}
+                                                            alt={product.name}
+                                                            className="w-10 h-10 object-contain rounded-md bg-white border border-border"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-10 h-10 flex items-center justify-center bg-muted rounded-md text-muted-foreground border border-border">
+                                                            <PackageSearch size={16} />
+                                                        </div>
+                                                    )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-bold truncate group-hover/item:text-primary transition-colors">
+                                                            {highlightMatch(product.name, searchTerm)}
+                                                        </p>
+                                                        <div className="flex items-center gap-2 mt-0.5 text-xs text-muted-foreground">
+                                                            <span className="truncate">{product.category}</span>
+                                                            {product.brand && (
+                                                                <>
+                                                                    <span className="w-1 h-1 rounded-full bg-border" />
+                                                                    <span className="truncate font-medium">{product.brand}</span>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </Link>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                    <div className="p-2 border-t border-border/50 bg-muted/20">
+                                        <button
+                                            type="submit"
+                                            className="w-full py-2 text-xs font-bold text-secondary hover:bg-secondary hover:text-white rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                                        >
+                                            View all results for "{searchTerm}" <ChevronRight size={14} />
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                                    <Search className="w-10 h-10 text-muted-foreground/30 mb-3" />
+                                    <p className="text-sm font-bold">No products found</p>
+                                    <p className="text-xs text-muted-foreground mt-1 max-w-[250px]">
+                                        We couldn't find anything matching "{searchTerm}". Try adjusting your search term.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </form>
 
                 {/* Actions */}

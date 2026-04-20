@@ -387,23 +387,29 @@ export class ProductsService {
     }
 
     async search(query: string) {
-        return this.prisma.product.findMany({
-            where: {
-                status: ProductStatus.APPROVED,
+        const terms = query.trim().split(/\s+/).filter(t => t.length > 0);
+        let whereCondition: any = { status: ProductStatus.APPROVED };
+        
+        if (terms.length > 0) {
+            whereCondition.AND = terms.map(term => ({
                 OR: [
-                    { name: { contains: query, mode: 'insensitive' } },
-                    { description: { contains: query, mode: 'insensitive' } },
-                    { category: { contains: query, mode: 'insensitive' } },
-                    { brand: { contains: query, mode: 'insensitive' } },
-                    { ean: { contains: query, mode: 'insensitive' } },
-                ],
-            },
+                    { name: { contains: term, mode: 'insensitive' } },
+                    { description: { contains: term, mode: 'insensitive' } },
+                    { category: { contains: term, mode: 'insensitive' } },
+                    { brand: { contains: term, mode: 'insensitive' } },
+                    { ean: { contains: term, mode: 'insensitive' } },
+                ]
+            }));
+        }
+
+        return this.prisma.product.findMany({
+            where: whereCondition,
             include: {
                 supplier: {
                     select: { id: true, name: true, companyName: true }
                 }
             },
-            take: 20
+            take: 8 // Autocomplete should return 8 suggestions max
         });
     }
 }
