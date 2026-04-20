@@ -84,7 +84,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
       </div>
 
       <div className="bg-card border border-border/50 rounded-3xl p-6 shadow-premium">
-        <PaymentElement options={{ layout: 'accordion' }} />
+        <PaymentElement options={{ layout: 'tabs' }} />
       </div>
 
       {errorMessage && (
