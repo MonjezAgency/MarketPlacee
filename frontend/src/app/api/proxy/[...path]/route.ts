@@ -54,17 +54,19 @@ async function handler(
     forwardHeaders['Content-Type'] = contentType;
   }
 
-  try {
-    const body =
-      req.method !== 'GET' && req.method !== 'HEAD'
-        ? await req.arrayBuffer()
-        : undefined;
+    try {
+      const fetchOptions: RequestInit = {
+        method: req.method,
+        headers: forwardHeaders,
+      };
 
-    const res = await fetch(backendUrl, {
-      method: req.method,
-      headers: forwardHeaders,
-      body: body ? Buffer.from(body) : undefined,
-    });
+      if (req.method !== 'GET' && req.method !== 'HEAD') {
+        fetchOptions.body = req.body;
+        // Node.js 18+ fetch requires duplex: 'half' when streaming a Request body
+        (fetchOptions as any).duplex = 'half';
+      }
+
+      const res = await fetch(backendUrl, fetchOptions);
 
     const responseData = await res.arrayBuffer();
     return new NextResponse(responseData, {
