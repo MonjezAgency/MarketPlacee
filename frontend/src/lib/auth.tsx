@@ -24,7 +24,7 @@ export interface User {
 interface AuthContextType {
     user: User | null;
     isLoggedIn: boolean;
-    login: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string }>;
+    login: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string; qrCodeUrl?: string }>;
     verify2FALogin: (partialToken: string, code: string) => Promise<{ success: boolean; user?: User; message?: string }>;
     register: (data: {
         name: string;
@@ -131,7 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const login = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string }> => {
+    const login = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string; qrCodeUrl?: string }> => {
         const attemptLogin = async () => {
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
@@ -172,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             // 2FA challenge
             if (data.requiresTwoFactor) {
-                return { success: true, requiresTwoFactor: true, partialToken: data.partialToken };
+                return { success: true, requiresTwoFactor: true, partialToken: data.partialToken, qrCodeUrl: data.qrCodeUrl };
             }
 
             if (!data.user) {
