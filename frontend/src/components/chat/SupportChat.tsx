@@ -47,19 +47,19 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
     const scrollRef = React.useRef<HTMLDivElement>(null);
     const socketRef = React.useRef<Socket | null>(null);
 
-    const API_URL = '/api';
-
     // Load initial messages via HTTP
     const fetchMessages = React.useCallback(async () => {
         try {
             const url = isSupport && targetUserId
-                ? `${API_URL}/chat/admin/messages/${targetUserId}`
-                : `${API_URL}/chat/messages`;
+                ? `/chat/admin/messages/${targetUserId}`
+                : `/chat/messages`;
 
-            const res = await axios.get(url, {
-                
-            });
-            setMessages(res.data);
+            const res = await apiFetch(url);
+            if (!res.ok) {
+                if (res.status === 401) throw new Error('Unauthorized');
+                throw new Error('Failed to fetch');
+            }
+            setMessages(await res.json());
             setHasLoadedMessages(true);
         } catch (err: any) {
             setHasLoadedMessages(true);
@@ -77,7 +77,8 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
 
         fetchMessages();
 
-        const socket = io(`${API_URL}/chat`, {
+        const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+        const socket = io(`${socketUrl}/chat`, {
             auth: { token: getToken() },
             transports: ['websocket', 'polling'],
         });
@@ -149,15 +150,19 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
         } else {
             // Fallback to HTTP
             try {
-                await axios.post(`${API_URL}/chat/send`, {
-                    content: greetingText,
-                    receiverId: null
-                }, {
-                    
+                const res = await apiFetch(`/chat/send`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        content: greetingText,
+                        receiverId: null
+                    })
                 });
+                if (!res.ok) {
+                    if (res.status === 401) window.location.href = '/auth/login';
+                    throw new Error('Failed to send');
+                }
                 fetchMessages();
             } catch (err: any) {
-                if (err.response?.status === 401) window.location.href = '/auth/login';
                 removeMessage(optimisticMsg.id);
             }
         }
@@ -203,13 +208,24 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
         } else {
             // Fallback to HTTP
             try {
-                await axios.post(`${API_URL}/chat/send`, {
-                    content,
-                    imageUrl: image,
-                    receiverId,
-                }, {
-                    
+                const res = await apiFetch(`/chat/send`, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        content,
+                        imageUrl: image,
+                        receiverId,
+                    })
                 });
+                
+                if (!res.ok) {
+                    if (res.status === 401) {
+                        alert("انتهت صلاحية الجلسة. سيتم تحويلك لصفحة الدخول.");
+                        window.location.href = '/auth/login';
+                        return;
+                    }
+                    throw new Error('Failed to send message');
+                }
+                
                 fetchMessages();
             } catch (err: any) {
                 if (err.response?.status === 401) {

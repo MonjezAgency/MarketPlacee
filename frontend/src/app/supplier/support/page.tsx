@@ -20,11 +20,10 @@ export default function SupportPage() {
     const fetchConversations = async () => {
         if (!isSupportTeam) return;
         try {
-            const API_URL = '/api';
-            const res = await axios.get(`${API_URL}/chat/admin/conversations`, {
-                
-            });
-            setConversations(res.data);
+            const res = await apiFetch(`/chat/admin/conversations`);
+            if (res.ok) {
+                setConversations(await res.json());
+            }
         } catch (err) {
             console.error(err);
         }
