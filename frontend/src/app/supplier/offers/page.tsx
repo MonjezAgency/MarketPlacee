@@ -16,7 +16,8 @@ import {
     LayoutList,
     Image as ImageIcon,
     Edit2,
-    Trash
+    Trash,
+    Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
