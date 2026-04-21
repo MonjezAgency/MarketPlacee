@@ -522,6 +522,15 @@ export const ar = {
         updatePassword: "تحديث كلمة المرور",
         currentPassword: "كلمة المرور الحالية",
         newPassword: "كلمة المرور الجديدة",
-        confirmPassword: "تأكيد كلمة المرور"
+        confirmPassword: "تأكيد كلمة المرور",
+        globalIdentity: "الهوية العالمية",
+        businessVerification: "توثيق العمل",
+        contactAccess: "الاتصال والوصول",
+        accountSecurity: "أمن الحساب",
+        financialManagement: "الإدارة المالية",
+        verifiedNotice: "حساب موثق",
+        systemNotice: "إشعار النظام",
+        logoDescription: "سيكون شعار شركتك مرئياً لجميع المشترين في السوق.",
+        updateFinancials: "تحديث البيانات اللوجستية بأمان",
     }
 };
