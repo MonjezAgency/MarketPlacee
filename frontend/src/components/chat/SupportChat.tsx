@@ -69,7 +69,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                 window.location.href = '/auth/login';
             }
         }
-    }, [isSupport, targetUserId, API_URL]);
+    }, [isSupport, targetUserId]);
 
     // Setup WebSocket connection
     React.useEffect(() => {
