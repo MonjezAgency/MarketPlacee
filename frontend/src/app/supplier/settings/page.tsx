@@ -328,6 +328,3 @@ export default function SupplierSettingsPage() {
         </div>
     );
 }
-
-    );
-}
