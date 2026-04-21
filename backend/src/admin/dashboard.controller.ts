@@ -11,13 +11,13 @@ export class DashboardController {
     constructor(private readonly dashboardService: DashboardService) { }
 
     @Get('admin')
-    @Roles(Role.ADMIN)
+    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
     async getAdminSnapshot() {
         return this.dashboardService.getAdminSnapshot();
     }
 
     @Get('admin/notifications')
-    @Roles(Role.ADMIN)
+    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
     async getNotificationCounts() {
         return this.dashboardService.getNotificationCounts();
     }

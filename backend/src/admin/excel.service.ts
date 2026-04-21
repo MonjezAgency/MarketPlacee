@@ -350,4 +350,42 @@ export class ExcelService {
         
         return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     }
+
+    async generateFinancialStatementExcel(summary: any, transactions: any[]): Promise<Buffer> {
+        const workbook = XLSX.utils.book_new();
+
+        // 1. Summary Sheet
+        const summaryRows = [
+            ['Atlantis Financial Statement'],
+            ['Generated At', new Date().toLocaleString()],
+            ['Period', summary.period],
+            [],
+            ['Metrics', 'Value'],
+            ['Total Orders', summary.totalOrders],
+            ['Gross Revenue', summary.totalRevenue],
+            ['Platform Gross Profit', summary.platformRevenue],
+            ['Supplier Net Payouts', summary.supplierRevenue],
+            ['Paid Orders', summary.paidOrders],
+            ['Pending Orders', summary.pendingOrders],
+            ['Cancelled Orders', summary.cancelledOrders],
+        ];
+        const summarySheet = XLSX.utils.aoa_to_sheet(summaryRows);
+        XLSX.utils.book_append_sheet(workbook, summarySheet, 'Summary');
+
+        // 2. Transactions Sheet
+        const txData = transactions.map(tx => ({
+            'Order ID': tx.orderId,
+            'Date': tx.createdAt,
+            'Status': tx.status,
+            'Total Amount': tx.totalAmount,
+            'Platform Fee': tx.platformFee,
+            'Supplier Share': tx.supplierAmount,
+            'Payment Status': tx.paymentStatus,
+            'Settled': tx.escrowStatus === 'RELEASED' ? 'Yes' : 'No'
+        }));
+        const txSheet = XLSX.utils.json_to_sheet(txData);
+        XLSX.utils.book_append_sheet(workbook, txSheet, 'Transactions');
+
+        return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    }
 }

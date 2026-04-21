@@ -211,18 +211,10 @@ export class EmailService {
       </div>
     `;
 
-    const text = `Hi ${name}, \n\nYou requested a password reset for your Atlantis account. \n\nPlease use the following link to reset your password: \n${url} \n\nThis link expires in 1 hour. \n\nIf you did not request this, please ignore this email.`;
-
-    try {
-        await this.sendMail(email, 'Atlantis — Password Reset Request 🔐', html);
-        return true;
-    } catch (err: any) {
-        console.error(`[EMAIL_ERROR] sendPasswordResetEmail failed for ${email}:`, err.message);
-        return false;
-    }
+    return this.sendMail(email, 'Atlantis — Password Reset Request 🔐', html);
   }
 
-  async sendTeamInvitation(email: string, name: string, role: string, tempPassword?: string) {
+  async sendTeamInvitation(email: string, name: string, role: string, tempPassword?: string): Promise<boolean> {
     const baseUrl = this.getFrontendUrl();
     const url = `${baseUrl}/auth/login`;
     const credentialsBlock = tempPassword ? `
@@ -232,32 +224,28 @@ export class EmailService {
               <p style="margin: 0; font-size: 14px; color: #2E2E2E;"><strong>Password:</strong> ${tempPassword}</p>
               <p style="margin: 10px 0 0 0; font-size: 11px; color: #667085;">Please change your password after first login.</p>
             </div>` : '';
-    try {
-      await this.sendMail(email, 'You have been invited to the Atlantis Team', `
-          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
-            <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
-              <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
-              <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
-            </div>
-            <div style="padding: 40px 30px; background: #FFFFFF;">
-              <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Team Invitation 🤝</h2>
-              <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">Hello <strong style="color: #0A1A2F;">${name}</strong>,</p>
-              <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">You have been invited to join the Atlantis Marketplace team as a <strong style="color: #1BC7C9;">${role}</strong>.</p>
-              ${credentialsBlock}
-              <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">Please log in to your account to get started.</p>
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${url}" style="display: inline-block; padding: 16px 40px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Login Now →</a>
-              </div>
-            </div>
-            <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-              <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+    
+    return this.sendMail(email, 'You have been invited to the Atlantis Team', `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+          <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
+            <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
+            <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
+          </div>
+          <div style="padding: 40px 30px; background: #FFFFFF;">
+            <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Team Invitation 🤝</h2>
+            <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">Hello <strong style="color: #0A1A2F;">${name}</strong>,</p>
+            <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">You have been invited to join the Atlantis Marketplace team as a <strong style="color: #1BC7C9;">${role}</strong>.</p>
+            ${credentialsBlock}
+            <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7;">Please log in to your account to get started.</p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${url}" style="display: inline-block; padding: 16px 40px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Login Now →</a>
             </div>
           </div>
-        `);
-    } catch (error) {
-      console.error('ERROR [sendTeamInvitation]:', error);
-      throw error;
-    }
+          <div style="background: #0A1A2F; padding: 20px; text-align: center;">
+            <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+          </div>
+        </div>
+      `);
   }
 
   /**

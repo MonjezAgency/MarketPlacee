@@ -27,9 +27,10 @@ import { CATEGORIES_LIST } from '@/lib/products';
 import { fetchMyProducts, apiFetch, apiUrl } from '@/lib/api';
 import { Product, ProductStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import ProductEditorModal from '@/app/dashboard/supplier/ProductEditorModal';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function SupplierProductsPage() {
+    const { t } = useLanguage();
     const { user } = useAuth();
     const [products, setProducts] = React.useState<Product[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
@@ -117,10 +118,14 @@ export default function SupplierProductsPage() {
             }
 
             setBulkResults(accumulatedResults);
-            loadProducts(); // Refresh list
+            
+            // Only refresh if something was actually created
+            if (accumulatedResults.createdCount > 0) {
+                loadProducts();
+            }
         } catch (err: any) {
             console.error('Bulk upload error:', err);
-            alert(`Upload failed: ${err.message || 'Unknown error. Check connection.'}`);
+            alert(`${t('supplier', 'uploadFailed')}: ${err.message || 'Unknown error. Check connection.'}`);
         } finally {
             setIsSubmitting(false);
         }
@@ -228,17 +233,17 @@ export default function SupplierProductsPage() {
                     <ShieldAlert className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                         <p className="font-black text-amber-800 dark:text-amber-300">
-                            {kycStatus === 'PENDING' ? 'KYC Under Review ⏳' : 'Identity Verification Required 🔐'}
+                            {kycStatus === 'PENDING' ? (locale === 'ar' ? 'KYC قيد المراجعة ⏳' : 'KYC Under Review ⏳') : (locale === 'ar' ? 'مطلوب التحقق من الهوية 🔐' : 'Identity Verification Required 🔐')}
                         </p>
                         <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
                             {kycStatus === 'PENDING'
-                                ? 'Your documents are being reviewed. You can add products once your identity is verified.'
-                                : 'You must complete KYC (identity verification) before listing products on the platform.'}
+                                ? (locale === 'ar' ? 'يتم مراجعة مستنداتك. ستتمكن من إضافة المنتجات بمجرد التحقق من هويتك.' : 'Your documents are being reviewed. You can add products once your identity is verified.')
+                                : (locale === 'ar' ? 'يجب إكمال KYC (التحقق من الهوية) قبل إدراج المنتجات على المنصة.' : 'You must complete KYC (identity verification) before listing products on the platform.')}
                         </p>
                     </div>
                     {kycStatus !== 'PENDING' && (
                         <Link href="/dashboard/kyc" className="shrink-0 px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded-xl hover:bg-amber-600 transition-colors">
-                            Verify Now
+                            {locale === 'ar' ? 'تحقق الآن' : 'Verify Now'}
                         </Link>
                     )}
                 </div>
@@ -248,9 +253,9 @@ export default function SupplierProductsPage() {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div>
                     <h1 className="text-3xl font-black text-foreground tracking-tight flex items-center gap-3">
-                        Product Management <Box className="text-primary w-8 h-8" />
+                        {t('supplier', 'allProducts')} <Box className="text-primary w-8 h-8" />
                     </h1>
-                    <p className="text-muted-foreground font-medium mt-1">Manage your active inventory and listings.</p>
+                    <p className="text-muted-foreground font-medium mt-1">{t('supplier', 'performanceMetrics')}</p>
                 </div>
 
                 <div className="flex items-center gap-3 flex-wrap justify-end">
@@ -261,7 +266,7 @@ export default function SupplierProductsPage() {
                             className="h-12 px-6 rounded-xl font-black bg-destructive/10 text-destructive hover:bg-destructive hover:text-white transition-all flex items-center gap-2"
                         >
                             <Trash2 size={18} />
-                            {isDeletingBulk ? 'Deleting...' : `Delete Selected (${selectedProducts.size})`}
+                            {isDeletingBulk ? (locale === 'ar' ? 'جاري الحذف...' : 'Deleting...') : (locale === 'ar' ? `حذف المحدد (${selectedProducts.size})` : `Delete Selected (${selectedProducts.size})`)}
                         </button>
                     )}
                     <button
@@ -269,14 +274,14 @@ export default function SupplierProductsPage() {
                         disabled={kycBlocked}
                         className="h-12 px-6 rounded-xl font-black border border-border/50 hover:bg-muted/50 flex items-center gap-2 text-foreground transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                        <UploadCloud size={18} /> Bulk Upload
+                        <UploadCloud size={18} /> {t('supplier', 'bulkUploadTitle')}
                     </button>
                     <button
                         disabled={kycBlocked}
                         onClick={() => { setEditingProduct(null); setIsEditorOpen(true); }}
                         className="h-12 px-8 bg-primary text-primary-foreground rounded-xl font-black flex items-center gap-2 hover:bg-primary/90 transition-all shadow-xl shadow-primary/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                     >
-                        <Plus size={20} /> Add New
+                        <Plus size={20} /> {locale === 'ar' ? 'إضافة جديد' : 'Add New'}
                     </button>
                 </div>
             </div>
@@ -284,10 +289,10 @@ export default function SupplierProductsPage() {
             {/* Stats Overview */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 {[
-                    { label: 'Total Listings', value: products.length, icon: Archive, color: 'text-primary' },
-                    { label: 'Active', value: products.filter(p => p.status === ProductStatus.APPROVED || p.status === 'APPROVED').length, icon: CheckCircle2, color: 'text-emerald-500' },
-                    { label: 'Pending', value: products.filter(p => p.status === ProductStatus.PENDING || p.status === 'PENDING').length, icon: Box, color: 'text-amber-500' },
-                    { label: 'Categories', value: new Set(products.map(p => p.category).filter(Boolean)).size, icon: Tag, color: 'text-blue-500' },
+                    { label: t('admin', 'totalProducts'), value: products.length, icon: Archive, color: 'text-primary' },
+                    { label: t('common', 'active'), value: products.filter(p => p.status === ProductStatus.APPROVED || p.status === 'APPROVED').length, icon: CheckCircle2, color: 'text-emerald-500' },
+                    { label: t('common', 'pending'), value: products.filter(p => p.status === ProductStatus.PENDING || p.status === 'PENDING').length, icon: Box, color: 'text-amber-500' },
+                    { label: t('admin', 'categories'), value: new Set(products.map(p => p.category).filter(Boolean)).size, icon: Tag, color: 'text-blue-500' },
                 ].map((stat, idx) => (
                     <div key={idx} className="bg-card border border-border/50 rounded-2xl p-6 shadow-sm">
                         <div className="flex items-center justify-between">
@@ -480,12 +485,29 @@ export default function SupplierProductsPage() {
                             >
                                 <div className="p-8 border-b border-border/50 flex items-center justify-between">
                                     <div>
-                                        <h2 className="text-2xl font-black text-foreground tracking-tight">Bulk Upload Products</h2>
-                                        <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1">Upload via Excel or CSV</p>
+                                        <h2 className="text-2xl font-black text-foreground tracking-tight">{t('supplier', 'bulkUploadTitle')}</h2>
+                                        <p className="text-xs text-muted-foreground font-bold uppercase tracking-widest mt-1">{t('supplier', 'uploadViaExcel')}</p>
                                     </div>
-                                    <button type="button" onClick={() => { setIsBulkModalOpen(false); setBulkResults(null); setBulkFiles([]); }} className="w-10 h-10 bg-muted/50 hover:bg-muted rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-                                        <X size={20} />
-                                    </button>
+                                    <div className="flex items-center gap-4">
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                const headers = 'name,brand,description,category,price,stock,ean,unit,minOrder';
+                                                const blob = new Blob([headers], { type: 'text/csv' });
+                                                const url = window.URL.createObjectURL(blob);
+                                                const a = document.createElement('a');
+                                                a.href = url;
+                                                a.download = 'atlantis_upload_template.csv';
+                                                a.click();
+                                            }}
+                                            className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline"
+                                        >
+                                            {t('supplier', 'downloadTemplate')}
+                                        </button>
+                                        <button type="button" onClick={() => { setIsBulkModalOpen(false); setBulkResults(null); setBulkFiles([]); }} className="w-10 h-10 bg-muted/50 hover:bg-muted rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                                            <X size={20} />
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div className="p-8 space-y-6">
@@ -494,17 +516,17 @@ export default function SupplierProductsPage() {
                                             <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
                                                 <FileSpreadsheet size={32} className="text-primary" />
                                             </div>
-                                            <h3 className="text-xl font-black text-foreground mb-2">Drop your spreadsheet here</h3>
-                                            <p className="text-muted-foreground">Supports .xlsx and .csv files</p>
+                                            <h3 className="text-xl font-black text-foreground mb-2">{t('supplier', 'dropSpreadsheet')}</h3>
+                                            <p className="text-muted-foreground">{t('supplier', 'supportsXlsxCsv')}</p>
 
                                             <div className="mt-6 text-start bg-muted/30 p-4 rounded-xl border border-border/50 max-w-md w-full relative z-20 pointer-events-auto">
                                                 <h4 className="text-xs font-black uppercase tracking-widest text-foreground mb-2 flex items-center gap-2">
-                                                    <CheckCircle2 size={14} className="text-primary" /> Important Rules
+                                                    <CheckCircle2 size={14} className="text-primary" /> {t('supplier', 'importantRules')}
                                                 </h4>
                                                 <ul className="text-[11px] text-muted-foreground space-y-1.5 list-disc ps-4 font-medium">
-                                                    <li><strong className="text-foreground">Required Columns:</strong> name, description, category, price, stock</li>
-                                                    <li>Products missing a title, description, or image <strong className="text-amber-500">will remain PENDING</strong> and hidden from the marketplace.</li>
-                                                    <li>If no image URL is provided, the system will attempt to fetch one using the <strong className="text-foreground">EAN</strong> if available.</li>
+                                                    <li><strong className="text-foreground">{t('supplier', 'requiredColumns')}:</strong> name, description, category, price, stock</li>
+                                                    <li>{t('supplier', 'pendingWarning')}</li>
+                                                    <li>{t('supplier', 'eanFetch')}</li>
                                                     <li>No default or placeholder images (e.g., Coca-Cola) will be used.</li>
                                                 </ul>
                                             </div>
@@ -535,11 +557,39 @@ export default function SupplierProductsPage() {
                                         </div>
                                     ) : (
                                         <div className="space-y-6">
-                                            <div className="p-6 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex flex-col items-center justify-center text-center">
-                                                <CheckCircle2 className="text-emerald-500 mb-2" size={32} />
-                                                <h3 className="text-xl font-black text-foreground">Upload Complete!</h3>
-                                                <p className="text-emerald-500 mt-1">Successfully processed {bulkResults.totalRows} rows.</p>
+                                            <div className={cn(
+                                                "p-6 rounded-2xl flex flex-col items-center justify-center text-center border",
+                                                bulkResults.createdCount > 0 ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20"
+                                            )}>
+                                                {bulkResults.createdCount > 0 ? (
+                                                    <CheckCircle2 className="text-emerald-500 mb-2" size={32} />
+                                                ) : (
+                                                    <ShieldAlert className="text-red-500 mb-2" size={32} />
+                                                )}
+                                                <h3 className="text-xl font-black text-foreground">
+                                                    {bulkResults.createdCount > 0 ? t('supplier', 'uploadSuccess') : t('supplier', 'uploadFailed')}
+                                                </h3>
+                                                <p className={cn("mt-1 font-bold", bulkResults.createdCount > 0 ? "text-emerald-500" : "text-red-500")}>
+                                                    {bulkResults.createdCount} {t('supplier', 'productsCreated')} {bulkResults.totalRows} {t('supplier', 'row')}.
+                                                </p>
                                             </div>
+
+                                            {bulkResults.errorCount > 0 && (
+                                                <div className="space-y-3">
+                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('supplier', 'errorReport')} ({bulkResults.errorCount})</h4>
+                                                    <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+                                                        {bulkResults.results.filter((r: any) => !r.success).map((err: any, i: number) => (
+                                                            <div key={i} className="p-3 bg-red-500/5 border border-red-500/10 rounded-xl text-[11px]">
+                                                                <div className="flex items-center justify-between mb-1">
+                                                                    <span className="font-black text-red-500">{t('supplier', 'row')} {err.rowNumber}</span>
+                                                                    <span className="text-[9px] text-muted-foreground">{err.file}</span>
+                                                                </div>
+                                                                <p className="text-muted-foreground">{err.errors?.join(', ') || 'Validation error'}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

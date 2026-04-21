@@ -6,7 +6,7 @@ import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('chat')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 
@@ -21,7 +21,6 @@ export class ChatController {
   }
 
   @Get('admin/conversations')
-  @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.SUPPORT, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
   async getConversations(@Request() req) {
     return this.chatService.getConversationsWithStatus(req.user.role?.toUpperCase());
@@ -29,14 +28,12 @@ export class ChatController {
 
   /** Switch conversation from bot to human agent */
   @Patch('admin/switch/:userId')
-  @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.SUPPORT, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
   async switchToHuman(@Param('userId') userId: string, @Request() req) {
     return this.chatService.switchToHuman(userId, req.user.sub);
   }
 
   @Get('admin/messages/:userId')
-  @UseGuards(RolesGuard)
   @Roles(Role.ADMIN, Role.SUPPORT, Role.DEVELOPER, Role.LOGISTICS)
   async getUserMessages(@Param('userId') userId: string) {
     return this.chatService.getMessagesForUser(userId);

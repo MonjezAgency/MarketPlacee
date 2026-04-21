@@ -9,14 +9,14 @@ export class ProductsService {
     constructor(private prisma: PrismaService, private eanService: EanService) { }
 
     async create(createProductDto: CreateProductDto, isAdmin: boolean = false) {
-        // KYC enforcement: suppliers must be verified before listing products
+        // KYC enforcement: suppliers must be verified or pending approval before listing products
         if (!isAdmin && createProductDto.supplierId) {
             const supplier = await this.prisma.user.findUnique({
                 where: { id: createProductDto.supplierId },
                 select: { kycStatus: true },
             });
-            if (supplier && supplier.kycStatus !== 'VERIFIED') {
-                throw new ForbiddenException('KYC verification required. Complete your identity verification before listing products.');
+            if (supplier && supplier.kycStatus === 'UNVERIFIED') {
+                throw new ForbiddenException('Identity verification required. Please submit your documents before listing products.');
             }
         }
 

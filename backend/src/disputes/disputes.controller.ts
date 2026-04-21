@@ -38,7 +38,7 @@ export class DisputesController {
 
     /** Admin/Support views all disputes */
     @Get()
-    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR)
+    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
     findAll(
         @Query('page') page?: string,
         @Query('limit') limit?: string,
@@ -53,7 +53,7 @@ export class DisputesController {
 
     /** Admin/Support dispute stats */
     @Get('stats')
-    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR)
+    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
     getStats() {
         return this.disputesService.getStats();
     }
@@ -62,14 +62,14 @@ export class DisputesController {
     @Get(':id')
     async findOne(@Param('id') id: string, @Request() req) {
         const dispute = await this.disputesService.findOne(id);
-        const isAdmin = [Role.ADMIN, Role.SUPPORT, Role.MODERATOR].includes(req.user.role);
+        const isAdmin = [Role.ADMIN, Role.SUPPORT, Role.MODERATOR, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER].includes(req.user.role);
         if (!isAdmin && dispute.customerId !== req.user.sub) throw new ForbiddenException();
         return dispute;
     }
 
     /** Admin resolves the dispute */
     @Patch(':id/resolve')
-    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR)
+    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
     resolve(
         @Param('id') id: string,
         @Body() body: { decision: 'RESOLVED_REFUND' | 'RESOLVED_NO_REFUND'; resolution: string },
@@ -80,7 +80,7 @@ export class DisputesController {
 
     /** Admin updates status (e.g. → UNDER_REVIEW) */
     @Patch(':id/status')
-    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR)
+    @Roles(Role.ADMIN, Role.SUPPORT, Role.MODERATOR, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
     updateStatus(@Param('id') id: string, @Body('status') status: DisputeStatus) {
         return this.disputesService.updateStatus(id, status);
     }

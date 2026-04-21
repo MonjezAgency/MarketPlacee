@@ -155,27 +155,29 @@ export class ProductsController {
                     const dto = result.data as CreateProductDto;
                     const supplierId = isAdmin ? (dto.supplierId || req.user.sub) : req.user.sub;
 
-                    if (!dto.name || dto.name.trim() === '' || !dto.description || dto.description.trim() === '') {
-                        dto.adminNotes = (dto.adminNotes ? dto.adminNotes + ' | ' : '') + 'Warning: Missing title or description.';
-                    }
-
                     try {
                         const product = await this.productsService.create({
                             ...dto,
                             supplierId,
                         }, isAdmin);
                         createdProducts.push(product);
+                        result.message = 'Created successfully';
                     } catch (e) {
                         result.success = false;
                         result.errors = result.errors || [];
-                        result.errors.push(`Failed to create product via DB: ${e.message}`);
+                        const errorMsg = e.response?.message || e.message || 'Unknown database error';
+                        result.errors.push(Array.isArray(errorMsg) ? errorMsg.join(', ') : errorMsg);
                         report.successCount--;
                         report.errorCount++;
                     }
                 }
             }
 
-            return { ...report, createdCount: createdProducts.length };
+            return { 
+                ...report, 
+                createdCount: createdProducts.length,
+                success: createdProducts.length > 0 
+            };
         } catch (error) {
             this.logger.error(`[BulkUpload] Error: ${error?.message}`);
             return { totalRows: 0, successCount: 0, errorCount: 0, createdCount: 0, results: [], error: error.message || 'Unknown error processing file' };

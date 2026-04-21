@@ -1,13 +1,14 @@
 import { Controller, Post, Get, Delete, Param, Body, UseGuards, Req } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { EmailService } from '../email/email.service';
+import { Role, UserStatus } from '@prisma/client';
+import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
-import { Roles } from '../auth/roles.decorator';
 
 @Controller('admin/team')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
+@Roles(Role.ADMIN, Role.OWNER, Role.DEVELOPER)
 export class TeamController {
     constructor(
         private readonly adminService: AdminService,
@@ -30,7 +31,7 @@ export class TeamController {
     }
 
     @Post(':id/verify-kyc')
-    @Roles('OWNER', 'ADMIN')
+    @Roles(Role.OWNER, Role.ADMIN, Role.DEVELOPER)
     async verifyKyc(@Param('id') id: string) {
         return this.adminService.verifyTeamMemberKyc(id);
     }

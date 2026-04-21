@@ -231,4 +231,28 @@ export class FinanceService {
             totalOrders: items.length,
         };
     }
+
+    async getFinancialTransactions(days: number = 30) {
+        const since = new Date(Date.now() - days * 86_400_000);
+        const orders = await this.prisma.order.findMany({
+            where: { createdAt: { gte: since } },
+            orderBy: { createdAt: 'desc' },
+            include: {
+                escrow: true,
+            },
+        });
+
+        const feePct = parseFloat(process.env.PLATFORM_FEE_PERCENT || '5') / 100;
+
+        return orders.map(o => ({
+            orderId: o.id,
+            createdAt: o.createdAt.toISOString(),
+            status: o.status,
+            totalAmount: o.totalAmount,
+            platformFee: o.escrow?.platformFee ?? (o.totalAmount * feePct),
+            supplierAmount: o.escrow?.supplierAmount ?? (o.totalAmount * (1 - feePct)),
+            paymentStatus: o.paymentStatus,
+            escrowStatus: o.escrow?.status ?? 'N/A',
+        }));
+    }
 }

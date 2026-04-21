@@ -8,6 +8,8 @@ import { BarChart3, Package, ShoppingCart, Eye, TrendingUp, ArrowUpRight, Plus, 
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid } from 'recharts';
 import { useAuth } from '@/lib/auth';
 import { formatPrice } from '@/lib/currency';
+import { useLanguage } from '@/contexts/LanguageContext';
+import Link from 'next/link';
 
 const REVENUE_SPARKLINE = [
     { month: 'Feb', value: 3100 },
@@ -28,6 +30,7 @@ const ORDERS_SPARKLINE = [
 ];
 
 export default function SupplierOverviewPage() {
+    const { t, locale } = useLanguage();
     const { user } = useAuth();
     const [dashboardStats, setDashboardStats] = React.useState<any>(null);
 
@@ -50,10 +53,10 @@ export default function SupplierOverviewPage() {
     }, []);
 
     const STATS = [
-        { label: 'Revenue (MTD)', value: '$8,420.00', trend: '+18.4%', up: true, icon: BarChart3, color: 'text-emerald-500' },
-        { label: 'Active Products', value: '24', trend: 'Stable', up: true, icon: Package, color: 'text-primary' },
-        { label: 'Total Orders', value: '156', trend: '+22%', up: true, icon: ShoppingCart, color: 'text-blue-500' },
-        { label: 'Digital Impressions', value: '4.2k', trend: '+12%', up: true, icon: Eye, color: 'text-purple-500' },
+        { label: t('supplier', 'revenueMtd'), value: '$8,420.00', trend: '+18.4%', up: true, icon: BarChart3, color: 'text-emerald-500' },
+        { label: t('supplier', 'activeProducts'), value: '24', trend: 'Stable', up: true, icon: Package, color: 'text-primary' },
+        { label: t('supplier', 'totalOrders'), value: '156', trend: '+22%', up: true, icon: ShoppingCart, color: 'text-blue-500' },
+        { label: t('supplier', 'digitalImpressions'), value: '4.2k', trend: '+12%', up: true, icon: Eye, color: 'text-purple-500' },
     ];
 
     return (
@@ -61,13 +64,13 @@ export default function SupplierOverviewPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div className="space-y-1">
-                    <h1 className="text-3xl font-black text-foreground tracking-tight">Business Hub</h1>
-                    <p className="text-muted-foreground font-medium">Performance metrics for your wholesale catalog.</p>
+                    <h1 className="text-3xl font-black text-foreground tracking-tight">{t('supplier', 'businessHub')}</h1>
+                    <p className="text-muted-foreground font-medium">{t('supplier', 'performanceMetrics')}</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="px-6 py-2.5 bg-primary text-primary-foreground font-black text-sm rounded-xl hover:scale-105 transition-transform shadow-lg shadow-primary/20 flex items-center gap-2">
-                        <Plus size={18} strokeWidth={3} /> Add New Product
-                    </button>
+                    <Link href="/supplier/products" className="px-6 py-2.5 bg-primary text-primary-foreground font-black text-sm rounded-xl hover:scale-105 transition-transform shadow-md shadow-primary/10 flex items-center gap-2">
+                        <Plus size={18} strokeWidth={3} /> {t('supplier', 'addNewProduct')}
+                    </Link>
                 </div>
             </div>
 
@@ -107,11 +110,11 @@ export default function SupplierOverviewPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.25 }}
-                    className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm"
+                    className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow"
                 >
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Monthly Revenue</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('supplier', 'monthlyRevenue')}</p>
                             <p className="text-2xl font-black text-foreground">$8,420</p>
                         </div>
                         <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase">
@@ -141,11 +144,11 @@ export default function SupplierOverviewPage() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: 0.3 }}
-                    className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm"
+                    className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow"
                 >
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Monthly Orders</p>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('supplier', 'monthlyOrders')}</p>
                             <p className="text-2xl font-black text-foreground">78</p>
                         </div>
                         <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase">
@@ -170,18 +173,18 @@ export default function SupplierOverviewPage() {
             <div className="bg-card rounded-3xl border border-border/50 p-8 space-y-8 shadow-sm">
                 <div className="flex items-center justify-between">
                     <h3 className="text-xl font-black text-foreground tracking-tight flex items-center gap-3">
-                        <TrendingUp className="text-primary" /> Top 5 Best-Selling Products
+                        <TrendingUp className="text-primary" /> {t('supplier', 'topProductsTitle')}
                     </h3>
-                    <button className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors">View Sales Report</button>
+                    <button className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors">{t('supplier', 'viewSalesReport')}</button>
                 </div>
 
                 <div className="overflow-x-auto">
                     <table className="w-full text-start">
                         <thead>
                             <tr className="bg-muted/30">
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Product</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Total Sold</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">Revenue generated</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">{t('supplier', 'product')}</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">{t('supplier', 'totalSold')}</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">{t('supplier', 'revenueGenerated')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
@@ -195,7 +198,7 @@ export default function SupplierOverviewPage() {
                             {(!dashboardStats?.topProducts || dashboardStats.topProducts.length === 0) && (
                                 <tr>
                                     <td colSpan={3} className="px-8 py-10 text-center text-muted-foreground text-sm font-bold">
-                                        No sales data available yet.
+                                        {t('supplier', 'noSalesData')}
                                     </td>
                                 </tr>
                             )}
@@ -216,7 +219,7 @@ export default function SupplierOverviewPage() {
                                         </div>
                                     </td>
                                     <td className="px-8 py-6">
-                                        <p className="font-black text-foreground">{product.totalQuantitySold} <span className="text-[10px] text-muted-foreground uppercase">Units</span></p>
+                                        <p className="font-black text-foreground">{product.totalQuantitySold} <span className="text-[10px] text-muted-foreground uppercase">{t('supplier', 'units')}</span></p>
                                     </td>
                                     <td className="px-8 py-6">
                                         <p className="font-black text-emerald-500">{formatPrice(product.totalRevenue)}</p>

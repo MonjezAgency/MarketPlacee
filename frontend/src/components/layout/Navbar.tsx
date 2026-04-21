@@ -134,6 +134,8 @@ export default function Navbar() {
         );
     };
 
+    const isDashboardPath = pathname.startsWith('/admin') || pathname.startsWith('/supplier') || pathname.startsWith('/dashboard');
+
     return (
         <header className={cn(
             "fixed top-0 start-0 end-0 z-[999] transition-all duration-300",
@@ -151,59 +153,61 @@ export default function Navbar() {
                         </span>
                     </Link>
 
-                    <div 
-                        className="relative" 
-                        ref={categoriesRef}
-                        onMouseEnter={() => setIsCategoriesOpen(true)}
-                        onMouseLeave={() => setIsCategoriesOpen(false)}
-                    >
-                        <button
-                            onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}
-                            className={cn(
-                                "hidden lg:flex items-center gap-2 text-sm font-bold transition-all group",
-                                (isCategoriesOpen || scrolled || isWhiteBackgroundPage) ? "text-secondary hover:text-primary" : "text-white hover:text-secondary"
-                            )}
+                    {!isDashboardPath && (
+                        <div 
+                            className="relative" 
+                            ref={categoriesRef}
+                            onMouseEnter={() => setIsCategoriesOpen(true)}
+                            onMouseLeave={() => setIsCategoriesOpen(false)}
                         >
-                            <Menu size={20} className={cn("transition-transform", isCategoriesOpen ? "rotate-90" : "group-hover:rotate-90")} />
-                            <span>{t('navbar', 'categories') || 'Categories'}</span>
-                            <ChevronDown size={16} className={cn("transition-transform", isCategoriesOpen ? "rotate-180" : "")} />
-                        </button>
+                            <button
+                                onClick={() => setIsCategoriesOpen(!isCategoriesOpen)}
+                                className={cn(
+                                    "hidden lg:flex items-center gap-2 text-sm font-bold transition-all group",
+                                    (isCategoriesOpen || scrolled || isWhiteBackgroundPage) ? "text-secondary hover:text-primary" : "text-white hover:text-secondary"
+                                )}
+                            >
+                                <Menu size={20} className={cn("transition-transform", isCategoriesOpen ? "rotate-90" : "group-hover:rotate-90")} />
+                                <span>{t('navbar', 'categories') || 'Categories'}</span>
+                                <ChevronDown size={16} className={cn("transition-transform", isCategoriesOpen ? "rotate-180" : "")} />
+                            </button>
 
-                        {isCategoriesOpen && (
-                            <div className="absolute top-full -mt-1 pt-4 start-0 w-72 z-[1000] animate-in fade-in slide-in-from-top-2 duration-200">
-                                <div className="bg-card border border-border/50 rounded-xl shadow-2xl py-3 whitespace-nowrap overflow-hidden text-foreground">
-                                <div className="px-4 pb-2 mb-2 border-b border-border/50">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                        {t('footer', 'browseCategories') || 'Browse Categories'}
-                                    </span>
-                                </div>
-                                <div className="max-h-[60vh] overflow-y-auto no-scrollbar py-1">
-                                    {CATEGORIES_LIST.map((cat) => (
+                            {isCategoriesOpen && (
+                                <div className="absolute top-full -mt-1 pt-4 start-0 w-72 z-[1000] animate-in fade-in slide-in-from-top-2 duration-200">
+                                    <div className="bg-card border border-border/50 rounded-xl shadow-2xl py-3 whitespace-nowrap overflow-hidden text-foreground">
+                                    <div className="px-4 pb-2 mb-2 border-b border-border/50">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                            {t('footer', 'browseCategories') || 'Browse Categories'}
+                                        </span>
+                                    </div>
+                                    <div className="max-h-[60vh] overflow-y-auto no-scrollbar py-1">
+                                        {CATEGORIES_LIST.map((cat) => (
+                                            <Link
+                                                key={cat}
+                                                href={`/categories?category=${encodeURIComponent(cat)}`}
+                                                className="flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-primary/5 hover:text-primary transition-colors group/item"
+                                                onClick={() => setIsCategoriesOpen(false)}
+                                            >
+                                                <span>{t('categories', cat.replace(/\s+/g, '').replace(/&/g, '').charAt(0).toLowerCase() + cat.replace(/\s+/g, '').replace(/&/g, '').slice(1)) || cat}</span>
+                                                <ChevronRight size={14} className={cn("opacity-0 group-hover/item:opacity-100 translate-x-1 group-hover/item:translate-x-0 transition-all", dir === 'rtl' ? "rotate-180" : "")} />
+                                            </Link>
+                                        ))}
+                                    </div>
+                                    <div className="mt-2 pt-2 border-t border-border/50 px-3">
                                         <Link
-                                            key={cat}
-                                            href={`/categories?category=${encodeURIComponent(cat)}`}
-                                            className="flex items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-primary/5 hover:text-primary transition-colors group/item"
+                                            href="/categories"
+                                            className="flex items-center justify-center gap-2 w-full py-2 bg-secondary/10 text-secondary hover:bg-secondary hover:text-white rounded-lg text-xs font-bold transition-all uppercase tracking-wider"
                                             onClick={() => setIsCategoriesOpen(false)}
                                         >
-                                            <span>{t('categories', cat.replace(/\s+/g, '').replace(/&/g, '').charAt(0).toLowerCase() + cat.replace(/\s+/g, '').replace(/&/g, '').slice(1)) || cat}</span>
-                                            <ChevronRight size={14} className={cn("opacity-0 group-hover/item:opacity-100 translate-x-1 group-hover/item:translate-x-0 transition-all", dir === 'rtl' ? "rotate-180" : "")} />
+                                            {t('navbar', 'browseAll')}
+                                            <PackageSearch size={14} />
                                         </Link>
-                                    ))}
-                                </div>
-                                <div className="mt-2 pt-2 border-t border-border/50 px-3">
-                                    <Link
-                                        href="/categories"
-                                        className="flex items-center justify-center gap-2 w-full py-2 bg-secondary/10 text-secondary hover:bg-secondary hover:text-white rounded-lg text-xs font-bold transition-all uppercase tracking-wider"
-                                        onClick={() => setIsCategoriesOpen(false)}
-                                    >
-                                        {t('navbar', 'browseAll')}
-                                        <PackageSearch size={14} />
-                                    </Link>
+                                    </div>
                                 </div>
                             </div>
+                            )}
                         </div>
-                        )}
-                    </div>
+                    )}
                 </div>
 
                 {/* Main Search Bar */}
@@ -324,17 +328,17 @@ export default function Navbar() {
                             value={locale}
                             onChange={(e) => setLocale(e.target.value as Locale)}
                             className={cn(
-                                "bg-transparent text-[11px] font-bold outline-none cursor-pointer uppercase",
-                                (scrolled || isWhiteBackgroundPage) ? "text-foreground" : "text-white"
+                                "bg-transparent text-[11px] font-black outline-none cursor-pointer p-1 rounded-md transition-colors",
+                                (scrolled || isWhiteBackgroundPage) ? "text-foreground hover:bg-muted" : "text-white hover:bg-white/10"
                             )}
                         >
-                            <option value="en" className="text-black">EN</option>
-                            <option value="ar" className="text-black">عربي</option>
-                            <option value="fr" className="text-black">FR</option>
-                            <option value="de" className="text-black">DE</option>
-                            <option value="es" className="text-black">ES</option>
-                            <option value="pt" className="text-black">PT</option>
-                            <option value="ro" className="text-black">RO</option>
+                            <option value="en" className="text-black bg-white">EN</option>
+                            <option value="ar" className="text-black bg-white">عربي</option>
+                            <option value="fr" className="text-black bg-white">FR</option>
+                            <option value="de" className="text-black bg-white">DE</option>
+                            <option value="es" className="text-black bg-white">ES</option>
+                            <option value="pt" className="text-black bg-white">PT</option>
+                            <option value="ro" className="text-black bg-white">RO</option>
                         </select>
                     </div>
 
@@ -342,19 +346,22 @@ export default function Navbar() {
 
                     <div className={cn("w-px h-6 mx-1 hidden lg:block", (scrolled || isWhiteBackgroundPage) ? "bg-border" : "bg-white/10")} />
 
+                    {/* Account / Dashboard Selection */}
                     <Link
                         href={user ? (user.role?.toLowerCase() === 'admin' ? '/admin' : user.role?.toLowerCase() === 'supplier' ? '/supplier' : '/dashboard/customer') : '/auth/login'}
-                        className="flex flex-col items-center gap-0.5 group"
+                        className="flex flex-col items-center gap-0.5 group transition-transform active:scale-95"
                     >
                         <User className="w-5 h-5 group-hover:text-secondary transition-colors" />
-                        <span className="text-[10px] font-bold">{user ? (user.name?.split(' ')[0] || 'User') : t('navbar', 'account')}</span>
+                        <span className="text-[10px] font-black tracking-tight uppercase">
+                            {user ? (user.name?.split(' ')[0] || t('navbar', 'account')) : t('navbar', 'account')}
+                        </span>
                     </Link>
 
-                    {/* Wishlist */}
-                    {user && (
-                        <Link href="/wishlist" className="flex flex-col items-center gap-0.5 group">
+                    {/* Wishlist - Only for non-suppliers for now or as a generic feature */}
+                    {user && user.role !== 'SUPPLIER' && !isDashboardPath && (
+                        <Link href="/wishlist" className="flex flex-col items-center gap-0.5 group transition-transform active:scale-95">
                             <Heart className="w-5 h-5 group-hover:text-secondary transition-colors" />
-                            <span className="text-[10px] font-bold">Saved</span>
+                            <span className="text-[10px] font-black tracking-tight uppercase">{t('navbar', 'saved') || 'Saved'}</span>
                         </Link>
                     )}
 
@@ -362,23 +369,25 @@ export default function Navbar() {
                     <div className="relative" ref={currencyRef}>
                         <button
                             onClick={() => setIsCurrencyOpen(prev => !prev)}
-                            className="flex flex-col items-center gap-0.5 group"
+                            className="flex flex-col items-center gap-0.5 group transition-transform active:scale-95"
                         >
                             <Globe className="w-5 h-5 group-hover:text-secondary transition-colors" />
-                            <span className="text-[10px] font-bold">{activeCurrency}</span>
+                            <span className="text-[10px] font-black tracking-tight uppercase">{activeCurrency}</span>
                         </button>
                         {isCurrencyOpen && (
-                            <div className="absolute end-0 top-10 w-52 bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden z-[1000]">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-4 pt-3 pb-1">Select Currency</p>
-                                <div className="max-h-64 overflow-y-auto">
+                            <div className="absolute end-0 top-10 w-52 bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden z-[1000] animate-in fade-in zoom-in-95 duration-200">
+                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-4 pt-3 pb-1 border-b border-border/50">
+                                    {t('navbar', 'selectCurrency') || 'Select Currency'}
+                                </p>
+                                <div className="max-h-64 overflow-y-auto no-scrollbar">
                                     {SUPPORTED_CURRENCIES.map(c => (
                                         <button key={c.code} onClick={() => handleCurrencySelect(c.code)}
                                             className={cn(
-                                                "w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-primary/5 transition-colors text-foreground dark:text-white",
+                                                "w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-primary/5 transition-colors text-foreground dark:text-white capitalize",
                                                 activeCurrency === c.code && "bg-primary/5 text-primary font-black"
                                             )}>
-                                            <span className="font-bold">{c.name}</span>
-                                            <span className="text-xs font-black opacity-60">{c.symbol} {c.code}</span>
+                                            <span className="font-bold">{c.name.toLowerCase()}</span>
+                                            <span className="text-[10px] font-black opacity-40">{c.symbol} {c.code}</span>
                                         </button>
                                     ))}
                                 </div>
@@ -390,15 +399,19 @@ export default function Navbar() {
                     <NotificationBell isLight={scrolled || isWhiteBackgroundPage} />
 
                     {/* Cart */}
-                    <Link href="/cart" className="relative flex flex-col items-center gap-0.5 group">
-                        <ShoppingCart className="w-5 h-5 group-hover:text-secondary transition-colors" />
-                        <span className="text-[10px] font-bold">{t('navbar', 'cart')}</span>
-                        {cartCount > 0 && (
-                            <span className="absolute -top-1 -end-1 bg-secondary text-secondary-foreground text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                                {cartCount}
-                            </span>
-                        )}
-                    </Link>
+                    {!isDashboardPath && (
+                        <Link href="/cart" className="relative flex flex-col items-center gap-0.5 group transition-transform active:scale-95">
+                            <div className="relative">
+                                <ShoppingCart className="w-5 h-5 group-hover:text-secondary transition-colors" />
+                                {cartCount > 0 && (
+                                    <span className="absolute -top-1.5 -end-1.5 bg-secondary text-secondary-foreground text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-card shadow-sm">
+                                        {cartCount}
+                                    </span>
+                                )}
+                            </div>
+                            <span className="text-[10px] font-black tracking-tight uppercase">{t('navbar', 'cart')}</span>
+                        </Link>
+                    )}
                 </div>
             </div>
         </header>

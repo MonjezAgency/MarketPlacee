@@ -441,5 +441,18 @@ export const en = {
         redBullSubtitle: "Keep your inventory energized. Buy 10 cases, get 1 free.",
         coffeeTitle: "Premium Coffee Selection",
         coffeeSubtitle: "Arabica beans starting from $45/kg for wholesale."
+    },
+    supplier: {
+        ...en.supplier,
+        globalIdentity: "Global Identity",
+        businessVerification: "Business Verification",
+        contactAccess: "Contact & Access",
+        accountSecurity: "Account Security",
+        financialManagement: "Financial Management",
+        verifiedNotice: "Verified Account",
+        systemNotice: "System Notice",
+        logoDescription: "Your company logo will be visible to all buyers in the marketplace.",
+        updateFinancials: "Update Financials Securely",
+        securityGrade: "Enterprise Grade Security",
     }
 };

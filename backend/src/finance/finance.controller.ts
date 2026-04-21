@@ -1,19 +1,43 @@
 import {
-    Controller, Get, Post, Delete, Put, Body, Param, Query, UseGuards, Request,
+    Controller, Get, Post, Delete, Put, Body, Param, Query, UseGuards, Request, Res,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+import { Response } from 'express';
 import { FinanceService } from './finance.service';
 import { ReportsService } from './reports.service';
 import { FinancialAuditService } from '../common/financial-audit.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
+import { Role } from '@prisma/client';
+import { ExcelService } from '../admin/excel.service';
 
 @Controller('finance')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class FinanceController {
     constructor(
         private readonly financeService: FinanceService,
         private readonly reportsService: ReportsService,
         private readonly auditService: FinancialAuditService,
+        private readonly excelService: ExcelService,
     ) {}
+
+    @Get('export/statement')
+    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT)
+    async exportStatement(@Query('days') days: string, @Res() res: Response) {
+        const periodDays = parseInt(days || '30', 10);
+        const summary = await this.financeService.getRevenueReport(periodDays > 7 ? (periodDays > 30 ? 'year' : 'month') : 'week');
+        const transactions = await this.financeService.getFinancialTransactions(periodDays);
+        
+        const buffer = await this.excelService.generateFinancialStatementExcel(summary, transactions);
+        
+        res.set({
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            'Content-Disposition': `attachment; filename=financial-statement-${new Date().toISOString().split('T')[0]}.xlsx`,
+            'Content-Length': buffer.length,
+        });
+        
+        res.end(buffer);
+    }
 
     /** Admin: generate on-demand report for any time window */
     @Get('report')
