@@ -578,14 +578,16 @@ export default function KycPage() {
                     )}
 
                     {useCameraForDocs && (
-                        <div className="space-y-4 p-4 border border-border bg-black rounded-2xl overflow-hidden relative">
-                            <video ref={videoRef} autoPlay playsInline muted className="w-full h-64 object-cover" />
-                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                                <div className="w-[80%] h-[60%] border-2 border-white/50 border-dashed rounded-xl" />
+                        <div className="space-y-4 p-4 border border-border bg-black rounded-2xl overflow-hidden">
+                            <div className="relative w-full rounded-xl overflow-hidden shadow-inner">
+                                <video ref={videoRef} autoPlay playsInline muted className="w-full h-64 object-cover" />
+                                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                    <div className="w-[80%] h-[70%] border-[3px] border-white/40 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] border-dashed rounded-xl" />
+                                </div>
                             </div>
-                            <div className="flex gap-3 relative z-10 p-2">
-                                <button onClick={stopCamera} className="flex-1 py-3 bg-white/20 text-white rounded-xl font-bold text-sm">Cancel</button>
-                                <button onClick={captureDocWithCamera} className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2"><Camera size={18} /> Capture</button>
+                            <div className="flex gap-3 relative z-10 pt-2">
+                                <button onClick={stopCamera} className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold text-sm transition-colors border border-white/10">Cancel</button>
+                                <button onClick={captureDocWithCamera} className="flex-1 py-3 bg-emerald-500 hover:bg-emerald-400 border border-emerald-500/50 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-500/20"><Camera size={18} /> Capture</button>
                             </div>
                         </div>
                     )}
