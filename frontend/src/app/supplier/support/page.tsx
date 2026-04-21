@@ -5,7 +5,7 @@ import { SupportChat } from '@/components/chat/SupportChat';
 import { useAuth } from '@/lib/auth';
 import { motion } from 'framer-motion';
 import { MessageCircle, ShieldCheck, Users, Search } from 'lucide-react';
-import axios from 'axios';
+import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 export default function SupportPage() {
