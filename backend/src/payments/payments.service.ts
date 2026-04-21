@@ -146,14 +146,12 @@ export class PaymentsService {
             try {
                 const intent = await this.stripe.stripe.paymentIntents.retrieve(existing.stripeIntentId);
                 
-                // Diagnostics to determine if intent is still valid (especially against the old automatic_payment_methods bug)
                 const isAmountCorrect = intent.amount === expectedAmount;
                 const isCurrencyCorrect = intent.currency.toLowerCase() === currency;
                 const isNotCanceled = intent.status !== 'canceled';
-                const hasCardMethod = Array.isArray(intent.payment_method_types) && intent.payment_method_types.includes('card');
-                const noAutomaticMethods = !intent.automatic_payment_methods?.enabled;
+                const hasAutomaticMethods = intent.automatic_payment_methods?.enabled === true;
 
-                if (isAmountCorrect && isCurrencyCorrect && isNotCanceled && hasCardMethod && noAutomaticMethods) {
+                if (isAmountCorrect && isCurrencyCorrect && isNotCanceled && hasAutomaticMethods) {
                     return {
                         clientSecret: intent.client_secret!,
                         order,
@@ -161,7 +159,7 @@ export class PaymentsService {
                 }
 
                 console.warn(`[Payment] Stale or invalid PaymentIntent detected for Order ${orderId}. Replacing with fresh intent.`);
-                console.warn(`[Payment] Diagnostics -> amount:${isAmountCorrect}, cur:${isCurrencyCorrect}, status:${intent.status}, card:${hasCardMethod}, noAuto:${noAutomaticMethods}`);
+                console.warn(`[Payment] Diagnostics -> amount:${isAmountCorrect}, cur:${isCurrencyCorrect}, status:${intent.status}, auto:${hasAutomaticMethods}`);
             } catch (err) {
                 console.error(`[Payment] Failed to retrieve or validate existing PaymentIntent for Order ${orderId}. Will create a new one.`);
             }
@@ -172,7 +170,7 @@ export class PaymentsService {
             amount: expectedAmount,
             currency,
             capture_method: 'manual',
-            payment_method_types: ['card'], // FORCE card method so Stripe doesn't render a blank element
+            automatic_payment_methods: { enabled: true },
             metadata: {
                 orderId: order.id,
                 customerId: customerId,
