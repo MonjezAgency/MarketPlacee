@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
+import { useChatStore } from '@/store/chatStore';
 
 interface Message {
     id: string;
@@ -35,7 +36,9 @@ const ISSUE_CATEGORIES = [
 
 export function SupportChat({ isSupport = false, targetUserId = null }: { isSupport?: boolean, targetUserId?: string | null }) {
     const { user } = useAuth();
-    const [messages, setMessages] = React.useState<Message[]>([]);
+    const chatId = isSupport ? (targetUserId || 'support_admin') : 'customer';
+    const { messages, setMessages, updateMessage, removeMessage } = useChatStore(chatId);
+    
     const [newMessage, setNewMessage] = React.useState('');
     const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
     const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
@@ -91,9 +94,9 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
 
         // Listen for new incoming messages
         socket.on('new_message', (msg: Message) => {
-            setMessages(prev => {
-                // Avoid duplicates
-                if (prev.some(m => m.id === msg.id)) return prev;
+            setMessages((prev: Message[]) => {
+                // Avoid duplicates by simply updating if it exists
+                if (prev.some((m: Message) => m.id === msg.id)) return prev;
                 return [...prev, msg];
             });
         });
@@ -101,8 +104,8 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
         // Support staff: listen for new user inquiries
         if (isSupport) {
             socket.on('new_inquiry', ({ message }: { userId: string; message: Message }) => {
-                setMessages(prev => {
-                    if (prev.some(m => m.id === message.id)) return prev;
+                setMessages((prev: Message[]) => {
+                    if (prev.some((m: Message) => m.id === message.id)) return prev;
                     return [...prev, message];
                 });
             });
@@ -135,11 +138,14 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
             createdAt: new Date().toISOString(),
             sender: { name: user?.name || 'You', role: user?.role || '' },
         };
-        setMessages(prev => [...prev, optimisticMsg]);
+        setMessages((prev: Message[]) => [...prev, optimisticMsg]);
 
         // Send via WebSocket for instant delivery
         if (socketRef.current?.connected) {
-            socketRef.current.emit('send_message', { content: greetingText, receiverId: null });
+            socketRef.current.emit('send_message', { content: greetingText, receiverId: null }, (res: any) => {
+                if (res?.id) updateMessage(optimisticMsg.id, res);
+                else if (res?.userMessage?.id) updateMessage(optimisticMsg.id, res.userMessage);
+            });
         } else {
             // Fallback to HTTP
             try {
@@ -152,7 +158,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                 fetchMessages();
             } catch (err: any) {
                 if (err.response?.status === 401) window.location.href = '/auth/login';
-                setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+                removeMessage(optimisticMsg.id);
             }
         }
     };
@@ -179,13 +185,20 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
             createdAt: new Date().toISOString(),
             sender: { name: user?.name || 'You', role: user?.role || '' },
         };
-        setMessages(prev => [...prev, optimisticMsg]);
+        setMessages((prev: Message[]) => [...prev, optimisticMsg]);
 
         if (socketRef.current?.connected) {
             socketRef.current.emit('send_message', {
                 content,
                 imageUrl: image,
                 receiverId,
+            }, (res: any) => {
+                // Reconcile ID from backend to fix state desync / duplicate IDs
+                if (res?.id) {
+                    updateMessage(optimisticMsg.id, res);
+                } else if (res?.userMessage?.id) {
+                    updateMessage(optimisticMsg.id, res.userMessage);
+                }
             });
         } else {
             // Fallback to HTTP
@@ -206,7 +219,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                     window.location.href = '/auth/login';
                 }
                 // Remove optimistic message on failure
-                setMessages(prev => prev.filter(m => m.id !== optimisticMsg.id));
+                removeMessage(optimisticMsg.id);
             }
         }
     };

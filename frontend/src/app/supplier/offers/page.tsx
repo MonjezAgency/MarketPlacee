@@ -275,18 +275,30 @@ export default function SupplierOffersPage() {
                                 </div>
                             </div>
 
-                            <div className="bg-muted/50 rounded-2xl p-5 grid grid-cols-3 gap-2 mb-8 relative z-10 border border-border/50">
-                                <div className="space-y-1.5 text-center px-2 border-e border-border/50">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Investment</p>
-                                    <p className="text-lg font-black text-foreground">${offer.price}</p>
+                            <div className="bg-muted/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 mb-8 relative z-10 border border-border/50 shadow-inner">
+                                <div className="flex flex-col gap-1 w-[calc(50%-0.5rem)] sm:w-auto">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                                        <CircleDollarSign size={12} className="text-emerald-500" />
+                                        Investment
+                                    </div>
+                                    <p className="text-xl font-black text-foreground tracking-tight">${offer.price}</p>
                                 </div>
-                                <div className="space-y-1.5 text-center px-2 border-e border-border/50">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Expires</p>
-                                    <p className="text-sm font-bold text-foreground/80 mt-1">{new Date(offer.expiry).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</p>
+                                <div className="flex flex-col gap-1 w-[calc(50%-0.5rem)] sm:w-auto sm:border-s border-border/50 sm:ps-6">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                                        <Calendar size={12} className="text-amber-500" />
+                                        Expires
+                                    </div>
+                                    <p className="text-sm font-bold text-foreground/80 mt-1">{new Date(offer.expiry).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
                                 </div>
-                                <div className="space-y-1.5 text-center px-2">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Views</p>
-                                    <p className="text-lg font-black text-emerald-500">{offer.impressions.toLocaleString()}</p>
+                                <div className="flex flex-col gap-1 w-full sm:w-auto sm:border-s border-border/50 sm:ps-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/50">
+                                    <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                                        <Eye size={12} className="text-blue-500" />
+                                        Platform Views
+                                    </div>
+                                    <div className="flex items-baseline gap-1">
+                                        <p className="text-xl font-black text-emerald-500">{offer.impressions.toLocaleString()}</p>
+                                        <span className="text-[10px] text-muted-foreground font-bold uppercase">Imp</span>
+                                    </div>
                                 </div>
                             </div>
 

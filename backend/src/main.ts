@@ -58,7 +58,11 @@ async function bootstrap() {
     // 3. THIRD: Cookie parser
     app.use(cookieParser());
 
-    // 4. FOURTH: Dynamic CORS matching
+    // 4. FOURTH: Increase payload size limit to support high-res KYC images (10MB+)
+    app.use(express.json({ limit: '50mb' }));
+    app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+    // 5. FIFTH: Dynamic CORS matching
     const frontendUrl = process.env.FRONTEND_URL;
     
     app.enableCors({

@@ -14,6 +14,15 @@ import { cn } from '@/lib/utils';
 
 type Step = 'status' | 'doc-type' | 'upload' | 'selfie' | 'review' | 'submitted';
 
+// Dynamic script loader for MediaPipe
+const loadScript = (src: string) => new Promise((resolve) => {
+    if (document.querySelector(`script[src="${src}"]`)) return resolve(true);
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    document.head.appendChild(script);
+});
+
 interface KycStatus {
     kycStatus: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
     document: {
@@ -89,35 +98,126 @@ export default function KycPage() {
     const [livenessStep, setLivenessStep] = React.useState(0);
     const [completedDirections, setCompletedDirections] = React.useState<Set<number>>(new Set());
 
+    // Camera & Mobile Handoff
     const videoRef = React.useRef<HTMLVideoElement>(null);
     const streamRef = React.useRef<MediaStream | null>(null);
+    const [useCameraForDocs, setUseCameraForDocs] = React.useState<'front' | 'back' | null>(null);
+    const [mobileHandoffUrl, setMobileHandoffUrl] = React.useState<string | null>(null);
+
+    // MediaPipe Face Mesh Refs
+    const faceMeshRef = React.useRef<any>(null);
+    const cameraRef = React.useRef<any>(null);
+    const smoothYawRef = React.useRef<number>(0);
+    const smoothPitchRef = React.useRef<number>(0);
 
     React.useEffect(() => { fetchStatus(); }, []);
 
     // Fix: attach stream AFTER the video element renders
     React.useEffect(() => {
-        if (cameraActive && streamRef.current && videoRef.current) {
+        if (cameraActive && streamRef.current && videoRef.current && !livenessPhase) {
             const video = videoRef.current;
             video.srcObject = streamRef.current;
             video.onloadedmetadata = () => { video.play().catch(() => {}); };
         }
-    }, [cameraActive]);
+    }, [cameraActive, livenessPhase]);
 
-    // Liveness checker: advance one step every 1.6s
+    // Handle Mobile Handoff
+    const startMobileHandoff = () => {
+        const sessionToken = Math.random().toString(36).substring(2, 15);
+        const url = `${window.location.origin}/dashboard/kyc/mobile?session=${sessionToken}`;
+        setMobileHandoffUrl(url);
+    };
+
+    // Liveness checker using MediaPipe Face Mesh
+    const initFaceMesh = async () => {
+        setLoading(true);
+        try {
+            await Promise.all([
+                loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js'),
+                loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/face_mesh.js')
+            ]);
+            
+            const { FaceMesh, Camera } = window as any;
+            if (!FaceMesh) throw new Error("Failed to load FaceMesh");
+
+            const faceMesh = new FaceMesh({
+                locateFile: (file: string) => `https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh/${file}`
+            });
+            faceMesh.setOptions({ maxNumFaces: 1, refineLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+            
+            faceMesh.onResults((results: any) => {
+                if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) return;
+                const landmarks = results.multiFaceLandmarks[0];
+                
+                // Head pose estimation using landmarks (Nose=1, LeftEar=234, RightEar=454, Top=10, Bottom=152)
+                const nose = landmarks[1];
+                const leftEar = landmarks[234];
+                const rightEar = landmarks[454];
+                const topNode = landmarks[10];
+                const bottomNode = landmarks[152];
+
+                // Yaw mapping
+                const distLeft = nose.x - leftEar.x;
+                const distRight = rightEar.x - nose.x;
+                const currentYaw = distLeft / (distRight || 0.0001);
+                smoothYawRef.current = smoothYawRef.current * 0.7 + currentYaw * 0.3; // Smoothing
+
+                // Pitch mapping
+                const distTop = nose.y - topNode.y;
+                const distBottom = bottomNode.y - nose.y;
+                const currentPitch = distTop / (distBottom || 0.0001);
+                smoothPitchRef.current = smoothPitchRef.current * 0.7 + currentPitch * 0.3;
+
+                // Thresholds for directions
+                setLivenessStep(currentStep => {
+                    if (currentStep >= LIVENESS_DIRECTIONS.length) return currentStep;
+                    const dir = LIVENESS_DIRECTIONS[currentStep].id;
+                    let pass = false;
+                    
+                    if (dir === 'up' && smoothPitchRef.current < 0.6) pass = true;
+                    if (dir === 'down' && smoothPitchRef.current > 1.4) pass = true;
+                    if (dir === 'left' && smoothYawRef.current > 1.5) pass = true;
+                    if (dir === 'right' && smoothYawRef.current < 0.6) pass = true;
+
+                    if (pass) {
+                        setCompletedDirections(prev => { const n = new Set(prev); n.add(currentStep); return n; });
+                        return currentStep + 1;
+                    }
+                    return currentStep;
+                });
+            });
+
+            faceMeshRef.current = faceMesh;
+            
+            if (videoRef.current) {
+                const camera = new Camera(videoRef.current, {
+                    onFrame: async () => { await faceMesh.send({ image: videoRef.current }); },
+                    width: 640, height: 480
+                });
+                camera.start();
+                cameraRef.current = camera;
+            }
+        } catch (e) {
+            setError('Failed to initialize Face Liveness models. Please try again.');
+        }
+        setLoading(false);
+    };
+
+    React.useEffect(() => {
+        if (livenessPhase === 'checking') initFaceMesh();
+        return () => {
+            if (cameraRef.current) { cameraRef.current.stop(); cameraRef.current = null; }
+            if (faceMeshRef.current) { faceMeshRef.current.close(); faceMeshRef.current = null; }
+        };
+    }, [livenessPhase]);
+
     React.useEffect(() => {
         if (livenessPhase !== 'checking') return;
         if (livenessStep >= LIVENESS_DIRECTIONS.length) {
             setLivenessPhase('done');
-            // Auto-capture after all steps
-            setTimeout(() => { captureAndStop(); }, 600);
-            return;
+            setTimeout(() => { captureAndStop(); }, 800);
         }
-        const t = setTimeout(() => {
-            setCompletedDirections(prev => { const next = new Set(Array.from(prev)); next.add(livenessStep); return next; });
-            setLivenessStep(prev => prev + 1);
-        }, 1600);
-        return () => clearTimeout(t);
-    }, [livenessPhase, livenessStep]);
+    }, [livenessStep, livenessPhase]);
 
     const fetchStatus = async () => {
         try {
@@ -135,11 +235,36 @@ export default function KycPage() {
         setLoading(false);
     };
 
-    const toBase64 = (file: File): Promise<string> =>
+    const compressImage = (file: File): Promise<string> =>
         new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
-            reader.onload = () => resolve(reader.result as string);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target?.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 1280;
+                    const MAX_HEIGHT = 1280;
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height && width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    } else if (height > MAX_HEIGHT) {
+                        width *= MAX_HEIGHT / height;
+                        height = MAX_HEIGHT;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.8)); // 80% quality
+                };
+                img.onerror = reject;
+            };
             reader.onerror = reject;
         });
 
@@ -147,7 +272,7 @@ export default function KycPage() {
         const file = e.target.files?.[0];
         if (!file) return;
         if (file.size > 10 * 1024 * 1024) { setError('File must be under 10MB'); return; }
-        setter(await toBase64(file));
+        setter(await compressImage(file));
         setError('');
     };
 
@@ -167,10 +292,25 @@ export default function KycPage() {
     const stopCamera = () => {
         streamRef.current?.getTracks().forEach(t => t.stop());
         streamRef.current = null;
+        if (cameraRef.current) { cameraRef.current.stop(); cameraRef.current = null; }
+        if (faceMeshRef.current) { faceMeshRef.current.close(); faceMeshRef.current = null; }
         setCameraActive(false);
+        setUseCameraForDocs(null);
         setLivenessPhase('idle');
         setLivenessStep(0);
         setCompletedDirections(new Set());
+    };
+
+    const captureDocWithCamera = () => {
+        if (!videoRef.current || !useCameraForDocs) return;
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth || 640;
+        canvas.height = videoRef.current.videoHeight || 480;
+        canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        if (useCameraForDocs === 'front') setFrontImage(dataUrl);
+        else setBackImage(dataUrl);
+        stopCamera();
     };
 
     const startLiveness = () => {
@@ -372,8 +512,29 @@ export default function KycPage() {
             {/* Step: Upload Documents */}
             {step === 'upload' && (
                 <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
-                    <h2 className="text-lg font-black">Upload {selectedDoc?.label}</h2>
-                    <p className="text-sm text-muted-foreground">Ensure documents are clear, unobscured, and all corners are visible.</p>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-lg font-black">Upload {selectedDoc?.label}</h2>
+                            <p className="text-sm text-muted-foreground">Ensure documents are clear, unobscured, and all corners are visible.</p>
+                        </div>
+                        <button onClick={startMobileHandoff} className="px-4 py-2 bg-primary/10 text-primary font-bold rounded-xl text-xs hover:bg-primary/20 transition-colors flex items-center justify-center gap-2 border border-primary/20">
+                            Continue on Mobile
+                        </button>
+                    </div>
+
+                    {mobileHandoffUrl && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-6 bg-card border border-border rounded-2xl flex flex-col items-center justify-center gap-4 shadow-xl">
+                            <h3 className="font-black">Scan to continue on your phone</h3>
+                            <div className="p-2 bg-white rounded-xl shadow-sm">
+                                <img src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(mobileHandoffUrl)}`} alt="QR Code" className="w-32 h-32" />
+                            </div>
+                            <p className="text-xs text-muted-foreground text-center max-w-xs">Scan this QR code with your mobile camera. Leave this tab open; it will automatically refresh once completed.</p>
+                            <button onClick={() => setMobileHandoffUrl(null)} className="text-xs font-bold text-muted-foreground hover:text-foreground">Cancel</button>
+                        </motion.div>
+                    )}
+
+                    {(!mobileHandoffUrl && !useCameraForDocs) && (
+                        <>
 
                     <div className="space-y-2">
                         <label className="text-sm font-bold">Front Side *</label>
@@ -401,7 +562,7 @@ export default function KycPage() {
                                     <button onClick={() => setBackImage(null)} className="absolute top-2 end-2 bg-red-500 text-white rounded-full p-1.5"><XCircle size={14} /></button>
                                 </div>
                             ) : (
-                                <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all">
+                                <label className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-border rounded-xl cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all relative overflow-hidden">
                                     <Upload className="w-8 h-8 text-muted-foreground mb-2" />
                                     <span className="text-sm font-bold text-muted-foreground">Click to upload back side</span>
                                     <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(e, setBackImage)} />
@@ -409,9 +570,29 @@ export default function KycPage() {
                             )}
                         </div>
                     )}
+                    </>
+                    )}
+
+                    {useCameraForDocs && (
+                        <div className="space-y-4 p-4 border border-border bg-black rounded-2xl overflow-hidden relative">
+                            <video ref={videoRef} autoPlay playsInline muted className="w-full h-64 object-cover" />
+                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                <div className="w-[80%] h-[60%] border-2 border-white/50 border-dashed rounded-xl" />
+                            </div>
+                            <div className="flex gap-3 relative z-10 p-2">
+                                <button onClick={stopCamera} className="flex-1 py-3 bg-white/20 text-white rounded-xl font-bold text-sm">Cancel</button>
+                                <button onClick={captureDocWithCamera} className="flex-1 py-3 bg-emerald-500 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2"><Camera size={18} /> Capture</button>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="flex gap-3">
                         <button onClick={() => setStep('doc-type')} className="flex-1 py-3 border border-border rounded-xl font-bold text-sm hover:bg-muted transition-colors">Back</button>
+                        {!useCameraForDocs && !mobileHandoffUrl && (
+                            <button onClick={() => { setUseCameraForDocs(!frontImage ? 'front' : 'back'); startCamera(); }} className="flex-1 py-3 bg-secondary/10 text-secondary border border-secondary/20 rounded-xl font-bold text-sm hover:bg-secondary/20 transition-colors flex items-center justify-center gap-2">
+                                <Camera size={18} /> Use Webcam instead
+                            </button>
+                        )}
                         <button
                             disabled={!frontImage || !!(selectedDoc?.requiresBack && !backImage)}
                             onClick={() => setStep('selfie')}
