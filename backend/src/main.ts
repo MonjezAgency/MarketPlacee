@@ -29,7 +29,7 @@ async function bootstrap() {
     }
 
     const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-        rawBody: true, // Required for Stripe webhook signature verification
+        bodyParser: false, // Disables default NestJS body parser (which forces 100kb limit)
     });
 
     // 1. FIRST: Trust proxy for Railway/SSL termination
