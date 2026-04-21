@@ -152,7 +152,7 @@ export default function AdminOverviewPage() {
             {/* Upper Grid - High-Impact Insights */}
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 {/* Total Sales Command Center */}
-                <div className="lg:col-span-3 glass-card-strong p-10 flex flex-col justify-between overflow-hidden relative group min-h-[500px]">
+                <div className="lg:col-span-3 glass-card-strong p-8 flex flex-col justify-between overflow-hidden relative group min-h-[420px]">
                     <div className="absolute top-0 end-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
                         <TrendingUp size={240} className="text-secondary rotate-12" />
                     </div>
@@ -165,7 +165,7 @@ export default function AdminOverviewPage() {
                                 </div>
                                 <p className={cn("text-[10px] font-black uppercase text-muted-foreground", !isAr && "tracking-[0.4em]")}>{t('admin', 'globalSettlementLedger')}</p>
                             </div>
-                            <h2 className="text-7xl font-black tracking-tighter font-heading mb-4 select-none">${stats.totalSales.toLocaleString()}</h2>
+                            <h2 className="text-5xl font-black tracking-tighter font-heading mb-4 select-none">${stats.totalSales.toLocaleString()}</h2>
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-500 px-4 py-1.5 rounded-full font-black text-xs">
                                     <ArrowUpRight size={16} />
@@ -200,7 +200,7 @@ export default function AdminOverviewPage() {
                         </div>
                     </div>
 
-                    <div className="h-64 mt-auto -mx-10 -mb-10 opacity-80 hover:opacity-100 transition-opacity">
+                    <div className="h-56 mt-auto -mx-8 -mb-8 opacity-80 hover:opacity-100 transition-opacity">
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart data={REVENUE_DATA}>
                                 <defs>
@@ -221,7 +221,7 @@ export default function AdminOverviewPage() {
 
                 {/* Platform Activity Mini-Dashboard */}
                 <div className="space-y-8 flex flex-col">
-                    <div className="glass-card p-10 flex-1 flex flex-col justify-between border-s-8 border-primary relative overflow-hidden">
+                    <div className="glass-card p-8 flex-1 flex flex-col justify-between border-s-4 border-primary relative overflow-hidden">
                          <div className="absolute top-4 end-4 text-primary/5">
                             <Activity size={80} />
                         </div>
@@ -249,11 +249,11 @@ export default function AdminOverviewPage() {
                         </div>
                         <p className={cn("text-[10px] font-black uppercase mb-4 text-muted-foreground", !isAr && "tracking-[0.2em]")}>{t('admin', 'quickActionTerminal')}</p>
                         <div className="space-y-3">
-                            <Link href="/admin/billing" className="w-full py-3 bg-primary text-primary-foreground font-black rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                            <Link href="/admin/billing" className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-primary/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                                 <Briefcase size={14} />
                                 {t('admin', 'auditFullLedger')}
                             </Link>
-                            <Link href="/admin/orders" className="w-full py-3 bg-accent text-accent-foreground font-black rounded-xl text-xs hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+                            <Link href="/admin/orders" className="w-full py-3 bg-accent text-accent-foreground font-bold rounded-xl text-xs hover:bg-accent/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
                                 <ShoppingCart size={14} />
                                 {t('admin', 'settlePendingInvoices')}
                             </Link>
@@ -265,7 +265,7 @@ export default function AdminOverviewPage() {
             {/* Leaderboards Tier - THE TOP 10s */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
                 {/* Top 10 Products */}
-                <div className="glass-card-strong p-10 border-t-8 border-accent">
+                <div className="glass-card-strong p-8 border-t-4 border-accent">
                     <div className="flex items-center justify-between mb-10">
                         <div>
                             <h3 className="text-2xl font-black font-heading tracking-tighter uppercase">{t('admin', 'topSellingProducts')}</h3>
@@ -304,7 +304,7 @@ export default function AdminOverviewPage() {
                 </div>
 
                 {/* Top 10 Suppliers */}
-                <div className="glass-card-strong p-10 border-t-8 border-secondary">
+                <div className="glass-card-strong p-8 border-t-4 border-secondary">
                     <div className="flex items-center justify-between mb-10">
                         <div>
                             <h3 className="text-2xl font-black font-heading tracking-tighter uppercase">{t('admin', 'elitePartners')}</h3>
@@ -346,7 +346,7 @@ export default function AdminOverviewPage() {
             {/* Visual Analytics Tier - Charts & Heatmaps */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                 {/* Category Saturation Pie */}
-                <div className="glass-card p-10">
+                <div className="glass-card p-8">
                     <div className="flex items-center justify-between mb-10">
                         <p className={cn("text-[10px] font-black uppercase text-muted-foreground", !isAr && "tracking-[0.3em]")}>{t('admin', 'marketSegmentation')}</p>
                         <BarChart3 size={16} className="text-muted-foreground" />
@@ -393,7 +393,7 @@ export default function AdminOverviewPage() {
                 </div>
 
                 {/* Operational Flow - WITH CLARIFIED LEGENDS */}
-                <div className="lg:col-span-2 glass-card-strong p-10">
+                <div className="lg:col-span-2 glass-card-strong p-8">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
                         <div>
                             <h3 className="text-2xl font-black font-heading tracking-tighter uppercase mb-1">{t('admin', 'operationalFlow')}</h3>

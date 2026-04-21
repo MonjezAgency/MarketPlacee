@@ -149,11 +149,11 @@
     }
 
     .glass-card {
-        @apply glass rounded-[2rem];
+        @apply glass rounded-2xl;
     }
 
     .glass-card-strong {
-        @apply glass rounded-[2rem] border-primary/20;
+        @apply glass rounded-2xl border-primary/20;
     }
 
     .btn-primary {
