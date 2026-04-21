@@ -513,7 +513,6 @@ export const ar = {
         companyLogo: "شعار الشركة",
         logoDesc: "سيكون هذا الشعار مرئياً لجميع المشترين في صفحات منتجاتك.",
         saveChanges: "حفظ التغييرات",
-        payouts: "المدفوعات",
         payoutMethod: "طريقة الاستلام",
         bankTransfer: "تحويل بنكي",
         stripe: "سترايب",

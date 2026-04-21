@@ -28,6 +28,7 @@ import { fetchMyProducts, apiFetch, apiUrl } from '@/lib/api';
 import { Product, ProductStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
+import ProductEditorModal from '@/app/dashboard/supplier/ProductEditorModal';
 
 export default function SupplierProductsPage() {
     const { t, locale } = useLanguage();
