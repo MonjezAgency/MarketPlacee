@@ -32,28 +32,47 @@ const CartContext = createContext<CartContextType>({
     total: 0,
 });
 
+// Cart key is scoped per user so switching accounts never leaks items
+function getCartKey(): string {
+    if (typeof window === 'undefined') return 'bev-cart-guest';
+    try {
+        // Read user id from /api/auth/me response cached in window, or fall back to guest
+        const stored = sessionStorage.getItem('bev-uid');
+        return stored ? `bev-cart-${stored}` : 'bev-cart-guest';
+    } catch {
+        return 'bev-cart-guest';
+    }
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
     const [items, setItems] = useState<CartItem[]>([]);
+    const [cartKey, setCartKey] = useState<string>('bev-cart-guest');
 
-    // Load from localStorage
+    // Detect user-id changes (login / logout) and reload the correct cart
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        if (typeof window === 'undefined') return;
+        const syncKey = () => {
+            const key = getCartKey();
+            setCartKey(key);
             try {
-                const saved = localStorage.getItem('bev-cart');
-                if (saved) setItems(JSON.parse(saved));
-            } catch (err) {
-                console.error("Failed to parse cart items:", err);
-                localStorage.removeItem('bev-cart');
+                const saved = localStorage.getItem(key);
+                setItems(saved ? JSON.parse(saved) : []);
+            } catch {
+                localStorage.removeItem(key);
+                setItems([]);
             }
-        }
+        };
+        syncKey();
+        window.addEventListener('bev-auth-changed', syncKey);
+        return () => window.removeEventListener('bev-auth-changed', syncKey);
     }, []);
 
-    // Save to localStorage
+    // Persist to the current user's cart key
     useEffect(() => {
         if (typeof window !== 'undefined') {
-            localStorage.setItem('bev-cart', JSON.stringify(items));
+            localStorage.setItem(cartKey, JSON.stringify(items));
         }
-    }, [items]);
+    }, [items, cartKey]);
 
     const addItem = (item: Omit<CartItem, 'quantity'>, qty = 1) => {
         setItems(prev => {
@@ -74,7 +93,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: qty } : i));
     };
 
-    const clearCart = () => setItems([]);
+    const clearCart = () => {
+        setItems([]);
+        if (typeof window !== 'undefined') localStorage.removeItem(cartKey);
+    };
 
     const total = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 

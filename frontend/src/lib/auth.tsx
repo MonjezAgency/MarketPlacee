@@ -72,6 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (res.ok) {
                     const userData = await res.json();
                     setUser(userData);
+                    if (typeof window !== 'undefined' && userData?.id) {
+                        sessionStorage.setItem('bev-uid', userData.id);
+                        window.dispatchEvent(new Event('bev-auth-changed'));
+                    }
                 } else {
                     setUser(null);
                 }
@@ -176,6 +180,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 return { success: false, message: 'Invalid response from server.' };
             }
             setUser(data.user);
+            if (typeof window !== 'undefined' && data.user?.id) {
+                sessionStorage.setItem('bev-uid', data.user.id);
+                window.dispatchEvent(new Event('bev-auth-changed'));
+            }
             return { success: true, user: data.user };
         } catch (err) {
             console.error("Login failed:", err);
@@ -198,6 +206,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const result = await res.json();
             const userData = result.user;
             setUser(userData);
+            if (typeof window !== 'undefined' && userData?.id) {
+                sessionStorage.setItem('bev-uid', userData.id);
+                window.dispatchEvent(new Event('bev-auth-changed'));
+            }
             return { success: true, user: userData };
         } catch (err) {
             return { success: false, message: 'Server connection failed.' };
@@ -229,6 +241,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await fetch('/api/auth/logout', { method: 'POST' });
         } catch (err) {
             console.error("Logout request failed:", err);
+        }
+        if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('bev-uid');
+            window.dispatchEvent(new Event('bev-auth-changed'));
         }
         setUser(null);
     };

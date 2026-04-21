@@ -47,7 +47,7 @@ export class OrdersController {
     }
 
     @Get('stats')
-    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT)
+    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT, Role.MODERATOR, Role.DEVELOPER, Role.LOGISTICS)
     async getOrderStats() {
         return this.ordersService.getOrderStats();
     }

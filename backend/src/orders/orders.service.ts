@@ -103,32 +103,41 @@ export class OrdersService {
 
         // Map to format suitable for Admin Dashboard
         return orders.map(order => {
-            const supplierNamesFromItems = order.items
-                .map(item => item.product?.supplier?.name)
-                .filter(Boolean);
-                
-            let supplierNames = 'System Vendor';
-            if (order.supplier?.name && order.supplier.name !== order.customer?.name) {
+            const customerId = order.customer?.id;
+            const customerName = order.customer?.name ?? 'Unknown Buyer';
+
+            // Collect unique supplier names from order items, excluding the buyer themselves
+            const supplierNamesFromItems: string[] = [];
+            const supplierIdsFromItems = new Set<string>();
+            for (const item of order.items) {
+                const sup = item.product?.supplier;
+                if (!sup) continue;
+                if (sup.id === customerId) continue; // buyer bought their own product (test data)
+                if (supplierIdsFromItems.has(sup.id)) continue;
+                supplierIdsFromItems.add(sup.id);
+                supplierNamesFromItems.push(sup.name);
+            }
+
+            // Prefer the order-level supplierId relation only if it differs from the buyer
+            let supplierNames: string;
+            if (order.supplier && order.supplier.id !== customerId) {
                 supplierNames = order.supplier.name;
             } else if (supplierNamesFromItems.length > 0) {
-                // Deduplicate and filter out the admin if they are not the only vendor
-                const uniqueSuppliers = [...new Set(supplierNamesFromItems)];
-                if (uniqueSuppliers.length > 1) {
-                    supplierNames = uniqueSuppliers.filter(name => name !== order.customer?.name).join(', ') || uniqueSuppliers.join(', ');
-                } else {
-                    supplierNames = uniqueSuppliers[0];
-                }
+                supplierNames = supplierNamesFromItems.join(', ');
+            } else {
+                supplierNames = 'Platform Inventory';
             }
+
             let supplierProfit = 0;
-            order.items.forEach(item => {
-                supplierProfit += (item.price * item.quantity);
-            });
-            // Assume 5% admin cut 
-            const adminProfit = order.totalAmount * 0.05;
+            for (const item of order.items) {
+                supplierProfit += item.price * item.quantity;
+            }
+            const feePercent = Number(process.env.PLATFORM_FEE_PERCENT) || 5;
+            const adminProfit = order.totalAmount * (feePercent / 100);
 
             return {
                 id: order.id,
-                customer: order.customer.name,
+                customer: customerName,
                 supplier: supplierNames,
                 total: order.totalAmount,
                 supplierProfit,
@@ -138,10 +147,10 @@ export class OrdersService {
                 shippingCompany: order.shippingCompany,
                 shippingCost: order.shippingCost,
                 items: order.items.map(i => ({
-                    product: i.product.name,
+                    product: i.product?.name ?? 'Unknown Product',
                     quantity: i.quantity,
-                    price: i.price
-                }))
+                    price: i.price,
+                })),
             };
         });
     }

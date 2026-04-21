@@ -112,12 +112,16 @@ export default function KycPage() {
 
     React.useEffect(() => { fetchStatus(); }, []);
 
-    // Fix: attach stream AFTER the video element renders
+    // Attach camera stream after the video element renders.
+    // Skip when livenessPhase === 'checking' because MediaPipe's Camera utility
+    // manages the stream directly in that phase.
     React.useEffect(() => {
-        if (cameraActive && streamRef.current && videoRef.current && !livenessPhase) {
+        if (cameraActive && streamRef.current && videoRef.current && livenessPhase !== 'checking') {
             const video = videoRef.current;
             video.srcObject = streamRef.current;
             video.onloadedmetadata = () => { video.play().catch(() => {}); };
+            // Fallback: if metadata already loaded, play immediately
+            if (video.readyState >= 2) { video.play().catch(() => {}); }
         }
     }, [cameraActive, livenessPhase]);
 

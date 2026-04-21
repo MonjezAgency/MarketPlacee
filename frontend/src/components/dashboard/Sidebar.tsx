@@ -192,7 +192,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                 )}
                 <Button
                     variant="ghost"
-                    onClick={() => { logout(); window.location.href = '/'; }}
+                    onClick={async () => { await logout(); window.location.href = '/auth/login'; }}
                     className="w-full justify-start gap-3 px-4 py-6 hover:bg-red-500/10 text-white/60 hover:text-red-400 rounded-xl"
                 >
                     <LogOut className="w-5 h-5" />

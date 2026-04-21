@@ -190,10 +190,10 @@ export function UserMenu({ role }: UserMenuProps) {
 
                         <div className="p-2 bg-[#F9F9F9] border-t border-[#EAEDED]">
                             <button
-                                onClick={() => {
+                                onClick={async () => {
                                     setIsOpen(false);
-                                    logout();
-                                    window.location.href = '/';
+                                    await logout();
+                                    window.location.href = '/auth/login';
                                 }}
                                 className="flex items-center gap-3 px-4 py-2.5 w-full rounded-lg text-[#C40000] hover:bg-red-50 transition-all group"
                             >

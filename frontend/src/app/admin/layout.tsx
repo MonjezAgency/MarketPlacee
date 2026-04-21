@@ -352,7 +352,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-black px-8 py-3 rounded-2xl text-sm transition-all">
                         رفع وثائق KYC
                     </a>
-                    <button onClick={() => { logout(); window.location.href = '/'; }}
+                    <button onClick={async () => { await logout(); window.location.href = '/auth/login'; }}
                         className="block w-full mt-3 text-xs text-gray-400 hover:text-red-500 font-bold">
                         تسجيل الخروج
                     </button>
@@ -414,9 +414,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {/* Sidebar Footer */}
                 <div className="p-6">
                     <button
-                        onClick={() => {
-                            logout();
-                            window.location.href = '/';
+                        onClick={async () => {
+                            await logout();
+                            window.location.href = '/auth/login';
                         }}
                         className="flex items-center gap-4 px-6 py-4 w-full bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white rounded-[1.5rem] transition-all group font-black uppercase text-xs tracking-widest"
                     >

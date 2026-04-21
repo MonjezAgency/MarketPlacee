@@ -45,9 +45,9 @@ export default function PendingApprovalPage() {
                         <ArrowLeft size={16} /> Back to Storefront
                     </Link>
                     <button
-                        onClick={() => {
-                            logout();
-                            window.location.href = '/';
+                        onClick={async () => {
+                            await logout();
+                            window.location.href = '/auth/login';
                         }}
                         className="w-full py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl transition-colors border border-white/10"
                     >

@@ -94,9 +94,9 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 {/* Footer */}
                 <div className="p-4 border-t border-border/50">
                     <button
-                        onClick={() => {
-                            logout();
-                            window.location.href = '/';
+                        onClick={async () => {
+                            await logout();
+                            window.location.href = '/auth/login';
                         }}
                         className="flex items-center gap-4 px-4 py-3 w-full text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-xl transition-all group"
                     >
@@ -208,7 +208,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                         </div>
 
                                         <button
-                                            onClick={() => logout()}
+                                            onClick={async () => { await logout(); window.location.href = '/auth/login'; }}
                                             className="w-full py-4 text-[11px] font-black text-muted-foreground hover:text-foreground uppercase tracking-[0.2em] transition-colors"
                                         >
                                             Sign Out

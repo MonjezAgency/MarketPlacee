@@ -19,6 +19,7 @@ export default function LoginPage() {
     const [step, setStep] = useState<1 | 2>(1);
     const [partialToken, setPartialToken] = useState('');
     const [twoFACode, setTwoFACode] = useState('');
+    const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
     const router = useRouter();
     const { login, verify2FALogin } = useAuth();
     const { t } = useLanguage();
@@ -46,6 +47,7 @@ export default function LoginPage() {
 
             if (result.requiresTwoFactor && result.partialToken) {
                 setPartialToken(result.partialToken);
+                if (result.qrCodeUrl) setQrCodeUrl(result.qrCodeUrl);
                 setStep(2);
                 setLoading(false);
                 return;
@@ -184,6 +186,14 @@ export default function LoginPage() {
                                 </div>
                             </div>
 
+                            {qrCodeUrl && (
+                                <div className="flex flex-col items-center gap-3 p-5 bg-slate-50 border border-slate-100 rounded-2xl mb-2">
+                                    <p className="text-xs font-black text-slate-500 uppercase tracking-widest">امسح رمز QR بتطبيق المصادقة</p>
+                                    <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40 rounded-xl border border-slate-200 bg-white p-2" />
+                                    <p className="text-[10px] text-slate-400 text-center">Google Authenticator · Authy · Microsoft Authenticator</p>
+                                </div>
+                            )}
+
                             <div className="space-y-2">
                                 <label className="block text-[10px] font-black text-slate-400 tracking-widest uppercase ms-1">رمز التحقق</label>
                                 <div className="relative">
@@ -220,7 +230,7 @@ export default function LoginPage() {
 
                             <button
                                 type="button"
-                                onClick={() => { setStep(1); setError(''); setTwoFACode(''); setPartialToken(''); }}
+                                onClick={() => { setStep(1); setError(''); setTwoFACode(''); setPartialToken(''); setQrCodeUrl(null); }}
                                 className="w-full text-center text-xs text-slate-400 hover:text-[#0A1A2F] font-bold tracking-widest uppercase transition-colors"
                             >
                                 ← رجوع
@@ -258,7 +268,7 @@ export default function LoginPage() {
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     placeholder="••••••••"
-                                    className="w-full bg-white sm:bg-slate-50 border-2 border-slate-100 rounded-xl sm:rounded-[24px] ps-14 pe-14 py-4 md:py-5 text-sm md:text-base text-[#0A1A2F] font-bold outline-none focus:border-[#FF8A00]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300 tracking-[0.2em] focus:tracking-normal"
+                                    className="w-full bg-white sm:bg-slate-50 border-2 border-slate-100 rounded-xl sm:rounded-[24px] ps-14 pe-14 py-4 md:py-5 text-sm md:text-base text-[#0A1A2F] font-bold outline-none focus:border-[#FF8A00]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300 overflow-hidden resize-none"
                                 />
                                 <button
                                     type="button"
