@@ -153,9 +153,9 @@ export class PaymentsService {
                 const isAmountCorrect = intent.amount === expectedAmount;
                 const isCurrencyCorrect = intent.currency.toLowerCase() === currency;
                 const isNotCanceled = intent.status !== 'canceled';
-                const hasAutomaticMethods = intent.automatic_payment_methods?.enabled === true;
+                const hasCardMethod = Array.isArray(intent.payment_method_types) && intent.payment_method_types.includes('card');
 
-                if (isAmountCorrect && isCurrencyCorrect && isNotCanceled && hasAutomaticMethods) {
+                if (isAmountCorrect && isCurrencyCorrect && isNotCanceled && hasCardMethod) {
                     return {
                         clientSecret: intent.client_secret!,
                         order,
@@ -163,7 +163,7 @@ export class PaymentsService {
                 }
 
                 console.warn(`[Payment] Stale or invalid PaymentIntent detected for Order ${orderId}. Replacing with fresh intent.`);
-                console.warn(`[Payment] Diagnostics -> amount:${isAmountCorrect}, cur:${isCurrencyCorrect}, status:${intent.status}, auto:${hasAutomaticMethods}`);
+                console.warn(`[Payment] Diagnostics -> amount:${isAmountCorrect}, cur:${isCurrencyCorrect}, status:${intent.status}, card:${hasCardMethod}`);
             } catch (err) {
                 console.error(`[Payment] Failed to retrieve or validate existing PaymentIntent for Order ${orderId}. Will create a new one.`);
             }
@@ -174,7 +174,7 @@ export class PaymentsService {
             amount: expectedAmount,
             currency,
             capture_method: 'manual',
-            automatic_payment_methods: { enabled: true },
+            payment_method_types: ['card'],
             metadata: {
                 orderId: order.id,
                 customerId: customerId,

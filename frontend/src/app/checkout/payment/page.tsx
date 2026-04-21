@@ -11,7 +11,9 @@ import OrderSummary from './OrderSummary';
 import { ShoppingBag, ShieldCheck, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 
-// Initialize inside component to secure SSR boundary
+// Initialize Stripe JS strictly outside the component to prevent React 18 Strict Mode double-mount crashes
+const stripePublishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+const stripePromise = stripePublishableKey ? loadStripe(stripePublishableKey) : null;
 
 function PaymentContent() {
     const searchParams = useSearchParams();
@@ -20,20 +22,15 @@ function PaymentContent() {
     const isDark = resolvedTheme === 'dark';
     const orderId = searchParams.get('orderId');
 
-    const [stripePromise, setStripePromise] = useState<any>(null);
-    const [stripeInitError, setStripeInitError] = useState(false);
+    const [stripeInitError, setStripeInitError] = useState(!stripePublishableKey);
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    // Initialize Stripe JS gracefully strictly in client environment
     useEffect(() => {
-        if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
-            setStripePromise(loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY));
-        } else if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+        if (!stripePublishableKey) {
             console.error('[Stripe Init Error] NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY is missing');
-            setStripeInitError(true);
         }
     }, []);
 
