@@ -139,7 +139,7 @@ function PaymentContent() {
     return (
         <div className="min-h-screen bg-background">
             {/* Sticky Header */}
-            <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+            <header className="sticky top-[80px] z-40 bg-background/80 backdrop-blur-md border-b border-border">
                 <div className="max-w-7xl mx-auto px-4 h-20 flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Link href="/cart" className="text-muted-foreground hover:text-foreground transition-colors">

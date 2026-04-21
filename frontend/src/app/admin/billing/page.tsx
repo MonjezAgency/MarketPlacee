@@ -1,6 +1,6 @@
 'use client';
-
 import * as React from 'react';
+import { apiFetch } from '@/lib/api';
 import {
     CreditCard,
     TrendingUp,
@@ -27,7 +27,22 @@ export default function AdminBillingPage() {
                     <p className="text-[#555] dark:text-[#999] font-medium text-sm">Monitor platform revenue, VIES profiles, and transaction analytics.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="h-11 px-6 bg-[#0A1A2F] text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:scale-[1.02] transition-all shadow-lg active:scale-[0.98]">
+                    <button 
+                        onClick={async () => {
+                            const res = await apiFetch('/orders/export/excel');
+                            if (res.ok) {
+                                const blob = await res.blob();
+                                const url = window.URL.createObjectURL(blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `financials-report-${new Date().toISOString().split('T')[0]}.xlsx`;
+                                document.body.appendChild(a);
+                                a.click();
+                                a.remove();
+                            }
+                        }}
+                        className="h-11 px-6 bg-[#0A1A2F] text-white rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:scale-[1.02] transition-all shadow-lg active:scale-[0.98]"
+                    >
                         <Download size={14} /> Export Report
                     </button>
                 </div>
@@ -191,7 +206,22 @@ export default function AdminBillingPage() {
                             ))}
                         </div>
 
-                        <button className="w-full h-14 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl flex items-center justify-center gap-3 transition-all relative z-10">
+                        <button 
+                            onClick={async () => {
+                                const res = await apiFetch('/orders/export/excel');
+                                if (res.ok) {
+                                    const blob = await res.blob();
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `bank-statement-${new Date().toISOString().split('T')[0]}.xlsx`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    a.remove();
+                                }
+                            }}
+                            className="w-full h-14 bg-white/10 hover:bg-white/20 border border-white/10 rounded-2xl flex items-center justify-center gap-3 transition-all relative z-10"
+                        >
                             <Download size={16} />
                             <span className="text-[10px] font-black uppercase tracking-widest">Download Statement</span>
                         </button>

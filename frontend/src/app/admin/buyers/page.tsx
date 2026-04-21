@@ -40,8 +40,9 @@ export default function AdminBuyersPage() {
             const res = await apiFetch('/users', {
             });
             if (res.ok) {
-                const data = await res.json();
-                setBuyers(data.filter((u: any) => u.role === 'CUSTOMER'));
+                const result = await res.json();
+                const usersData = Array.isArray(result) ? result : (result.users || []);
+                setBuyers(usersData.filter((u: any) => u.role === 'CUSTOMER'));
             }
         } catch (err) {
             console.error("Failed to load buyers:", err);

@@ -41,8 +41,9 @@ export default function AdminUsersPage() {
             const res = await apiFetch('/users', {
             });
             if (res.ok) {
-                const data = await res.json();
-                setUsers(data.filter((u: any) => u.role !== 'ADMIN'));
+                const result = await res.json();
+                const usersData = Array.isArray(result) ? result : (result.users || []);
+                setUsers(usersData.filter((u: any) => u.role !== 'ADMIN'));
             }
         } catch (err) {
             console.error("Failed to load users:", err);

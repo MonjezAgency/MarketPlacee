@@ -3,6 +3,7 @@ import {
     Get,
     Post,
     Put,
+    Patch,
     Body,
     Param,
     Query,
@@ -105,7 +106,7 @@ export class OrdersController {
         throw new ForbiddenException();
     }
 
-    @Put(':id/status')
+    @Patch(':id/status')
     @Roles(Role.SUPPLIER, Role.ADMIN)
     @UseGuards(PolicyGuard)
     @CheckOwnership('ORDER')

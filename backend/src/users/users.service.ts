@@ -47,8 +47,10 @@ export class UsersService {
         });
     }
 
-    async findAll(status?: any, page = 1, limit = 20, search?: string) {
-        const whereCondition: any = status ? { status } : {};
+    async findAll(status?: any, page = 1, limit = 20, search?: string, role?: string) {
+        const whereCondition: any = {};
+        if (status) whereCondition.status = status;
+        if (role) whereCondition.role = role;
         
         if (search) {
             whereCondition.OR = [

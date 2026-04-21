@@ -136,7 +136,7 @@ export default function Navbar() {
 
     return (
         <header className={cn(
-            "fixed top-0 start-0 end-0 z-[100] transition-all duration-300",
+            "fixed top-0 start-0 end-0 z-[999] transition-all duration-300",
             scrolled ? "glass py-2 text-foreground" : (isWhiteBackgroundPage ? "bg-card border-b border-border/50 py-4 text-foreground shadow-sm" : "bg-transparent py-4 text-white")
         )}>
             <div className="container mx-auto px-6 flex items-center justify-between gap-8">
@@ -170,7 +170,7 @@ export default function Navbar() {
                         </button>
 
                         {isCategoriesOpen && (
-                            <div className="absolute top-full -mt-1 pt-4 start-0 w-72 z-[110] animate-in fade-in slide-in-from-top-2 duration-200">
+                            <div className="absolute top-full -mt-1 pt-4 start-0 w-72 z-[1000] animate-in fade-in slide-in-from-top-2 duration-200">
                                 <div className="bg-card border border-border/50 rounded-xl shadow-2xl py-3 whitespace-nowrap overflow-hidden text-foreground">
                                 <div className="px-4 pb-2 mb-2 border-b border-border/50">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
@@ -226,7 +226,7 @@ export default function Navbar() {
 
                     {/* Autocomplete Dropdown */}
                     {showSuggestions && searchTerm.trim() && (
-                        <div className="absolute top-full mt-2 w-full bg-card border border-border/50 rounded-xl shadow-2xl overflow-hidden z-[110] animate-in fade-in slide-in-from-top-2 duration-200 text-foreground">
+                        <div className="absolute top-full mt-2 w-full bg-card border border-border/50 rounded-xl shadow-2xl overflow-hidden z-[1000] animate-in fade-in slide-in-from-top-2 duration-200 text-foreground">
                             {isSearching ? (
                                 <div className="flex items-center justify-center py-8 text-muted-foreground">
                                     <Loader2 className="w-5 h-5 animate-spin me-2" />
@@ -368,7 +368,7 @@ export default function Navbar() {
                             <span className="text-[10px] font-bold">{activeCurrency}</span>
                         </button>
                         {isCurrencyOpen && (
-                            <div className="absolute end-0 top-10 w-52 bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden z-50">
+                            <div className="absolute end-0 top-10 w-52 bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden z-[1000]">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-4 pt-3 pb-1">Select Currency</p>
                                 <div className="max-h-64 overflow-y-auto">
                                     {SUPPORTED_CURRENCIES.map(c => (

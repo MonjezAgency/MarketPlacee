@@ -63,47 +63,48 @@ export class EmailService {
 
     try {
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            console.error('[SMTP_ERROR] Missing EMAIL_USER or EMAIL_PASS in .env');
+            console.error('ERROR [EmailService]: Missing EMAIL_USER or EMAIL_PASS in .env');
             throw new Error('MISSING_SMTP_CONFIG');
         }
 
-        await this.transporter.sendMail({
+        const mailOptions = {
             from: this.getFrom(),
             to,
             subject,
             html,
-        });
-        console.log(`[SMTP_SUCCESS] Sent to ${to}`);
+        };
+
+        console.log(`DEBUG [EmailService]: Attempting to send email to ${to} via SMTP...`);
+        const info = await this.transporter.sendMail(mailOptions);
+        console.log(`DEBUG [EmailService]: SMTP SUCCESS - MessageId: ${info.messageId}`);
         return true;
     } catch (error: any) {
-        // Structured error logging for easier debugging
         const errorCode = error.code || 'UNKNOWN';
         const errorMsg = error.message || 'No message';
         
+        console.error(`ERROR [EmailService]: SMTP failed for ${to}. Code: ${errorCode}, Message: ${errorMsg}`);
         this.logSmtpError(errorCode, errorMsg, to, subject);
 
         const isRetryable = retryableErrors.includes(errorCode);
         
         if (isRetryable && retries > 0) {
-            console.warn(`[SMTP_RETRY] Attempting retry for ${to} due to ${errorCode}...`);
+            console.warn(`DEBUG [EmailService]: Retrying ${to} in 2 seconds...`);
             await new Promise(res => setTimeout(res, 2000));
             return this.sendMail(to, subject, html, retries - 1);
         }
 
         // Only fallback to Resend if it's a connection issue or SMTP-specific failure
-        // We don't fallback for invalid recipient errors (550, etc.)
         if (errorCode.startsWith('55') || errorCode === 'EENVELOPE') {
-            console.error(`[SMTP_FATAL] Invalid recipient or envelope error for ${to}. Skipping fallback.`);
+            console.error(`ERROR [EmailService]: Fatal envelope error for ${to}. Skipping fallback.`);
             return false;
         }
 
-        console.error(`[SMTP_FAIL] Falling back to Resend for ${to}`);
+        console.log(`DEBUG [EmailService]: Attempting Resend fallback for ${to}...`);
         const result = await this.sendViaResend({ to, subject, html });
         
         if (!result) {
-            // Log final failure after all transports failed
-            console.error(`[EMAIL_SYSTEM_FATAL] All delivery methods failed for ${to}`);
-            return false; // Return false instead of throwing to allow app to continue gracefully
+            console.error(`ERROR [EmailService]: All delivery methods failed for ${to}`);
+            return false;
         }
         
         return true;

@@ -138,8 +138,19 @@ export default function AdminReviewsPage() {
                                     transition={{ delay: i * 0.03 }}
                                     className="border-b border-border/30 hover:bg-muted/20 transition-colors">
                                     <td className="px-5 py-3">
-                                        <p className="font-bold text-sm">{review.user?.name || '—'}</p>
-                                        <p className="text-xs text-muted-foreground">{review.user?.companyName || ''}</p>
+                                        <div className="flex items-center gap-3">
+                                            {review.user?.avatar ? (
+                                                <img src={review.user.avatar} alt="" className="w-8 h-8 rounded-lg object-cover border border-border" />
+                                            ) : (
+                                                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center font-black text-primary text-[10px] uppercase">
+                                                    {(review.user?.name || '?')[0]}
+                                                </div>
+                                            )}
+                                            <div>
+                                                <p className="font-bold text-sm">{review.user?.name || '—'}</p>
+                                                <p className="text-xs text-muted-foreground">{review.user?.companyName || ''}</p>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td className="px-5 py-3">
                                         <p className="font-bold text-sm line-clamp-1 max-w-[160px]">{review.product?.name || '—'}</p>

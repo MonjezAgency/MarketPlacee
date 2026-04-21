@@ -40,8 +40,9 @@ export default function AdminSuppliersPage() {
             const res = await apiFetch('/users', {
             });
             if (res.ok) {
-                const data = await res.json();
-                setSuppliers(data.filter((u: any) => u.role === 'SUPPLIER'));
+                const result = await res.json();
+                const usersData = Array.isArray(result) ? result : (result.users || []);
+                setSuppliers(usersData.filter((u: any) => u.role === 'SUPPLIER'));
             }
         } catch (err) {
             console.error("Failed to load suppliers:", err);

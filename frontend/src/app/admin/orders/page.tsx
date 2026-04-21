@@ -9,7 +9,7 @@ import {
     Clock, CheckCircle2, XCircle, MoreVertical, 
     Truck, DollarSign, Briefcase, ChevronRight,
     ArrowRight, Globe, Zap, ShieldCheck, 
-    CreditCard, Receipt, Package, TrendingUp, User, X
+    CreditCard, Receipt, Package, TrendingUp, User, X, Loader2, Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/currency';
@@ -33,6 +33,7 @@ export default function AdminOrdersPage() {
     const [orders, setOrders] = React.useState<AdminOrder[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [selectedOrder, setSelectedOrder] = React.useState<AdminOrder | null>(null);
+    const [updatingStatus, setUpdatingStatus] = React.useState(false);
 
     React.useEffect(() => {
         const fetchOrders = async () => {
@@ -53,8 +54,8 @@ export default function AdminOrdersPage() {
     }, []);
 
     const handleUpdateStatus = async (id: string, status: string) => {
+        setUpdatingStatus(true);
         try {
-            
             const res = await apiFetch(`/orders/${id}/status`, {
                 method: 'PATCH',
                 body: JSON.stringify({ status })
@@ -65,6 +66,7 @@ export default function AdminOrdersPage() {
                 if (selectedOrder?.id === id) setSelectedOrder(prev => prev ? { ...prev, status: newStatus } : null);
             }
         } catch (err) { console.error(err); }
+        finally { setUpdatingStatus(false); }
     };
 
     const filteredOrders = orders.filter(o => 
@@ -330,17 +332,45 @@ export default function AdminOrdersPage() {
                                 <div className="pt-12 border-t border-border/20 grid grid-cols-2 gap-6">
                                     {selectedOrder.status === 'PENDING' ? (
                                         <>
-                                            <button onClick={() => handleUpdateStatus(selectedOrder.id, 'REJECTED')} className="h-20 flex items-center justify-center gap-3 rounded-[2rem] border-2 border-red-500/20 text-red-500 font-black uppercase text-xs tracking-widest hover:bg-red-500 hover:text-white transition-all group">
-                                                <XCircle size={24} className="group-hover:rotate-90 transition-transform" /> Void Transaction
+                                            <button 
+                                                onClick={() => handleUpdateStatus(selectedOrder.id, 'CANCELLED')} 
+                                                disabled={updatingStatus}
+                                                className="h-20 flex items-center justify-center gap-3 rounded-[2rem] border-2 border-red-500/20 text-red-500 font-black uppercase text-xs tracking-widest hover:bg-red-500 hover:text-white transition-all group disabled:opacity-50"
+                                            >
+                                                {updatingStatus ? <Loader2 className="animate-spin" /> : <XCircle size={24} className="group-hover:rotate-90 transition-transform" />}
+                                                Void Transaction
                                             </button>
-                                            <button onClick={() => handleUpdateStatus(selectedOrder.id, 'PAID')} className="h-20 flex items-center justify-center gap-3 rounded-[2rem] bg-emerald-500 text-white font-black uppercase text-xs tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-emerald-500/30">
-                                                <CheckCircle2 size={24} /> Authorize Settlement
+                                            <button 
+                                                onClick={() => handleUpdateStatus(selectedOrder.id, 'PAID')} 
+                                                disabled={updatingStatus}
+                                                className="h-20 flex items-center justify-center gap-3 rounded-[2rem] bg-emerald-500 text-white font-black uppercase text-xs tracking-widest hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-emerald-500/30 disabled:opacity-50"
+                                            >
+                                                {updatingStatus ? <Loader2 className="animate-spin" /> : <CheckCircle2 size={24} />}
+                                                Authorize Settlement
                                             </button>
                                         </>
                                     ) : (
-                                        <button onClick={() => setSelectedOrder(null)} className="h-20 col-span-2 flex items-center justify-center gap-3 rounded-[2rem] bg-primary text-white font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-2xl shadow-primary/30">
-                                            Protocol View Mode Active
-                                        </button>
+                                        <div className="col-span-2 flex flex-col gap-4">
+                                            <button 
+                                                onClick={async () => {
+                                                    const res = await apiFetch('/orders/export/excel');
+                                                    if (res.ok) {
+                                                        const blob = await res.blob();
+                                                        const url = window.URL.createObjectURL(blob);
+                                                        const a = document.createElement('a');
+                                                        a.href = url;
+                                                        a.download = `statement-${selectedOrder.id.substring(0,8)}.xlsx`;
+                                                        document.body.appendChild(a);
+                                                        a.click();
+                                                        a.remove();
+                                                    }
+                                                }}
+                                                className="h-20 flex items-center justify-center gap-3 rounded-[2rem] bg-primary text-white font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-2xl shadow-primary/30"
+                                            >
+                                                <Download size={24} /> Download Statement
+                                            </button>
+                                            <p className="text-center text-[10px] uppercase font-black text-muted-foreground tracking-widest opacity-60">Protocol View Mode Active</p>
+                                        </div>
                                     )}
                                 </div>
                             </div>

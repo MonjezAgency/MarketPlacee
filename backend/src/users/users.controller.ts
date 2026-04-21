@@ -18,11 +18,12 @@ export class UsersController {
     @Roles(Role.ADMIN)
     async findAll(
         @Query('status') status?: string,
+        @Query('role') role?: string,
         @Query('search') search?: string,
         @Query('page') page: string = '1',
         @Query('limit') limit: string = '20'
     ) {
-        const result = await this.usersService.findAll(status, parseInt(page), parseInt(limit), search);
+        const result = await this.usersService.findAll(status, parseInt(page), parseInt(limit), search, role);
         return {
             ...result,
             users: plainToInstance(UserDto, result.users)
