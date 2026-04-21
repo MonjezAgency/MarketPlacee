@@ -195,7 +195,7 @@ function ModalPortalContent({
                                             <div className="bg-background rounded-2xl border border-border shadow-sm group-hover:shadow-lg transition-all">
                                                 <div className="aspect-[4/3] bg-muted/10 flex items-center justify-center">
                                                     {(formData.images || [])[0] ? (
-                                                        <img src={formData.images[0]} alt="Preview" className="w-full h-full object-contain p-4" />
+                                                        <img src={formData.images?.[0]} alt="Preview" className="w-full h-full object-contain p-4" />
                                                     ) : (
                                                         <ImageIcon size={32} className="text-muted-foreground/20" />
                                                     )}
