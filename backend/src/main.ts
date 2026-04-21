@@ -115,8 +115,8 @@ async function bootstrap() {
                           frontendUrl, 
                           "https://api.stripe.com",
                           "https://checkout.stripe.com",
-                          "wss://marketplace-backend-production-dfc2.up.railway.app",
-                          "https://marketplace-backend-production-dfc2.up.railway.app"
+                          "wss://marketplace-backend-production-539c.up.railway.app",
+                          "https://marketplace-backend-production-539c.up.railway.app"
                       ].filter(Boolean) as string[],
                       frameSrc: ["'self'", "https://js.stripe.com", "https://checkout.stripe.com"],
                       fontSrc: ["'self'", "https://fonts.gstatic.com"],

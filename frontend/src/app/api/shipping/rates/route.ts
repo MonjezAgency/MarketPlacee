@@ -8,7 +8,7 @@ export async function GET(req: Request) {
         const destination = searchParams.get('destination') || 'Default';
         
         // Use BACKEND_URL (server-side variable) or NEXT_PUBLIC_API_URL (client-side fallback)
-        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-dfc2.up.railway.app';
+        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app';
         const apiUrl = rawApiUrl.replace(/\/$/, '');
         
         const backendUrl = `${apiUrl}/shipping/rates?cartTotal=${cartTotal}&destination=${destination}`;
