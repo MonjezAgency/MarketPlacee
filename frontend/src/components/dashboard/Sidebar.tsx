@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/lib/auth';
 import { apiFetch } from '@/lib/api';
 import { DollarSign } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface SidebarItem {
     name: string;
@@ -21,44 +22,50 @@ interface SidebarItem {
     badge?: string;
 }
 
-const SUPPLIER_ITEMS: SidebarItem[] = [
-    { name: 'Overview', icon: LayoutDashboard, href: '/supplier' },
-    { name: 'My Products', icon: Package, href: '/supplier/products' },
-    { name: 'Placements', icon: Star, href: '/supplier/placements', badge: 'New' },
-    { name: 'Orders', icon: ShoppingCart, href: '/supplier/orders' },
-    { name: 'Earnings', icon: DollarSign, href: '/supplier/earnings' },
-    { name: 'Analytics', icon: TrendingUp, href: '/supplier/analytics' },
-    { name: 'Support', icon: MessageCircle, href: '/supplier/support' },
-    { name: 'Settings', icon: Settings, href: '/supplier/settings' },
-];
-
-const BUYER_ITEMS: SidebarItem[] = [
-    { name: 'My Dashboard', icon: LayoutDashboard, href: '/dashboard/buyer' },
-    { name: 'Orders History', icon: History, href: '/dashboard/buyer/orders' },
-    { name: 'Notifications', icon: Bell, href: '/dashboard/buyer/notifications' },
-    { name: 'Support', icon: MessageCircle, href: '/dashboard/support' },
-    { name: 'Settings', icon: Settings, href: '/dashboard/buyer/settings' },
-];
-
-const ADMIN_ITEMS: SidebarItem[] = [
-    { name: 'Overview', icon: LayoutDashboard, href: '/admin' },
-    { name: 'Control Center', icon: ShieldCheck, href: '/admin/users' },
-    { name: 'Manage Placements', icon: Star, href: '/admin/placements' },
-    { name: 'Global Orders', icon: ShoppingCart, href: '/admin/orders' },
-    { name: 'Support Hub', icon: MessageCircle, href: '/dashboard/support' },
-    { name: 'Settings', icon: Settings, href: '/admin/settings' },
-];
-
 export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'buyer' | 'admin' }) {
     const pathname = usePathname();
     const { theme, setTheme } = useTheme();
     const { user, logout } = useAuth();
+    const { t } = useLanguage();
     const [mounted, setMounted] = useState(false);
+
+    const SUPPLIER_ITEMS: SidebarItem[] = [
+        { name: t('sidebar', 'overview'), icon: LayoutDashboard, href: '/supplier' },
+        { name: t('sidebar', 'myProducts'), icon: Package, href: '/supplier/products' },
+        { name: t('sidebar', 'placements'), icon: Star, href: '/supplier/placements', badge: 'New' },
+        { name: t('sidebar', 'orders'), icon: ShoppingCart, href: '/supplier/orders' },
+        { name: t('sidebar', 'earnings'), icon: DollarSign, href: '/supplier/earnings' },
+        { name: t('sidebar', 'analytics'), icon: TrendingUp, href: '/supplier/analytics' },
+        { name: t('sidebar', 'support'), icon: MessageCircle, href: '/supplier/support' },
+        { name: t('sidebar', 'settings'), icon: Settings, href: '/supplier/settings' },
+    ];
+
+    const BUYER_ITEMS: SidebarItem[] = [
+        { name: t('sidebar', 'myDashboard'), icon: LayoutDashboard, href: '/dashboard/buyer' },
+        { name: t('sidebar', 'ordersHistory'), icon: History, href: '/dashboard/buyer/orders' },
+        { name: t('sidebar', 'notifications'), icon: Bell, href: '/dashboard/buyer/notifications' },
+        { name: t('sidebar', 'support'), icon: MessageCircle, href: '/dashboard/support' },
+        { name: t('sidebar', 'settings'), icon: Settings, href: '/dashboard/buyer/settings' },
+    ];
+
+    const ADMIN_ITEMS: SidebarItem[] = [
+        { name: t('sidebar', 'overview'), icon: LayoutDashboard, href: '/admin' },
+        { name: t('sidebar', 'controlCenter'), icon: ShieldCheck, href: '/admin/users' },
+        { name: t('sidebar', 'managePlacements'), icon: Star, href: '/admin/placements' },
+        { name: t('sidebar', 'globalOrders'), icon: ShoppingCart, href: '/admin/orders' },
+        { name: t('sidebar', 'supportHub'), icon: MessageCircle, href: '/dashboard/support' },
+        { name: t('sidebar', 'settings'), icon: Settings, href: '/admin/settings' },
+    ];
 
     // Dynamic items state to hold badges
     const [supplierItems, setSupplierItems] = useState<SidebarItem[]>(SUPPLIER_ITEMS);
 
     useEffect(() => { setMounted(true); }, []);
+
+    // Update supplier items when language changes
+    useEffect(() => {
+        setSupplierItems(SUPPLIER_ITEMS);
+    }, [t]);
 
     useEffect(() => {
         if (role === 'supplier' && user?.id) {
@@ -73,7 +80,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                         if (unreadErrors.length > 0) {
                             // Update badge for My Products tab
                             setSupplierItems(prev => prev.map(item =>
-                                item.name === 'My Products'
+                                item.href === '/supplier/products'
                                     ? { ...item, badge: `${unreadErrors.length} Errors` }
                                     : item
                             ));
@@ -96,7 +103,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                         } else {
                             // Clear badge
                             setSupplierItems(prev => prev.map(item =>
-                                item.name === 'My Products' ? { ...item, badge: undefined } : item
+                                item.href === '/supplier/products' ? { ...item, badge: undefined } : item
                             ));
                         }
                     }
@@ -114,6 +121,12 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
 
     const items = role === 'admin' ? ADMIN_ITEMS : role === 'buyer' ? BUYER_ITEMS : supplierItems;
 
+    const portalLabel = role === 'admin' 
+        ? t('sidebar', 'adminPortal') 
+        : role === 'buyer' 
+            ? t('sidebar', 'buyerPortal') 
+            : t('sidebar', 'supplierPortal');
+
     return (
         <aside style={{ backgroundColor: '#0A1A2F', color: '#F5F7FA' }} className="w-72 border-e border-border min-h-screen hidden md:flex flex-col flex-shrink-0 sticky top-0 h-screen overflow-hidden group/sidebar transition-all duration-300">
             {/* Branding Header */}
@@ -126,7 +139,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                         Atlantis
                     </h2>
                     <span className="text-[10px] text-secondary font-black uppercase tracking-[0.2em] mt-1">
-                        {role} Portal
+                        {portalLabel}
                     </span>
                 </div>
             </div>
@@ -174,7 +187,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                         className="flex items-center gap-3 px-4 py-3 w-full text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all"
                     >
                         {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                        <span className="font-bold text-sm">{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+                        <span className="font-bold text-sm">{theme === 'dark' ? t('sidebar', 'lightMode') : t('sidebar', 'darkMode')}</span>
                     </button>
                 )}
                 <Button
@@ -183,7 +196,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                     className="w-full justify-start gap-3 px-4 py-6 hover:bg-red-500/10 text-white/60 hover:text-red-400 rounded-xl"
                 >
                     <LogOut className="w-5 h-5" />
-                    <span className="font-bold text-sm">Sign Out</span>
+                    <span className="font-bold text-sm">{t('sidebar', 'signOut')}</span>
                 </Button>
             </div>
         </aside>

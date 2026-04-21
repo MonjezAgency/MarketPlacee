@@ -17,6 +17,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface UserMenuProps {
     role?: string;
@@ -25,6 +26,7 @@ interface UserMenuProps {
 export function UserMenu({ role }: UserMenuProps) {
     const [isOpen, setIsOpen] = React.useState(false);
     const { user, logout } = useAuth();
+    const { t } = useLanguage();
     const menuRef = React.useRef<HTMLDivElement>(null);
 
     // Detect if we're on the admin layout (white background) vs homepage (dark navbar)
@@ -45,55 +47,54 @@ export function UserMenu({ role }: UserMenuProps) {
 
     const getRoleLabel = () => {
         switch (normalizedRole) {
-            case 'admin': return 'Super Admin';
-            case 'owner': return 'Platform Owner';
-            case 'developer': return 'Tech Team';
-            case 'moderator': return 'Moderator';
-            case 'support': return 'Support Agent';
-            case 'editor': return 'Content Editor';
-            case 'logistics': return 'Logistics';
-            case 'supplier': return 'Verified Supplier';
-            default: return 'Partner';
+            case 'admin': return t('userMenu', 'superAdmin');
+            case 'owner': return t('userMenu', 'platformOwner');
+            case 'developer': return t('userMenu', 'techTeam');
+            case 'moderator': return t('userMenu', 'moderator');
+            case 'support': return t('userMenu', 'supportAgent');
+            case 'editor': return t('userMenu', 'contentEditor');
+            case 'logistics': return t('userMenu', 'logistics');
+            case 'supplier': return t('userMenu', 'verifiedSupplier');
+            default: return t('userMenu', 'partner');
         }
     };
 
     const menuItems = [
         {
-            label: 'My Profile',
-            icon: User,
-            href: isTeamMember ? '/admin' : normalizedRole === 'supplier' ? '/supplier' : '/dashboard/customer'
-        },
-        {
-            label: 'Dashboard',
+            label: t('userMenu', 'dashboard'),
             icon: LayoutDashboard,
-            href: isTeamMember ? '/admin' : '/supplier',
-            hidden: !isTeamMember && normalizedRole !== 'supplier'
+            href: isTeamMember ? '/admin' : normalizedRole === 'supplier' ? '/supplier' : '/dashboard/customer',
         },
         {
-            label: 'Tech Dashboard',
+            label: t('userMenu', 'myProfile'),
+            icon: User,
+            href: isTeamMember ? '/admin/settings' : normalizedRole === 'supplier' ? '/supplier/settings' : '/dashboard/settings'
+        },
+        {
+            label: t('userMenu', 'techDashboard'),
             icon: Shield,
             href: '/admin/tech',
             hidden: normalizedRole !== 'developer'
         },
         {
-            label: 'Support Center',
+            label: t('userMenu', 'supportCenter'),
             icon: Shield,
             href: '/dashboard/support',
             hidden: normalizedRole !== 'support' && normalizedRole !== 'admin' && normalizedRole !== 'owner'
         },
         {
-            label: 'Settings',
+            label: t('userMenu', 'settings'),
             icon: Settings,
             href: isTeamMember ? '/admin/settings' : normalizedRole === 'supplier' ? '/supplier/settings' : '/dashboard/settings'
         },
         {
-            label: 'Track Order',
+            label: t('userMenu', 'trackOrder'),
             icon: Truck,
             href: '/dashboard/track',
             hidden: isTeamMember || normalizedRole === 'supplier'
         },
         {
-            label: 'Identity Verification (KYC)',
+            label: t('userMenu', 'identityVerification'),
             icon: ShieldCheck,
             href: '/dashboard/kyc',
             hidden: normalizedRole === 'admin' || normalizedRole === 'owner' || normalizedRole === 'support'
@@ -158,7 +159,7 @@ export function UserMenu({ role }: UserMenuProps) {
                         className="absolute end-0 mt-4 w-64 bg-white border border-[#DDD] rounded-xl shadow-xl z-[100] overflow-hidden"
                     >
                         <div className="p-4 border-b border-[#EAEDED]">
-                            <p className="text-[10px] font-black text-[#888] uppercase tracking-[0.2em] mb-3">Account</p>
+                            <p className="text-[10px] font-black text-[#888] uppercase tracking-[0.2em] mb-3">{t('userMenu', 'account')}</p>
                             <div className="flex items-center gap-3 px-2 py-1">
                                 <div className="w-10 h-10 rounded-full bg-[#F3F3F3] flex items-center justify-center border border-[#DDD]">
                                     <Shield size={20} className={normalizedRole === 'admin' ? "text-[#FF9900]" : "text-emerald-500"} />
@@ -197,7 +198,7 @@ export function UserMenu({ role }: UserMenuProps) {
                                 className="flex items-center gap-3 px-4 py-2.5 w-full rounded-lg text-[#C40000] hover:bg-red-50 transition-all group"
                             >
                                 <LogOut size={18} className="group-hover:translate-x-1 transition-transform" />
-                                <span className="text-sm font-bold">Sign Out</span>
+                                <span className="text-sm font-bold">{t('userMenu', 'signOut')}</span>
                             </button>
                         </div>
                     </motion.div>
