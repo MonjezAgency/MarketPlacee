@@ -2,14 +2,14 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-    "ANTHROPIC_AUTH_TOKEN": "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",
+    "ANTHROPIC_AUTH_TOKEN": "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",
     "ANTHROPIC_API_KEY": "",
-    "ANTHROPIC_MODEL": "qwen/qwen3-coder:free",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "qwen/qwen3-coder:free",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "qwen/qwen3-coder:free",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "qwen/qwen3-coder:free",
-    "ANTHROPIC_SMALL_FAST_MODEL": "qwen/qwen3-coder:free",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "qwen/qwen3-coder:free"
+    "ANTHROPIC_MODEL": "anthropic/claude-sonnet-4.6",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "anthropic/claude-sonnet-4.6",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "anthropic/claude-sonnet-4.6",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "anthropic/claude-sonnet-4.6",
+    "ANTHROPIC_SMALL_FAST_MODEL": "anthropic/claude-sonnet-4.6",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "anthropic/claude-sonnet-4.6"
   },
   "permissions": {
     "allow": [
