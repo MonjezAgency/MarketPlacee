@@ -46,6 +46,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
     const [isConnected, setIsConnected] = React.useState(false);
     const scrollRef = React.useRef<HTMLDivElement>(null);
     const socketRef = React.useRef<Socket | null>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     // Load initial messages via HTTP
     const fetchMessages = React.useCallback(async () => {
@@ -166,6 +167,17 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                 removeMessage(optimisticMsg.id);
             }
         }
+    };
+
+    const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            setSelectedImage(reader.result as string);
+        };
+        reader.readAsDataURL(file);
     };
 
     const handleSend = async () => {
@@ -360,7 +372,17 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                     </div>
                 )}
                 <div className="flex items-center gap-2">
-                    <button className="p-2 text-muted-foreground hover:text-primary transition-colors">
+                    <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleImageSelect}
+                    />
+                    <button 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="p-2 text-muted-foreground hover:text-primary transition-colors"
+                    >
                         <ImageIcon size={20} />
                     </button>
                     <input

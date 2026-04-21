@@ -26,31 +26,41 @@ export class PaymentsService {
         }
 
         let accountId = user.stripeAccountId;
-        if (!accountId) {
-            const account = await this.stripe.stripe.accounts.create({
-                type: 'express',
-                country: user.country || 'US',
-                email: user.email,
-                capabilities: {
-                    transfers: { requested: true },
-                },
-                metadata: { userId: user.id },
+        try {
+            if (!accountId) {
+                // Determine a supported country for Express accounts. If EG (Egypt) fallback to AE or US for testing.
+                let connectCountry = user.country?.toUpperCase() || 'US';
+                const unsupportedList = ['EG', 'SA', 'MA']; // Expand based on Stripe Connect support map
+                if (unsupportedList.includes(connectCountry)) connectCountry = 'AE';
+
+                const account = await this.stripe.stripe.accounts.create({
+                    type: 'express',
+                    country: connectCountry,
+                    email: user.email,
+                    capabilities: {
+                        transfers: { requested: true },
+                    },
+                    metadata: { userId: user.id },
+                });
+                accountId = account.id;
+                await this.prisma.user.update({
+                    where: { id: userId },
+                    data: { stripeAccountId: accountId },
+                });
+            }
+
+            const accountLink = await this.stripe.stripe.accountLinks.create({
+                account: accountId,
+                refresh_url: `${process.env.FRONTEND_URL}/supplier/payment-methods?refresh=true`,
+                return_url: `${process.env.FRONTEND_URL}/supplier/payment-methods?success=true`,
+                type: 'account_onboarding',
             });
-            accountId = account.id;
-            await this.prisma.user.update({
-                where: { id: userId },
-                data: { stripeAccountId: accountId },
-            });
+
+            return { url: accountLink.url };
+        } catch (err: any) {
+            this.logger.error(`[STRIPE ONBOARDING ERROR] ${err.message}`);
+            throw new BadRequestException('Failed to initialize Stripe Account: ' + err.message);
         }
-
-        const accountLink = await this.stripe.stripe.accountLinks.create({
-            account: accountId,
-            refresh_url: `${process.env.FRONTEND_URL}/supplier/settings/payout?refresh=true`,
-            return_url: `${process.env.FRONTEND_URL}/supplier/settings/payout?success=true`,
-            type: 'account_onboarding',
-        });
-
-        return { url: accountLink.url };
     }
 
     async getSupplierEarnings(supplierId: string) {
