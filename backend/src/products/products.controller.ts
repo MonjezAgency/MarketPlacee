@@ -161,7 +161,7 @@ export class ProductsController {
                             supplierId,
                         }, isAdmin);
                         createdProducts.push(product);
-                        result.message = 'Created successfully';
+                        (result as any).message = 'Created successfully';
                     } catch (e) {
                         result.success = false;
                         result.errors = result.errors || [];

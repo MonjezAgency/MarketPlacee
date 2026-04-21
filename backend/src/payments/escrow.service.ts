@@ -143,7 +143,7 @@ export class EscrowService {
 
         await this.prisma.escrowTransaction.update({
             where: { orderId },
-            data: { status: EscrowStatus.CANCELLED },
+            data: { status: EscrowStatus.REFUNDED },
         });
 
         this.logger.log(`[ESCROW VOIDED] Order: ${orderId} Reason: ${reason}`);

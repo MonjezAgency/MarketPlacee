@@ -225,7 +225,8 @@ export class OrdersService {
                 quantity: item.quantity,
                 price: item.price,
             })),
-        }));\n    }
+        }));
+    }
 
     // ─── Admin Stats ─────────────────────────────────────────────────
     async countPending(): Promise<number> {
@@ -307,14 +308,14 @@ export class OrdersService {
         // Send email notification to customer
         try {
             const statusLabel = STATUS_LABELS[status] || status;
-            await this.emailService.sendMail({
-                to: order.customer.email,
-                subject: `Order #${orderId.slice(-8).toUpperCase()} — ${statusLabel}`,
-                html: `<p>Hi ${order.customer.name},</p>
+            await this.emailService.sendMail(
+                order.customer.email,
+                `Order #${orderId.slice(-8).toUpperCase()} — ${statusLabel}`,
+                `<p>Hi ${order.customer.name},</p>
                        <p>Your order <strong>#${orderId.slice(-8).toUpperCase()}</strong> status has been updated to <strong>${statusLabel}</strong>.</p>
                        ${reason ? `<p>Note: ${reason}</p>` : ''}
-                       <p>— Atlantis FMCG</p>`,
-            });
+                       <p>— Atlantis FMCG</p>`
+            );
         } catch (e) {
             console.error(`[ORDER_EMAIL_FAIL] ${orderId}:`, e);
         }
@@ -336,7 +337,7 @@ export class OrdersService {
         // Handle invoice generation on delivery
         if (status === OrderStatus.DELIVERED) {
             try {
-                await this.invoiceService.generateForOrder(orderId);
+                await this.invoiceService.createInvoiceForOrder(orderId);
             } catch (e) {
                 console.error(`[ORDER_INVOICE_FAIL] ${orderId}:`, e);
             }
