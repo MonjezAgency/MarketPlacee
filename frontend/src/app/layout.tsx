@@ -6,6 +6,7 @@ import ClientLayout from "@/components/layout/ClientLayout";
 import { Toaster } from 'react-hot-toast';
 import { CookieConsent } from '@/components/CookieConsent';
 import { cn } from "@/lib/utils";
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const cairo = Cairo({
     subsets: ["arabic", "latin"],
@@ -64,6 +65,7 @@ export default function RootLayout({
                     </ClientLayout>
                     <CookieConsent />
                 </Providers>
+                <SpeedInsights />
             </body>
         </html>
     );
