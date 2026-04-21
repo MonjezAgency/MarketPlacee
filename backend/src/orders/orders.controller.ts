@@ -46,6 +46,12 @@ export class OrdersController {
         return plainToInstance(OrderDto, order);
     }
 
+    @Get('stats')
+    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT)
+    async getOrderStats() {
+        return this.ordersService.getOrderStats();
+    }
+
     @Get('supplier/analytics')
     @Roles(Role.SUPPLIER)
     async getSupplierAnalytics(@Request() req, @Query('days') days?: string) {

@@ -83,6 +83,9 @@ export class OrdersService {
                 customer: {
                     select: { id: true, name: true, email: true, phone: true }
                 },
+                supplier: {
+                    select: { id: true, name: true, email: true }
+                },
                 items: {
                     include: {
                         product: {
@@ -100,7 +103,22 @@ export class OrdersService {
 
         // Map to format suitable for Admin Dashboard
         return orders.map(order => {
-            const supplierNames = [...new Set(order.items.map(item => item.product.supplier.name))].join(', ');
+            const supplierNamesFromItems = order.items
+                .map(item => item.product?.supplier?.name)
+                .filter(Boolean);
+                
+            let supplierNames = 'System Vendor';
+            if (order.supplier?.name && order.supplier.name !== order.customer?.name) {
+                supplierNames = order.supplier.name;
+            } else if (supplierNamesFromItems.length > 0) {
+                // Deduplicate and filter out the admin if they are not the only vendor
+                const uniqueSuppliers = [...new Set(supplierNamesFromItems)];
+                if (uniqueSuppliers.length > 1) {
+                    supplierNames = uniqueSuppliers.filter(name => name !== order.customer?.name).join(', ') || uniqueSuppliers.join(', ');
+                } else {
+                    supplierNames = uniqueSuppliers[0];
+                }
+            }
             let supplierProfit = 0;
             order.items.forEach(item => {
                 supplierProfit += (item.price * item.quantity);
@@ -198,8 +216,122 @@ export class OrdersService {
                 quantity: item.quantity,
                 price: item.price,
             })),
-        }));
+        }));\n    }
+
+    // ─── Admin Stats ─────────────────────────────────────────────────
+    async countPending(): Promise<number> {
+        return this.prisma.order.count({
+            where: { status: OrderStatus.PENDING },
+        });
     }
+
+    async getOrderStats() {
+        const [pending, processing, shipped, delivered, cancelled, total] = await Promise.all([
+            this.prisma.order.count({ where: { status: OrderStatus.PENDING } }),
+            this.prisma.order.count({ where: { status: OrderStatus.PROCESSING } }),
+            this.prisma.order.count({ where: { status: OrderStatus.SHIPPED } }),
+            this.prisma.order.count({ where: { status: OrderStatus.DELIVERED } }),
+            this.prisma.order.count({ where: { status: OrderStatus.CANCELLED } }),
+            this.prisma.order.count(),
+        ]);
+
+        // Total revenue in EGP (all non-cancelled orders)
+        const revenueResult = await this.prisma.order.aggregate({
+            where: { status: { not: OrderStatus.CANCELLED } },
+            _sum: { totalAmount: true },
+        });
+
+        return {
+            pending,
+            processing,
+            shipped,
+            delivered,
+            cancelled,
+            total,
+            totalRevenue: revenueResult._sum.totalAmount || 0,
+        };
+    }
+
+    // ─── Update Status ───────────────────────────────────────────────
+    async updateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string) {
+        const order = await this.prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                customer: { select: { email: true, name: true } },
+                items: {
+                    include: {
+                        product: {
+                            include: {
+                                supplier: { select: { id: true, name: true, email: true } }
+                            }
+                        }
+                    }
+                },
+            },
+        });
+
+        if (!order) throw new NotFoundException(`Order ${orderId} not found`);
+
+        const previousStatus = order.status;
+
+        // Update order status + create history entry
+        const updated = await this.prisma.order.update({
+            where: { id: orderId },
+            data: {
+                status,
+                history: {
+                    create: {
+                        previousStatus,
+                        newStatus: status,
+                        changedById,
+                        reason: reason || `Status changed to ${STATUS_LABELS[status] || status}`,
+                    },
+                },
+            },
+            include: {
+                items: true,
+                history: true,
+                customer: { select: { email: true, name: true } },
+            },
+        });
+
+        // Send email notification to customer
+        try {
+            const statusLabel = STATUS_LABELS[status] || status;
+            await this.emailService.sendMail({
+                to: order.customer.email,
+                subject: `Order #${orderId.slice(-8).toUpperCase()} — ${statusLabel}`,
+                html: `<p>Hi ${order.customer.name},</p>
+                       <p>Your order <strong>#${orderId.slice(-8).toUpperCase()}</strong> status has been updated to <strong>${statusLabel}</strong>.</p>
+                       ${reason ? `<p>Note: ${reason}</p>` : ''}
+                       <p>— Atlantis FMCG</p>`,
+            });
+        } catch (e) {
+            console.error(`[ORDER_EMAIL_FAIL] ${orderId}:`, e);
+        }
+
+        // Notify each supplier involved
+        const supplierIds = [...new Set(
+            order.items.map((item: any) => item.product?.supplier?.id).filter(Boolean)
+        )];
+        for (const supplierId of supplierIds) {
+            this.notificationsService.create(
+                supplierId as string,
+                `Order ${STATUS_LABELS[status] || status}`,
+                `Order #${orderId.slice(-8).toUpperCase()} has been updated to ${STATUS_LABELS[status] || status}.`,
+                'INFO',
+                { orderId },
+            ).catch(() => {});
+        }
+
+        // Handle invoice generation on delivery
+        if (status === OrderStatus.DELIVERED) {
+            try {
+                await this.invoiceService.generateForOrder(orderId);
+            } catch (e) {
+                console.error(`[ORDER_INVOICE_FAIL] ${orderId}:`, e);
+            }
+        }
 
         // Handle Escrow Void/Refund on Cancellation
         if (status === OrderStatus.CANCELLED) {
@@ -209,20 +341,17 @@ export class OrdersService {
                     if (escrow.status === 'HOLDING') {
                         await this.escrowService.voidEscrow(orderId, reason || 'Order cancelled by admin/supplier');
                     } else if (escrow.status === 'RELEASED' || escrow.status === 'CAPTURED') {
-                        // If funds were already released (unlikely for cancellation but possible for returns)
-                        // we trigger a refund.
                         await this.escrowService.refundEscrow(orderId, reason || 'Order cancelled/refunded');
                     }
                 }
             } catch (err: any) {
                 console.error(`[ORDER_CANCEL_ESCROW_ERROR] Failed for ${orderId}:`, err.message);
-                // We log but don't block order status update if escrow fails, 
-                // though usually we want consistency.
             }
         }
 
         return updated;
     }
+
 
     // ─── Supplier Analytics ───────────────────────────────────────────
 
@@ -331,6 +460,7 @@ export class OrdersService {
                     select: {
                         id: true,
                         name: true,
+                        email: true,
                         stripeAccountId: true,
                         stripeOnboarded: true,
                     }

@@ -47,29 +47,29 @@ const TRAFFIC_DATA = [
 ];
 
 const TOP_PRODUCTS = [
-    { id: 1, name: 'Coca-Cola Classic 330ml', sales: '12,450', revenue: '$18,675', growth: '+12%', image: 'https://picsum.photos/seed/cola/100/100' },
-    { id: 2, name: 'Red Bull Energy 250ml', sales: '9,820', revenue: '$24,550', growth: '+18%', image: 'https://picsum.photos/seed/redbull/100/100' },
-    { id: 3, name: 'Lipton Ice Tea Lemon', sales: '8,140', revenue: '$10,175', growth: '+5%', image: 'https://picsum.photos/seed/lipton/100/100' },
-    { id: 4, name: 'Pepsi Zero Sugar', sales: '7,650', revenue: '$11,475', growth: '+22%', image: 'https://picsum.photos/seed/pepsi/100/100' },
-    { id: 5, name: 'Almarai Fresh Milk 1L', sales: '6,420', revenue: '$8,025', growth: '+8%', image: 'https://picsum.photos/seed/milk/100/100' },
-    { id: 6, name: 'Gatorade Blue Bolt', sales: '5,210', revenue: '$9,115', growth: '+15%', image: 'https://picsum.photos/seed/gator/100/100' },
-    { id: 7, name: 'Aquafina Water 500ml', sales: '4,840', revenue: '$2,420', growth: '+3%', image: 'https://picsum.photos/seed/water/100/100' },
-    { id: 8, name: 'Starbucks Frappuccino', sales: '4,120', revenue: '$16,480', growth: '+30%', image: 'https://picsum.photos/seed/coffee/100/100' },
-    { id: 9, name: 'Nescafe Gold 200g', sales: '3,850', revenue: '$28,875', growth: '+10%', image: 'https://picsum.photos/seed/nes/100/100' },
-    { id: 10, name: 'Oreo Biscuits Pack', sales: '3,420', revenue: '$5,130', growth: '+6%', image: 'https://picsum.photos/seed/oreo/100/100' },
+    { id: 1, name: 'Coca-Cola Classic 330ml', sales: '12,450', revenue: 'EGP 18,675', growth: '+12%', image: 'https://picsum.photos/seed/cola/100/100' },
+    { id: 2, name: 'Red Bull Energy 250ml', sales: '9,820', revenue: 'EGP 24,550', growth: '+18%', image: 'https://picsum.photos/seed/redbull/100/100' },
+    { id: 3, name: 'Lipton Ice Tea Lemon', sales: '8,140', revenue: 'EGP 10,175', growth: '+5%', image: 'https://picsum.photos/seed/lipton/100/100' },
+    { id: 4, name: 'Pepsi Zero Sugar', sales: '7,650', revenue: 'EGP 11,475', growth: '+22%', image: 'https://picsum.photos/seed/pepsi/100/100' },
+    { id: 5, name: 'Almarai Fresh Milk 1L', sales: '6,420', revenue: 'EGP 8,025', growth: '+8%', image: 'https://picsum.photos/seed/milk/100/100' },
+    { id: 6, name: 'Gatorade Blue Bolt', sales: '5,210', revenue: 'EGP 9,115', growth: '+15%', image: 'https://picsum.photos/seed/gator/100/100' },
+    { id: 7, name: 'Aquafina Water 500ml', sales: '4,840', revenue: 'EGP 2,420', growth: '+3%', image: 'https://picsum.photos/seed/water/100/100' },
+    { id: 8, name: 'Starbucks Frappuccino', sales: '4,120', revenue: 'EGP 16,480', growth: '+30%', image: 'https://picsum.photos/seed/coffee/100/100' },
+    { id: 9, name: 'Nescafe Gold 200g', sales: '3,850', revenue: 'EGP 28,875', growth: '+10%', image: 'https://picsum.photos/seed/nes/100/100' },
+    { id: 10, name: 'Oreo Biscuits Pack', sales: '3,420', revenue: 'EGP 5,130', growth: '+6%', image: 'https://picsum.photos/seed/oreo/100/100' },
 ];
 
 const TOP_SUPPLIERS = [
-    { id: 1, name: 'Global Bev Distribution', volume: '$428,500', orders: 1240, rating: 4.9 },
-    { id: 2, name: 'Emirates Refreshments', volume: '$312,400', orders: 980, rating: 4.8 },
-    { id: 3, name: 'United Foods Group', volume: '$284,000', orders: 850, rating: 4.7 },
-    { id: 4, name: 'Arabian Snacks Co', volume: '$215,600', orders: 720, rating: 4.6 },
-    { id: 5, name: 'Prime Logistics', volume: '$198,200', orders: 640, rating: 4.9 },
-    { id: 6, name: 'Desert Oasis Drinks', volume: '$165,400', orders: 580, rating: 4.5 },
-    { id: 7, name: 'Gulf Trading Elite', volume: '$142,800', orders: 490, rating: 4.7 },
-    { id: 8, name: 'Zand Food Services', volume: '$128,500', orders: 420, rating: 4.8 },
-    { id: 9, name: 'Al-Khair Distribution', volume: '$112,000', orders: 380, rating: 4.4 },
-    { id: 10, name: 'Horizon Wholesalers', volume: '$98,400', orders: 320, rating: 4.6 },
+    { id: 1, name: 'Global Bev Distribution', volume: 'EGP 428,500', orders: 1240, rating: 4.9 },
+    { id: 2, name: 'Emirates Refreshments', volume: 'EGP 312,400', orders: 980, rating: 4.8 },
+    { id: 3, name: 'United Foods Group', volume: 'EGP 284,000', orders: 850, rating: 4.7 },
+    { id: 4, name: 'Arabian Snacks Co', volume: 'EGP 215,600', orders: 720, rating: 4.6 },
+    { id: 5, name: 'Prime Logistics', volume: 'EGP 198,200', orders: 640, rating: 4.9 },
+    { id: 6, name: 'Desert Oasis Drinks', volume: 'EGP 165,400', orders: 580, rating: 4.5 },
+    { id: 7, name: 'Gulf Trading Elite', volume: 'EGP 142,800', orders: 490, rating: 4.7 },
+    { id: 8, name: 'Zand Food Services', volume: 'EGP 128,500', orders: 420, rating: 4.8 },
+    { id: 9, name: 'Al-Khair Distribution', volume: 'EGP 112,000', orders: 380, rating: 4.4 },
+    { id: 10, name: 'Horizon Wholesalers', volume: 'EGP 98,400', orders: 320, rating: 4.6 },
 ];
 
 export default function AdminOverviewPage() {
@@ -77,8 +77,9 @@ export default function AdminOverviewPage() {
     const isAr = locale === 'ar';
     const [stats, setStats] = React.useState({ 
         pendingUsers: 0, 
+        pendingOrdersCount: 0,
         activeProducts: 0, 
-        totalSales: 1284584,
+        totalSales: 0,
         loading: true 
     });
     const [showConfirm, setShowConfirm] = React.useState(false);
@@ -87,19 +88,22 @@ export default function AdminOverviewPage() {
     const fetchStats = React.useCallback(async () => {
         try {
             setStats(prev => ({ ...prev, loading: true }));
-            const [usersRes, productsRes] = await Promise.all([
+            const [usersRes, productsRes, ordersStatsRes] = await Promise.all([
                 apiFetch('/users?status=PENDING_APPROVAL&limit=1'),
-                apiFetch('/products?limit=1')
+                apiFetch('/products?limit=1'),
+                apiFetch('/orders/stats')
             ]);
 
             if (usersRes.ok && productsRes.ok) {
                 const usersData = await usersRes.json();
                 const productsData = await productsRes.json();
+                const ordersStats = ordersStatsRes.ok ? await ordersStatsRes.json() : null;
 
                 setStats({
                     pendingUsers: usersData.total || 0,
+                    pendingOrdersCount: ordersStats?.pending || 0,
                     activeProducts: productsData.total || 0,
-                    totalSales: 1284584,
+                    totalSales: ordersStats?.totalRevenue || 0,
                     loading: false
                 });
             }
@@ -165,7 +169,7 @@ export default function AdminOverviewPage() {
                                 </div>
                                 <p className={cn("text-[10px] font-black uppercase text-muted-foreground", !isAr && "tracking-[0.4em]")}>{t('admin', 'globalSettlementLedger')}</p>
                             </div>
-                            <h2 className="text-5xl font-black tracking-tighter font-heading mb-4 select-none">${stats.totalSales.toLocaleString()}</h2>
+                            <h2 className="text-5xl font-black tracking-tighter font-heading mb-4 select-none">EGP {stats.totalSales.toLocaleString('ar-EG')}</h2>
                             <div className="flex items-center gap-4">
                                 <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-500 px-4 py-1.5 rounded-full font-black text-xs">
                                     <ArrowUpRight size={16} />
@@ -182,19 +186,18 @@ export default function AdminOverviewPage() {
                                     {stats.loading ? '...' : (stats.activeProducts >= 1000 ? (stats.activeProducts/1000).toFixed(1) + 'k' : stats.activeProducts)}
                                 </p>
                             </div>
-                            <div className="glass p-6 rounded-3xl border-secondary/10 hover:border-secondary/30 transition-all group/stat relative overflow-hidden">
-                                {stats.pendingUsers > 0 && (
-                                    <button 
-                                        onClick={() => setShowConfirm(true)}
-                                        disabled={approving}
-                                        className="absolute top-0 end-0 px-3 py-1 bg-orange-500 hover:bg-orange-600 text-white text-[9px] font-black rounded-es-xl transition-colors active:scale-95 disabled:opacity-50"
+                            <div className="glass p-6 rounded-3xl border-secondary/10 hover:border-secondary/30 transition-all group/stat relative overflow-hidden flex flex-col justify-between">
+                                {stats.pendingOrdersCount > 0 && (
+                                    <Link 
+                                        href="/admin/orders"
+                                        className="absolute top-0 end-0 px-3 py-1 bg-secondary text-secondary-foreground text-[9px] font-black rounded-es-xl transition-colors hover:bg-secondary/90 active:scale-95"
                                     >
-                                        {approving ? '...' : (isAr ? 'تفعيل الكل' : 'APPROVE ALL')}
-                                    </button>
+                                        {isAr ? 'عرض' : 'VIEW'}
+                                    </Link>
                                 )}
                                 <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{t('admin', 'pendingApprovals')}</p>
                                 <p className="text-2xl font-black font-heading group-hover:text-secondary transition-colors">
-                                    {stats.loading ? '...' : stats.pendingUsers}
+                                    {stats.loading ? '...' : stats.pendingOrdersCount}
                                 </p>
                             </div>
                         </div>
