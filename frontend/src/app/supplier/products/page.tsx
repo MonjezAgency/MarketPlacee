@@ -30,7 +30,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function SupplierProductsPage() {
-    const { t } = useLanguage();
+    const { t, locale } = useLanguage();
     const { user } = useAuth();
     const [products, setProducts] = React.useState<Product[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
