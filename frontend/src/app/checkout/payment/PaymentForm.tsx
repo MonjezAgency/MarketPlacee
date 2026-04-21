@@ -26,14 +26,25 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
   const [stripeMountError, setStripeMountError] = useState<string | null>(null);
 
   React.useEffect(() => {
-    // Intercept console.error to catch Stripe IntegrationErrors which fail silently without triggering onChange
+    // Intercept console.error and console.warn to catch Stripe IntegrationErrors which fail silently
     const originalConsoleError = console.error;
-    console.error = (...args: any[]) => {
+    const originalConsoleWarn = console.warn;
+
+    const handleError = (...args: any[]) => {
       const errorMsg = args.map(arg => (typeof arg === 'string' ? arg : JSON.stringify(arg))).join(' ');
       if (errorMsg.includes('IntegrationError') || errorMsg.includes('Stripe')) {
-        setStripeMountError((prev) => prev ? prev + " | " + errorMsg : "Stripe Console Error: " + errorMsg);
+        setStripeMountError((prev) => prev ? prev + " | " + errorMsg : "Stripe Diagnostic: " + errorMsg);
       }
+    };
+
+    console.error = (...args: any[]) => {
+      handleError(...args);
       originalConsoleError.apply(console, args);
+    };
+
+    console.warn = (...args: any[]) => {
+      handleError(...args);
+      originalConsoleWarn.apply(console, args);
     };
 
     // If Stripe iframe doesn't mount within 5 seconds, surface warning
@@ -46,6 +57,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
     return () => {
       clearTimeout(timer);
       console.error = originalConsoleError;
+      console.warn = originalConsoleWarn;
     };
   }, [isElementReady]);
 

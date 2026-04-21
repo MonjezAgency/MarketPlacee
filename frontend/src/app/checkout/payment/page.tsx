@@ -53,6 +53,10 @@ function PaymentContent() {
 
                 if (!res.ok) {
                     const data = await res.json();
+                    if (data.message === 'PAYMENT_ALREADY_COMPLETED') {
+                        router.replace(`/checkout/confirmation?orderId=${orderId}`);
+                        return;
+                    }
                     throw new Error(data.message || 'Failed to initialize payment');
                 }
 

@@ -146,6 +146,10 @@ export class PaymentsService {
             try {
                 const intent = await this.stripe.stripe.paymentIntents.retrieve(existing.stripeIntentId);
                 
+                if (['succeeded', 'requires_capture', 'processing'].includes(intent.status)) {
+                    throw new BadRequestException('PAYMENT_ALREADY_COMPLETED');
+                }
+
                 const isAmountCorrect = intent.amount === expectedAmount;
                 const isCurrencyCorrect = intent.currency.toLowerCase() === currency;
                 const isNotCanceled = intent.status !== 'canceled';
