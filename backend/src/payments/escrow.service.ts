@@ -75,8 +75,15 @@ export class EscrowService {
         // We capture it now to move funds from Buyer to Platform.
         if (escrow.status === EscrowStatus.HOLDING) {
             try {
-                await this.stripe.stripe.paymentIntents.capture(escrow.stripeIntentId);
-                this.logger.log(`[STRIPE CAPTURE] Intent: ${escrow.stripeIntentId} for Order: ${orderId}`);
+                // If the intent was created without capture_method: 'manual', it might already be captured.
+                // Retrieve the intent first to check status, or just gracefully handle capture failure if already captured.
+                const intent = await this.stripe.stripe.paymentIntents.retrieve(escrow.stripeIntentId);
+                if (intent.status === 'requires_capture') {
+                    await this.stripe.stripe.paymentIntents.capture(escrow.stripeIntentId);
+                    this.logger.log(`[STRIPE CAPTURE] Intent: ${escrow.stripeIntentId} for Order: ${orderId}`);
+                } else if (intent.status === 'succeeded') {
+                    this.logger.log(`[STRIPE CAPTURE] Intent ${escrow.stripeIntentId} was already captured.`);
+                }
             } catch (err: any) {
                 this.logger.error(`[STRIPE CAPTURE FAILED] ${err.message}`);
                 throw new BadRequestException('Failed to capture funds from buyer: ' + err.message);

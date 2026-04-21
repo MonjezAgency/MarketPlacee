@@ -173,7 +173,7 @@ export class PaymentsService {
         const intent = await this.stripe.stripe.paymentIntents.create({
             amount: expectedAmount,
             currency,
-            capture_method: 'manual',
+            // Fallback to automatic capture to prevent Stripe Element blocks in unsupported regions
             payment_method_types: ['card'],
             metadata: {
                 orderId: order.id,
