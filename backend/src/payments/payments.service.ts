@@ -59,6 +59,15 @@ export class PaymentsService {
             return { url: accountLink.url };
         } catch (err: any) {
             this.logger.error(`[STRIPE ONBOARDING ERROR] ${err.message}`);
+            // If the account link fails (often due to a corrupted/unsupported account ID lingering in the DB), 
+            // clear it and try once more or fail gracefully.
+            if (accountId && err.message?.includes('account')) {
+                await this.prisma.user.update({
+                    where: { id: userId },
+                    data: { stripeAccountId: null },
+                });
+                throw new BadRequestException('Stripe Account was corrupted and has been reset. Please click Connect to Stripe again.');
+            }
             throw new BadRequestException('Failed to initialize Stripe Account: ' + err.message);
         }
     }

@@ -31,7 +31,7 @@ export class PaymentsController {
     }
 
     @Post('connect/onboard')
-    @Roles(Role.SUPPLIER)
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.DEVELOPER)
     @UseGuards(RolesGuard)
     async onboardConnect(@Request() req) {
         return this.paymentsService.createConnectOnboardingUrl(req.user.sub);
