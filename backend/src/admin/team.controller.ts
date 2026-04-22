@@ -46,7 +46,12 @@ export class TeamController {
                 inviteLink: body.inviteLink,
                 senderName,
             });
-            return { success: true, message: 'Invitation email sent!', ...result };
+            
+            if (result.success) {
+                return { success: true, message: 'Invitation email sent!', ...result };
+            } else {
+                return { success: false, message: 'Invite prepared but email delivery failed (SMTP Error)', ...result };
+            }
         } catch (error: any) {
             console.error('TEAM INVITE ERROR:', error);
             return { 

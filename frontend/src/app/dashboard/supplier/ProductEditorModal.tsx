@@ -488,55 +488,56 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         onClose();
     };
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
 
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const img = new globalThis.Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let { width, height } = img;
-                    const maxDim = 800;
+        const processFile = (file: File): Promise<string> => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    const img = new globalThis.Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let { width, height } = img;
+                        const maxDim = 1000; // Increased quality
 
-                    if (width > height && width > maxDim) {
-                        height = Math.round((height * maxDim) / width);
-                        width = maxDim;
-                    } else if (height > maxDim) {
-                        width = Math.round((width * maxDim) / height);
-                        height = maxDim;
-                    }
+                        if (width > height && width > maxDim) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else if (height > maxDim) {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
 
-                    canvas.width = width;
-                    canvas.height = height;
-                    const ctx = canvas.getContext('2d');
-                    if (ctx) {
-                        ctx.drawImage(img, 0, 0, width, height);
-                        const compressedDataUrl = canvas.toDataURL('image/webp', 0.8);
-                        setFormData((prev: Product) => {
-                            const newImages = [...(prev.images || [])];
-                            if (!newImages.includes(compressedDataUrl)) {
-                                newImages.push(compressedDataUrl);
-                            }
-                            return { ...prev, images: newImages, image: newImages[0] };
-                        });
-                    } else {
-                        setFormData((prev: Product) => {
-                            const newImages = [...(prev.images || [])];
-                            const result = reader.result as string;
-                            if (!newImages.includes(result)) {
-                                newImages.push(result);
-                            }
-                            return { ...prev, images: newImages, image: newImages[0] };
-                        });
-                    }
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                            ctx.drawImage(img, 0, 0, width, height);
+                            resolve(canvas.toDataURL('image/webp', 0.8));
+                        } else {
+                            resolve(reader.result as string);
+                        }
+                    };
+                    img.onerror = () => reject(new Error('Image load failed'));
+                    img.src = reader.result as string;
                 };
-                img.src = reader.result as string;
-            };
-            reader.readAsDataURL(file);
-        });
+                reader.readAsDataURL(file);
+            });
+        };
+
+        try {
+            const results = await Promise.all(files.map(processFile));
+            setFormData((prev: Product) => {
+                const existing = prev.images || [];
+                const newOnes = results.filter(r => !existing.includes(r));
+                const combined = [...existing, ...newOnes];
+                return { ...prev, images: combined, image: combined[0] };
+            });
+        } catch (err) {
+            console.error('Image upload failed:', err);
+        }
     };
 
     const [isFetchingEan, setIsFetchingEan] = useState(false);

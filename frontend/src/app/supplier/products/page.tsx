@@ -158,6 +158,17 @@ export default function SupplierProductsPage() {
         }
     };
 
+    const handleDeleteProduct = async (id: string, name: string) => {
+        if (!confirm(`Are you sure you want to delete "${name}"?`)) return;
+        try {
+            const res = await apiFetch(`/products/${id}`, { method: 'DELETE' });
+            if (!res.ok) throw new Error('Failed to delete product');
+            loadProducts();
+        } catch (err: any) {
+            alert(`Error: ${err.message}`);
+        }
+    };
+
     const handleSaveProduct = async (formData: any) => {
         try {
             const endpoint = editingProduct
@@ -434,6 +445,7 @@ export default function SupplierProductsPage() {
                                             <Edit2 size={14} /> Edit
                                         </button>
                                         <button
+                                            onClick={() => handleDeleteProduct(product.id, product.name)}
                                             className="w-10 h-10 bg-muted hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl flex items-center justify-center transition-all"
                                         >
                                             <Trash2 size={16} />

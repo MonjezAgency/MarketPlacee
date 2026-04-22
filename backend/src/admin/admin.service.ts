@@ -46,13 +46,16 @@ export class AdminService {
         });
 
         // Non-blocking email: don't let SMTP failures prevent user creation
-        this.emailService.sendTeamInvitation(user.email, user.name, user.role, tempPassword).catch((err) => {
+        // BUT await it for the returned message status if we want to be honest
+        const emailSent = await this.emailService.sendTeamInvitation(user.email, user.name, user.role, tempPassword).catch((err) => {
             console.error(`[TEAM] Failed to send invitation email to ${user.email}:`, err.message);
+            return false;
         });
 
         return {
-            message: 'Invitation sent successfully',
-            userId: user.id
+            message: emailSent ? 'Invitation sent successfully' : 'Account created but invitation email failed',
+            userId: user.id,
+            emailSent
         };
     }
 

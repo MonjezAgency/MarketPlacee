@@ -264,6 +264,23 @@ export class OrdersService {
 
     // ─── Update Status ───────────────────────────────────────────────
     async updateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string) {
+        return this.internalUpdateStatus(orderId, status, changedById, reason);
+    }
+
+    async bulkUpdateStatus(orderIds: string[], status: OrderStatus, changedById: string) {
+        const results = [];
+        for (const orderId of orderIds) {
+            try {
+                const updated = await this.internalUpdateStatus(orderId, status, changedById, `Bulk update to ${status}`);
+                results.push({ orderId, success: true });
+            } catch (err: any) {
+                results.push({ orderId, success: false, error: err.message });
+            }
+        }
+        return results;
+    }
+
+    private async internalUpdateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string) {
         const order = await this.prisma.order.findUnique({
             where: { id: orderId },
             include: {
@@ -314,7 +331,7 @@ export class OrdersService {
                 `<p>Hi ${order.customer.name},</p>
                        <p>Your order <strong>#${orderId.slice(-8).toUpperCase()}</strong> status has been updated to <strong>${statusLabel}</strong>.</p>
                        ${reason ? `<p>Note: ${reason}</p>` : ''}
-                       <p>— Atlantis FMCG</p>`
+                       <p>— Atlantis Marketplace</p>`
             );
         } catch (e) {
             console.error(`[ORDER_EMAIL_FAIL] ${orderId}:`, e);

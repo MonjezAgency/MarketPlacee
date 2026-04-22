@@ -131,6 +131,21 @@ export class OrdersController {
         return plainToInstance(OrderDto, order);
     }
 
+    @Patch('bulk-status')
+    @Roles(Role.ADMIN)
+    async bulkUpdateStatus(
+        @Body('ids') ids: string[],
+        @Body('status') status: OrderStatus,
+        @Request() req,
+    ) {
+        const results = await this.ordersService.bulkUpdateStatus(
+            ids,
+            status,
+            req.user.sub,
+        );
+        return results;
+    }
+
     @Post(':id/confirm-delivery')
     @Roles(Role.CUSTOMER)
     async confirmDelivery(@Param('id') id: string, @Request() req) {

@@ -72,6 +72,47 @@ export default function AdminUsersPage() {
         }
     };
 
+    const [selectedUsers, setSelectedUsers] = React.useState<Set<string>>(new Set());
+    const [isBulkUpdating, setIsBulkUpdating] = React.useState(false);
+
+    const toggleUserSelection = (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const next = new Set(selectedUsers);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setSelectedUsers(next);
+    };
+
+    const handleSelectAll = () => {
+        if (selectedUsers.size === filteredUsers.length) {
+            setSelectedUsers(new Set());
+        } else {
+            setSelectedUsers(new Set(filteredUsers.map(u => u.id)));
+        }
+    };
+
+    const handleBulkStatusUpdate = async (status: UserStatus) => {
+        if (selectedUsers.size === 0) return;
+        if (!confirm(`Are you sure you want to set ${selectedUsers.size} users to ${status}?`)) return;
+
+        setIsBulkUpdating(true);
+        try {
+            await Promise.all(
+                Array.from(selectedUsers).map(id => apiFetch(`/users/${id}/status`, {
+                    method: 'POST',
+                    body: JSON.stringify({ status })
+                }))
+            );
+            setSelectedUsers(new Set());
+            loadUsers();
+        } catch (err) {
+            console.error("Bulk update failed:", err);
+            alert("Some updates failed. Please try again.");
+        } finally {
+            setIsBulkUpdating(false);
+        }
+    };
+
     const filteredUsers = users.filter(u =>
         u.status === activeTab &&
         (u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -95,6 +136,27 @@ export default function AdminUsersPage() {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-4">
+                    {selectedUsers.size > 0 && (
+                        <div className="flex items-center gap-2 animate-in slide-in-from-right-4">
+                            {activeTab === 'PENDING_APPROVAL' ? (
+                                <button
+                                    onClick={() => handleBulkStatusUpdate('ACTIVE')}
+                                    disabled={isBulkUpdating}
+                                    className="h-16 px-8 bg-emerald-500 text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all flex items-center gap-2"
+                                >
+                                    <CheckCircle size={18} /> Approve ({selectedUsers.size})
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => handleBulkStatusUpdate('BLOCKED')}
+                                    disabled={isBulkUpdating}
+                                    className="h-16 px-8 bg-destructive text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-destructive/20 hover:scale-105 transition-all flex items-center gap-2"
+                                >
+                                    <Ban size={18} /> Block ({selectedUsers.size})
+                                </button>
+                            )}
+                        </div>
+                    )}
                     <div className="relative group">
                         <Search className="absolute start-6 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={20} />
                         <input
@@ -119,7 +181,7 @@ export default function AdminUsersPage() {
                     return (
                         <button
                             key={tab.id}
-                            onClick={() => setActiveTab(tab.id as UserStatus)}
+                            onClick={() => { setActiveTab(tab.id as UserStatus); setSelectedUsers(new Set()); }}
                             className={cn(
                                 "flex items-center gap-3 px-8 py-4 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.1em] transition-all",
                                 activeTab === tab.id
@@ -147,7 +209,22 @@ export default function AdminUsersPage() {
                 <table className="w-full text-start border-collapse">
                     <thead>
                         <tr className="border-b border-border/50">
-                            <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">Identity Hub</th>
+                            <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={handleSelectAll}
+                                        className={cn(
+                                            "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
+                                            selectedUsers.size === filteredUsers.length && filteredUsers.length > 0
+                                                ? "bg-primary border-primary text-primary-foreground"
+                                                : "border-muted-foreground/30 hover:border-primary/50"
+                                        )}
+                                    >
+                                        {selectedUsers.size === filteredUsers.length && filteredUsers.length > 0 && <CheckCircle size={14} />}
+                                    </button>
+                                    Identity Hub
+                                </div>
+                            </th>
                             <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">Business Unit</th>
                             <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">Compliance Check</th>
                             <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em] text-end">Actions</th>
@@ -161,11 +238,25 @@ export default function AdminUsersPage() {
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, x: -20 }}
-                                    className="group hover:bg-primary/5 transition-all cursor-pointer"
+                                    className={cn(
+                                        "group hover:bg-primary/5 transition-all cursor-pointer",
+                                        selectedUsers.has(user.id) && "bg-primary/10 hover:bg-primary/15"
+                                    )}
                                     onClick={() => setSelectedUser(user)}
                                 >
                                     <td className="px-10 py-8">
                                         <div className="flex items-center gap-5">
+                                            <button
+                                                onClick={(e) => toggleUserSelection(user.id, e)}
+                                                className={cn(
+                                                    "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0",
+                                                    selectedUsers.has(user.id)
+                                                        ? "bg-primary border-primary text-primary-foreground"
+                                                        : "border-muted-foreground/30 hover:border-primary/50"
+                                                )}
+                                            >
+                                                {selectedUsers.has(user.id) && <CheckCircle size={14} />}
+                                            </button>
                                             <div className="relative">
                                                 {user.avatar ? (
                                                     <img src={user.avatar} className="w-14 h-14 rounded-2xl object-cover border-2 border-border group-hover:border-primary transition-colors" />

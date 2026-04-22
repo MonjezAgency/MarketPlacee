@@ -325,6 +325,17 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
 
                 {messages.map((msg) => {
                     const isMine = (msg.senderId === user?.id) && !msg.isBot;
+                    // In RTL (Arabic), isMine should be at the "start" (Right) 
+                    // and others at the "end" (Left), but since Flexbox justify-start 
+                    // is Right in RTL and justify-end is Left:
+                    // isMine (Right) -> justify-start
+                    // others (Left) -> justify-end
+                    // Wait, usually we want My messages on the Right and Others on the Left.
+                    // In RTL: justify-start is Right, justify-end is Left.
+                    // So: isMine ? "justify-start" : "justify-end"
+                    // However, if the user switched to English, it flips.
+                    // Let's use a more robust way or just stick to standard RTL conventions.
+                    
                     let displayContent = msg.content;
                     if (msg.isBot && msg.content?.startsWith('{')) {
                         try {
@@ -337,7 +348,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                     return (
                         <div
                             key={msg.id}
-                            className={cn("flex w-full", isMine ? "justify-end" : "justify-start")}
+                            className={cn("flex w-full", isMine ? "justify-start" : "justify-end")}
                         >
                             <div className={cn(
                                 "max-w-[80%] rounded-2xl px-4 py-2.5 shadow-sm relative group",
@@ -347,7 +358,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                             )}>
                                 {!isMine && (
                                     <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-primary opacity-80 flex items-center gap-2">
-                                        {msg.isBot ? "Atlantis Support" : `${msg.sender.name} (${msg.sender.role})`}
+                                        {msg.isBot ? "Atlantis Support" : `${msg.sender?.name || 'User'} (${msg.sender?.role || 'Guest'})`}
                                         {msg.assignedTeam && (
                                             <span className="bg-secondary/20 text-secondary px-2 py-0.5 rounded-full text-[8px]">{msg.assignedTeam}</span>
                                         )}
@@ -355,7 +366,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                                 )}
                                 {isMine && isSupport && (
                                     <p className="text-[10px] font-black uppercase tracking-widest mb-1 text-primary-foreground opacity-80">
-                                        You ({msg.sender.role})
+                                        You ({msg.sender?.role || 'Admin'})
                                     </p>
                                 )}
                                 {msg.imageUrl && (

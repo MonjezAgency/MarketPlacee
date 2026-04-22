@@ -29,10 +29,10 @@ import { UserMenu } from '@/components/dashboard/UserMenu';
 
 const SUPPLIER_LINKS = [
     { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
-    { label: 'Inventory Manager', href: '/supplier/products', icon: Box },
+    { label: 'Inventory Manager', href: '/supplier/products', icon: Box, key: 'products' },
     { label: 'Placements', href: '/supplier/placements', icon: Star },
     { label: 'Offers & Ads', href: '/supplier/offers', icon: ListPlus },
-    { label: 'My Sales', href: '/supplier/orders', icon: ShoppingCart },
+    { label: 'My Sales', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
     { label: 'Analytics', href: '/supplier/analytics', icon: TrendingUp },
     { label: 'Payment Methods', href: '/supplier/payment-methods', icon: CreditCard },
     { label: 'Support', href: '/supplier/support', icon: MessageSquare },
@@ -46,6 +46,42 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     const pathname = usePathname();
     const { user, logout } = useAuth();
     const { theme, setTheme } = useTheme();
+    const [pendingCounts, setPendingCounts] = React.useState<Record<string, number>>({
+        orders: 0,
+        products: 0
+    });
+
+    React.useEffect(() => {
+        const fetchCounts = async () => {
+            try {
+                // Fetch orders and products to count pending status
+                const [ordersRes, prodsRes] = await Promise.all([
+                    apiFetch('/orders'),
+                    apiFetch('/products/my-products')
+                ]);
+                
+                let oCount = 0;
+                let pCount = 0;
+
+                if (ordersRes.ok) {
+                    const data = await ordersRes.json();
+                    oCount = data.filter((o: any) => o.status === 'PENDING').length;
+                }
+                if (prodsRes.ok) {
+                    const data = await prodsRes.json();
+                    pCount = data.filter((p: any) => p.status === 'PENDING').length;
+                }
+
+                setPendingCounts({ orders: oCount, products: pCount });
+            } catch (err) {
+                console.error('Failed to fetch sidebar counts:', err);
+            }
+        };
+
+        fetchCounts();
+        const interval = setInterval(fetchCounts, 60000); // 1 min poll
+        return () => clearInterval(interval);
+    }, []);
 
     return (
         <div className="flex h-screen bg-background overflow-hidden transition-colors duration-500">
@@ -85,7 +121,12 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                 )}
                             >
                                 <Icon size={20} className={cn("transition-transform group-hover:scale-110", isActive ? "stroke-[2.5]" : "")} />
-                                {isOpen && <span className="text-sm">{link.label}</span>}
+                                {isOpen && <span className="text-sm flex-1">{link.label}</span>}
+                                {isOpen && (link as any).key && pendingCounts[(link as any).key] > 0 && (
+                                    <span className="flex items-center justify-center min-w-[18px] h-[18px] rounded-full bg-destructive text-[10px] font-black text-white px-1">
+                                        {pendingCounts[(link as any).key]}
+                                    </span>
+                                )}
                             </Link>
                         );
                     })}
