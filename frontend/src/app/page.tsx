@@ -82,48 +82,48 @@ export default function Home() {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                                 <AmazonCardTile
-                                    title={t('home', 'makeup')}
+                                    title="Makeup for Everyone"
                                     items={[
-                                        { label: t('home', 'womensBeauty'), image: "https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=200&h=200&fit=crop", link: "/categories?category=Makeup" },
-                                        { label: t('home', 'mensGrooming'), image: "https://images.unsplash.com/photo-1590156221122-c748c789d36a?w=200&h=200&fit=crop", link: "/categories?category=Makeup" },
-                                        { label: t('home', 'skincare'), image: "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=200&h=200&fit=crop", link: "/categories?category=Personal Care" },
-                                        { label: t('home', 'bestsellers'), image: "https://images.unsplash.com/photo-1512496015851-a90fb38ba796?w=200&h=200&fit=crop", link: "/categories?category=Makeup" }
+                                        { label: "Dove Beauty", image: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f6/Dove_logo.svg/1200px-Dove_logo.svg.png", link: "/categories?category=Makeup" },
+                                        { label: "Lux Care", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQO_O_m4GvYm1v5A6sB9z7V9m9I1C0V0_8wZg&s", link: "/categories?category=Makeup" },
+                                        { label: "Pond's Glow", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Pond%27s_Logo.svg/2560px-Pond%27s_Logo.svg.png", link: "/categories?category=Personal Care" },
+                                        { label: "Vaseline", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Vaseline_logo.svg/2560px-Vaseline_logo.svg.png", link: "/categories?category=Makeup" }
                                     ]}
                                     footerLink="/categories?category=Makeup"
                                     footerText={t('home', 'shopAllBeauty')}
                                 />
                                 <AmazonCardTile
-                                    title={t('home', 'fragrances')}
+                                    title="Premium Fragrances"
                                     items={[
-                                        { label: t('home', 'forMen'), image: "https://images.unsplash.com/photo-1541643600914-78b084683601?w=200&h=200&fit=crop", link: "/categories?category=Perfume" },
-                                        { label: t('home', 'forWomen'), image: "https://images.unsplash.com/photo-1592945403244-b3fbafd7f539?w=200&h=200&fit=crop", link: "/categories?category=Perfume" },
-                                        { label: t('home', 'giftSets'), image: "https://images.unsplash.com/photo-1523293182086-7651a899d37f?w=200&h=200&fit=crop", link: "/categories?category=Perfume" },
-                                        { label: t('home', 'newArrivals'), image: "https://images.unsplash.com/photo-1583467875263-d50dec37a88c?w=200&h=200&fit=crop", link: "/categories?category=Perfume" }
+                                        { label: "Davidoff", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Davidoff_logo.svg/2560px-Davidoff_logo.svg.png", link: "/categories?category=Perfume" },
+                                        { label: "Chanel Paris", image: "https://upload.wikimedia.org/wikipedia/en/thumb/9/92/Chanel_logo_interlocking_cs.svg/1200px-Chanel_logo_interlocking_cs.svg.png", link: "/categories?category=Perfume" },
+                                        { label: "Dior Luxury", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Dior_Logo.svg/2560px-Dior_Logo.svg.png", link: "/categories?category=Perfume" },
+                                        { label: "Giorgio Armani", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Giorgio_Armani_logo.svg/2560px-Giorgio_Armani_logo.svg.png", link: "/categories?category=Perfume" }
                                     ]}
                                     footerLink="/categories?category=Perfume"
-                                    footerText={t('home', 'seeAllPerfumes')}
+                                    footerText="See All Fragrances"
                                 />
                                 <AmazonCardTile
-                                    title={t('home', 'personalCare')}
+                                    title="Personal Care"
                                     items={[
-                                        { label: t('home', 'bodyCare'), image: "https://images.unsplash.com/photo-1612817288484-6f916006741a?w=200&h=200&fit=crop", link: "/categories?category=Personal Care" },
-                                        { label: t('home', 'hairCare'), image: "https://images.unsplash.com/photo-1535585209827-a15fcdbc4c2d?w=200&h=200&fit=crop", link: "/categories?category=Personal Care" },
-                                        { label: t('home', 'oralCare'), image: "https://images.unsplash.com/photo-1559613122-02ec9d898a00?w=200&h=200&fit=crop", link: "/categories?category=Personal Care" },
-                                        { label: t('home', 'shaving'), image: "https://images.unsplash.com/photo-1626285492eda-fa605a9a4734?w=200&h=200&fit=crop", link: "/categories?category=Personal Care" }
+                                        { label: "Axe Styling", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/AXE_Logo.svg/2560px-AXE_Logo.svg.png", link: "/categories?category=Personal Care" },
+                                        { label: "Rexona Active", image: "https://upload.wikimedia.org/wikipedia/en/thumb/4/4b/Rexona_logo.svg/1200px-Rexona_logo.svg.png", link: "/categories?category=Personal Care" },
+                                        { label: "Signal Care", image: "https://upload.wikimedia.org/wikipedia/en/thumb/d/dc/Signal_toothpaste_logo.svg/1200px-Signal_toothpaste_logo.svg.png", link: "/categories?category=Personal Care" },
+                                        { label: "Close-up", image: "https://upload.wikimedia.org/wikipedia/en/thumb/e/e0/Closeup_toothpaste_logo.svg/1200px-Closeup_toothpaste_logo.svg.png", link: "/categories?category=Personal Care" }
                                     ]}
                                     footerLink="/categories?category=Personal Care"
-                                    footerText={t('home', 'essentials')}
+                                    footerText="Shop Essentials"
                                 />
                                 <AmazonCardTile
-                                    title={t('home', 'homeCleaning')}
+                                    title="Home Cleaning"
                                     items={[
-                                        { label: t('home', 'laundry'), image: "https://images.unsplash.com/photo-1583947581924-860bda6a26df?w=200&h=200&fit=crop", link: "/categories?category=Home Care" },
-                                        { label: t('home', 'dishwashing'), image: "https://images.unsplash.com/photo-1584622650111-993a426fbf0a?w=200&h=200&fit=crop", link: "/categories?category=Home Care" },
-                                        { label: t('home', 'surfaceCare'), image: "https://images.unsplash.com/photo-1584622781564-1d987f7333c1?w=200&h=200&fit=crop", link: "/categories?category=Home Care" },
-                                        { label: t('home', 'paperPlastic'), image: "https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=200&h=200&fit=crop", link: "/categories?category=Home Care" }
+                                        { label: "Persil Tech", image: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f1/Persil_logo.svg/1200px-Persil_logo.svg.png", link: "/categories?category=Home Care" },
+                                        { label: "Cif Professional", image: "https://upload.wikimedia.org/wikipedia/en/thumb/6/6d/Cif_logo.svg/1200px-Cif_logo.svg.png", link: "/categories?category=Home Care" },
+                                        { label: "Domestos", image: "https://upload.wikimedia.org/wikipedia/en/thumb/4/4c/Domestos_logo.svg/1200px-Domestos_logo.svg.png", link: "/categories?category=Home Care" },
+                                        { label: "Comfort Soft", image: "https://upload.wikimedia.org/wikipedia/en/thumb/8/87/Comfort_logo.svg/1200px-Comfort_logo.svg.png", link: "/categories?category=Home Care" }
                                     ]}
                                     footerLink="/categories?category=Home Care"
-                                    footerText={t('home', 'shopHousehold')}
+                                    footerText="Clean Home Store"
                                 />
                             </div>
                         )}
