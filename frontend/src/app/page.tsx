@@ -82,46 +82,26 @@ export default function Home() {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                                 <AmazonCardTile
-                                    title="Makeup for Everyone"
-                                    items={[
-                                        { label: "Dove Beauty", image: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f6/Dove_logo.svg/1200px-Dove_logo.svg.png", link: "/categories?category=Makeup" },
-                                        { label: "Lux Care", image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQO_O_m4GvYm1v5A6sB9z7V9m9I1C0V0_8wZg&s", link: "/categories?category=Makeup" },
-                                        { label: "Pond's Glow", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c7/Pond%27s_Logo.svg/2560px-Pond%27s_Logo.svg.png", link: "/categories?category=Personal Care" },
-                                        { label: "Vaseline", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Vaseline_logo.svg/2560px-Vaseline_logo.svg.png", link: "/categories?category=Makeup" }
-                                    ]}
+                                    title="Makeup & Beauty"
+                                    singleItem={{ image: "/Logos/brand2.jpg", link: "/categories?category=Makeup" }}
                                     footerLink="/categories?category=Makeup"
                                     footerText={t('home', 'shopAllBeauty')}
                                 />
                                 <AmazonCardTile
                                     title="Premium Fragrances"
-                                    items={[
-                                        { label: "Davidoff", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/30/Davidoff_logo.svg/2560px-Davidoff_logo.svg.png", link: "/categories?category=Perfume" },
-                                        { label: "Chanel Paris", image: "https://upload.wikimedia.org/wikipedia/en/thumb/9/92/Chanel_logo_interlocking_cs.svg/1200px-Chanel_logo_interlocking_cs.svg.png", link: "/categories?category=Perfume" },
-                                        { label: "Dior Luxury", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3f/Dior_Logo.svg/2560px-Dior_Logo.svg.png", link: "/categories?category=Perfume" },
-                                        { label: "Giorgio Armani", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Giorgio_Armani_logo.svg/2560px-Giorgio_Armani_logo.svg.png", link: "/categories?category=Perfume" }
-                                    ]}
+                                    singleItem={{ image: "/Logos/brand2.jpg", link: "/categories?category=Perfume" }}
                                     footerLink="/categories?category=Perfume"
                                     footerText="See All Fragrances"
                                 />
                                 <AmazonCardTile
                                     title="Personal Care"
-                                    items={[
-                                        { label: "Axe Styling", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/AXE_Logo.svg/2560px-AXE_Logo.svg.png", link: "/categories?category=Personal Care" },
-                                        { label: "Rexona Active", image: "https://upload.wikimedia.org/wikipedia/en/thumb/4/4b/Rexona_logo.svg/1200px-Rexona_logo.svg.png", link: "/categories?category=Personal Care" },
-                                        { label: "Signal Care", image: "https://upload.wikimedia.org/wikipedia/en/thumb/d/dc/Signal_toothpaste_logo.svg/1200px-Signal_toothpaste_logo.svg.png", link: "/categories?category=Personal Care" },
-                                        { label: "Close-up", image: "https://upload.wikimedia.org/wikipedia/en/thumb/e/e0/Closeup_toothpaste_logo.svg/1200px-Closeup_toothpaste_logo.svg.png", link: "/categories?category=Personal Care" }
-                                    ]}
+                                    singleItem={{ image: "/Logos/brand2.jpg", link: "/categories?category=Personal Care" }}
                                     footerLink="/categories?category=Personal Care"
                                     footerText="Shop Essentials"
                                 />
                                 <AmazonCardTile
                                     title="Home Cleaning"
-                                    items={[
-                                        { label: "Persil Tech", image: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f1/Persil_logo.svg/1200px-Persil_logo.svg.png", link: "/categories?category=Home Care" },
-                                        { label: "Cif Professional", image: "https://upload.wikimedia.org/wikipedia/en/thumb/6/6d/Cif_logo.svg/1200px-Cif_logo.svg.png", link: "/categories?category=Home Care" },
-                                        { label: "Domestos", image: "https://upload.wikimedia.org/wikipedia/en/thumb/4/4c/Domestos_logo.svg/1200px-Domestos_logo.svg.png", link: "/categories?category=Home Care" },
-                                        { label: "Comfort Soft", image: "https://upload.wikimedia.org/wikipedia/en/thumb/8/87/Comfort_logo.svg/1200px-Comfort_logo.svg.png", link: "/categories?category=Home Care" }
-                                    ]}
+                                    singleItem={{ image: "/Logos/brand2.jpg", link: "/categories?category=Home Care" }}
                                     footerLink="/categories?category=Home Care"
                                     footerText="Clean Home Store"
                                 />
@@ -239,34 +219,19 @@ export default function Home() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 mt-8">
                             <AmazonCardTile
                                 title="Bulk Beverages"
-                                items={[
-                                    { label: "Coca-Cola", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/2560px-Coca-Cola_logo.svg.png", link: "/categories?category=Soft Drinks" },
-                                    { label: "Pepsi", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Pepsi_logo_2023.svg/2560px-Pepsi_logo_2023.svg.png", link: "/categories?category=Soft Drinks" },
-                                    { label: "Red Bull", image: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f5/Red_Bull_new_logo.svg/1200px-Red_Bull_new_logo.svg.png", link: "/categories?category=Energy Drinks" },
-                                    { label: "Fanta", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Fanta_logo_%282023%29.svg/2560px-Fanta_logo_%282023%29.svg.png", link: "/categories?category=Soft Drinks" }
-                                ]}
+                                singleItem={{ image: "/Logos/brand3.jpg", link: "/categories?category=Soft Drinks" }}
                                 footerLink="/categories?category=Soft Drinks"
                                 footerText="Restock Drinks"
                             />
                             <AmazonCardTile
                                 title="Snacks & Sweets"
-                                items={[
-                                    { label: "Twix", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Twix-Logo.svg/2560px-Twix-Logo.svg.png", link: "/categories?category=Snacks & Sweets" },
-                                    { label: "Oreo", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Oreo_logo.svg/2560px-Oreo_logo.svg.png", link: "/categories?category=Snacks & Sweets" },
-                                    { label: "Kinder", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Kinder_logo.svg/2560px-Kinder_logo.svg.png", link: "/categories?category=Snacks & Sweets" },
-                                    { label: "M&M's", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/M%26Ms_logo.svg/2560px-M%26Ms_logo.svg.png", link: "/categories?category=Snacks & Sweets" }
-                                ]}
+                                singleItem={{ image: "/Logos/brand4.jpg", link: "/categories?category=Snacks & Sweets" }}
                                 footerLink="/categories?category=Snacks & Sweets"
                                 footerText="Treats in Bulk"
                             />
                             <AmazonCardTile
                                 title="Coffee & Tea"
-                                items={[
-                                    { label: "Nescafé", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Nescafe_logo.svg/2560px-Nescafe_logo.svg.png", link: "/categories?category=Coffee & Tea" },
-                                    { label: "Starbucks", image: "https://upload.wikimedia.org/wikipedia/en/thumb/d/d3/Starbucks_Corporation_Logo_2011.svg/1200px-Starbucks_Corporation_Logo_2011.svg.png", link: "/categories?category=Coffee & Tea" },
-                                    { label: "Lavazza", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Lavazza_logo.svg/2560px-Lavazza_logo.svg.png", link: "/categories?category=Coffee & Tea" },
-                                    { label: "Jacobs", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Jacobs_Logo.svg/2560px-Jacobs_Logo.svg.png", link: "/categories?category=Coffee & Tea" }
-                                ]}
+                                singleItem={{ image: "/Logos/brand1.jpg", link: "/categories?category=Coffee & Tea" }}
                                 footerLink="/categories?category=Coffee & Tea"
                                 footerText="Caffeine Selection"
                             />
