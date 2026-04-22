@@ -168,6 +168,9 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
         if (hasActiveLink) setExpanded(true);
     }, [hasActiveLink]);
 
+    // Check if any link in this group has a badge
+    const groupBadgeCount = group.links.reduce((acc, link) => acc + (badgeCounts[link.href] || 0), 0);
+
     if (!isOpen) {
         // Collapsed: just show icons
         return (
@@ -199,8 +202,6 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
         );
     }
 
-    // Check if any link in this group has a badge
-    const groupBadgeCount = group.links.reduce((acc, link) => acc + (badgeCounts[link.href] || 0), 0);
 
     return (
         <div className="mb-4">
