@@ -6,7 +6,7 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function POST(request: NextRequest) {
     try {
         const token = request.headers.get('authorization') || '';
-        const backendUrl = process.env.BACKEND_URL ? `${process.env.BACKEND_URL}/products/bulk-upload` : 'http://localhost:3001/products/bulk-upload';
+        const backendUrl = process.env.BACKEND_URL ? `${process.env.BACKEND_URL}/products/bulk-upload` : 'https://marketplace-backend-production-539c.up.railway.app/products/bulk-upload';
 
         // Parse formData properly and forward it instead of raw request_body
         const formData = await request.formData();

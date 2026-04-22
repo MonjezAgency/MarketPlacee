@@ -5,7 +5,7 @@ import { cookies } from 'next/headers';
 import { getServerSession } from '@/lib/auth-server';
 
 const getBackendUrl = () =>
-  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').replace(/\/$/, '');
+  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app').replace(/\/$/, '');
 
 /** Delete a team member */
 export async function DELETE(

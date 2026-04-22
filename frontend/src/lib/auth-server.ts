@@ -24,7 +24,7 @@ export async function getServerSession(): Promise<ServerUser | null> {
   const apiUrl = (
     process.env.BACKEND_URL ||
     process.env.NEXT_PUBLIC_API_URL ||
-    'http://localhost:3005'
+    'https://marketplace-backend-production-539c.up.railway.app'
   ).replace(/\/$/, '');
 
   try {

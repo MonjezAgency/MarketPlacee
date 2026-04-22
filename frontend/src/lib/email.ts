@@ -67,7 +67,7 @@ export const generateEmailTemplate = (type: EmailTemplate, data: any): EmailPayl
                         <h2 style="margin-top: 0; color: #108910;">Congratulations!</h2>
                         <p>Your Atlantis account has been <strong>Approved</strong>.</p>
                         <p>You now have full access to your personalized dashboard and can start ${data.role === 'supplier' ? 'listing products' : 'placing orders'}.</p>
-                        <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/login" style="${btnStyle}">Login to Dashboard</a>
+                        <a href="${process.env.NEXT_PUBLIC_SITE_URL || 'https://marketpl7ce.vercel.app'}/auth/login" style="${btnStyle}">Login to Dashboard</a>
                     </div>
                     ${footer}
                 `

@@ -10,6 +10,17 @@ export class ChatService {
   ) {}
 
   async sendMessage(senderId: string, data: { content?: string; imageUrl?: string; receiverId?: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: senderId },
+      include: {
+        orders: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, status: true, totalAmount: true, createdAt: true }
+        }
+      }
+    });
+
     const message = await this.prisma.supportMessage.create({
       data: {
         senderId,
@@ -38,7 +49,18 @@ export class ChatService {
     } else {
       // User sending to Support
       // Generate AI Response
-      const aiResponse = await this.botService.getResponse(data.content || '');
+      const context = {
+        userName: user?.name,
+        userRole: user?.role,
+        recentOrders: user?.orders.map(o => ({
+          id: o.id.slice(-8).toUpperCase(),
+          status: o.status,
+          amount: o.totalAmount,
+          date: o.createdAt
+        }))
+      };
+
+      const aiResponse = await this.botService.getResponse(data.content || '', [], context);
       
       // Save Bot Message
       const botMessage = await this.prisma.supportMessage.create({

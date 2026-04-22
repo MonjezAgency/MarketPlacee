@@ -5,7 +5,7 @@ import { getServerSession } from '@/lib/auth-server';
 import { cookies } from 'next/headers';
 
 const getBackendUrl = () =>
-  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005').replace(/\/$/, '');
+  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app').replace(/\/$/, '');
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

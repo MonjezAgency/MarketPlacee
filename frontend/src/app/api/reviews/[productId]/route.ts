@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: { productId: stri
         const token = cookieStore.get('token')?.value;
         
         // Sanitize API URL
-        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
+        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app';
         const apiUrl = rawApiUrl.replace(/\/$/, '');
         const backendUrl = `${apiUrl}/products/${params.productId}/reviews`;
 

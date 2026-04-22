@@ -74,50 +74,67 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
 
     // Setup WebSocket connection
     React.useEffect(() => {
-        
-
         fetchMessages();
 
-        const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3005';
-        const socket = io(`${socketUrl}/chat`, {
-            auth: { token: getToken() },
-            transports: ['websocket', 'polling'],
-        });
+        let socket: Socket | null = null;
 
-        socketRef.current = socket;
+        const initSocket = async () => {
+            let token: string | undefined;
+            try {
+                const tokenRes = await fetch('/api/auth/socket-token');
+                if (tokenRes.ok) {
+                    const tokenData = await tokenRes.json();
+                    token = tokenData.token;
+                }
+            } catch (err) {
+                console.error("Failed to fetch socket token:", err);
+            }
 
-        socket.on('connect', () => {
-            setIsConnected(true);
-        });
-
-        socket.on('disconnect', () => {
-            setIsConnected(false);
-        });
-
-        // Listen for new incoming messages
-        socket.on('new_message', (msg: Message) => {
-            setMessages((prev: Message[]) => {
-                // Avoid duplicates by simply updating if it exists
-                if (prev.some((m: Message) => m.id === msg.id)) return prev;
-                return [...prev, msg];
+            const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app';
+            socket = io(`${socketUrl}/chat`, {
+                auth: { token },
+                transports: ['websocket', 'polling'],
             });
-        });
 
-        // Support staff: listen for new user inquiries
-        if (isSupport) {
-            socket.on('new_inquiry', ({ message }: { userId: string; message: Message }) => {
+            socketRef.current = socket;
+
+            socket.on('connect', () => {
+                setIsConnected(true);
+            });
+
+            socket.on('disconnect', () => {
+                setIsConnected(false);
+            });
+
+            // Listen for new incoming messages
+            socket.on('new_message', (msg: Message) => {
                 setMessages((prev: Message[]) => {
-                    if (prev.some((m: Message) => m.id === message.id)) return prev;
-                    return [...prev, message];
+                    const exists = prev.some(m => m.id === msg.id);
+                    if (exists) return prev;
+                    return [...prev, msg];
                 });
             });
-        }
+
+            // Support staff: listen for new user inquiries
+            if (isSupport) {
+                socket.on('new_inquiry', ({ message }: { userId: string; message: Message }) => {
+                    setMessages((prev: Message[]) => {
+                        if (prev.some((m: Message) => m.id === message.id)) return prev;
+                        return [...prev, message];
+                    });
+                });
+            }
+        };
+
+        initSocket();
 
         return () => {
-            socket.disconnect();
-            socketRef.current = null;
+            if (socket) {
+                socket.disconnect();
+                socketRef.current = null;
+            }
         };
-    }, [targetUserId]);
+    }, [user?.id, targetUserId, isSupport]);
 
     // Auto-scroll on new messages
     React.useEffect(() => {
@@ -344,7 +361,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                                 {msg.imageUrl && (
                                     <img src={msg.imageUrl} alt="attached" className="rounded-lg mb-2 max-w-full h-auto" />
                                 )}
-                                <p className="text-sm whitespace-pre-wrap">{displayContent}</p>
+                                <p className="text-sm whitespace-pre-wrap" dir="auto" style={{ textAlign: 'start' }}>{displayContent}</p>
                                 <div className={cn(
                                     "flex items-center justify-end gap-1 mt-1 opacity-60",
                                     isMine ? "text-primary-foreground" : "text-muted-foreground"
@@ -390,7 +407,7 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                        placeholder="Type your message..."
+                        placeholder="اكتب رسالتك هنا... / Type your message..."
                         className="flex-1 bg-accent/10 border-none rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-1 ring-primary/30 transition-all"
                     />
                     <button
