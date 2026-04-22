@@ -16,6 +16,8 @@ import { formatPrice } from '@/lib/currency';
 interface AdminOrder {
     id: string;
     customer: string;
+    customerEmail?: string;
+    customerPhone?: string;
     supplier: string;
     total: number;
     supplierProfit: number;
@@ -203,24 +205,24 @@ export default function AdminOrdersPage() {
             </AnimatePresence>
 
             {/* Table Section */}
-            <div className="bg-card border border-border rounded-3xl overflow-hidden shadow-2xl">
-                <div className="overflow-x-auto">
+            <div className="bg-card border border-border/50 rounded-3xl overflow-hidden shadow-xl p-2">
+                <div className="overflow-x-auto rounded-2xl border border-border/50">
                     <table className="w-full text-start border-collapse">
                         <thead>
-                            <tr className="border-b border-border/50 bg-muted/20">
-                                <th className="px-6 py-6 w-12">
+                            <tr className="bg-muted/30">
+                                <th className="border border-border/40 px-4 py-4 w-12 bg-muted/20">
                                     <button onClick={toggleAllSelections} className="text-muted-foreground hover:text-primary transition-colors">
                                         {selectedIds.size === filteredOrders.length && filteredOrders.length > 0 ? <CheckSquare size={20} /> : <Square size={20} />}
                                     </button>
                                 </th>
-                                <th className="px-6 py-6 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-start">Order Entry</th>
-                                <th className="px-6 py-6 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-start">Counterparty</th>
-                                <th className="px-6 py-6 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-start">Global Value</th>
-                                <th className="px-6 py-6 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-start">Settlement State</th>
-                                <th className="px-6 py-6 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-end">Action</th>
+                                <th className="border border-border/40 px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-start bg-muted/20">Order Entry</th>
+                                <th className="border border-border/40 px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-start">Counterparty</th>
+                                <th className="border border-border/40 px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-start bg-muted/20">Global Value</th>
+                                <th className="border border-border/40 px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-start">Settlement State</th>
+                                <th className="border border-border/40 px-4 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] text-end bg-muted/20">Action</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-border/30">
+                        <tbody>
                             {filteredOrders.length > 0 ? (
                                 filteredOrders.map((order) => {
                                     const Config = STATUS_CONFIG[order.status] || STATUS_CONFIG.PENDING;
@@ -237,12 +239,12 @@ export default function AdminOrdersPage() {
                                                 isSelected ? "bg-primary/5" : "hover:bg-muted/30"
                                             )}
                                         >
-                                            <td className="px-6 py-6" onClick={(e) => { e.stopPropagation(); toggleSelection(order.id); }}>
+                                            <td className="border border-border/40 px-4 py-3 bg-muted/50" onClick={(e) => { e.stopPropagation(); toggleSelection(order.id); }}>
                                                 <div className={cn("transition-colors", isSelected ? "text-primary" : "text-muted-foreground opacity-30 group-hover:opacity-100")}>
                                                     {isSelected ? <CheckSquare size={20} /> : <Square size={20} />}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-6" onClick={() => setSelectedOrder(order)}>
+                                            <td className="border border-border/40 px-4 py-3" onClick={() => setSelectedOrder(order)}>
                                                 <div className="space-y-1">
                                                     <p className="text-xs font-black text-primary uppercase tracking-tighter">#{order.id.slice(-8).toUpperCase()}</p>
                                                     <p className="text-[10px] font-black text-muted-foreground uppercase opacity-60 flex items-center gap-1">
@@ -250,7 +252,7 @@ export default function AdminOrdersPage() {
                                                     </p>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-6" onClick={() => setSelectedOrder(order)}>
+                                            <td className="border border-border/40 px-4 py-3 bg-muted/50" onClick={() => setSelectedOrder(order)}>
                                                 <div className="space-y-1">
                                                     <p className="text-sm font-black text-foreground max-w-[200px] truncate">{order.customer}</p>
                                                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-60">
@@ -258,7 +260,7 @@ export default function AdminOrdersPage() {
                                                     </p>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-6" onClick={() => setSelectedOrder(order)}>
+                                            <td className="border border-border/40 px-4 py-3" onClick={() => setSelectedOrder(order)}>
                                                 <div className="space-y-1">
                                                     <p className="text-base font-black text-foreground">{formatPrice(order.total)}</p>
                                                     <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest opacity-80">
@@ -266,7 +268,7 @@ export default function AdminOrdersPage() {
                                                     </p>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-6" onClick={() => setSelectedOrder(order)}>
+                                            <td className="border border-border/40 px-4 py-3 bg-muted/50" onClick={() => setSelectedOrder(order)}>
                                                 <div className={cn(
                                                     "inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest border shadow-sm",
                                                     Config.color, Config.bg, Config.border
@@ -275,8 +277,8 @@ export default function AdminOrdersPage() {
                                                     {order.status}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-6 text-end">
-                                                <button onClick={() => setSelectedOrder(order)} className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center hover:bg-primary hover:text-white transition-all ms-auto">
+                                            <td className="border border-border/40 px-4 py-3 text-end" onClick={() => setSelectedOrder(order)}>
+                                                <button className="w-10 h-10 rounded-xl bg-muted border border-border flex items-center justify-center hover:bg-primary hover:text-white transition-all ms-auto">
                                                     <ChevronRight size={18} />
                                                 </button>
                                             </td>
@@ -307,17 +309,17 @@ export default function AdminOrdersPage() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setSelectedOrder(null)}
-                            className="absolute inset-0 bg-background/60 backdrop-blur-2xl"
+                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
                         />
                         
                         <motion.div
-                            initial={{ scale: 0.9, y: 50, opacity: 0 }}
+                            initial={{ scale: 0.95, y: 30, opacity: 0 }}
                             animate={{ scale: 1, y: 0, opacity: 1 }}
-                            exit={{ scale: 0.9, y: 50, opacity: 0 }}
-                            className="bg-card glass-card-strong w-full max-w-5xl relative z-10 overflow-hidden flex flex-col md:flex-row h-[min(850px,90vh)] shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-primary/20"
+                            exit={{ scale: 0.95, y: 30, opacity: 0 }}
+                            className="bg-card glass-card-strong w-full max-w-4xl relative z-10 overflow-hidden flex flex-col md:flex-row h-[min(700px,85vh)] shadow-[0_0_100px_rgba(0,0,0,0.5)] border border-primary/20 rounded-3xl"
                         >
                             {/* Left Panel: High Level Summary & Stats (Non-scrollable) */}
-                            <div className="w-full md:w-[400px] bg-primary/5 p-8 lg:p-10 flex flex-col border-e border-border/10 overflow-hidden">
+                            <div className="w-full md:w-[360px] bg-primary/5 p-6 lg:p-8 flex flex-col border-e border-border/10 overflow-y-auto no-scrollbar">
                                 <div className="space-y-8 h-full flex flex-col">
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-4 mb-2">
@@ -326,7 +328,7 @@ export default function AdminOrdersPage() {
                                             </div>
                                             <div>
                                                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">ORDER REFERENCE</p>
-                                                <h2 className="text-2xl font-black uppercase tracking-tighter">#{selectedOrder.id.slice(-8).toUpperCase()}</h2>
+                                                <h2 className="text-xl font-black uppercase tracking-tighter">#{selectedOrder.id.slice(-8).toUpperCase()}</h2>
                                             </div>
                                         </div>
                                         <div className={cn(
@@ -337,6 +339,31 @@ export default function AdminOrdersPage() {
                                         )}>
                                             {selectedOrder.status}
                                         </div>
+                                    </div>
+
+                                    {/* Action Deck (Moved to top) */}
+                                    <div className="space-y-2 pt-2 border-t border-border/10">
+                                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-50 mb-2 block">Quick Actions</span>
+                                        {selectedOrder.status === 'PENDING' && (
+                                            <>
+                                                <button onClick={() => updateStatus(selectedOrder.id, 'PAID')} className="w-full h-12 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3">
+                                                    <CheckCircle size={16} /> Approve & Fill
+                                                </button>
+                                                <button onClick={() => updateStatus(selectedOrder.id, 'CANCELLED')} className="w-full h-12 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-red-500/20 transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-3">
+                                                    <XCircle size={16} /> Cancel Order
+                                                </button>
+                                            </>
+                                        )}
+                                        {selectedOrder.status === 'PAID' && (
+                                            <button onClick={() => updateStatus(selectedOrder.id, 'SHIPPED')} className="w-full h-12 bg-blue-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
+                                                <Truck size={16} /> Mark as Shipped
+                                            </button>
+                                        )}
+                                        {selectedOrder.status === 'SHIPPED' && (
+                                            <button onClick={() => updateStatus(selectedOrder.id, 'DELIVERED')} className="w-full h-12 bg-purple-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
+                                                <CheckCircle size={16} /> Confirm Delivery
+                                            </button>
+                                        )}
                                     </div>
 
                                     <div className="space-y-6">
@@ -361,13 +388,19 @@ export default function AdminOrdersPage() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="flex flex-col gap-4">
                                             <div className="p-4 bg-muted/40 rounded-2xl border border-border/20">
                                                 <User className="text-secondary mb-2" size={16} />
-                                                <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Purchaser</p>
+                                                <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Purchaser Info</p>
                                                 <p className="text-xs font-black truncate">{selectedOrder.customer}</p>
+                                                {selectedOrder.customerEmail && (
+                                                    <p className="text-[10px] font-medium text-muted-foreground mt-1 select-all">{selectedOrder.customerEmail}</p>
+                                                )}
+                                                {selectedOrder.customerPhone && (
+                                                    <p className="text-[10px] font-medium text-muted-foreground mt-0.5 select-all">{selectedOrder.customerPhone}</p>
+                                                )}
                                             </div>
-                                            <div className="p-4 bg-muted/40 rounded-2xl border border-border/20">
+                                            <div className="p-4 bg-muted/40 rounded-2xl border border-border/20 flex-1">
                                                 <Truck className="text-secondary mb-2" size={16} />
                                                 <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Logistics</p>
                                                 <p className="text-xs font-black truncate">{selectedOrder.shippingCompany || 'Pending'}</p>
@@ -375,32 +408,6 @@ export default function AdminOrdersPage() {
                                         </div>
                                     </div>
 
-                                    {/* Action Deck (Sticky at bottom of left panel) */}
-                                    <div className="mt-auto space-y-3 pt-8 border-t border-border/10">
-                                        {selectedOrder.status === 'PENDING' && (
-                                            <>
-                                                <button onClick={() => updateStatus(selectedOrder.id, 'PAID')} className="w-full h-14 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3">
-                                                    <CheckCircle size={18} /> Approve & Capture
-                                                </button>
-                                                <button onClick={() => updateStatus(selectedOrder.id, 'CANCELLED')} className="w-full h-14 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-red-500/20 transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-3">
-                                                    <XCircle size={18} /> Cancel Transaction
-                                                </button>
-                                            </>
-                                        )}
-                                        {selectedOrder.status === 'PAID' && (
-                                            <button onClick={() => updateStatus(selectedOrder.id, 'SHIPPED')} className="w-full h-14 bg-blue-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
-                                                <Truck size={18} /> Mark as Shipped
-                                            </button>
-                                        )}
-                                        {selectedOrder.status === 'SHIPPED' && (
-                                            <button onClick={() => updateStatus(selectedOrder.id, 'DELIVERED')} className="w-full h-14 bg-purple-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] flex items-center justify-center gap-3">
-                                                <CheckCircle size={18} /> Final Delivery Confirmation
-                                            </button>
-                                        )}
-                                        <button className="w-full h-12 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-foreground transition-all">
-                                            <Printer size={14} /> Print Invoice
-                                        </button>
-                                    </div>
                                 </div>
                             </div>
 

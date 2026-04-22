@@ -138,6 +138,8 @@ export class OrdersService {
             return {
                 id: order.id,
                 customer: customerName,
+                customerEmail: order.customer?.email,
+                customerPhone: order.customer?.phone,
                 supplier: supplierNames,
                 total: order.totalAmount,
                 supplierProfit,

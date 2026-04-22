@@ -19,7 +19,8 @@ import {
     Star,
     TrendingUp,
     Settings,
-    CreditCard
+    CreditCard,
+    Lock
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -35,7 +36,7 @@ const SUPPLIER_LINKS = [
     { label: 'Offers & Ads', href: '/supplier/offers', icon: ListPlus },
     { label: 'My Sales', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
     { label: 'Analytics', href: '/supplier/analytics', icon: TrendingUp },
-    { label: 'Payment Methods', href: '/supplier/payment-methods', icon: CreditCard },
+    { label: 'Payment Methods', href: '/supplier/payment-methods', icon: CreditCard, locked: true },
     { label: 'Support', href: '/supplier/support', icon: MessageSquare },
     { label: 'Settings', href: '/supplier/settings', icon: Settings },
 ];
@@ -110,6 +111,22 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                     {SUPPLIER_LINKS.map((link) => {
                         const Icon = link.icon;
                         const isActive = pathname === link.href;
+
+                        if (link.locked) {
+                            return (
+                                <div
+                                    key={link.href}
+                                    className="flex items-center gap-4 px-4 py-3 rounded-xl transition-all relative overflow-hidden cursor-not-allowed opacity-70"
+                                    title="Temporarily unavailable"
+                                >
+                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-10" />
+                                    <Icon size={20} className="relative z-0 text-muted-foreground" />
+                                    {isOpen && <span className="text-sm flex-1 relative z-0 text-muted-foreground font-medium strike-through">{link.label}</span>}
+                                    {isOpen && <Lock size={16} className="absolute right-4 z-20 text-foreground/50" />}
+                                </div>
+                            );
+                        }
+
                         return (
                             <Link
                                 key={link.href}

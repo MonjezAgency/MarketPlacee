@@ -172,8 +172,9 @@ export default function CheckoutPage() {
 
             if (res.ok) {
                 const order = await res.json();
-                // Don't clear cart here — it will be cleared after successful payment on the confirmation page
-                router.push(`/checkout/payment?orderId=${order.id}`);
+                setCreatedOrderId(order.id);
+                clearCart();
+                setStep(3);
             } else {
                 const err = await res.json().catch(() => ({}));
                 alert(err?.message || 'Failed to place order. Please try again.');
@@ -200,7 +201,7 @@ export default function CheckoutPage() {
 
                     {/* Progress Steps */}
                     <div className="flex items-center gap-3 bg-card border border-border/50 p-2 rounded-2xl premium-shadow">
-                        {[1, 2, 3].map(i => (
+                        {[1, 2].map(i => (
                             <div key={i} className="flex items-center">
                                 <div className={cn(
                                     "w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black transition-all duration-500",
@@ -210,7 +211,7 @@ export default function CheckoutPage() {
                                 )}>
                                     {i}
                                 </div>
-                                {i < 3 && (
+                                {i < 2 && (
                                     <div className="w-12 h-1 mx-2 rounded-full bg-muted overflow-hidden">
                                         <motion.div
                                             initial={{ width: 0 }}
@@ -224,32 +225,44 @@ export default function CheckoutPage() {
                     </div>
                 </div>
 
-                {step === 4 ? (
+                {step === 3 ? (
                     <motion.div
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         className="max-w-3xl mx-auto bg-card border border-border/50 p-16 rounded-[48px] text-center space-y-8 premium-shadow relative overflow-hidden"
                     >
-                        <div className="absolute top-0 start-0 w-full h-2 bg-accent" />
-                        <div className="w-24 h-24 bg-accent/10 rounded-[32px] flex items-center justify-center mx-auto text-accent mb-6 animate-pulse">
-                            <CheckCircle2 size={48} />
+                        <div className="absolute top-0 start-0 w-full h-2 bg-gradient-to-r from-emerald-500 via-primary to-secondary" />
+                        <div className="w-24 h-24 bg-emerald-500/10 rounded-[32px] flex items-center justify-center mx-auto text-emerald-500 mb-6">
+                            <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: 'spring', stiffness: 200, damping: 12, delay: 0.2 }}
+                            >
+                                <CheckCircle2 size={48} />
+                            </motion.div>
                         </div>
                         <div className="space-y-4">
-                            <h2 className="text-5xl font-heading font-black tracking-tight">Order Procurement Initiated</h2>
+                            <h2 className="text-4xl md:text-5xl font-heading font-black tracking-tight">Order Received!</h2>
                             <p className="text-xl text-muted-foreground leading-relaxed max-w-xl mx-auto font-medium">
-                                Tracking <span className="text-foreground font-black">#SKU-990-2026</span> is now active.
-                                Our logistics partners are preparing your distribution batch.
+                                Thank you for your order. Your reference number is{' '}
+                                <span className="text-foreground font-black">#{createdOrderId?.slice(-8).toUpperCase()}</span>.
+                            </p>
+                            <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mx-auto">
+                                A member of our team will be in touch with you shortly to confirm details and arrange fulfillment.
                             </p>
                         </div>
-                        <div className="pt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-                            <Link href="/dashboard/buyer">
-                                <Button variant="outline" size="xl" className="rounded-3xl px-12 font-black">Distribution Center</Button>
-                            </Link>
+                        <div className="p-5 bg-primary/5 rounded-3xl flex items-start gap-4 border border-primary/10 max-w-md mx-auto">
+                            <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
+                            <p className="text-[13px] text-primary/80 leading-relaxed font-medium text-start">
+                                Our Marketplace team will contact you to finalize payment and delivery. Please keep an eye on your email and phone.
+                            </p>
+                        </div>
+                        <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
                             <Link href="/">
-                                <Button size="xl" className="rounded-3xl px-12 font-black">Source More items</Button>
+                                <Button size="xl" className="rounded-3xl px-12 font-black">Continue Shopping</Button>
                             </Link>
                         </div>
-                        <div className="absolute bottom-[-10%] right-[-5%] w-64 h-64 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute bottom-[-10%] right-[-5%] w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
                     </motion.div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
@@ -432,7 +445,7 @@ export default function CheckoutPage() {
                                                 Modify
                                             </Button>
                                             <Button onClick={handlePlaceOrder} size="xl" className="flex-[2]" isLoading={isProcessing}>
-                                                Proceed to Payment
+                                                Confirm Order
                                                 <ArrowRight size={20} />
                                             </Button>
                                         </div>
