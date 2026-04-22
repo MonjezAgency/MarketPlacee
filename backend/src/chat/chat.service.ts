@@ -13,7 +13,12 @@ export class ChatService {
     const user = await this.prisma.user.findUnique({
       where: { id: senderId },
       include: {
-        orders: {
+        customerOrders: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: { id: true, status: true, totalAmount: true, createdAt: true }
+        },
+        supplierOrders: {
           take: 5,
           orderBy: { createdAt: 'desc' },
           select: { id: true, status: true, totalAmount: true, createdAt: true }
@@ -49,10 +54,15 @@ export class ChatService {
     } else {
       // User sending to Support
       // Generate AI Response
+      const allOrders = [
+        ...(user?.customerOrders || []),
+        ...(user?.supplierOrders || [])
+      ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 5);
+
       const context = {
         userName: user?.name,
         userRole: user?.role,
-        recentOrders: user?.orders.map(o => ({
+        recentOrders: allOrders.map(o => ({
           id: o.id.slice(-8).toUpperCase(),
           status: o.status,
           amount: o.totalAmount,
