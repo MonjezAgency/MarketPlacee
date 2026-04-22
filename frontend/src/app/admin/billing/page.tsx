@@ -47,7 +47,8 @@ export default function AdminBillingPage() {
         { label: 'Total Volume', value: stats ? formatPrice(stats.totalRevenue) : '—', trend: stats?.conversionRate ? `${stats.conversionRate}% Conv.` : '0%', isUp: true, icon: DollarSign, color: 'emerald' },
         { label: 'Platform Profit', value: stats ? formatPrice(stats.platformRevenue) : '—', trend: '+5% Fee', isUp: true, icon: TrendingUp, color: 'blue' },
         { label: 'Active Requests', value: viesProfiles.filter(v => v.status === 'PENDING').length.toString(), trend: 'Tax Compliance', isUp: true, icon: ShieldCheck, color: 'amber' },
-        { label: 'Settled Orders', value: stats?.paidOrders?.toString() || '0', trend: 'Completed', isUp: true, icon: Building2, color: 'rose' },
+    ];
+
     return (
         <div className="max-w-[1200px] mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header Area */}
