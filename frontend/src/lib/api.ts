@@ -209,3 +209,39 @@ export async function fetchImageByEan(ean: string): Promise<string | null> {
     const images = await fetchImagesByEan(ean, 1);
     return images.length > 0 ? images[0] : null;
 }
+export async function fetchSupplierAds(): Promise<any[]> {
+    try {
+        const res = await apiFetch('/ads/supplier/my-ads', { cache: 'no-store' });
+        if (!res.ok) return [];
+        return await res.json();
+    } catch (error) {
+        console.error('Error fetching supplier ads:', error);
+        return [];
+    }
+}
+
+export async function requestAdPlacement(data: { productId: string; type: string; durationDays: number }): Promise<any> {
+    try {
+        const res = await apiFetch('/ads/supplier/request', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        if (!res.ok) throw new Error('Failed to request placement');
+        return await res.json();
+    } catch (error) {
+        console.error('Error requesting ad placement:', error);
+        throw error;
+    }
+}
+
+export async function deleteAdPlacement(id: string): Promise<boolean> {
+    try {
+        const res = await apiFetch(`/ads/supplier/${id}`, {
+            method: 'DELETE',
+        });
+        return res.ok;
+    } catch (error) {
+        console.error('Error deleting ad placement:', error);
+        return false;
+    }
+}

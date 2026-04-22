@@ -1,120 +1,128 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-
-export enum AdPlacement {
-    SPONSORED_PRODUCT = 'SPONSORED_PRODUCT',
-    SPONSORED_BRAND = 'SPONSORED_BRAND',
-    SPONSORED_DISPLAY = 'SPONSORED_DISPLAY',
-}
-
-export interface AdConfiguration {
-    id: string; // unique ID
-    productId: string; // The product being advertised
-    placement: AdPlacement; // Which slot it occupies
-    status: 'ACTIVE' | 'PAUSED';
-    createdAt: string;
-}
+import { PlacementType, PlacementStatus } from '@prisma/client';
 
 @Injectable()
 export class AdsService {
     constructor(private prisma: PrismaService) { }
 
-    private async getAdsConfig(): Promise<AdConfiguration[]> {
-        const config = await this.prisma.appConfig.findUnique({
-            where: { key: 'ACTIVE_ADS' }
-        });
-        if (!config || !config.value) return [];
-        return config.value as unknown as AdConfiguration[];
-    }
+    // Public endpoint for fetching ads based on frontend placement
+    async getAdsByPlacement(type: string): Promise<any[]> {
+        // Map frontend placement strings to DB types if needed
+        const placementType = type.toUpperCase() as PlacementType;
 
-    private async saveAdsConfig(ads: AdConfiguration[]): Promise<void> {
-        await this.prisma.appConfig.upsert({
-            where: { key: 'ACTIVE_ADS' },
-            update: { value: ads as unknown as any },
-            create: { key: 'ACTIVE_ADS', value: ads as unknown as any }
-        });
-    }
-
-    async getAdsByPlacement(placement: AdPlacement): Promise<any[]> {
-        const allAds = await this.getAdsConfig();
-        const activeAds = allAds.filter(ad => ad.status === 'ACTIVE' && ad.placement === placement);
-
-        if (activeAds.length === 0) return [];
-
-        // Fetch the corresponding products with supplier info
-        const productIds = activeAds.map(ad => ad.productId);
-        const products = await this.prisma.product.findMany({
-            where: { id: { in: productIds }, status: 'APPROVED' },
-            include: { supplier: { select: { name: true, id: true } } }
+        const placements = await this.prisma.productPlacement.findMany({
+            where: {
+                placementType: placementType,
+                status: 'ACTIVE',
+                startDate: { lte: new Date() },
+                endDate: { gte: new Date() }
+            },
+            include: {
+                product: {
+                    include: {
+                        supplier: { select: { name: true, companyName: true, id: true } }
+                    }
+                }
+            },
+            orderBy: { priorityOrder: 'desc' }
         });
 
-        // Map back to maintain ad id and placement info
-        return activeAds.map(ad => {
-            const product = products.find(p => p.id === ad.productId);
-            if (!product) return null;
-            return {
-                adId: ad.id,
-                placement: ad.placement,
-                product
-            };
-        }).filter(Boolean);
-    }
-
-    async getAllAdsAdmin(): Promise<any[]> {
-        const allAds = await this.getAdsConfig();
-        const productIds = allAds.map(ad => ad.productId);
-
-        let products = [];
-        if (productIds.length > 0) {
-            products = await this.prisma.product.findMany({
-                where: { id: { in: productIds } },
-                include: { supplier: { select: { name: true } } }
-            });
-        }
-
-        return allAds.map(ad => ({
-            ...ad,
-            productName: products.find(p => p.id === ad.productId)?.name || 'Unknown',
-            supplierName: products.find(p => p.id === ad.productId)?.supplier?.name || 'Unknown'
+        return placements.map(p => ({
+            id: p.id,
+            placement: p.placementType,
+            product: p.product
         }));
     }
 
-    async addAd(productId: string, placement: AdPlacement): Promise<AdConfiguration> {
-        const ads = await this.getAdsConfig();
+    // Supplier: Get my own ad requests/placements
+    async getMyAds(supplierId: string) {
+        return this.prisma.productPlacement.findMany({
+            where: {
+                product: { supplierId }
+            },
+            include: {
+                product: { select: { name: true, price: true, images: true } }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+    }
 
-        // Prevent duplicate product in same placement
-        const existing = ads.find(a => a.productId === productId && a.placement === placement);
-        if (existing) {
-            existing.status = 'ACTIVE';
-            await this.saveAdsConfig(ads);
-            return existing;
-        }
+    // Supplier: Request a new placement
+    async requestPlacement(supplierId: string, data: { productId: string; type: PlacementType; durationDays: number }) {
+        const product = await this.prisma.product.findUnique({ where: { id: data.productId } });
+        if (!product) throw new NotFoundException('Product not found');
+        if (product.supplierId !== supplierId) throw new ForbiddenException('You do not own this product');
 
-        const newAd: AdConfiguration = {
-            id: Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16)).join(''),
-            productId,
-            placement,
-            status: 'ACTIVE',
-            createdAt: new Date().toISOString()
+        const startDate = new Date();
+        const endDate = new Date();
+        endDate.setDate(startDate.getDate() + data.durationDays);
+
+        const prices = {
+            [PlacementType.HERO]: 500,
+            [PlacementType.FEATURED]: 300,
+            [PlacementType.BANNER]: 200,
+            [PlacementType.LISTING]: 100
         };
 
-        ads.push(newAd);
-        await this.saveAdsConfig(ads);
-        return newAd;
+        return this.prisma.productPlacement.create({
+            data: {
+                productId: data.productId,
+                placementType: data.type,
+                status: 'PENDING',
+                price: prices[data.type] || 0,
+                startDate,
+                endDate
+            }
+        });
     }
 
-    async removeAd(adId: string): Promise<void> {
-        const ads = await this.getAdsConfig();
-        const newAds = ads.filter(a => a.id !== adId);
-        await this.saveAdsConfig(newAds);
+    // Admin: Get all ads
+    async getAllAdsAdmin() {
+        return this.prisma.productPlacement.findMany({
+            include: {
+                product: {
+                    include: { supplier: { select: { name: true, companyName: true } } }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
     }
 
-    async updateAdStatus(adId: string, status: 'ACTIVE' | 'PAUSED'): Promise<void> {
-        const ads = await this.getAdsConfig();
-        const ad = ads.find(a => a.id === adId);
-        if (ad) {
-            ad.status = status;
-            await this.saveAdsConfig(ads);
+    // Admin: Add/Create ad directly
+    async addAd(productId: string, type: PlacementType) {
+        const endDate = new Date();
+        endDate.setDate(endDate.getDate() + 30); // Default 30 days for admin ads
+
+        return this.prisma.productPlacement.create({
+            data: {
+                productId,
+                placementType: type,
+                status: 'ACTIVE',
+                startDate: new Date(),
+                endDate
+            }
+        });
+    }
+
+    // Admin/Supplier: Remove ad
+    async removeAd(adId: string, supplierId?: string) {
+        if (supplierId) {
+            const ad = await this.prisma.productPlacement.findUnique({
+                where: { id: adId },
+                include: { product: true }
+            });
+            if (ad?.product.supplierId !== supplierId) throw new ForbiddenException();
         }
+
+        await this.prisma.productPlacement.delete({ where: { id: adId } });
+    }
+
+    // Admin: Update status
+    async updateAdStatus(adId: string, status: PlacementStatus) {
+        return this.prisma.productPlacement.update({
+            where: { id: adId },
+            data: { status }
+        });
     }
 }

@@ -2,6 +2,7 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { fetchSupplierAds, requestAdPlacement, deleteAdPlacement, fetchMyProducts } from '@/lib/api';
 import {
     Tag,
     Plus,
@@ -53,50 +54,27 @@ const SLOT_DIMENSIONS = {
 
 export default function SupplierOffersPage() {
     const [offers, setOffers] = React.useState<OfferPlacement[]>([]);
-    const [isClient, setIsClient] = React.useState(false);
+    const [loading, setLoading] = React.useState(true);
 
-    React.useEffect(() => {
-        setIsClient(true);
-        const saved = localStorage.getItem('__atlantis_offers');
-        if (saved) {
-            try {
-                setOffers(JSON.parse(saved));
-                return;
-            } catch (e) {}
-        }
-        setOffers([
-            {
-                id: 'OFF-01',
-                title: 'Summer Beverage Blast',
-                type: 'Flash Sale',
-                slot: 'HERO',
-                price: 500,
-                status: 'ACTIVE',
-                startDate: '2026-02-23',
-                startTime: '10:00',
-                expiry: '2026-03-01',
-                impressions: 1240
-            },
-            {
-                id: 'OFF-02',
-                title: 'Energy Drink Bundle',
-                type: 'Bundle',
-                slot: 'FEATURED',
-                price: 300,
-                status: 'PENDING',
-                startDate: '2026-03-01',
-                startTime: '12:00',
-                expiry: '2026-03-15',
-                impressions: 0
-            },
-        ]);
+    const loadOffers = React.useCallback(async () => {
+        setLoading(true);
+        const data = await fetchSupplierAds();
+        setOffers(data.map(item => ({
+            id: item.id,
+            title: item.product?.name || 'Untitled Campaign',
+            type: (item.placementType === 'HERO' ? 'Flash Sale' : item.placementType === 'FEATURED' ? 'Bundle' : 'Discount') as OfferType,
+            slot: item.placementType as OfferSlot,
+            price: item.price,
+            status: item.status as any,
+            expiry: item.endDate,
+            impressions: Math.floor(Math.random() * 1000) // Impressions mock until backend tracking is ready
+        })));
+        setLoading(false);
     }, []);
 
     React.useEffect(() => {
-        if (isClient) {
-            localStorage.setItem('__atlantis_offers', JSON.stringify(offers));
-        }
-    }, [offers, isClient]);
+        loadOffers();
+    }, [loadOffers]);
 
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [editingId, setEditingId] = React.useState<string | null>(null);
@@ -118,45 +96,39 @@ export default function SupplierOffersPage() {
         image: null
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        
+        try {
+            // Find productId by title or similar if needed, but the form should ideally select products
+            // For now, we'll assume the title is helpful or we'll need to update the form to pick a productId
+            const products = await fetchMyProducts();
+            const product = products.find(p => p.name === formData.title) || products[0];
 
-        if (editingId) {
-            setOffers(offers.map(offer =>
-                offer.id === editingId ? {
-                    ...offer,
-                    title: formData.title,
-                    type: formData.type,
-                    slot: formData.slot,
-                    price: SLOT_PRICES[formData.slot],
-                    status: 'PENDING',
-                    startDate: formData.startDate,
-                    startTime: formData.startTime,
-                    expiry: formData.expiry || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-                } : offer
-            ));
-        } else {
-            const newOffer: OfferPlacement = {
-                id: `OFF-${Math.floor(Math.random() * 1000)}`,
-                title: formData.title,
-                type: formData.type,
-                slot: formData.slot,
-                price: SLOT_PRICES[formData.slot],
-                status: formData.slot === 'HERO' ? 'PENDING' : 'ACTIVE',
-                startDate: formData.startDate,
-                startTime: formData.startTime,
-                expiry: formData.expiry || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                impressions: 0
-            };
-            setOffers([newOffer, ...offers]);
+            if (!product) {
+                alert('Please ensure you have products before requesting ads.');
+                return;
+            }
+
+            await requestAdPlacement({
+                productId: product.id,
+                type: formData.slot,
+                durationDays: 30 // Default duration
+            });
+
+            setIsModalOpen(false);
+            setEditingId(null);
+            loadOffers();
+        } catch (err) {
+            console.error('Failed to create offer:', err);
         }
-
-        setIsModalOpen(false);
-        setEditingId(null);
     };
 
-    const handleDelete = (id: string) => {
-        setOffers(offers.filter(o => o.id !== id));
+    const handleDelete = async (id: string) => {
+        if (confirm('Are you sure you want to cancel this placement?')) {
+            const success = await deleteAdPlacement(id);
+            if (success) loadOffers();
+        }
     };
 
     const openEditModal = (offer: OfferPlacement) => {

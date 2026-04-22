@@ -24,7 +24,8 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { CATEGORIES_LIST } from '@/lib/products';
-import { fetchMyProducts, apiFetch, apiUrl } from '@/lib/api';
+import { fetchMyProducts, apiFetch, apiUrl, requestAdPlacement } from '@/lib/api';
+import { Zap, Rocket } from 'lucide-react';
 import { Product, ProductStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -167,6 +168,20 @@ export default function SupplierProductsPage() {
             loadProducts();
         } catch (err: any) {
             alert(`Error: ${err.message}`);
+        }
+    };
+
+    const handleQuickBoost = async (productId: string, productName: string) => {
+        if (!confirm(`Boost "${productName}" to the Featured section for $300?`)) return;
+        try {
+            await requestAdPlacement({
+                productId,
+                type: 'FEATURED',
+                durationDays: 7
+            });
+            alert('Boost request submitted! An admin will review it shortly.');
+        } catch (err: any) {
+            alert(`Failed to boost: ${err.message}`);
         }
     };
 
@@ -449,6 +464,13 @@ export default function SupplierProductsPage() {
                                             className="flex-1 h-10 bg-muted hover:bg-muted/80 text-foreground rounded-xl flex items-center justify-center gap-2 transition-colors text-xs font-bold"
                                         >
                                             <Edit2 size={14} /> Edit
+                                        </button>
+                                        <button
+                                            onClick={() => handleQuickBoost(product.id, product.name)}
+                                            className="w-10 h-10 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl flex items-center justify-center transition-all shadow-lg shadow-primary/5 group/boost"
+                                            title="Quick Boost"
+                                        >
+                                            <Zap size={16} className="group-hover/boost:scale-125 transition-transform" />
                                         </button>
                                         <button
                                             onClick={() => handleDeleteProduct(product.id, product.name)}
