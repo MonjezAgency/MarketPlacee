@@ -238,37 +238,37 @@ export default function Home() {
                     ) : !dynamicCategories ? (
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 mt-8">
                             <AmazonCardTile
-                                title={t('home', 'bulkBevs')}
+                                title="Bulk Beverages"
                                 items={[
-                                    { label: t('home', 'energyDrinks'), image: "https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=200&h=200&fit=crop", link: "/categories?category=Energy Drinks" },
-                                    { label: t('home', 'softDrinks'), image: "https://images.unsplash.com/photo-1553456558-aff63285bdd1?w=200&h=200&fit=crop", link: "/categories?category=Soft Drinks" },
-                                    { label: t('home', 'juices'), image: "https://images.unsplash.com/photo-1613478223719-2ab802602423?w=200&h=200&fit=crop", link: "/categories?category=Soft Drinks" },
-                                    { label: t('home', 'water'), image: "https://images.unsplash.com/photo-1548839140-29a749e1cf4d?w=200&h=200&fit=crop", link: "/categories?category=Soft Drinks" }
+                                    { label: "Coca-Cola", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ce/Coca-Cola_logo.svg/2560px-Coca-Cola_logo.svg.png", link: "/categories?category=Soft Drinks" },
+                                    { label: "Pepsi", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/Pepsi_logo_2023.svg/2560px-Pepsi_logo_2023.svg.png", link: "/categories?category=Soft Drinks" },
+                                    { label: "Red Bull", image: "https://upload.wikimedia.org/wikipedia/en/thumb/f/f5/Red_Bull_new_logo.svg/1200px-Red_Bull_new_logo.svg.png", link: "/categories?category=Energy Drinks" },
+                                    { label: "Fanta", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d6/Fanta_logo_%282023%29.svg/2560px-Fanta_logo_%282023%29.svg.png", link: "/categories?category=Soft Drinks" }
                                 ]}
                                 footerLink="/categories?category=Soft Drinks"
-                                footerText={t('home', 'restockDrinks')}
+                                footerText="Restock Drinks"
                             />
                             <AmazonCardTile
-                                title={t('home', 'snacks')}
+                                title="Snacks & Sweets"
                                 items={[
-                                    { label: t('home', 'biscuits'), image: "https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=200&h=200&fit=crop", link: "/categories?category=Snacks & Sweets" },
-                                    { label: t('home', 'chocolates'), image: "https://images.unsplash.com/photo-1511381939415-e44015466834?w=200&h=200&fit=crop", link: "/categories?category=Snacks & Sweets" },
-                                    { label: t('home', 'chips'), image: "https://images.unsplash.com/photo-1566478989037-eec170784d0b?w=200&h=200&fit=crop", link: "/categories?category=Snacks & Sweets" },
-                                    { label: t('home', 'gums'), image: "https://images.unsplash.com/photo-1559181567-c3190ca9959b?w=200&h=200&fit=crop", link: "/categories?category=Snacks & Sweets" }
+                                    { label: "Twix", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f9/Twix-Logo.svg/2560px-Twix-Logo.svg.png", link: "/categories?category=Snacks & Sweets" },
+                                    { label: "Oreo", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Oreo_logo.svg/2560px-Oreo_logo.svg.png", link: "/categories?category=Snacks & Sweets" },
+                                    { label: "Kinder", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/0/03/Kinder_logo.svg/2560px-Kinder_logo.svg.png", link: "/categories?category=Snacks & Sweets" },
+                                    { label: "M&M's", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/M%26Ms_logo.svg/2560px-M%26Ms_logo.svg.png", link: "/categories?category=Snacks & Sweets" }
                                 ]}
                                 footerLink="/categories?category=Snacks & Sweets"
-                                footerText={t('home', 'treatsInBulk')}
+                                footerText="Treats in Bulk"
                             />
                             <AmazonCardTile
-                                title={t('home', 'coffeeTea')}
+                                title="Coffee & Tea"
                                 items={[
-                                    { label: t('home', 'instantCoffee'), image: "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=200&h=200&fit=crop", link: "/categories?category=Coffee & Tea" },
-                                    { label: t('home', 'groundCoffee'), image: "https://images.unsplash.com/photo-1559056199-641a0ac8b55e?w=200&h=200&fit=crop", link: "/categories?category=Coffee & Tea" },
-                                    { label: t('home', 'teaBags'), image: "https://images.unsplash.com/photo-1594631252845-29fc4586d517?w=200&h=200&fit=crop", link: "/categories?category=Coffee & Tea" },
-                                    { label: t('home', 'creamers'), image: "https://images.unsplash.com/photo-1544233726-9f1d2b27be8b?w=200&h=200&fit=crop", link: "/categories?category=Coffee & Tea" }
+                                    { label: "Nescafé", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/b/be/Nescafe_logo.svg/2560px-Nescafe_logo.svg.png", link: "/categories?category=Coffee & Tea" },
+                                    { label: "Starbucks", image: "https://upload.wikimedia.org/wikipedia/en/thumb/d/d3/Starbucks_Corporation_Logo_2011.svg/1200px-Starbucks_Corporation_Logo_2011.svg.png", link: "/categories?category=Coffee & Tea" },
+                                    { label: "Lavazza", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c8/Lavazza_logo.svg/2560px-Lavazza_logo.svg.png", link: "/categories?category=Coffee & Tea" },
+                                    { label: "Jacobs", image: "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Jacobs_Logo.svg/2560px-Jacobs_Logo.svg.png", link: "/categories?category=Coffee & Tea" }
                                 ]}
                                 footerLink="/categories?category=Coffee & Tea"
-                                footerText={t('home', 'caffeineSelection')}
+                                footerText="Caffeine Selection"
                             />
                         </div>
                     ) : null}
