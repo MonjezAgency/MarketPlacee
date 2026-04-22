@@ -28,6 +28,7 @@ import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { apiFetch } from '@/lib/api';
+import { formatPrice } from '@/lib/currency';
 
 const SUPPLIER_LINKS = [
     { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
@@ -48,6 +49,19 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     const pathname = usePathname();
     const { user, logout } = useAuth();
     const { theme, setTheme } = useTheme();
+    const [stats, setStats] = React.useState<any>(null);
+
+    React.useEffect(() => {
+        const fetchStats = async () => {
+            try {
+                const res = await apiFetch(`/dashboard/supplier`);
+                if (res.ok) setStats(await res.json());
+            } catch (err) {
+                console.error('Failed to fetch header stats:', err);
+            }
+        };
+        fetchStats();
+    }, []);
     const [pendingCounts, setPendingCounts] = React.useState<Record<string, number>>({
         orders: 0,
         products: 0
@@ -179,11 +193,11 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                         <div className="hidden lg:flex items-center gap-8 border-s border-border/50 ps-8">
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Revenue (MTD)</span>
-                                <span className="text-sm font-black text-foreground">$8,420.00</span>
+                                <span className="text-sm font-black text-foreground">{stats ? formatPrice(stats.totalRevenue) : '—'}</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Active Sales</span>
-                                <span className="text-sm font-black text-emerald-500">12</span>
+                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Active Orders</span>
+                                <span className="text-sm font-black text-emerald-500">{stats?.totalOrders || '0'}</span>
                             </div>
                         </div>
                     </div>

@@ -124,10 +124,10 @@ export default function AdminOverviewPage() {
                             </div>
                             <h2 className="text-5xl font-black tracking-tighter font-heading mb-4 select-none">EGP {stats.totalSales.toLocaleString('ar-EG')}</h2>
                             <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-500 px-4 py-1.5 rounded-full font-black text-xs">
-                                    <ArrowUpRight size={16} />
-                                    <span>+64.54%</span>
-                                </div>
+                                    <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-500 px-4 py-1.5 rounded-full font-black text-xs">
+                                        <ArrowUpRight size={16} />
+                                        <span>+0.00%</span>
+                                    </div>
                                 <p className="text-xs font-bold text-muted-foreground italic truncate">{t('admin', 'projectedVsReactive')}</p>
                             </div>
                         </div>

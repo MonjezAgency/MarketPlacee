@@ -17,7 +17,37 @@ import {
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+import { formatPrice } from '@/lib/currency';
+
 export default function AdminBillingPage() {
+    const [stats, setStats] = React.useState<any>(null);
+    const [viesProfiles, setViesProfiles] = React.useState<any[]>([]);
+    const [loading, setLoading] = React.useState(true);
+
+    React.useEffect(() => {
+        const fetchData = async () => {
+            try {
+                const [statsRes, viesRes] = await Promise.all([
+                    apiFetch('/finance/reports/revenue?period=month'),
+                    apiFetch('/finance/tax-exemptions')
+                ]);
+                
+                if (statsRes.ok) setStats(await statsRes.json());
+                if (viesRes.ok) setViesProfiles(await viesRes.json());
+            } catch (err) {
+                console.error("Failed to fetch billing data:", err);
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchData();
+    }, []);
+
+    const STAT_CARDS = [
+        { label: 'Total Volume', value: stats ? formatPrice(stats.totalRevenue) : '—', trend: stats?.conversionRate ? `${stats.conversionRate}% Conv.` : '0%', isUp: true, icon: DollarSign, color: 'emerald' },
+        { label: 'Platform Profit', value: stats ? formatPrice(stats.platformRevenue) : '—', trend: '+5% Fee', isUp: true, icon: TrendingUp, color: 'blue' },
+        { label: 'Active Requests', value: viesProfiles.filter(v => v.status === 'PENDING').length.toString(), trend: 'Tax Compliance', isUp: true, icon: ShieldCheck, color: 'amber' },
+        { label: 'Settled Orders', value: stats?.paidOrders?.toString() || '0', trend: 'Completed', isUp: true, icon: Building2, color: 'rose' },
     return (
         <div className="max-w-[1200px] mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header Area */}
@@ -50,12 +80,7 @@ export default function AdminBillingPage() {
 
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {[
-                    { label: 'Total Revenue', value: '$128,430.50', trend: '+12.5%', isUp: true, icon: DollarSign, color: 'emerald' },
-                    { label: 'Net Profit', value: '$12,240.00', trend: '+8.2%', isUp: true, icon: TrendingUp, color: 'blue' },
-                    { label: 'Active VAT IDs', value: '412', trend: '+18', isUp: true, icon: ShieldCheck, color: 'amber' },
-                    { label: 'Pending Payouts', value: '$8,240.10', trend: '-2.4%', isUp: false, icon: Building2, color: 'rose' },
-                ].map((stat, i) => (
+                {STAT_CARDS.map((stat, i) => (
                     <motion.div
                         key={i}
                         initial={{ opacity: 0, scale: 0.95 }}
@@ -105,34 +130,33 @@ export default function AdminBillingPage() {
                         </div>
 
                         <div className="space-y-4">
-                            {[
-                                { name: 'Global Tech GMBH', vat: 'DE29384756', status: 'VERIFIED', time: '2h ago' },
-                                { name: 'Nordic Logistics AB', vat: 'SE19283746', status: 'VERIFIED', time: '5h ago' },
-                                { name: 'Lumiere Retail SAS', vat: 'FR48293746', status: 'PENDING', time: '1d ago' },
-                                { name: 'Vito Solutions SRL', vat: 'IT38294756', status: 'VERIFIED', time: '2d ago' },
-                            ].map((item, i) => (
-                                <div key={i} className="flex items-center justify-between p-4 bg-[#F8FAFC] dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 group hover:border-[#FF8A00]/30 transition-all">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-xl bg-white dark:bg-[#131921] border border-[#EAEDED] dark:border-white/10 flex items-center justify-center font-black text-xs text-[#0A1A2F] dark:text-white">
-                                            {item.name[0]}
+                            {viesProfiles.length === 0 ? (
+                                <div className="py-20 text-center opacity-30 font-black uppercase tracking-widest text-xs">No Recent VIES Activity</div>
+                            ) : (
+                                viesProfiles.slice(0, 5).map((item, i) => (
+                                    <div key={i} className="flex items-center justify-between p-4 bg-[#F8FAFC] dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5 group hover:border-[#FF8A00]/30 transition-all">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-white dark:bg-[#131921] border border-[#EAEDED] dark:border-white/10 flex items-center justify-center font-black text-xs text-[#0A1A2F] dark:text-white">
+                                                ID
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-black text-[#0A1A2F] dark:text-white truncate max-w-[150px]">{item.certificateType || 'Tax Certificate'}</p>
+                                                <p className="text-[10px] font-bold text-[#888]">{item.userId.slice(-12)}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="text-sm font-black text-[#0A1A2F] dark:text-white">{item.name}</p>
-                                            <p className="text-[10px] font-bold text-[#888]">{item.vat}</p>
+                                        <div className="flex items-center gap-6">
+                                            <div className="hidden md:block text-end">
+                                                <p className="text-[10px] font-bold text-[#888] uppercase tracking-tighter">Status</p>
+                                                <p className="text-[10px] font-black text-[#0A1A2F] dark:text-white tracking-widest">{item.status}</p>
+                                            </div>
+                                            <div className={cn("w-2 h-2 rounded-full", item.status === 'APPROVED' ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-amber-500")} />
+                                            <button className="text-[#888] hover:text-[#0A1A2F] dark:hover:text-white transition-colors">
+                                                <MoreHorizontal size={18} />
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-6">
-                                        <div className="hidden md:block text-end">
-                                            <p className="text-[10px] font-bold text-[#888] uppercase tracking-tighter">Identity</p>
-                                            <p className="text-[10px] font-black text-[#0A1A2F] dark:text-white tracking-widest">{item.status}</p>
-                                        </div>
-                                        <div className={cn("w-2 h-2 rounded-full", item.status === 'VERIFIED' ? "bg-emerald-500 shadow-[0_0_8px_#10b981]" : "bg-amber-500")} />
-                                        <button className="text-[#888] hover:text-[#0A1A2F] dark:hover:text-white transition-colors">
-                                            <MoreHorizontal size={18} />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))}
+                                ))
+                            )}
                         </div>
                     </div>
 
@@ -184,9 +208,9 @@ export default function AdminBillingPage() {
 
                         <div className="space-y-6 relative z-10">
                             {[
-                                { label: 'Commission Profit', val: '$14,200', pct: 60, color: '#FF8A00' },
-                                { label: 'Ad Revenue', val: '$8,400', pct: 35, color: '#1BC7C9' },
-                                { label: 'Service Fees', val: '$1,200', pct: 5, color: '#FFFFFF' },
+                                { label: 'Platform Volume', val: stats ? formatPrice(stats.totalRevenue) : '$0.00', pct: 100, color: '#FFFFFF' },
+                                { label: 'Supplier Share', val: stats ? formatPrice(stats.supplierRevenue) : '$0.00', pct: 95, color: '#1BC7C9' },
+                                { label: 'Net Commission', val: stats ? formatPrice(stats.platformRevenue) : '$0.00', pct: 5, color: '#FF8A00' },
                             ].map((item, i) => (
                                 <div key={i} className="space-y-2">
                                     <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">

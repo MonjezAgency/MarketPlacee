@@ -84,7 +84,11 @@ export default function AdminOrdersPage() {
 
     const handleBulkAction = async (status: string) => {
         if (selectedIds.size === 0) return;
+        
+        const actionLabel = status === 'PAID' ? 'approving' : 'cancelling';
+        const tid = toast.loading(`Bulk ${actionLabel} ${selectedIds.size} orders...`);
         setIsBulkLoading(true);
+        
         try {
             const res = await apiFetch('/orders/bulk-status', {
                 method: 'PATCH',
@@ -93,12 +97,18 @@ export default function AdminOrdersPage() {
                     status
                 })
             });
+            
             if (res.ok) {
+                toast.success(`Successfully ${status.toLowerCase()} ${selectedIds.size} orders`, { id: tid });
                 await loadOrders();
                 setSelectedIds(new Set());
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast.error(err.message || "Failed to process bulk action", { id: tid });
             }
         } catch (err) {
             console.error('Bulk action failed:', err);
+            toast.error("Network error during bulk action", { id: tid });
         } finally {
             setIsBulkLoading(false);
         }
