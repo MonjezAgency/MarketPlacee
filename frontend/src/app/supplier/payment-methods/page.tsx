@@ -102,7 +102,7 @@ export default function PaymentMethodsPage() {
         }
     };
 
-    const kycBlocked = kycStatus === 'UNVERIFIED' || kycStatus === 'REJECTED';
+    const kycBlocked = kycStatus === 'UNVERIFIED' || kycStatus === 'REJECTED' || kycStatus === 'PENDING';
 
     if (loadingKyc) return (
         <div className="flex items-center justify-center h-64">
