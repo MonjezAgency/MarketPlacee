@@ -26,6 +26,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { UserMenu } from '@/components/dashboard/UserMenu';
+import { apiFetch } from '@/lib/api';
 
 const SUPPLIER_LINKS = [
     { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
