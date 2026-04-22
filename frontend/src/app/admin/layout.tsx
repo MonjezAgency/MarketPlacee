@@ -1,5 +1,6 @@
 'use client';
 import { apiFetch } from '@/lib/api';
+import NotificationBell from '@/components/ui/NotificationBell';
 
 
 import * as React from 'react';
@@ -12,7 +13,6 @@ import {
     Package,
     ShoppingCart,
     Settings,
-    Bell,
     LogOut,
     Menu,
     UserPlus,
