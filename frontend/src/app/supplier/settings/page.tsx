@@ -42,7 +42,7 @@ export default function SupplierSettingsPage() {
 
     const showToast = (type: 'success' | 'error', msg: string) => {
         setToast({ type, msg });
-        setTimeout(() => setToast(null), 3000);
+        setTimeout(() => setToast(null), 5000);
     };
 
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -267,12 +267,15 @@ export default function SupplierSettingsPage() {
                         </div>
 
                         <div className="pt-6 border-t border-border/50">
-                            <Link 
-                                href="/supplier/settings/payout"
-                                className="w-full h-14 bg-secondary text-secondary-foreground flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest rounded-2xl border border-border/50 hover:bg-secondary/90 hover:shadow-lg transition-all"
+                            <div 
+                                className="w-full h-14 bg-secondary/50 text-secondary-foreground/50 flex items-center justify-center gap-2 font-black text-[10px] uppercase tracking-widest rounded-2xl border border-border/50 cursor-not-allowed select-none transition-all relative overflow-hidden"
                             >
-                                <CreditCard size={16} /> {t('settings', 'updateFinancials')}
-                            </Link>
+                                <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-0 pointer-events-none" />
+                                <div className="flex items-center gap-2 relative z-10 line-through opacity-70 border border-transparent">
+                                    <CreditCard size={16} /> {t('settings', 'updateFinancials')}
+                                </div>
+                                <Lock size={14} className="absolute end-4 z-10 text-white/50" />
+                            </div>
                         </div>
                     </div>
 

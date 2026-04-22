@@ -41,6 +41,8 @@ export default function AdminOrdersPage() {
     const [orders, setOrders] = React.useState<AdminOrder[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [searchTerm, setSearchTerm] = React.useState('');
+    const [sortOrder, setSortOrder] = React.useState<'DESC' | 'ASC'>('DESC');
+    const [filterStatus, setFilterStatus] = React.useState<string>('ALL');
     const [selectedOrder, setSelectedOrder] = React.useState<AdminOrder | null>(null);
     const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
     const [isBulkLoading, setIsBulkLoading] = React.useState(false);
@@ -118,11 +120,19 @@ export default function AdminOrdersPage() {
         }
     };
 
-    const filteredOrders = orders.filter(o =>
-        o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        o.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        o.supplier.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredOrders = orders
+        .filter(o => filterStatus === 'ALL' || o.status === filterStatus)
+        .filter(o =>
+            o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            o.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            o.supplier.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+        .sort((a, b) => {
+            // By default sortNewest First
+            const dateA = new Date(a.date).getTime();
+            const dateB = new Date(b.date).getTime();
+            return sortOrder === 'DESC' ? dateB - dateA : dateA - dateB;
+        });
 
     return (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -152,9 +162,26 @@ export default function AdminOrdersPage() {
                             className="h-12 ps-12 pe-6 bg-card rounded-2xl border border-border outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 text-sm font-bold min-w-[320px] transition-all"
                         />
                     </div>
-                    <button className="h-12 w-12 flex items-center justify-center bg-card border border-border rounded-2xl hover:bg-muted transition-colors">
-                        <Filter size={18} />
-                    </button>
+                    <select
+                        value={filterStatus}
+                        onChange={(e) => setFilterStatus(e.target.value)}
+                        className="h-12 px-4 bg-card rounded-2xl border border-border outline-none focus:border-primary text-sm font-bold transition-all cursor-pointer"
+                    >
+                        <option value="ALL">All Statuses</option>
+                        <option value="PENDING">Pending</option>
+                        <option value="PAID">Confirmed</option>
+                        <option value="SHIPPED">Shipped</option>
+                        <option value="DELIVERED">Delivered</option>
+                        <option value="CANCELLED">Rejected/Cancelled</option>
+                    </select>
+                    <select
+                        value={sortOrder}
+                        onChange={(e) => setSortOrder(e.target.value as 'DESC'|'ASC')}
+                        className="h-12 px-4 bg-card rounded-2xl border border-border outline-none focus:border-primary text-sm font-bold transition-all cursor-pointer"
+                    >
+                        <option value="DESC">Newest First</option>
+                        <option value="ASC">Oldest First</option>
+                    </select>
                     <button className="h-12 px-6 flex items-center gap-2 bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-xl shadow-primary/20">
                         <Download size={16} />
                         Export Ledger
@@ -309,7 +336,7 @@ export default function AdminOrdersPage() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setSelectedOrder(null)}
-                            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+                            className="fixed w-screen h-[100dvh] inset-0 bg-black/80 backdrop-blur-sm z-[-1]"
                         />
                         
                         <motion.div

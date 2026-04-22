@@ -42,6 +42,7 @@ import {
     Code2,
     ExternalLink,
     Bot,
+    Lock,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -54,7 +55,7 @@ interface SidebarGroup {
     title: string;
     titleKey: string;
     icon: React.ElementType;
-    links: { label: string; translationKey: string; href: string; icon: React.ElementType }[];
+    links: { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean }[];
 }
 
 // Owner-only group — بيظهر بس لـ OWNER
@@ -141,7 +142,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         icon: Wrench,
         links: [
             { label: 'Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
-            { label: 'Billing', translationKey: 'billing', href: '/admin/billing', icon: CreditCard },
+            { label: 'Billing', translationKey: 'billing', href: '/admin/billing', icon: CreditCard, locked: true },
             { label: 'Pricing / Markup', translationKey: 'pricingMarkup', href: '/admin/pricing', icon: Tag },
             { label: 'Security Logs', translationKey: 'securityLogs', href: '/admin/security', icon: Shield },
             { label: 'Settings', translationKey: 'settings', href: '/admin/settings', icon: Settings },
@@ -170,7 +171,11 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
     if (!isOpen) {
         // Collapsed: just show icons
         return (
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
+                {/* Dot indicator if group has pending badges */}
+                {groupBadgeCount > 0 && (
+                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-secondary rounded-full border-2 border-[#0A1A2F]" />
+                )}
                 {group.links.map(link => {
                     const Icon = link.icon;
                     const isActive = pathname === link.href;
@@ -220,6 +225,23 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
                     {group.links.map(link => {
                         const Icon = link.icon;
                         const isActive = pathname === link.href;
+                        
+                        if (link.locked) {
+                             return (
+                                <div
+                                    key={link.href}
+                                    className="flex items-center justify-between px-6 py-3 rounded-xl text-xs font-bold transition-all relative overflow-hidden cursor-not-allowed text-white/30"
+                                >
+                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-0 pointer-events-none" />
+                                    <div className="flex items-center gap-3 relative z-10 opacity-50">
+                                        <Icon size={16} />
+                                        <span className="line-through">{t('admin', link.translationKey) || link.label}</span>
+                                    </div>
+                                    <Lock size={14} className="relative z-10 text-white/50" />
+                                </div>
+                             )
+                        }
+
                         return (
                             <Link
                                 key={link.href}

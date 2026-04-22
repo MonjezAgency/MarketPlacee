@@ -54,9 +54,15 @@ export class OrdersService {
             },
         });
 
-        // NOTE: Customer notification + confirmation email are sent AFTER payment
-        // is confirmed via Stripe webhook (payment_intent.succeeded/amount_capturable_updated)
-        // to avoid showing "Order Placed" before funds are actually captured.
+        // Send Customer Confirmation Email (payment bypassed as per client request)
+        if (order.customer?.email) {
+            this.emailService.sendOrderConfirmationEmail(
+                order.customer.email,
+                order.customer.name,
+                order.id,
+                order.totalAmount
+            ).catch(err => console.error('Failed to send order confirmation email:', err));
+        }
 
         // Notify each supplier
         const supplierIds = [...new Set(
@@ -73,6 +79,21 @@ export class OrdersService {
                 { orderId: order.id },
             ).catch(() => {});
         }
+
+        // Notify Admins
+        this.prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
+            .then(admins => {
+                for (const admin of admins) {
+                    this.notificationsService.create(
+                        admin.id,
+                        'New Order Received',
+                        `Order #${order.id.slice(-8).toUpperCase()} has been placed by ${order.customer?.name}.`,
+                        'INFO',
+                        { orderId: order.id }
+                    ).catch(() => {});
+                }
+            })
+            .catch(() => {});
 
         return order;
     }

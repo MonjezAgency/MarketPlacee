@@ -52,32 +52,51 @@ const SLOT_DIMENSIONS = {
 };
 
 export default function SupplierOffersPage() {
-    const [offers, setOffers] = React.useState<OfferPlacement[]>([
-        {
-            id: 'OFF-01',
-            title: 'Summer Beverage Blast',
-            type: 'Flash Sale',
-            slot: 'HERO',
-            price: 500,
-            status: 'ACTIVE',
-            startDate: '2026-02-23',
-            startTime: '10:00',
-            expiry: '2026-03-01',
-            impressions: 1240
-        },
-        {
-            id: 'OFF-02',
-            title: 'Energy Drink Bundle',
-            type: 'Bundle',
-            slot: 'FEATURED',
-            price: 300,
-            status: 'PENDING',
-            startDate: '2026-03-01',
-            startTime: '12:00',
-            expiry: '2026-03-15',
-            impressions: 0
-        },
-    ]);
+    const [offers, setOffers] = React.useState<OfferPlacement[]>([]);
+    const [isClient, setIsClient] = React.useState(false);
+
+    React.useEffect(() => {
+        setIsClient(true);
+        const saved = localStorage.getItem('__atlantis_offers');
+        if (saved) {
+            try {
+                setOffers(JSON.parse(saved));
+                return;
+            } catch (e) {}
+        }
+        setOffers([
+            {
+                id: 'OFF-01',
+                title: 'Summer Beverage Blast',
+                type: 'Flash Sale',
+                slot: 'HERO',
+                price: 500,
+                status: 'ACTIVE',
+                startDate: '2026-02-23',
+                startTime: '10:00',
+                expiry: '2026-03-01',
+                impressions: 1240
+            },
+            {
+                id: 'OFF-02',
+                title: 'Energy Drink Bundle',
+                type: 'Bundle',
+                slot: 'FEATURED',
+                price: 300,
+                status: 'PENDING',
+                startDate: '2026-03-01',
+                startTime: '12:00',
+                expiry: '2026-03-15',
+                impressions: 0
+            },
+        ]);
+    }, []);
+
+    React.useEffect(() => {
+        if (isClient) {
+            localStorage.setItem('__atlantis_offers', JSON.stringify(offers));
+        }
+    }, [offers, isClient]);
 
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [editingId, setEditingId] = React.useState<string | null>(null);

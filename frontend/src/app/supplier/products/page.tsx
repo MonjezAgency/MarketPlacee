@@ -37,6 +37,7 @@ export default function SupplierProductsPage() {
     const [isLoading, setIsLoading] = React.useState(true);
     const [searchTerm, setSearchTerm] = React.useState('');
     const [selectedCategory, setSelectedCategory] = React.useState('All');
+    const [currentPage, setCurrentPage] = React.useState(1);
     const [isEditorOpen, setIsEditorOpen] = React.useState(false);
     const [editingProduct, setEditingProduct] = React.useState<Product | null>(null);
 
@@ -210,6 +211,10 @@ export default function SupplierProductsPage() {
         return matchesSearch && matchesCategory;
     });
 
+    const ITEMS_PER_PAGE = 10;
+    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+    const paginatedProducts = filteredProducts.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
     const getStatusColor = (status: string | undefined) => {
         switch ((status || '').toUpperCase()) {
             case 'ACTIVE': return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
@@ -339,14 +344,14 @@ export default function SupplierProductsPage() {
                         type="text"
                         placeholder="Search by name, EAN, or description..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                         className="w-full h-14 bg-card border border-border/50 rounded-2xl ps-12 pe-4 text-foreground outline-none focus:border-primary/50 transition-all font-medium"
                     />
                 </div>
                 <div className="flex gap-2 min-w-max">
                     <select
                         value={selectedCategory}
-                        onChange={(e) => setSelectedCategory(e.target.value)}
+                        onChange={(e) => { setSelectedCategory(e.target.value); setCurrentPage(1); }}
                         className="h-14 px-6 bg-card border border-border/50 rounded-2xl text-foreground font-bold outline-none cursor-pointer appearance-none min-w-[160px]"
                     >
                         <option value="All">All Categories</option>
@@ -365,10 +370,11 @@ export default function SupplierProductsPage() {
                     ))}
                 </div>
             ) : filteredProducts.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <AnimatePresence mode="popLayout">
-                        {filteredProducts.map((product) => (
-                            <motion.div
+                <div className="space-y-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <AnimatePresence mode="popLayout">
+                            {paginatedProducts.map((product) => (
+                                <motion.div
                                 key={product.id}
                                 layout
                                 initial={{ opacity: 0, scale: 0.9 }}
@@ -455,6 +461,30 @@ export default function SupplierProductsPage() {
                             </motion.div>
                         ))}
                     </AnimatePresence>
+                </div>
+
+                    {/* Pagination Controls */}
+                    {totalPages > 1 && (
+                        <div className="flex items-center justify-center gap-4 py-4">
+                            <button
+                                disabled={currentPage === 1}
+                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                className="h-10 px-4 rounded-xl border border-border/50 bg-card hover:bg-muted font-bold text-sm disabled:opacity-50 transition-all"
+                            >
+                                Previous
+                            </button>
+                            <span className="text-sm font-bold text-muted-foreground">
+                                Page <span className="text-foreground">{currentPage}</span> of {totalPages}
+                            </span>
+                            <button
+                                disabled={currentPage === totalPages}
+                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                className="h-10 px-4 rounded-xl border border-border/50 bg-card hover:bg-muted font-bold text-sm disabled:opacity-50 transition-all"
+                            >
+                                Next
+                            </button>
+                        </div>
+                    )}
                 </div>
             ) : (
                 <div className="flex flex-col items-center justify-center py-20 bg-card rounded-[48px] border border-border/50 border-dashed">

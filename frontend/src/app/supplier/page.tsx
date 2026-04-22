@@ -53,10 +53,10 @@ export default function SupplierOverviewPage() {
     }, []);
 
     const STATS = [
-        { label: t('supplier', 'revenueMtd'), value: '$8,420.00', trend: '+18.4%', up: true, icon: BarChart3, color: 'text-emerald-500' },
-        { label: t('supplier', 'activeProducts'), value: '24', trend: 'Stable', up: true, icon: Package, color: 'text-primary' },
-        { label: t('supplier', 'totalOrders'), value: '156', trend: '+22%', up: true, icon: ShoppingCart, color: 'text-blue-500' },
-        { label: t('supplier', 'digitalImpressions'), value: '4.2k', trend: '+12%', up: true, icon: Eye, color: 'text-purple-500' },
+        { label: t('supplier', 'revenueMtd'), value: dashboardStats?.totalRevenue ? formatPrice(dashboardStats.totalRevenue) : '$0.00', trend: '+0.0%', up: true, icon: BarChart3, color: 'text-emerald-500' },
+        { label: t('supplier', 'activeProducts'), value: dashboardStats?.activeProductsCount?.toString() || '0', trend: 'Stable', up: true, icon: Package, color: 'text-primary' },
+        { label: t('supplier', 'totalOrders'), value: dashboardStats?.totalOrders?.toString() || '0', trend: '+0%', up: true, icon: ShoppingCart, color: 'text-blue-500' },
+        { label: t('supplier', 'digitalImpressions'), value: dashboardStats?.impressions?.toString() || '0', trend: '+0%', up: true, icon: Eye, color: 'text-purple-500' },
     ];
 
     return (
@@ -115,10 +115,10 @@ export default function SupplierOverviewPage() {
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('supplier', 'monthlyRevenue')}</p>
-                            <p className="text-2xl font-black text-foreground">$8,420</p>
+                            <p className="text-2xl font-black text-foreground">{dashboardStats?.totalRevenue ? formatPrice(dashboardStats.totalRevenue) : '$0.00'}</p>
                         </div>
                         <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase">
-                            +18.4% <ArrowUpRight size={12} />
+                            +0.0% <ArrowUpRight size={12} />
                         </span>
                     </div>
                     <ResponsiveContainer width="100%" height={120}>
@@ -149,10 +149,10 @@ export default function SupplierOverviewPage() {
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('supplier', 'monthlyOrders')}</p>
-                            <p className="text-2xl font-black text-foreground">78</p>
+                            <p className="text-2xl font-black text-foreground">{dashboardStats?.totalOrders || '0'}</p>
                         </div>
                         <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase">
-                            +22% <ArrowUpRight size={12} />
+                            +0% <ArrowUpRight size={12} />
                         </span>
                     </div>
                     <ResponsiveContainer width="100%" height={120}>
