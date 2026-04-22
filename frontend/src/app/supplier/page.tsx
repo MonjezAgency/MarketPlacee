@@ -11,23 +11,8 @@ import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import Link from 'next/link';
 
-const REVENUE_SPARKLINE = [
-    { month: 'Feb', value: 3100 },
-    { month: 'Mar', value: 4900 },
-    { month: 'Apr', value: 4200 },
-    { month: 'May', value: 6100 },
-    { month: 'Jun', value: 5400 },
-    { month: 'Jul', value: 8420 },
-];
-
-const ORDERS_SPARKLINE = [
-    { month: 'Feb', value: 28 },
-    { month: 'Mar', value: 44 },
-    { month: 'Apr', value: 38 },
-    { month: 'May', value: 55 },
-    { month: 'Jun', value: 48 },
-    { month: 'Jul', value: 78 },
-];
+const REVENUE_SPARKLINE: any[] = [];
+const ORDERS_SPARKLINE: any[] = [];
 
 export default function SupplierOverviewPage() {
     const { t, locale } = useLanguage();

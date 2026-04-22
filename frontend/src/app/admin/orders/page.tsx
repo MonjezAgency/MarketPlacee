@@ -46,6 +46,7 @@ export default function AdminOrdersPage() {
     const [selectedOrder, setSelectedOrder] = React.useState<AdminOrder | null>(null);
     const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
     const [isBulkLoading, setIsBulkLoading] = React.useState(false);
+    const [isStatusUpdating, setIsStatusUpdating] = React.useState<string | null>(null);
 
     const loadOrders = async () => {
         try {
@@ -103,6 +104,8 @@ export default function AdminOrdersPage() {
     };
 
     const updateStatus = async (id: string, status: string) => {
+        setIsStatusUpdating(id);
+        const tid = toast.loading(`Updating status to ${status}...`);
         try {
             const res = await apiFetch(`/orders/${id}/status`, {
                 method: 'PATCH',
@@ -110,13 +113,20 @@ export default function AdminOrdersPage() {
             });
             if (res.ok) {
                 const updated = await res.json();
-                setOrders(orders.map(o => o.id === id ? { ...o, status: updated.status as any } : o));
+                setOrders(prev => prev.map(o => o.id === id ? { ...o, status: updated.status as any } : o));
                 if (selectedOrder?.id === id) {
-                    setSelectedOrder({ ...selectedOrder, status: updated.status as any });
+                    setSelectedOrder(prev => prev ? { ...prev, status: updated.status as any } : null);
                 }
+                toast.success(`Order ${status.toLowerCase()} successfully`, { id: tid });
+            } else {
+                const errData = await res.json().catch(() => ({}));
+                toast.error(errData.message || `Failed to update status`, { id: tid });
             }
         } catch (err) {
             console.error('Failed to update status:', err);
+            toast.error('Connection error', { id: tid });
+        } finally {
+            setIsStatusUpdating(null);
         }
     };
 
@@ -336,7 +346,7 @@ export default function AdminOrdersPage() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setSelectedOrder(null)}
-                            className="fixed w-screen h-[100dvh] inset-0 bg-black/80 backdrop-blur-sm z-[-1]"
+                            className="fixed inset-0 w-full h-full bg-black/90 backdrop-blur-md z-[-1]"
                         />
                         
                         <motion.div
@@ -373,11 +383,21 @@ export default function AdminOrdersPage() {
                                         <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-50 mb-2 block">Quick Actions</span>
                                         {selectedOrder.status === 'PENDING' && (
                                             <>
-                                                <button onClick={() => updateStatus(selectedOrder.id, 'PAID')} className="w-full h-12 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3">
-                                                    <CheckCircle size={16} /> Approve & Fill
+                                                <button 
+                                                    disabled={isStatusUpdating === selectedOrder.id}
+                                                    onClick={() => updateStatus(selectedOrder.id, 'PAID')} 
+                                                    className="w-full h-12 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-emerald-500/20 transition-all hover:scale-[1.02] active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
+                                                >
+                                                    {isStatusUpdating === selectedOrder.id ? <RefreshCw className="animate-spin" size={16} /> : <CheckCircle size={16} />} 
+                                                    Approve & Fill
                                                 </button>
-                                                <button onClick={() => updateStatus(selectedOrder.id, 'CANCELLED')} className="w-full h-12 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-red-500/20 transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-3">
-                                                    <XCircle size={16} /> Cancel Order
+                                                <button 
+                                                    disabled={isStatusUpdating === selectedOrder.id}
+                                                    onClick={() => updateStatus(selectedOrder.id, 'CANCELLED')} 
+                                                    className="w-full h-12 bg-red-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg shadow-red-500/20 transition-all hover:opacity-90 active:scale-95 flex items-center justify-center gap-3 disabled:opacity-50"
+                                                >
+                                                    {isStatusUpdating === selectedOrder.id ? <RefreshCw className="animate-spin" size={16} /> : <XCircle size={16} />} 
+                                                    Cancel Order
                                                 </button>
                                             </>
                                         )}

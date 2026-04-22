@@ -322,30 +322,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             .catch(() => {}); // في حالة network error — مش نحجب
     }, [user]);
 
-    // Auto-open on mount for desktop
-    React.useEffect(() => {
-        setMounted(true);
-        if (typeof window !== 'undefined' && window.innerWidth > 1024) {
-            setIsOpen(true);
-        }
-        const fetchNotifications = async () => {
-            if (user?.role !== 'admin' && user?.role !== 'ADMIN' && !isOwner) return;
-            try {
-                
-                const res = await apiFetch('/dashboard/admin/notifications', {
-                });
-                if (res.ok) {
-                    const data = await res.json();
-                    setNotifications(data);
-                }
-            } catch (err) {
-                console.error("Failed to fetch notifications:", err);
-            }
-        };
-        fetchNotifications();
-        const interval = setInterval(fetchNotifications, 30000);
-        return () => clearInterval(interval);
-    }, [user]);
+    // Notifications are now handled by the useNotifications hook within the NotificationBell component
+    // No more local intervals or duplicate fetching here.
 
     // Map notification counts to sidebar routes
     const badgeCounts: Record<string, number> = {
@@ -522,55 +500,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             </button>
                         )}
 
-                        {/* Notification Bell */}
-                        <div className="relative group">
-                            <button
-                                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                                className="p-2 rounded-md hover:bg-[#F3F3F3] dark:hover:bg-white/10 transition-all outline-none"
-                            >
-                                <Bell size={18} className="text-[#555] dark:text-[#999] group-hover:text-[#FF9900] transition-all" />
-                                {totalPending > 0 && <span className="absolute top-1.5 end-1.5 w-2 h-2 bg-[#C40000] rounded-full animate-pulse" />}
-                            </button>
-
-                            {/* Dropdown Notification */}
-                            <div className={cn(
-                                "absolute top-full end-0 mt-2 w-72 bg-white dark:bg-[#1A1F26] border border-[#DDD] dark:border-white/10 rounded-lg shadow-lg transition-all p-3 z-[100] origin-top-right",
-                                isNotificationsOpen ? "scale-100 opacity-100 visible" : "scale-95 opacity-0 invisible"
-                            )}>
-                                <h4 className="text-xs font-bold text-[#0F1111] dark:text-white uppercase tracking-wider mb-3">{t('admin', 'notifications')}</h4>
-                                <div className="space-y-2">
-                                    {totalPending > 0 ? (
-                                        <div className="space-y-1">
-                                            {notifications.pendingUsers > 0 && (
-                                                <Link href="/admin/users" onClick={() => setIsNotificationsOpen(false)} className="flex items-center gap-2 p-2 rounded-md hover:bg-[#FEF8E8] dark:hover:bg-[#FF9900]/10 border border-transparent hover:border-[#FF9900]/20 transition-colors">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#FF9900]" />
-                                                    <p className="text-xs text-[#0F1111] dark:text-white font-medium">{notifications.pendingUsers} {t('admin', 'userApprovalsCount')}</p>
-                                                </Link>
-                                            )}
-                                            {notifications.pendingProducts > 0 && (
-                                                <Link href="/admin/products" onClick={() => setIsNotificationsOpen(false)} className="flex items-center gap-2 p-2 rounded-md hover:bg-[#FEF8E8] dark:hover:bg-[#FF9900]/10 border border-transparent hover:border-[#FF9900]/20 transition-colors">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#FF9900]" />
-                                                    <p className="text-xs text-[#0F1111] dark:text-white font-medium">{notifications.pendingProducts} {t('admin', 'pendingProductsCount')}</p>
-                                                </Link>
-                                            )}
-                                            {notifications.pendingOrders > 0 && (
-                                                <Link href="/admin/orders" onClick={() => setIsNotificationsOpen(false)} className="flex items-center gap-2 p-2 rounded-md hover:bg-[#FEF8E8] dark:hover:bg-[#FF9900]/10 border border-transparent hover:border-[#FF9900]/20 transition-colors">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#FF9900]" />
-                                                    <p className="text-xs text-[#0F1111] dark:text-white font-medium">{notifications.pendingOrders} {t('admin', 'pendingOrdersCount')}</p>
-                                                </Link>
-                                            )}
-                                            {notifications.pendingPlacements > 0 && (
-                                                <Link href="/admin/placements" onClick={() => setIsNotificationsOpen(false)} className="flex items-center gap-2 p-2 rounded-md hover:bg-[#FEF8E8] dark:hover:bg-[#FF9900]/10 border border-transparent hover:border-[#FF9900]/20 transition-colors">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-[#FF9900]" />
-                                                    <p className="text-xs text-[#0F1111] dark:text-white font-medium">{notifications.pendingPlacements} {t('admin', 'placementRequestsCount')}</p>
-                                                </Link>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div className="p-2 text-xs text-[#888] font-medium">{t('admin', 'noPendingActions')}</div>
-                                    )}
-                                </div>
-                            </div>
+                        {/* Unified Notification Bell */}
+                        <div className="flex items-center">
+                            <NotificationBell isLight={resolvedTheme !== 'dark'} />
                         </div>
 
                         <div className="h-6 w-[1px] bg-[#DDD] dark:bg-white/10" />

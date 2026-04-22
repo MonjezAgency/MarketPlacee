@@ -473,7 +473,7 @@ export default function SupportPage() {
 
             {/* ── Live Chat ── */}
             {tab === 'chat' && (
-                <div className="flex gap-4 h-[72vh]">
+                <div className="flex gap-4 h-[calc(100vh-260px)] min-h-[600px]">
                     {/* Conversations list */}
                     <div className="w-80 bg-card border border-border/50 rounded-2xl overflow-hidden flex flex-col shrink-0">
                         {/* Search */}

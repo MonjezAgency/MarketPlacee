@@ -122,6 +122,7 @@ export class OrdersController {
         @Body('reason') reason: string,
         @Request() req,
     ) {
+        // reason is optional, service handles default
         const order = await this.ordersService.updateStatus(
             id,
             status,

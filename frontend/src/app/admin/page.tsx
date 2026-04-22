@@ -19,58 +19,11 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 
-const REVENUE_DATA = [
-    { name: 'Jan', revenue: 45000, items: 1200 },
-    { name: 'Feb', revenue: 52000, items: 1400 },
-    { name: 'Mar', revenue: 48000, items: 1300 },
-    { name: 'Apr', revenue: 61000, items: 1600 },
-    { name: 'May', revenue: 55000, items: 1500 },
-    { name: 'Jun', revenue: 67000, items: 1800 },
-    { name: 'Jul', revenue: 72000, items: 2100 },
-];
-
-const CATEGORY_DATA = [
-    { name: 'catBeverages', value: 4520, color: '#0A1A2F' },
-    { name: 'catSnacks', value: 2840, color: '#FF8A00' },
-    { name: 'catHygiene', value: 1800, color: '#1BC7C9' },
-    { name: 'catOther', value: 1200, color: '#F2F4F7' },
-];
-
-const TRAFFIC_DATA = [
-    { name: 'daySun', visitors: 4200, invoices: 2400 },
-    { name: 'dayMon', visitors: 3800, invoices: 1398 },
-    { name: 'dayTue', visitors: 5600, invoices: 9800 },
-    { name: 'dayWed', visitors: 4780, invoices: 3908 },
-    { name: 'dayThu', visitors: 3890, invoices: 4800 },
-    { name: 'dayFri', visitors: 4390, invoices: 3800 },
-    { name: 'daySat', visitors: 5490, invoices: 4300 },
-];
-
-const TOP_PRODUCTS = [
-    { id: 1, name: 'Coca-Cola Classic 330ml', sales: '12,450', revenue: 'EGP 18,675', growth: '+12%', image: 'https://picsum.photos/seed/cola/100/100' },
-    { id: 2, name: 'Red Bull Energy 250ml', sales: '9,820', revenue: 'EGP 24,550', growth: '+18%', image: 'https://picsum.photos/seed/redbull/100/100' },
-    { id: 3, name: 'Lipton Ice Tea Lemon', sales: '8,140', revenue: 'EGP 10,175', growth: '+5%', image: 'https://picsum.photos/seed/lipton/100/100' },
-    { id: 4, name: 'Pepsi Zero Sugar', sales: '7,650', revenue: 'EGP 11,475', growth: '+22%', image: 'https://picsum.photos/seed/pepsi/100/100' },
-    { id: 5, name: 'Almarai Fresh Milk 1L', sales: '6,420', revenue: 'EGP 8,025', growth: '+8%', image: 'https://picsum.photos/seed/milk/100/100' },
-    { id: 6, name: 'Gatorade Blue Bolt', sales: '5,210', revenue: 'EGP 9,115', growth: '+15%', image: 'https://picsum.photos/seed/gator/100/100' },
-    { id: 7, name: 'Aquafina Water 500ml', sales: '4,840', revenue: 'EGP 2,420', growth: '+3%', image: 'https://picsum.photos/seed/water/100/100' },
-    { id: 8, name: 'Starbucks Frappuccino', sales: '4,120', revenue: 'EGP 16,480', growth: '+30%', image: 'https://picsum.photos/seed/coffee/100/100' },
-    { id: 9, name: 'Nescafe Gold 200g', sales: '3,850', revenue: 'EGP 28,875', growth: '+10%', image: 'https://picsum.photos/seed/nes/100/100' },
-    { id: 10, name: 'Oreo Biscuits Pack', sales: '3,420', revenue: 'EGP 5,130', growth: '+6%', image: 'https://picsum.photos/seed/oreo/100/100' },
-];
-
-const TOP_SUPPLIERS = [
-    { id: 1, name: 'Global Bev Distribution', volume: 'EGP 428,500', orders: 1240, rating: 4.9 },
-    { id: 2, name: 'Emirates Refreshments', volume: 'EGP 312,400', orders: 980, rating: 4.8 },
-    { id: 3, name: 'United Foods Group', volume: 'EGP 284,000', orders: 850, rating: 4.7 },
-    { id: 4, name: 'Arabian Snacks Co', volume: 'EGP 215,600', orders: 720, rating: 4.6 },
-    { id: 5, name: 'Prime Logistics', volume: 'EGP 198,200', orders: 640, rating: 4.9 },
-    { id: 6, name: 'Desert Oasis Drinks', volume: 'EGP 165,400', orders: 580, rating: 4.5 },
-    { id: 7, name: 'Gulf Trading Elite', volume: 'EGP 142,800', orders: 490, rating: 4.7 },
-    { id: 8, name: 'Zand Food Services', volume: 'EGP 128,500', orders: 420, rating: 4.8 },
-    { id: 9, name: 'Al-Khair Distribution', volume: 'EGP 112,000', orders: 380, rating: 4.4 },
-    { id: 10, name: 'Horizon Wholesalers', volume: 'EGP 98,400', orders: 320, rating: 4.6 },
-];
+const REVENUE_DATA: any[] = [];
+const CATEGORY_DATA: any[] = [];
+const TRAFFIC_DATA: any[] = [];
+const TOP_PRODUCTS: any[] = [];
+const TOP_SUPPLIERS: any[] = [];
 
 export default function AdminOverviewPage() {
     const { locale, t } = useLanguage();

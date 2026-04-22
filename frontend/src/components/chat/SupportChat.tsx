@@ -272,17 +272,17 @@ export function SupportChat({ isSupport = false, targetUserId = null }: { isSupp
     const showCategorySelector = !isSupport && hasLoadedMessages && messages.length === 0 && !selectedCategory;
 
     return (
-        <div className="flex flex-col h-[600px] w-full bg-card border border-border rounded-2xl shadow-xl overflow-hidden">
-            {/* Header */}
-            <div className="p-4 bg-primary/5 border-b border-border flex items-center justify-between">
+        <div className="flex flex-col h-full w-full bg-card border-none rounded-none overflow-hidden">
+            {/* Header - Simplified as it's now internal to the dashboard's chat area */}
+            <div className="p-4 bg-muted/30 border-b border-border/50 flex items-center justify-between shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        {isSupport ? <User className="text-primary" /> : <Headphones className="text-primary" />}
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        {isSupport ? <User size={16} className="text-primary" /> : <Headphones size={16} className="text-primary" />}
                     </div>
                     <div>
-                        <h3 className="text-sm font-black">{isSupport ? 'Customer' : 'Atlantis Support'}</h3>
+                        <h3 className="text-xs font-black">{isSupport ? 'Customer' : 'Atlantis Support'}</h3>
                         <p className={cn(
-                            "text-[10px] uppercase tracking-widest font-bold",
+                            "text-[8px] uppercase tracking-widest font-black",
                             isConnected ? "text-emerald-500" : "text-muted-foreground"
                         )}>
                             {isConnected ? '● Online' : '○ Connecting...'}
