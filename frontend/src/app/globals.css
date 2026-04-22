@@ -119,6 +119,8 @@
         overflow-x: hidden;
         width: 100%;
         position: relative;
+        margin: 0 !important;
+        padding: 0 !important;
     }
 
     /* Responsive Typography with clamp() */

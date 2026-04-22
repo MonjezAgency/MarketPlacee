@@ -83,25 +83,45 @@ export default function Home() {
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                                 <AmazonCardTile
                                     title="Makeup & Beauty"
-                                    singleItem={{ image: "/Logos/brand2.jpg", link: "/categories?category=Makeup" }}
-                                    footerLink="/categories?category=Makeup"
+                                    items={[
+                                        { name: "Dove", image: "/Logos/dove.png", href: "/categories?category=Makeup & Beauty&brand=Dove" },
+                                        { name: "Lux", image: "/Logos/lux.png", href: "/categories?category=Makeup & Beauty&brand=Lux" },
+                                        { name: "Ponds", image: "/Logos/ponds.png", href: "/categories?category=Makeup & Beauty&brand=Ponds" },
+                                        { name: "Vaseline", image: "/Logos/vaseline.png", href: "/categories?category=Makeup & Beauty&brand=Vaseline" }
+                                    ]}
+                                    footerLink="/categories?category=Makeup & Beauty"
                                     footerText={t('home', 'shopAllBeauty')}
                                 />
                                 <AmazonCardTile
                                     title="Premium Fragrances"
-                                    singleItem={{ image: "/Logos/brand2.jpg", link: "/categories?category=Perfume" }}
-                                    footerLink="/categories?category=Perfume"
+                                    items={[
+                                        { name: "Chanel", image: "/Logos/Screenshot 2026-04-22 at 10.18.23 PM.png", href: "/categories?category=Premium Fragrances" },
+                                        { name: "Dior", image: "/Logos/Screenshot 2026-04-22 at 10.18.26 PM.png", href: "/categories?category=Premium Fragrances" },
+                                        { name: "Armani", image: "/Logos/Screenshot 2026-04-22 at 10.18.32 PM.png", href: "/categories?category=Premium Fragrances" },
+                                        { name: "Gucci", image: "/Logos/Screenshot 2026-04-22 at 10.18.15 PM.png", href: "/categories?category=Premium Fragrances" }
+                                    ]}
+                                    footerLink="/categories?category=Premium Fragrances"
                                     footerText="See All Fragrances"
                                 />
                                 <AmazonCardTile
                                     title="Personal Care"
-                                    singleItem={{ image: "/Logos/brand2.jpg", link: "/categories?category=Personal Care" }}
+                                    items={[
+                                        { name: "Axe", image: "/Logos/Screenshot 2026-04-22 at 10.18.43 PM.png", href: "/categories?category=Personal Care" },
+                                        { name: "Rexona", image: "/Logos/Screenshot 2026-04-22 at 10.18.47 PM.png", href: "/categories?category=Personal Care" },
+                                        { name: "Signal", image: "/Logos/Screenshot 2026-04-22 at 10.19.16 PM.png", href: "/categories?category=Personal Care" },
+                                        { name: "Clear", image: "/Logos/Screenshot 2026-04-22 at 10.18.35 PM.png", href: "/categories?category=Personal Care" }
+                                    ]}
                                     footerLink="/categories?category=Personal Care"
                                     footerText="Shop Essentials"
                                 />
                                 <AmazonCardTile
                                     title="Home Cleaning"
-                                    singleItem={{ image: "/Logos/brand2.jpg", link: "/categories?category=Home Care" }}
+                                    items={[
+                                        { name: "Persil", image: "/Logos/Screenshot 2026-04-22 at 10.19.20 PM.png", href: "/categories?category=Home Cleaning" },
+                                        { name: "Comfort", image: "/Logos/Screenshot 2026-04-22 at 10.19.26 PM.png", href: "/categories?category=Home Cleaning" },
+                                        { name: "Domestos", image: "/Logos/Screenshot 2026-04-22 at 10.18.08 PM.png", href: "/categories?category=Home Cleaning" },
+                                        { name: "Cif", image: "/Logos/Screenshot 2026-04-22 at 10.18.11 PM.png", href: "/categories?category=Home Cleaning" }
+                                    ]}
                                     footerLink="/categories?category=Home Care"
                                     footerText="Clean Home Store"
                                 />
@@ -219,19 +239,34 @@ export default function Home() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 mt-8">
                             <AmazonCardTile
                                 title="Bulk Beverages"
-                                singleItem={{ image: "/Logos/brand3.jpg", link: "/categories?category=Soft Drinks" }}
+                                items={[
+                                    { name: "Coca-Cola", image: "/Logos/cocacola.png", href: "/categories?category=Bulk Beverages" },
+                                    { name: "Pepsi", image: "/Logos/pepsi.png", href: "/categories?category=Bulk Beverages" },
+                                    { name: "Red Bull", image: "/Logos/redbull.png", href: "/categories?category=Bulk Beverages" },
+                                    { name: "Fanta", image: "/Logos/fanta.png", href: "/categories?category=Bulk Beverages" }
+                                ]}
                                 footerLink="/categories?category=Soft Drinks"
                                 footerText="Restock Drinks"
                             />
                             <AmazonCardTile
                                 title="Snacks & Sweets"
-                                singleItem={{ image: "/Logos/brand4.jpg", link: "/categories?category=Snacks & Sweets" }}
+                                items={[
+                                    { name: "Oreo", image: "/Logos/Screenshot 2026-04-22 at 10.20.23 PM.png", href: "/categories?category=Snacks & Sweets" },
+                                    { name: "Twix", image: "/Logos/Screenshot 2026-04-22 at 10.20.28 PM.png", href: "/categories?category=Snacks & Sweets" },
+                                    { name: "Kinder", image: "/Logos/Screenshot 2026-04-22 at 10.21.10 PM.png", href: "/categories?category=Snacks & Sweets" },
+                                    { name: "Nutella", image: "/Logos/Screenshot 2026-04-22 at 10.20.39 PM.png", href: "/categories?category=Snacks & Sweets" }
+                                ]}
                                 footerLink="/categories?category=Snacks & Sweets"
                                 footerText="Treats in Bulk"
                             />
                             <AmazonCardTile
                                 title="Coffee & Tea"
-                                singleItem={{ image: "/Logos/brand1.jpg", link: "/categories?category=Coffee & Tea" }}
+                                items={[
+                                    { name: "Nescafe", image: "/Logos/nescafe.png", href: "/categories?category=Coffee & Tea" },
+                                    { name: "Starbucks", image: "/Logos/starbucks.png", href: "/categories?category=Coffee & Tea" },
+                                    { name: "Lavazza", image: "/Logos/lavazza.png", href: "/categories?category=Coffee & Tea" },
+                                    { name: "Jacobs", image: "/Logos/Screenshot 2026-04-22 at 10.17.28 PM.png", href: "/categories?category=Coffee & Tea" }
+                                ]}
                                 footerLink="/categories?category=Coffee & Tea"
                                 footerText="Caffeine Selection"
                             />
