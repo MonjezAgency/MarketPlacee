@@ -250,12 +250,41 @@ export class ProductsService {
     }
 
     async deleteProducts(ids: string[], supplierId?: string) {
-        return this.prisma.product.deleteMany({
-            where: {
-                id: { in: ids },
-                ...(supplierId ? { supplierId } : {})
-            }
+        // 1. First, check if any of these products have orders.
+        // If they have orders, we should probably not delete them to keep history.
+        const productsWithOrders = await this.prisma.orderItem.findMany({
+            where: { productId: { in: ids } },
+            select: { productId: true }
         });
+        
+        const idsWithOrders = new Set(productsWithOrders.map(oi => oi.productId));
+        const idsToDelete = ids.filter(id => !idsWithOrders.has(id));
+
+        if (idsToDelete.length === 0 && ids.length > 0) {
+            throw new BadRequestException('Cannot delete products that are already part of existing orders.');
+        }
+
+        // 2. Clear related records that might not have Cascade Delete set in DB yet
+        await this.prisma.$transaction([
+            this.prisma.productPlacement.deleteMany({ where: { productId: { in: idsToDelete } } }),
+            this.prisma.tieredPrice.deleteMany({ where: { productId: { in: idsToDelete } } }),
+            this.prisma.review.deleteMany({ where: { productId: { in: idsToDelete } } }),
+            this.prisma.wishlistItem.deleteMany({ where: { productId: { in: idsToDelete } } }),
+            this.prisma.product.deleteMany({
+                where: {
+                    id: { in: idsToDelete },
+                    ...(supplierId ? { supplierId } : {})
+                }
+            })
+        ]);
+
+        return { 
+            deletedCount: idsToDelete.length, 
+            skippedCount: ids.length - idsToDelete.length,
+            message: idsToDelete.length === ids.length 
+                ? 'All selected products deleted' 
+                : `Deleted ${idsToDelete.length} products. Skipped ${ids.length - idsToDelete.length} products due to existing orders.`
+        };
     }
 
     async bulkApprove(ids: string[]) {

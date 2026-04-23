@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 interface Supplier {
     id: string;
@@ -41,6 +42,10 @@ export default function AdminSuppliersPage() {
     const [activeTab, setActiveTab] = React.useState<'ALL' | 'ACTIVE' | 'PENDING'>('ALL');
     const [panelTab, setPanelTab] = React.useState<'profile' | 'products' | 'performance' | 'compliance'>('profile');
 
+    // Bulk Selection
+    const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+    const [isBulkLoading, setIsBulkLoading] = React.useState(false);
+
     const loadSuppliers = async () => {
         try {
             const res = await apiFetch('/users?role=SUPPLIER&limit=100', { cache: 'no-store' });
@@ -65,6 +70,51 @@ export default function AdminSuppliersPage() {
     React.useEffect(() => {
         loadSuppliers();
     }, []);
+
+    const handleBulkAction = async (action: 'approve' | 'block' | 'delete') => {
+        if (selectedIds.length === 0) return;
+        
+        if (!window.confirm(`Are you sure you want to ${action} ${selectedIds.length} suppliers?`)) return;
+
+        const tid = toast.loading(`${action.charAt(0).toUpperCase() + action.slice(1)}ing suppliers...`);
+        setIsBulkLoading(true);
+        try {
+            const endpoint = `/users/bulk-${action}`;
+            const res = await apiFetch(endpoint, {
+                method: 'POST',
+                body: JSON.stringify({ ids: selectedIds })
+            });
+
+            if (res.ok) {
+                const result = await res.json();
+                toast.success(result.message || `Successfully ${action}d suppliers`, { id: tid });
+                setSelectedIds([]);
+                loadSuppliers();
+            } else {
+                const errorData = await res.json().catch(() => ({}));
+                toast.error(errorData.message || `Bulk ${action} failed`, { id: tid });
+            }
+        } catch (err) {
+            toast.error(`Error during bulk ${action}`, { id: tid });
+        } finally {
+            setIsBulkLoading(false);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredSuppliers.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredSuppliers.map(s => s.id));
+        }
+    };
+
+    const toggleSelectSupplier = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
+    };
 
     const filteredSuppliers = suppliers.filter(s => {
         const matchesSearch = (s.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -143,6 +193,14 @@ export default function AdminSuppliersPage() {
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50/50 border-b border-slate-100">
                                     <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        <th className="px-6 py-4 w-10">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedIds.length > 0 && selectedIds.length === filteredSuppliers.length}
+                                                onChange={toggleSelectAll}
+                                                className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                            />
+                                        </th>
                                         <th className="px-6 py-4">Supplier Name</th>
                                         <th className="px-6 py-4">Products</th>
                                         <th className="px-6 py-4">Revenue</th>
@@ -164,9 +222,17 @@ export default function AdminSuppliersPage() {
                                             onClick={() => setSelectedSupplier(supplier)}
                                             className={cn(
                                                 "group cursor-pointer hover:bg-slate-50 transition-all h-[64px]",
-                                                selectedSupplier?.id === supplier.id ? "bg-teal-50/50" : ""
+                                                (selectedSupplier?.id === supplier.id || selectedIds.includes(supplier.id)) ? "bg-teal-50/50" : ""
                                             )}
                                         >
+                                            <td className="px-6 py-4" onClick={(e) => toggleSelectSupplier(e, supplier.id)}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedIds.includes(supplier.id)}
+                                                    readOnly
+                                                    className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                                />
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
@@ -427,6 +493,61 @@ export default function AdminSuppliersPage() {
                     )}
                 </AnimatePresence>
             </div>
+
+            {/* Bulk Actions Floating Bar */}
+            <AnimatePresence>
+                {selectedIds.length > 0 && (
+                    <motion.div 
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] w-full max-w-2xl px-6"
+                    >
+                        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-2xl flex items-center justify-between gap-6 text-white ring-1 ring-white/10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center font-bold text-white shadow-lg shadow-teal-500/20">
+                                    {selectedIds.length}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold">Suppliers Selected</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Apply network actions</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <button 
+                                    onClick={() => handleBulkAction('approve')}
+                                    disabled={isBulkLoading}
+                                    className="h-10 px-4 bg-teal-600 hover:bg-teal-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    <Check size={14} /> Approve
+                                </button>
+                                <button 
+                                    onClick={() => handleBulkAction('block')}
+                                    disabled={isBulkLoading}
+                                    className="h-10 px-4 bg-orange-600 hover:bg-orange-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    <Shield size={14} /> Block
+                                </button>
+                                <div className="w-px h-6 bg-slate-800 mx-1" />
+                                <button 
+                                    onClick={() => handleBulkAction('delete')}
+                                    disabled={isBulkLoading}
+                                    className="h-10 px-4 bg-white/10 hover:bg-red-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    <X size={14} /> Delete
+                                </button>
+                                <button 
+                                    onClick={() => setSelectedIds([])}
+                                    className="h-10 px-4 text-slate-400 hover:text-white transition-colors text-xs font-bold"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

@@ -131,14 +131,14 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
         <aside style={{ backgroundColor: '#0A1A2F', color: '#F5F7FA' }} className="w-72 border-e border-border min-h-screen hidden md:flex flex-col flex-shrink-0 sticky top-0 h-screen overflow-hidden group/sidebar transition-all duration-300">
             {/* Branding Header */}
             <div className="p-6 flex items-center gap-4 border-b border-border/50">
-                <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-primary-foreground font-black text-2xl shadow-lg shadow-primary/20">
-                    AT
+                <div className="w-12 h-12 bg-teal-500 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-teal-500/20 overflow-hidden border-2 border-white/10">
+                    <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
                 </div>
                 <div className="flex flex-col">
                     <h2 className="text-lg font-poppins font-bold tracking-tight text-white leading-none">
-                        Atlantis
+                        Atlan<span className="text-teal-400">tis.</span>
                     </h2>
-                    <span className="text-[10px] text-secondary font-black uppercase tracking-[0.2em] mt-1">
+                    <span className="text-[10px] text-teal-500 font-black uppercase tracking-[0.2em] mt-1">
                         {portalLabel}
                     </span>
                 </div>
@@ -179,25 +179,43 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-white/10 space-y-1">
-                {/* Theme Toggle */}
-                {mounted && (
-                    <button
-                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                        className="flex items-center gap-3 px-4 py-3 w-full text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all"
-                    >
-                        {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-                        <span className="font-bold text-sm">{theme === 'dark' ? t('sidebar', 'lightMode') : t('sidebar', 'darkMode')}</span>
-                    </button>
+            <div className="p-4 border-t border-white/10 space-y-4">
+                {/* User Profile Section */}
+                {user && (
+                    <div className="px-4 py-3 bg-white/5 rounded-2xl border border-white/5 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-teal-500/20 border border-teal-500/30 flex items-center justify-center overflow-hidden">
+                            {user.avatar ? (
+                                <img src={user.avatar} className="w-full h-full object-cover" alt={user.name} />
+                            ) : (
+                                <span className="text-teal-400 font-bold text-sm">{user.name?.[0] || 'U'}</span>
+                            )}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                            <p className="text-xs font-bold text-white truncate">{user.name}</p>
+                            <p className="text-[9px] text-teal-500 font-black uppercase tracking-widest">{user.role}</p>
+                        </div>
+                    </div>
                 )}
-                <Button
-                    variant="ghost"
-                    onClick={async () => { await logout(); window.location.href = '/auth/login'; }}
-                    className="w-full justify-start gap-3 px-4 py-6 hover:bg-red-500/10 text-white/60 hover:text-red-400 rounded-xl"
-                >
-                    <LogOut className="w-5 h-5" />
-                    <span className="font-bold text-sm">{t('sidebar', 'signOut')}</span>
-                </Button>
+
+                <div className="space-y-1">
+                    {/* Theme Toggle */}
+                    {mounted && (
+                        <button
+                            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            className="flex items-center gap-3 px-4 py-3 w-full text-white/60 hover:text-white hover:bg-white/10 rounded-xl transition-all"
+                        >
+                            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+                            <span className="font-bold text-sm">{theme === 'dark' ? t('sidebar', 'lightMode') : t('sidebar', 'darkMode')}</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={async () => { await logout(); window.location.href = '/auth/login'; }}
+                        className="w-full flex items-center gap-3 px-4 py-3 bg-transparent hover:bg-red-500/10 text-white/60 hover:text-red-400 rounded-xl transition-all outline-none"
+                    >
+                        <LogOut className="w-5 h-5" />
+                        <span className="font-bold text-sm">{t('sidebar', 'signOut')}</span>
+                    </button>
+                </div>
             </div>
         </aside>
     );

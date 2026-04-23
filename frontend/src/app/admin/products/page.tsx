@@ -195,11 +195,13 @@ export default function ProductsModerationPage() {
             });
 
             if (res.ok) {
-                toast.success(`Successfully ${action}d ${selectedIds.length} products`, { id: tid });
+                const result = await res.json();
+                toast.success(result.message || `Successfully ${action}d products`, { id: tid, duration: 4000 });
                 setSelectedIds([]);
                 fetchData();
             } else {
-                toast.error(`Bulk ${action} failed`, { id: tid });
+                const errorData = await res.json().catch(() => ({}));
+                toast.error(errorData.message || `Bulk ${action} failed`, { id: tid });
             }
         } catch (err) {
             toast.error(`Error during bulk ${action}`, { id: tid });

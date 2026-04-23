@@ -113,7 +113,7 @@ export function UserMenu({ role }: UserMenuProps) {
                 )}
             >
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-primary to-[#FF8C33] flex items-center justify-center font-black text-[#131921] border-2 border-white/10 shadow-lg group-hover:scale-105 transition-transform overflow-hidden">
+                    <div className="w-10 h-10 rounded-full bg-teal-500/10 flex items-center justify-center font-black text-teal-600 border-2 border-teal-500/20 shadow-lg group-hover:scale-105 transition-transform overflow-hidden">
                         {user?.avatar ? (
                             <img src={user.avatar} className="w-full h-full object-cover" alt={user.name} />
                         ) : (
@@ -161,8 +161,12 @@ export function UserMenu({ role }: UserMenuProps) {
                         <div className="p-4 border-b border-[#EAEDED]">
                             <p className="text-[10px] font-black text-[#888] uppercase tracking-[0.2em] mb-3">{t('userMenu', 'account')}</p>
                             <div className="flex items-center gap-3 px-2 py-1">
-                                <div className="w-10 h-10 rounded-full bg-[#F3F3F3] flex items-center justify-center border border-[#DDD]">
-                                    <Shield size={20} className={normalizedRole === 'admin' ? "text-[#FF9900]" : "text-emerald-500"} />
+                                <div className="w-10 h-10 rounded-full bg-slate-50 flex items-center justify-center border border-slate-200 overflow-hidden">
+                                    {user?.avatar ? (
+                                        <img src={user.avatar} className="w-full h-full object-cover" alt={user.name} />
+                                    ) : (
+                                        <User size={20} className="text-slate-400" />
+                                    )}
                                 </div>
                                 <div className="overflow-hidden">
                                     <p className="text-xs font-black text-[#0F1111] truncate">{user?.name}</p>
