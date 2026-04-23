@@ -10,59 +10,65 @@ export class EmailService {
 
   constructor() {
     const host = process.env.EMAIL_HOST || 'smtp.hostinger.com';
-    const port = parseInt(process.env.EMAIL_PORT || '465');
+    const port = parseInt(process.env.EMAIL_PORT || '587');
     const user = process.env.EMAIL_USER;
     const pass = process.env.EMAIL_PASS;
 
     if (!user || !pass) {
-        console.warn('⚠️ SMTP Credentials missing in .env. Email delivery will depend on Resend fallback.');
+        console.warn('⚠️ SMTP Credentials missing. Email delivery will fail.');
     }
 
-    console.log(`[SMTP] Initializing for ${host}:${port} (secure: ${port === 465})`);
+    console.log(`[SMTP] ====== INIT ======`);
+    console.log(`[SMTP] Host: ${host}`);
+    console.log(`[SMTP] Port: ${port}`);
+    console.log(`[SMTP] User: ${user}`);
+    console.log(`[SMTP] Pass: ${pass ? '***SET***' : '***MISSING***'}`);
 
-    this.transporter = nodemailer.createTransport({
-      host,
-      port,
-      secure: port === 465, // true for 465 (SSL), false for 587 (STARTTLS)
-      pool: false,
-      auth: { user, pass },
-      tls: {
-        rejectUnauthorized: false, // Allow self-signed certs (dev only)
-        minVersion: 'TLSv1.2', // Enforce modern TLS
-      },
-      connectionTimeout: 15000, // Increased to 15s for slow connections
-      greetingTimeout: 15000,
-      socketTimeout: 20000, // Added socket timeout
-      logger: false, // Disable verbose nodemailer logging
-      debug: false,
-    } as any);
+    this.transporter = this.createTransport(host, port, user, pass);
 
     this.transporter.verify((error, success) => {
       if (error) {
-        console.error('❌ [SMTP] CONNECTION FAILED:', error.message);
-        if (port === 465 && (error.message.includes('ETIMEDOUT') || error.message.includes('ECONNREFUSED'))) {
-            console.warn('🔄 Port 465 seems blocked. Attempting auto-switch to Port 587...');
-            this.setupTransporter(host, 587, user, pass);
-        }
+        console.error(`❌ [SMTP] Connection FAILED on port ${port}:`, error.message);
+        // Auto-try the other port
+        const altPort = port === 587 ? 465 : 587;
+        console.warn(`🔄 [SMTP] Trying alternative port ${altPort}...`);
+        this.transporter = this.createTransport(host, altPort, user, pass);
+        this.transporter.verify((err2) => {
+          if (err2) {
+            console.error(`❌ [SMTP] Port ${altPort} also FAILED:`, err2.message);
+            console.error(`❌ [SMTP] ALL PORTS FAILED. Emails will use Resend fallback only.`);
+          } else {
+            console.log(`✅ [SMTP] CONNECTED on fallback port ${altPort}`);
+          }
+        });
       } else {
-        console.log(`✅ [SMTP] CONNECTION ESTABLISHED on Port ${port}`);
+        console.log(`✅ [SMTP] CONNECTED on port ${port}`);
       }
     });
   }
 
-  private setupTransporter(host: string, port: number, user: string, pass: string) {
-    this.transporter = nodemailer.createTransport({
+  private createTransport(host: string, port: number, user: string, pass: string) {
+    const isSSL = port === 465;
+    return nodemailer.createTransport({
       host,
       port,
-      secure: port === 465,
-      auth: { user, pass },
-      tls: { rejectUnauthorized: false },
+      secure: isSSL,           // true for 465 (SSL), false for 587 (STARTTLS)
+      requireTLS: !isSSL,      // force STARTTLS on port 587
+      auth: {
+        user,
+        pass,
+      },
+      authMethod: 'LOGIN',     // Hostinger requires LOGIN auth method
+      tls: {
+        rejectUnauthorized: false,
+        ciphers: 'SSLv3',      // Hostinger compatibility
+      },
+      connectionTimeout: 20000,
+      greetingTimeout: 15000,
+      socketTimeout: 25000,
+      logger: true,            // Enable logging to see what's happening
+      debug: true,
     } as any);
-    
-    this.transporter.verify((err) => {
-        if (err) console.error(`❌ [SMTP] Fallback to Port ${port} also failed:`, err.message);
-        else console.log(`✅ [SMTP] FIXED: Connected via Port ${port}`);
-    });
   }
 
   private getFrom() {
@@ -110,12 +116,12 @@ export class EmailService {
         console.error(`   Code: ${errorCode} | SMTP Code: ${smtpCode}`);
         console.error(`   Response: ${smtpResponse}`);
 
-        // If it's a connection/timeout issue, try switching port if we haven't already
-        if ((errorCode === 'ETIMEDOUT' || errorCode === 'ECONNREFUSED' || errorCode === 'ESOCKET') && retries > 0) {
-            const currentPort = this.transporter.options.port;
+        // If it's a connection/timeout/auth issue, try switching port
+        if ((errorCode === 'ETIMEDOUT' || errorCode === 'ECONNREFUSED' || errorCode === 'ESOCKET' || errorCode === 'EAUTH') && retries > 0) {
+            const currentPort = this.transporter.options?.port || 587;
             const nextPort = currentPort === 465 ? 587 : 465;
-            console.warn(`🔄 [SMTP] Network issue on port ${currentPort}. Trying alternative port ${nextPort}...`);
-            this.setupTransporter(process.env.EMAIL_HOST || 'smtp.hostinger.com', nextPort, process.env.EMAIL_USER!, process.env.EMAIL_PASS!);
+            console.warn(`🔄 [SMTP] Retrying on port ${nextPort}...`);
+            this.transporter = this.createTransport(process.env.EMAIL_HOST || 'smtp.hostinger.com', nextPort, process.env.EMAIL_USER!, process.env.EMAIL_PASS!);
             return this.sendMail(to, subject, html, retries - 1);
         }
 
