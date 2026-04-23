@@ -37,28 +37,44 @@ export class TeamController {
     }
 
     @Post('send-invite')
-    async sendInvite(@Body() body: { email: string; role: string; inviteLink: string }, @Req() req: any) {
+    async sendInvite(@Body() body: { email: string | string[]; role: string; inviteLink: string }, @Req() req: any) {
         const senderName = req.user?.name || 'Atlantis Admin';
-        try {
-            const result = await this.emailService.sendInviteEmail({
-                recipientEmail: body.email,
-                role: body.role,
-                inviteLink: body.inviteLink,
-                senderName,
-            });
-            
-            if (result.success) {
-                return { success: true, message: 'Invitation email sent!', ...result };
-            } else {
-                return { success: false, message: 'Invite prepared but email delivery failed (SMTP Error)', ...result };
-            }
-        } catch (error: any) {
-            console.error('TEAM INVITE ERROR:', error);
-            return { 
-                success: false, 
-                message: 'Failed to send invitation', 
-                error: error.message || 'Unknown SMTP error' 
-            };
+        const emails = Array.isArray(body.email) 
+            ? body.email 
+            : body.email.split(/[,\s\n]+/).filter(e => e.includes('@')).map(e => e.trim());
+
+        if (emails.length === 0) {
+            return { success: false, message: 'No valid emails provided' };
         }
+
+        const results = await Promise.all(emails.map(async (email) => {
+            try {
+                const result = await this.emailService.sendInviteEmail({
+                    recipientEmail: email,
+                    role: body.role,
+                    inviteLink: body.inviteLink,
+                    senderName,
+                });
+                return { email, success: result.success };
+            } catch (error) {
+                return { email, success: false, error: 'SMTP/Delivery failure' };
+            }
+        }));
+
+        const successCount = results.filter(r => r.success).length;
+        const failureCount = results.length - successCount;
+
+        return {
+            success: successCount > 0,
+            summary: {
+                total: emails.length,
+                success: successCount,
+                failed: failureCount
+            },
+            results,
+            message: failureCount === 0 
+                ? `Successfully sent ${successCount} invitations!` 
+                : `Sent ${successCount} successfully, but ${failureCount} failed.`
+        };
     }
 }

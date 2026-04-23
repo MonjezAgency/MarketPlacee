@@ -185,14 +185,14 @@ export default function AdminInvitePage() {
                         </div>
 
                         <div className="space-y-3">
-                            <label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Partner Email</label>
-                            <input
-                                type="email"
+                            <label className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Partner Emails</label>
+                            <textarea
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                placeholder="name@company.com"
-                                className="w-full h-14 bg-muted rounded-xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium"
+                                placeholder="name@company.com, info@partner.io ..."
+                                className="w-full h-24 bg-muted rounded-xl border border-border/50 p-4 outline-none focus:border-primary/50 text-foreground font-medium resize-none"
                             />
+                            <p className="text-[10px] text-muted-foreground italic">Separate multiple emails with commas or new lines.</p>
                         </div>
 
                         <button
@@ -240,11 +240,11 @@ export default function AdminInvitePage() {
                                 >
                                     {isSendingEmail ? (
                                         <>
-                                            <Loader2 size={18} className="animate-spin" /> Sending Email...
+                                            <Loader2 size={18} className="animate-spin" /> Sending to Pool...
                                         </>
                                     ) : (
                                         <>
-                                            <Send size={18} /> Send Invitation Email
+                                            <Send size={18} /> Send Bulk Invitations
                                         </>
                                     )}
                                 </button>

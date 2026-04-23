@@ -47,8 +47,13 @@ export class EmailService {
   }
 
   private getFrom() {
-    const fromEmail = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'no-reply@atlantis.com';
-    return `"${this.fromName}" <${fromEmail}>`;
+    const rawFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'no-reply@atlantis.com';
+    // If someone put "Display Name <email@addr.com>" in the ENV, use it directly.
+    if (rawFrom.includes('<') && rawFrom.includes('>')) {
+      return rawFrom;
+    }
+    // Otherwise, wrap the email with our default display name.
+    return `"${this.fromName}" <${rawFrom}>`;
   }
 
   private getFrontendUrl() {
