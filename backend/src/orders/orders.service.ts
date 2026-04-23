@@ -8,6 +8,7 @@ import { EscrowService } from '../payments/escrow.service';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
     PENDING: 'Pending',
+    PAID: 'Paid',
     PROCESSING: 'Processing',
     SHIPPED: 'Shipped',
     DELIVERED: 'Delivered',

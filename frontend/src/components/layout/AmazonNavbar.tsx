@@ -71,13 +71,13 @@ export default function AmazonNavbar() {
         <header className="sticky top-0 z-50 w-full flex flex-col shadow-md">
             <div className="bg-primary text-primary-foreground">
                 <div className="page-container flex items-center gap-3 h-16">
-                    <Link href="/" className="flex items-center gap-2 shrink-0 group" aria-label="Home">
-                        <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center shadow-sm group-hover:bg-accent/90 transition-colors">
-                            <Building2 size={18} className="text-white" />
+                    <Link href="/" className="flex items-center gap-3 shrink-0 group" aria-label="Home">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center bg-white shadow-sm group-hover:scale-105 transition-transform">
+                            <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
                         </div>
                         <div className="hidden sm:flex flex-col leading-none">
-                            <span className="font-bold text-base text-white tracking-tight">BizMarket</span>
-                            <span className="text-[10px] text-white/60 font-medium uppercase tracking-widest">B2B Platform</span>
+                            <span className="font-bold text-lg text-white tracking-tight">Atlan<span className="text-secondary">tis</span></span>
+                            <span className="text-[10px] text-white/60 font-medium uppercase tracking-widest">Premium B2B Platform</span>
                         </div>
                     </Link>
 

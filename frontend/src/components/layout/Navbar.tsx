@@ -136,7 +136,10 @@ export default function Navbar() {
             <div className="container mx-auto px-6 flex items-center justify-between gap-8">
                 {/* Logo & Categories */}
                 <div className="flex items-center gap-8">
-                    <Link href="/" className="flex items-center gap-2 group">
+                    <Link href="/" className="flex items-center gap-3 group">
+                        <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center premium-shadow group-hover:scale-110 transition-transform duration-300">
+                            <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
+                        </div>
                         <span className={cn(
                             "font-heading font-black text-2xl tracking-tighter",
                             (scrolled || isWhiteBackgroundPage) ? "text-primary dark:text-foreground" : "text-white"

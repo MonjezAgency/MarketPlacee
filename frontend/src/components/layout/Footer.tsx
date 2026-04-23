@@ -44,8 +44,8 @@ export default function Footer() {
                     {/* Brand Info */}
                     <div className="space-y-6">
                         <Link href="/" className="flex items-center gap-2 group">
-                            <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center premium-shadow group-hover:rotate-12 transition-transform duration-300">
-                                <PackageSearch className="text-primary-foreground" size={24} />
+                            <div className="w-10 h-10 rounded-xl overflow-hidden flex items-center justify-center premium-shadow group-hover:rotate-12 transition-transform duration-300">
+                                <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
                             </div>
                             <span className="font-heading font-bold text-2xl tracking-tight text-white">
                                 Atlan<span className="text-secondary">tis</span>
