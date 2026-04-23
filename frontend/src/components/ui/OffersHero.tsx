@@ -7,6 +7,7 @@ import Link from 'next/link';
 
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getAdPlacements } from '@/lib/api';
 
 interface Slide {
     image: string;
@@ -55,11 +56,20 @@ export default function OffersHero() {
     const [current, setCurrent] = React.useState(0);
     const [allSlides, setAllSlides] = React.useState<Slide[]>(DEMO_SLIDES);
 
-    const loadHeroAds = React.useCallback(() => {
+    const loadHeroAds = React.useCallback(async () => {
         try {
-            const stored = localStorage.getItem('admin-placements');
-            if (stored) {
-                const slots = JSON.parse(stored);
+            // First try API
+            let slots = await getAdPlacements();
+
+            // Fallback to localStorage if API fails
+            if (!slots) {
+                const stored = localStorage.getItem('admin-placements');
+                if (stored) {
+                    slots = JSON.parse(stored);
+                }
+            }
+
+            if (slots && Array.isArray(slots)) {
                 const heroSlot = slots.find((s: any) => s.id === 'hero-banner');
                 if (heroSlot?.ads && heroSlot.ads.length > 0) {
                     const adminSlides: Slide[] = heroSlot.ads.map((ad: any) => ({

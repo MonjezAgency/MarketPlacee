@@ -75,4 +75,14 @@ export class AppConfigController {
         await this.appConfigService.setPlatformCurrency(currency);
         return { message: 'Platform currency updated successfully', currency };
     }
+    @Get('placements')
+    async getAdPlacements() {
+        return this.appConfigService.getAdPlacements();
+    }
+
+    @Post('placements')
+    async setAdPlacements(@Body() data: any) {
+        await this.appConfigService.setAdPlacements(data);
+        return { message: 'Ad placements updated successfully' };
+    }
 }

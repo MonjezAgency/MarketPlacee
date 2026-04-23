@@ -7,6 +7,7 @@ import {
     X, Eye, Settings, Monitor, Smartphone, Info, CheckCircle, Upload, Search
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getAdPlacements, setAdPlacements } from '@/lib/api';
 
 interface PlacementSlot {
     id: string;
@@ -80,18 +81,6 @@ const DEFAULT_SLOTS: PlacementSlot[] = [
     }
 ];
 
-function loadSlots(): PlacementSlot[] {
-    if (typeof window === 'undefined') return DEFAULT_SLOTS;
-    try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        return stored ? JSON.parse(stored) : DEFAULT_SLOTS;
-    } catch (_e) { return DEFAULT_SLOTS; }
-}
-
-function saveSlots(slots: PlacementSlot[]) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(slots));
-}
-
 export default function AdminPlacementsPage() {
     const [slots, setSlots] = useState<PlacementSlot[]>([]);
     const [selectedSlot, setSelectedSlot] = useState<PlacementSlot | null>(null);
@@ -99,22 +88,44 @@ export default function AdminPlacementsPage() {
     const [editingPrice, setEditingPrice] = useState<string | null>(null);
     const [priceInput, setPriceInput] = useState('');
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+    const [isSaving, setIsSaving] = useState(false);
     const imageUploadRef = React.useRef<HTMLInputElement>(null);
 
     // Ad form
     const [adForm, setAdForm] = useState({ title: '', subtitle: '', image: '', link: '', badge: 'Sponsored' });
 
-    useEffect(() => { setSlots(loadSlots()); }, []);
+    useEffect(() => {
+        const load = async () => {
+            const data = await getAdPlacements();
+            if (data && Array.isArray(data)) {
+                setSlots(data);
+            } else {
+                setSlots(DEFAULT_SLOTS);
+            }
+        };
+        load();
+    }, []);
 
     const showMsg = (type: 'success' | 'error', text: string) => {
         setMessage({ type, text });
         setTimeout(() => setMessage(null), 4000);
     };
 
+    const handleSaveToBackend = async (currentSlots: PlacementSlot[]) => {
+        setIsSaving(true);
+        const ok = await setAdPlacements(currentSlots);
+        setIsSaving(false);
+        if (ok) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(currentSlots));
+        } else {
+            showMsg('error', 'Failed to sync with server. Changes saved locally only.');
+        }
+    };
+
     const updateSlot = (id: string, updates: Partial<PlacementSlot>) => {
         const updated = slots.map(s => s.id === id ? { ...s, ...updates } : s);
         setSlots(updated);
-        saveSlots(updated);
+        handleSaveToBackend(updated);
     };
 
     const toggleOpen = (id: string) => {

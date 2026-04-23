@@ -39,7 +39,7 @@ export async function POST(request: Request) {
         secure: true,
         sameSite: 'lax',
         path: '/',
-        maxAge: 15 * 60,
+        maxAge: 7 * 24 * 60 * 60,
       });
     }
 

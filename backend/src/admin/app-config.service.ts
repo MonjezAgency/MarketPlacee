@@ -137,4 +137,23 @@ export class AppConfigService {
             update: { value: currency }
         });
     }
+    async getAdPlacements() {
+        const config = await this.prisma.appConfig.findUnique({
+            where: { key: 'AD_PLACEMENTS' }
+        });
+        if (!config || !config.value) return null;
+        try {
+            return JSON.parse(config.value);
+        } catch (e) {
+            return null;
+        }
+    }
+
+    async setAdPlacements(data: any) {
+        return this.prisma.appConfig.upsert({
+            where: { key: 'AD_PLACEMENTS' },
+            create: { key: 'AD_PLACEMENTS', value: JSON.stringify(data) },
+            update: { value: JSON.stringify(data) }
+        });
+    }
 }

@@ -245,3 +245,26 @@ export async function deleteAdPlacement(id: string): Promise<boolean> {
         return false;
     }
 }
+export async function getAdPlacements(): Promise<any> {
+    try {
+        const res = await apiFetch(`/admin/config/placements`, { cache: 'no-store' });
+        if (!res.ok) return null;
+        return await res.json();
+    } catch (error) {
+        console.error('Error fetching ad placements:', error);
+        return null;
+    }
+}
+
+export async function setAdPlacements(data: any): Promise<boolean> {
+    try {
+        const res = await apiFetch(`/admin/config/placements`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        });
+        return res.ok;
+    } catch (error) {
+        console.error('Error setting ad placements:', error);
+        return false;
+    }
+}
