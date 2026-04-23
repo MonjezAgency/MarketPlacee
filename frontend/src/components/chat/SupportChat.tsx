@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils';
 import axios from 'axios';
 import { io, Socket } from 'socket.io-client';
 import { useChatStore } from '@/store/chatStore';
+import { toast } from 'react-hot-toast';
 
 interface Message {
     id: string;
