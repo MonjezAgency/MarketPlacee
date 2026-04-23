@@ -10,74 +10,30 @@ export class EmailService {
 
   constructor() {
     const host = process.env.EMAIL_HOST || 'smtp.hostinger.com';
-    const port = parseInt(process.env.EMAIL_PORT || '587');
+    const port = parseInt(process.env.EMAIL_PORT || '465');
     const user = process.env.EMAIL_USER;
     const pass = process.env.EMAIL_PASS;
 
-    if (!user || !pass) {
-        console.warn('⚠️ SMTP Credentials missing. Email delivery will fail.');
-    }
+    console.log(`[EMAIL] ====== INIT ======`);
+    console.log(`[EMAIL] SMTP: ${host}:${port} (user: ${user})`);
+    console.log(`[EMAIL] Resend: ${process.env.RESEND_API_KEY ? 'KEY SET' : 'NO KEY'}`);
 
-    console.log(`[SMTP] ====== INIT ======`);
-    console.log(`[SMTP] Host: ${host}`);
-    console.log(`[SMTP] Port: ${port}`);
-    console.log(`[SMTP] User: ${user}`);
-    console.log(`[SMTP] Pass: ${pass ? '***SET***' : '***MISSING***'}`);
-
-    this.transporter = this.createTransport(host, port, user, pass);
-
-    this.transporter.verify((error, success) => {
-      if (error) {
-        console.error(`❌ [SMTP] Connection FAILED on port ${port}:`, error.message);
-        // Auto-try the other port
-        const altPort = port === 587 ? 465 : 587;
-        console.warn(`🔄 [SMTP] Trying alternative port ${altPort}...`);
-        this.transporter = this.createTransport(host, altPort, user, pass);
-        this.transporter.verify((err2) => {
-          if (err2) {
-            console.error(`❌ [SMTP] Port ${altPort} also FAILED:`, err2.message);
-            console.error(`❌ [SMTP] ALL PORTS FAILED. Emails will use Resend fallback only.`);
-          } else {
-            console.log(`✅ [SMTP] CONNECTED on fallback port ${altPort}`);
-          }
-        });
-      } else {
-        console.log(`✅ [SMTP] CONNECTED on port ${port}`);
-      }
-    });
-  }
-
-  private createTransport(host: string, port: number, user: string, pass: string) {
-    const isSSL = port === 465;
-    return nodemailer.createTransport({
+    // Create SMTP transport (works locally, may be blocked on Railway)
+    this.transporter = nodemailer.createTransport({
       host,
       port,
-      secure: isSSL,           // true for 465 (SSL), false for 587 (STARTTLS)
-      requireTLS: !isSSL,      // force STARTTLS on port 587
-      auth: {
-        user,
-        pass,
-      },
-      authMethod: 'LOGIN',     // Hostinger requires LOGIN auth method
-      tls: {
-        rejectUnauthorized: false,
-        ciphers: 'SSLv3',      // Hostinger compatibility
-      },
-      connectionTimeout: 20000,
-      greetingTimeout: 15000,
-      socketTimeout: 25000,
-      logger: true,            // Enable logging to see what's happening
-      debug: true,
+      secure: port === 465,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false },
+      connectionTimeout: 5000,
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
     } as any);
   }
 
   private getFrom() {
     const rawFrom = process.env.EMAIL_FROM || process.env.EMAIL_USER || 'no-reply@atlantis.com';
-    // If someone put "Display Name <email@addr.com>" in the ENV, use it directly.
-    if (rawFrom.includes('<') && rawFrom.includes('>')) {
-      return rawFrom;
-    }
-    // Otherwise, wrap the email with our default display name.
+    if (rawFrom.includes('<') && rawFrom.includes('>')) return rawFrom;
     return `"${this.fromName}" <${rawFrom}>`;
   }
 
@@ -85,79 +41,69 @@ export class EmailService {
     return process.env.FRONTEND_URL || 'http://localhost:3000';
   }
 
-   /**
-   * Primary mail sender — tries Resend API first (HTTPS, never blocked),
-   * then falls back to SMTP if Resend is unavailable.
+  /**
+   * Send email — tries SMTP first (fast 5s timeout), then Resend API.
    */
   async sendMail(to: string, subject: string, html: string): Promise<boolean> {
-    // Strategy 1: Resend API (uses HTTPS port 443, never blocked by cloud providers)
-    const resendResult = await this.sendViaResend({ to, subject, html });
-    if (resendResult) {
+    // ──── Strategy 1: SMTP (works locally / non-Railway) ────
+    try {
+      console.log(`[EMAIL] Trying SMTP to ${to}...`);
+      const info = await this.transporter.sendMail({
+        from: this.getFrom(),
+        to,
+        subject,
+        html,
+      });
+      console.log(`✅ [EMAIL] SMTP SUCCESS — ${info.messageId}`);
       return true;
+    } catch (smtpErr: any) {
+      console.warn(`⚠️ [EMAIL] SMTP failed: ${smtpErr.code || smtpErr.message}`);
     }
 
-    // Strategy 2: SMTP fallback
-    console.log(`[EMAIL] Resend failed for ${to}. Trying SMTP fallback...`);
-    try {
-        const info = await this.transporter.sendMail({
-            from: this.getFrom(),
-            to,
-            subject,
-            html,
-        });
-        console.log(`✅ [SMTP] SUCCESS - MessageId: ${info.messageId}`);
-        return true;
-    } catch (smtpError: any) {
-        console.error(`❌ [SMTP] Also failed for ${to}:`, smtpError.message);
-        console.error(`   SMTP Response: ${smtpError.response || 'none'}`);
-        return false;
-    }
-  }
-
-  private async sendViaResend(options: { to: string; subject: string; html: string; }): Promise<boolean> {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-        console.warn('[RESEND] No API key set. Skipping Resend.');
-        return false;
+    // ──── Strategy 2: Resend API (HTTPS, never blocked) ────
+    const resendKey = process.env.RESEND_API_KEY;
+    if (!resendKey) {
+      console.error(`❌ [EMAIL] No RESEND_API_KEY. Cannot send to ${to}.`);
+      return false;
     }
 
-    const fromEmail = process.env.RESEND_FROM || 'onboarding@resend.dev';
-    console.log(`[RESEND] Sending to ${options.to} from ${fromEmail}...`);
+    const resendFrom = process.env.RESEND_FROM || 'onboarding@resend.dev';
+    console.log(`[EMAIL] Trying Resend API to ${to} (from: ${resendFrom})...`);
 
     try {
-        const response = await axios.post(
-            'https://api.resend.com/emails',
-            {
-                from: `Atlantis Marketplace <${fromEmail}>`,
-                to: [options.to],
-                subject: options.subject,
-                html: options.html,
-            },
-            {
-                headers: {
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': 'application/json',
-                },
-            }
-        );
-        console.log(`✅ [RESEND] SUCCESS for ${options.to}:`, response.data);
-        return true;
-    } catch (err: any) {
-        const status = err.response?.status;
-        const errorData = err.response?.data;
-        console.error(`❌ [RESEND] FAILED for ${options.to}:`);
-        console.error(`   HTTP Status: ${status}`);
-        console.error(`   Error: ${JSON.stringify(errorData || err.message)}`);
-        
-        if (status === 403) {
-            console.error(`   👉 FIX: You need to verify your domain in Resend dashboard (resend.com/domains)`);
-            console.error(`   👉 Or use the free "onboarding@resend.dev" sender`);
-        } else if (status === 422) {
-            console.error(`   👉 FIX: Invalid email address or missing required fields`);
-        } else if (status === 429) {
-            console.error(`   👉 FIX: Rate limited. Wait and try again.`);
-        }
-        return false;
+      const res = await axios.post(
+        'https://api.resend.com/emails',
+        {
+          from: `Atlantis Marketplace <${resendFrom}>`,
+          to: [to],
+          subject,
+          html,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${resendKey}`,
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+      console.log(`✅ [EMAIL] Resend SUCCESS — ID: ${res.data?.id}`);
+      return true;
+    } catch (resendErr: any) {
+      const status = resendErr.response?.status;
+      const data = resendErr.response?.data;
+      console.error(`❌ [EMAIL] Resend FAILED — HTTP ${status}`);
+      console.error(`   ${JSON.stringify(data)}`);
+
+      if (status === 403 && data?.message?.includes('verify a domain')) {
+        console.error(`\n╔══════════════════════════════════════════════════╗`);
+        console.error(`║  TO FIX EMAIL: Verify your domain in Resend!     ║`);
+        console.error(`║  1. Go to https://resend.com/domains             ║`);
+        console.error(`║  2. Add domain: atlantisfmcg.com                 ║`);
+        console.error(`║  3. Add the DNS records they give you            ║`);
+        console.error(`║  4. Set RESEND_FROM=noreply@atlantisfmcg.com     ║`);
+        console.error(`╚══════════════════════════════════════════════════╝\n`);
+      }
+      return false;
     }
   }
 
@@ -258,7 +204,6 @@ export class EmailService {
     senderName?: string;
   }) {
     const html = getInvitationEmailHtml(params);
-    const text = `🎉 You're invited to join Atlantis as a ${params.role}! \n\nClick here to join: ${params.inviteLink}`;
 
     try {
       const result = await this.sendMail(params.recipientEmail, `🎉 Invitation: Join Atlantis as a ${params.role === 'supplier' ? 'Supplier' : 'Strategic Customer'}`, html);
@@ -502,25 +447,20 @@ export class EmailService {
     try {
       await this.sendMail(email, `✅ Order Confirmed + Invoice ${invoiceNumber} — ${shippingCompany} | Atlantis`, `
           <div style="font-family:'Segoe UI',Arial,sans-serif; max-width:620px; margin:0 auto; background:#F2F4F7; border-radius:16px; overflow:hidden;">
-            <!-- Header -->
             <div style="background:#0A1A2F; padding:36px 30px; text-align:center; border-bottom:4px solid #1BC7C9;">
               <h1 style="color:#fff; font-size:30px; margin:0 0 4px; font-weight:900; letter-spacing:-1px;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
               <p style="color:#B0BCCF; font-size:12px; margin:0; letter-spacing:2px; text-transform:uppercase;">B2B Marketplace</p>
             </div>
-
-            <!-- Hero -->
             <div style="background:#fff; padding:36px 30px 0;">
-              <div style="background:#E8FFF5; border:1.5px solid #10B981; border-radius:12px; padding:16px 20px; display:flex; align-items:center; margin-bottom:24px;">
+              <div style="background:#E8FFF5; border:1.5px solid #10B981; border-radius:12px; padding:16px 20px; margin-bottom:24px;">
                 <span style="font-size:24px; margin-right:12px;">✅</span>
-                <div>
+                <div style="display:inline-block;">
                   <p style="margin:0; font-size:16px; font-weight:800; color:#065F46;">Payment Received & Order Confirmed</p>
                   <p style="margin:4px 0 0; font-size:13px; color:#065F46;">Order <strong>#${orderId.slice(0,8).toUpperCase()}</strong> — Invoice <strong>${invoiceNumber}</strong></p>
                 </div>
               </div>
-              <p style="color:#2E2E2E; font-size:15px; line-height:1.7; margin:0 0 24px;">Dear <strong>${name}</strong>, your order has been confirmed and payment processed. Below you will find your invoice and shipping details.</p>
+              <p style="color:#2E2E2E; font-size:15px; line-height:1.7; margin:0 0 24px;">Dear <strong>${name}</strong>, your order has been confirmed and payment processed.</p>
             </div>
-
-            <!-- Invoice Table -->
             <div style="background:#fff; padding:0 30px 24px;">
               <h3 style="font-size:14px; font-weight:800; color:#0A1A2F; margin:0 0 12px; text-transform:uppercase; letter-spacing:1px;">Invoice ${invoiceNumber}</h3>
               <table style="width:100%; border-collapse:collapse; background:#FAFAFA; border-radius:8px; overflow:hidden;">
@@ -548,35 +488,18 @@ export class EmailService {
                 </tbody>
               </table>
             </div>
-
-            <!-- Shipping Partner -->
             <div style="background:#fff; padding:0 30px 30px;">
               <div style="background:#F8F9FF; border:1.5px solid ${carrierColor}; border-radius:12px; padding:18px 20px;">
                 <p style="margin:0 0 4px; font-size:11px; color:#667085; text-transform:uppercase; letter-spacing:1px; font-weight:700;">Logistics Partner</p>
                 <p style="margin:0 0 8px; font-size:18px; font-weight:900; color:${carrierColor};">${shippingCompany}</p>
-                <div style="display:flex; gap:20px; flex-wrap:wrap;">
-                  <div>
-                    <p style="margin:0; font-size:11px; color:#667085; text-transform:uppercase; letter-spacing:1px;">Estimated Delivery</p>
-                    <p style="margin:4px 0 0; font-size:14px; font-weight:700; color:#0A1A2F;">${estimatedDays} business days</p>
-                  </div>
-                  <div>
-                    <p style="margin:0; font-size:11px; color:#667085; text-transform:uppercase; letter-spacing:1px;">Destination</p>
-                    <p style="margin:4px 0 0; font-size:14px; font-weight:700; color:#0A1A2F;">${destinationAddress}</p>
-                  </div>
-                </div>
+                <p style="margin:0; font-size:11px; color:#667085;">Estimated: ${estimatedDays} business days — ${destinationAddress}</p>
               </div>
             </div>
-
-            <!-- CTA -->
             <div style="background:#fff; padding:0 30px 36px; text-align:center;">
               <a href="${frontendUrl}/dashboard/customer" style="display:inline-block; padding:16px 48px; background:#1BC7C9; color:#fff; text-decoration:none; border-radius:12px; font-weight:800; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Track Order →</a>
-              <p style="margin:16px 0 0; font-size:12px; color:#667085;">Questions? Reply to this email or visit our support center.</p>
             </div>
-
-            <!-- Footer -->
             <div style="background:#0A1A2F; padding:20px 30px; text-align:center;">
               <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
-              <p style="color:#4A5568; font-size:10px; margin:6px 0 0;">This is a transaction confirmation. Secure payment processed via Stripe.</p>
             </div>
           </div>
         `);
@@ -645,6 +568,7 @@ export class EmailService {
   async sendRawEmail(to: string, subject: string, html: string): Promise<void> {
     await this.sendMail(to, subject, html);
   }
+
   async sendAdminSignupAlert(userData: {
       name: string;
       email: string;
