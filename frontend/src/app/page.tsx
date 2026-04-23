@@ -82,45 +82,45 @@ export default function Home() {
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
                                 <AmazonCardTile
-                                    title="Makeup & Beauty"
+                                    title="Soft Drinks & Energy"
                                     items={[
-                                        { label: "Dove", image: "/Logos/dove.png", link: "/categories?category=Makeup & Beauty&brand=Dove" },
-                                        { label: "Lux", image: "/Logos/lux.png", link: "/categories?category=Makeup & Beauty&brand=Lux" },
-                                        { label: "Ponds", image: "/Logos/ponds.png", link: "/categories?category=Makeup & Beauty&brand=Ponds" },
-                                        { label: "Vaseline", image: "/Logos/vaseline.png", link: "/categories?category=Makeup & Beauty&brand=Vaseline" }
+                                        { label: "Coca-Cola", image: "/Logos/cocacola.png", link: "/categories?category=Soft Drinks&brand=Coca-Cola" },
+                                        { label: "Pepsi", image: "/Logos/pepsi.png", link: "/categories?category=Soft Drinks&brand=Pepsi" },
+                                        { label: "Fanta", image: "/Logos/fanta.png", link: "/categories?category=Soft Drinks&brand=Fanta" },
+                                        { label: "Red Bull", image: "/Logos/redbull.png", link: "/categories?category=Energy Drinks&brand=Red Bull" }
                                     ]}
-                                    footerLink="/categories?category=Makeup & Beauty"
-                                    footerText={t('home', 'shopAllBeauty')}
+                                    footerLink="/categories?category=Soft Drinks"
+                                    footerText="Shop All Drinks"
                                 />
                                 <AmazonCardTile
-                                    title="Premium Fragrances"
+                                    title="Coffee & Hot Beverages"
                                     items={[
-                                        { label: "Chanel", image: "/Logos/chanel.png", link: "/categories?category=Premium Fragrances" },
-                                        { label: "Dior", image: "/Logos/dior.png", link: "/categories?category=Premium Fragrances" },
-                                        { label: "Armani", image: "/Logos/armani.png", link: "/categories?category=Premium Fragrances" },
-                                        { label: "Gucci", image: "/Logos/gucci.png", link: "/categories?category=Premium Fragrances" }
+                                        { label: "Nescafé", image: "/Logos/nescafe.png", link: "/categories?category=Coffee&brand=Nescafe" },
+                                        { label: "Jacobs", image: "/Logos/jacobs.png", link: "/categories?category=Coffee&brand=Jacobs" },
+                                        { label: "Lavazza", image: "/Logos/lavazza.png", link: "/categories?category=Coffee&brand=Lavazza" },
+                                        { label: "Starbucks", image: "/Logos/starbucks.png", link: "/categories?category=Coffee&brand=Starbucks" }
                                     ]}
-                                    footerLink="/categories?category=Premium Fragrances"
-                                    footerText="See All Fragrances"
+                                    footerLink="/categories?category=Coffee"
+                                    footerText="See All Coffee"
                                 />
                                 <AmazonCardTile
-                                    title="Personal Care"
+                                    title="Snacks & Confectionery"
                                     items={[
-                                        { label: "Axe", image: "/Logos/axe.png", link: "/categories?category=Personal Care" },
-                                        { label: "Rexona", image: "/Logos/rexona.png", link: "/categories?category=Personal Care" },
-                                        { label: "Signal", image: "/Logos/signal.png", link: "/categories?category=Personal Care" },
-                                        { label: "Clear", image: "/Logos/clear.png", link: "/categories?category=Personal Care" }
+                                        { label: "Nutella", image: "/Logos/nutella.png", link: "/categories?category=Snacks&brand=Nutella" },
+                                        { label: "Oreo", image: "/Logos/oreo.png", link: "/categories?category=Snacks&brand=Oreo" },
+                                        { label: "Kinder", image: "/Logos/kinder.png", link: "/categories?category=Snacks&brand=Kinder" },
+                                        { label: "Twix", image: "/Logos/twix.png", link: "/categories?category=Snacks&brand=Twix" }
                                     ]}
-                                    footerLink="/categories?category=Personal Care"
-                                    footerText="Shop Essentials"
+                                    footerLink="/categories?category=Snacks"
+                                    footerText="Shop All Snacks"
                                 />
                                 <AmazonCardTile
                                     title="Home Cleaning"
                                     items={[
-                                        { label: "Persil", image: "/Logos/persil.png", link: "/categories?category=Home Cleaning" },
-                                        { label: "Comfort", image: "/Logos/comfort.png", link: "/categories?category=Home Cleaning" },
-                                        { label: "Domestos", image: "/Logos/domestos.png", link: "/categories?category=Home Cleaning" },
-                                        { label: "Cif", image: "/Logos/cif.png", link: "/categories?category=Home Cleaning" }
+                                        { label: "Persil", image: "/Logos/persil.png", link: "/categories?category=Home Cleaning&brand=Persil" },
+                                        { label: "Comfort", image: "/Logos/comfort.png", link: "/categories?category=Home Cleaning&brand=Comfort" },
+                                        { label: "Domestos", image: "/Logos/domestos.png", link: "/categories?category=Home Cleaning&brand=Domestos" },
+                                        { label: "Cif", image: "/Logos/cif.png", link: "/categories?category=Home Cleaning&brand=Cif" }
                                     ]}
                                     footerLink="/categories?category=Home Care"
                                     footerText="Clean Home Store"
