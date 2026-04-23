@@ -143,6 +143,34 @@ export class UsersService {
         });
     }
 
+    async bulkUpdateStatus(ids: string[], status: string) {
+        const results = { updated: 0, failed: 0 };
+        for (const id of ids) {
+            try {
+                await this.updateStatus(id, status);
+                results.updated++;
+            } catch (err) {
+                console.error(`[BULK_UPDATE_ERROR] User ${id}:`, err.message);
+                results.failed++;
+            }
+        }
+        return results;
+    }
+
+    async bulkDelete(ids: string[]) {
+        const results = { deleted: 0, failed: 0 };
+        for (const id of ids) {
+            try {
+                await this.deleteUser(id);
+                results.deleted++;
+            } catch (err) {
+                console.error(`[BULK_DELETE_ERROR] User ${id}:`, err.message);
+                results.failed++;
+            }
+        }
+        return results;
+    }
+
     async updateProfile(id: string, data: any) {
         const updateData = { ...data };
         // Encrypt sensitive billing data if being updated

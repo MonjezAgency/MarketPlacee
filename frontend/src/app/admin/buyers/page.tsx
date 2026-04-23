@@ -426,12 +426,26 @@ export default function AdminBuyersPage() {
                                                 ))}
                                             </div>
 
-                                            <div className="pt-6 border-t border-slate-100 flex items-center gap-3">
-                                                <button className="flex-1 h-12 bg-teal-600 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-teal-700 transition-all">
-                                                    Re-Verify Account
+                                            <div className="pt-6 border-t border-slate-100 grid grid-cols-2 gap-3">
+                                                <button 
+                                                    onClick={async () => {
+                                                        if (window.confirm(`Permanently delete ${selectedBuyer.name}?`)) {
+                                                            const res = await apiFetch(`/users/${selectedBuyer.id}`, { method: 'DELETE' });
+                                                            if (res.ok) {
+                                                                toast.success("Buyer removed");
+                                                                setSelectedBuyer(null);
+                                                                loadBuyers();
+                                                            } else {
+                                                                toast.error("Failed to delete");
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="h-12 bg-red-600 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all"
+                                                >
+                                                    Delete Buyer
                                                 </button>
-                                                <button className="h-12 px-6 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-red-100 transition-all">
-                                                    Block Entity
+                                                <button className="h-12 bg-slate-900 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all">
+                                                    Manage Access
                                                 </button>
                                             </div>
                                         </div>

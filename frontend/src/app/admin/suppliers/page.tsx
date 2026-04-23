@@ -478,10 +478,24 @@ export default function AdminSuppliersPage() {
                                             </div>
 
                                             <div className="pt-6 border-t border-slate-100 flex items-center gap-3">
-                                                <button className="flex-1 h-12 bg-teal-600 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-teal-700 transition-all">
-                                                    Review Full KYC
+                                                <button 
+                                                    onClick={async () => {
+                                                        if (window.confirm(`Permanently delete ${selectedSupplier.name}?`)) {
+                                                            const res = await apiFetch(`/users/${selectedSupplier.id}`, { method: 'DELETE' });
+                                                            if (res.ok) {
+                                                                toast.success("Supplier removed");
+                                                                setSelectedSupplier(null);
+                                                                loadSuppliers();
+                                                            } else {
+                                                                toast.error("Failed to delete");
+                                                            }
+                                                        }
+                                                    }}
+                                                    className="flex-1 h-12 bg-red-600 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-red-700 transition-all"
+                                                >
+                                                    Delete Supplier
                                                 </button>
-                                                <button className="h-12 px-6 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-red-100 transition-all">
+                                                <button className="h-12 px-6 bg-slate-900 text-white border border-slate-200 rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all">
                                                     Suspend
                                                 </button>
                                             </div>
