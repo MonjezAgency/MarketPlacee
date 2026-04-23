@@ -36,13 +36,16 @@ export default function AdminSuppliersPage() {
 
     const loadSuppliers = async () => {
         try {
-            // Request specifically suppliers from the backend to avoid missing them due to pagination/limit
+            // Request specifically suppliers from the backend with no-store cache to ensure fresh data
             const res = await apiFetch('/users?role=SUPPLIER&limit=100', {
+                cache: 'no-store'
             });
             if (res.ok) {
                 const result = await res.json();
                 const usersData = Array.isArray(result) ? result : (result.users || []);
                 setSuppliers(usersData);
+            } else {
+                console.error("API Error (Suppliers):", res.statusText);
             }
         } catch (err) {
             console.error("Failed to load suppliers:", err);

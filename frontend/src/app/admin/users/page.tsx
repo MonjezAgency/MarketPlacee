@@ -39,11 +39,15 @@ export default function AdminUsersPage() {
         try {
             // Increase limit to ensure we see more users at once in the identity hub
             const res = await apiFetch('/users?limit=100', {
+                cache: 'no-store'
             });
             if (res.ok) {
                 const result = await res.json();
                 const usersData = Array.isArray(result) ? result : (result.users || []);
                 setUsers(usersData.filter((u: any) => u.role !== 'ADMIN'));
+            } else {
+                const err = await res.json().catch(() => ({}));
+                console.error("API Error (Users):", err.message || res.statusText);
             }
         } catch (err) {
             console.error("Failed to load users:", err);
@@ -115,7 +119,7 @@ export default function AdminUsersPage() {
 
     const filteredUsers = users.filter(u =>
         u.status === activeTab &&
-        (u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()))
+        ((u.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (u.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()))
     );
 
     const TABS = [

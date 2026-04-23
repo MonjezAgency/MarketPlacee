@@ -36,13 +36,16 @@ export default function AdminBuyersPage() {
 
     const loadBuyers = async () => {
         try {
-            // Request specifically customers from the backend
+            // Request specifically customers from the backend with no-store cache
             const res = await apiFetch('/users?role=CUSTOMER&limit=100', {
+                cache: 'no-store'
             });
             if (res.ok) {
                 const result = await res.json();
                 const usersData = Array.isArray(result) ? result : (result.users || []);
                 setBuyers(usersData);
+            } else {
+                console.error("API Error (Buyers):", res.statusText);
             }
         } catch (err) {
             console.error("Failed to load buyers:", err);
