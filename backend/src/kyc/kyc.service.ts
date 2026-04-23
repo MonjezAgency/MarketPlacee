@@ -8,6 +8,7 @@ import {
 import { KYCStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
+import { AiAgentService } from '../ai-agent/ai-agent.service';
 
 @Injectable()
 export class KycService {
@@ -16,6 +17,7 @@ export class KycService {
   constructor(
     private prisma: PrismaService,
     private emailService: EmailService,
+    private aiAgent: AiAgentService,
   ) {}
 
   /** Submit or re-submit KYC documents */
