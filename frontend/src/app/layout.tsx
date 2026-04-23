@@ -23,11 +23,6 @@ const poppins = Poppins({
 export const metadata: Metadata = {
     title: "Atlantis — Premium Beverage Distribution",
     description: "Your trusted B2B Atlantis for Pepsi, Coca-Cola, Red Bull, Lipton and more. Wholesale beverage distribution for businesses.",
-    icons: {
-        icon: '/icon.png',
-        shortcut: '/icon.png',
-        apple: '/apple-icon.png',
-    }
 };
 
 export const viewport = {
@@ -45,6 +40,9 @@ export default function RootLayout({
     return (
         <html lang="ar" dir="rtl" suppressHydrationWarning>
             <head>
+                <link rel="icon" href="/favicon.ico" sizes="any" />
+                <link rel="icon" href="/icon.png" type="image/png" />
+                <link rel="apple-touch-icon" href="/icon.png" />
                 <link rel="manifest" href="/manifest.json" />
                 <meta name="theme-color" content="#0a0a0a" />
                 <script dangerouslySetInnerHTML={{
