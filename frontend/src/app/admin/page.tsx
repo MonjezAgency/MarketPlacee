@@ -102,16 +102,18 @@ export default function AdminOverviewPage() {
     const [revenueData, setRevenueData] = React.useState<any[]>([]);
     const [topProducts, setTopProducts] = React.useState<any[]>([]);
     const [topSuppliers, setTopSuppliers] = React.useState<any[]>([]);
+    const [timeframe, setTimeframe] = React.useState('Daily');
 
     const fetchStats = React.useCallback(async () => {
         try {
             setStats(prev => ({ ...prev, loading: true }));
+            const timeframeParam = timeframe.toLowerCase();
             const [usersRes, productsRes, ordersStatsRes, disputesRes, analyticsRes] = await Promise.all([
                 apiFetch('/users?status=PENDING_APPROVAL&limit=1'),
                 apiFetch('/products?limit=1'),
                 apiFetch('/orders/stats'),
                 apiFetch('/disputes/stats').catch(() => null),
-                apiFetch('/orders/admin-analytics').catch(() => null)
+                apiFetch(`/orders/admin-analytics?timeframe=${timeframeParam}`).catch(() => null)
             ]);
 
             const usersData = usersRes.ok ? await usersRes.json() : { total: 0 };
@@ -138,7 +140,7 @@ export default function AdminOverviewPage() {
         } catch (err) {
             setStats(prev => ({ ...prev, loading: false }));
         }
-    }, []);
+    }, [timeframe]);
 
     const handleExportReport = async () => {
         const tid = toast.loading('Generating platform report...');
@@ -241,10 +243,14 @@ export default function AdminOverviewPage() {
                             </div>
                             <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
                                 {['Daily', 'Weekly', 'Monthly'].map((t) => (
-                                    <button key={t} className={cn(
-                                        "px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all",
-                                        t === 'Weekly' ? "bg-teal-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
-                                    )}>
+                                    <button 
+                                        key={t} 
+                                        onClick={() => setTimeframe(t)}
+                                        className={cn(
+                                            "px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all",
+                                            t === timeframe ? "bg-teal-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                        )}
+                                    >
                                         {t}
                                     </button>
                                 ))}

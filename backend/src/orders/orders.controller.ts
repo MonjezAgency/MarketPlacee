@@ -55,8 +55,8 @@ export class OrdersController {
 
     @Get('admin-analytics')
     @Roles(Role.ADMIN, Role.OWNER)
-    async getAdminAnalytics() {
-        return this.ordersService.getAdminAnalytics();
+    async getAdminAnalytics(@Query('timeframe') timeframe?: string) {
+        return this.ordersService.getAdminAnalytics(timeframe);
     }
 
     @Get('supplier/analytics')

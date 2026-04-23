@@ -619,7 +619,7 @@ export class OrdersService {
         });
     }
 
-    async getAdminAnalytics() {
+    async getAdminAnalytics(timeframe: string = 'daily') {
         // Fetch all non-cancelled orders with their items and suppliers
         const orders = await this.prisma.order.findMany({
             where: { status: { not: OrderStatus.CANCELLED } },
@@ -641,7 +641,22 @@ export class OrdersService {
         const revenueTrends: Record<string, number> = {};
 
         for (const order of orders) {
-            const dateKey = order.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            let dateKey: string;
+            
+            if (timeframe === 'monthly') {
+                dateKey = order.createdAt.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+            } else if (timeframe === 'weekly') {
+                // Get start of week (Sunday)
+                const d = new Date(order.createdAt);
+                const day = d.getDay();
+                const diff = d.getDate() - day;
+                const startOfWeek = new Date(d.setDate(diff));
+                dateKey = `Wk ${startOfWeek.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+            } else {
+                // Default: Daily
+                dateKey = order.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            }
+
             revenueTrends[dateKey] = (revenueTrends[dateKey] || 0) + order.totalAmount;
 
             for (const item of order.items) {
@@ -682,7 +697,11 @@ export class OrdersService {
 
         const revenueData = Object.entries(revenueTrends)
             .map(([name, revenue]) => ({ name, revenue }))
-            .slice(-7); // Last 7 days/entries
+            .sort((a, b) => {
+                // Very basic sort for chart display
+                return 0; // Keeping insertion order for now (linked to order dates)
+            })
+            .slice(timeframe === 'daily' ? -14 : -12); // Show more data for daily, less for others
 
         return {
             topProducts,
