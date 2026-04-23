@@ -6,13 +6,14 @@ import Link from 'next/link';
 import {
     Package, Truck, CheckCircle2, Clock,
     ChevronRight, ShoppingBag, Heart, Star,
-    Loader2, XCircle, RefreshCw,
+    Loader2, XCircle, RefreshCw, Trash2
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { fetchProducts, apiFetch } from '@/lib/api';
 import type { Product } from '@/lib/types';
 import ProductCard from '@/components/product/ProductCard';
 import { cn } from '@/lib/utils';
+import { toast } from 'react-hot-toast';
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -58,6 +59,23 @@ export default function CustomerDashboard() {
         } catch (_e) { /* offline */ }
         finally { setIsLoadingOrders(false); }
     }, []);
+
+    const handleDeleteOrder = async (orderId: string) => {
+        const tid = toast.loading('Hiding order...');
+        try {
+            const res = await apiFetch(`/orders/${orderId}/customer-hide`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                toast.success('Order removed from your dashboard', { id: tid });
+                setOrders(prev => prev.filter(o => o.id !== orderId));
+            } else {
+                toast.error('Failed to remove order', { id: tid });
+            }
+        } catch (err) {
+            toast.error('Network error', { id: tid });
+        }
+    };
 
     React.useEffect(() => {
         fetchOrders();
@@ -225,6 +243,16 @@ export default function CustomerDashboard() {
                                                 {order.status}
                                             </span>
                                         </div>
+                                        <button 
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                handleDeleteOrder(order.id);
+                                            }}
+                                            className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
+                                        >
+                                            <Trash2 size={14} />
+                                        </button>
                                         <ChevronRight size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
                                     </div>
                                 </Link>

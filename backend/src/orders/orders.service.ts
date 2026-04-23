@@ -186,7 +186,7 @@ export class OrdersService {
         const skip = (page - 1) * limit;
         const [orders, total] = await Promise.all([
             this.prisma.order.findMany({
-                where: { customerId },
+                where: { customerId, deletedByCustomer: false },
                 include: {
                     items: {
                         include: {
@@ -591,5 +591,18 @@ export class OrdersService {
         );
 
         return { success: true };
+    }
+
+    async hideOrder(orderId: string, customerId: string) {
+        const order = await this.prisma.order.findUnique({
+            where: { id: orderId },
+        });
+        if (!order) throw new NotFoundException('Order not found');
+        if (order.customerId !== customerId) throw new ForbiddenException('This order does not belong to you');
+
+        return this.prisma.order.update({
+            where: { id: orderId },
+            data: { deletedByCustomer: true },
+        });
     }
 }

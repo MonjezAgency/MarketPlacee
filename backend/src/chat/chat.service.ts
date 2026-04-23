@@ -191,7 +191,7 @@ export class ChatService {
   async switchToHuman(userId: string, agentId: string) {
     // Mark the conversation thread as handed over
     await this.prisma.supportMessage.updateMany({
-      where: { senderId: userId, isBot: false, receiverId: null },
+      where: { senderId: userId, receiverId: null },
       data: { isHandedOver: true, handedOverBy: agentId },
     });
 
@@ -204,6 +204,28 @@ export class ChatService {
         isBot: false,
         isHandedOver: true,
         handedOverBy: agentId,
+      },
+      include: { sender: { select: { name: true, role: true } } },
+    });
+
+    return { success: true, systemMessage };
+  }
+
+  async switchToAI(userId: string, agentId: string) {
+    // Reset handover status
+    await this.prisma.supportMessage.updateMany({
+      where: { senderId: userId, receiverId: null },
+      data: { isHandedOver: false, handedOverBy: null },
+    });
+
+    // Post a system message (generic sender to maintain privacy as requested)
+    const systemMessage = await this.prisma.supportMessage.create({
+      data: {
+        senderId: agentId, 
+        receiverId: userId,
+        content: '🤖 تم إعادة تفعيل مساعد الذكاء الاصطناعي لمساعدتك.',
+        isBot: true,
+        isHandedOver: false,
       },
       include: { sender: { select: { name: true, role: true } } },
     });

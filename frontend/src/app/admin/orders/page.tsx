@@ -248,7 +248,30 @@ export default function AdminOrdersPage() {
                         <option value="DESC">Newest First</option>
                         <option value="ASC">Oldest First</option>
                     </select>
-                    <button className="h-12 px-6 flex items-center gap-2 bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-xl shadow-primary/20">
+                    <button 
+                        onClick={async () => {
+                            const tid = toast.loading('Generating Excel report...');
+                            try {
+                                const res = await apiFetch('/orders/export/excel');
+                                if (res.ok) {
+                                    const blob = await res.blob();
+                                    const url = window.URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `orders-ledger-${new Date().toISOString().split('T')[0]}.xlsx`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    a.remove();
+                                    toast.success('Report downloaded', { id: tid });
+                                } else {
+                                    toast.error('Failed to export', { id: tid });
+                                }
+                            } catch (err) {
+                                toast.error('Network error', { id: tid });
+                            }
+                        }}
+                        className="h-12 px-6 flex items-center gap-2 bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-widest rounded-2xl hover:opacity-90 transition-all shadow-xl shadow-primary/20"
+                    >
                         <Download size={16} />
                         Export Ledger
                     </button>

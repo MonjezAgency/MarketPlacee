@@ -4,6 +4,7 @@ import {
     Post,
     Put,
     Patch,
+    Delete,
     Body,
     Param,
     Query,
@@ -158,5 +159,11 @@ export class OrdersController {
     @Roles(Role.ADMIN, Role.LOGISTICS)
     async notifyDeliveryDay(@Param('id') id: string) {
         return this.ordersService.notifyDeliveryDay(id);
+    }
+
+    @Delete(':id/customer-hide')
+    @Roles(Role.CUSTOMER)
+    async hideOrder(@Param('id') id: string, @Request() req) {
+        return this.ordersService.hideOrder(id, req.user.sub);
     }
 }

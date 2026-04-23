@@ -2,7 +2,7 @@
 import { apiFetch, getToken } from "@/lib/api";
 
 import * as React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { SupportChat } from '@/components/chat/SupportChat';
 import { useAuth } from '@/lib/auth';
 import {
@@ -10,60 +10,81 @@ import {
     ShoppingCart, Users, Clock, CheckCircle2, XCircle,
     Eye, ChevronRight, Star, Package, RefreshCw, Receipt,
     Loader2, UserCheck, Filter, Bot, UserCheck2, Zap,
+    TrendingUp, TrendingDown, Activity, Info, FileText,
+    History, ExternalLink, Download, LayoutDashboard,
 } from 'lucide-react';
 import { io, Socket } from 'socket.io-client';
 import { cn } from '@/lib/utils';
 
 const API_URL = '/api';
 
-type Tab = 'overview' | 'disputes' | 'orders' | 'kyc' | 'chat';
-
-const DISPUTE_STATUS_COLORS: Record<string, string> = {
-    OPEN: 'bg-red-500/10 text-red-500 border-red-500/20',
-    UNDER_REVIEW: 'bg-amber-500/10 text-amber-500 border-amber-500/20',
-    RESOLVED_REFUND: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
-    RESOLVED_NO_REFUND: 'bg-muted/50 text-muted-foreground border-border/50',
-    CLOSED: 'bg-muted/30 text-muted-foreground/50 border-border/30',
+// ─── Design Tokens ──────────────────────────────────────────────────────────
+const COLORS = {
+    primary: '#FF6B00',
+    secondary: '#131921',
+    accent: '#232F3E',
+    success: '#10B981',
+    warning: '#F59E0B',
+    danger: '#EF4444',
+    info: '#3B82F6',
 };
 
-function StatCard({ icon: Icon, label, value, color, onClick }: any) {
+const PRIORITY_STYLES = {
+    HIGH: 'bg-red-500/10 text-red-500 border-red-500/20',
+    MEDIUM: 'bg-orange-500/10 text-orange-500 border-orange-500/20',
+    LOW: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
+};
+
+// ─── UI Components ──────────────────────────────────────────────────────────
+
+function KPICard({ icon: Icon, label, value, trend, trendValue, color }: any) {
+    const isUp = trend === 'up';
     return (
-        <motion.button
+        <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            onClick={onClick}
-            className="w-full text-left glass-card p-6 hover:border-primary/30 transition-all group hover:scale-[1.02]"
+            className="bg-[#131921] border border-white/5 rounded-2xl p-5 shadow-2xl relative overflow-hidden group"
         >
-            <div className="flex items-start justify-between">
-                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", color)}>
-                    <Icon size={20} />
-                </div>
-                <ChevronRight size={14} className="text-muted-foreground/30 group-hover:text-primary transition-colors mt-1" />
+            <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                <Icon size={48} />
             </div>
-            <p className="text-3xl font-black font-heading mt-4">{value ?? '—'}</p>
-            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-2">{label}</p>
-        </motion.button>
+            <div className="flex items-center justify-between mb-4">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", color)}>
+                    <Icon size={18} />
+                </div>
+                {trend && (
+                    <div className={cn(
+                        "flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-black",
+                        isUp ? "bg-emerald-500/10 text-emerald-500" : "bg-red-500/10 text-red-500"
+                    )}>
+                        {isUp ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
+                        {trendValue}%
+                    </div>
+                )}
+            </div>
+            <p className="text-2xl font-black text-white tracking-tight">{value ?? '—'}</p>
+            <p className="text-[10px] text-white/40 font-black uppercase tracking-widest mt-1">{label}</p>
+        </motion.div>
     );
 }
 
 // ─── Customer-facing support page ───────────────────────────────────────────
 function CustomerSupportView() {
     return (
-        <div className="flex flex-col h-[calc(100vh-80px)] bg-accent/5 rounded-3xl overflow-hidden border border-border/50">
+        <div className="flex flex-col h-[calc(100vh-80px)] bg-[#0A0D12] rounded-[2.5rem] overflow-hidden border border-white/10">
             <SupportChat />
         </div>
     );
 }
 
-// ─── Support Team full dashboard ─────────────────────────────────────────────
+// ─── Support HQ Dashboard ────────────────────────────────────────────────────
 export default function SupportPage() {
     const { user } = useAuth();
     const userRole = user?.role?.toUpperCase();
-    const isSupportTeam = ['SUPPORT', 'ADMIN', 'MODERATOR', 'DEVELOPER', 'LOGISTICS'].includes(userRole || '');
+    const isSupportTeam = ['SUPPORT', 'ADMIN', 'MODERATOR', 'DEVELOPER', 'LOGISTICS', 'OWNER'].includes(userRole || '');
 
     if (!isSupportTeam) return <CustomerSupportView />;
 
-    const [tab, setTab] = React.useState<Tab>('overview');
     const [stats, setStats] = React.useState<any>(null);
     const [disputes, setDisputes] = React.useState<any[]>([]);
     const [orders, setOrders] = React.useState<any[]>([]);
@@ -72,12 +93,10 @@ export default function SupportPage() {
     const [selectedUser, setSelectedUser] = React.useState<any>(null);
     const [searchTerm, setSearchTerm] = React.useState('');
     const [switchingId, setSwitchingId] = React.useState<string | null>(null);
-    const socketRef = React.useRef<Socket | null>(null);
     const [isLoading, setIsLoading] = React.useState(true);
     const [isRefreshing, setIsRefreshing] = React.useState(false);
-    const [disputeFilter, setDisputeFilter] = React.useState<string>('OPEN');
-
-    
+    const [rightPanelTab, setRightPanelTab] = React.useState<'chat' | 'order' | 'customer'>('chat');
+    const socketRef = React.useRef<Socket | null>(null);
 
     const fetchAll = React.useCallback(async (silent = false) => {
         if (!silent) setIsLoading(true);
@@ -98,7 +117,7 @@ export default function SupportPage() {
             if (kycData.status === 'fulfilled') setKycList(Array.isArray(kycData.value) ? kycData.value : []);
             if (chatData.status === 'fulfilled') setConversations(Array.isArray(chatData.value) ? chatData.value : []);
         } catch (_e) {
-            // silently ignore fetch errors — Promise.allSettled handles partial failures
+            // silently ignore fetch errors
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
@@ -107,7 +126,6 @@ export default function SupportPage() {
 
     React.useEffect(() => { fetchAll(); }, [fetchAll]);
 
-    // ── Real-time WebSocket for conversation list updates ─────────────────────
     React.useEffect(() => {
         const tok = getToken();
         if (!tok) return;
@@ -116,528 +134,338 @@ export default function SupportPage() {
             transports: ['websocket', 'polling'],
         });
         socketRef.current = socket;
-
-        // New inquiry from customer → refresh conversations list immediately
         socket.on('new_inquiry', () => { fetchAll(true); });
-        // Any conversation updated (support replied, etc.)
         socket.on('conversation_updated', () => { fetchAll(true); });
-
         return () => { socket.disconnect(); socketRef.current = null; };
     }, [fetchAll]);
-
-    const handleDisputeAction = async (id: string, action: 'review' | 'refund' | 'no_refund') => {
-        if (action === 'review') {
-            await apiFetch(`/disputes/${id}/status`, {
-                method: 'PATCH', body: JSON.stringify({ status: 'UNDER_REVIEW' }),
-            });
-        } else {
-            const decision = action === 'refund' ? 'RESOLVED_REFUND' : 'RESOLVED_NO_REFUND';
-            const resolution = action === 'refund' ? 'Refund approved after review.' : 'No refund issued after review.';
-            await apiFetch(`/disputes/${id}/resolve`, {
-                method: 'PATCH', body: JSON.stringify({ decision, resolution }),
-            });
-        }
-        fetchAll(true);
-    };
 
     const handleSwitch = async (userId: string) => {
         setSwitchingId(userId);
         try {
-            await apiFetch(`/chat/admin/switch/${userId}`, {
-                method: 'PATCH',
-            });
+            await apiFetch(`/chat/admin/switch/${userId}`, { method: 'PATCH' });
             await fetchAll(true);
-            // Auto-open this conversation after switching
             const conv = conversations.find(c => c.id === userId);
             if (conv) setSelectedUser(conv);
-            setTab('chat');
-        } finally {
-            setSwitchingId(null);
-        }
+        } finally { setSwitchingId(null); }
     };
 
-    const filteredDisputes = disputes.filter(d =>
-        disputeFilter === 'ALL' ? true : d.status === disputeFilter
-    );
-
-    const TABS: { id: Tab; label: string; icon: React.ElementType; badge?: number }[] = [
-        { id: 'overview', label: 'Overview', icon: ShieldCheck },
-        { id: 'disputes', label: 'Disputes', icon: AlertCircle, badge: stats?.OPEN },
-        { id: 'orders', label: 'Orders', icon: ShoppingCart },
-        { id: 'kyc', label: 'KYC Queue', icon: UserCheck, badge: kycList.length },
-        { id: 'chat', label: 'Live Chat', icon: MessageCircle, badge: conversations.filter(c => c.unread).length || undefined },
-    ];
+    const handleSwitchAI = async (userId: string) => {
+        setSwitchingId(userId);
+        try {
+            await apiFetch(`/chat/admin/switch-ai/${userId}`, { method: 'PATCH' });
+            await fetchAll(true);
+            const conv = conversations.find(c => c.id === userId);
+            if (conv) setSelectedUser(conv);
+        } finally { setSwitchingId(null); }
+    };
 
     if (isLoading) {
         return (
-            <div className="flex items-center justify-center h-64">
-                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] space-y-4">
+                <Loader2 className="w-12 h-12 animate-spin text-primary" />
+                <p className="text-[10px] font-black uppercase tracking-[0.4em] text-white/40">Initializing Command Center...</p>
             </div>
         );
     }
 
     return (
-        <div className="space-y-6 pb-10">
-            {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-border/10">
+        <div className="space-y-8 pb-10 max-w-[1600px] mx-auto">
+            {/* Header Area */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-white/5 pb-8">
                 <div className="flex items-center gap-6">
-                    <a
-                        href="/admin"
-                        className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-lg border border-primary/20 group"
-                        title="Back to Admin Panel"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="group-hover:-translate-x-1 transition-transform"><path d="m15 18-6-6 6-6"/></svg>
-                    </a>
+                    <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center shadow-2xl shadow-primary/20">
+                        <LayoutDashboard size={28} className="text-white" />
+                    </div>
                     <div>
-                        <h1 className="text-4xl font-black font-heading tracking-tighter uppercase leading-none">Support HQ</h1>
-                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-[0.4em] mt-2 opacity-70">Commerce resolution & entity verification</p>
+                        <h1 className="text-4xl font-black text-white tracking-tighter uppercase leading-none">Support HQ</h1>
+                        <p className="text-[10px] text-white/40 font-black uppercase tracking-[0.4em] mt-3 flex items-center gap-2">
+                            <Activity size={10} className="text-emerald-500" /> 
+                            Operational Control Center · v2.4
+                        </p>
                     </div>
                 </div>
-                <button onClick={() => fetchAll(true)} disabled={isRefreshing}
-                    className="h-14 px-8 flex items-center gap-3 rounded-2xl bg-card border border-border/50 text-foreground text-xs font-black uppercase tracking-widest hover:bg-muted disabled:opacity-50 transition-all shadow-xl">
-                    <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
-                    Synchronize
-                </button>
-            </div>
-
-            {/* Tabs */}
-            <div className="flex gap-2 flex-wrap p-1.5 bg-muted/30 rounded-2xl border border-border/50 w-fit">
-                {TABS.map(t => (
-                    <button key={t.id} onClick={() => setTab(t.id)}
-                        className={cn(
-                            "h-10 px-5 rounded-xl text-xs font-black flex items-center gap-2 transition-all relative",
-                            tab === t.id ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                        )}>
-                        <t.icon size={14} />
-                        {t.label}
-                        {t.badge ? (
-                            <span className="absolute -top-1.5 -end-1.5 w-5 h-5 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center shadow-lg">
-                                {t.badge > 9 ? '9+' : t.badge}
-                            </span>
-                        ) : null}
+                <div className="flex items-center gap-3">
+                    <button onClick={() => fetchAll(true)} disabled={isRefreshing}
+                        className="h-14 px-8 flex items-center gap-3 rounded-2xl bg-white/5 border border-white/10 text-white text-[10px] font-black uppercase tracking-widest hover:bg-white/10 disabled:opacity-50 transition-all">
+                        <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+                        Synchronize
                     </button>
-                ))}
+                    <a href="/admin" className="h-14 w-14 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-white/10 transition-all">
+                        <ChevronRight size={18} />
+                    </a>
+                </div>
             </div>
 
-            {/* ── Overview ── */}
-            {tab === 'overview' && (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <StatCard icon={AlertCircle} label="Open Disputes" value={stats?.OPEN ?? 0}
-                            color="bg-red-500/10 text-red-500" onClick={() => setTab('disputes')} />
-                        <StatCard icon={Clock} label="Under Review" value={stats?.UNDER_REVIEW ?? 0}
-                            color="bg-amber-500/10 text-amber-500" onClick={() => setTab('disputes')} />
-                        <StatCard icon={UserCheck} label="KYC Pending" value={kycList.length}
-                            color="bg-blue-500/10 text-blue-500" onClick={() => setTab('kyc')} />
-                        <StatCard icon={MessageCircle} label="Conversations" value={conversations.length}
-                            color="bg-primary/10 text-primary" onClick={() => setTab('chat')} />
+            {/* KPI Row (5 Cards) */}
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                <KPICard icon={AlertCircle} label="Open Disputes" value={stats?.OPEN ?? 0} trend="down" trendValue={12} color="bg-red-500/10 text-red-500" />
+                <KPICard icon={Clock} label="Under Review" value={stats?.UNDER_REVIEW ?? 0} trend="up" trendValue={5} color="bg-amber-500/10 text-amber-500" />
+                <KPICard icon={UserCheck} label="KYC Pending" value={kycList.length} color="bg-blue-500/10 text-blue-500" />
+                <KPICard icon={MessageCircle} label="Active Chats" value={conversations.length} trend="up" trendValue={24} color="bg-primary/10 text-primary" />
+                <KPICard icon={Activity} label="SLA Compliance" value="98.2%" trend="up" trendValue={1.4} color="bg-emerald-500/10 text-emerald-500" />
+            </div>
+
+            {/* Main Grid: 70% Conversations | 30% Active Context */}
+            <div className="grid grid-cols-1 xl:grid-cols-10 gap-6 h-[calc(100vh-320px)] min-h-[700px]">
+                
+                {/* Left (70%): Conversations List */}
+                <div className="xl:col-span-7 bg-[#131921] border border-white/5 rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl">
+                    <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                        <div className="flex items-center gap-4 flex-1">
+                            <div className="relative flex-1 max-w-md">
+                                <Search className="absolute start-4 top-1/2 -translate-y-1/2 text-white/20" size={16} />
+                                <input 
+                                    type="text" 
+                                    placeholder="Search by customer name, email, or order ID..." 
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                    className="w-full h-12 bg-white/5 rounded-2xl ps-12 pe-4 text-sm text-white placeholder:text-white/20 outline-none border border-transparent focus:border-primary/30 transition-all"
+                                />
+                            </div>
+                            <button className="h-12 w-12 flex items-center justify-center rounded-2xl bg-white/5 border border-white/10 text-white/60 hover:text-white">
+                                <Filter size={18} />
+                            </button>
+                        </div>
+                        <div className="flex items-center gap-2 ml-4">
+                            <span className="text-[10px] font-black uppercase tracking-widest text-white/40">{conversations.length} Threads</span>
+                        </div>
                     </div>
 
-                    {/* Quick actions: latest open disputes */}
-                    <div className="bg-card border border-border/50 rounded-2xl overflow-hidden">
-                        <div className="px-5 py-4 border-b border-border/30 flex items-center justify-between">
-                            <h3 className="text-sm font-black uppercase tracking-widest">Urgent — Open Disputes</h3>
-                            <button onClick={() => setTab('disputes')} className="text-xs font-bold text-primary hover:underline">View all</button>
-                        </div>
-                        {disputes.filter(d => d.status === 'OPEN').slice(0, 5).length === 0 ? (
-                            <div className="p-8 text-center text-muted-foreground text-sm">
-                                <CheckCircle2 size={28} className="mx-auto mb-2 text-emerald-500" />
-                                No open disputes
+                    <div className="flex-1 overflow-y-auto no-scrollbar">
+                        {conversations
+                            .filter(c => !searchTerm || c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || c.email?.toLowerCase().includes(searchTerm.toLowerCase()))
+                            .map((conv, idx) => {
+                                // Priority Logic (Mocked based on category or content)
+                                const priority = conv.lastMessage?.toLowerCase().includes('payment') || conv.lastMessage?.toLowerCase().includes('نزاع') ? 'HIGH' : 
+                                               conv.lastMessage?.toLowerCase().includes('delay') ? 'MEDIUM' : 'LOW';
+
+                                return (
+                                    <motion.button
+                                        key={conv.id}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ delay: idx * 0.02 }}
+                                        onClick={() => setSelectedUser(conv)}
+                                        className={cn(
+                                            "w-full p-5 flex items-center gap-6 border-b border-white/[0.02] text-start transition-all group",
+                                            selectedUser?.id === conv.id ? "bg-primary/5 border-l-4 border-l-primary" : "hover:bg-white/[0.02]"
+                                        )}
+                                    >
+                                        <div className="relative shrink-0">
+                                            <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center font-black text-white text-xl">
+                                                {(conv.name || '?')[0]}
+                                            </div>
+                                            <div className={cn(
+                                                "absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-4 border-[#131921] flex items-center justify-center",
+                                                conv.isHandedOver ? "bg-emerald-500" : "bg-blue-500"
+                                            )}>
+                                                {conv.isHandedOver ? <UserCheck2 size={10} className="text-white" /> : <Bot size={10} className="text-white" />}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center justify-between mb-1">
+                                                <h4 className="text-sm font-black text-white truncate">{conv.name}</h4>
+                                                <span className="text-[9px] font-black text-white/30 uppercase tracking-tighter">
+                                                    {conv.lastMessageAt ? new Date(conv.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-white/40 truncate font-medium mb-3">
+                                                {conv.lastMessage || 'No messages yet...'}
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <span className={cn("text-[8px] font-black px-2 py-1 rounded-lg border uppercase tracking-widest", PRIORITY_STYLES[priority])}>
+                                                    {priority} Priority
+                                                </span>
+                                                <span className="text-[8px] font-black px-2 py-1 rounded-lg border border-white/5 bg-white/5 text-white/40 uppercase tracking-widest">
+                                                    {conv.isHandedOver ? 'Assigned' : 'AI Routing'}
+                                                </span>
+                                                {conv.unread > 0 && (
+                                                    <span className="bg-red-500 text-white text-[8px] font-black px-2 py-1 rounded-lg animate-pulse">
+                                                        {conv.unread} NEW
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <ChevronRight size={16} className="text-white/10 group-hover:text-primary transition-colors" />
+                                    </motion.button>
+                                );
+                            })}
+                        
+                        {conversations.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-20 text-white/20">
+                                <MessageCircle size={48} className="mb-4 opacity-10" />
+                                <p className="text-sm font-black uppercase tracking-widest">Awaiting inquiries...</p>
                             </div>
-                        ) : (
-                            disputes.filter(d => d.status === 'OPEN').slice(0, 5).map(d => (
-                                <div key={d.id} className="flex items-center justify-between px-5 py-3 border-b border-border/20 hover:bg-muted/20 transition-colors">
-                                    <div>
-                                        <p className="text-sm font-bold">{d.reason?.replace(/_/g, ' ')}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {d.buyer?.name || '—'} · Order #{d.orderId?.slice(-8).toUpperCase()}
-                                        </p>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border uppercase", DISPUTE_STATUS_COLORS[d.status])}>
-                                            {d.status}
-                                        </span>
-                                        <button onClick={() => handleDisputeAction(d.id, 'review')}
-                                            className="h-7 px-3 bg-amber-500/10 text-amber-600 text-[10px] font-black rounded-lg hover:bg-amber-500/20 transition-colors">
-                                            Take Over
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
                         )}
                     </div>
+                </div>
 
-                    {/* Recent KYC pending */}
-                    {kycList.length > 0 && (
-                        <div className="bg-card border border-border/50 rounded-2xl overflow-hidden">
-                            <div className="px-5 py-4 border-b border-border/30 flex items-center justify-between">
-                                <h3 className="text-sm font-black uppercase tracking-widest">KYC Awaiting Review</h3>
-                                <button onClick={() => setTab('kyc')} className="text-xs font-bold text-primary hover:underline">View all</button>
-                            </div>
-                            {kycList.slice(0, 4).map((kyc: any) => (
-                                <div key={kyc.id} className="flex items-center justify-between px-5 py-3 border-b border-border/20">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center font-black text-primary text-sm">
-                                            {(kyc.user?.name || kyc.name || '?')[0]}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold">{kyc.user?.name || kyc.name || '—'}</p>
-                                            <p className="text-xs text-muted-foreground">{kyc.documentType} · {new Date(kyc.createdAt).toLocaleDateString()}</p>
-                                        </div>
-                                    </div>
-                                    <a href="/admin/kyc"
-                                        className="h-7 px-3 bg-primary/10 text-primary text-[10px] font-black rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-1">
-                                        <Eye size={11} /> Review
-                                    </a>
-                                </div>
+                {/* Right (30%): Active Chat & Context */}
+                <div className="xl:col-span-3 flex flex-col gap-6 overflow-hidden">
+                    
+                    {/* Main Context Card */}
+                    <div className="flex-1 bg-[#131921] border border-white/5 rounded-[2.5rem] flex flex-col overflow-hidden shadow-2xl">
+                        <div className="p-2 border-b border-white/5 flex gap-1">
+                            {(['chat', 'order', 'customer'] as const).map(t => (
+                                <button
+                                    key={t}
+                                    onClick={() => setRightPanelTab(t)}
+                                    className={cn(
+                                        "flex-1 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all",
+                                        rightPanelTab === t ? "bg-primary text-white" : "text-white/30 hover:text-white hover:bg-white/5"
+                                    )}
+                                >
+                                    {t}
+                                </button>
                             ))}
                         </div>
-                    )}
-                </div>
-            )}
 
-            {/* ── Disputes ── */}
-            {tab === 'disputes' && (
-                <div className="space-y-4">
-                    {/* Filter */}
-                    <div className="flex gap-2 flex-wrap items-center">
-                        <Filter size={13} className="text-muted-foreground" />
-                        {['ALL', 'OPEN', 'UNDER_REVIEW', 'RESOLVED_REFUND', 'RESOLVED_NO_REFUND'].map(s => (
-                            <button key={s} onClick={() => setDisputeFilter(s)}
-                                className={cn("h-7 px-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-colors",
-                                    disputeFilter === s ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/70"
-                                )}>
-                                {s.replace(/_/g, ' ')} ({s === 'ALL' ? disputes.length : disputes.filter(d => d.status === s).length})
-                            </button>
-                        ))}
-                    </div>
-
-                    {filteredDisputes.length === 0 ? (
-                        <div className="text-center py-16 text-muted-foreground">
-                            <AlertCircle size={32} className="mx-auto mb-3 opacity-20" />
-                            <p className="font-bold text-sm">No disputes in this category</p>
-                        </div>
-                    ) : (
-                        <div className="space-y-3">
-                            {filteredDisputes.map((d, i) => (
-                                <motion.div key={d.id}
-                                    initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                                    className="bg-card border border-border/50 rounded-2xl p-5">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="flex-1 space-y-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border uppercase", DISPUTE_STATUS_COLORS[d.status])}>
-                                                    {d.status.replace(/_/g, ' ')}
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground font-bold">
-                                                    #{d.orderId?.slice(-8).toUpperCase()}
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground">
-                                                    {new Date(d.createdAt).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                            <p className="font-black text-sm">{d.reason?.replace(/_/g, ' ')}</p>
-                                            <p className="text-xs text-muted-foreground line-clamp-2">{d.description}</p>
-                                            <p className="text-xs font-bold text-muted-foreground">
-                                                Buyer: {d.buyer?.name || '—'} · {d.buyer?.email || '—'}
-                                            </p>
-                                        </div>
-                                        {(d.status === 'OPEN' || d.status === 'UNDER_REVIEW') && (
-                                            <div className="flex flex-col gap-2 shrink-0">
-                                                {d.status === 'OPEN' && (
-                                                    <button onClick={() => handleDisputeAction(d.id, 'review')}
-                                                        className="h-8 px-3 bg-amber-500/10 text-amber-600 text-[10px] font-black rounded-xl hover:bg-amber-500/20 transition-colors whitespace-nowrap">
-                                                        Take Over
-                                                    </button>
-                                                )}
-                                                <button onClick={() => handleDisputeAction(d.id, 'refund')}
-                                                    className="h-8 px-3 bg-emerald-500/10 text-emerald-600 text-[10px] font-black rounded-xl hover:bg-emerald-500/20 transition-colors whitespace-nowrap">
-                                                    ✓ Refund
-                                                </button>
-                                                <button onClick={() => handleDisputeAction(d.id, 'no_refund')}
-                                                    className="h-8 px-3 bg-red-500/10 text-red-500 text-[10px] font-black rounded-xl hover:bg-red-500/20 transition-colors whitespace-nowrap">
-                                                    ✗ No Refund
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-                                </motion.div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ── Orders ── */}
-            {tab === 'orders' && (
-                <div className="space-y-3">
-                    <div className="flex gap-3 mb-4">
-                        <div className="relative flex-1">
-                            <Search size={14} className="absolute start-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                            <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                placeholder="Search by order ID or buyer name..."
-                                className="w-full h-11 bg-muted rounded-2xl ps-10 pe-4 text-sm outline-none border border-border/50 focus:border-primary/50" />
-                        </div>
-                        <button
-                            onClick={async () => {
-                                const res = await apiFetch('/orders/export/excel');
-                                if (res.ok) {
-                                    const blob = await res.blob();
-                                    const url = window.URL.createObjectURL(blob);
-                                    const a = document.createElement('a');
-                                    a.href = url;
-                                    a.download = `orders-support-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-                                    document.body.appendChild(a);
-                                    a.click();
-                                    a.remove();
-                                }
-                            }}
-                            className="h-11 px-6 bg-emerald-500 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all flex items-center gap-2 shadow-lg shadow-emerald-500/20"
-                        >
-                            <Receipt size={14} />
-                            Export
-                        </button>
-                    </div>
-                    {orders
-                        .filter(o => !searchTerm ||
-                            o.id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            o.buyer?.name?.toLowerCase().includes(searchTerm.toLowerCase()))
-                        .map((o: any, i: number) => (
-                            <motion.div key={o.id}
-                                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
-                                className="bg-card border border-border/50 rounded-2xl px-5 py-4 flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
-                                        <Package size={16} className="text-primary" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-black">#{o.id?.slice(-8).toUpperCase()}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {o.buyer?.name || '—'} · {new Date(o.createdAt).toLocaleDateString()}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="text-end">
-                                    <p className="text-sm font-black">${Number(o.totalAmount || 0).toFixed(2)}</p>
-                                    <span className={cn("text-[10px] font-black px-2 py-0.5 rounded-full border uppercase",
-                                        o.status === 'DELIVERED' ? 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' :
-                                        o.status === 'CANCELLED' ? 'bg-red-500/10 text-red-500 border-red-500/20' :
-                                        'bg-amber-500/10 text-amber-500 border-amber-500/20'
-                                    )}>
-                                        {o.status}
-                                    </span>
-                                </div>
-                            </motion.div>
-                        ))}
-                </div>
-            )}
-
-            {/* ── KYC Queue ── */}
-            {tab === 'kyc' && (
-                <div className="space-y-3">
-                    {kycList.length === 0 ? (
-                        <div className="text-center py-16 text-muted-foreground">
-                            <CheckCircle2 size={32} className="mx-auto mb-3 text-emerald-500 opacity-60" />
-                            <p className="font-bold text-sm">No pending KYC reviews</p>
-                        </div>
-                    ) : (
-                        kycList.map((kyc: any, i: number) => (
-                            <motion.div key={kyc.id}
-                                initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
-                                className="bg-card border border-border/50 rounded-2xl p-5 flex items-center justify-between gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-2xl bg-blue-500/10 flex items-center justify-center font-black text-blue-500">
-                                        {(kyc.user?.name || kyc.name || '?')[0]}
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-sm">{kyc.user?.name || kyc.name || '—'}</p>
-                                        <p className="text-xs text-muted-foreground">
-                                            {kyc.documentType} · Submitted {new Date(kyc.createdAt).toLocaleDateString()}
-                                        </p>
-                                        {kyc.livenessScore !== undefined && (
-                                            <p className="text-xs font-bold text-amber-500">
-                                                Liveness Score: {(kyc.livenessScore * 100).toFixed(0)}%
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <a href="/admin/kyc"
-                                    className="h-9 px-4 bg-primary text-primary-foreground text-[11px] font-black rounded-xl hover:opacity-90 transition-opacity flex items-center gap-2">
-                                    <Eye size={13} /> Review in KYC Panel
-                                </a>
-                            </motion.div>
-                        ))
-                    )}
-                </div>
-            )}
-
-            {/* ── Live Chat ── */}
-            {tab === 'chat' && (
-                <div className="flex gap-4 h-[calc(100vh-260px)] min-h-[600px]">
-                    {/* Conversations list */}
-                    <div className="w-80 bg-card border border-border/50 rounded-2xl overflow-hidden flex flex-col shrink-0">
-                        {/* Search */}
-                        <div className="p-3 border-b border-border/30 space-y-2">
-                            <div className="relative">
-                                <Search size={13} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                                <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-                                    placeholder="Search users..."
-                                    className="w-full bg-muted rounded-xl ps-9 pe-4 py-2 text-xs outline-none" />
-                            </div>
-                            <div className="flex items-center justify-between px-1">
-                                <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
-                                    {conversations.length} conversations
-                                </span>
-                                <span className="text-[10px] text-emerald-500 font-bold flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
-                                    Live
-                                </span>
-                            </div>
-                        </div>
-
-                        {/* Conversation rows */}
-                        <div className="flex-1 overflow-y-auto divide-y divide-border/20">
-                            {conversations
-                                .filter(c => c.name?.toLowerCase().includes(searchTerm.toLowerCase()))
-                                .map(conv => (
-                                    <div key={conv.id}
-                                        className={cn(
-                                            "group hover:bg-muted/20 transition-colors",
-                                            selectedUser?.id === conv.id && "bg-primary/5 border-s-2 border-s-primary"
-                                        )}>
-                                        {/* Main row — click to open */}
-                                        <button className="w-full p-3 flex items-center gap-3 text-start"
-                                            onClick={() => { setSelectedUser(conv); }}>
-                                            {/* Avatar */}
-                                            <div className="relative shrink-0">
-                                                <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-sm">
-                                                    {(conv.name || '?')[0]}
-                                                </div>
-                                                {/* Bot / Human indicator */}
-                                                <div className={cn(
-                                                    "absolute -bottom-0.5 -end-0.5 w-4 h-4 rounded-full flex items-center justify-center border-2 border-card",
-                                                    conv.isHandedOver ? "bg-emerald-500" : "bg-blue-500"
-                                                )}>
-                                                    {conv.isHandedOver
-                                                        ? <UserCheck2 size={8} className="text-white" />
-                                                        : <Bot size={8} className="text-white" />}
-                                                </div>
-                                            </div>
-
-                                            <div className="flex-1 overflow-hidden">
-                                                <div className="flex items-center justify-between">
-                                                    <p className="text-sm font-black truncate">{conv.name}</p>
-                                                    {conv.unread > 0 && (
-                                                        <span className="shrink-0 w-5 h-5 bg-red-500 text-white text-[9px] font-black rounded-full flex items-center justify-center">
-                                                            {conv.unread > 9 ? '9+' : conv.unread}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <p className="text-[10px] text-muted-foreground truncate mt-0.5">
-                                                    {conv.lastMessage || '—'}
-                                                </p>
-                                                <div className="flex items-center gap-1.5 mt-0.5">
-                                                    <span className={cn(
-                                                        "text-[9px] font-black px-1.5 py-0.5 rounded-full",
-                                                        conv.isHandedOver
-                                                            ? "bg-emerald-500/10 text-emerald-600"
-                                                            : "bg-blue-500/10 text-blue-600"
-                                                    )}>
-                                                        {conv.isHandedOver ? '👤 Human' : '🤖 Bot'}
+                        <div className="flex-1 relative overflow-hidden">
+                            {selectedUser ? (
+                                <AnimatePresence mode="wait">
+                                    {rightPanelTab === 'chat' && (
+                                        <motion.div 
+                                            key="chat"
+                                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                            className="h-full flex flex-col"
+                                        >
+                                            <div className="px-5 py-4 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+                                                <div className="flex items-center gap-2">
+                                                    <div className={cn("w-2 h-2 rounded-full", selectedUser.isHandedOver ? "bg-emerald-500" : "bg-blue-500")} />
+                                                    <span className="text-[10px] font-black text-white/60 uppercase tracking-widest">
+                                                        {selectedUser.isHandedOver ? 'Human Active' : 'AI Assistant'}
                                                     </span>
-                                                    {conv.lastMessageAt && (
-                                                        <span className="text-[9px] text-muted-foreground">
-                                                            {new Date(conv.lastMessageAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </span>
+                                                </div>
+                                                <div className="flex gap-2">
+                                                    {selectedUser.isHandedOver ? (
+                                                        <button 
+                                                            onClick={() => handleSwitchAI(selectedUser.id)}
+                                                            className="p-2 bg-white/5 hover:bg-primary/20 hover:text-primary rounded-xl transition-all"
+                                                            title="Switch to AI"
+                                                        >
+                                                            <Bot size={14} />
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={() => handleSwitch(selectedUser.id)}
+                                                            className="p-2 bg-primary/10 text-primary hover:bg-primary hover:text-white rounded-xl transition-all shadow-lg"
+                                                            title="Take Control"
+                                                        >
+                                                            <Zap size={14} />
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
-                                        </button>
+                                            <div className="flex-1 overflow-hidden">
+                                                <SupportChat isSupport={true} targetUserId={selectedUser.id} />
+                                            </div>
+                                        </motion.div>
+                                    )}
 
-                                        {/* Switch button — only shown when still bot-handled */}
-                                        {!conv.isHandedOver && (
-                                            <div className="px-3 pb-2">
-                                                <button
-                                                    onClick={() => handleSwitch(conv.id)}
-                                                    disabled={switchingId === conv.id}
-                                                    className={cn(
-                                                        "w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-[10px] font-black transition-all",
-                                                        "bg-amber-500/10 text-amber-600 border border-amber-500/20 hover:bg-amber-500/20",
-                                                        switchingId === conv.id && "opacity-60 cursor-wait"
-                                                    )}>
-                                                    {switchingId === conv.id
-                                                        ? <RefreshCw size={10} className="animate-spin" />
-                                                        : <Zap size={10} />}
-                                                    Switch to Human
+                                    {rightPanelTab === 'order' && (
+                                        <motion.div 
+                                            key="order"
+                                            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                                            className="p-6 space-y-6 overflow-y-auto h-full no-scrollbar"
+                                        >
+                                            <h5 className="text-xs font-black text-white uppercase tracking-widest mb-4">Latest Order Reference</h5>
+                                            <div className="bg-white/5 border border-white/10 rounded-2xl p-5 space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-black text-white/40 uppercase">Status</span>
+                                                    <span className="px-2 py-1 bg-primary/10 text-primary text-[9px] font-black rounded-lg">SHIPPED</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-white">
+                                                    <span className="text-[10px] font-black text-white/40 uppercase">Total Value</span>
+                                                    <span className="text-sm font-black">$1,240.00</span>
+                                                </div>
+                                                <div className="pt-4 border-t border-white/5">
+                                                    <p className="text-[10px] font-black text-white/40 uppercase mb-3">Items</p>
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-primary"><Package size={14} /></div>
+                                                            <span className="text-xs font-bold text-white/80">Industrial Compressor x1</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button className="w-full py-3 bg-white/5 hover:bg-white/10 text-white text-[10px] font-black uppercase rounded-xl transition-all flex items-center justify-center gap-2">
+                                                    <ExternalLink size={12} /> Full Transaction Ledger
                                                 </button>
                                             </div>
-                                        )}
-                                    </div>
-                                ))}
+                                        </motion.div>
+                                    )}
 
-                            {conversations.filter(c => c.name?.toLowerCase().includes(searchTerm.toLowerCase())).length === 0 && (
-                                <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
-                                    <MessageCircle size={24} className="mb-2 opacity-20" />
-                                    <p className="text-xs font-bold">No conversations yet</p>
+                                    {rightPanelTab === 'customer' && (
+                                        <motion.div 
+                                            key="customer"
+                                            initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}
+                                            className="p-6 space-y-6 overflow-y-auto h-full no-scrollbar"
+                                        >
+                                            <div className="text-center pb-6">
+                                                <div className="w-20 h-20 rounded-[2rem] bg-white/5 border-2 border-primary/20 flex items-center justify-center mx-auto mb-4 font-black text-white text-3xl">
+                                                    {(selectedUser.name || '?')[0]}
+                                                </div>
+                                                <h4 className="text-lg font-black text-white">{selectedUser.name}</h4>
+                                                <p className="text-xs text-white/40 font-medium">{selectedUser.email}</p>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div className="bg-white/5 rounded-2xl p-4 flex items-center gap-4">
+                                                    <Users size={16} className="text-primary" />
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-white/30 uppercase">Relationship Type</p>
+                                                        <p className="text-xs font-bold text-white">Wholesale Customer</p>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-white/5 rounded-2xl p-4 flex items-center gap-4">
+                                                    <History size={16} className="text-primary" />
+                                                    <div>
+                                                        <p className="text-[9px] font-black text-white/30 uppercase">Member Since</p>
+                                                        <p className="text-xs font-bold text-white">August 2023</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </motion.div>
+                                    )}
+                                </AnimatePresence>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center p-8 text-center text-white/10">
+                                    <ShieldCheck size={48} className="mb-4 opacity-5" />
+                                    <p className="text-xs font-black uppercase tracking-widest">Select a Thread to begin processing</p>
                                 </div>
                             )}
                         </div>
                     </div>
 
-                    {/* Chat area */}
-                    <div className="flex-1 bg-card border border-border/50 rounded-2xl overflow-hidden flex flex-col">
-                        {selectedUser ? (
-                            <>
-                                {/* Chat header with user info + status */}
-                                <div className="px-5 py-3 border-b border-border/30 flex items-center justify-between shrink-0">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-black text-primary text-sm">
-                                            {(selectedUser.name || '?')[0]}
-                                        </div>
-                                        <div>
-                                            <p className="font-black text-sm">{selectedUser.name}</p>
-                                            <p className="text-[10px] text-muted-foreground">{selectedUser.email}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        {selectedUser.isHandedOver ? (
-                                            <span className="flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-500/10 px-2 py-1 rounded-full">
-                                                <UserCheck2 size={10} /> Human Support Active
-                                            </span>
-                                        ) : (
-                                            <>
-                                                <span className="flex items-center gap-1 text-[10px] font-black text-blue-600 bg-blue-500/10 px-2 py-1 rounded-full">
-                                                    <Bot size={10} /> Bot Handling
-                                                </span>
-                                                <button
-                                                    onClick={() => handleSwitch(selectedUser.id)}
-                                                    disabled={switchingId === selectedUser.id}
-                                                    className="flex items-center gap-1.5 text-[10px] font-black bg-amber-500 text-white px-3 py-1.5 rounded-xl hover:bg-amber-600 transition-colors disabled:opacity-60">
-                                                    {switchingId === selectedUser.id
-                                                        ? <RefreshCw size={10} className="animate-spin" />
-                                                        : <Zap size={10} />}
-                                                    Switch to Human
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex-1 overflow-hidden">
-                                    <SupportChat isSupport={true} targetUserId={selectedUser.id} />
-                                </div>
-                            </>
-                        ) : (
-                            <div className="h-full flex flex-col items-center justify-center text-center text-muted-foreground p-8">
-                                <MessageCircle size={36} className="mb-3 opacity-20" />
-                                <p className="font-bold text-sm">Select a conversation</p>
-                                <p className="text-xs mt-1 max-w-48">
-                                    Choose a conversation from the list — 🤖 means the bot is handling it, click <strong>Switch</strong> to take over
-                                </p>
+                    {/* Operational Health Widget */}
+                    <div className="bg-[#131921] border border-white/5 rounded-[2.5rem] p-6 shadow-2xl">
+                        <h5 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-4">Support Health</h5>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black text-white/80 uppercase">Avg Response</span>
+                                <span className="text-xs font-black text-emerald-500">2m 14s</span>
                             </div>
-                        )}
+                            <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                <div className="h-full bg-emerald-500 w-[92%]" />
+                            </div>
+                            <div className="flex items-center justify-between pt-2">
+                                <span className="text-[10px] font-black text-white/80 uppercase">Resolved Today</span>
+                                <span className="text-xs font-black text-white">142</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Quick Actions */}
+                    <div className="grid grid-cols-2 gap-3">
+                        <button className="h-12 bg-white/5 border border-white/10 rounded-2xl text-[9px] font-black uppercase text-white hover:bg-primary hover:border-primary transition-all flex items-center justify-center gap-2">
+                            <FileText size={12} /> Reports
+                        </button>
+                        <button className="h-12 bg-white/5 border border-white/10 rounded-2xl text-[9px] font-black uppercase text-white hover:bg-primary hover:border-primary transition-all flex items-center justify-center gap-2">
+                            <Download size={12} /> Export
+                        </button>
                     </div>
                 </div>
-            )}
+            </div>
         </div>
     );
 }

@@ -26,11 +26,16 @@ export class ChatController {
     return this.chatService.getConversationsWithStatus(req.user.role?.toUpperCase());
   }
 
-  /** Switch conversation from bot to human agent */
   @Patch('admin/switch/:userId')
   @Roles(Role.ADMIN, Role.SUPPORT, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
   async switchToHuman(@Param('userId') userId: string, @Request() req) {
     return this.chatService.switchToHuman(userId, req.user.sub);
+  }
+
+  @Patch('admin/switch-ai/:userId')
+  @Roles(Role.ADMIN, Role.SUPPORT, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
+  async switchToAI(@Param('userId') userId: string, @Request() req) {
+    return this.chatService.switchToAI(userId, req.user.sub);
   }
 
   @Get('admin/messages/:userId')
