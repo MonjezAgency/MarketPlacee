@@ -42,6 +42,8 @@ export interface Product {
     inStock?: boolean;
     moq?: number;
     minOrder?: number; // UI Alias for moq
+    unitsPerPallet?: number;
+    palletsPerShipment?: number;
     status?: ProductStatus | string;
     
     // Advanced Data

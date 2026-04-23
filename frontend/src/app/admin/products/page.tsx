@@ -98,6 +98,10 @@ export default function ProductsModerationPage() {
     const [activePanelTab, setActivePanelTab] = React.useState('Product Info');
     const [rejectReason, setRejectReason] = React.useState('');
     const [showRejectInput, setShowRejectInput] = React.useState(false);
+    
+    // Bulk Selection
+    const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
+    const [isBulkLoading, setIsBulkLoading] = React.useState(false);
 
     const fetchData = React.useCallback(async () => {
         setIsLoading(true);
@@ -170,6 +174,53 @@ export default function ProductsModerationPage() {
         } catch (err) {
             toast.error('Error during rejection', { id: tid });
         }
+    };
+
+    const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
+        if (selectedIds.length === 0) return;
+        
+        const confirmMsg = action === 'delete' 
+            ? `Are you sure you want to delete ${selectedIds.length} products?`
+            : `Are you sure you want to ${action} ${selectedIds.length} products?`;
+            
+        if (!window.confirm(confirmMsg)) return;
+
+        const tid = toast.loading(`${action.charAt(0).toUpperCase() + action.slice(1)}ing products...`);
+        setIsBulkLoading(true);
+        try {
+            const endpoint = `/products/bulk-${action}`;
+            const res = await apiFetch(endpoint, {
+                method: 'POST',
+                body: JSON.stringify({ ids: selectedIds })
+            });
+
+            if (res.ok) {
+                toast.success(`Successfully ${action}d ${selectedIds.length} products`, { id: tid });
+                setSelectedIds([]);
+                fetchData();
+            } else {
+                toast.error(`Bulk ${action} failed`, { id: tid });
+            }
+        } catch (err) {
+            toast.error(`Error during bulk ${action}`, { id: tid });
+        } finally {
+            setIsBulkLoading(false);
+        }
+    };
+
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredProducts.length) {
+            setSelectedIds([]);
+        } else {
+            setSelectedIds(filteredProducts.map(p => p.id));
+        }
+    };
+
+    const toggleSelectProduct = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation(); // Don't trigger row click (panel open)
+        setSelectedIds(prev => 
+            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+        );
     };
 
     // Filters
@@ -263,6 +314,14 @@ export default function ProductsModerationPage() {
                             <table className="w-full text-left">
                                 <thead className="bg-slate-50/50 border-b border-slate-100">
                                     <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        <th className="px-6 py-4 w-10">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedIds.length > 0 && selectedIds.length === filteredProducts.length}
+                                                onChange={toggleSelectAll}
+                                                className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                            />
+                                        </th>
                                         <th className="px-6 py-4">Product</th>
                                         <th className="px-6 py-4">Supplier</th>
                                         <th className="px-6 py-4">Status</th>
@@ -286,9 +345,17 @@ export default function ProductsModerationPage() {
                                             onClick={() => setSelectedProduct(p)}
                                             className={cn(
                                                 "group hover:bg-slate-50 transition-all cursor-pointer h-[64px]",
-                                                selectedProduct?.id === p.id && "bg-teal-50/30"
+                                                (selectedProduct?.id === p.id || selectedIds.includes(p.id)) && "bg-teal-50/30"
                                             )}
                                         >
+                                            <td className="px-6 py-4" onClick={(e) => toggleSelectProduct(e, p.id)}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedIds.includes(p.id)}
+                                                    readOnly
+                                                    className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                                                />
+                                            </td>
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-200">
@@ -577,6 +644,61 @@ export default function ProductsModerationPage() {
                 </AnimatePresence>
 
             </div>
+
+            {/* Bulk Actions Floating Bar */}
+            <AnimatePresence>
+                {selectedIds.length > 0 && (
+                    <motion.div 
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] w-full max-w-2xl px-6"
+                    >
+                        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-2xl flex items-center justify-between gap-6 text-white ring-1 ring-white/10">
+                            <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center font-bold text-white shadow-lg shadow-teal-500/20">
+                                    {selectedIds.length}
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold">Items Selected</p>
+                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Apply actions to selection</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                                <button 
+                                    onClick={() => handleBulkAction('approve')}
+                                    disabled={isBulkLoading}
+                                    className="h-10 px-4 bg-teal-600 hover:bg-teal-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    <CheckCircle size={14} /> Approve
+                                </button>
+                                <button 
+                                    onClick={() => handleBulkAction('reject')}
+                                    disabled={isBulkLoading}
+                                    className="h-10 px-4 bg-orange-600 hover:bg-orange-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    <XCircle size={14} /> Reject
+                                </button>
+                                <div className="w-px h-6 bg-slate-800 mx-1" />
+                                <button 
+                                    onClick={() => handleBulkAction('delete')}
+                                    disabled={isBulkLoading}
+                                    className="h-10 px-4 bg-white/10 hover:bg-red-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
+                                >
+                                    <Trash2 size={14} /> Delete
+                                </button>
+                                <button 
+                                    onClick={() => setSelectedIds([])}
+                                    className="h-10 px-4 text-slate-400 hover:text-white transition-colors text-xs font-bold"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

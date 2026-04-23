@@ -51,6 +51,10 @@ export class ExcelService {
             'الفئة': 'category', 'القسم': 'category', 'التصنيف': 'category', 'نوع': 'category', 'فئة': 'category', 'صنف': 'category', 'المجموعة': 'category', 'مجموعة': 'category',
             'ean': 'ean', 'barcode': 'ean', 'upc': 'ean', 'sku': 'ean', 'code': 'ean', 'productcode': 'ean',
             'الباركود': 'ean', 'كودالمنتج': 'ean', 'كود': 'ean', 'رقم': 'ean',
+            'unitsperpallet': 'unitsPerPallet', 'itemsperpallet': 'unitsPerPallet', 'palletunits': 'unitsPerPallet', 'palletqty': 'unitsPerPallet',
+            'عددالوحداتفيالبالتة': 'unitsPerPallet', 'وحداتالبالتة': 'unitsPerPallet', 'البالتةفيهاكام': 'unitsPerPallet',
+            'palletspershipment': 'palletsPerShipment', 'palletsperload': 'palletsPerShipment', 'shipmentpallets': 'palletsPerShipment',
+            'عددالبالتاتفيالشحنة': 'palletsPerShipment', 'البالتاتفيالشحنة': 'palletsPerShipment', 'بالتاتالشحنة': 'palletsPerShipment',
         };
 
         // Find header row
@@ -186,6 +190,16 @@ export class ExcelService {
         if (row.stock !== undefined && row.stock !== null) {
             const s = parseInt(String(row.stock).replace(/[^0-9-]/g, ''), 10);
             row.stock = isNaN(s) ? 10 : Math.min(Math.max(s, 0), 2147483647);
+        }
+
+        if (row.unitsPerPallet !== undefined && row.unitsPerPallet !== null) {
+            const val = parseInt(String(row.unitsPerPallet).replace(/[^0-9]/g, ''), 10);
+            row.unitsPerPallet = isNaN(val) ? 0 : val;
+        }
+
+        if (row.palletsPerShipment !== undefined && row.palletsPerShipment !== null) {
+            const val = parseInt(String(row.palletsPerShipment).replace(/[^0-9]/g, ''), 10);
+            row.palletsPerShipment = isNaN(val) ? 0 : val;
         }
 
         // Defaults for missing required fields

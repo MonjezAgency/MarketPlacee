@@ -56,6 +56,16 @@ export class CreateProductDto {
     moq?: number;
 
     @IsOptional()
+    @IsInt()
+    @Min(0)
+    unitsPerPallet?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    palletsPerShipment?: number;
+
+    @IsOptional()
     @IsString()
     warehouseId?: string;
 }

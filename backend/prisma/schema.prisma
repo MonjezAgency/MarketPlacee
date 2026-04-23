@@ -159,6 +159,8 @@ model Product {
   status      ProductStatus @default(PENDING)
   adminNotes  String?
   moq         Int?          // Minimum Order Quantity
+  unitsPerPallet Int?
+  palletsPerShipment Int?
 
   rating       Float @default(0.0)
   reviewsCount Int   @default(0)

@@ -344,12 +344,35 @@ function ModalPortalContent({
                                                         />
                                                     </div>
                                                     <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Minimum Order</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Minimum Order (Cases)</label>
                                                         <input
                                                             type="number"
                                                             placeholder="min cases"
                                                             value={formData.minOrder || ''}
                                                             onChange={e => setFormData({ ...formData, minOrder: parseInt(e.target.value) || 1 })}
+                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/10">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Units per Pallet</label>
+                                                        <input
+                                                            type="number"
+                                                            placeholder="e.g. 1440"
+                                                            value={formData.unitsPerPallet || ''}
+                                                            onChange={e => setFormData({ ...formData, unitsPerPallet: parseInt(e.target.value) || 0 })}
+                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Pallets per Shipment</label>
+                                                        <input
+                                                            type="number"
+                                                            placeholder="e.g. 26"
+                                                            value={formData.palletsPerShipment || ''}
+                                                            onChange={e => setFormData({ ...formData, palletsPerShipment: parseInt(e.target.value) || 0 })}
                                                             className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
                                                         />
                                                     </div>
@@ -457,6 +480,7 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         name: '', brand: '', price: 0, stock: 0, image: '', images: [],
         category: 'Beverages', description: '', unit: 'Case (24 units)',
         minOrder: 1, ean: '', variants: [], inStock: true,
+        unitsPerPallet: 0, palletsPerShipment: 0,
         status: ProductStatus.PENDING,
         isNew: false, bulkSave: false
     };
