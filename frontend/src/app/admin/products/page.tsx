@@ -6,7 +6,7 @@ import {
     XCircle, AlertCircle, MoreHorizontal, ChevronRight,
     ArrowUpRight, Info, User, Sparkles, MessageSquare,
     Trash2, Eye, ExternalLink, Filter, Download,
-    CheckCircle, ShieldAlert, Activity
+    CheckCircle, ShieldAlert, Activity, Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -34,6 +34,11 @@ interface Product {
     };
     createdAt: string;
     completeness?: number; // Calculated field
+    unit?: string;
+    unitsPerPallet?: number;
+    palletsPerShipment?: number;
+    basePrice?: number;
+    moq?: number;
 }
 
 // ─── Components ─────────────────────────────────────────────────────────────
@@ -104,6 +109,42 @@ export default function ProductsModerationPage() {
     // Bulk Selection
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
     const [isBulkLoading, setIsBulkLoading] = React.useState(false);
+
+    // Edit Mode State
+    const [isEditing, setIsEditing] = React.useState(false);
+    const [editData, setEditData] = React.useState<any>(null);
+    const [isSavingEdit, setIsSavingEdit] = React.useState(false);
+
+    const startEditing = (product: any) => {
+        setEditData({ ...product });
+        setIsEditing(true);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editData) return;
+        const tid = toast.loading('Saving changes...');
+        setIsSavingEdit(true);
+        try {
+            const res = await apiFetch(`/products/${editData.id}`, {
+                method: 'PATCH',
+                body: JSON.stringify(editData)
+            });
+
+            if (res.ok) {
+                toast.success('Product updated successfully', { id: tid });
+                setIsEditing(false);
+                fetchData();
+                setSelectedProduct(editData);
+            } else {
+                const err = await res.json();
+                toast.error(err.message || 'Failed to save changes', { id: tid });
+            }
+        } catch (err) {
+            toast.error('Connection error', { id: tid });
+        } finally {
+            setIsSavingEdit(false);
+        }
+    };
 
     const fetchData = React.useCallback(async () => {
         setIsLoading(true);
@@ -494,13 +535,13 @@ export default function ProductsModerationPage() {
                                 </div>
 
                                 {/* Panel Content Tabs */}
-                                <div className="flex items-center gap-4 px-6 border-b border-slate-100">
-                                    {['Product Info', 'Supplier Info', 'AI Data', 'Notes'].map((t) => (
+                                <div className="flex items-center gap-4 px-6 border-b border-slate-100 overflow-x-auto scrollbar-hide">
+                                    {['Product Info', 'Pricing & Units', 'Supplier Info', 'AI Data', 'Notes'].map((t) => (
                                         <button 
                                             key={t}
                                             onClick={() => setActivePanelTab(t)}
                                             className={cn(
-                                                "py-4 text-[11px] font-bold uppercase tracking-widest border-b-2 transition-all",
+                                                "py-4 text-[11px] font-bold uppercase tracking-widest border-b-2 transition-all whitespace-nowrap",
                                                 activePanelTab === t ? "border-teal-500 text-teal-600" : "border-transparent text-slate-400 hover:text-slate-600"
                                             )}
                                         >
@@ -515,47 +556,194 @@ export default function ProductsModerationPage() {
                                         <>
                                             <div className="space-y-4">
                                                 <div className="aspect-video w-full rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden relative group">
-                                                    <img src={selectedProduct.images?.[0]} className="w-full h-full object-cover" />
-                                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                                                        <button className="h-9 px-4 bg-white rounded-xl text-xs font-bold flex items-center gap-2">
-                                                            <Eye size={14} /> Full View
-                                                        </button>
-                                                    </div>
+                                                    <img src={isEditing ? editData.images?.[0] : selectedProduct.images?.[0]} className="w-full h-full object-cover" />
+                                                    {isEditing && (
+                                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                            <p className="text-white text-[10px] font-bold uppercase tracking-widest">Editing Mode</p>
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                                                    {selectedProduct.images.map((img, i) => (
+                                                    {(isEditing ? editData.images : selectedProduct.images).map((img: string, i: number) => (
                                                         <img key={i} src={img} className="w-16 h-16 rounded-xl object-cover border border-slate-100 shrink-0" />
                                                     ))}
+                                                    {isEditing && (
+                                                        <button 
+                                                            onClick={() => {
+                                                                const url = window.prompt('Enter image URL:');
+                                                                if (url) setEditData({...editData, images: [...editData.images, url]});
+                                                            }}
+                                                            className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 shrink-0"
+                                                        >
+                                                            <Plus size={20} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-1 gap-4">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Product Name</label>
+                                                    {isEditing ? (
+                                                        <input 
+                                                            className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
+                                                            value={editData.name}
+                                                            onChange={(e) => setEditData({...editData, name: e.target.value})}
+                                                        />
+                                                    ) : (
+                                                        <p className="text-sm font-bold text-slate-900">{selectedProduct.name}</p>
+                                                    )}
                                                 </div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Price</p>
-                                                    <p className="text-lg font-bold text-slate-900">${selectedProduct.price.toLocaleString()}</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Display Price ($)</p>
+                                                    {isEditing ? (
+                                                        <input 
+                                                            type="number"
+                                                            className="w-full bg-transparent border-b border-teal-200 text-lg font-bold outline-none"
+                                                            value={editData.price}
+                                                            onChange={(e) => setEditData({...editData, price: parseFloat(e.target.value)})}
+                                                        />
+                                                    ) : (
+                                                        <p className="text-lg font-bold text-slate-900">${selectedProduct.price.toLocaleString()}</p>
+                                                    )}
                                                 </div>
                                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Stock</p>
-                                                    <p className="text-lg font-bold text-slate-900">{selectedProduct.stock.toLocaleString()} units</p>
+                                                    {isEditing ? (
+                                                        <input 
+                                                            type="number"
+                                                            className="w-full bg-transparent border-b border-teal-200 text-lg font-bold outline-none"
+                                                            value={editData.stock}
+                                                            onChange={(e) => setEditData({...editData, stock: parseInt(e.target.value)})}
+                                                        />
+                                                    ) : (
+                                                        <p className="text-lg font-bold text-slate-900">{selectedProduct.stock.toLocaleString()} units</p>
+                                                    )}
                                                 </div>
                                             </div>
 
                                             <div className="space-y-2">
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</p>
-                                                <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-2xl border border-slate-100 italic">
-                                                    "{selectedProduct.description || 'No description provided'}"
-                                                </p>
+                                                {isEditing ? (
+                                                    <textarea 
+                                                        className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-teal-500 resize-none"
+                                                        value={editData.description}
+                                                        onChange={(e) => setEditData({...editData, description: e.target.value})}
+                                                    />
+                                                ) : (
+                                                    <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-2xl border border-slate-100 italic">
+                                                        "{selectedProduct.description || 'No description provided'}"
+                                                    </p>
+                                                )}
                                             </div>
 
                                             <div className="space-y-2">
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Category</p>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="px-3 py-1 bg-teal-50 text-teal-600 text-[11px] font-bold rounded-lg border border-teal-100">
-                                                        {selectedProduct.category}
-                                                    </span>
-                                                </div>
+                                                {isEditing ? (
+                                                    <select 
+                                                        className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none"
+                                                        value={editData.category}
+                                                        onChange={(e) => setEditData({...editData, category: e.target.value})}
+                                                    >
+                                                        <option value="Food & Beverages">Food & Beverages</option>
+                                                        <option value="Personal Care">Personal Care</option>
+                                                        <option value="Household">Household</option>
+                                                        <option value="Packaging">Packaging</option>
+                                                    </select>
+                                                ) : (
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="px-3 py-1 bg-teal-50 text-teal-600 text-[11px] font-bold rounded-lg border border-teal-100">
+                                                            {selectedProduct.category}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </>
+                                    )}
+
+                                    {activePanelTab === 'Pricing & Units' && (
+                                        <div className="space-y-6">
+                                            <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl">
+                                                <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-3">Unit Configuration</p>
+                                                <div className="grid grid-cols-1 gap-4">
+                                                    <div className="space-y-1">
+                                                        <label className="text-[10px] text-slate-500 font-bold uppercase">Basic Unit (e.g. Carton, Bag)</label>
+                                                        {isEditing ? (
+                                                            <input 
+                                                                className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm"
+                                                                value={editData.unit || 'carton'}
+                                                                onChange={(e) => setEditData({...editData, unit: e.target.value})}
+                                                            />
+                                                        ) : (
+                                                            <p className="text-sm font-bold text-slate-900 capitalize">{selectedProduct.unit || 'Carton'}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] text-slate-500 font-bold uppercase">Units Per Pallet</label>
+                                                            {isEditing ? (
+                                                                <input 
+                                                                    type="number"
+                                                                    className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm"
+                                                                    value={editData.unitsPerPallet || 0}
+                                                                    onChange={(e) => setEditData({...editData, unitsPerPallet: parseInt(e.target.value)})}
+                                                                />
+                                                            ) : (
+                                                                <p className="text-sm font-bold text-slate-900">{selectedProduct.unitsPerPallet || 0}</p>
+                                                            )}
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <label className="text-[10px] text-slate-500 font-bold uppercase">Pallets Per Shipment</label>
+                                                            {isEditing ? (
+                                                                <input 
+                                                                    type="number"
+                                                                    className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm"
+                                                                    value={editData.palletsPerShipment || 0}
+                                                                    onChange={(e) => setEditData({...editData, palletsPerShipment: parseInt(e.target.value)})}
+                                                                />
+                                                            ) : (
+                                                                <p className="text-sm font-bold text-slate-900">{selectedProduct.palletsPerShipment || 0}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Base Cost & MOQ</p>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    <div className="p-4 border border-slate-100 rounded-2xl">
+                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Base Price</p>
+                                                        {isEditing ? (
+                                                            <input 
+                                                                type="number"
+                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-slate-100"
+                                                                value={editData.basePrice || 0}
+                                                                onChange={(e) => setEditData({...editData, basePrice: parseFloat(e.target.value)})}
+                                                            />
+                                                        ) : (
+                                                            <p className="text-sm font-bold text-slate-900">${selectedProduct.basePrice || 0}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="p-4 border border-slate-100 rounded-2xl">
+                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Min. Order (MOQ)</p>
+                                                        {isEditing ? (
+                                                            <input 
+                                                                type="number"
+                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-slate-100"
+                                                                value={editData.moq || 1}
+                                                                onChange={(e) => setEditData({...editData, moq: parseInt(e.target.value)})}
+                                                            />
+                                                        ) : (
+                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.moq || 1} {selectedProduct.unit}s</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
 
                                     {activePanelTab === 'Supplier Info' && (
@@ -643,7 +831,23 @@ export default function ProductsModerationPage() {
 
                                 {/* Panel Footer Actions */}
                                 <div className="p-6 border-t border-slate-100 bg-slate-50/50 space-y-4">
-                                    {showRejectInput ? (
+                                    {isEditing ? (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <button 
+                                                onClick={() => setIsEditing(false)}
+                                                className="h-11 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50"
+                                            >
+                                                Cancel
+                                            </button>
+                                            <button 
+                                                onClick={handleSaveEdit}
+                                                disabled={isSavingEdit}
+                                                className="h-11 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-900/20"
+                                            >
+                                                {isSavingEdit ? "Saving..." : "Save Changes"}
+                                            </button>
+                                        </div>
+                                    ) : showRejectInput ? (
                                         <motion.div 
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
@@ -684,8 +888,11 @@ export default function ProductsModerationPage() {
                                             >
                                                 Approve Product
                                             </button>
-                                            <button className="col-span-2 h-11 bg-orange-50 border border-orange-100 text-orange-600 rounded-xl text-xs font-bold hover:bg-orange-100 transition-all">
-                                                Request Changes
+                                            <button 
+                                                onClick={() => startEditing(selectedProduct)}
+                                                className="col-span-2 h-11 bg-slate-100 border border-slate-200 text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Pencil size={14} /> Edit Product Details
                                             </button>
                                         </div>
                                     )}
