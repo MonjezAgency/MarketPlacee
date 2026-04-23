@@ -35,22 +35,7 @@ export function BrandLogosMarquee() {
                             key={`${brand.name}-${i}`}
                             className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl border border-black/8 dark:border-white/10 shrink-0 bg-white dark:bg-white/5 shadow-sm"
                         >
-                            {brand.image ? (
-                                <img src={brand.image} alt={brand.name} className="h-8 w-auto object-contain opacity-100 transition-opacity" />
-                            ) : (
-                                <>
-                                    <div
-                                        className="w-2 h-2 rounded-full shrink-0"
-                                        style={{ backgroundColor: brand.color }}
-                                    />
-                                    <span
-                                        className="text-xs font-black whitespace-nowrap"
-                                        style={{ color: brand.color }}
-                                    >
-                                        {brand.name}
-                                    </span>
-                                </>
-                            )}
+                            <img src={brand.image} alt={brand.name} className="h-8 w-auto object-contain opacity-100 transition-opacity" />
                         </div>
                     ))}
                 </div>
