@@ -86,81 +86,49 @@ export class EmailService {
   }
 
    /**
-   * Primary mail sender with retry and automatic port-switching
+   * Primary mail sender — tries Resend API first (HTTPS, never blocked),
+   * then falls back to SMTP if Resend is unavailable.
    */
-  async sendMail(to: string, subject: string, html: string, retries = 1): Promise<boolean> {
-    const fromAddress = this.getFrom();
-    
-    try {
-        if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            throw new Error('MISSING_SMTP_CONFIG');
-        }
+  async sendMail(to: string, subject: string, html: string): Promise<boolean> {
+    // Strategy 1: Resend API (uses HTTPS port 443, never blocked by cloud providers)
+    const resendResult = await this.sendViaResend({ to, subject, html });
+    if (resendResult) {
+      return true;
+    }
 
-        const mailOptions = {
-            from: fromAddress,
+    // Strategy 2: SMTP fallback
+    console.log(`[EMAIL] Resend failed for ${to}. Trying SMTP fallback...`);
+    try {
+        const info = await this.transporter.sendMail({
+            from: this.getFrom(),
             to,
             subject,
             html,
-        };
-
-        console.log(`[SMTP] Attempting delivery to ${to} via ${this.transporter.options.host}:${this.transporter.options.port}...`);
-        const info = await this.transporter.sendMail(mailOptions);
+        });
         console.log(`✅ [SMTP] SUCCESS - MessageId: ${info.messageId}`);
         return true;
-    } catch (error: any) {
-        const errorCode = error.code || 'UNKNOWN';
-        const smtpCode = error.responseCode || 'N/A';
-        const smtpResponse = error.response || error.message || 'No response';
-        
-        console.error(`❌ [SMTP] FAILED for ${to}:`);
-        console.error(`   Code: ${errorCode} | SMTP Code: ${smtpCode}`);
-        console.error(`   Response: ${smtpResponse}`);
-
-        // If it's a connection/timeout/auth issue, try switching port
-        if ((errorCode === 'ETIMEDOUT' || errorCode === 'ECONNREFUSED' || errorCode === 'ESOCKET' || errorCode === 'EAUTH') && retries > 0) {
-            const currentPort = this.transporter.options?.port || 587;
-            const nextPort = currentPort === 465 ? 587 : 465;
-            console.warn(`🔄 [SMTP] Retrying on port ${nextPort}...`);
-            this.transporter = this.createTransport(process.env.EMAIL_HOST || 'smtp.hostinger.com', nextPort, process.env.EMAIL_USER!, process.env.EMAIL_PASS!);
-            return this.sendMail(to, subject, html, retries - 1);
-        }
-
-        console.warn(`⚠️ [SMTP] Permanent failure for ${to}. Falling back to Resend API...`);
-        return await this.sendViaResend({ to, subject, html });
+    } catch (smtpError: any) {
+        console.error(`❌ [SMTP] Also failed for ${to}:`, smtpError.message);
+        console.error(`   SMTP Response: ${smtpError.response || 'none'}`);
+        return false;
     }
-  }
-
-  private logSmtpError(code: string, message: string, to: string, subject: string) {
-    const timestamp = new Date().toISOString();
-    console.error(`--- [SMTP ERROR DIAGNOSTIC] ---`);
-    console.error(`Time: ${timestamp}`);
-    console.error(`Code: ${code}`);
-    console.error(`Message: ${message}`);
-    console.error(`Target: ${to}`);
-    console.error(`Subject: ${subject}`);
-    
-    if (code === 'EAUTH') {
-        console.error(`Analysis: SMTP Authentication failed. Verify EMAIL_USER/EMAIL_PASS.`);
-    } else if (code === 'ETIMEDOUT') {
-        console.error(`Analysis: Connection timed out. Check firewall, port (465 vs 587), and EMAIL_HOST.`);
-    } else if (code === 'ECONNREFUSED') {
-        console.error(`Analysis: Connection refused. Verify host and port.`);
-    }
-    console.error(`-------------------------------`);
   }
 
   private async sendViaResend(options: { to: string; subject: string; html: string; }): Promise<boolean> {
     const apiKey = process.env.RESEND_API_KEY;
     if (!apiKey) {
-        console.error('[RESEND_FAIL] Missing RESEND_API_KEY env variable.');
+        console.warn('[RESEND] No API key set. Skipping Resend.');
         return false;
     }
 
+    const fromEmail = process.env.RESEND_FROM || 'onboarding@resend.dev';
+    console.log(`[RESEND] Sending to ${options.to} from ${fromEmail}...`);
+
     try {
-        await axios.post(
+        const response = await axios.post(
             'https://api.resend.com/emails',
             {
-                from: `Atlantis Marketplace <${process.env.RESEND_FROM || 'onboarding@resend.dev'}>`,
+                from: `Atlantis Marketplace <${fromEmail}>`,
                 to: [options.to],
                 subject: options.subject,
                 html: options.html,
@@ -172,10 +140,23 @@ export class EmailService {
                 },
             }
         );
-        console.log(`[RESEND_SUCCESS] Sent to ${options.to}`);
+        console.log(`✅ [RESEND] SUCCESS for ${options.to}:`, response.data);
         return true;
     } catch (err: any) {
-        console.error(`[RESEND_FAIL] Failed for ${options.to}:`, err.response?.data || err.message);
+        const status = err.response?.status;
+        const errorData = err.response?.data;
+        console.error(`❌ [RESEND] FAILED for ${options.to}:`);
+        console.error(`   HTTP Status: ${status}`);
+        console.error(`   Error: ${JSON.stringify(errorData || err.message)}`);
+        
+        if (status === 403) {
+            console.error(`   👉 FIX: You need to verify your domain in Resend dashboard (resend.com/domains)`);
+            console.error(`   👉 Or use the free "onboarding@resend.dev" sender`);
+        } else if (status === 422) {
+            console.error(`   👉 FIX: Invalid email address or missing required fields`);
+        } else if (status === 429) {
+            console.error(`   👉 FIX: Rate limited. Wait and try again.`);
+        }
         return false;
     }
   }
