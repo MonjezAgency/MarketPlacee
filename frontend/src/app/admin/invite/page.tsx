@@ -257,30 +257,56 @@ export default function AdminInvitePage() {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0 }}
                                             className={cn(
-                                                "p-4 rounded-xl border flex items-start gap-3 text-sm",
+                                                "p-5 rounded-xl border flex flex-col gap-3 text-sm shadow-inner",
                                                 emailResult.success
-                                                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                                                    : "bg-red-500/10 border-red-500/20 text-red-400"
+                                                    ? "bg-emerald-500/5 border-emerald-500/20 text-emerald-400"
+                                                    : "bg-red-500/5 border-red-500/20 text-red-400"
                                             )}
                                         >
-                                            {emailResult.success ? (
-                                                <Sparkles size={18} className="shrink-0 mt-0.5" />
-                                            ) : (
-                                                <AlertTriangle size={18} className="shrink-0 mt-0.5" />
-                                            )}
-                                            <div>
-                                                <p className="font-bold">{emailResult.message}</p>
-                                                {emailResult.previewUrl && (
-                                                    <a
-                                                        href={emailResult.previewUrl}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-xs underline mt-1 inline-block opacity-80 hover:opacity-100"
-                                                    >
-                                                        👀 Preview email in browser (Ethereal)
-                                                    </a>
+                                            <div className="flex items-start gap-3">
+                                                {emailResult.success ? (
+                                                    <Sparkles size={18} className="shrink-0 mt-0.5" />
+                                                ) : (
+                                                    <AlertTriangle size={18} className="shrink-0 mt-0.5 text-red-500" />
                                                 )}
+                                                <div className="flex-1">
+                                                    <p className="font-black text-xs uppercase tracking-widest mb-1">
+                                                        {emailResult.success ? 'Bulk Send Complete' : 'Delivery Issues Detected'}
+                                                    </p>
+                                                    <p className="font-medium opacity-90">{emailResult.message}</p>
+                                                </div>
                                             </div>
+
+                                            {/* Detailed Results List */}
+                                            {invites.length > 0 && (
+                                                <div className="mt-2 space-y-1.5 border-t border-border/20 pt-3">
+                                                     <p className="text-[10px] font-black uppercase text-muted-foreground mb-2">Detailed Status:</p>
+                                                     <div className="max-h-32 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
+                                                        {email.split(/[,\s\n]+/).filter(e => e.includes('@')).map((e, idx) => (
+                                                            <div key={idx} className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
+                                                                <span className="text-[11px] truncate max-w-[180px] opacity-70 font-mono">{e.trim()}</span>
+                                                                <span className={cn(
+                                                                    "text-[9px] font-black uppercase px-2 py-0.5 rounded-md",
+                                                                    emailResult.success ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                                                                )}>
+                                                                    {emailResult.success ? 'ACCEPTED' : 'REJECTED'}
+                                                                </span>
+                                                            </div>
+                                                        ))}
+                                                     </div>
+                                                </div>
+                                            )}
+
+                                            {emailResult.previewUrl && (
+                                                <a
+                                                    href={emailResult.previewUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs underline mt-1 inline-block opacity-80 hover:opacity-100"
+                                                >
+                                                    👀 Preview mail in browser (Ethereal)
+                                                </a>
+                                            )}
                                         </motion.div>
                                     )}
                                 </AnimatePresence>

@@ -39,10 +39,29 @@ export class EmailService {
 
     this.transporter.verify((error, success) => {
       if (error) {
-        console.error('❌ SMTP CONNECTION FAILED:', error.message);
+        console.error('❌ [SMTP] CONNECTION FAILED:', error.message);
+        if (port === 465 && (error.message.includes('ETIMEDOUT') || error.message.includes('ECONNREFUSED'))) {
+            console.warn('🔄 Port 465 seems blocked. Attempting auto-switch to Port 587...');
+            this.setupTransporter(host, 587, user, pass);
+        }
       } else {
-        console.log('✅ SMTP CONNECTION ESTABLISHED');
+        console.log(`✅ [SMTP] CONNECTION ESTABLISHED on Port ${port}`);
       }
+    });
+  }
+
+  private setupTransporter(host: string, port: number, user: string, pass: string) {
+    this.transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure: port === 465,
+      auth: { user, pass },
+      tls: { rejectUnauthorized: false },
+    } as any);
+    
+    this.transporter.verify((err) => {
+        if (err) console.error(`❌ [SMTP] Fallback to Port ${port} also failed:`, err.message);
+        else console.log(`✅ [SMTP] FIXED: Connected via Port ${port}`);
     });
   }
 

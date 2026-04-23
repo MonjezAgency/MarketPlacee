@@ -55,9 +55,9 @@ export class TeamController {
                     inviteLink: body.inviteLink,
                     senderName,
                 });
-                return { email, success: result.success };
-            } catch (error) {
-                return { email, success: false, error: 'SMTP/Delivery failure' };
+                return { email, success: result.success, message: result.success ? 'Accepted' : 'Failed' };
+            } catch (error: any) {
+                return { email, success: false, error: error.message || 'SMTP/Delivery failure' };
             }
         }));
 
@@ -65,7 +65,8 @@ export class TeamController {
         const failureCount = results.length - successCount;
 
         return {
-            success: successCount > 0,
+            success: successCount === emails.length, // Only true if ALL succeeded
+            partial: successCount > 0 && failureCount > 0,
             summary: {
                 total: emails.length,
                 success: successCount,
