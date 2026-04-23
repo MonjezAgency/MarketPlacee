@@ -244,10 +244,10 @@ export class EmailService {
     }
   }
 
-  async sendOrderStatusUpdateEmail(email: string, name: string, orderId: string, newStatus: string) {
+  async sendOrderStatusUpdateEmail(email: string, name: string, orderId: string, newStatus: string, trackingUrl?: string) {
     const statusMessages: Record<string, { title: string; body: string; color: string }> = {
       PROCESSING: { title: 'Order is Being Processed 🔄', body: 'Your order is now being processed by the supplier.', color: '#F59E0B' },
-      SHIPPED: { title: 'Order Shipped 🚚', body: 'Great news! Your order has been shipped and is on its way.', color: '#3B82F6' },
+      SHIPPED: { title: 'Order Shipped 🚚', body: `Great news! Your order has been shipped and is on its way.${trackingUrl ? ' You can track it using the link below.' : ''}`, color: '#3B82F6' },
       DELIVERED: { title: 'Order Delivered ✅', body: 'Your order has been delivered successfully. Thank you for choosing Atlantis!', color: '#10B981' },
       CANCELLED: { title: 'Order Cancelled ❌', body: 'Your order has been cancelled. Contact support if you have any questions.', color: '#EF4444' },
     };
@@ -267,6 +267,11 @@ export class EmailService {
                 <p style="margin:0; font-size:14px; color:#2E2E2E;"><strong>Order ID:</strong> #${orderId.slice(0, 8).toUpperCase()}</p>
                 <p style="margin:8px 0 0; font-size:14px; color:#2E2E2E;"><strong>Status:</strong> ${newStatus}</p>
               </div>
+              ${trackingUrl ? `
+              <div style="text-align:center; margin:30px 0;">
+                <a href="${trackingUrl}" style="display:inline-block; padding:16px 40px; background:#3B82F6; color:#fff; text-decoration:none; border-radius:12px; font-weight:800; font-size:14px; text-transform:uppercase; letter-spacing:1px;">Track Live Shipment 🚚</a>
+              </div>
+              ` : ''}
             </div>
             <div style="background:#0A1A2F; padding:20px; text-align:center;">
               <p style="color:#667085; font-size:11px; margin:0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
@@ -331,6 +336,65 @@ export class EmailService {
           <a href="${ctaUrl}" style="display: inline-block; background:#f97316; color:#fff; padding:16px 32px; border-radius:12px; text-decoration:none; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
             Go to Your Dashboard →
           </a>
+        </div>
+        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+        </div>
+      </div>
+    `);
+  }
+
+  async sendRejectionEmail(email: string, name: string, reason?: string) {
+    await this.sendMail(email, 'Update regarding your Atlantis application', `
+      <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0A1A2F; padding: 50px 40px; text-align: center; border-bottom: 4px solid #EF4444;">
+          <h1 style="color: white; font-size: 26px; margin: 0; font-weight: 900;">Application Update</h1>
+        </div>
+        <div style="padding: 40px 30px; background: #fff; text-align: center;">
+          <p style="font-size: 16px; color: #2E2E2E; margin-bottom: 25px;">Hi ${name}, thank you for your interest in Atlantis. After reviewing your application, we are unable to approve your account at this time.</p>
+          ${reason ? `<div style="background:#FEF2F2; padding:16px; border-radius:12px; margin:20px 0; border-left:4px solid #EF4444; text-align:left;"><p style="margin:0; font-size:14px; color:#991B1B;"><strong>Reason:</strong> ${reason}</p></div>` : ''}
+          <p style="font-size: 14px; color: #667085;">If you believe this is a mistake or have updated documentation, please contact our compliance team.</p>
+        </div>
+        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+        </div>
+      </div>
+    `);
+  }
+
+  async sendArrivingTodayEmail(email: string, name: string, orderId: string) {
+    await this.sendMail(email, `🚚 Your Order #${orderId.slice(0, 8).toUpperCase()} is arriving today!`, `
+      <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid #1BC7C9;">
+          <h1 style="color: white; font-size: 26px; margin: 0; font-weight: 900;">Out for Delivery 🚚</h1>
+        </div>
+        <div style="padding: 40px 30px; background: #fff; text-align: center;">
+          <p style="font-size: 18px; color: #0A1A2F; font-weight: 800;">Get Ready, ${name}!</p>
+          <p style="font-size: 16px; color: #2E2E2E; margin-bottom: 25px;">Your order <strong>#${orderId.slice(0, 8).toUpperCase()}</strong> is out for delivery and should arrive today.</p>
+          <div style="background: #F8FAFC; padding: 20px; border-radius: 16px; border: 1px solid #E2E8F0; margin-bottom: 30px;">
+            <p style="margin: 0; font-size: 14px; color: #64748B;">Please ensure someone is available at the delivery address to receive the shipment.</p>
+          </div>
+        </div>
+        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
+          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
+        </div>
+      </div>
+    `);
+  }
+
+  async sendFeedbackPromptEmail(email: string, name: string, orderId: string) {
+    const frontendUrl = this.getFrontendUrl();
+    await this.sendMail(email, `How was your order #${orderId.slice(0, 8).toUpperCase()}? ⭐️`, `
+      <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
+        <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid #F59E0B;">
+          <h1 style="color: white; font-size: 26px; margin: 0; font-weight: 900;">Your Feedback Matters ⭐️</h1>
+        </div>
+        <div style="padding: 40px 30px; background: #fff; text-align: center;">
+          <p style="font-size: 16px; color: #2E2E2E; margin-bottom: 25px;">Hi ${name}, we hope you're happy with your recent purchase!</p>
+          <p style="font-size: 15px; color: #64748B; margin-bottom: 30px;">Could you take a moment to confirm delivery and rate your experience?</p>
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${frontendUrl}/dashboard/customer" style="display: inline-block; padding: 16px 40px; background: #0A1A2F; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Rate Experience →</a>
+          </div>
         </div>
         <div style="background: #0A1A2F; padding: 20px; text-align: center;">
           <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>

@@ -27,6 +27,8 @@ interface AdminOrder {
     date: string;
     shippingCompany?: string;
     shippingCost?: number;
+    trackingNumber?: string;
+    carrier?: string;
     items: { product: string; quantity: number; price: number }[];
 }
 
@@ -48,6 +50,8 @@ export default function AdminOrdersPage() {
     const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
     const [isBulkLoading, setIsBulkLoading] = React.useState(false);
     const [isStatusUpdating, setIsStatusUpdating] = React.useState<string | null>(null);
+    const [shipmentForm, setShipmentForm] = React.useState({ trackingNumber: '', carrier: 'DHL' });
+    const [isNotifying, setIsNotifying] = React.useState(false);
 
     const loadOrders = async () => {
         try {
@@ -138,6 +142,47 @@ export default function AdminOrdersPage() {
             toast.error('Connection error', { id: tid });
         } finally {
             setIsStatusUpdating(null);
+        }
+    };
+
+    const handleSaveShipment = async (orderId: string) => {
+        const tid = toast.loading('Saving shipment details...');
+        try {
+            const res = await apiFetch('/shipments', {
+                method: 'POST',
+                body: JSON.stringify({
+                    orderId,
+                    trackingNumber: shipmentForm.trackingNumber,
+                    carrier: shipmentForm.carrier
+                })
+            });
+            if (res.ok) {
+                toast.success('Shipment information updated', { id: tid });
+                await loadOrders();
+            } else {
+                toast.error('Failed to update shipment', { id: tid });
+            }
+        } catch (err) {
+            toast.error('Network error', { id: tid });
+        }
+    };
+
+    const handleNotifyArriving = async (orderId: string) => {
+        setIsNotifying(true);
+        const tid = toast.loading('Sending "Arriving Today" notification...');
+        try {
+            const res = await apiFetch(`/orders/${orderId}/notify-delivery-day`, {
+                method: 'POST'
+            });
+            if (res.ok) {
+                toast.success('Notification sent successfully', { id: tid });
+            } else {
+                toast.error('Failed to send notification', { id: tid });
+            }
+        } catch (err) {
+            toast.error('Connection error', { id: tid });
+        } finally {
+            setIsNotifying(false);
         }
     };
 
@@ -458,10 +503,57 @@ export default function AdminOrdersPage() {
                                                     <p className="text-[10px] font-medium text-muted-foreground mt-0.5 select-all">{selectedOrder.customerPhone}</p>
                                                 )}
                                             </div>
-                                            <div className="p-4 bg-muted/40 rounded-2xl border border-border/20 flex-1">
-                                                <Truck className="text-secondary mb-2" size={16} />
-                                                <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest mb-1">Logistics</p>
-                                                <p className="text-xs font-black truncate">{selectedOrder.shippingCompany || 'Pending'}</p>
+
+                                            {/* Logistics Management */}
+                                            <div className="p-4 bg-card rounded-2xl border border-primary/20 flex-1 space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-2">
+                                                        <Truck className="text-primary" size={16} />
+                                                        <p className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Logistics Hub</p>
+                                                    </div>
+                                                    {selectedOrder.status === 'SHIPPED' && (
+                                                        <button 
+                                                            onClick={() => handleNotifyArriving(selectedOrder.id)}
+                                                            disabled={isNotifying}
+                                                            className="text-[8px] font-black uppercase text-primary hover:underline"
+                                                        >
+                                                            Notify Delivery
+                                                        </button>
+                                                    )}
+                                                </div>
+
+                                                <div className="space-y-3">
+                                                    <div className="space-y-1">
+                                                        <label className="text-[8px] font-black text-muted-foreground uppercase">Tracking Number</label>
+                                                        <input 
+                                                            type="text" 
+                                                            placeholder="AWB / Ref Number"
+                                                            className="w-full h-8 px-3 bg-muted rounded-lg text-[10px] font-bold outline-none focus:ring-1 focus:ring-primary/30"
+                                                            value={shipmentForm.trackingNumber || selectedOrder.trackingNumber || ''}
+                                                            onChange={(e) => setShipmentForm({...shipmentForm, trackingNumber: e.target.value})}
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-[8px] font-black text-muted-foreground uppercase">Carrier</label>
+                                                        <select 
+                                                            className="w-full h-8 px-2 bg-muted rounded-lg text-[10px] font-bold outline-none"
+                                                            value={shipmentForm.carrier || selectedOrder.carrier || 'DHL'}
+                                                            onChange={(e) => setShipmentForm({...shipmentForm, carrier: e.target.value})}
+                                                        >
+                                                            <option value="DHL">DHL Express</option>
+                                                            <option value="FEDEX">FedEx Corp</option>
+                                                            <option value="UPS">UPS Logistics</option>
+                                                            <option value="ARAMEX">Aramex</option>
+                                                            <option value="OTHER">Internal / Other</option>
+                                                        </select>
+                                                    </div>
+                                                    <button 
+                                                        onClick={() => handleSaveShipment(selectedOrder.id)}
+                                                        className="w-full h-8 bg-foreground text-background rounded-lg text-[8px] font-black uppercase tracking-widest hover:opacity-90"
+                                                    >
+                                                        Update Shipment
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

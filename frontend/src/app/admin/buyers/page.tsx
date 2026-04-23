@@ -36,13 +36,13 @@ export default function AdminBuyersPage() {
 
     const loadBuyers = async () => {
         try {
-            
-            const res = await apiFetch('/users', {
+            // Request specifically customers from the backend
+            const res = await apiFetch('/users?role=CUSTOMER&limit=100', {
             });
             if (res.ok) {
                 const result = await res.json();
                 const usersData = Array.isArray(result) ? result : (result.users || []);
-                setBuyers(usersData.filter((u: any) => u.role === 'CUSTOMER'));
+                setBuyers(usersData);
             }
         } catch (err) {
             console.error("Failed to load buyers:", err);

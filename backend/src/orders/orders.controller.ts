@@ -153,4 +153,10 @@ export class OrdersController {
         const order = await this.ordersService.confirmDelivery(id, req.user.sub);
         return plainToInstance(OrderDto, order);
     }
+
+    @Post(':id/notify-delivery-day')
+    @Roles(Role.ADMIN, Role.LOGISTICS)
+    async notifyDeliveryDay(@Param('id') id: string) {
+        return this.ordersService.notifyDeliveryDay(id);
+    }
 }

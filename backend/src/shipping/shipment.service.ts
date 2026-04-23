@@ -5,8 +5,8 @@ import { PrismaService } from '../common/prisma.service';
 export class ShipmentService {
   constructor(private prisma: PrismaService) {}
 
-  async createShipment(orderId: string, data: { carrier?: string; expectedDelivery?: Date }) {
-    const trackingNumber = `ATL-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+  async createShipment(orderId: string, data: { trackingNumber?: string; carrier?: string; expectedDelivery?: Date }) {
+    const trackingNumber = data.trackingNumber || `ATL-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
     return this.prisma.shipment.create({
       data: {
         orderId,

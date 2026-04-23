@@ -37,8 +37,8 @@ export default function AdminUsersPage() {
 
     const loadUsers = async () => {
         try {
-            
-            const res = await apiFetch('/users', {
+            // Increase limit to ensure we see more users at once in the identity hub
+            const res = await apiFetch('/users?limit=100', {
             });
             if (res.ok) {
                 const result = await res.json();

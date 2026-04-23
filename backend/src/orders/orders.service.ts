@@ -169,6 +169,8 @@ export class OrdersService {
                 date: order.createdAt.toISOString().split('T')[0],
                 shippingCompany: order.shippingCompany,
                 shippingCost: order.shippingCost,
+                trackingNumber: order.shipment?.trackingNumber,
+                carrier: order.shipment?.carrier,
                 items: order.items.map(i => ({
                     product: i.product?.name ?? 'Unknown Product',
                     quantity: i.quantity,
@@ -345,17 +347,45 @@ export class OrdersService {
             },
         });
 
+        // Fetch shipment info if it exists for tracking
+        const shipment = await this.prisma.shipment.findUnique({
+            where: { orderId }
+        });
+
         // Send email notification to customer
         try {
             const statusLabel = STATUS_LABELS[status] || status;
-            await this.emailService.sendMail(
+            
+            // Build tracking URL if possible (Generic example, would ideally use carrier-specific logic)
+            let trackingUrl: string | undefined = undefined;
+            if (shipment && shipment.trackingNumber) {
+                if (shipment.carrier?.toUpperCase() === 'DHL') {
+                    trackingUrl = `https://www.dhl.com/en/express/tracking.html?AWB=${shipment.trackingNumber}`;
+                } else if (shipment.carrier?.toUpperCase() === 'FEDEX') {
+                    trackingUrl = `https://www.fedex.com/apps/fedextrack/?tracknumbers=${shipment.trackingNumber}`;
+                } else {
+                    // Fallback to internal tracking or generic link
+                    trackingUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/dashboard/customer/orders/${orderId}`;
+                }
+            }
+
+            await this.emailService.sendOrderStatusUpdateEmail(
                 order.customer.email,
-                `Order #${orderId.slice(-8).toUpperCase()} — ${statusLabel}`,
-                `<p>Hi ${order.customer.name},</p>
-                       <p>Your order <strong>#${orderId.slice(-8).toUpperCase()}</strong> status has been updated to <strong>${statusLabel}</strong>.</p>
-                       ${reason ? `<p>Note: ${reason}</p>` : ''}
-                       <p>— Atlantis Marketplace</p>`
+                order.customer.name,
+                orderId,
+                status,
+                trackingUrl
             );
+
+            // Special follow-up for DELIVERED status
+            if (status === OrderStatus.DELIVERED) {
+                await this.emailService.sendFeedbackPromptEmail(
+                    order.customer.email,
+                    order.customer.name,
+                    orderId
+                );
+            }
+
         } catch (e) {
             console.error(`[ORDER_EMAIL_FAIL] ${orderId}:`, e);
         }
@@ -541,5 +571,23 @@ export class OrdersService {
             );
         }
         return this.updateStatus(orderId, OrderStatus.DELIVERED, customerId, 'Customer confirmed delivery');
+    }
+
+    async notifyDeliveryDay(orderId: string) {
+        const order = await this.prisma.order.findUnique({
+            where: { id: orderId },
+            include: { customer: { select: { email: true, name: true } } }
+        });
+
+        if (!order) throw new NotFoundException('Order not found');
+        if (!order.customer?.email) throw new BadRequestException('Customer has no email');
+
+        await this.emailService.sendArrivingTodayEmail(
+            order.customer.email,
+            order.customer.name,
+            order.id
+        );
+
+        return { success: true };
     }
 }

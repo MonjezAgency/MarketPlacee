@@ -47,7 +47,7 @@ export class UsersService {
         });
     }
 
-    async findAll(status?: any, page = 1, limit = 20, search?: string, role?: string) {
+    async findAll(status?: any, page = 1, limit = 1000, search?: string, role?: string) {
         const whereCondition: any = {};
         if (status) whereCondition.status = status;
         if (role) whereCondition.role = role;
@@ -127,6 +127,11 @@ export class UsersService {
         // Trigger welcome/approval email if user is activated from pending state
         if (status === 'ACTIVE' && user && user.status === 'PENDING_APPROVAL') {
             await this.emailService.sendWelcomeEmail(updated.email, updated.name, updated.role);
+        }
+
+        // Trigger rejection email if user is rejected from pending state
+        if (status === 'REJECTED' && user && user.status === 'PENDING_APPROVAL') {
+            await this.emailService.sendRejectionEmail(updated.email, updated.name);
         }
 
         return updated;

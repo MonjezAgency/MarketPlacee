@@ -178,22 +178,22 @@ export class AuthService {
 
             this.logger.log(`[AUTH] User created successfully: ${user.id} (${user.email})`);
 
-            if (user.status === 'PENDING_APPROVAL') {
-                // Background email sending to prevent slow SMTP response from hanging the API
-                (async () => {
-                    try {
-                        if (user.verificationToken) {
-                            await this.emailService.sendVerificationEmail(user.email, user.verificationToken);
-                        }
-                        await this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, data.locale);
-                    } catch (emailError: any) {
-                        this.logger.error('[AUTH] Background email sending failed:', emailError.message);
-                    }
-                })();
+            (async () => {
+                try {
+                    this.logger.log(`[AUTH] Background tasks started for ${user.email}`);
 
-                // Notify all admins about the new pending registration
-                (async () => {
-                    try {
+                    // 1. Send Verification Email (if needed)
+                    if (user.verificationToken) {
+                        await this.emailService.sendVerificationEmail(user.email, user.verificationToken);
+                        this.logger.log(`[AUTH] Verification email sent to ${user.email}`);
+                    }
+
+                    // 2. Send Registration Confirmation Email
+                    await this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, data.locale);
+                    this.logger.log(`[AUTH] Registration confirmation email sent to ${user.email}`);
+
+                    if (user.status === 'PENDING_APPROVAL') {
+                        // 3. Send Admin Alert Email
                         await this.emailService.sendAdminSignupAlert({
                             name: user.name || 'N/A',
                             email: user.email,
@@ -201,6 +201,9 @@ export class AuthService {
                             companyName: data.companyName,
                             registeredAt: user.createdAt || new Date(),
                         });
+                        this.logger.log(`[AUTH] Admin signup alert email sent for ${user.email}`);
+
+                        // 4. Create In-App Notifications for Admins
                         const admins = await this.prisma.user.findMany({
                             where: { role: { in: ['ADMIN', 'OWNER'] }, status: 'ACTIVE' },
                             select: { id: true },
@@ -210,17 +213,21 @@ export class AuthService {
                                 data: {
                                     userId: admin.id,
                                     title: 'New Registration Pending Approval',
-                                    message: `${user.name} (${user.email}) has registered as ${data.role} and is awaiting your approval.`,
-                                    type: 'NEW_REGISTRATION',
-                                    data: { userId: user.id, email: user.email, role: data.role },
-                                },
+                                    message: `${user.name} (${user.companyName}) has registered as a ${data.role} and is waiting for approval.`,
+                                    type: 'INFO',
+                                    metadata: { userId: user.id }
+                                }
                             });
                         }
-                    } catch (notifError: any) {
-                        this.logger.error('[AUTH] Failed to create admin notification:', notifError.message);
+                        this.logger.log(`[AUTH] In-app notifications created for ${admins.length} admins regarding ${user.email}`);
                     }
-                })();
-            } else if (user.status === 'ACTIVE') {
+                } catch (error: any) {
+                    this.logger.error(`[AUTH] Background tasks failed for ${user.email}: ${error.message}`);
+                    console.error('[AUTH] Task Error Stack:', error.stack);
+                }
+            })();
+
+            if (user.status === 'ACTIVE') {
                  // Background email sending for active users
                  this.emailService.sendWelcomeEmail(user.email, user.name, user.role).catch((err: any) => {
                      this.logger.error('[AUTH] Welcome email background error:', err.message);

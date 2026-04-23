@@ -23,7 +23,7 @@ export class ShipmentController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  async create(@Body() data: { orderId: string; carrier?: string; expectedDelivery?: Date }) {
+  async create(@Body() data: { orderId: string; trackingNumber?: string; carrier?: string; expectedDelivery?: Date }) {
     return this.shipmentService.createShipment(data.orderId, data);
   }
 
