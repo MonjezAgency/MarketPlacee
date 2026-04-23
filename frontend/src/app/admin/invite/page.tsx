@@ -102,25 +102,23 @@ export default function AdminInvitePage() {
             if (res.ok && data.success !== false) {
                 setEmailResult({
                     success: true,
-                    message: `Invitation email sent to ${email}!`,
-                    previewUrl: data.previewUrl || undefined,
+                    message: data.message || `Invitation emails sent successfully!`,
+                    previewUrl: data.previewUrl,
+                    details: data.results // Store the array of results
                 });
 
-                // Mark invite as email sent
-                const updated = invites.map(inv =>
-                    inv.email === email && !inv.emailSent ? { ...inv, emailSent: true } : inv
-                );
+                // Mark invites as email sent
+                const updated = invites.map(inv => {
+                    const result = data.results?.find((r: any) => r.email === inv.email);
+                    return (result && result.success) ? { ...inv, emailSent: true } : inv;
+                });
                 setInvites(updated);
                 localStorage.setItem('marketplace-invites', JSON.stringify(updated));
-            } else if (res.status === 401) {
-                setEmailResult({
-                    success: false,
-                    message: 'Your session has expired. Please log out and sign in again.',
-                });
             } else {
                 setEmailResult({
                     success: false,
-                    message: data.error || data.message || 'Failed to send email. Check backend connection.',
+                    message: data.message || 'Partial failure or connection issue.',
+                    details: data.results || [] // Store whatever results we got
                 });
             }
         } catch (err) {
@@ -278,18 +276,18 @@ export default function AdminInvitePage() {
                                             </div>
 
                                             {/* Detailed Results List */}
-                                            {invites.length > 0 && (
+                                            {emailResult.details && emailResult.details.length > 0 && (
                                                 <div className="mt-2 space-y-1.5 border-t border-border/20 pt-3">
                                                      <p className="text-[10px] font-black uppercase text-muted-foreground mb-2">Detailed Status:</p>
                                                      <div className="max-h-32 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
-                                                        {email.split(/[,\s\n]+/).filter(e => e.includes('@')).map((e, idx) => (
+                                                        {emailResult.details.map((res: any, idx: number) => (
                                                             <div key={idx} className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
-                                                                <span className="text-[11px] truncate max-w-[180px] opacity-70 font-mono">{e.trim()}</span>
+                                                                <span className="text-[11px] truncate max-w-[180px] opacity-70 font-mono italic">{res.email}</span>
                                                                 <span className={cn(
                                                                     "text-[9px] font-black uppercase px-2 py-0.5 rounded-md",
-                                                                    emailResult.success ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
+                                                                    res.success ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
                                                                 )}>
-                                                                    {emailResult.success ? 'ACCEPTED' : 'REJECTED'}
+                                                                    {res.success ? 'ACCEPTED' : 'REJECTED'}
                                                                 </span>
                                                             </div>
                                                         ))}

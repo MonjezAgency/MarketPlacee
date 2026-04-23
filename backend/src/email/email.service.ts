@@ -105,33 +105,21 @@ export class EmailService {
     } catch (error: any) {
         const errorCode = error.code || 'UNKNOWN';
         const errorMsg = error.message || 'No message';
+        const smtpResponse = error.response || 'No SMTP response';
         
-        console.error(`ERROR [EmailService]: SMTP failed for ${to}. Code: ${errorCode}, Message: ${errorMsg}`);
-        this.logSmtpError(errorCode, errorMsg, to, subject);
-
-        const isRetryable = retryableErrors.includes(errorCode);
+        console.error(`--- [CRITICAL SMTP FAILURE] ---`);
+        console.error(`Target: ${to}`);
+        console.error(`Code: ${errorCode}`);
+        console.error(`Message: ${errorMsg}`);
+        console.error(`SMTP Response: ${smtpResponse}`);
+        console.error(`-------------------------------`);
         
-        if (isRetryable && retries > 0) {
-            console.warn(`DEBUG [EmailService]: Retrying ${to} in 2 seconds...`);
-            await new Promise(res => setTimeout(res, 2000));
-            return this.sendMail(to, subject, html, retries - 1);
-        }
-
-        // Only fallback to Resend if it's a connection issue or SMTP-specific failure
-        if (errorCode.startsWith('55') || errorCode === 'EENVELOPE') {
-            console.error(`ERROR [EmailService]: Fatal envelope error for ${to}. Skipping fallback.`);
-            return false;
-        }
-
+        // Re-throw if it's a fatal error we want the controller to catch
+        // But for now, just fallback
+        
         console.log(`DEBUG [EmailService]: Attempting Resend fallback for ${to}...`);
         const result = await this.sendViaResend({ to, subject, html });
-        
-        if (!result) {
-            console.error(`ERROR [EmailService]: All delivery methods failed for ${to}`);
-            return false;
-        }
-        
-        return true;
+        return result;
     }
   }
 
