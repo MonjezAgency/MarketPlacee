@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { Locale } from '@/locales';
 import { usePathname } from 'next/navigation';
 import { CATEGORIES_LIST } from '@/lib/products';
@@ -23,11 +24,11 @@ export default function Navbar() {
     const { user, logout } = useAuth();
     const { theme, setTheme } = useTheme();
     const { locale, setLocale, t, dir } = useLanguage();
+    const { currency, setCurrency } = useCurrency();
     const [searchTerm, setSearchTerm] = React.useState('');
     const [scrolled, setScrolled] = React.useState(false);
     const [isCategoriesOpen, setIsCategoriesOpen] = React.useState(false);
     const [isCurrencyOpen, setIsCurrencyOpen] = React.useState(false);
-    const [activeCurrency, setActiveCurrencyState] = React.useState('EUR');
     
     // Autocomplete states
     const [suggestions, setSuggestions] = React.useState<Product[]>([]);
@@ -38,17 +39,8 @@ export default function Navbar() {
     const currencyRef = React.useRef<HTMLDivElement>(null);
     const searchRef = React.useRef<HTMLFormElement>(null);
 
-    // Load saved currency on mount + react to changes
-    React.useEffect(() => {
-        setActiveCurrencyState(getActiveCurrency());
-        const handler = () => setActiveCurrencyState(getActiveCurrency());
-        window.addEventListener('currency-changed', handler);
-        return () => window.removeEventListener('currency-changed', handler);
-    }, []);
-
     const handleCurrencySelect = (code: string) => {
-        setActiveCurrency(code);
-        setActiveCurrencyState(code);
+        setCurrency(code);
         setIsCurrencyOpen(false);
     };
 
@@ -372,7 +364,7 @@ export default function Navbar() {
                             className="flex flex-col items-center gap-0.5 group transition-transform active:scale-95"
                         >
                             <Globe className="w-5 h-5 group-hover:text-secondary transition-colors" />
-                            <span className="text-[10px] font-black tracking-tight uppercase">{activeCurrency}</span>
+                            <span className="text-[10px] font-black tracking-tight uppercase">{currency}</span>
                         </button>
                         {isCurrencyOpen && (
                             <div className="absolute end-0 top-10 w-52 bg-card border border-border/50 rounded-2xl shadow-2xl overflow-hidden z-[1000] animate-in fade-in zoom-in-95 duration-200">
@@ -384,7 +376,7 @@ export default function Navbar() {
                                         <button key={c.code} onClick={() => handleCurrencySelect(c.code)}
                                             className={cn(
                                                 "w-full flex items-center justify-between px-4 py-2.5 text-sm hover:bg-primary/5 transition-colors text-foreground dark:text-white capitalize",
-                                                activeCurrency === c.code && "bg-primary/5 text-primary font-black"
+                                                currency === c.code && "bg-primary/5 text-primary font-black"
                                             )}>
                                             <span className="font-bold">{c.name.toLowerCase()}</span>
                                             <span className="text-[10px] font-black opacity-40">{c.symbol} {c.code}</span>

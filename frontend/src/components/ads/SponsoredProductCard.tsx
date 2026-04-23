@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { useCart } from '@/lib/cart';
 import { formatPrice } from '@/lib/currency';
 import { useState } from 'react';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface SponsoredProductProps {
     product: any;
@@ -13,6 +14,7 @@ interface SponsoredProductProps {
 }
 
 export default function SponsoredProductCard({ product, index }: SponsoredProductProps) {
+    const { currency } = useCurrency();
     const { addItem } = useCart();
     const [isAdded, setIsAdded] = useState(false);
 

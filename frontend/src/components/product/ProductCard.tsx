@@ -10,9 +10,11 @@ import { type Product } from '@/lib/types';
 import { useAuth } from '@/lib/auth';
 import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { translateText } from '@/lib/translator';
 
 export default function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
+    const { currency } = useCurrency();
     const [isAdded, setIsAdded] = useState(false);
     const { addItem } = useCart();
     const { user, isLoggedIn } = useAuth();

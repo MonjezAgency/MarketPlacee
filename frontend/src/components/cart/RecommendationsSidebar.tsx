@@ -7,6 +7,7 @@ import { apiFetch } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { useCart, CartItem } from '@/lib/cart';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { formatPrice } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,7 @@ interface RecommendedProduct {
 export default function RecommendationsSidebar({ items }: { items: CartItem[] }) {
     const { addItem } = useCart();
     const { t } = useLanguage();
+    const { currency } = useCurrency();
     const [recommendations, setRecommendations] = useState<RecommendedProduct[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 

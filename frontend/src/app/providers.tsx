@@ -5,6 +5,7 @@ import { ToastProvider } from '@/components/ui/ToastProvider';
 import { AuthProvider } from '@/lib/auth';
 import { CartProvider } from '@/lib/cart';
 import { LanguageProvider } from '@/contexts/LanguageContext';
+import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import { SessionProvider } from 'next-auth/react';
 import { useEffect } from 'react';
 
@@ -29,9 +30,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <ToastProvider>
                 <AuthProvider>
                     <LanguageProvider>
+                        <CurrencyProvider>
                         <CartProvider>
                             {children}
                         </CartProvider>
+                        </CurrencyProvider>
                     </LanguageProvider>
                 </AuthProvider>
             </ToastProvider>

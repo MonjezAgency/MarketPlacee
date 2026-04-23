@@ -4,9 +4,15 @@ import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EanService } from './ean.service';
 
+import { AiAgentService } from '../ai-agent/ai-agent.service';
+
 @Injectable()
 export class ProductsService {
-    constructor(private prisma: PrismaService, private eanService: EanService) { }
+    constructor(
+        private prisma: PrismaService, 
+        private eanService: EanService,
+        private aiAgent: AiAgentService,
+    ) { }
 
     async create(createProductDto: CreateProductDto, isAdmin: boolean = false) {
         // KYC enforcement: suppliers must be verified or pending approval before listing products
@@ -70,10 +76,22 @@ export class ProductsService {
             adminNotes = adminNotes ? `${adminNotes} | ${msg}` : msg;
         }
 
+        // Auto-categorize if missing
+        let finalCategory = createProductDto.category;
+        if (!finalCategory || finalCategory.toLowerCase() === 'general' || finalCategory.toLowerCase() === 'others') {
+            const categories = await this.prisma.product.findMany({ select: { category: true }, distinct: ['category'] });
+            const catList = categories.map(c => c.category).filter(c => c && c !== 'General');
+            if (catList.length > 0 && createProductDto.name) {
+                const suggested = await this.aiAgent.categorizeProduct(createProductDto.name, createProductDto.description || '', catList);
+                if (suggested) finalCategory = suggested;
+            }
+        }
+
         try {
             return await this.prisma.product.create({
                 data: {
                     ...createProductDto,
+                    category: finalCategory || 'General',
                     adminNotes,
                     status: finalStatus,
                     basePrice: createProductDto.price,

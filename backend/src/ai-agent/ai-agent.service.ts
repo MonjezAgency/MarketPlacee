@@ -11,6 +11,9 @@ const ALLOWED_ACTIONS = new Set([
     'FLAG_PAYMENT_FOR_REVIEW',
     'REMIND_KYC',
     'LOG_ISSUE',
+    'APPROVE_KYC',
+    'REJECT_KYC',
+    'CATEGORIZE_PRODUCT',
 ]);
 
 export interface AgentReport {
@@ -347,6 +350,91 @@ export class AiAgentService {
                 analysis: 'Your complaint has been recorded. Our team will review it shortly.',
                 suggestedActions: ['Check your email for updates', 'Visit support chat for immediate help'],
             };
+        }
+    }
+
+    async categorizeProduct(productName: string, description: string, categories: string[]): Promise<string | null> {
+        if (!process.env.OPENROUTER_API_KEY) return null;
+
+        try {
+            const prompt = `You are a product categorization expert. Given a product name and description, select the most appropriate category from the provided list. Return ONLY the category name exactly as it appears in the list. If no category matches, return "General".
+            
+Product Name: ${productName}
+Description: ${description}
+Categories List: ${categories.join(', ')}`;
+
+            const response = await axios.post(
+                this.openRouterUrl,
+                {
+                    model: 'google/gemini-2.0-flash-001',
+                    messages: [{ role: 'user', content: prompt }],
+                    max_tokens: 50,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 20000,
+                },
+            );
+
+            const result = response.data.choices[0].message.content.trim();
+            return categories.includes(result) ? result : null;
+        } catch {
+            return null;
+        }
+    }
+
+    async verifyKYCDocument(frontUrl: string, backUrl?: string): Promise<{ approved: boolean; reason: string }> {
+        if (!process.env.OPENROUTER_API_KEY) {
+            return { approved: false, reason: 'AI Verification system offline' };
+        }
+
+        try {
+            const prompt = `You are an Identity Document Verification Expert. Analyze the provided image(s) of an ID card or Passport. 
+            Check for:
+            1. Is it a real identity document (National ID, Passport, or License)?
+            2. Is the image clear and legible?
+            3. Are there any obvious signs of tampering or forgery?
+            
+            Respond only in JSON format: { "approved": boolean, "reason": "short explanation" }`;
+
+            const images = [{ type: 'image_url', image_url: { url: frontUrl } }];
+            if (backUrl) images.push({ type: 'image_url', image_url: { url: backUrl } });
+
+            const response = await axios.post(
+                this.openRouterUrl,
+                {
+                    model: 'google/gemini-2.0-flash-001',
+                    messages: [
+                        {
+                            role: 'user',
+                            content: [
+                                { type: 'text', text: prompt },
+                                ...images
+                            ]
+                        }
+                    ],
+                    max_tokens: 300,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 30000,
+                },
+            );
+
+            const content = response.data.choices[0].message.content.trim();
+            const jsonMatch = content.match(/\{[\s\S]*\}/);
+            if (jsonMatch) return JSON.parse(jsonMatch[0]);
+
+            return { approved: false, reason: 'AI analysis failed to produce a clear result' };
+        } catch (error) {
+            this.logger.error(`KYC AI Verification ERROR: ${error.message}`);
+            return { approved: false, reason: 'Error during AI processing' };
         }
     }
 

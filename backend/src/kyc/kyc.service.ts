@@ -115,15 +115,11 @@ export class KycService {
   }
 
   /**
-   * Simulated AI Identity Analysis
-   * This is what fulfilling the "actually verify" requirement involves.
+   * AI Identity Analysis using Gemini Vision
    */
   private async runSmartVerification(docId: string) {
-    this.logger.log(`[KYC_AI_PROCESSOR] Starting analysis for doc: ${docId}`);
+    this.logger.log(`[KYC_AI_PROCESSOR] Starting AI analysis for doc: ${docId}`);
     
-    // Simulate processing delay (5 seconds)
-    await new Promise(resolve => setTimeout(resolve, 5000));
-
     const doc = await this.prisma.kYCDocument.findUnique({
       where: { id: docId },
       include: { user: true },
@@ -131,17 +127,19 @@ export class KycService {
 
     if (!doc || doc.status !== KYCStatus.PENDING) return;
 
-    // Simulated Logic: 
-    // 1. Check liveness score (should be > 0.8)
-    const isLivenessValid = (doc.livenessScore || 0) > 0.8;
-    const hasFrontImage = !!doc.frontImageUrl;
-    
-    if (isLivenessValid && hasFrontImage) {
-      this.logger.log(`[KYC_AI_PROCESSOR] PASS: Automating approval for user ${doc.userId}`);
-      await this.verifyKyc(doc.id, 'Automated AI Verification Passed (Liveness Verified)');
-    } else {
-      this.logger.log(`[KYC_AI_PROCESSOR] FAIL: Automatic flags raised for user ${doc.userId}`);
-      // Don't auto-reject yet, leave for manual admin review if flags are yellow
+    try {
+        const result = await this.aiAgent.verifyKYCDocument(doc.frontImageUrl, doc.backImageUrl || undefined);
+        
+        if (result.approved) {
+            this.logger.log(`[KYC_AI_PROCESSOR] PASS: AI Approved doc ${docId}. Reason: ${result.reason}`);
+            await this.verifyKyc(doc.id, `AI-Automated: ${result.reason}`);
+        } else {
+            this.logger.warn(`[KYC_AI_PROCESSOR] FAIL: AI Rejected doc ${docId}. Reason: ${result.reason}`);
+            // Automatically reject if AI is confident
+            await this.rejectKyc(doc.id, `AI-Automated Rejection: ${result.reason}`);
+        }
+    } catch (err) {
+        this.logger.error(`[KYC_AI_PROCESSOR] Critical failure: ${err.message}`);
     }
   }
 
