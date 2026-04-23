@@ -79,47 +79,48 @@ export class EmailService {
     return process.env.FRONTEND_URL || 'http://localhost:3000';
   }
 
-  /**
-   * Primary mail sender with retry and fallback
+   /**
+   * Primary mail sender with retry and automatic port-switching
    */
   async sendMail(to: string, subject: string, html: string, retries = 1): Promise<boolean> {
-    const retryableErrors = ['ETIMEDOUT', 'ECONNREFUSED', 'ESOCKET', 'ENOTFOUND', 'EAI_AGAIN'];
-
+    const fromAddress = this.getFrom();
+    
     try {
         if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-            console.error('ERROR [EmailService]: Missing EMAIL_USER or EMAIL_PASS in .env');
             throw new Error('MISSING_SMTP_CONFIG');
         }
 
         const mailOptions = {
-            from: this.getFrom(),
+            from: fromAddress,
             to,
             subject,
             html,
         };
 
-        console.log(`DEBUG [EmailService]: Attempting to send email to ${to} via SMTP...`);
+        console.log(`[SMTP] Attempting delivery to ${to} via ${this.transporter.options.host}:${this.transporter.options.port}...`);
         const info = await this.transporter.sendMail(mailOptions);
-        console.log(`DEBUG [EmailService]: SMTP SUCCESS - MessageId: ${info.messageId}`);
+        console.log(`✅ [SMTP] SUCCESS - MessageId: ${info.messageId}`);
         return true;
     } catch (error: any) {
         const errorCode = error.code || 'UNKNOWN';
-        const errorMsg = error.message || 'No message';
-        const smtpResponse = error.response || 'No SMTP response';
+        const smtpCode = error.responseCode || 'N/A';
+        const smtpResponse = error.response || error.message || 'No response';
         
-        console.error(`--- [CRITICAL SMTP FAILURE] ---`);
-        console.error(`Target: ${to}`);
-        console.error(`Code: ${errorCode}`);
-        console.error(`Message: ${errorMsg}`);
-        console.error(`SMTP Response: ${smtpResponse}`);
-        console.error(`-------------------------------`);
-        
-        // Re-throw if it's a fatal error we want the controller to catch
-        // But for now, just fallback
-        
-        console.log(`DEBUG [EmailService]: Attempting Resend fallback for ${to}...`);
-        const result = await this.sendViaResend({ to, subject, html });
-        return result;
+        console.error(`❌ [SMTP] FAILED for ${to}:`);
+        console.error(`   Code: ${errorCode} | SMTP Code: ${smtpCode}`);
+        console.error(`   Response: ${smtpResponse}`);
+
+        // If it's a connection/timeout issue, try switching port if we haven't already
+        if ((errorCode === 'ETIMEDOUT' || errorCode === 'ECONNREFUSED' || errorCode === 'ESOCKET') && retries > 0) {
+            const currentPort = this.transporter.options.port;
+            const nextPort = currentPort === 465 ? 587 : 465;
+            console.warn(`🔄 [SMTP] Network issue on port ${currentPort}. Trying alternative port ${nextPort}...`);
+            this.setupTransporter(process.env.EMAIL_HOST || 'smtp.hostinger.com', nextPort, process.env.EMAIL_USER!, process.env.EMAIL_PASS!);
+            return this.sendMail(to, subject, html, retries - 1);
+        }
+
+        console.warn(`⚠️ [SMTP] Permanent failure for ${to}. Falling back to Resend API...`);
+        return await this.sendViaResend({ to, subject, html });
     }
   }
 

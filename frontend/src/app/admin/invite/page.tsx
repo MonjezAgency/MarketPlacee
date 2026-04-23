@@ -284,10 +284,13 @@ export default function AdminInvitePage() {
                                                             <div key={idx} className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
                                                                 <span className="text-[11px] truncate max-w-[180px] opacity-70 font-mono italic">{res.email}</span>
                                                                 <span className={cn(
-                                                                    "text-[9px] font-black uppercase px-2 py-0.5 rounded-md",
+                                                                    "text-[9px] font-black uppercase px-2 py-0.5 rounded-md flex items-center gap-1",
                                                                     res.success ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
                                                                 )}>
                                                                     {res.success ? 'ACCEPTED' : 'REJECTED'}
+                                                                    {!res.success && res.error && (
+                                                                        <span className="opacity-60 text-[8px] lowercase italic">({res.error.substring(0, 15)})</span>
+                                                                    )}
                                                                 </span>
                                                             </div>
                                                         ))}
