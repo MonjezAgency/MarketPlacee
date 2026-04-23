@@ -97,7 +97,8 @@ function SectionTab({ active, label, icon: Icon, count, onClick }: any) {
 }
 
 // ─── Support HQ Dashboard ────────────────────────────────────────────────────
-export default function SupportPage() {
+// ─── Support HQ Content ──────────────────────────────────────────────────────
+function SupportHQContent() {
     const { user } = useAuth();
     const userRole = user?.role?.toUpperCase();
     const isSupportTeam = ['SUPPORT', 'ADMIN', 'MODERATOR', 'DEVELOPER', 'LOGISTICS', 'OWNER'].includes(userRole || '');
@@ -472,5 +473,18 @@ export default function SupportPage() {
                 </button>
             </div>
         </div>
+    );
+}
+
+export default function SupportPage() {
+    return (
+        <React.Suspense fallback={
+            <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)]">
+                <Loader2 className="w-10 h-10 animate-spin text-teal-600" />
+                <p className="text-xs font-bold text-slate-400 mt-4 uppercase tracking-widest">Initialising HQ...</p>
+            </div>
+        }>
+            <SupportHQContent />
+        </React.Suspense>
     );
 }
