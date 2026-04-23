@@ -96,10 +96,18 @@ export default function SettingsDashboard() {
 
     // Form States
     const [platformName, setPlatformName] = React.useState('Atlantis Marketplace');
+    const [adminFullName, setAdminFullName] = React.useState('');
     const [currency, setCurrency] = React.useState('USD');
     const [timezone, setTimezone] = React.useState('UTC+2 (Cairo)');
     const [twoFactor, setTwoFactor] = React.useState(true);
     const [passwordRules, setPasswordRules] = React.useState(true);
+    
+    // Password Change State
+    const [currentPassword, setCurrentPassword] = React.useState('');
+    const [newPassword, setNewPassword] = React.useState('');
+    const [confirmPassword, setConfirmPassword] = React.useState('');
+    const [isUpdatingPassword, setIsUpdatingPassword] = React.useState(false);
+
     const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -108,6 +116,7 @@ export default function SettingsDashboard() {
         if (user) {
             setAvatarPreview(user.avatar || null);
             setPlatformName(user.companyName || 'Atlantis Marketplace');
+            setAdminFullName(user.name || '');
         }
     }, [user]);
 
@@ -143,13 +152,49 @@ export default function SettingsDashboard() {
         try {
             await updateUser({
                 avatar: avatarPreview || undefined,
-                companyName: platformName
+                companyName: platformName,
+                name: adminFullName
             });
             toast.success('Settings saved successfully');
         } catch (err) {
             toast.error('Failed to save settings');
         } finally {
             setIsSaving(false);
+        }
+    };
+
+    const handleChangePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!currentPassword || !newPassword || !confirmPassword) {
+            toast.error('Please fill in all password fields');
+            return;
+        }
+        if (newPassword !== confirmPassword) {
+            toast.error('Passwords do not match');
+            return;
+        }
+
+        setIsUpdatingPassword(true);
+        const tid = toast.loading('Updating password...');
+        try {
+            const res = await apiFetch('/auth/change-password', {
+                method: 'POST',
+                body: JSON.stringify({ currentPassword, newPassword })
+            });
+
+            if (res.ok) {
+                toast.success('Password updated successfully', { id: tid });
+                setCurrentPassword('');
+                setNewPassword('');
+                setConfirmPassword('');
+            } else {
+                const err = await res.json();
+                toast.error(err.message || 'Failed to update password', { id: tid });
+            }
+        } catch (err) {
+            toast.error('Connection error', { id: tid });
+        } finally {
+            setIsUpdatingPassword(false);
         }
     };
 
@@ -258,13 +303,19 @@ export default function SettingsDashboard() {
                                 <SettingCard title="Basic Information">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <InputField 
-                                            label="Platform Name" 
+                                            label="Administrator Name" 
+                                            value={adminFullName} 
+                                            onChange={(e: any) => setAdminFullName(e.target.value)} 
+                                            placeholder="Your full name" 
+                                        />
+                                        <InputField 
+                                            label="Platform Display Name" 
                                             value={platformName} 
                                             onChange={(e: any) => setPlatformName(e.target.value)} 
                                             placeholder="Enter marketplace name" 
                                         />
                                         <InputField 
-                                            label="Support Email" 
+                                            label="Account Email" 
                                             value={user?.email || ""} 
                                             placeholder="Contact email" 
                                             disabled
@@ -283,9 +334,23 @@ export default function SettingsDashboard() {
                                                     onChange={(e) => setCurrency(e.target.value)}
                                                     className="h-10 w-full pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500 appearance-none cursor-pointer"
                                                 >
-                                                    <option value="USD">USD - US Dollar</option>
-                                                    <option value="EGP">EGP - Egyptian Pound</option>
-                                                    <option value="SAR">SAR - Saudi Riyal</option>
+                                                    <optgroup label="Popular">
+                                                        <option value="EGP">EGP - Egyptian Pound</option>
+                                                        <option value="USD">USD - US Dollar</option>
+                                                        <option value="SAR">SAR - Saudi Riyal</option>
+                                                        <option value="AED">AED - UAE Dirham</option>
+                                                        <option value="EUR">EUR - Euro</option>
+                                                        <option value="GBP">GBP - British Pound</option>
+                                                    </optgroup>
+                                                    <optgroup label="All Currencies">
+                                                        <option value="KWD">KWD - Kuwaiti Dinar</option>
+                                                        <option value="QAR">QAR - Qatari Rial</option>
+                                                        <option value="BHD">BHD - Bahraini Dinar</option>
+                                                        <option value="OMR">OMR - Omani Rial</option>
+                                                        <option value="JOD">JOD - Jordanian Dinar</option>
+                                                        <option value="TRY">TRY - Turkish Lira</option>
+                                                        <option value="CNY">CNY - Chinese Yuan</option>
+                                                    </optgroup>
                                                 </select>
                                             </div>
                                         </div>
@@ -369,6 +434,43 @@ export default function SettingsDashboard() {
                                         checked={passwordRules}
                                         onChange={setPasswordRules}
                                     />
+                                </SettingCard>
+
+                                <SettingCard title="Change Administrator Password">
+                                    <form onSubmit={handleChangePassword} className="space-y-4">
+                                        <InputField 
+                                            label="Current Password" 
+                                            type="password"
+                                            value={currentPassword}
+                                            onChange={(e: any) => setCurrentPassword(e.target.value)}
+                                            placeholder="••••••••"
+                                        />
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <InputField 
+                                                label="New Password" 
+                                                type="password"
+                                                value={newPassword}
+                                                onChange={(e: any) => setNewPassword(e.target.value)}
+                                                placeholder="••••••••"
+                                            />
+                                            <InputField 
+                                                label="Confirm New Password" 
+                                                type="password"
+                                                value={confirmPassword}
+                                                onChange={(e: any) => setConfirmPassword(e.target.value)}
+                                                placeholder="••••••••"
+                                            />
+                                        </div>
+                                        <div className="flex justify-end pt-2">
+                                            <button 
+                                                type="submit"
+                                                disabled={isUpdatingPassword}
+                                                className="h-10 px-6 bg-slate-900 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2 disabled:opacity-50"
+                                            >
+                                                {isUpdatingPassword ? "Updating..." : "Update Password"}
+                                            </button>
+                                        </div>
+                                    </form>
                                 </SettingCard>
 
                                 <SettingCard title="Session Management">

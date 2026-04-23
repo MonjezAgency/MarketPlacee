@@ -53,6 +53,12 @@ export class AuthController {
         return this.authService.resetPassword(body.token, body.newPassword);
     }
 
+    @UseGuards(JwtAuthGuard)
+    @Post('change-password')
+    async changePassword(@Request() req: any, @Body() body: any) {
+        return this.authService.changePassword(req.user.sub, body.currentPassword, body.newPassword);
+    }
+
     @Post('refresh')
     @SkipThrottle()
     async refresh(@Req() req: any, @Res({ passthrough: true }) res: any) {
@@ -85,7 +91,7 @@ export class AuthController {
             httpOnly: true,
             secure: true,
             sameSite: 'none',
-            path: '/auth/refresh',
+            path: '/',
         });
         return { message: 'Logged out successfully' };
     }
