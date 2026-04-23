@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useAuth } from '@/lib/auth';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -88,6 +89,7 @@ function ToggleField({ label, description, checked, onChange }: any) {
 // ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function SettingsDashboard() {
+    const { user, updateUser } = useAuth();
     const { locale } = useLanguage();
     const [activeSection, setActiveSection] = React.useState('General');
     const [isSaving, setIsSaving] = React.useState(false);
@@ -98,8 +100,16 @@ export default function SettingsDashboard() {
     const [timezone, setTimezone] = React.useState('UTC+2 (Cairo)');
     const [twoFactor, setTwoFactor] = React.useState(true);
     const [passwordRules, setPasswordRules] = React.useState(true);
-    const [avatarPreview, setAvatarPreview] = React.useState<string | null>("https://api.dicebear.com/7.x/avataaars/svg?seed=Admin");
+    const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+    // Initialize from user data
+    React.useEffect(() => {
+        if (user) {
+            setAvatarPreview(user.avatar || null);
+            setPlatformName(user.companyName || 'Atlantis Marketplace');
+        }
+    }, [user]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -130,10 +140,17 @@ export default function SettingsDashboard() {
 
     const handleSave = async () => {
         setIsSaving(true);
-        // Simulate API call
-        await new Promise(r => setTimeout(r, 1000));
-        toast.success('Settings saved successfully');
-        setIsSaving(false);
+        try {
+            await updateUser({
+                avatar: avatarPreview || undefined,
+                companyName: platformName
+            });
+            toast.success('Settings saved successfully');
+        } catch (err) {
+            toast.error('Failed to save settings');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -248,8 +265,9 @@ export default function SettingsDashboard() {
                                         />
                                         <InputField 
                                             label="Support Email" 
-                                            value="support@atlantis.com" 
+                                            value={user?.email || ""} 
                                             placeholder="Contact email" 
+                                            disabled
                                         />
                                     </div>
                                 </SettingCard>

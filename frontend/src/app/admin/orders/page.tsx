@@ -288,12 +288,50 @@ export default function AdminOrdersPage() {
 
     const handleExport = async () => {
         setIsExporting(true);
-        toast.loading('Generating export...', { duration: 2000 });
-        setTimeout(() => {
+        const tid = toast.loading('Generating export...');
+        try {
+            // In a real app, you might fetch all orders or a filtered set
+            // For now, we'll convert the current visible 'orders' state to CSV
+            if (orders.length === 0) {
+                toast.error('No orders to export', { id: tid });
+                setIsExporting(false);
+                return;
+            }
+
+            const headers = ['Order ID', 'Customer', 'Supplier', 'Total', 'Status', 'Date'];
+            const rows = orders.map(o => [
+                o.id,
+                o.customer,
+                o.supplier,
+                o.total.toString(),
+                o.status,
+                new Date(o.date).toLocaleDateString()
+            ]);
+
+            const csvContent = [
+                headers.join(','),
+                ...rows.map(r => r.map(cell => `"${cell}"`).join(','))
+            ].join('\n');
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `atlantis-orders-${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            toast.success('Export downloaded successfully', { id: tid });
+        } catch (err) {
+            toast.error('Export failed', { id: tid });
+        } finally {
             setIsExporting(false);
-            toast.success('Export downloaded successfully');
-        }, 2000);
+        }
     };
+
+    const [showFilterBar, setShowFilterBar] = React.useState(true);
 
     if (loading) {
         return (
@@ -322,7 +360,13 @@ export default function AdminOrdersPage() {
                             className="h-10 ps-11 pe-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/20 transition-all min-w-[280px]"
                         />
                     </div>
-                    <button className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all">
+                    <button 
+                        onClick={() => setShowFilterBar(!showFilterBar)}
+                        className={cn(
+                            "h-10 px-4 border rounded-xl text-xs font-semibold flex items-center gap-2 transition-all",
+                            showFilterBar ? "bg-teal-50 border-teal-200 text-teal-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                        )}
+                    >
                         <Filter size={16} />
                         Filters
                     </button>
@@ -346,25 +390,64 @@ export default function AdminOrdersPage() {
             </div>
 
             {/* Sticky Filter Bar */}
-            <div className="sticky top-0 z-20 bg-slate-50/80 backdrop-blur-md py-4 border-b border-slate-200 -mx-6 px-6 lg:-mx-8 lg:px-8">
-                <div className="flex items-center gap-4">
-                    <select 
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500/20"
+            <AnimatePresence>
+                {showFilterBar && (
+                    <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="sticky top-0 z-20 bg-slate-50/80 backdrop-blur-md py-4 border-b border-slate-200 -mx-6 px-6 lg:-mx-8 lg:px-8 overflow-hidden"
                     >
-                        <option value="ALL">All Statuses</option>
-                        <option value="PENDING">Pending</option>
-                        <option value="PAID">Confirmed</option>
-                        <option value="SHIPPED">Shipped</option>
-                        <option value="DELIVERED">Delivered</option>
-                        <option value="CANCELLED">Cancelled</option>
-                    </select>
-                    <button className="h-9 px-4 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors">Date Range</button>
-                    <button className="h-9 px-4 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors">Payment Status</button>
-                    <button className="h-9 px-4 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-500 hover:text-slate-900 transition-colors">Seller / Supplier</button>
-                </div>
-            </div>
+                        <div className="flex flex-wrap items-center gap-4">
+                            <select 
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500/20"
+                            >
+                                <option value="ALL">All Statuses</option>
+                                <option value="PENDING">Pending</option>
+                                <option value="PAID">Confirmed</option>
+                                <option value="SHIPPED">Shipped</option>
+                                <option value="DELIVERED">Delivered</option>
+                                <option value="CANCELLED">Cancelled</option>
+                            </select>
+                            
+                            <div className="h-9 px-4 bg-white border border-slate-200 rounded-lg flex items-center gap-2">
+                                <Calendar size={14} className="text-slate-400" />
+                                <input type="date" className="bg-transparent border-none outline-none text-[10px] font-bold text-slate-600" />
+                                <span className="text-slate-300">→</span>
+                                <input type="date" className="bg-transparent border-none outline-none text-[10px] font-bold text-slate-600" />
+                            </div>
+
+                            <select className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500/20">
+                                <option>All Payment Statuses</option>
+                                <option>Paid</option>
+                                <option>Awaiting Payment</option>
+                                <option>Refunded</option>
+                            </select>
+
+                            <select 
+                                onChange={(e) => setSearchTerm(e.target.value === 'All Suppliers' ? '' : e.target.value)}
+                                className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500/20"
+                            >
+                                <option>All Suppliers</option>
+                                {Array.from(new Set(orders.map(o => o.supplier))).map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+
+                            {(filterStatus !== 'ALL' || searchTerm) && (
+                                <button 
+                                    onClick={() => { setFilterStatus('ALL'); setSearchTerm(''); }}
+                                    className="text-[10px] font-bold text-teal-600 uppercase hover:underline"
+                                >
+                                    Reset Filters
+                                </button>
+                            )}
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Main Content Grid (65/35) */}
             <div className="grid grid-cols-12 gap-8 items-start">

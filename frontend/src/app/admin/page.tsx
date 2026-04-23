@@ -140,6 +140,31 @@ export default function AdminOverviewPage() {
         }
     }, []);
 
+    const handleExportReport = async () => {
+        const tid = toast.loading('Generating platform report...');
+        try {
+            const data = [
+                ['Metric', 'Value'],
+                ['Total Sales', stats.totalSales.toString()],
+                ['Pending Orders', stats.pendingOrdersCount.toString()],
+                ['Active Products', stats.activeProducts.toString()],
+                ['Pending Users', stats.pendingUsers.toString()],
+                ['Active Disputes', stats.activeDisputes.toString()]
+            ];
+
+            const csvContent = data.map(row => row.join(',')).join('\n');
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `atlantis-report-${new Date().toISOString().split('T')[0]}.csv`);
+            link.click();
+            toast.success('Report exported successfully', { id: tid });
+        } catch (err) {
+            toast.error('Failed to export report', { id: tid });
+        }
+    };
+
     React.useEffect(() => {
         fetchStats();
     }, [fetchStats]);
@@ -157,7 +182,10 @@ export default function AdminOverviewPage() {
                         <Clock size={16} />
                         May 20, 2025 - May 26, 2025
                     </button>
-                    <button className="h-10 px-4 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20">
+                    <button 
+                        onClick={handleExportReport}
+                        className="h-10 px-4 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20"
+                    >
                         <Activity size={16} />
                         Export Report
                     </button>
@@ -401,24 +429,24 @@ export default function AdminOverviewPage() {
                     <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                         <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4">Quick Actions</h3>
                         <div className="grid grid-cols-1 gap-3">
-                            <button className="flex items-center gap-3 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
+                            <Link href="/admin/products/new" className="flex items-center gap-3 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
                                 <div className="w-6 h-6 bg-teal-500/10 text-teal-600 rounded-lg flex items-center justify-center">
                                     <Plus size={14} />
                                 </div>
                                 Add New Product
-                            </button>
-                            <button className="flex items-center gap-3 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
+                            </Link>
+                            <Link href="/admin/orders" className="flex items-center gap-3 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
                                 <div className="w-6 h-6 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center">
                                     <ShoppingCart size={14} />
                                 </div>
                                 View All Orders
-                            </button>
-                            <button className="flex items-center gap-3 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
+                            </Link>
+                            <Link href="/admin/users?role=SUPPLIER" className="flex items-center gap-3 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
                                 <div className="w-6 h-6 bg-orange-500/10 text-orange-600 rounded-lg flex items-center justify-center">
                                     <UserCheck2 size={14} />
                                 </div>
                                 Manage Suppliers
-                            </button>
+                            </Link>
                         </div>
                     </div>
 
