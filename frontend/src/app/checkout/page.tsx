@@ -50,6 +50,7 @@ export default function CheckoutPage() {
     const [couponApplied, setCouponApplied] = useState('');
     const [couponError, setCouponError] = useState('');
     const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
+    const [isDetectingLocation, setIsDetectingLocation] = useState(false);
 
     // Fetch rates from Shipping Agent — re-runs when address country/city changes
     const fetchShippingRates = React.useCallback(async (country: string, city: string) => {
@@ -338,30 +339,53 @@ export default function CheckoutPage() {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
+                                                    disabled={isDetectingLocation}
                                                     onClick={async () => {
+                                                        setIsDetectingLocation(true);
                                                         try {
                                                             const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-                                                                navigator.geolocation.getCurrentPosition(resolve, reject);
+                                                                navigator.geolocation.getCurrentPosition(resolve, reject, {
+                                                                    enableHighAccuracy: true,
+                                                                    timeout: 10000,
+                                                                    maximumAge: 0
+                                                                });
                                                             });
                                                             const { latitude, longitude } = position.coords;
 
-                                                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`);
+                                                            const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${latitude}&lon=${longitude}`, {
+                                                                headers: {
+                                                                    'Accept-Language': 'en-US,en;q=0.9',
+                                                                }
+                                                            });
                                                             const data = await res.json();
 
                                                             if (data.address) {
-                                                                setAddrStreet(data.address.road || data.address.street || '');
-                                                                setAddrCity(data.address.city || data.address.town || data.address.village || '');
+                                                                // Try to be more robust with address mapping
+                                                                const street = data.address.road || data.address.street || data.address.suburb || data.address.neighbourhood || '';
+                                                                const city = data.address.city || data.address.town || data.address.village || data.address.state || '';
+                                                                
+                                                                setAddrStreet(street);
+                                                                setAddrCity(city);
                                                                 setAddrPostal(data.address.postcode || '');
                                                                 setAddrCountry(data.address.country || '');
                                                             }
-                                                        } catch (err) {
+                                                        } catch (err: any) {
                                                             console.error('Location error:', err);
-                                                            alert('Could not detect location. Please enter your address manually.');
+                                                            if (err.code === 1) {
+                                                                alert('Location access denied. Please enable location permissions in your browser.');
+                                                            } else if (err.code === 3) {
+                                                                alert('Location request timed out. Please try again or enter manually.');
+                                                            } else {
+                                                                alert('Could not detect location. Please enter your address manually.');
+                                                            }
+                                                        } finally {
+                                                            setIsDetectingLocation(false);
                                                         }
                                                     }}
-                                                    className="text-xs"
+                                                    className="text-xs gap-2"
                                                 >
-                                                    📍 Auto-fill from Location
+                                                    {isDetectingLocation ? <Loader2 size={12} className="animate-spin" /> : '📍'}
+                                                    {isDetectingLocation ? 'Detecting...' : 'Auto-fill from Location'}
                                                 </Button>
                                             </div>
                                             <p className="text-xs text-muted-foreground mb-6">Saved automatically for your next order.</p>
