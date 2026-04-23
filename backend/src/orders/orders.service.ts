@@ -605,4 +605,89 @@ export class OrdersService {
             data: { deletedByCustomer: true },
         });
     }
+
+    async delete(orderId: string) {
+        // Administrative hard delete
+        return this.prisma.order.delete({
+            where: { id: orderId }
+        });
+    }
+
+    async bulkDelete(orderIds: string[]) {
+        return this.prisma.order.deleteMany({
+            where: { id: { in: orderIds } }
+        });
+    }
+
+    async getAdminAnalytics() {
+        // Fetch all non-cancelled orders with their items and suppliers
+        const orders = await this.prisma.order.findMany({
+            where: { status: { not: OrderStatus.CANCELLED } },
+            include: {
+                items: {
+                    include: {
+                        product: {
+                            include: {
+                                supplier: { select: { id: true, name: true, email: true } }
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        const productStats: Record<string, { name: string, sales: number, revenue: number, image: string }> = {};
+        const supplierStats: Record<string, { name: string, revenue: number, orders: number }> = {};
+        const revenueTrends: Record<string, number> = {};
+
+        for (const order of orders) {
+            const dateKey = order.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            revenueTrends[dateKey] = (revenueTrends[dateKey] || 0) + order.totalAmount;
+
+            for (const item of order.items) {
+                const prod = item.product;
+                if (!prod) continue;
+
+                // Product Stats
+                if (!productStats[prod.id]) {
+                    productStats[prod.id] = {
+                        name: prod.name,
+                        sales: 0,
+                        revenue: 0,
+                        image: prod.images?.[0] || ''
+                    };
+                }
+                productStats[prod.id].sales += item.quantity;
+                productStats[prod.id].revenue += item.price * item.quantity;
+
+                // Supplier Stats
+                const sup = prod.supplier;
+                if (sup) {
+                    if (!supplierStats[sup.id]) {
+                        supplierStats[sup.id] = { name: sup.name, revenue: 0, orders: 0 };
+                    }
+                    supplierStats[sup.id].revenue += item.price * item.quantity;
+                    supplierStats[sup.id].orders += 1;
+                }
+            }
+        }
+
+        const topProducts = Object.values(productStats)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
+
+        const topSuppliers = Object.values(supplierStats)
+            .sort((a, b) => b.revenue - a.revenue)
+            .slice(0, 5);
+
+        const revenueData = Object.entries(revenueTrends)
+            .map(([name, revenue]) => ({ name, revenue }))
+            .slice(-7); // Last 7 days/entries
+
+        return {
+            topProducts,
+            topSuppliers,
+            revenueData
+        };
+    }
 }

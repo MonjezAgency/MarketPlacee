@@ -6,7 +6,7 @@ import Link from 'next/link';
 import {
     Star, Plus, Minus, Check, Truck,
     ShieldCheck, RotateCcw, ChevronRight, Share2,
-    Heart, Info, Package, Sparkles, ArrowLeft, ShoppingCart
+    Heart, Info, Package, Sparkles, ArrowLeft, ShoppingCart, X, ChevronLeft
 } from 'lucide-react';
 import { type Product, ProductStatus } from '@/lib/types';
 import { fetchProductById, apiFetch } from '@/lib/api';
@@ -43,6 +43,8 @@ export default function ProductDetailClient() {
     const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
     const [similarProducts, setSimilarProducts] = useState<Product[]>([]);
     const [bundleProducts, setBundleProducts] = useState<Product[]>([]);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [previewIndex, setPreviewIndex] = useState(0);
 
     // Fetch the specific product by ID directly — no need to load all products
     useEffect(() => {
@@ -179,16 +181,33 @@ export default function ProductDetailClient() {
                             <div className="absolute bottom-10 start-10 w-48 h-48 bg-secondary/5 rounded-full blur-[80px]" />
 
                             <AnimatePresence mode="wait">
-                                <motion.img
+                                <motion.div
                                     key={selectedImage}
                                     initial={{ opacity: 0, scale: 0.9, rotateY: 10 }}
                                     animate={{ opacity: 1, scale: 1, rotateY: 0 }}
                                     exit={{ opacity: 0, scale: 1.1, rotateY: -10 }}
                                     transition={{ duration: 0.5, ease: "easeOut" }}
-                                    src={selectedImage || product.image}
-                                    alt={product.name}
-                                    className="w-full max-w-[480px] max-h-[550px] min-h-[200px] object-contain relative z-10 drop-shadow-2xl"
-                                />
+                                    onClick={() => {
+                                        const allImages = product.images && product.images.length > 0 ? product.images : [product.image].filter(Boolean) as string[];
+                                        const idx = allImages.indexOf(selectedImage);
+                                        setPreviewIndex(idx >= 0 ? idx : 0);
+                                        setIsPreviewOpen(true);
+                                    }}
+                                    className="cursor-zoom-in relative z-10 w-full flex items-center justify-center group/img"
+                                >
+                                    <img
+                                        src={selectedImage || product.image}
+                                        alt={product.name}
+                                        className="w-full max-w-[480px] max-h-[550px] min-h-[200px] object-contain drop-shadow-2xl transition-transform duration-700 group-hover/img:scale-105"
+                                    />
+                                    {/* Zoom Hint */}
+                                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity">
+                                        <div className="bg-white/90 dark:bg-black/80 backdrop-blur-md px-6 py-3 rounded-full flex items-center gap-2 shadow-2xl">
+                                            <Sparkles className="text-primary w-4 h-4 animate-pulse" />
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-foreground">{isAr ? 'عرض ملء الشاشة' : 'FULLSCREEN VIEW'}</span>
+                                        </div>
+                                    </div>
+                                </motion.div>
                             </AnimatePresence>
 
                             {/* Floating Badges */}
@@ -507,6 +526,83 @@ export default function ProductDetailClient() {
                     ))}
                 </div>
             </main>
+
+            {/* High-Fidelity Image Preview Gallery Modal */}
+            <AnimatePresence>
+                {isPreviewOpen && (
+                    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 lg:p-10">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsPreviewOpen(false)}
+                            className="absolute inset-0 bg-black/95 backdrop-blur-xl cursor-zoom-out"
+                        />
+                        
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="relative z-10 w-full max-w-6xl h-full flex flex-col items-center justify-center gap-8"
+                        >
+                            <div className="relative w-full flex-1 flex items-center justify-center">
+                                {/* Navigation Arrows */}
+                                {product.images && product.images.length > 1 && (
+                                    <>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPreviewIndex((prev) => (prev === 0 ? product.images!.length - 1 : prev - 1));
+                                            }}
+                                            className="absolute left-4 lg:left-0 top-1/2 -translate-y-1/2 w-16 h-16 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center hover:bg-white hover:text-black transition-all z-20 group"
+                                        >
+                                            <ChevronLeft size={32} className="group-active:scale-90 transition-transform" />
+                                        </button>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setPreviewIndex((prev) => (prev === product.images!.length - 1 ? 0 : prev + 1));
+                                            }}
+                                            className="absolute right-4 lg:right-0 top-1/2 -translate-y-1/2 w-16 h-16 bg-white/5 border border-white/10 text-white rounded-full flex items-center justify-center hover:bg-white hover:text-black transition-all z-20 group"
+                                        >
+                                            <ChevronRight size={32} className="group-active:scale-90 transition-transform" />
+                                        </button>
+                                    </>
+                                )}
+
+                                <AnimatePresence mode="wait">
+                                    <motion.img
+                                        key={previewIndex}
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20 }}
+                                        src={product.images && product.images.length > 0 ? product.images[previewIndex] : product.image}
+                                        alt="Preview"
+                                        onContextMenu={(e) => e.preventDefault()}
+                                        className="max-w-full max-h-[75vh] object-contain drop-shadow-[0_0_50px_rgba(20,184,166,0.3)] select-none"
+                                    />
+                                </AnimatePresence>
+                            </div>
+                            
+                            <div className="flex flex-col items-center gap-6 mb-8">
+                                <div className="flex flex-col items-center gap-2">
+                                    <p className="text-[#14B8A6] text-[12px] font-black tracking-[0.4em]">
+                                        {previewIndex + 1} / {product.images?.length || 1}
+                                    </p>
+                                    <p className="text-white/40 text-[10px] font-black uppercase tracking-[0.4em]">{isAr ? 'معاينة المعرض' : 'Gallery Master Preview'}</p>
+                                </div>
+                                <button
+                                    onClick={() => setIsPreviewOpen(false)}
+                                    className="h-14 px-10 bg-white/5 border border-white/10 hover:bg-white text-white hover:text-black rounded-2xl transition-all font-black text-xs uppercase tracking-widest flex items-center gap-3"
+                                >
+                                    <X size={20} />
+                                    {isAr ? 'إغلاق المعاينة' : 'Dismiss View'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

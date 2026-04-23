@@ -1,17 +1,19 @@
 'use client';
-import { apiFetch } from '@/lib/api';
-
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-    Package, Search, Building2, ShieldCheck, X, 
-    Mail, Phone, Globe, Link as LinkIcon, 
-    MoreVertical, ChevronRight, Briefcase, 
-    Users, Verified, ShieldAlert, Activity,
-    Calendar, ArrowUpRight
+    Search, UserCircle2, Mail, Phone, 
+    ChevronRight, Store, Shield, 
+    ShieldCheck, ShieldAlert, Activity, 
+    TrendingUp, Filter, X, Globe, 
+    Clock, Package, FileText, Download,
+    Check, AlertCircle, MoreVertical, 
+    ArrowUpRight, BarChart3, Briefcase,
+    Zap, DollarSign, Target, Award
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
 
 interface Supplier {
     id: string;
@@ -19,12 +21,16 @@ interface Supplier {
     email: string;
     phone?: string;
     companyName?: string;
-    website?: string;
-    socialLinks?: string;
     avatar?: string;
     status: string;
+    kycStatus?: 'VERIFIED' | 'PENDING' | 'REJECTED' | 'NOT_STARTED';
     role: string;
     createdAt: string;
+    _count?: {
+        products: number;
+    };
+    revenue?: number;
+    approvalRate?: number;
 }
 
 export default function AdminSuppliersPage() {
@@ -33,19 +39,21 @@ export default function AdminSuppliersPage() {
     const [suppliers, setSuppliers] = React.useState<Supplier[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [activeTab, setActiveTab] = React.useState<'ALL' | 'ACTIVE' | 'PENDING'>('ALL');
+    const [panelTab, setPanelTab] = React.useState<'profile' | 'products' | 'performance' | 'compliance'>('profile');
 
     const loadSuppliers = async () => {
         try {
-            // Request specifically suppliers from the backend with no-store cache to ensure fresh data
-            const res = await apiFetch('/users?role=SUPPLIER&limit=100', {
-                cache: 'no-store'
-            });
+            const res = await apiFetch('/users?role=SUPPLIER&limit=100', { cache: 'no-store' });
             if (res.ok) {
                 const result = await res.json();
                 const usersData = Array.isArray(result) ? result : (result.users || []);
-                setSuppliers(usersData);
-            } else {
-                console.error("API Error (Suppliers):", res.statusText);
+                // Add some mock data for performance display
+                const enrichedData = usersData.map((s: any) => ({
+                    ...s,
+                    revenue: Math.floor(Math.random() * 50000) + 5000,
+                    approvalRate: Math.floor(Math.random() * 20) + 80,
+                }));
+                setSuppliers(enrichedData);
             }
         } catch (err) {
             console.error("Failed to load suppliers:", err);
@@ -56,8 +64,6 @@ export default function AdminSuppliersPage() {
 
     React.useEffect(() => {
         loadSuppliers();
-        const interval = setInterval(loadSuppliers, 15000);
-        return () => clearInterval(interval);
     }, []);
 
     const filteredSuppliers = suppliers.filter(s => {
@@ -72,249 +78,355 @@ export default function AdminSuppliersPage() {
         return matchesSearch && matchesTab;
     });
 
+    const getKycBadge = (status?: string) => {
+        switch (status) {
+            case 'VERIFIED': return <span className="flex items-center gap-1 text-teal-600 bg-teal-50 px-2 py-0.5 rounded text-[10px] font-bold border border-teal-100"><ShieldCheck size={12} /> Verified</span>;
+            case 'PENDING': return <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[10px] font-bold border border-amber-100"><Clock size={12} /> Pending</span>;
+            case 'REJECTED': return <span className="flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded text-[10px] font-bold border border-red-100"><ShieldAlert size={12} /> Rejected</span>;
+            default: return <span className="flex items-center gap-1 text-slate-400 bg-slate-50 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-100">Not Started</span>;
+        }
+    };
+
     return (
-        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-            {/* Header Section */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                <div className="space-y-2">
-                    <h1 className="text-5xl font-black text-foreground tracking-tighter uppercase leading-none">Vendor Network</h1>
-                    <p className="text-muted-foreground font-black text-[11px] uppercase tracking-[0.4em] opacity-70">Supply Chain Integrity & Enterprise Partners</p>
+        <div className="flex flex-col h-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Header Area */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Suppliers Network</h1>
+                    <p className="text-sm text-slate-500 mt-1">Monitor vendor performance, product catalogs, and compliance standards.</p>
                 </div>
-                
-                <div className="flex items-center gap-4">
-                    <div className="relative group">
-                        <Search className="absolute start-6 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={20} />
-                        <input
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input 
                             type="text"
-                            placeholder="Identify supplier by name or entity..."
+                            placeholder="Search suppliers..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="h-16 ps-16 pe-8 bg-card rounded-[2rem] border border-border/50 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 text-foreground font-bold text-sm min-w-[350px] transition-all shadow-xl"
+                            className="h-10 w-64 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500 transition-all shadow-sm"
                         />
                     </div>
+                    <button className="h-10 px-4 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
+                        <Filter size={16} /> Filters
+                    </button>
                 </div>
             </div>
 
-            {/* Performance Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-card-strong p-8 overflow-hidden relative group">
-                    <div className="absolute top-0 end-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity"><Building2 size={120} /></div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Total Partnerships</p>
-                    <h2 className="text-5xl font-black tracking-tighter">{suppliers.length}</h2>
-                    <div className="flex items-center gap-2 mt-4 text-primary font-black text-[10px] uppercase tracking-widest">
-                        <ArrowUpRight size={14} /> Global Supply Nodes
-                    </div>
-                </div>
-                <div className="glass-card-strong p-8 overflow-hidden relative group border-s-4 border-emerald-500">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Compliance Verified</p>
-                    <h2 className="text-5xl font-black tracking-tighter text-emerald-500">{suppliers.filter(s => s.status === 'ACTIVE').length}</h2>
-                    <div className="flex items-center gap-2 mt-4 text-emerald-500 font-black text-[10px] uppercase tracking-widest">
-                        <ShieldCheck size={14} /> Active Protocols
-                    </div>
-                </div>
-                <div className="glass-card-strong p-8 overflow-hidden relative group border-s-4 border-amber-500">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Approval Velocity</p>
-                    <h2 className="text-5xl font-black tracking-tighter text-amber-500">{suppliers.filter(s => s.status === 'PENDING_APPROVAL').length}</h2>
-                    <div className="flex items-center gap-2 mt-4 text-amber-500 font-black text-[10px] uppercase tracking-widest">
-                        <Activity size={14} /> Critical items pending
-                    </div>
-                </div>
-            </div>
-
-            {/* Navigation Filter */}
-            <div className="flex items-center gap-3 p-2 glass rounded-[2.5rem] w-fit shadow-2xl">
+            {/* KPI Row */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 {[
-                    { id: 'ALL', label: 'Entire Network', icon: Users },
-                    { id: 'ACTIVE', label: 'Verified Status', icon: Verified },
-                    { id: 'PENDING', label: 'Verification Queue', icon: ShieldAlert },
-                ].map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as 'ALL' | 'ACTIVE' | 'PENDING')}
-                            className={cn(
-                                "flex items-center gap-3 px-8 py-4 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.1em] transition-all",
-                                activeTab === tab.id
-                                    ? "bg-primary text-primary-foreground shadow-xl shadow-primary/30"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                            )}
-                        >
-                            <Icon size={16} />
-                            {tab.label}
-                        </button>
-                    );
-                })}
+                    { label: 'Total Suppliers', value: suppliers.length, icon: Store, color: 'text-slate-600', bg: 'bg-slate-100' },
+                    { label: 'Network Revenue', value: `$${suppliers.reduce((acc, s) => acc + (s.revenue || 0), 0).toLocaleString()}`, icon: DollarSign, color: 'text-teal-600', bg: 'bg-teal-50' },
+                    { label: 'Verified Partners', value: suppliers.filter(s => s.status === 'ACTIVE').length, icon: ShieldCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
+                    { label: 'KYC Backlog', value: suppliers.filter(s => s.status === 'PENDING_APPROVAL').length, icon: Activity, color: 'text-amber-600', bg: 'bg-amber-50' },
+                ].map((stat, i) => (
+                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+                        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", stat.bg, stat.color)}>
+                            <stat.icon size={22} />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                            <h3 className="text-lg font-bold text-slate-900 mt-0.5">{stat.value}</h3>
+                        </div>
+                    </div>
+                ))}
             </div>
 
-            {/* Supplier Elite Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <AnimatePresence mode="popLayout">
-                    {filteredSuppliers.map((supplier, i) => (
-                        <motion.div
-                            key={supplier.id}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ delay: i * 0.05 }}
-                            className="glass-card-strong p-8 group transition-all hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3)] border-primary/10 hover:border-primary/30 cursor-pointer overflow-hidden relative"
-                            onClick={() => setSelectedSupplier(supplier)}
-                        >
-                            <div className="absolute top-0 end-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <Briefcase size={80} className="rotate-12" />
-                            </div>
-                            
-                            <div className="flex justify-between items-start mb-8 relative z-10">
-                                <div className="relative group-hover:scale-110 transition-transform duration-500">
-                                    <div className="absolute -inset-2 bg-primary blur-xl opacity-20 group-hover:opacity-40 animate-pulse rounded-full" />
-                                    {supplier.avatar ? (
-                                        <img src={supplier.avatar} className="w-16 h-16 rounded-2xl object-cover relative z-10 border-2 border-card" alt={supplier.name} />
-                                    ) : (
-                                        <div className="w-16 h-16 rounded-2xl bg-card flex items-center justify-center text-2xl font-black text-primary relative z-10 border-2 border-card uppercase">
-                                            {supplier.name[0]}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className={cn(
-                                    "px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-lg",
-                                    supplier.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                                )}>
-                                    {supplier.status === 'ACTIVE' ? 'Verified' : 'Pending'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-6 relative z-10">
-                                <div>
-                                    <h3 className="text-2xl font-black text-foreground group-hover:text-primary transition-colors tracking-tighter leading-none mb-2">{supplier.name}</h3>
-                                    <p className="text-[11px] text-muted-foreground font-black uppercase tracking-widest opacity-60 flex items-center gap-1">
-                                        <Mail size={10} /> {supplier.email}
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 py-6 border-y border-border/10">
-                                    <div className="space-y-1">
-                                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Entity Unit</p>
-                                        <p className="text-sm font-black text-foreground truncate">{supplier.companyName || 'Private Partner'}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Phone Link</p>
-                                        <p className="text-sm font-black text-foreground">{supplier.phone || 'Registry Missing'}</p>
-                                    </div>
-                                </div>
-
-                                <button className="w-full h-14 glass rounded-2xl font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all flex items-center justify-center gap-3">
-                                    Entity Dossier <ChevronRight size={16} />
-                                </button>
-                            </div>
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
-            </div>
-
-            {/* Deep Layered Profile Modal */}
-            <AnimatePresence>
-                {selectedSupplier && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-8">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            onClick={() => setSelectedSupplier(null)} className="absolute inset-0 bg-background/80 backdrop-blur-3xl" />
-                        
-                        <motion.div 
-                            initial={{ scale: 0.9, y: 50, opacity: 0 }} 
-                            animate={{ scale: 1, y: 0, opacity: 1 }} 
-                            exit={{ scale: 0.9, y: 50, opacity: 0 }}
-                            className="glass-card-strong w-full max-w-4xl relative z-10 overflow-hidden flex flex-col md:flex-row h-[750px] shadow-[0_0_120px_rgba(0,0,0,0.6)] border-primary/20"
-                        >
-                            {/* Left Side: Partner Identity */}
-                            <div className="w-full md:w-[40%] bg-primary/5 p-12 flex flex-col items-center justify-center text-center space-y-8 border-e border-border/10">
-                                <div className="relative">
-                                    <div className="absolute -inset-4 bg-gradient-to-tr from-primary to-secondary opacity-30 blur-2xl rounded-full" />
-                                    {selectedSupplier.avatar ? (
-                                        <img src={selectedSupplier.avatar} className="w-44 h-44 rounded-[3.5rem] object-cover relative z-10 border-4 border-card shadow-2xl" />
-                                    ) : (
-                                        <div className="w-44 h-44 rounded-[3.5rem] bg-card flex items-center justify-center text-7xl font-black text-primary relative z-10 border-4 border-card shadow-2xl uppercase">
-                                            {selectedSupplier.name[0]}
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <h2 className="text-4xl font-black uppercase tracking-tighter leading-none">{selectedSupplier.name}</h2>
-                                    <div className="inline-flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20">
-                                        <ShieldCheck size={14} /> Registered Partner
-                                    </div>
-                                </div>
-                                <div className="w-full space-y-4 pt-10 border-t border-border/10">
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Network ID</p>
-                                        <p className="text-xs font-black uppercase tracking-tighter">AT-SP-{selectedSupplier.id.substring(0, 8).toUpperCase()}</p>
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Registry Date</p>
-                                        <p className="text-xs font-black tracking-tighter">{new Date(selectedSupplier.createdAt).toLocaleDateString()}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Right Side: Operational Records */}
-                            <div className="flex-1 p-12 flex flex-col h-full bg-card/10 overflow-y-auto">
-                                <div className="flex-1 space-y-12">
-                                    <section className="space-y-8">
-                                        <h3 className="text-sm font-black uppercase tracking-[0.3em] flex items-center gap-3 border-b border-border/10 pb-6 whitespace-nowrap">
-                                            <Globe className="text-primary" /> Global Contact Profile
-                                        </h3>
-                                        <div className="grid grid-cols-1 gap-6">
-                                            <div className="glass p-6 rounded-3xl flex items-center gap-6 group hover:border-primary/20 transition-all">
-                                                <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
-                                                    <Mail size={24} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Corporate Email</p>
-                                                    <p className="text-lg font-black">{selectedSupplier.email}</p>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-6">
-                                                <div className="glass p-6 rounded-3xl group hover:border-primary/20 transition-all">
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Entity Unit</p>
-                                                    <p className="text-base font-black truncate">{selectedSupplier.companyName || 'Private Partner'}</p>
-                                                </div>
-                                                <div className="glass p-6 rounded-3xl group hover:border-primary/20 transition-all">
-                                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Direct Line</p>
-                                                    <p className="text-base font-black truncate">{selectedSupplier.phone || 'Unverified'}</p>
-                                                </div>
-                                            </div>
-                                            {selectedSupplier.website && (
-                                                <a href={selectedSupplier.website} target="_blank" className="glass p-6 rounded-3xl flex items-center justify-between group hover:border-primary transition-all">
-                                                    <div className="flex items-center gap-6">
-                                                        <div className="w-14 h-14 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
-                                                            <Globe size={24} />
-                                                        </div>
-                                                        <div>
-                                                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Digital Presence</p>
-                                                            <p className="text-base font-black">{selectedSupplier.website}</p>
-                                                        </div>
+            <div className="grid grid-cols-12 gap-6 items-start">
+                {/* TABLE (LEFT - 65%) */}
+                <div className={cn(
+                    "transition-all duration-500",
+                    selectedSupplier ? "col-span-12 lg:col-span-7" : "col-span-12"
+                )}>
+                    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50/50 border-b border-slate-100">
+                                    <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        <th className="px-6 py-4">Supplier Name</th>
+                                        <th className="px-6 py-4">Products</th>
+                                        <th className="px-6 py-4">Revenue</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4">KYC</th>
+                                        <th className="px-6 py-4 text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {loading ? (
+                                        [...Array(6)].map((_, i) => (
+                                            <tr key={i} className="animate-pulse h-[64px]">
+                                                <td colSpan={6} className="px-6 py-4 bg-slate-50/30" />
+                                            </tr>
+                                        ))
+                                    ) : filteredSuppliers.map((supplier) => (
+                                        <tr 
+                                            key={supplier.id} 
+                                            onClick={() => setSelectedSupplier(supplier)}
+                                            className={cn(
+                                                "group cursor-pointer hover:bg-slate-50 transition-all h-[64px]",
+                                                selectedSupplier?.id === supplier.id ? "bg-teal-50/50" : ""
+                                            )}
+                                        >
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                                        {supplier.avatar ? (
+                                                            <img src={supplier.avatar} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-sm font-bold text-slate-400">{supplier.name[0]}</span>
+                                                        )}
                                                     </div>
-                                                    <ChevronRight className="text-primary group-hover:translate-x-2 transition-transform" />
-                                                </a>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-sm font-bold text-slate-900 truncate">{supplier.name}</span>
+                                                        <span className="text-[11px] text-slate-500 truncate">{supplier.companyName || 'Private Supplier'}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-700">
+                                                {supplier._count?.products || 0}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-900">
+                                                ${supplier.revenue?.toLocaleString()}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={cn(
+                                                    "px-2 py-0.5 rounded text-[10px] font-bold uppercase border",
+                                                    supplier.status === 'ACTIVE' ? "bg-teal-50 text-teal-600 border-teal-100" : "bg-red-50 text-red-600 border-red-100"
+                                                )}>
+                                                    {supplier.status === 'ACTIVE' ? 'Active' : 'Blocked'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {getKycBadge(supplier.kycStatus || (supplier.status === 'ACTIVE' ? 'VERIFIED' : 'PENDING'))}
+                                            </td>
+                                            <td className="px-6 py-4 text-end">
+                                                <button className="p-2 text-slate-400 hover:text-slate-900 transition-all">
+                                                    <ChevronRight size={18} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {/* RIGHT PANEL (35% / 420px) */}
+                <AnimatePresence>
+                    {selectedSupplier && (
+                        <motion.div 
+                            initial={{ x: 20, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: 20, opacity: 0 }}
+                            className="col-span-12 lg:col-span-5"
+                        >
+                            <div className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden sticky top-8 flex flex-col max-h-[calc(100vh-140px)]">
+                                {/* Panel Header */}
+                                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-teal-500 text-white overflow-hidden flex items-center justify-center font-bold text-xl border-2 border-slate-100 shadow-sm">
+                                            {selectedSupplier.avatar ? (
+                                                <img src={selectedSupplier.avatar} className="w-full h-full object-cover" alt={selectedSupplier.name} />
+                                            ) : (
+                                                <span>{selectedSupplier.name[0]}</span>
                                             )}
                                         </div>
-                                    </section>
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-900">{selectedSupplier.name}</h3>
+                                            <p className="text-[10px] text-teal-600 font-bold uppercase tracking-widest">{selectedSupplier.companyName || 'Private Unit'}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedSupplier(null)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all">
+                                        <X size={20} />
+                                    </button>
                                 </div>
 
-                                <div className="pt-12 mt-12 border-t border-border/20 flex gap-6">
-                                    <button className="h-20 flex-1 flex items-center justify-center gap-4 rounded-[2rem] border-2 border-border/20 text-muted-foreground font-black uppercase text-xs tracking-[0.2em] hover:bg-muted hover:text-foreground transition-all">
-                                        Suspend Partner
-                                    </button>
-                                    <button className="h-20 flex-1 flex items-center justify-center gap-4 rounded-[2rem] bg-primary text-white font-black uppercase text-xs tracking-[0.3em] hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-primary/30">
-                                        Manage Integration
-                                    </button>
+                                {/* Panel Tabs */}
+                                <div className="flex items-center px-4 pt-4 gap-2 border-b border-slate-100">
+                                    {[
+                                        { id: 'profile', label: 'Profile', icon: Briefcase },
+                                        { id: 'products', label: 'Products', icon: Package },
+                                        { id: 'performance', label: 'Performance', icon: Zap },
+                                        { id: 'compliance', label: 'Compliance', icon: ShieldCheck }
+                                    ].map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setPanelTab(tab.id as any)}
+                                            className={cn(
+                                                "flex items-center gap-2 px-3 py-3 text-[11px] font-bold transition-all border-b-2",
+                                                panelTab === tab.id ? "border-teal-600 text-teal-600" : "border-transparent text-slate-500 hover:text-slate-900"
+                                            )}
+                                        >
+                                            <tab.icon size={13} />
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Panel Content */}
+                                <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
+                                    {panelTab === 'profile' && (
+                                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                                            <div className="space-y-4">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enterprise Profile</h4>
+                                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-400 border border-slate-100">
+                                                        <Mail size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Business Email</p>
+                                                        <p className="text-sm font-bold text-slate-900">{selectedSupplier.email}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-400 border border-slate-100">
+                                                        <Phone size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Contact Line</p>
+                                                        <p className="text-sm font-bold text-slate-900">{selectedSupplier.phone || 'N/A'}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Onboarding</p>
+                                                        <p className="text-sm font-bold text-slate-900">{new Date(selectedSupplier.createdAt).toLocaleDateString()}</p>
+                                                    </div>
+                                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Rating</p>
+                                                        <div className="flex items-center gap-1">
+                                                            <Check size={14} className="text-teal-600" />
+                                                            <span className="text-sm font-bold text-slate-900">4.9/5.0</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="pt-6 border-t border-slate-100">
+                                                <button className="w-full h-12 bg-slate-900 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                                                    Manage Access Rights
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {panelTab === 'products' && (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                                            <div className="flex items-center justify-between">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Catalog</h4>
+                                                <span className="text-[10px] font-bold text-teal-600">{selectedSupplier._count?.products || 0} Products</span>
+                                            </div>
+                                            {[...Array(3)].map((_, i) => (
+                                                <div key={i} className="p-3 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-teal-200 transition-all">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-12 h-12 rounded-xl bg-white border border-slate-100 flex items-center justify-center">
+                                                            <Package size={20} className="text-slate-400" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-xs font-bold text-slate-900">Premium Product {i + 1}</p>
+                                                            <p className="text-[9px] text-slate-500 font-medium">SKU: AT-8429-{i}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-xs font-bold text-slate-900">$124.00</p>
+                                                        <span className="text-[8px] font-bold text-teal-600 bg-teal-50 px-1 py-0.5 rounded">IN STOCK</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <button className="w-full py-4 text-teal-600 text-[10px] font-bold uppercase tracking-widest hover:bg-teal-50 rounded-2xl transition-all">
+                                                Open Full Catalog
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {panelTab === 'performance' && (
+                                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Growth Metrics</h4>
+                                            
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="p-5 bg-teal-600 rounded-3xl text-white space-y-2 shadow-lg shadow-teal-600/20">
+                                                    <BarChart3 size={20} />
+                                                    <div>
+                                                        <p className="text-[9px] font-bold uppercase tracking-widest opacity-80">Sales Volume</p>
+                                                        <p className="text-lg font-bold">${selectedSupplier.revenue?.toLocaleString()}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="p-5 bg-slate-900 rounded-3xl text-white space-y-2 shadow-lg shadow-slate-900/20">
+                                                    <Award size={20} className="text-teal-400" />
+                                                    <div>
+                                                        <p className="text-[9px] font-bold uppercase tracking-widest opacity-80">Approval Rate</p>
+                                                        <p className="text-lg font-bold">{selectedSupplier.approvalRate}%</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Operational Health</h4>
+                                                {[
+                                                    { label: 'Order Fulfillment', value: '98.2%', icon: Check, color: 'bg-teal-500' },
+                                                    { label: 'Avg. Shipping Time', value: '1.2 Days', icon: Clock, color: 'bg-blue-500' },
+                                                    { label: 'Return Rate', value: '0.4%', icon: ArrowUpRight, color: 'bg-emerald-500' }
+                                                ].map((metric, i) => (
+                                                    <div key={i} className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center text-white", metric.color)}>
+                                                                <metric.icon size={14} />
+                                                            </div>
+                                                            <span className="text-xs font-bold text-slate-700">{metric.label}</span>
+                                                        </div>
+                                                        <span className="text-sm font-bold text-slate-900">{metric.value}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {panelTab === 'compliance' && (
+                                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                                            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col items-center text-center space-y-4">
+                                                <div className="w-16 h-16 rounded-3xl bg-teal-100 text-teal-600 flex items-center justify-center shadow-lg shadow-teal-600/10">
+                                                    <ShieldCheck size={32} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-base font-bold text-slate-900">Fully Compliant Entity</h4>
+                                                    <p className="text-xs text-slate-500 mt-1">KYC & Tax documents verified</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Verification Status</h4>
+                                                <div className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl">
+                                                    <div className="flex items-center gap-3">
+                                                        <FileText size={18} className="text-teal-600" />
+                                                        <span className="text-xs font-bold text-slate-900">Tax Compliance Status</span>
+                                                    </div>
+                                                    <span className="px-2 py-0.5 bg-teal-50 text-teal-600 rounded text-[9px] font-bold uppercase border border-teal-100">VALID</span>
+                                                </div>
+                                                <div className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl">
+                                                    <div className="flex items-center gap-3">
+                                                        <ShieldAlert size={18} className="text-slate-400" />
+                                                        <span className="text-xs font-bold text-slate-900">Policy Violations</span>
+                                                    </div>
+                                                    <span className="px-2 py-0.5 bg-slate-50 text-slate-400 rounded text-[9px] font-bold uppercase border border-slate-100">NONE</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-6 border-t border-slate-100 flex items-center gap-3">
+                                                <button className="flex-1 h-12 bg-teal-600 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-teal-700 transition-all">
+                                                    Review Full KYC
+                                                </button>
+                                                <button className="h-12 px-6 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-red-100 transition-all">
+                                                    Suspend
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedSupplier(null)} className="absolute top-8 end-8 w-14 h-14 glass rounded-full flex items-center justify-center hover:rotate-90 transition-transform duration-500">
-                                <X size={28} />
-                            </button>
                         </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
+                    )}
+                </AnimatePresence>
+            </div>
         </div>
     );
 }

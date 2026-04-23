@@ -1,17 +1,18 @@
 'use client';
-import { apiFetch } from '@/lib/api';
-
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-    Search, Building2, UserCircle2, Mail, 
-    Download, MoreVertical, X, Shield, 
-    CircleDollarSign, Phone, Globe, Link as LinkIcon,
-    ChevronRight, ArrowUpRight, Users, Verified,
-    ShieldAlert, Activity, CreditCard, Landmark
+    Search, UserCircle2, Mail, Phone, 
+    ChevronRight, Users, Shield, 
+    ShieldCheck, ShieldAlert, Activity, 
+    CreditCard, Filter, X, Globe, 
+    Clock, Package, FileText, Download,
+    Check, AlertCircle, MoreVertical, 
+    ArrowUpRight, User, History
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
 
 interface Buyer {
     id: string;
@@ -19,12 +20,14 @@ interface Buyer {
     email: string;
     phone?: string;
     companyName?: string;
-    website?: string;
-    socialLinks?: string;
     avatar?: string;
     status: string;
+    kycStatus?: 'VERIFIED' | 'PENDING' | 'REJECTED' | 'NOT_STARTED';
     role: string;
     createdAt: string;
+    _count?: {
+        orders: number;
+    };
 }
 
 export default function AdminBuyersPage() {
@@ -33,19 +36,15 @@ export default function AdminBuyersPage() {
     const [buyers, setBuyers] = React.useState<Buyer[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [activeTab, setActiveTab] = React.useState<'ALL' | 'ACTIVE' | 'PENDING'>('ALL');
+    const [panelTab, setPanelTab] = React.useState<'profile' | 'orders' | 'kyc'>('profile');
 
     const loadBuyers = async () => {
         try {
-            // Request specifically customers from the backend with no-store cache
-            const res = await apiFetch('/users?role=CUSTOMER&limit=100', {
-                cache: 'no-store'
-            });
+            const res = await apiFetch('/users?role=CUSTOMER&limit=100', { cache: 'no-store' });
             if (res.ok) {
                 const result = await res.json();
                 const usersData = Array.isArray(result) ? result : (result.users || []);
                 setBuyers(usersData);
-            } else {
-                console.error("API Error (Buyers):", res.statusText);
             }
         } catch (err) {
             console.error("Failed to load buyers:", err);
@@ -56,8 +55,6 @@ export default function AdminBuyersPage() {
 
     React.useEffect(() => {
         loadBuyers();
-        const interval = setInterval(loadBuyers, 15000);
-        return () => clearInterval(interval);
     }, []);
 
     const filteredBuyers = buyers.filter(b => {
@@ -72,230 +69,313 @@ export default function AdminBuyersPage() {
         return matchesSearch && matchesTab;
     });
 
+    const getKycBadge = (status?: string) => {
+        switch (status) {
+            case 'VERIFIED': return <span className="flex items-center gap-1 text-teal-600 bg-teal-50 px-2 py-0.5 rounded text-[10px] font-bold border border-teal-100"><ShieldCheck size={12} /> Verified</span>;
+            case 'PENDING': return <span className="flex items-center gap-1 text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[10px] font-bold border border-amber-100"><Clock size={12} /> Pending</span>;
+            case 'REJECTED': return <span className="flex items-center gap-1 text-red-600 bg-red-50 px-2 py-0.5 rounded text-[10px] font-bold border border-red-100"><ShieldAlert size={12} /> Rejected</span>;
+            default: return <span className="flex items-center gap-1 text-slate-400 bg-slate-50 px-2 py-0.5 rounded text-[10px] font-bold border border-slate-100">Not Started</span>;
+        }
+    };
+
     return (
-        <div className="space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-1000">
-            {/* Elite Header */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
-                <div className="space-y-2">
-                    <h1 className="text-5xl font-black text-foreground tracking-tighter uppercase leading-none">Procurement Hub</h1>
-                    <p className="text-muted-foreground font-black text-[11px] uppercase tracking-[0.4em] opacity-70">Corporate Accounts & Institutional Buyers</p>
+        <div className="flex flex-col h-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+            {/* Header Area */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Buyers Management</h1>
+                    <p className="text-sm text-slate-500 mt-1">Verify profiles, track activity, and manage global customer base.</p>
                 </div>
-                
-                <div className="flex items-center gap-4">
-                    <div className="relative group">
-                        <Search className="absolute start-6 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={20} />
-                        <input
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                        <input 
                             type="text"
-                            placeholder="Identify buyer or corporate entity..."
+                            placeholder="Search buyers..."
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
-                            className="h-16 ps-16 pe-8 bg-card rounded-[2rem] border border-border/50 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 text-foreground font-bold text-sm min-w-[350px] transition-all shadow-xl"
+                            className="h-10 w-64 pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500 transition-all shadow-sm"
                         />
                     </div>
+                    <button className="h-10 px-4 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
+                        <Filter size={16} /> Filters
+                    </button>
+                    <button className="h-10 px-4 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20">
+                        <Download size={16} /> Export
+                    </button>
                 </div>
             </div>
 
-            {/* Network Vital Stats */}
+            {/* KPI Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="glass-card-strong p-8 overflow-hidden relative group">
-                    <div className="absolute top-0 end-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity"><Landmark size={120} /></div>
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Corporate Registries</p>
-                    <h2 className="text-5xl font-black tracking-tighter">{buyers.length}</h2>
-                    <div className="flex items-center gap-2 mt-4 text-primary font-black text-[10px] uppercase tracking-widest">
-                        <ArrowUpRight size={14} /> Global Procurement Units
-                    </div>
-                </div>
-                <div className="glass-card-strong p-8 overflow-hidden relative group border-s-4 border-emerald-500">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Active Buying Power</p>
-                    <h2 className="text-5xl font-black tracking-tighter text-emerald-500">{buyers.filter(b => b.status === 'ACTIVE').length}</h2>
-                    <div className="flex items-center gap-2 mt-4 text-emerald-500 font-black text-[10px] uppercase tracking-widest">
-                        <Verified size={14} /> Verified Institutional Capital
-                    </div>
-                </div>
-                <div className="glass-card-strong p-8 overflow-hidden relative group border-s-4 border-amber-500">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Verification Backlog</p>
-                    <h2 className="text-5xl font-black tracking-tighter text-amber-500">{buyers.filter(b => b.status === 'PENDING_APPROVAL').length}</h2>
-                    <div className="flex items-center gap-2 mt-4 text-amber-500 font-black text-[10px] uppercase tracking-widest">
-                        <Activity size={14} /> Critical items pending
-                    </div>
-                </div>
-            </div>
-
-            {/* Segment Controller */}
-            <div className="flex items-center gap-3 p-2 glass rounded-[2.5rem] w-fit shadow-2xl">
                 {[
-                    { id: 'ALL', label: 'Global Directory', icon: Users },
-                    { id: 'ACTIVE', label: 'Verified Partners', icon: Shield },
-                    { id: 'PENDING', label: 'Vetting Area', icon: ShieldAlert },
-                ].map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => setActiveTab(tab.id as 'ALL' | 'ACTIVE' | 'PENDING')}
-                            className={cn(
-                                "flex items-center gap-3 px-8 py-4 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.1em] transition-all",
-                                activeTab === tab.id
-                                    ? "bg-primary text-primary-foreground shadow-xl shadow-primary/30 scale-105"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                            )}
-                        >
-                            <Icon size={16} />
-                            {tab.label}
-                        </button>
-                    );
-                })}
+                    { label: 'Total Buyers', value: buyers.length, icon: Users, color: 'text-slate-600', bg: 'bg-slate-100' },
+                    { label: 'Active Verified', value: buyers.filter(b => b.status === 'ACTIVE').length, icon: ShieldCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
+                    { label: 'Pending Verification', value: buyers.filter(b => b.status === 'PENDING_APPROVAL' || b.kycStatus === 'PENDING').length, icon: Activity, color: 'text-amber-600', bg: 'bg-amber-50' },
+                ].map((stat, i) => (
+                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4">
+                        <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", stat.bg, stat.color)}>
+                            <stat.icon size={24} />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                            <h3 className="text-xl font-bold text-slate-900 mt-0.5">{stat.value}</h3>
+                        </div>
+                    </div>
+                ))}
             </div>
 
-            {/* Buyer Elite Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                <AnimatePresence mode="popLayout">
-                    {filteredBuyers.map((buyer, i) => (
-                        <motion.div
-                            key={buyer.id}
-                            initial={{ opacity: 0, scale: 0.9 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ delay: i * 0.05 }}
-                            className="glass-card-strong p-8 group transition-all hover:-translate-y-2 hover:shadow-[0_20px_60px_rgba(0,0,0,0.3)] border-primary/10 hover:border-primary/30 cursor-pointer overflow-hidden relative"
-                            onClick={() => setSelectedBuyer(buyer)}
+            <div className="grid grid-cols-12 gap-6 items-start">
+                {/* TABLE (LEFT - 65%) */}
+                <div className={cn(
+                    "transition-all duration-500",
+                    selectedBuyer ? "col-span-12 lg:col-span-7" : "col-span-12"
+                )}>
+                    <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead className="bg-slate-50/50 border-b border-slate-100">
+                                    <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                        <th className="px-6 py-4">Buyer Name</th>
+                                        <th className="px-6 py-4">Status</th>
+                                        <th className="px-6 py-4">KYC Status</th>
+                                        <th className="px-6 py-4">Orders</th>
+                                        <th className="px-6 py-4 text-end">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {loading ? (
+                                        [...Array(6)].map((_, i) => (
+                                            <tr key={i} className="animate-pulse h-[64px]">
+                                                <td colSpan={5} className="px-6 py-4 bg-slate-50/30" />
+                                            </tr>
+                                        ))
+                                    ) : filteredBuyers.map((buyer) => (
+                                        <tr 
+                                            key={buyer.id} 
+                                            onClick={() => setSelectedBuyer(buyer)}
+                                            className={cn(
+                                                "group cursor-pointer hover:bg-slate-50 transition-all h-[64px]",
+                                                selectedBuyer?.id === buyer.id ? "bg-teal-50/50" : ""
+                                            )}
+                                        >
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                                        {buyer.avatar ? (
+                                                            <img src={buyer.avatar} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <span className="text-sm font-bold text-slate-400">{buyer.name[0]}</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="text-sm font-bold text-slate-900 truncate">{buyer.name}</span>
+                                                        <span className="text-[11px] text-slate-500 truncate">{buyer.email}</span>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={cn(
+                                                    "px-2 py-0.5 rounded text-[10px] font-bold uppercase border",
+                                                    buyer.status === 'ACTIVE' ? "bg-teal-50 text-teal-600 border-teal-100" : "bg-red-50 text-red-600 border-red-100"
+                                                )}>
+                                                    {buyer.status === 'ACTIVE' ? 'Active' : 'Blocked'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                {getKycBadge(buyer.kycStatus || (buyer.status === 'ACTIVE' ? 'VERIFIED' : 'PENDING'))}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className="text-sm font-bold text-slate-700">{buyer._count?.orders || 0}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-end">
+                                                <button className="p-2 text-slate-400 hover:text-slate-900 transition-all">
+                                                    <ChevronRight size={18} />
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {/* RIGHT PANEL (35% / 420px) */}
+                <AnimatePresence>
+                    {selectedBuyer && (
+                        <motion.div 
+                            initial={{ x: 20, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            exit={{ x: 20, opacity: 0 }}
+                            className="col-span-12 lg:col-span-5"
                         >
-                            <div className="absolute top-0 end-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                <CreditCard size={80} className="-rotate-12" />
-                            </div>
-                            
-                            <div className="flex justify-between items-start mb-8 relative z-10">
-                                <div className="relative group-hover:scale-110 transition-transform duration-500">
-                                    <div className="absolute -inset-2 bg-primary blur-xl opacity-20 group-hover:opacity-40 animate-pulse rounded-full" />
-                                    {buyer.avatar ? (
-                                        <img src={buyer.avatar} className="w-16 h-16 rounded-2xl object-cover relative z-10 border-2 border-card" alt={buyer.name} />
-                                    ) : (
-                                        <div className="w-16 h-16 rounded-2xl bg-card flex items-center justify-center text-2xl font-black text-primary relative z-10 border-2 border-card uppercase">
-                                            {buyer.name[0]}
+                            <div className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden sticky top-8 flex flex-col max-h-[calc(100vh-140px)]">
+                                {/* Panel Header */}
+                                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-2xl bg-teal-500 text-white overflow-hidden flex items-center justify-center font-bold text-xl border-2 border-slate-100 shadow-sm">
+                                            {selectedBuyer.avatar ? (
+                                                <img src={selectedBuyer.avatar} className="w-full h-full object-cover" alt={selectedBuyer.name} />
+                                            ) : (
+                                                <span>{selectedBuyer.name[0]}</span>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-900">{selectedBuyer.name}</h3>
+                                            <p className="text-xs text-slate-500">{selectedBuyer.id.substring(0, 12)}</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setSelectedBuyer(null)} className="p-2 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-all">
+                                        <X size={20} />
+                                    </button>
+                                </div>
+
+                                {/* Panel Tabs */}
+                                <div className="flex items-center px-4 pt-4 gap-2 border-b border-slate-100">
+                                    {[
+                                        { id: 'profile', label: 'Profile', icon: User },
+                                        { id: 'orders', label: 'Orders', icon: Package },
+                                        { id: 'kyc', label: 'KYC Details', icon: ShieldCheck }
+                                    ].map(tab => (
+                                        <button
+                                            key={tab.id}
+                                            onClick={() => setPanelTab(tab.id as any)}
+                                            className={cn(
+                                                "flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2",
+                                                panelTab === tab.id ? "border-teal-600 text-teal-600" : "border-transparent text-slate-500 hover:text-slate-900"
+                                            )}
+                                        >
+                                            <tab.icon size={14} />
+                                            {tab.label}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                {/* Panel Content */}
+                                <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
+                                    {panelTab === 'profile' && (
+                                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                                            <div className="space-y-4">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">General Information</h4>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Company</p>
+                                                        <p className="text-sm font-bold text-slate-900">{selectedBuyer.companyName || 'N/A'}</p>
+                                                    </div>
+                                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Status</p>
+                                                        <span className={cn(
+                                                            "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                                                            selectedBuyer.status === 'ACTIVE' ? "bg-teal-100 text-teal-700" : "bg-red-100 text-red-700"
+                                                        )}>{selectedBuyer.status}</span>
+                                                    </div>
+                                                </div>
+                                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-400 border border-slate-100">
+                                                        <Mail size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email Address</p>
+                                                        <p className="text-sm font-bold text-slate-900">{selectedBuyer.email}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-400 border border-slate-100">
+                                                        <Phone size={18} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone Number</p>
+                                                        <p className="text-sm font-bold text-slate-900">{selectedBuyer.phone || 'N/A'}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="pt-6 border-t border-slate-100">
+                                                <button className="w-full h-12 bg-slate-900 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                                                    <UserCircle2 size={16} /> Edit Profile Data
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {panelTab === 'orders' && (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
+                                            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order History</h4>
+                                            {[...Array(3)].map((_, i) => (
+                                                <div key={i} className="p-4 bg-slate-50 border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-teal-200 transition-all">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-teal-600 border border-slate-100">
+                                                            <Package size={18} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-slate-900">#ORD-28492{i}</p>
+                                                            <p className="text-[10px] text-slate-500 font-medium">March 1{i}, 2024 • 12:40 PM</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-sm font-bold text-slate-900">$2,480.00</p>
+                                                        <span className="text-[9px] font-bold text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">DELIVERED</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <button className="w-full py-4 text-teal-600 text-[10px] font-bold uppercase tracking-widest hover:bg-teal-50 rounded-2xl transition-all">
+                                                View All Transactions
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {panelTab === 'kyc' && (
+                                        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                                            <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100 flex flex-col items-center text-center space-y-4">
+                                                <div className="w-16 h-16 rounded-3xl bg-teal-100 text-teal-600 flex items-center justify-center shadow-lg shadow-teal-600/10">
+                                                    <ShieldCheck size={32} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-base font-bold text-slate-900">Verified Institutional Buyer</h4>
+                                                    <p className="text-xs text-slate-500 mt-1">KYC completed on Jan 12, 2024</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Verification Documents</h4>
+                                                {[
+                                                    { name: 'Business License', type: 'PDF', size: '2.4 MB' },
+                                                    { name: 'Tax ID Certificate', type: 'PNG', size: '1.1 MB' },
+                                                    { name: 'Authorized Signatory ID', type: 'JPG', size: '840 KB' }
+                                                ].map((doc, i) => (
+                                                    <div key={i} className="p-4 bg-white border border-slate-100 rounded-2xl flex items-center justify-between group hover:border-teal-200 transition-all">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:text-teal-600 transition-all">
+                                                                <FileText size={18} />
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-bold text-slate-900">{doc.name}</p>
+                                                                <p className="text-[10px] text-slate-500 font-medium uppercase">{doc.type} • {doc.size}</p>
+                                                            </div>
+                                                        </div>
+                                                        <button className="p-2 text-slate-300 hover:text-slate-900 transition-all">
+                                                            <Download size={16} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            <div className="pt-6 border-t border-slate-100 flex items-center gap-3">
+                                                <button className="flex-1 h-12 bg-teal-600 text-white rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-teal-700 transition-all">
+                                                    Re-Verify Account
+                                                </button>
+                                                <button className="h-12 px-6 bg-red-50 text-red-600 border border-red-100 rounded-2xl font-bold uppercase text-[10px] tracking-widest hover:bg-red-100 transition-all">
+                                                    Block Entity
+                                                </button>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
-                                <div className={cn(
-                                    "px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border shadow-lg",
-                                    buyer.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                                )}>
-                                    {buyer.status === 'ACTIVE' ? 'Verified' : 'Pending'}
-                                </div>
-                            </div>
-
-                            <div className="space-y-6 relative z-10">
-                                <div>
-                                    <h3 className="text-2xl font-black text-foreground group-hover:text-primary transition-colors tracking-tighter leading-none mb-2">{buyer.name}</h3>
-                                    <p className="text-[11px] text-muted-foreground font-black uppercase tracking-widest opacity-60 flex items-center gap-1">
-                                        <Mail size={10} /> {buyer.email}
-                                    </p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4 py-6 border-y border-border/10">
-                                    <div className="space-y-1">
-                                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Entity Corp</p>
-                                        <p className="text-sm font-black text-foreground truncate">{buyer.companyName || 'Institutional'}</p>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Registry ID</p>
-                                        <p className="text-sm font-black text-foreground">{buyer.id.substring(0, 8).toUpperCase()}</p>
-                                    </div>
-                                </div>
-
-                                <button className="w-full h-14 glass rounded-2xl font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all flex items-center justify-center gap-3">
-                                    Entity Dossier <ChevronRight size={16} />
-                                </button>
                             </div>
                         </motion.div>
-                    ))}
+                    )}
                 </AnimatePresence>
             </div>
-
-            {/* Institutional Side-Drawer */}
-            <AnimatePresence>
-                {selectedBuyer && (
-                    <div className="fixed inset-0 z-[200] flex justify-end">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            onClick={() => setSelectedBuyer(null)} className="absolute inset-0 bg-background/60 backdrop-blur-3xl" />
-                        
-                        <motion.div 
-                            initial={{ x: '100%' }} 
-                            animate={{ x: 0 }} 
-                            exit={{ x: '100%' }}
-                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-                            className="bg-card w-full max-w-xl h-full relative z-10 border-s border-primary/20 shadow-[-50px_0_100px_rgba(0,0,0,0.5)] overflow-y-auto no-scrollbar flex flex-col"
-                        >
-                            <div className="p-12 space-y-12">
-                                <div className="flex justify-between items-start">
-                                    <div className="relative">
-                                        <div className="absolute -inset-4 bg-primary blur-2xl opacity-20 rounded-full" />
-                                        {selectedBuyer.avatar ? (
-                                            <img src={selectedBuyer.avatar} className="w-32 h-32 rounded-[2.5rem] object-cover relative z-10 border-4 border-card shadow-2xl" />
-                                        ) : (
-                                            <div className="w-32 h-32 rounded-[2.5rem] bg-card flex items-center justify-center text-4xl font-black text-primary relative z-10 border-4 border-card shadow-2xl uppercase">
-                                                {selectedBuyer.name[0]}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <button onClick={() => setSelectedBuyer(null)} className="w-14 h-14 glass rounded-full flex items-center justify-center hover:rotate-90 transition-transform duration-500">
-                                        <X size={28} />
-                                    </button>
-                                </div>
-
-                                <div>
-                                    <h2 className="text-4xl font-black uppercase tracking-tighter leading-none mb-3">{selectedBuyer.name}</h2>
-                                    <div className="flex gap-3">
-                                        <div className="px-5 py-2 bg-primary/10 text-primary border border-primary/20 rounded-full text-[10px] font-black uppercase tracking-widest italic">
-                                            Institutional Buyer
-                                        </div>
-                                        <div className={cn(
-                                            "px-5 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border",
-                                            selectedBuyer.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" : "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                                        )}>
-                                            {selectedBuyer.status}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <section className="space-y-6">
-                                    <h3 className="text-xs font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-3">
-                                        <Globe size={16} className="text-primary" /> Corporate Identity
-                                    </h3>
-                                    <div className="grid grid-cols-1 gap-4">
-                                        <div className="glass p-8 rounded-3xl border-s-4 border-primary">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Registered Entity</p>
-                                            <p className="text-xl font-black">{selectedBuyer.companyName || 'Institutional Account'}</p>
-                                        </div>
-                                        <div className="glass p-8 rounded-3xl">
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Corporate Core Email</p>
-                                            <p className="text-xl font-black">{selectedBuyer.email}</p>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="glass p-8 rounded-3xl">
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Contact Line</p>
-                                                <p className="text-lg font-black">{selectedBuyer.phone || 'N/A'}</p>
-                                            </div>
-                                            <div className="glass p-8 rounded-3xl">
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Joined Network</p>
-                                                <p className="text-lg font-black">{new Date(selectedBuyer.createdAt).toLocaleDateString()}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </section>
-
-                                <div className="pt-12 mt-12 border-t border-border/10 flex flex-col gap-4">
-                                    <button className="h-20 w-full flex items-center justify-center gap-4 rounded-[2rem] bg-primary text-white font-black uppercase text-xs tracking-[0.3em] hover:scale-[1.02] active:scale-[0.98] transition-all shadow-2xl shadow-primary/40">
-                                        Modify Entity Permissions
-                                    </button>
-                                    <button className="h-20 w-full flex items-center justify-center gap-4 rounded-[2rem] border-2 border-red-500/20 text-red-500 font-black uppercase text-xs tracking-[0.2em] hover:bg-red-500 hover:text-white transition-all">
-                                        Freeze Corporate Assets
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
         </div>
     );
 }

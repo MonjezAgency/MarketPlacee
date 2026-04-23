@@ -43,6 +43,9 @@ import {
     ExternalLink,
     Bot,
     Lock,
+    LifeBuoy,
+    MessageCircle,
+    Activity,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -71,81 +74,37 @@ const OWNER_GROUP: SidebarGroup = {
 
 const SIDEBAR_GROUPS: SidebarGroup[] = [
     {
-        title: 'Dashboard',
-        titleKey: 'groupDashboard',
+        title: 'Control Panel',
+        titleKey: 'groupControlPanel',
         icon: LayoutDashboard,
         links: [
-            { label: 'Overview', translationKey: 'overview', href: '/admin', icon: LayoutDashboard },
-            { label: 'AI Agent', translationKey: 'aiAgent', href: '/admin/ai-agent', icon: Bot },
-            { label: 'Tech Dashboard', translationKey: 'techDashboard', href: '/admin/tech', icon: Code2 },
-            { label: 'Homepage', translationKey: 'homepage', href: '/admin/homepage', icon: Home },
+            { label: 'Dashboard', translationKey: 'overview', href: '/admin', icon: Home },
+            { label: 'Products', translationKey: 'allProducts', href: '/admin/products', icon: Package },
+            { label: 'Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
+            { label: 'Sellers', translationKey: 'suppliers', href: '/admin/suppliers', icon: Store },
+            { label: 'Customers', translationKey: 'buyers', href: '/admin/buyers', icon: Users },
+            { label: 'Finance & Logistics', translationKey: 'groupFinance', href: '/admin/finance', icon: DollarSign },
         ]
     },
     {
-        title: 'Team & Users',
-        titleKey: 'groupUsers',
-        icon: Users,
-        links: [
-            { label: 'User Approvals', translationKey: 'allUsers', href: '/admin/users', icon: Users },
-            { label: 'KYC Review', translationKey: 'allUsers', href: '/admin/kyc', icon: ShieldCheck },
-            { label: 'Buyers', translationKey: 'buyers', href: '/admin/buyers', icon: Users },
-            { label: 'Suppliers', translationKey: 'suppliers', href: '/admin/suppliers', icon: Store },
-            { label: 'Team Members', translationKey: 'teamMembers', href: '/admin/team', icon: Users },
-            { label: 'Invite Center', translationKey: 'inviteCenter', href: '/admin/invite', icon: UserPlus },
-        ]
-    },
-    {
-        title: 'Catalog',
-        titleKey: 'groupCatalog',
-        icon: Package,
-        links: [
-            { label: 'All Products', translationKey: 'allProducts', href: '/admin/products', icon: Package },
-            { label: 'Add Product', translationKey: 'addProduct', href: '/admin/products/new', icon: Package },
-            { label: 'Categories', translationKey: 'categories', href: '/admin/categories', icon: FolderTree },
-        ]
-    },
-    {
-        title: 'Promotions',
-        titleKey: 'groupPromotions',
-        icon: Megaphone,
-        links: [
-            { label: 'Active Offers', translationKey: 'activeOffers', href: '/admin/offers', icon: Tag },
-            { label: 'Create Offer', translationKey: 'createOffer', href: '/admin/offers/new', icon: Tag },
-            { label: 'Bulk Discounts', translationKey: 'bulkDiscounts', href: '/admin/discounts', icon: Percent },
-            { label: 'Discount Codes', translationKey: 'discountCodes', href: '/admin/coupons', icon: Ticket },
-            { label: 'Ad Placements', translationKey: 'adPlacements', href: '/admin/placements', icon: LayoutList },
-        ]
-    },
-    {
-        title: 'Finance & Logistics',
-        titleKey: 'groupFinance',
-        icon: DollarSign,
-        links: [
-            { label: 'Finance & Compliance', translationKey: 'financeCompliance', href: '/admin/finance', icon: CreditCard },
-            { label: 'Warehouses', translationKey: 'warehouses', href: '/admin/finance?tab=warehouses', icon: WarehouseIcon },
-            { label: 'Shipments', translationKey: 'shipments', href: '/admin/logistics', icon: Truck },
-        ]
-    },
-    {
-        title: 'Support',
+        title: 'SUPPORT',
         titleKey: 'groupSupport',
-        icon: Megaphone,
+        icon: LifeBuoy,
         links: [
-            { label: 'Support Center', translationKey: 'supportCenter', href: '/dashboard/support', icon: Megaphone },
+            { label: 'Overview', translationKey: 'overview', href: '/admin/support', icon: LayoutDashboard },
             { label: 'Disputes', translationKey: 'disputes', href: '/admin/disputes', icon: AlertCircle },
-            { label: 'Review Moderation', translationKey: 'reviews', href: '/admin/reviews', icon: Star },
+            { label: 'Live Chat', translationKey: 'liveChat', href: '/admin/support?tab=chat', icon: MessageCircle },
+            { label: 'KYC Queue', translationKey: 'kycQueue', href: '/admin/kyc', icon: ShieldCheck },
         ]
     },
     {
-        title: 'System',
+        title: 'REPORTS & SYSTEM',
         titleKey: 'groupSystem',
         icon: Wrench,
         links: [
-            { label: 'Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
-            { label: 'Billing', translationKey: 'billing', href: '/admin/billing', icon: CreditCard, locked: true },
-            { label: 'Pricing / Markup', translationKey: 'pricingMarkup', href: '/admin/pricing', icon: Tag },
-            { label: 'Security Logs', translationKey: 'securityLogs', href: '/admin/security', icon: Shield },
+            { label: 'Reports', translationKey: 'reports', href: '/admin/security', icon: Activity },
             { label: 'Settings', translationKey: 'settings', href: '/admin/settings', icon: Settings },
+            { label: 'AI Agent', translationKey: 'aiAgent', href: '/admin/ai-agent', icon: Bot },
         ]
     },
 ];
@@ -160,25 +119,16 @@ interface NotificationCounts {
 function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group: SidebarGroup; isOpen: boolean; pathname: string; badgeCounts: Record<string, number> }) {
     const hasActiveLink = group.links.some(l => l.href === pathname);
     const [expanded, setExpanded] = React.useState(hasActiveLink);
-    const GroupIcon = group.icon;
     const { t } = useLanguage();
 
     // Auto-expand on route change
     React.useEffect(() => {
         if (hasActiveLink) setExpanded(true);
-    }, [hasActiveLink]);
-
-    // Check if any link in this group has a badge
-    const groupBadgeCount = group.links.reduce((acc, link) => acc + (badgeCounts[link.href] || 0), 0);
+    }, [hasActiveLink, pathname]);
 
     if (!isOpen) {
-        // Collapsed: just show icons
         return (
-            <div className="space-y-2 relative">
-                {/* Dot indicator if group has pending badges */}
-                {groupBadgeCount > 0 && (
-                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-secondary rounded-full border-2 border-[#0A1A2F]" />
-                )}
+            <div className="space-y-4 py-4 flex flex-col items-center">
                 {group.links.map(link => {
                     const Icon = link.icon;
                     const isActive = pathname === link.href;
@@ -188,13 +138,16 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
                             href={link.href}
                             title={t('admin', link.translationKey) || link.label}
                             className={cn(
-                                "flex items-center justify-center w-12 h-12 mx-auto rounded-2xl transition-all shadow-lg",
+                                "flex items-center justify-center w-11 h-11 rounded-xl transition-all relative group",
                                 isActive
-                                    ? "bg-primary text-primary-foreground shadow-primary/30"
-                                    : "text-white/50 hover:text-white hover:bg-white/10"
+                                    ? "bg-teal-500/10 text-teal-500"
+                                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
                             )}
                         >
                             <Icon size={20} />
+                            {(badgeCounts[link.href] || 0) > 0 && (
+                                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0F172A]" />
+                            )}
                         </Link>
                     );
                 })}
@@ -202,65 +155,45 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
         );
     }
 
-
     return (
-        <div className="mb-4">
-            <button
+        <div className="mb-6">
+            <div 
+                className="px-6 py-2 mb-2 flex items-center justify-between group/header cursor-pointer" 
                 onClick={() => setExpanded(!expanded)}
-                className={cn(
-                    "flex items-center justify-between w-full px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] transition-all",
-                    hasActiveLink ? "bg-white/10 text-white" : "text-white/60 hover:text-white hover:bg-white/5"
-                )}
             >
-                <span className="flex items-center gap-3">
-                    <GroupIcon size={16} />
+                <span className={cn(
+                    "text-[11px] font-semibold uppercase tracking-widest transition-all",
+                    hasActiveLink ? "text-teal-500" : "text-slate-500 group-hover/header:text-slate-400"
+                )}>
                     {t('admin', group.titleKey) || group.title}
-                    {groupBadgeCount > 0 && !expanded && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-primary ms-1" />
-                    )}
                 </span>
-                <ChevronDown size={14} className={cn("transition-transform duration-300", expanded && "rotate-180")} />
-            </button>
+                <ChevronDown size={14} className={cn("text-slate-600 transition-transform duration-300", expanded && "rotate-180")} />
+            </div>
+            
             {expanded && (
-                <div className="mt-2 ms-4 space-y-1 border-s-2 border-white/20 ps-4">
-                    {group.links.map(link => {
+                <div className="space-y-1.5 px-3">
+                    {group.links.map((link) => {
                         const Icon = link.icon;
                         const isActive = pathname === link.href;
                         
-                        if (link.locked) {
-                             return (
-                                <div
-                                    key={link.href}
-                                    className="flex items-center justify-between px-6 py-3 rounded-xl text-xs font-bold transition-all relative overflow-hidden cursor-not-allowed text-white/30"
-                                >
-                                    <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] z-0 pointer-events-none" />
-                                    <div className="flex items-center gap-3 relative z-10 opacity-50">
-                                        <Icon size={16} />
-                                        <span className="line-through">{t('admin', link.translationKey) || link.label}</span>
-                                    </div>
-                                    <Lock size={14} className="relative z-10 text-white/50" />
-                                </div>
-                             )
-                        }
-
                         return (
                             <Link
                                 key={link.href}
                                 href={link.href}
                                 className={cn(
-                                    "flex items-center justify-between px-6 py-3 rounded-xl text-xs font-bold transition-all",
+                                    "flex items-center justify-between px-4 h-[44px] text-[14px] font-medium transition-all rounded-xl",
                                     isActive
-                                        ? "bg-secondary text-secondary-foreground shadow-lg shadow-secondary/20 scale-105"
-                                        : "text-white/50 hover:text-white hover:bg-white/10"
+                                        ? "bg-teal-500/10 text-teal-500"
+                                        : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
                                 )}
                             >
                                 <div className="flex items-center gap-3">
-                                    <Icon size={16} />
+                                    <Icon size={18} />
                                     <span>{t('admin', link.translationKey) || link.label}</span>
                                 </div>
                                 {(badgeCounts[link.href] || 0) > 0 && (
-                                    <div className="flex items-center justify-center bg-secondary text-secondary-foreground text-[10px] font-black px-2 py-0.5 min-w-[20px] h-[20px] rounded-full shadow-lg">
-                                        {badgeCounts[link.href] > 99 ? '99+' : badgeCounts[link.href]}
+                                    <div className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                        {badgeCounts[link.href]}
                                     </div>
                                 )}
                             </Link>
@@ -274,7 +207,7 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-    const [isOpen, setIsOpen] = React.useState(false); // Default to closed for mobile
+    const [isOpen, setIsOpen] = React.useState(true); // Open by default
     const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
     const [notifications, setNotifications] = React.useState<NotificationCounts>({
         pendingUsers: 0,
@@ -289,22 +222,21 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const { locale, setLocale, t } = useLanguage();
     const [mounted, setMounted] = React.useState(false);
 
+    // ... (keep role logic)
     const isOwner = user?.role === 'OWNER' || user?.role === 'owner';
     const isDeveloper = (user?.role || '').toUpperCase() === 'DEVELOPER';
     const isTeamMember = ['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS']
         .includes((user?.role || '').toUpperCase());
 
-    // Filter sidebar groups based on role
     const getFilteredSidebarGroups = () => {
         if (isDeveloper) {
-            // DEVELOPER only sees Dashboard, Support, and System
             return SIDEBAR_GROUPS.filter(g => ['Dashboard', 'Support', 'System'].includes(g.title));
         }
         return SIDEBAR_GROUPS;
     };
     const filteredSidebarGroups = getFilteredSidebarGroups();
 
-    // ── KYC Gate: block team members who haven't verified ────────────────────
+    // ... (keep KYC logic)
     React.useEffect(() => {
         if (!user) return;
         if (isOwner) { setKycBlocked(false); return; }
@@ -315,17 +247,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         })
             .then(r => r.ok ? r.json() : null)
             .then(data => {
-                // لو الـ endpoint رجع null أو error — مش نحجب المستخدم
                 if (!data) return;
                 setKycBlocked(data?.kycStatus !== 'VERIFIED');
             })
-            .catch(() => {}); // في حالة network error — مش نحجب
+            .catch(() => {});
     }, [user]);
 
-    // Notifications are now handled by the useNotifications hook within the NotificationBell component
-    // No more local intervals or duplicate fetching here.
-
-    // Map notification counts to sidebar routes
     const badgeCounts: Record<string, number> = {
         '/admin/users': notifications.pendingUsers,
         '/admin/products': notifications.pendingProducts,
@@ -333,10 +260,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         '/admin/placements': notifications.pendingPlacements,
     };
 
-    // Total pending interactions for the bell icon
-    const totalPending = Object.values(notifications).reduce((a, b) => a + b, 0);
-
-    // ── KYC Block Screen ──────────────────────────────────────────────────────
     if (kycBlocked) {
         return (
             <div className="flex h-screen items-center justify-center bg-background" dir="rtl">
@@ -363,48 +286,40 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
 
     return (
-        <div className="flex h-screen bg-background text-foreground overflow-hidden font-sans">
-            {/* Sidebar - Inspired by Image 1 Density + Image 2 Cleanliness */}
+        <div className="flex h-screen bg-[#F8FAFC] text-foreground overflow-hidden font-sans">
             <aside
-                style={{ backgroundColor: '#0A1A2F', color: '#F5F7FA' }}
+                style={{ backgroundColor: '#0F172A' }}
                 className={cn(
                     "transition-all duration-500 flex flex-col z-[60] shrink-0",
-                    "fixed h-[calc(100vh-2rem)] lg:h-auto lg:relative m-4 rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5",
-                    isOpen ? "translate-x-0 w-72" : "-translate-x-[120%] lg:translate-x-0 w-0 lg:w-24"
+                    "fixed h-screen lg:h-auto lg:relative overflow-hidden shadow-2xl border-e border-white/5",
+                    isOpen ? "translate-x-0 w-[260px]" : "-translate-x-[120%] lg:translate-x-0 w-0 lg:w-[72px]"
                 )}>
                 {/* Sidebar Header */}
-                <div className="h-24 flex items-center justify-between px-8">
-                    {isOpen ? (
-                        <Link href="/" className="flex items-center gap-3 group">
-                            <div className="w-10 h-10 bg-gradient-to-tr from-sidebar to-primary rounded-2xl flex items-center justify-center shadow-lg shadow-sidebar/20 rotate-3 group-hover:rotate-12 transition-transform">
-                                <Shield className="text-white" size={20} />
-                            </div>
-                            <span className="font-heading font-black text-xl tracking-tighter uppercase text-white">
-                                Atlan<span className="text-secondary">tis</span><span className="text-secondary">.</span>
-                            </span>
-                        </Link>
-                    ) : (
-                        <div className="w-12 h-12 bg-gradient-to-tr from-sidebar to-primary rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-sidebar/20">
-                            <Shield className="text-white" size={24} />
+                <div className="h-28 flex items-center px-8 border-b border-white/5">
+                    <Link href="/" className="flex items-center gap-3 group">
+                        <div className="w-10 h-10 border-2 border-[#14B8A6]/30 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-110 shadow-[0_0_20px_rgba(20,184,166,0.1)]">
+                            <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
                         </div>
-                    )}
+                        <span className="font-heading font-black text-2xl tracking-tighter uppercase text-white flex items-center">
+                            Atlan<span className="text-[#14B8A6]">tis.</span>
+                        </span>
+                    </Link>
                 </div>
 
                 {/* Sidebar Content */}
-                <nav className="flex-1 py-4 px-4 space-y-2 overflow-y-auto no-scrollbar">
-                    {/* Owner-only section — يظهر بس للمالك */}
+                <nav className="flex-1 py-6 px-4 space-y-1 overflow-y-auto no-scrollbar">
                     {isOwner && (
-                        <div className="mb-2">
+                        <div className="mb-10">
                             {isOpen && (
-                                <div className="px-4 py-2 mb-1">
-                                    <div className="flex items-center gap-2 text-yellow-400">
-                                        <Crown size={14} />
-                                        <span className="text-[10px] font-black uppercase tracking-widest">Owner Zone</span>
+                                <div className="px-8 py-2 mb-2">
+                                    <div className="flex items-center gap-3 text-[#14B8A6]">
+                                        <Crown size={16} />
+                                        <span className="text-[11px] font-black uppercase tracking-[0.3em]">Owner Access</span>
                                     </div>
                                 </div>
                             )}
                             <SidebarGroupComponent group={OWNER_GROUP} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} />
-                            <div className="my-2 mx-4 border-t border-white/10" />
+                            <div className="my-8 mx-8 border-t border-white/5" />
                         </div>
                     )}
                     {filteredSidebarGroups.map(group => (
@@ -413,28 +328,62 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </nav>
 
                 {/* Sidebar Footer */}
-                <div className="p-6">
-                    <button
-                        onClick={async () => {
-                            await logout();
-                            window.location.href = '/auth/login';
-                        }}
-                        className="flex items-center gap-4 px-6 py-4 w-full bg-red-500/5 text-red-500 hover:bg-red-500 hover:text-white rounded-[1.5rem] transition-all group font-black uppercase text-xs tracking-widest"
-                    >
-                        <LogOut size={20} className="group-hover:-translate-x-1 transition-transform" />
-                        {isOpen && <span>Sign Out</span>}
-                    </button>
+                <div className="p-4 mt-auto border-t border-white/5">
+                    {isOpen && (
+                        <div className="bg-white/[0.03] border border-white/5 rounded-[15px] p-5 mb-4">
+                            <div className="flex items-center justify-between mb-6">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-11 h-11 rounded-full ring-2 ring-[#14B8A6]/30 p-0.5 overflow-hidden">
+                                        {user?.avatar ? (
+                                            <img src={user.avatar} alt={user.name || 'User'} className="w-full h-full rounded-full object-cover" />
+                                        ) : (
+                                            <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center text-[#14B8A6] font-black text-xs">
+                                                {user?.name?.[0] || 'A'}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-[13px] font-black text-white truncate max-w-[130px]">{user?.name || 'Admin User'}</span>
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{user?.role || 'Super Admin'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <button
+                                onClick={async () => {
+                                    await logout();
+                                    window.location.href = '/auth/login';
+                                }}
+                                className="flex items-center justify-center gap-3 h-11 w-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-[12px] transition-all font-black uppercase text-[10px] tracking-widest border border-red-500/20"
+                            >
+                                <LogOut size={16} />
+                                Terminate Session
+                            </button>
+                        </div>
+                    )}
+                    
+                    {!isOpen && (
+                        <button
+                            onClick={async () => {
+                                await logout();
+                                window.location.href = '/auth/login';
+                            }}
+                            className="w-12 h-12 mx-auto flex items-center justify-center bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                        >
+                            <LogOut size={20} />
+                        </button>
+                    )}
                 </div>
             </aside>
 
             {/* Main Content Area */}
-            <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative p-4 gap-4">
-                {/* Header Row - Glassy and High Contrast */}
-                <header className="h-20 glass rounded-[2rem] flex items-center justify-between px-8 z-40">
+            <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+                {/* Header Row - Perfect Balanced Proportions */}
+                <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 lg:px-8 z-40 shrink-0">
                     <div className="flex items-center gap-6">
                         <button 
                             onClick={() => setIsOpen(!isOpen)}
-                            className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center text-accent-foreground hover:scale-110 transition-transform shadow-sm"
+                            className="w-11 h-11 bg-[#14B8A6] text-white rounded-[12px] flex items-center justify-center shadow-lg shadow-[#14B8A6]/20 hover:scale-105 transition-all"
                         >
                             <Menu size={20} />
                         </button>
@@ -464,11 +413,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             </Link>
                         )}
                         <div className="flex flex-col">
-                            <h2 className="text-foreground font-black text-xl tracking-tighter uppercase leading-none">
-                                {isDeveloper ? 'Tech Control Panel' : t('admin', 'panelTitle')}
-                            </h2>
-                            <p className="text-primary text-[10px] font-black uppercase tracking-[0.2em] mt-1 opacity-80">
-                                {isDeveloper ? 'System Operations & Monitoring' : t('admin', 'enterpriseAdmin')}
+                            <h1 className="text-[#0F172A] font-semibold text-2xl tracking-tight uppercase leading-none">
+                                {isDeveloper ? 'Support HQ' : t('admin', 'panelTitle')}
+                            </h1>
+                            <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1 opacity-80">
+                                {isDeveloper ? 'Commerce Resolution & Entity Verification' : t('admin', 'enterpriseAdmin')}
                             </p>
                         </div>
                     </div>
@@ -512,9 +461,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </header>
 
 
-                {/* Scrollable Content */}
-                <div className="flex-1 overflow-y-auto p-6 no-scrollbar">
-                    {children}
+                {/* Scrollable Content with Perfect Spacing */}
+                <div className="flex-1 overflow-y-auto no-scrollbar bg-[#F8FAFC]">
+                    <div className="max-w-[1440px] mx-auto px-6 py-8 lg:py-10 min-h-full">
+                        {children}
+                    </div>
                 </div>
             </main>
         </div>

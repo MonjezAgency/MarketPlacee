@@ -1,389 +1,446 @@
 'use client';
 
 import * as React from 'react';
-import { motion } from 'framer-motion';
-import {
-    Camera,
-    Save,
-    User,
-    Lock,
-    Eye,
-    EyeOff,
-    Check,
-    AlertCircle,
-    Bell,
-    Shield,
-    Percent,
-    Loader2,
+import { 
+    Settings, Users, Bell, Shield, Globe, 
+    Save, Plus, Pencil, MoreHorizontal, 
+    Check, AlertCircle, ChevronRight,
+    DollarSign, Clock, Lock, Key,
+    Mail, MessageSquare, Database, Zap
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/lib/auth';
 import { apiFetch } from '@/lib/api';
-export default function AdminSettingsPage() {
-    const { user, updateUser } = useAuth();
-    const [avatar, setAvatar] = React.useState<string | null>(null);
-    const [name, setName] = React.useState(user?.name || 'Admin');
-    const [phone, setPhone] = React.useState(user?.phone || '+20 100 000 0000');
-    const [email] = React.useState(user?.email || 'admin@atlantis.com');
+import { toast } from 'react-hot-toast';
+import { useLanguage } from '@/contexts/LanguageContext';
 
+// ─── Types ──────────────────────────────────────────────────────────────────
+
+interface Role {
+    id: string;
+    name: string;
+    permissionsCount: number;
+    description: string;
+}
+
+// ─── Components ─────────────────────────────────────────────────────────────
+
+function SettingSection({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+            <div className="space-y-6">
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function SettingCard({ title, children }: { title?: string; children: React.ReactNode }) {
+    return (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-5">
+            {title && <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">{title}</h3>}
+            <div className="space-y-4">
+                {children}
+            </div>
+        </div>
+    );
+}
+
+function InputField({ label, placeholder, value, onChange, type = 'text' }: any) {
+    return (
+        <div className="space-y-1.5 flex-1">
+            <label className="text-[12px] font-medium text-slate-500">{label}</label>
+            <input 
+                type={type}
+                value={value}
+                onChange={onChange}
+                placeholder={placeholder}
+                className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/5 transition-all"
+            />
+        </div>
+    );
+}
+
+function ToggleField({ label, description, checked, onChange }: any) {
+    return (
+        <div className="flex items-center justify-between py-2">
+            <div className="space-y-0.5">
+                <p className="text-sm font-semibold text-slate-900">{label}</p>
+                <p className="text-xs text-slate-500">{description}</p>
+            </div>
+            <button 
+                onClick={() => onChange(!checked)}
+                className={cn(
+                    "w-10 h-5 rounded-full relative transition-all duration-300",
+                    checked ? "bg-teal-600" : "bg-slate-200"
+                )}
+            >
+                <motion.div 
+                    animate={{ x: checked ? 22 : 2 }}
+                    className="absolute top-1 w-3 h-3 bg-white rounded-full shadow-sm"
+                />
+            </button>
+        </div>
+    );
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────────────
+
+export default function SettingsDashboard() {
+    const { locale } = useLanguage();
+    const [activeSection, setActiveSection] = React.useState('General');
+    const [isSaving, setIsSaving] = React.useState(false);
+
+    // Form States
+    const [platformName, setPlatformName] = React.useState('Atlantis Marketplace');
+    const [currency, setCurrency] = React.useState('USD');
+    const [timezone, setTimezone] = React.useState('UTC+2 (Cairo)');
+    const [twoFactor, setTwoFactor] = React.useState(true);
+    const [passwordRules, setPasswordRules] = React.useState(true);
+    const [avatarPreview, setAvatarPreview] = React.useState<string | null>("https://api.dicebear.com/7.x/avataaars/svg?seed=Admin");
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-    const [oldPass, setOldPass] = React.useState('');
-    const [newPass, setNewPass] = React.useState('');
-    const [confirmPass, setConfirmPass] = React.useState('');
-    const [showPass, setShowPass] = React.useState(false);
-
-    const [isSaving, setIsSaving] = React.useState(false);
-    const [toast, setToast] = React.useState<{ type: 'success' | 'error', msg: string } | null>(null);
-
-    // ── Markup settings ──────────────────────────────────────
-    // Stored as multipliers (e.g. 1.10 = 10%). We display as % to the admin.
-    const [markupPiece, setMarkupPiece] = React.useState('10');       // default 10%
-    const [markupPallet, setMarkupPallet] = React.useState('5');      // default 5%
-    const [markupContainer, setMarkupContainer] = React.useState('2'); // default 2%
-    const [isLoadingMarkup, setIsLoadingMarkup] = React.useState(true);
-    const [isSavingMarkup, setIsSavingMarkup] = React.useState(false);
-
-    React.useEffect(() => {
-        apiFetch(`/admin/config/markup`)
-            .then(r => r.json())
-            .then(data => {
-                if (data?.markup) {
-                    // Convert multiplier → percentage string: 1.10 → "10"
-                    setMarkupPiece(String(Math.round((data.markup.piece - 1) * 100)));
-                    setMarkupPallet(String(Math.round((data.markup.pallet - 1) * 100)));
-                    setMarkupContainer(String(Math.round((data.markup.container - 1) * 100)));
-                }
-            })
-            .catch(() => {})
-            .finally(() => setIsLoadingMarkup(false));
-    }, []);
-
-    const handleSaveMarkup = async () => {
-        setIsSavingMarkup(true);
-        try {
-            
-            // Convert percentage → multiplier: "10" → 1.10
-            const payload = {
-                piece:     1 + (parseFloat(markupPiece) || 0) / 100,
-                pallet:    1 + (parseFloat(markupPallet) || 0) / 100,
-                container: 1 + (parseFloat(markupContainer) || 0) / 100,
-            };
-            const res = await apiFetch(`/admin/config/markup`, {
-                method: 'POST',
-                body: JSON.stringify(payload),
-            });
-            if (res.ok) showToast('success', 'Markup percentages saved. New products will use the updated rates.');
-            else showToast('error', 'Failed to save markup settings.');
-        } catch (_e) {
-            showToast('error', 'Network error. Please try again.');
-        } finally {
-            setIsSavingMarkup(false);
-        }
-    };
-    // ─────────────────────────────────────────────────────────
-
-    const showToast = (type: 'success' | 'error', msg: string) => {
-        setToast({ type, msg });
-        setTimeout(() => setToast(null), 3000);
-    };
-
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             const reader = new FileReader();
             reader.onloadend = () => {
-                const base64String = reader.result as string;
-                setAvatar(base64String);
-                updateUser({ avatar: base64String });
-                showToast('success', 'Avatar updated!');
+                setAvatarPreview(reader.result as string);
+                toast.success('Image selected');
             };
             reader.readAsDataURL(file);
         }
     };
 
-    const handleSave = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const navItems = [
+        { id: 'General', icon: Globe },
+        { id: 'Users & Roles', icon: Users },
+        { id: 'Notifications', icon: Bell },
+        { id: 'Security', icon: Shield },
+        { id: 'Integrations', icon: Zap }
+    ];
+
+    const roles: Role[] = [
+        { id: '1', name: 'Super Admin', permissionsCount: 42, description: 'Full system access' },
+        { id: '2', name: 'Moderator', permissionsCount: 18, description: 'Content & product approval' },
+        { id: '3', name: 'Support Agent', permissionsCount: 12, description: 'Customer tickets & chat' },
+        { id: '4', name: 'Logistics Manager', permissionsCount: 8, description: 'Shipment & tracking control' }
+    ];
+
+    const handleSave = async () => {
         setIsSaving(true);
-
-        // Update global auth state
-        updateUser({ name, phone });
-
         // Simulate API call
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 1000));
+        toast.success('Settings saved successfully');
         setIsSaving(false);
-        showToast('success', 'Profile settings updated successfully!');
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="max-w-[1200px] mx-auto space-y-8 pb-20">
             {/* Header */}
-            <div className="space-y-1">
-                <h1 className="text-3xl font-black text-foreground tracking-tight">Account Settings</h1>
-                <p className="text-muted-foreground font-medium">Manage your professional profile and security preferences.</p>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-4 lg:px-0">
+                <div>
+                    <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">System Settings</h1>
+                    <p className="text-sm text-slate-500 mt-1">Global platform configurations and security protocols.</p>
+                </div>
+                <button 
+                    onClick={handleSave}
+                    disabled={isSaving}
+                    className="h-10 px-6 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20 disabled:opacity-50"
+                >
+                    {isSaving ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={16} />}
+                    Save Changes
+                </button>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                {/* Left: Profile Information */}
-                <div className="lg:col-span-2 space-y-8">
-                    <form onSubmit={handleSave} className="bg-card border border-border/50 rounded-[32px] overflow-hidden p-8 space-y-8">
-                        <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
-                            <User size={16} className="text-primary" />
-                            Personal Information
-                        </h3>
-
-                        <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
-                            <div className="relative group shrink-0">
-                                <div className="w-24 h-24 rounded-3xl bg-muted/50 border border-border/50 flex items-center justify-center text-3xl font-black text-primary overflow-hidden">
-                                    {avatar || user?.avatar ? <img src={avatar || user?.avatar} className="w-full h-full object-cover" /> : name[0]}
-                                </div>
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    className="hidden"
-                                    accept="image/*"
-                                    onChange={handleAvatarChange}
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    className="absolute -bottom-2 -end-2 w-8 h-8 bg-primary rounded-xl flex items-center justify-center text-primary-foreground shadow-lg hover:scale-110 transition-transform"
-                                >
-                                    <Camera size={14} strokeWidth={3} />
-                                </button>
-                            </div>
-                            <div className="space-y-1 flex-1">
-                                <p className="text-[11px] font-black text-muted-foreground/50 uppercase tracking-[0.2em]">Avatar Upload</p>
-                                <p className="text-xs text-muted-foreground font-medium leading-relaxed max-w-xs">
-                                    Pick a professional photo. Recommended size 400x400px. JPG or PNG allowed.
-                                </p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">Full Name</label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={e => setName(e.target.value)}
-                                    className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">Business Email</label>
-                                <input
-                                    type="email"
-                                    value={email}
-                                    disabled
-                                    className="w-full h-14 bg-muted/30 rounded-2xl border border-border/50 px-6 text-muted-foreground/50 font-medium cursor-not-allowed"
-                                />
-                            </div>
-                            <div className="space-y-2 md:col-span-2">
-                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">Phone Number</label>
-                                <input
-                                    type="tel"
-                                    value={phone}
-                                    onChange={e => setPhone(e.target.value)}
-                                    className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="pt-4 border-t border-border/50 flex justify-end">
+            <div className="grid grid-cols-12 gap-8 px-4 lg:px-0 h-full min-h-[600px]">
+                
+                {/* LEFT (30%) — Navigation */}
+                <div className="col-span-12 lg:col-span-3 space-y-2">
+                    <div className="bg-white border border-slate-200 rounded-2xl p-2 shadow-sm sticky top-8">
+                        {navItems.map((item) => (
                             <button
-                                type="submit"
-                                disabled={isSaving}
-                                className="h-12 px-8 bg-primary text-primary-foreground font-black text-[11px] uppercase tracking-widest rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-2"
+                                key={item.id}
+                                onClick={() => setActiveSection(item.id)}
+                                className={cn(
+                                    "w-full h-10 px-3 rounded-xl flex items-center gap-3 text-sm font-medium transition-all mb-1",
+                                    activeSection === item.id 
+                                        ? "bg-teal-50 text-teal-700 shadow-sm border border-teal-100" 
+                                        : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                )}
                             >
-                                {isSaving ? 'Processing...' : <><Save size={14} /> Save Profile Changes</>}
+                                <item.icon size={18} className={cn(activeSection === item.id ? "text-teal-600" : "text-slate-400")} />
+                                {item.id}
+                                {activeSection === item.id && <ChevronRight size={14} className="ms-auto" />}
                             </button>
-                        </div>
-                    </form>
+                        ))}
+                    </div>
+                </div>
 
-                    {/* Security */}
-                    <div className="bg-card border border-border/50 rounded-[32px] p-8 space-y-8">
-                        <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
-                            <Shield size={16} className="text-primary" />
-                            Security & Password
-                        </h3>
-
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">Current Password</label>
-                                    <input
-                                        type="password"
-                                        value={oldPass}
-                                        onChange={e => setOldPass(e.target.value)}
-                                        className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium"
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">New Password</label>
-                                    <div className="relative">
-                                        <input
-                                            type={showPass ? 'text' : 'password'}
-                                            value={newPass}
-                                            onChange={e => setNewPass(e.target.value)}
-                                            placeholder="Leave blank to keep current"
-                                            className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium placeholder:text-muted-foreground/50"
+                {/* RIGHT (70%) — Content */}
+                <div className="col-span-12 lg:col-span-9">
+                    <AnimatePresence mode="wait">
+                        {activeSection === 'General' && (
+                            <SettingSection key="general" title="General Platform Settings">
+                                <SettingCard title="Profile Identity">
+                                    <div className="flex items-center gap-6">
+                                        <input 
+                                            type="file" 
+                                            ref={fileInputRef} 
+                                            onChange={handleFileChange} 
+                                            className="hidden" 
+                                            accept="image/*" 
                                         />
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowPass(!showPass)}
-                                            className="absolute end-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+                                        <div 
+                                            className="relative group cursor-pointer"
+                                            onClick={() => fileInputRef.current?.click()}
                                         >
-                                            {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                                            <div className="w-24 h-24 rounded-3xl bg-slate-100 border-2 border-slate-200 overflow-hidden relative">
+                                                {avatarPreview ? (
+                                                    <img 
+                                                        src={avatarPreview} 
+                                                        className="w-full h-full object-cover" 
+                                                        alt="Admin Avatar"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-teal-50 text-teal-600 font-bold text-2xl">
+                                                        A
+                                                    </div>
+                                                )}
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                                    <Pencil size={20} className="text-white" />
+                                                </div>
+                                            </div>
+                                            <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-teal-600 text-white rounded-xl flex items-center justify-center shadow-lg border-2 border-white">
+                                                <Plus size={16} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-bold text-slate-900">Administrator Avatar</h4>
+                                            <p className="text-xs text-slate-500">JPG, GIF or PNG. Max size of 2MB.</p>
+                                            <div className="flex items-center gap-2 mt-2">
+                                                <button 
+                                                    onClick={() => fileInputRef.current?.click()}
+                                                    className="text-[10px] font-bold text-teal-600 uppercase tracking-widest hover:underline"
+                                                >
+                                                    Upload New
+                                                </button>
+                                                <span className="text-slate-300">|</span>
+                                                <button 
+                                                    onClick={() => setAvatarPreview(null)}
+                                                    className="text-[10px] font-bold text-red-500 uppercase tracking-widest hover:underline"
+                                                >
+                                                    Remove
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </SettingCard>
+
+                                <SettingCard title="Basic Information">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <InputField 
+                                            label="Platform Name" 
+                                            value={platformName} 
+                                            onChange={(e: any) => setPlatformName(e.target.value)} 
+                                            placeholder="Enter marketplace name" 
+                                        />
+                                        <InputField 
+                                            label="Support Email" 
+                                            value="support@atlantis.com" 
+                                            placeholder="Contact email" 
+                                        />
+                                    </div>
+                                </SettingCard>
+
+                                <SettingCard title="Regional Preferences">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="space-y-1.5 flex-1">
+                                            <label className="text-[12px] font-medium text-slate-500">Default Currency</label>
+                                            <div className="relative">
+                                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <select 
+                                                    value={currency}
+                                                    onChange={(e) => setCurrency(e.target.value)}
+                                                    className="h-10 w-full pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500 appearance-none cursor-pointer"
+                                                >
+                                                    <option value="USD">USD - US Dollar</option>
+                                                    <option value="EGP">EGP - Egyptian Pound</option>
+                                                    <option value="SAR">SAR - Saudi Riyal</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5 flex-1">
+                                            <label className="text-[12px] font-medium text-slate-500">System Timezone</label>
+                                            <div className="relative">
+                                                <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <select 
+                                                    value={timezone}
+                                                    onChange={(e) => setTimezone(e.target.value)}
+                                                    className="h-10 w-full pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500 appearance-none cursor-pointer"
+                                                >
+                                                    <option value="UTC+2 (Cairo)">UTC+2 (Cairo)</option>
+                                                    <option value="UTC+0 (London)">UTC+0 (London)</option>
+                                                    <option value="UTC-5 (New York)">UTC-5 (New York)</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </SettingCard>
+                            </SettingSection>
+                        )}
+
+                        {activeSection === 'Users & Roles' && (
+                            <SettingSection key="roles" title="Users & Roles Management">
+                                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
+                                    <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                                        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">System Roles</h3>
+                                        <button className="h-8 px-3 bg-teal-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-teal-700 transition-all">
+                                            <Plus size={14} /> Create Role
+                                        </button>
+                                    </div>
+                                    <table className="w-full text-left">
+                                        <thead>
+                                            <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                <th className="px-6 py-4">Role Name</th>
+                                                <th className="px-6 py-4">Permissions</th>
+                                                <th className="px-6 py-4 text-end">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-50">
+                                            {roles.map((role) => (
+                                                <tr key={role.id} className="hover:bg-slate-50 transition-all group">
+                                                    <td className="px-6 py-4">
+                                                        <div className="space-y-0.5">
+                                                            <p className="text-sm font-semibold text-slate-900">{role.name}</p>
+                                                            <p className="text-[10px] text-slate-500">{role.description}</p>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-lg border border-slate-200">
+                                                            {role.permissionsCount} Active
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-end">
+                                                        <button className="p-2 text-slate-400 hover:text-teal-600 transition-colors">
+                                                            <Pencil size={16} />
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </SettingSection>
+                        )}
+
+                        {activeSection === 'Security' && (
+                            <SettingSection key="security" title="Security & Access Control">
+                                <SettingCard title="Authentication Protocols">
+                                    <ToggleField 
+                                        label="Two-Factor Authentication (2FA)" 
+                                        description="Require a second verification step for all admin accounts."
+                                        checked={twoFactor}
+                                        onChange={setTwoFactor}
+                                    />
+                                    <div className="h-px bg-slate-100 my-2" />
+                                    <ToggleField 
+                                        label="Enforce Complex Passwords" 
+                                        description="Require symbols, numbers, and uppercase characters."
+                                        checked={passwordRules}
+                                        onChange={setPasswordRules}
+                                    />
+                                </SettingCard>
+
+                                <SettingCard title="Session Management">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <InputField 
+                                            label="Session Timeout (Minutes)" 
+                                            value="120" 
+                                            type="number"
+                                        />
+                                        <InputField 
+                                            label="Max Login Attempts" 
+                                            value="5" 
+                                            type="number"
+                                        />
+                                    </div>
+                                </SettingCard>
+
+                                <button className="w-full h-12 bg-red-50 text-red-600 rounded-2xl text-[11px] font-bold uppercase tracking-widest border border-red-100 hover:bg-red-100 transition-all flex items-center justify-center gap-2">
+                                    <Lock size={16} /> Force Password Reset for All Users
+                                </button>
+                            </SettingSection>
+                        )}
+
+                        {activeSection === 'Notifications' && (
+                            <SettingSection key="notifications" title="Notification Settings">
+                                <SettingCard title="Email Configuration">
+                                    <div className="space-y-4">
+                                        <InputField label="Sender Name" value="Atlantis Marketplace" />
+                                        <InputField label="Sender Email" value="no-reply@atlantis.com" />
+                                        <div className="p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-600/20">
+                                                <Mail size={18} />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-blue-900">SMTP Server Active</h4>
+                                                <p className="text-[10px] text-blue-600 font-medium">Connection status: Optimal</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </SettingCard>
+
+                                <SettingCard title="System Alerts">
+                                    <ToggleField label="New User Registration" description="Notify admins when a new supplier signs up." checked={true} onChange={()=>{}} />
+                                    <div className="h-px bg-slate-100 my-2" />
+                                    <ToggleField label="Large Order Alert" description="Notify when an order exceeds $10,000." checked={true} onChange={()=>{}} />
+                                </SettingCard>
+                            </SettingSection>
+                        )}
+
+                        {activeSection === 'Integrations' && (
+                            <SettingSection key="integrations" title="Third-party Integrations">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4 hover:shadow-md transition-all group">
+                                        <div className="flex items-center justify-between">
+                                            <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center border border-blue-100">
+                                                <Database size={24} />
+                                            </div>
+                                            <span className="px-2 py-1 bg-green-50 text-green-600 text-[10px] font-bold rounded-lg border border-green-100 uppercase">Connected</span>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-slate-900">Stripe Connect</h4>
+                                            <p className="text-xs text-slate-500 mt-1">Payment gateway & automated supplier payouts.</p>
+                                        </div>
+                                        <button className="text-xs font-bold text-teal-600 flex items-center gap-1 group-hover:underline mt-2">
+                                            Configure Settings <ChevronRight size={14} />
+                                        </button>
+                                    </div>
+
+                                    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4 hover:shadow-md transition-all group opacity-60">
+                                        <div className="flex items-center justify-between">
+                                            <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center border border-orange-100">
+                                                <MessageSquare size={24} />
+                                            </div>
+                                            <span className="px-2 py-1 bg-slate-50 text-slate-400 text-[10px] font-bold rounded-lg border border-slate-100 uppercase">Disabled</span>
+                                        </div>
+                                        <div>
+                                            <h4 className="text-sm font-bold text-slate-900">Twilio SMS</h4>
+                                            <p className="text-xs text-slate-500 mt-1">SMS notifications for order tracking & OTP.</p>
+                                        </div>
+                                        <button className="text-xs font-bold text-teal-600 flex items-center gap-1 group-hover:underline mt-2">
+                                            Connect Twilio <ChevronRight size={14} />
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                            <button className="h-10 px-6 bg-muted border border-border/50 text-muted-foreground font-black text-[10px] uppercase tracking-widest rounded-xl hover:bg-muted/80 transition-all flex items-center gap-2">
-                                <Lock size={12} /> Update Password
-                            </button>
-                        </div>
-                    </div>
+                            </SettingSection>
+                        )}
+                    </AnimatePresence>
                 </div>
 
-                {/* Right: Preferences */}
-                <div className="space-y-6">
-                    <div className="bg-card border border-border/50 rounded-[32px] p-8 space-y-6">
-                        <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
-                            <Bell size={16} className="text-primary" />
-                            Notifications
-                        </h3>
-
-                        <div className="space-y-4">
-                            {[
-                                { label: 'Order Alerts', desc: 'Get notified about new orders' },
-                                { label: 'Market Updates', desc: 'Daily pricing trends' },
-                                { label: 'Security Logins', desc: 'New device detection' },
-                            ].map((pref, i) => (
-                                <div key={i} className="flex items-center justify-between group">
-                                    <div>
-                                        <p className="text-xs font-black text-foreground group-hover:text-primary transition-colors">{pref.label}</p>
-                                        <p className="text-[10px] text-muted-foreground/50 font-medium">{pref.desc}</p>
-                                    </div>
-                                    <div className="w-10 h-5 bg-primary/20 rounded-full relative cursor-pointer border border-primary/20">
-                                        <div className="absolute top-1 end-1 w-3 h-3 bg-primary rounded-full shadow-lg" />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="bg-primary/5 border border-primary/10 rounded-[32px] p-8 space-y-4">
-                        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
-                            <Check size={20} strokeWidth={3} />
-                        </div>
-                        <h4 className="text-sm font-black text-foreground uppercase tracking-widest">Enterprise Verified</h4>
-                        <p className="text-[11px] text-muted-foreground font-medium leading-relaxed">
-                            Your account is fully verified. You have maximum listing capacity and priority support access.
-                        </p>
-                    </div>
-                </div>
             </div>
-
-            {/* ── Platform Markup Settings ───────────────────────── */}
-            <div className="bg-card border border-border/50 rounded-[32px] p-8 space-y-6">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
-                        <Percent size={16} className="text-primary" />
-                        Platform Markup Settings
-                    </h3>
-                    <span className="text-[10px] font-bold px-3 py-1 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20 uppercase tracking-widest">
-                        Admin Only
-                    </span>
-                </div>
-
-                <div className="bg-amber-500/5 border border-amber-500/20 rounded-2xl p-4">
-                    <p className="text-xs text-amber-600 font-medium leading-relaxed">
-                        <strong>How it works:</strong> When a supplier lists a product at $5.00, the customer sees $5.00 + markup% (e.g. $5.50 at 10%).
-                        The supplier always receives their original price — the markup is platform revenue. Suppliers never see these percentages.
-                    </p>
-                </div>
-
-                {isLoadingMarkup ? (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                        <Loader2 size={16} className="animate-spin" />
-                        <span className="text-xs font-bold">Loading current rates...</span>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {[
-                            {
-                                label: 'Per Unit / Piece',
-                                desc: 'Products sold individually or by case',
-                                value: markupPiece,
-                                set: setMarkupPiece,
-                                example: markupPiece ? `$5.00 → $${(5 * (1 + parseFloat(markupPiece) / 100)).toFixed(2)}` : '',
-                            },
-                            {
-                                label: 'Per Pallet',
-                                desc: 'Bulk pallet orders',
-                                value: markupPallet,
-                                set: setMarkupPallet,
-                                example: markupPallet ? `$100 → $${(100 * (1 + parseFloat(markupPallet) / 100)).toFixed(2)}` : '',
-                            },
-                            {
-                                label: 'Container / Truck',
-                                desc: 'Full container or truck load',
-                                value: markupContainer,
-                                set: setMarkupContainer,
-                                example: markupContainer ? `$1000 → $${(1000 * (1 + parseFloat(markupContainer) / 100)).toFixed(2)}` : '',
-                            },
-                        ].map(field => (
-                            <div key={field.label} className="space-y-2">
-                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">
-                                    {field.label}
-                                </label>
-                                <p className="text-[10px] text-muted-foreground/60 ms-1">{field.desc}</p>
-                                <div className="relative">
-                                    <input
-                                        type="number"
-                                        min="0"
-                                        max="100"
-                                        step="0.5"
-                                        value={field.value}
-                                        onChange={e => field.set(e.target.value)}
-                                        className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 pe-10 outline-none focus:border-primary/50 text-foreground font-black text-xl transition-all"
-                                    />
-                                    <span className="absolute end-4 top-1/2 -translate-y-1/2 text-primary font-black text-lg">%</span>
-                                </div>
-                                {field.example && (
-                                    <p className="text-[10px] text-emerald-500 font-bold ms-1">{field.example}</p>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                )}
-
-                <div className="pt-4 border-t border-border/50 flex items-center justify-between">
-                    <p className="text-[10px] text-muted-foreground font-medium">
-                        Changes apply to <strong>new products only</strong>. Existing products keep their current markup.
-                    </p>
-                    <button
-                        onClick={handleSaveMarkup}
-                        disabled={isSavingMarkup || isLoadingMarkup}
-                        className="h-11 px-7 bg-primary text-primary-foreground font-black text-[11px] uppercase tracking-widest rounded-xl hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:scale-100 flex items-center gap-2"
-                    >
-                        {isSavingMarkup ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                        Save Markup Rates
-                    </button>
-                </div>
-            </div>
-
-            {/* Toast */}
-            {toast && (
-                <div className={cn(
-                    "fixed bottom-8 end-8 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-in fade-in slide-in-from-end-4 z-[100]",
-                    toast.type === 'success' ? "bg-emerald-500 text-primary-foreground" : "bg-red-500 text-primary-foreground"
-                )}>
-                    {toast.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
-                    <span className="text-xs font-black uppercase tracking-widest">{toast.msg}</span>
-                </div>
-            )}
         </div>
     );
 }

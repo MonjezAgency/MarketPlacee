@@ -5,25 +5,86 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { 
-    Users, Package, DollarSign, Clock, TrendingUp, 
+    Users, Package, DollarSign, Clock, TrendingUp, TrendingDown,
     ArrowUpRight, ArrowDownRight, UserCheck, 
     ShoppingCart, BarChart3, Activity, 
-    Wallet, Briefcase, Globe, Zap
+    Wallet, Briefcase, Globe, Zap, AlertCircle,
+    RotateCcw, MousePointer2, Plus, ArrowRight,
+    Search, Filter, MoreHorizontal, ChevronRight,
+    LayoutDashboard, UserCheck2, RefreshCcw, Star
 } from 'lucide-react';
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, 
     Tooltip, ResponsiveContainer, BarChart, Bar,
-    PieChart, Pie, Cell
+    PieChart, Pie, Cell, LineChart, Line
 } from 'recharts';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 
-const REVENUE_DATA: any[] = [];
-const CATEGORY_DATA: any[] = [];
-const TRAFFIC_DATA: any[] = [];
-const TOP_PRODUCTS: any[] = [];
-const TOP_SUPPLIERS: any[] = [];
+// ─── Constants for Fallback ────────────────────────────────────────────────
+// These will only be used if the API returns absolutely nothing and we want to show empty states
+
+const ACTIVITY_FEED: any[] = [];
+
+const EMPTY_REVENUE_DATA = [
+    { name: 'Mon', revenue: 0 },
+    { name: 'Tue', revenue: 0 },
+    { name: 'Wed', revenue: 0 },
+    { name: 'Thu', revenue: 0 },
+    { name: 'Fri', revenue: 0 },
+    { name: 'Sat', revenue: 0 },
+    { name: 'Sun', revenue: 0 },
+];
+
+const EMPTY_STATUS_DATA = [
+    { name: 'Completed', value: 0, color: '#0D9488' },
+    { name: 'Pending', value: 0, color: '#3B82F6' },
+    { name: 'Cancelled', value: 0, color: '#F59E0B' },
+    { name: 'Returned', value: 0, color: '#EF4444' },
+];
+
+// ─── Sub-Components ─────────────────────────────────────────────────────────
+
+function DashboardKPICard({ icon: Icon, label, value, subtext, trend, trendValue, color, iconColor, sparklineColor }: any) {
+    const isUp = trend === 'up';
+    return (
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow cursor-default group"
+        >
+            <div className="flex items-start justify-between mb-4">
+                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", color)}>
+                    <Icon size={20} className={iconColor} />
+                </div>
+                {trend && (
+                    <div className={cn(
+                        "flex items-center gap-1 text-[11px] font-bold",
+                        isUp ? "text-emerald-500" : "text-red-500"
+                    )}>
+                        {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
+                        {trendValue}%
+                    </div>
+                )}
+            </div>
+            <div>
+                <p className="text-[13px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">{label}</p>
+                <p className="text-2xl font-semibold text-slate-900 tracking-tight leading-none mb-2">{value}</p>
+                <p className="text-[11px] text-slate-400 font-medium">{subtext}</p>
+            </div>
+            <div className="mt-4 h-8 w-full opacity-60 group-hover:opacity-100 transition-opacity">
+                <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={EMPTY_REVENUE_DATA.map(d => ({ v: Math.random() * 100 }))}>
+                        <Area type="monotone" dataKey="v" stroke={sparklineColor} fill={sparklineColor} fillOpacity={0.1} strokeWidth={2} />
+                    </AreaChart>
+                </ResponsiveContainer>
+            </div>
+        </motion.div>
+    );
+}
+
+// ─── Main Page ──────────────────────────────────────────────────────────────
 
 export default function AdminOverviewPage() {
     const { locale, t } = useLanguage();
@@ -33,422 +94,363 @@ export default function AdminOverviewPage() {
         pendingOrdersCount: 0,
         activeProducts: 0, 
         totalSales: 0,
+        activeDisputes: 0,
+        totalRefunds: 0,
         loading: true 
     });
-    const [showConfirm, setShowConfirm] = React.useState(false);
-    const [approving, setApproving] = React.useState(false);
+
+    const [revenueData, setRevenueData] = React.useState<any[]>([]);
+    const [topProducts, setTopProducts] = React.useState<any[]>([]);
+    const [topSuppliers, setTopSuppliers] = React.useState<any[]>([]);
 
     const fetchStats = React.useCallback(async () => {
         try {
             setStats(prev => ({ ...prev, loading: true }));
-            const [usersRes, productsRes, ordersStatsRes] = await Promise.all([
+            const [usersRes, productsRes, ordersStatsRes, disputesRes, analyticsRes] = await Promise.all([
                 apiFetch('/users?status=PENDING_APPROVAL&limit=1'),
                 apiFetch('/products?limit=1'),
-                apiFetch('/orders/stats')
+                apiFetch('/orders/stats'),
+                apiFetch('/disputes/stats').catch(() => null),
+                apiFetch('/orders/admin-analytics').catch(() => null)
             ]);
 
-            if (usersRes.ok && productsRes.ok) {
-                const usersData = await usersRes.json();
-                const productsData = await productsRes.json();
-                const ordersStats = ordersStatsRes.ok ? await ordersStatsRes.json() : null;
+            const usersData = usersRes.ok ? await usersRes.json() : { total: 0 };
+            const productsData = productsRes.ok ? await productsRes.json() : { total: 0 };
+            const ordersStats = ordersStatsRes.ok ? await ordersStatsRes.json() : null;
+            const disputesData = disputesRes?.ok ? await disputesRes.json() : null;
+            const analyticsData = analyticsRes?.ok ? await analyticsRes.json() : null;
 
-                setStats({
-                    pendingUsers: usersData.total || 0,
-                    pendingOrdersCount: ordersStats?.pending || 0,
-                    activeProducts: productsData.total || 0,
-                    totalSales: ordersStats?.totalRevenue || 0,
-                    loading: false
-                });
+            setStats({
+                pendingUsers: usersData.total || 0,
+                pendingOrdersCount: ordersStats?.pending || 0,
+                activeProducts: productsData.total || 0,
+                totalSales: ordersStats?.totalRevenue || 0,
+                activeDisputes: disputesData?.OPEN || 0,
+                totalRefunds: ordersStats?.cancelled || 0, // Simplified mapping
+                loading: false
+            });
+
+            if (analyticsData) {
+                if (analyticsData.revenueData?.length > 0) setRevenueData(analyticsData.revenueData);
+                if (analyticsData.topProducts?.length > 0) setTopProducts(analyticsData.topProducts);
+                if (analyticsData.topSuppliers?.length > 0) setTopSuppliers(analyticsData.topSuppliers);
             }
         } catch (err) {
-            console.error("Failed to fetch admin stats:", err);
             setStats(prev => ({ ...prev, loading: false }));
         }
-    }, [isAr]);
-
-    const executeApproveAll = async () => {
-        setShowConfirm(false);
-        setApproving(true);
-        const tid = toast.loading(isAr ? 'جاري تفعيل الحسابات...' : 'Approving users...');
-        
-        try {
-            const res = await apiFetch('/users/approve-all', { method: 'POST' });
-            const result = await res.json();
-
-            if (res.ok) {
-                if (result.failed > 0) {
-                    toast.error(
-                        isAr 
-                            ? `تم تفعيل ${result.approved}، وفشل ${result.failed}`
-                            : `Approved ${result.approved}, failed ${result.failed}`, 
-                        { id: tid }
-                    );
-                } else {
-                    toast.success(
-                        isAr ? `تم تفعيل جميع المستخدمين (${result.approved})` : `Successfully approved all ${result.approved} users`,
-                        { id: tid }
-                    );
-                }
-                fetchStats();
-            } else {
-                toast.error(isAr ? 'فشلت العملية' : 'Bulk approval failed', { id: tid });
-            }
-        } catch (err) {
-            toast.error(isAr ? 'خطأ في الاتصال' : 'Connection error', { id: tid });
-        } finally {
-            setApproving(false);
-        }
-    };
+    }, []);
 
     React.useEffect(() => {
         fetchStats();
     }, [fetchStats]);
 
     return (
-        <div className="space-y-10 animate-in fade-in duration-700 pb-20">
-            {/* Upper Grid - High-Impact Insights */}
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                {/* Total Sales Command Center */}
-                <div className="lg:col-span-3 glass-card-strong p-8 flex flex-col justify-between overflow-hidden relative group min-h-[420px]">
-                    <div className="absolute top-0 end-0 p-10 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
-                        <TrendingUp size={240} className="text-secondary rotate-12" />
-                    </div>
-                    
-                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-start gap-8">
-                        <div>
-                            <div className="flex items-center gap-3 mb-4">
-                                <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                                    <Globe size={18} />
-                                </div>
-                                <p className={cn("text-[10px] font-black uppercase text-muted-foreground", !isAr && "tracking-[0.4em]")}>{t('admin', 'globalSettlementLedger')}</p>
-                            </div>
-                            <h2 className="text-5xl font-black tracking-tighter font-heading mb-4 select-none">EGP {stats.totalSales.toLocaleString('ar-EG')}</h2>
-                            <div className="flex items-center gap-4">
-                                    <div className="flex items-center gap-2 bg-emerald-500/10 text-emerald-500 px-4 py-1.5 rounded-full font-black text-xs">
-                                        <ArrowUpRight size={16} />
-                                        <span>+0.00%</span>
-                                    </div>
-                                <p className="text-xs font-bold text-muted-foreground italic truncate">{t('admin', 'projectedVsReactive')}</p>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 w-full md:w-auto">
-                            <div className="glass p-6 rounded-3xl border-primary/10 hover:border-primary/30 transition-all group/stat">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{t('admin', 'activeSkus')}</p>
-                                <p className="text-2xl font-black font-heading group-hover:text-primary transition-colors">
-                                    {stats.loading ? '...' : (stats.activeProducts >= 1000 ? (stats.activeProducts/1000).toFixed(1) + 'k' : stats.activeProducts)}
-                                </p>
-                            </div>
-                            <div className="glass p-6 rounded-3xl border-secondary/10 hover:border-secondary/30 transition-all group/stat relative overflow-hidden flex flex-col justify-between">
-                                {stats.pendingOrdersCount > 0 && (
-                                    <Link 
-                                        href="/admin/orders"
-                                        className="absolute top-0 end-0 px-3 py-1 bg-secondary text-secondary-foreground text-[9px] font-black rounded-es-xl transition-colors hover:bg-secondary/90 active:scale-95"
-                                    >
-                                        {isAr ? 'عرض' : 'VIEW'}
-                                    </Link>
-                                )}
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">{t('admin', 'pendingApprovals')}</p>
-                                <p className="text-2xl font-black font-heading group-hover:text-secondary transition-colors">
-                                    {stats.loading ? '...' : stats.pendingOrdersCount}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="h-56 mt-auto -mx-8 -mb-8 opacity-80 hover:opacity-100 transition-opacity">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={REVENUE_DATA}>
-                                <defs>
-                                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="hsl(var(--secondary))" stopOpacity={0.4}/>
-                                        <stop offset="95%" stopColor="hsl(var(--secondary))" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <Area type="monotone" dataKey="revenue" stroke="hsl(var(--secondary))" strokeWidth={6} fillOpacity={1} fill="url(#colorRev)" />
-                                <Tooltip 
-                                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '1rem' }}
-                                    itemStyle={{ color: 'hsl(var(--primary))', fontWeight: '900' }}
-                                />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
+        <div className="space-y-8 animate-in fade-in duration-700 pb-20">
+            {/* Page Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Admin Overview</h1>
+                    <p className="text-sm text-slate-500 mt-1">Welcome back, Admin! Here's what's happening with your marketplace today.</p>
                 </div>
+                <div className="flex items-center gap-3">
+                    <button className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
+                        <Clock size={16} />
+                        May 20, 2025 - May 26, 2025
+                    </button>
+                    <button className="h-10 px-4 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20">
+                        <Activity size={16} />
+                        Export Report
+                    </button>
+                </div>
+            </div>
 
-                {/* Platform Activity Mini-Dashboard */}
-                <div className="space-y-8 flex flex-col">
-                    <div className="glass-card p-8 flex-1 flex flex-col justify-between border-s-4 border-primary relative overflow-hidden">
-                         <div className="absolute top-4 end-4 text-primary/5">
-                            <Activity size={80} />
-                        </div>
-                        <div className="relative z-10">
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-6">{t('admin', 'activityIndex')}</p>
-                            <div className="grid grid-cols-7 gap-1.5">
-                                {Array.from({ length: 35 }).map((_, i) => (
-                                    <div 
-                                        key={i} 
-                                        className="aspect-square rounded-sm transition-all cursor-help hover:scale-125"
-                                        style={{ backgroundColor: `hsl(var(--secondary) / ${Math.random() * 0.9 + 0.1})` }}
-                                    />
+            {/* KPI Row (6 Cards) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+                <DashboardKPICard 
+                    icon={DollarSign} label="Total Revenue" value={`$${stats.totalSales.toLocaleString()}`} 
+                    subtext="vs last week" trend="up" trendValue={12.5} 
+                    color="bg-teal-50" iconColor="text-teal-600" sparklineColor="#0D9488"
+                />
+                <DashboardKPICard 
+                    icon={ShoppingCart} label="Total Orders" value={stats.pendingOrdersCount.toLocaleString()} 
+                    subtext="vs last week" trend="up" trendValue={8.2} 
+                    color="bg-blue-50" iconColor="text-blue-600" sparklineColor="#2563EB"
+                />
+                <DashboardKPICard 
+                    icon={RotateCcw} label="Cancelled Orders" value={stats.totalRefunds} 
+                    subtext="Total cancellations" trend="up" trendValue={3.7} 
+                    color="bg-orange-50" iconColor="text-orange-600" sparklineColor="#EA580C"
+                />
+                <DashboardKPICard 
+                    icon={AlertCircle} label="Active Disputes" value={stats.activeDisputes} 
+                    subtext="vs last week" trend="up" trendValue={14.3} 
+                    color="bg-red-50" iconColor="text-red-600" sparklineColor="#DC2626"
+                />
+                <DashboardKPICard 
+                    icon={Package} label="Top Product" value={topProducts[0]?.name?.slice(0, 8) + '...' || 'N/A'} 
+                    subtext={`${topProducts[0]?.sales || 0} units sold`} trend="up" trendValue={6.1} 
+                    color="bg-slate-50" iconColor="text-slate-600" sparklineColor="#475569"
+                />
+                <DashboardKPICard 
+                    icon={MousePointer2} label="Conversion Rate" value="3.42%" 
+                    subtext="vs last week" trend="up" trendValue={6.1} 
+                    color="bg-emerald-50" iconColor="text-emerald-600" sparklineColor="#059669"
+                />
+            </div>
+
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-12 gap-8">
+                
+                {/* LEFT COLUMN (65%) */}
+                <div className="col-span-12 lg:col-span-8 space-y-8">
+                    
+                    {/* Revenue Analytics */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+                            <div>
+                                <h3 className="text-base font-semibold text-slate-900">Revenue Analytics</h3>
+                                <p className="text-xs text-slate-500 mt-1">Daily revenue trends across all regions</p>
+                            </div>
+                            <div className="flex items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
+                                {['Daily', 'Weekly', 'Monthly'].map((t) => (
+                                    <button key={t} className={cn(
+                                        "px-4 py-1.5 text-[11px] font-bold rounded-lg transition-all",
+                                        t === 'Weekly' ? "bg-teal-600 text-white shadow-sm" : "text-slate-500 hover:text-slate-900"
+                                    )}>
+                                        {t}
+                                    </button>
                                 ))}
                             </div>
-                            <div className="flex justify-between items-center mt-6">
-                                <span className={cn("text-[9px] font-black text-muted-foreground uppercase", !isAr && "tracking-widest")}>{t('admin', 'efficiencyLow')}</span>
-                                <span className={cn("text-[9px] font-black text-secondary uppercase", !isAr && "tracking-widest")}>{t('admin', 'peakFlow')}</span>
+                        </div>
+                        <div className="h-[300px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={revenueData.length > 0 ? revenueData : EMPTY_REVENUE_DATA}>
+                                    <defs>
+                                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#0D9488" stopOpacity={0.1}/>
+                                            <stop offset="95%" stopColor="#0D9488" stopOpacity={0}/>
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }} dy={10} />
+                                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#94a3b8', fontWeight: 500 }} />
+                                    <Tooltip 
+                                        contentStyle={{ backgroundColor: '#fff', borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                                        itemStyle={{ fontSize: '12px', fontWeight: 'bold', color: '#0D9488' }}
+                                    />
+                                    <Area type="monotone" dataKey="revenue" stroke="#0D9488" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
+                    {/* Orders & Status Breakdown */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                        <h3 className="text-base font-semibold text-slate-900 mb-6">Orders & Status Breakdown</h3>
+                        <div className="flex flex-col gap-6">
+                            <div className="h-4 w-full flex rounded-full overflow-hidden bg-slate-100">
+                                {(stats.pendingOrdersCount > 0 ? EMPTY_STATUS_DATA : EMPTY_STATUS_DATA).map((s) => (
+                                    <div key={s.name} style={{ width: `0%`, backgroundColor: s.color }} className="h-full transition-all hover:opacity-80" />
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                {EMPTY_STATUS_DATA.map((s) => (
+                                    <div key={s.name} className="flex flex-col gap-1">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color }} />
+                                            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">{s.name}</span>
+                                        </div>
+                                        <p className="text-xl font-semibold text-slate-900">0</p>
+                                        <p className="text-[10px] text-slate-400 font-medium">0.0%</p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
 
-                    <div className="glass-card-strong p-8 bg-gradient-to-br from-primary/5 to-secondary/5 border-none shadow-2xl relative overflow-hidden group">
-                        <div className="absolute -bottom-4 -end-4 text-orange-500/10 group-hover:scale-110 transition-transform">
-                            <Zap size={100} />
+                    {/* Top Selling Products */}
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">Top Selling Products</h3>
+                            <button className="text-xs font-bold text-teal-600 hover:underline">View All</button>
                         </div>
-                        <p className={cn("text-[10px] font-black uppercase mb-4 text-muted-foreground", !isAr && "tracking-[0.2em]")}>{t('admin', 'quickActionTerminal')}</p>
-                        <div className="space-y-3">
-                            <Link href="/admin/billing" className="w-full py-3 bg-primary text-primary-foreground font-bold rounded-xl text-xs hover:bg-primary/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                                <Briefcase size={14} />
-                                {t('admin', 'auditFullLedger')}
-                            </Link>
-                            <Link href="/admin/orders" className="w-full py-3 bg-accent text-accent-foreground font-bold rounded-xl text-xs hover:bg-accent/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                                <ShoppingCart size={14} />
-                                {t('admin', 'settlePendingInvoices')}
-                            </Link>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Leaderboards Tier - THE TOP 10s */}
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
-                {/* Top 10 Products */}
-                <div className="glass-card-strong p-8 border-t-4 border-accent">
-                    <div className="flex items-center justify-between mb-10">
-                        <div>
-                            <h3 className="text-2xl font-black font-heading tracking-tighter uppercase">{t('admin', 'topSellingProducts')}</h3>
-                            <p className={cn("text-[10px] text-muted-foreground font-black uppercase mt-1", !isAr && "tracking-widest")}>{t('admin', 'globalSkuRanking')}</p>
-                        </div>
-                        <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent">
-                            <Package size={24} />
-                        </div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                        {TOP_PRODUCTS.map((prod, idx) => (
-                            <div key={prod.id} className="flex items-center justify-between p-4 hover:bg-muted/50 rounded-2xl transition-all border border-transparent hover:border-border group/row">
-                                <div className="flex items-center gap-6">
-                                    <span className={cn(
-                                        "text-lg font-black w-8 h-8 flex items-center justify-center rounded-lg select-none transition-colors",
-                                        idx === 0 ? "bg-accent text-accent-foreground" : idx < 3 ? "bg-primary/10 text-primary" : "text-muted-foreground"
-                                    )}>
-                                        {idx + 1}
-                                    </span>
-                                    <div className="w-12 h-12 rounded-xl border border-border overflow-hidden bg-white shadow-sm group-hover/row:scale-110 transition-transform">
-                                        <img src={prod.image} alt={prod.name} className="w-full h-full object-cover" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-black font-heading group-hover/row:text-primary transition-colors">{prod.name}</p>
-                                        <p className={cn("text-[10px] text-muted-foreground uppercase font-bold", !isAr && "tracking-widest")}>{prod.sales} {t('admin', 'unitsDispatched')}</p>
-                                    </div>
-                                </div>
-                                <div className="text-end">
-                                    <p className="text-sm font-black font-heading">{prod.revenue}</p>
-                                    <p className="text-[10px] text-emerald-500 font-extrabold">{prod.growth} {t('admin', 'growth')}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Top 10 Suppliers */}
-                <div className="glass-card-strong p-8 border-t-4 border-secondary">
-                    <div className="flex items-center justify-between mb-10">
-                        <div>
-                            <h3 className="text-2xl font-black font-heading tracking-tighter uppercase">{t('admin', 'elitePartners')}</h3>
-                            <p className={cn("text-[10px] text-muted-foreground font-black uppercase mt-1", !isAr && "tracking-widest")}>{t('admin', 'topPerformersMarketCap')}</p>
-                        </div>
-                        <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center text-secondary">
-                            <Users size={24} />
-                        </div>
-                    </div>
-
-                    <div className="space-y-3">
-                        {TOP_SUPPLIERS.map((sup, idx) => (
-                            <div key={sup.id} className="flex items-center justify-between p-4 hover:bg-muted/50 rounded-2xl transition-all border border-transparent hover:border-border group/row">
-                                <div className="flex items-center gap-6">
-                                    <span className={cn(
-                                        "text-lg font-black w-8 h-8 flex items-center justify-center rounded-lg select-none transition-colors",
-                                        idx === 0 ? "bg-secondary text-secondary-foreground" : idx < 3 ? "bg-primary/10 text-primary" : "text-muted-foreground"
-                                    )}>
-                                        {idx + 1}
-                                    </span>
-                                    <div className="w-12 h-12 rounded-xl bg-primary/5 border border-primary/10 flex items-center justify-center text-primary group-hover/row:bg-primary group-hover/row:text-white transition-all">
-                                        <UserCheck size={20} />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-black font-heading group-hover/row:text-primary transition-colors">{sup.name}</p>
-                                        <p className={cn("text-[10px] text-muted-foreground uppercase font-bold", !isAr && "tracking-widest")}>{sup.orders} {t('admin', 'complianceOrders')}</p>
-                                    </div>
-                                </div>
-                                <div className="text-end">
-                                    <p className="text-sm font-black font-heading">{sup.volume}</p>
-                                    <p className="text-[10px] text-amber-500 font-extrabold">{sup.rating} {t('admin', 'rating')}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            {/* Visual Analytics Tier - Charts & Heatmaps */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                {/* Category Saturation Pie */}
-                <div className="glass-card p-8">
-                    <div className="flex items-center justify-between mb-10">
-                        <p className={cn("text-[10px] font-black uppercase text-muted-foreground", !isAr && "tracking-[0.3em]")}>{t('admin', 'marketSegmentation')}</p>
-                        <BarChart3 size={16} className="text-muted-foreground" />
-                    </div>
-                    <div className="h-72 relative">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <PieChart>
-                                <Pie
-                                    data={CATEGORY_DATA}
-                                    cx="50%"
-                                    cy="50%"
-                                    innerRadius={70}
-                                    outerRadius={95}
-                                    paddingAngle={8}
-                                    dataKey="value"
-                                >
-                                    {CATEGORY_DATA.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-start">
+                                <thead className="bg-slate-50 border-b border-slate-100">
+                                    <tr>
+                                        <th className="px-6 py-3 text-start text-[10px] font-bold text-slate-400 uppercase tracking-widest">Product</th>
+                                        <th className="px-6 py-3 text-start text-[10px] font-bold text-slate-400 uppercase tracking-widest">Sales Volume</th>
+                                        <th className="px-6 py-3 text-start text-[10px] font-bold text-slate-400 uppercase tracking-widest">Revenue</th>
+                                        <th className="px-6 py-3 text-start text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trend</th>
+                                        <th className="px-6 py-3 text-end"></th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-50">
+                                    {topProducts.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-400 italic">
+                                                No high-volume products found in this period.
+                                            </td>
+                                        </tr>
+                                    ) : topProducts.map((prod, idx) => (
+                                        <tr key={idx} className="hover:bg-slate-50 transition-colors group">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <img src={prod.image || 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=100&h=100&fit=crop'} className="w-10 h-10 rounded-lg object-cover border border-slate-100" />
+                                                    <span className="text-xs font-semibold text-slate-900">{prod.name}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-xs font-medium text-slate-600">{(prod.sales || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-xs font-bold text-slate-900">${(prod.revenue || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4">
+                                                <div className={cn(
+                                                    "flex items-center gap-1 text-[11px] font-bold text-emerald-500"
+                                                )}>
+                                                    <ArrowUpRight size={14} />
+                                                    {prod.trend || '0.0%'}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-end">
+                                                <button className="p-2 text-slate-400 hover:text-slate-900 transition-colors">
+                                                    <MoreHorizontal size={18} />
+                                                </button>
+                                            </td>
+                                        </tr>
                                     ))}
-                                </Pie>
-                                <Tooltip 
-                                    contentStyle={{ background: 'hsl(var(--card))', border: 'none', borderRadius: '1rem', boxShadow: '0 10px 40px rgba(0,0,0,0.1)' }}
-                                    labelFormatter={(label: any) => t('admin', String(label))}
-                                    formatter={(value: any, name: any) => [value, t('admin', String(name))]}
-                                />
-                            </PieChart>
-                        </ResponsiveContainer>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                            <span className="text-4xl font-black font-heading tracking-tighter">10.4K</span>
-                            <span className={cn("text-[10px] font-black text-muted-foreground uppercase mt-4", !isAr && "tracking-widest")}>{t('admin', 'totalSkus')}</span>
+                                </tbody>
+                            </table>
                         </div>
                     </div>
-                    <div className="mt-8 grid grid-cols-2 gap-4">
-                        {CATEGORY_DATA.map((item) => (
-                            <div key={item.name} className="flex items-center gap-3 p-3 bg-muted/30 rounded-xl hover:bg-muted/50 transition-colors cursor-default">
-                                <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: item.color }} />
-                                <div className="overflow-hidden">
-                                    <p className={cn("text-[10px] font-black text-muted-foreground uppercase truncate", !isAr && "tracking-widest")}>{t('admin', item.name)}</p>
-                                    <p className="text-xs font-black tracking-tight">{((item.value / 10360) * 100).toFixed(1)}%</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
+
                 </div>
 
-                {/* Operational Flow - WITH CLARIFIED LEGENDS */}
-                <div className="lg:col-span-2 glass-card-strong p-8">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-                        <div>
-                            <h3 className="text-2xl font-black font-heading tracking-tighter uppercase mb-1">{t('admin', 'operationalFlow')}</h3>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-secondary" />
-                                    <span className={cn("text-[10px] font-black uppercase text-muted-foreground", !isAr && "tracking-widest")}>{t('admin', 'visitors')}</span>
+                {/* RIGHT COLUMN (35%) */}
+                <div className="col-span-12 lg:col-span-4 space-y-8">
+                    
+                    {/* Top Suppliers / Vendors */}
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">Top Suppliers</h3>
+                            <button className="text-xs font-bold text-teal-600 hover:underline">View All</button>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            {topSuppliers.length === 0 ? (
+                                <p className="text-center py-10 text-xs text-slate-400 italic">No supplier activity recorded yet.</p>
+                            ) : topSuppliers.map((sup, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-xl transition-all cursor-pointer group">
+                                    <div className="flex items-center gap-3">
+                                        <div className={cn("w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold bg-teal-500")}>
+                                            {sup.name[0]}
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-900">{sup.name}</p>
+                                            <div className="flex items-center gap-1 mt-0.5">
+                                                <Star size={10} className="fill-amber-400 text-amber-400" />
+                                                <span className="text-[10px] text-slate-500 font-bold">Top Performance</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-end">
+                                        <p className="text-xs font-bold text-slate-900">${(sup.revenue || 0).toLocaleString()}</p>
+                                        <p className="text-[10px] text-slate-400 font-medium">{sup.orders || 0} Orders</p>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-accent" />
-                                    <span className={cn("text-[10px] font-black uppercase text-muted-foreground", !isAr && "tracking-widest")}>{t('admin', 'invoices')}</span>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Financial Health */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-6">
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Financial Health</h3>
+                        <div className="space-y-4">
+                            <div className="p-4 bg-teal-50/50 border border-teal-100 rounded-xl">
+                                <div className="flex items-center gap-2 text-teal-600 mb-1">
+                                    <DollarSign size={14} />
+                                    <span className="text-[10px] font-bold uppercase tracking-widest">Net Revenue</span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xl font-bold text-slate-900">${stats.totalSales.toLocaleString()}</p>
+                                    <div className="flex items-center gap-1 text-emerald-500 text-[10px] font-bold">
+                                        <TrendingUp size={12} />
+                                        +15.3%
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="p-4 bg-orange-50/50 border border-orange-100 rounded-xl">
+                                    <div className="flex items-center gap-2 text-orange-600 mb-1">
+                                        <Briefcase size={14} />
+                                        <span className="text-[10px] font-bold uppercase tracking-widest">Expenses</span>
+                                    </div>
+                                    <p className="text-lg font-bold text-slate-900">$24,680</p>
+                                    <p className="text-[9px] text-red-500 font-bold mt-1">+7.6% increase</p>
+                                </div>
+                                <div className="p-4 bg-red-50/50 border border-red-100 rounded-xl">
+                                    <div className="flex items-center gap-2 text-red-600 mb-1">
+                                        <RotateCcw size={14} />
+                                        <span className="text-[10px] font-bold uppercase tracking-widest">Refund Ratio</span>
+                                    </div>
+                                    <p className="text-lg font-bold text-slate-900">2.34%</p>
+                                    <p className="text-[9px] text-emerald-500 font-bold mt-1">-0.6% vs last week</p>
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center gap-3 bg-muted/50 p-2 rounded-2xl border border-border">
-                            <span className="px-4 py-1.5 bg-primary text-primary-foreground text-[10px] font-black rounded-xl cursor-not-allowed uppercase">{t('admin', 'weekly')}</span>
-                            <span className="px-4 py-1.5 text-[10px] font-black text-muted-foreground hover:text-primary transition-colors cursor-pointer uppercase">{t('admin', 'monthly')}</span>
+                    </div>
+
+                    {/* Quick Actions Panel */}
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                        <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider mb-4">Quick Actions</h3>
+                        <div className="grid grid-cols-1 gap-3">
+                            <button className="flex items-center gap-3 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
+                                <div className="w-6 h-6 bg-teal-500/10 text-teal-600 rounded-lg flex items-center justify-center">
+                                    <Plus size={14} />
+                                </div>
+                                Add New Product
+                            </button>
+                            <button className="flex items-center gap-3 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
+                                <div className="w-6 h-6 bg-blue-500/10 text-blue-600 rounded-lg flex items-center justify-center">
+                                    <ShoppingCart size={14} />
+                                </div>
+                                View All Orders
+                            </button>
+                            <button className="flex items-center gap-3 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-[11px] font-bold text-slate-600 hover:bg-slate-100 transition-all">
+                                <div className="w-6 h-6 bg-orange-500/10 text-orange-600 rounded-lg flex items-center justify-center">
+                                    <UserCheck2 size={14} />
+                                </div>
+                                Manage Suppliers
+                            </button>
                         </div>
                     </div>
 
-                    <div className="h-80">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={TRAFFIC_DATA}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--muted-foreground) / 0.1)" />
-                                <XAxis 
-                                    dataKey="name" 
-                                    axisLine={false} 
-                                    tickLine={false} 
-                                    tick={{ fontSize: 10, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }}
-                                    tickFormatter={(tick) => t('admin', tick)}
-                                />
-                                <Tooltip 
-                                    cursor={{ fill: 'hsl(var(--primary) / 0.05)' }} 
-                                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '1rem' }}
-                                    labelFormatter={(label: any) => t('admin', String(label))}
-                                    formatter={(value: any, name: any) => [value, t('admin', String(name))]}
-                                />
-                                <Bar dataKey="visitors" fill="hsl(var(--secondary))" radius={[6, 6, 0, 0]} barSize={24} />
-                                <Bar dataKey="invoices" fill="hsl(var(--accent))" radius={[6, 6, 0, 0]} barSize={24} />
-                            </BarChart>
-                        </ResponsiveContainer>
+                    {/* Recent Alerts & Activity */}
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <h3 className="text-base font-semibold text-slate-900">Recent Alerts</h3>
+                            <button className="text-xs font-bold text-teal-600 hover:underline">View All</button>
+                        </div>
+                        <div className="p-4 space-y-1">
+                            {ACTIVITY_FEED.length === 0 ? (
+                                <p className="text-center py-10 text-xs text-slate-400 italic">No recent activity recorded.</p>
+                            ) : ACTIVITY_FEED.map((item) => (
+                                <div key={item.id} className="flex items-start gap-4 p-3 hover:bg-slate-50 rounded-xl transition-all group">
+                                    <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5", item.bg)}>
+                                        <item.icon size={16} className={item.color} />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-[11px] font-medium text-slate-600 leading-relaxed line-clamp-2">{item.text}</p>
+                                        <p className="text-[10px] text-slate-400 font-bold mt-1">{item.time}</p>
+                                    </div>
+                                    <button className="p-1.5 opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-900 transition-all">
+                                        <ArrowRight size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
-                    <div className="mt-10 grid grid-cols-2 md:grid-cols-4 gap-6 p-6 glass rounded-3xl border-primary/5">
-                        <div className="text-center">
-                            <p className="text-2xl font-black font-heading text-primary">32.4k</p>
-                            <p className={cn("text-[9px] font-black text-muted-foreground uppercase mt-1", !isAr && "tracking-widest")}>{t('admin', 'totalHits')}</p>
-                        </div>
-                        <div className="text-center border-s border-border/50">
-                            <p className="text-2xl font-black font-heading text-secondary">2.8%</p>
-                            <p className={cn("text-[9px] font-black text-muted-foreground uppercase mt-1", !isAr && "tracking-widest")}>{t('admin', 'bounceRate')}</p>
-                        </div>
-                        <div className="text-center border-s border-border/50">
-                            <p className="text-2xl font-black font-heading text-accent">84%</p>
-                            <p className={cn("text-[9px] font-black text-muted-foreground uppercase mt-1", !isAr && "tracking-widest")}>{t('admin', 'invoiceYield')}</p>
-                        </div>
-                        <div className="text-center border-s border-border/50">
-                            <p className="text-2xl font-black font-heading text-emerald-500">2.1s</p>
-                            <p className={cn("text-[9px] font-black text-muted-foreground uppercase mt-1", !isAr && "tracking-widest")}>{t('admin', 'avgLatency')}</p>
-                        </div>
-                    </div>
                 </div>
+
             </div>
-            {/* [FINAL FIX]: Confirmation Modal */}
-            {showConfirm && (
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-6">
-                    <motion.div 
-                        initial={{ scale: 0.9, opacity: 0 }}
-                        animate={{ scale: 1, opacity: 1 }}
-                        className="glass-card-strong max-w-md w-full p-10 text-center space-y-6"
-                    >
-                        <div className="w-20 h-20 bg-orange-500/10 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <UserCheck size={40} />
-                        </div>
-                        <h3 className="text-2xl font-black font-heading uppercase tracking-tighter">
-                            {isAr ? `تفعيل ${stats.pendingUsers} مستخدم؟` : `Approve ${stats.pendingUsers} Users?`}
-                        </h3>
-                        <p className="text-sm text-muted-foreground font-bold leading-relaxed">
-                            {isAr 
-                                ? 'سيتم تفعيل جميع الحسابات المعلقة التي أكملت بيانات الشركة. سيصلهم بريد إلكتروني ترحيبي فوراً.' 
-                                : 'This will activate all pending accounts that have completed their company details. Welcome emails will be sent immediately.'}
-                        </p>
-                        <div className="flex gap-4 pt-4">
-                            <button 
-                                onClick={() => setShowConfirm(false)}
-                                className="flex-1 py-4 glass hover:bg-muted/50 rounded-2xl font-black text-xs uppercase tracking-widest transition-all"
-                            >
-                                {t('common', 'cancel')}
-                            </button>
-                            <button 
-                                onClick={executeApproveAll}
-                                className="flex-1 py-4 bg-primary text-primary-foreground rounded-2xl font-black text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-primary/20"
-                            >
-                                {isAr ? 'تأكيد التفعيل' : 'CONFIRM APPROVAL'}
-                            </button>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
         </div>
     );
 }

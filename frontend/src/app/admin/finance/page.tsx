@@ -4,7 +4,8 @@ import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FileText, CreditCard, Shield, Warehouse, Plus, Trash2, Check, X, AlertCircle,
-    RefreshCw, Eye, DollarSign, Clock, Search, ChevronDown
+    RefreshCw, Eye, DollarSign, Clock, Search, ChevronRight, BarChart3, TrendingUp,
+    Download, Filter, MoreHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
@@ -60,6 +61,14 @@ function AdminFinanceContent() {
     const [newWarehouse, setNewWarehouse] = React.useState({ name: '', address: '', city: '', country: '', zipCode: '', supplierId: '' });
     const [suppliers, setSuppliers] = React.useState<any[]>([]);
 
+    // ── Analytics State ─────────────────────────────────────
+    const stats = {
+        totalRevenue: invoices.reduce((acc, inv) => acc + (inv.status === 'PAID' ? inv.totalAmount : 0), 0),
+        pendingInvoices: invoices.filter(inv => inv.status === 'ISSUED').length,
+        paidInvoices: invoices.filter(inv => inv.status === 'PAID').length,
+        outstandingBalance: invoices.reduce((acc, inv) => acc + (inv.status === 'ISSUED' ? inv.totalAmount : 0), 0),
+    };
+
     // ── Fetch Buyers & Suppliers ───────────────────────────
     React.useEffect(() => {
         const fetchUsers = async () => {
@@ -85,12 +94,12 @@ function AdminFinanceContent() {
         } catch (e) { console.error(e); }
         setIsLoadingInvoices(false);
     };
-    React.useEffect(() => { if (tab === 'invoices') fetchInvoices(); }, [tab]);
+    React.useEffect(() => { fetchInvoices(); }, []);
 
     const markPaid = async (id: string) => {
         try {
             const res = await apiFetch(`/invoices/${id}/pay`, { method: 'POST' });
-            if (res.ok) { showToast('success', t('admin', 'markedAsPaid')); fetchInvoices(); }
+            if (res.ok) { showToast('success', t('admin', 'markedAsPaid') || 'Marked as paid'); fetchInvoices(); }
         } catch (_e) { showToast('error', 'Failed'); }
     };
 
@@ -109,7 +118,7 @@ function AdminFinanceContent() {
                 method: 'POST',
                 body: JSON.stringify(newCredit),
             });
-            if (res.ok) { showToast('success', t('admin', 'creditTermSet')); fetchCredits(); setShowNewCredit(false); }
+            if (res.ok) { showToast('success', t('admin', 'creditTermSet') || 'Credit term set'); fetchCredits(); setShowNewCredit(false); }
             else { const e = await res.json(); showToast('error', e.message || 'Failed'); }
         } catch (_e) { showToast('error', 'Network error'); }
     };
@@ -155,7 +164,7 @@ function AdminFinanceContent() {
                 method: 'POST',
                 body: JSON.stringify(newWarehouse),
             });
-            if (res.ok) { showToast('success', t('admin', 'warehouseCreated')); fetchWarehouses(); setShowNewWarehouse(false); }
+            if (res.ok) { showToast('success', t('admin', 'warehouseCreated') || 'Warehouse created'); fetchWarehouses(); setShowNewWarehouse(false); }
             else { const e = await res.json(); showToast('error', e.message || 'Failed'); }
         } catch (_e) { showToast('error', 'Network error'); }
     };
@@ -168,289 +177,430 @@ function AdminFinanceContent() {
     };
 
     const statusColor = (s: string) => {
-        const map: Record<string, string> = { ISSUED: 'bg-blue-100 text-blue-700', PAID: 'bg-emerald-100 text-emerald-700', OVERDUE: 'bg-red-100 text-red-700', APPROVED: 'bg-emerald-100 text-emerald-700', PENDING: 'bg-amber-100 text-amber-700', REJECTED: 'bg-red-100 text-red-700', ACTIVE: 'bg-emerald-100 text-emerald-700', SUSPENDED: 'bg-red-100 text-red-700' };
-        return map[s] || 'bg-gray-100 text-gray-700';
+        const map: Record<string, string> = { 
+            ISSUED: 'bg-amber-50 text-amber-600 border-amber-100', 
+            PAID: 'bg-teal-50 text-teal-600 border-teal-100', 
+            OVERDUE: 'bg-red-50 text-red-600 border-red-100', 
+            APPROVED: 'bg-teal-50 text-teal-600 border-teal-100', 
+            PENDING: 'bg-amber-50 text-amber-600 border-amber-100', 
+            REJECTED: 'bg-red-50 text-red-600 border-red-100', 
+            ACTIVE: 'bg-teal-50 text-teal-600 border-teal-100', 
+            SUSPENDED: 'bg-red-50 text-red-600 border-red-100' 
+        };
+        return map[s] || 'bg-slate-50 text-slate-600 border-slate-100';
     };
 
     const tabs = [
-        { key: 'invoices' as Tab, label: t('admin', 'tabInvoices'), icon: FileText },
-        { key: 'credit' as Tab, label: t('admin', 'tabCredit'), icon: CreditCard },
-        { key: 'tax' as Tab, label: t('admin', 'tabTax'), icon: Shield },
-        { key: 'warehouses' as Tab, label: t('admin', 'tabWarehouses'), icon: Warehouse },
+        { key: 'invoices' as Tab, label: 'Invoices', icon: FileText },
+        { key: 'credit' as Tab, label: 'Credit Terms', icon: CreditCard },
+        { key: 'tax' as Tab, label: 'Tax Exemptions', icon: Shield },
+        { key: 'warehouses' as Tab, label: 'Warehouses', icon: Warehouse },
     ];
 
     return (
-        <div className="max-w-6xl mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header */}
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                    <DollarSign size={20} />
-                </div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black text-[#0F1111] dark:text-white tracking-tight">{t('admin', 'financeAndCompliance')}</h1>
-                    <p className="text-[#555] dark:text-[#999] font-medium text-sm">{t('admin', 'financeDescription')}</p>
+                    <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Finance & Compliance</h1>
+                    <p className="text-sm text-slate-500 mt-1">Manage billing, credit policies, and global warehouse infrastructure.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <button className="h-10 px-4 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
+                        <Download size={16} /> Export Data
+                    </button>
+                    {tab === 'warehouses' && (
+                        <button onClick={() => setShowNewWarehouse(true)} className="h-10 px-6 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20">
+                            <Plus size={16} /> Add Warehouse
+                        </button>
+                    )}
+                    {tab === 'credit' && (
+                        <button onClick={() => setShowNewCredit(true)} className="h-10 px-6 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20">
+                            <Plus size={16} /> Set Credit Term
+                        </button>
+                    )}
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div className="flex flex-wrap gap-2 bg-white dark:bg-[#131921] border border-[#DDD] dark:border-white/10 rounded-2xl p-1.5 w-fit">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                    { label: 'Total Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50' },
+                    { label: 'Pending Invoices', value: stats.pendingInvoices, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+                    { label: 'Paid Invoices', value: stats.paidInvoices, icon: Check, color: 'text-teal-600', bg: 'bg-teal-50' },
+                    { label: 'Outstanding Balance', value: `$${stats.outstandingBalance.toLocaleString()}`, icon: BarChart3, color: 'text-red-600', bg: 'bg-red-50' },
+                ].map((stat, i) => (
+                    <div key={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", stat.bg, stat.color)}>
+                                <stat.icon size={20} />
+                            </div>
+                        </div>
+                        <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{stat.label}</p>
+                        <h3 className="text-2xl font-bold text-slate-900 mt-1">{stat.value}</h3>
+                    </div>
+                ))}
+            </div>
+
+            {/* Tab Navigation */}
+            <div className="flex items-center gap-2 p-1.5 bg-slate-100 rounded-2xl w-fit">
                 {tabs.map(t => (
-                    <button key={t.key} onClick={() => setTab(t.key)}
-                        className={cn("flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all",
-                            tab === t.key ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "text-[#888] hover:text-[#0F1111] dark:hover:text-white hover:bg-[#F3F3F3] dark:hover:bg-white/10")}>
-                        <t.icon size={14} />{t.label}
+                    <button
+                        key={t.key}
+                        onClick={() => setTab(t.key)}
+                        className={cn(
+                            "flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all",
+                            tab === t.key 
+                                ? "bg-white text-teal-600 shadow-sm" 
+                                : "text-slate-500 hover:text-slate-900 hover:bg-white/50"
+                        )}
+                    >
+                        <t.icon size={14} />
+                        {t.label}
                     </button>
                 ))}
             </div>
 
-            {/* ── Invoices Tab ──────────────────────── */}
-            {tab === 'invoices' && (
-                <div className="space-y-4">
-                    {isLoadingInvoices ? <div className="py-16 flex justify-center"><RefreshCw size={24} className="animate-spin text-[#888]" /></div> :
-                    invoices.length === 0 ? (
-                        <div className="text-center py-16 text-[#888]">
-                            <FileText size={48} className="mx-auto mb-4 opacity-20" />
-                            <p className="font-bold">No invoices yet.</p>
-                            <p className="text-sm">Invoices are auto-generated when orders are confirmed.</p>
-                        </div>
-                    ) : (
-                        <div className="bg-white dark:bg-[#131921] border border-[#DDD] dark:border-white/10 rounded-[32px] overflow-hidden">
-                            <table className="w-full text-sm">
-                                <thead><tr className="border-b border-[#EAEDED] dark:border-white/10 text-[10px] font-black text-[#888] uppercase tracking-widest">
-                                    <th className="p-4 text-start">Invoice #</th><th className="p-4 text-start">Buyer</th>
-                                    <th className="p-4 text-end">Amount</th><th className="p-4 text-end">Tax</th>
-                                    <th className="p-4 text-end">Total</th><th className="p-4 text-center">Status</th>
-                                    <th className="p-4 text-center">Due</th><th className="p-4 text-center">Actions</th>
-                                </tr></thead>
-                                <tbody>
-                                    {invoices.map(inv => (
-                                        <tr key={inv.id} className="border-b border-[#EAEDED] dark:border-white/10 hover:bg-[#F7F8F8] dark:hover:bg-white/5 transition-all">
-                                            <td className="p-4 font-bold text-[#0F1111] dark:text-white">{inv.invoiceNumber}</td>
-                                            <td className="p-4 text-[#555] dark:text-[#999]">{inv.order?.buyer?.name || inv.buyerId}</td>
-                                            <td className="p-4 text-end font-bold">${inv.amount?.toFixed(2)}</td>
-                                            <td className="p-4 text-end text-[#888]">${inv.tax?.toFixed(2)}</td>
-                                            <td className="p-4 text-end font-black text-[#FF9900]">${inv.totalAmount?.toFixed(2)}</td>
-                                            <td className="p-4 text-center"><span className={cn("px-2 py-1 rounded-lg text-[10px] font-black uppercase", statusColor(inv.status))}>{inv.status}</span></td>
-                                            <td className="p-4 text-center text-[#888] text-xs">{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '-'}</td>
-                                            <td className="p-4 text-center">
-                                                {inv.status === 'ISSUED' && (
-                                                    <button onClick={() => markPaid(inv.id)} className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase hover:scale-105 transition-all">
-                                                        <Check size={12} className="inline me-1" />Paid
-                                                    </button>
-                                                )}
-                                            </td>
+            {/* Content Area */}
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={tab}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        {/* ── Invoices Tab ──────────────────────── */}
+                        {tab === 'invoices' && (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50/50 border-b border-slate-100">
+                                        <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                            <th className="px-6 py-4">Invoice ID</th>
+                                            <th className="px-6 py-4">Client</th>
+                                            <th className="px-6 py-4">Amount</th>
+                                            <th className="px-6 py-4">Status</th>
+                                            <th className="px-6 py-4">Due Date</th>
+                                            <th className="px-6 py-4 text-end">Actions</th>
                                         </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ── Credit Terms Tab ─────────────────── */}
-            {tab === 'credit' && (
-                <div className="space-y-6">
-                    <div className="flex justify-end">
-                        <button onClick={() => setShowNewCredit(!showNewCredit)}
-                            className="h-10 px-5 bg-emerald-500 text-white rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest hover:scale-[1.02] transition-all shadow-lg shadow-emerald-500/20">
-                            {showNewCredit ? <X size={14} /> : <Plus size={14} />}{showNewCredit ? 'Cancel' : 'Set Credit Term'}
-                        </button>
-                    </div>
-
-                    <AnimatePresence>{showNewCredit && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                            className="bg-white dark:bg-[#131921] border border-[#DDD] dark:border-white/10 rounded-[32px] p-8 space-y-6 shadow-sm">
-                            <h4 className="text-xs font-black text-[#0F1111] dark:text-white uppercase tracking-widest">Set Credit Terms</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-[#888] uppercase tracking-widest">Buyer</label>
-                                    <select value={newCredit.userId} onChange={e => setNewCredit({ ...newCredit, userId: e.target.value })}
-                                        className="w-full h-11 bg-[#F7F8F8] dark:bg-white/5 rounded-xl border border-[#EAEDED] dark:border-white/10 px-4 outline-none text-[#0F1111] dark:text-white font-medium text-sm">
-                                        <option value="">Select buyer...</option>
-                                        {buyers.map(b => <option key={b.id} value={b.id}>{b.name} ({b.companyName})</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-[#888] uppercase tracking-widest">Credit Limit ($)</label>
-                                    <input type="number" min={0} value={newCredit.creditLimit} onChange={e => setNewCredit({ ...newCredit, creditLimit: parseFloat(e.target.value) || 0 })}
-                                        className="w-full h-11 bg-[#F7F8F8] dark:bg-white/5 rounded-xl border border-[#EAEDED] dark:border-white/10 px-4 outline-none text-[#0F1111] dark:text-white font-bold text-sm" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-[#888] uppercase tracking-widest">Payment Terms</label>
-                                    <select value={newCredit.paymentTermDays} onChange={e => setNewCredit({ ...newCredit, paymentTermDays: parseInt(e.target.value) })}
-                                        className="w-full h-11 bg-[#F7F8F8] dark:bg-white/5 rounded-xl border border-[#EAEDED] dark:border-white/10 px-4 outline-none text-[#0F1111] dark:text-white font-bold text-sm">
-                                        <option value={15}>Net 15</option><option value={30}>Net 30</option><option value={45}>Net 45</option><option value={60}>Net 60</option><option value={90}>Net 90</option>
-                                    </select>
-                                </div>
-                                <div className="flex items-end">
-                                    <button onClick={createCredit} disabled={!newCredit.userId}
-                                        className={cn("w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
-                                            newCredit.userId ? "bg-emerald-500 text-white hover:scale-[1.02] shadow-lg" : "bg-[#F3F3F3] text-[#888] cursor-not-allowed")}>
-                                        <Check size={14} />Set
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    )}</AnimatePresence>
-
-                    {credits.length === 0 ? (
-                        <div className="text-center py-16 text-[#888]"><CreditCard size={48} className="mx-auto mb-4 opacity-20" /><p className="font-bold">No credit terms set.</p></div>
-                    ) : (
-                        <div className="space-y-3">
-                            {credits.map(c => {
-                                const buyer = buyers.find(b => b.id === c.userId);
-                                const usedPercent = (c.creditLimit ?? 0) > 0 ? (c.usedCredit / c.creditLimit) * 100 : 0;
-                                return (
-                                    <div key={c.id} className="bg-white dark:bg-[#131921] border border-[#DDD] dark:border-white/10 rounded-2xl p-6 flex items-center justify-between group">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/20 flex items-center justify-center text-emerald-600 font-black text-xs">
-                                                Net{c.paymentTermDays}
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-[#0F1111] dark:text-white">{buyer?.name || c.userId}</p>
-                                                <p className="text-xs text-[#888]">{buyer?.companyName || ''}</p>
-                                                <div className="flex items-center gap-3 mt-1.5">
-                                                    <div className="w-32 h-2 bg-[#EAEDED] dark:bg-white/10 rounded-full overflow-hidden">
-                                                        <div className={cn("h-full rounded-full transition-all", usedPercent > 80 ? "bg-red-500" : "bg-emerald-500")} style={{ width: `${Math.min(usedPercent, 100)}%` }} />
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-50">
+                                        {isLoadingInvoices ? (
+                                            [...Array(5)].map((_, i) => (
+                                                <tr key={i} className="animate-pulse">
+                                                    <td colSpan={6} className="px-6 py-8 bg-slate-50/30" />
+                                                </tr>
+                                            ))
+                                        ) : invoices.length === 0 ? (
+                                            <tr>
+                                                <td colSpan={6} className="px-6 py-20 text-center">
+                                                    <div className="flex flex-col items-center gap-3">
+                                                        <FileText size={40} className="text-slate-200" />
+                                                        <p className="text-sm font-medium text-slate-400">No invoices found.</p>
                                                     </div>
-                                                    <span className="text-[10px] font-bold text-[#888]">€${c.usedCredit.toFixed(0)} / €${c.creditLimit.toFixed(0)}</span>
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            invoices.map((inv) => (
+                                                <tr key={inv.id} className="group hover:bg-slate-50 transition-all h-[64px]">
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-sm font-bold text-slate-900">#{inv.invoiceNumber}</span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-semibold text-slate-900">{inv.order?.buyer?.name || 'Unknown Buyer'}</span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">{inv.order?.buyer?.companyName || 'Retail Customer'}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-bold text-slate-900">${inv.totalAmount?.toLocaleString()}</span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">Tax: ${inv.tax?.toFixed(2)}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={cn("px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase border", statusColor(inv.status))}>
+                                                            {inv.status}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4">
+                                                        <span className="text-xs text-slate-500 font-medium">
+                                                            {inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '-'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-6 py-4 text-end">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            {inv.status === 'ISSUED' && (
+                                                                <button onClick={() => markPaid(inv.id)} className="h-8 px-3 bg-teal-50 text-teal-600 rounded-lg text-[10px] font-bold uppercase hover:bg-teal-600 hover:text-white transition-all">
+                                                                    Mark Paid
+                                                                </button>
+                                                            )}
+                                                            <button className="p-2 text-slate-400 hover:text-slate-900 transition-all">
+                                                                <Eye size={16} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {/* ── Credit Terms Tab ─────────────────── */}
+                        {tab === 'credit' && (
+                            <div className="p-6 space-y-6">
+                                {credits.length === 0 ? (
+                                    <div className="py-20 text-center flex flex-col items-center gap-3">
+                                        <CreditCard size={40} className="text-slate-200" />
+                                        <p className="text-sm font-medium text-slate-400">No active credit terms.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {credits.map((c) => {
+                                            const buyer = buyers.find(b => b.id === c.userId);
+                                            const usedPercent = (c.creditLimit ?? 0) > 0 ? (c.usedCredit / c.creditLimit) * 100 : 0;
+                                            return (
+                                                <div key={c.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-6 hover:border-teal-200 transition-all group">
+                                                    <div className="flex items-center justify-between mb-4">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 flex items-center justify-center text-teal-600 font-bold text-xs">
+                                                                N{c.paymentTermDays}
+                                                            </div>
+                                                            <div>
+                                                                <h4 className="text-sm font-bold text-slate-900">{buyer?.name || 'Customer Account'}</h4>
+                                                                <p className="text-[10px] text-slate-500 font-medium uppercase tracking-widest">{buyer?.companyName || 'Corporate Entity'}</p>
+                                                            </div>
+                                                        </div>
+                                                        <button onClick={() => deleteCredit(c.id)} className="p-2 text-slate-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                    
+                                                    <div className="space-y-2">
+                                                        <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                                                            <span>Credit Utilization</span>
+                                                            <span>{usedPercent.toFixed(1)}%</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                                                            <motion.div 
+                                                                initial={{ width: 0 }}
+                                                                animate={{ width: `${Math.min(usedPercent, 100)}%` }}
+                                                                className={cn("h-full rounded-full transition-all", usedPercent > 80 ? "bg-red-500" : "bg-teal-500")} 
+                                                            />
+                                                        </div>
+                                                        <div className="flex items-center justify-between mt-2">
+                                                            <span className="text-xs font-bold text-slate-900">${c.usedCredit.toLocaleString()} <span className="text-slate-400 font-medium">/ ${c.creditLimit.toLocaleString()}</span></span>
+                                                            <span className={cn("px-2 py-0.5 rounded-md text-[9px] font-bold uppercase border", statusColor(c.status))}>{c.status}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* ── Tax Exemptions Tab ───────────────── */}
+                        {tab === 'tax' && (
+                            <div className="divide-y divide-slate-50">
+                                {exemptions.length === 0 ? (
+                                    <div className="py-20 text-center flex flex-col items-center gap-3">
+                                        <Shield size={40} className="text-slate-200" />
+                                        <p className="text-sm font-medium text-slate-400">No tax exemption requests found.</p>
+                                    </div>
+                                ) : (
+                                    exemptions.map((ex) => {
+                                        const buyer = buyers.find(b => b.id === ex.userId);
+                                        return (
+                                            <div key={ex.id} className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition-all">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center text-teal-600">
+                                                        <Shield size={22} />
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="text-sm font-bold text-slate-900">{buyer?.name || 'Corporate Account'}</h4>
+                                                        <div className="flex items-center gap-2 mt-0.5">
+                                                            <span className="text-[10px] text-slate-500 font-medium">{ex.certificateType}</span>
+                                                            <span className="text-slate-300">•</span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">Uploaded {new Date(ex.createdAt).toLocaleDateString()}</span>
+                                                        </div>
+                                                        {ex.certificateUrl && (
+                                                            <a href={ex.certificateUrl} target="_blank" rel="noopener" className="text-[10px] text-teal-600 font-bold hover:underline flex items-center gap-1 mt-1 uppercase tracking-widest">
+                                                                <Eye size={12} /> View Certificate
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <span className={cn("px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase border", statusColor(ex.status))}>
+                                                        {ex.status}
+                                                    </span>
+                                                    {ex.status === 'PENDING' && (
+                                                        <div className="flex items-center gap-2">
+                                                            <button onClick={() => reviewExemption(ex.id, 'APPROVED')} className="h-8 px-4 bg-teal-600 text-white rounded-lg text-[10px] font-bold uppercase hover:bg-teal-700 transition-all">
+                                                                Approve
+                                                            </button>
+                                                            <button onClick={() => reviewExemption(ex.id, 'REJECTED')} className="h-8 px-4 bg-white border border-red-200 text-red-500 rounded-lg text-[10px] font-bold uppercase hover:bg-red-50 transition-all">
+                                                                Reject
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <span className={cn("px-2 py-1 rounded-lg text-[10px] font-black uppercase", statusColor(c.status))}>{c.status}</span>
-                                            <button onClick={() => deleteCredit(c.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-all"><Trash2 size={14} /></button>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* ── Tax Exemptions Tab ───────────────── */}
-            {tab === 'tax' && (
-                <div className="space-y-4">
-                    {exemptions.length === 0 ? (
-                        <div className="text-center py-16 text-[#888]"><Shield size={48} className="mx-auto mb-4 opacity-20" /><p className="font-bold">No tax exemption requests.</p><p className="text-sm">Buyers can upload exemption certificates from their profile.</p></div>
-                    ) : exemptions.map(ex => {
-                        const buyer = buyers.find(b => b.id === ex.userId);
-                        return (
-                            <div key={ex.id} className="bg-white dark:bg-[#131921] border border-[#DDD] dark:border-white/10 rounded-2xl p-6 flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/20 flex items-center justify-center text-blue-600"><Shield size={18} /></div>
-                                    <div>
-                                        <p className="font-bold text-[#0F1111] dark:text-white">{buyer?.name || ex.userId}</p>
-                                        <p className="text-xs text-[#888]">{ex.certificateType} · Uploaded {new Date(ex.createdAt).toLocaleDateString()}</p>
-                                        {ex.certificateUrl && <a href={ex.certificateUrl} target="_blank" rel="noopener" className="text-xs text-blue-500 hover:underline flex items-center gap-1 mt-1"><Eye size={12} />View Certificate</a>}
-                                    </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <span className={cn("px-2 py-1 rounded-lg text-[10px] font-black uppercase", statusColor(ex.status))}>{ex.status}</span>
-                                    {ex.status === 'PENDING' && (
-                                        <>
-                                            <button onClick={() => reviewExemption(ex.id, 'APPROVED')} className="px-3 py-1.5 bg-emerald-500 text-white rounded-lg text-[10px] font-black uppercase hover:scale-105 transition-all"><Check size={12} className="inline me-1" />Approve</button>
-                                            <button onClick={() => reviewExemption(ex.id, 'REJECTED')} className="px-3 py-1.5 bg-red-500 text-white rounded-lg text-[10px] font-black uppercase hover:scale-105 transition-all"><X size={12} className="inline me-1" />Reject</button>
-                                        </>
-                                    )}
-                                </div>
+                                        );
+                                    })
+                                )}
                             </div>
-                        );
-                    })}
-                </div>
-            )}
+                        )}
 
-            {/* ── Warehouses Tab ────────────────────── */}
-            {tab === 'warehouses' && (
-                <div className="space-y-6">
-                    <div className="flex justify-end">
-                        <button onClick={() => setShowNewWarehouse(!showNewWarehouse)}
-                            className="h-10 px-5 bg-emerald-500 text-white rounded-xl flex items-center gap-2 font-black text-[10px] uppercase tracking-widest hover:scale-[1.02] transition-all shadow-lg shadow-emerald-500/20">
-                            {showNewWarehouse ? <X size={14} /> : <Plus size={14} />}{showNewWarehouse ? 'Cancel' : 'Add Warehouse'}
-                        </button>
-                    </div>
+                        {/* ── Warehouses Tab ────────────────────── */}
+                        {tab === 'warehouses' && (
+                            <div className="p-6">
+                                {warehouses.length === 0 ? (
+                                    <div className="py-20 text-center flex flex-col items-center gap-3">
+                                        <Warehouse size={40} className="text-slate-200" />
+                                        <p className="text-sm font-medium text-slate-400">No warehouses registered.</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                        {warehouses.map((w) => {
+                                            const supplier = suppliers.find(s => s.id === w.supplierId);
+                                            return (
+                                                <div key={w.id} className="bg-slate-50 border border-slate-100 rounded-2xl p-6 hover:border-teal-200 transition-all group flex flex-col justify-between h-full">
+                                                    <div>
+                                                        <div className="flex items-start justify-between mb-4">
+                                                            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center text-teal-600">
+                                                                <Warehouse size={22} />
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {w.isDefault && <span className="text-[9px] font-bold bg-teal-500 text-white px-2 py-0.5 rounded-full uppercase tracking-widest">Default</span>}
+                                                                <button onClick={() => deleteWarehouse(w.id)} className="p-2 text-slate-300 hover:text-red-500 transition-all">
+                                                                    <Trash2 size={16} />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <h4 className="text-sm font-bold text-slate-900 mb-1">{w.name}</h4>
+                                                        <p className="text-[10px] text-teal-600 font-bold uppercase tracking-widest mb-3">{supplier?.companyName || 'Supplier Global'}</p>
+                                                        <div className="space-y-1.5">
+                                                            <div className="flex items-start gap-2 text-xs text-slate-500">
+                                                                <Search size={14} className="shrink-0 mt-0.5" />
+                                                                <span>{w.address}, {w.city}, {w.country}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div className="mt-6 pt-4 border-t border-slate-200/50 flex items-center justify-between">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Active Stock</span>
+                                                            <span className="text-sm font-bold text-slate-900">4,280 Units</span>
+                                                        </div>
+                                                        <button className="p-2 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-slate-900 transition-all">
+                                                            <ChevronRight size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </motion.div>
+                </AnimatePresence>
+            </div>
 
-                    <AnimatePresence>{showNewWarehouse && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                            className="bg-white dark:bg-[#131921] border border-[#DDD] dark:border-white/10 rounded-[32px] p-8 space-y-6 shadow-sm">
-                            <h4 className="text-xs font-black text-[#0F1111] dark:text-white uppercase tracking-widest">Add Warehouse</h4>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-[#888] uppercase tracking-widest">Supplier</label>
-                                    <select value={newWarehouse.supplierId} onChange={e => setNewWarehouse({ ...newWarehouse, supplierId: e.target.value })}
-                                        className="w-full h-11 bg-[#F7F8F8] dark:bg-white/5 rounded-xl border border-[#EAEDED] dark:border-white/10 px-4 outline-none text-[#0F1111] dark:text-white font-medium text-sm">
-                                        <option value="">Select supplier...</option>
-                                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.companyName})</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-[#888] uppercase tracking-widest">Name</label>
-                                    <input type="text" value={newWarehouse.name} onChange={e => setNewWarehouse({ ...newWarehouse, name: e.target.value })} placeholder="e.g. Main Warehouse"
-                                        className="w-full h-11 bg-[#F7F8F8] dark:bg-white/5 rounded-xl border border-[#EAEDED] dark:border-white/10 px-4 outline-none text-[#0F1111] dark:text-white font-medium text-sm" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-[#888] uppercase tracking-widest">City</label>
-                                    <input type="text" value={newWarehouse.city} onChange={e => setNewWarehouse({ ...newWarehouse, city: e.target.value })} placeholder="e.g. Cairo"
-                                        className="w-full h-11 bg-[#F7F8F8] dark:bg-white/5 rounded-xl border border-[#EAEDED] dark:border-white/10 px-4 outline-none text-[#0F1111] dark:text-white font-medium text-sm" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-[#888] uppercase tracking-widest">Country</label>
-                                    <input type="text" value={newWarehouse.country} onChange={e => setNewWarehouse({ ...newWarehouse, country: e.target.value })} placeholder="e.g. Egypt"
-                                        className="w-full h-11 bg-[#F7F8F8] dark:bg-white/5 rounded-xl border border-[#EAEDED] dark:border-white/10 px-4 outline-none text-[#0F1111] dark:text-white font-medium text-sm" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black text-[#888] uppercase tracking-widest">Full Address</label>
-                                    <input type="text" value={newWarehouse.address} onChange={e => setNewWarehouse({ ...newWarehouse, address: e.target.value })} placeholder="Street, Building"
-                                        className="w-full h-11 bg-[#F7F8F8] dark:bg-white/5 rounded-xl border border-[#EAEDED] dark:border-white/10 px-4 outline-none text-[#0F1111] dark:text-white font-medium text-sm" />
-                                </div>
-                                <div className="flex items-end">
-                                    <button onClick={createWarehouse} disabled={!newWarehouse.name || !newWarehouse.supplierId}
-                                        className={cn("w-full h-11 rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all",
-                                            newWarehouse.name && newWarehouse.supplierId ? "bg-emerald-500 text-white hover:scale-[1.02] shadow-lg" : "bg-[#F3F3F3] text-[#888] cursor-not-allowed")}>
-                                        <Plus size={14} />Create
+            {/* Modals & Overlays */}
+            <AnimatePresence>
+                {(showNewCredit || showNewWarehouse) && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowNewCredit(false); setShowNewWarehouse(false); }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-lg relative z-10 overflow-hidden shadow-2xl">
+                            {showNewCredit && (
+                                <div className="p-8 space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-xl font-bold text-slate-900">Set Credit Term</h3>
+                                        <button onClick={() => setShowNewCredit(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400"><X size={20} /></button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Target Buyer</label>
+                                            <select value={newCredit.userId} onChange={e => setNewCredit({ ...newCredit, userId: e.target.value })} className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-medium text-sm transition-all appearance-none">
+                                                <option value="">Select account...</option>
+                                                {buyers.map(b => <option key={b.id} value={b.id}>{b.name} ({b.companyName})</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Credit Limit ($)</label>
+                                                <input type="number" value={newCredit.creditLimit} onChange={e => setNewCredit({ ...newCredit, creditLimit: parseFloat(e.target.value) || 0 })} className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-bold text-sm transition-all" />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Payment Term</label>
+                                                <select value={newCredit.paymentTermDays} onChange={e => setNewCredit({ ...newCredit, paymentTermDays: parseInt(e.target.value) })} className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-bold text-sm transition-all">
+                                                    <option value={30}>Net 30</option><option value={60}>Net 60</option><option value={90}>Net 90</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button onClick={createCredit} className="w-full h-14 bg-teal-600 text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg shadow-teal-600/20 hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
+                                        <Check size={18} /> Confirm Policy
                                     </button>
                                 </div>
-                            </div>
-                        </motion.div>
-                    )}</AnimatePresence>
-
-                    {warehouses.length === 0 ? (
-                        <div className="text-center py-16 text-[#888]"><Warehouse size={48} className="mx-auto mb-4 opacity-20" /><p className="font-bold">No warehouses registered.</p></div>
-                    ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {warehouses.map(w => {
-                                const supplier = suppliers.find(s => s.id === w.supplierId);
-                                return (
-                                    <div key={w.id} className="bg-white dark:bg-[#131921] border border-[#DDD] dark:border-white/10 rounded-2xl p-6 space-y-3 group">
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/20 flex items-center justify-center text-violet-600"><Warehouse size={18} /></div>
-                                                <div>
-                                                    <p className="font-bold text-[#0F1111] dark:text-white">{w.name} {w.isDefault && <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md ms-1">DEFAULT</span>}</p>
-                                                    <p className="text-xs text-[#888]">{supplier?.companyName || w.supplierId}</p>
-                                                </div>
-                                            </div>
-                                            <button onClick={() => deleteWarehouse(w.id)} className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-all"><Trash2 size={14} /></button>
-                                        </div>
-                                        <p className="text-sm text-[#555] dark:text-[#999]">{w.address}, {w.city}, {w.country} {w.zipCode || ''}</p>
+                            )}
+                            {showNewWarehouse && (
+                                <div className="p-8 space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-xl font-bold text-slate-900">Add Warehouse</h3>
+                                        <button onClick={() => setShowNewWarehouse(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400"><X size={20} /></button>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            )}
+                                    <div className="space-y-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Supplier Owner</label>
+                                            <select value={newWarehouse.supplierId} onChange={e => setNewWarehouse({ ...newWarehouse, supplierId: e.target.value })} className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-medium text-sm transition-all appearance-none">
+                                                <option value="">Select supplier...</option>
+                                                {suppliers.map(s => <option key={s.id} value={s.id}>{s.name} ({s.companyName})</option>)}
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Warehouse Name</label>
+                                            <input type="text" value={newWarehouse.name} onChange={e => setNewWarehouse({ ...newWarehouse, name: e.target.value })} className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-medium text-sm transition-all" />
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">City</label>
+                                                <input type="text" value={newWarehouse.city} onChange={e => setNewWarehouse({ ...newWarehouse, city: e.target.value })} className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-medium text-sm transition-all" />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Country</label>
+                                                <input type="text" value={newWarehouse.country} onChange={e => setNewWarehouse({ ...newWarehouse, country: e.target.value })} className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-medium text-sm transition-all" />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Address</label>
+                                            <input type="text" value={newWarehouse.address} onChange={e => setNewWarehouse({ ...newWarehouse, address: e.target.value })} className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-medium text-sm transition-all" />
+                                        </div>
+                                    </div>
+                                    <button onClick={createWarehouse} className="w-full h-14 bg-teal-600 text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg shadow-teal-600/20 hover:bg-teal-700 transition-all flex items-center justify-center gap-2">
+                                        <Plus size={18} /> Create Warehouse
+                                    </button>
+                                </div>
+                            )}
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
 
             {/* Toast */}
             <AnimatePresence>
                 {toast && (
                     <motion.div initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 50 }}
                         className={cn("fixed bottom-8 end-8 px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-[100]",
-                            toast.type === 'success' ? "bg-emerald-500 text-white" : "bg-red-500 text-white")}>
+                            toast.type === 'success' ? "bg-teal-600 text-white" : "bg-red-500 text-white")}>
                         {toast.type === 'success' ? <Check size={18} /> : <AlertCircle size={18} />}
-                        <span className="text-xs font-black uppercase tracking-widest">{toast.msg}</span>
+                        <span className="text-xs font-bold uppercase tracking-widest">{toast.msg}</span>
                     </motion.div>
                 )}
             </AnimatePresence>

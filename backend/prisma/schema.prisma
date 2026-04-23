@@ -263,7 +263,7 @@ model Order {
 model OrderStatusHistory {
   id      String @id @default(uuid())
   orderId String
-  order   Order  @relation(fields: [orderId], references: [id])
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   previousStatus OrderStatus?
   newStatus      OrderStatus
@@ -279,7 +279,7 @@ model OrderItem {
   price    Float
 
   orderId String
-  order   Order  @relation(fields: [orderId], references: [id])
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   productId String
   product   Product @relation(fields: [productId], references: [id])
@@ -410,7 +410,7 @@ model Invoice {
   id            String   @id @default(uuid())
   invoiceNumber String   @unique
   orderId       String
-  order         Order    @relation(fields: [orderId], references: [id])
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId    String
   customer      User     @relation("CustomerInvoices", fields: [customerId], references: [id])
   amount        Float
@@ -491,7 +491,7 @@ model SupportMessage {
 model Shipment {
   id              String   @id @default(uuid())
   orderId         String   @unique
-  order           Order    @relation(fields: [orderId], references: [id])
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   trackingNumber  String   @unique
   carrier         String?
   status          String   @default("PENDING")
@@ -541,7 +541,7 @@ enum DisputeStatus {
 model Dispute {
   id          String        @id @default(uuid())
   orderId     String
-  order       Order         @relation(fields: [orderId], references: [id])
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId  String
   customer    User          @relation("CustomerDisputes", fields: [customerId], references: [id])
   reason      String        // e.g. "Item not received", "Wrong item", "Damaged"
@@ -648,7 +648,7 @@ enum EscrowStatus {
 model EscrowTransaction {
   id               String       @id @default(cuid())
   orderId          String       @unique
-  order            Order        @relation(fields: [orderId], references: [id])
+  order            Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
   amount           Float
   currency         String       @default("USD")
   platformFee      Float

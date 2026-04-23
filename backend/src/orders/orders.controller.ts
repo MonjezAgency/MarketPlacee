@@ -53,6 +53,12 @@ export class OrdersController {
         return this.ordersService.getOrderStats();
     }
 
+    @Get('admin-analytics')
+    @Roles(Role.ADMIN, Role.OWNER)
+    async getAdminAnalytics() {
+        return this.ordersService.getAdminAnalytics();
+    }
+
     @Get('supplier/analytics')
     @Roles(Role.SUPPLIER)
     async getSupplierAnalytics(@Request() req, @Query('days') days?: string) {
@@ -165,5 +171,17 @@ export class OrdersController {
     @Roles(Role.CUSTOMER)
     async hideOrder(@Param('id') id: string, @Request() req) {
         return this.ordersService.hideOrder(id, req.user.sub);
+    }
+
+    @Delete('bulk')
+    @Roles(Role.ADMIN)
+    async bulkDelete(@Body('ids') ids: string[]) {
+        return this.ordersService.bulkDelete(ids);
+    }
+
+    @Delete(':id')
+    @Roles(Role.ADMIN)
+    async delete(@Param('id') id: string) {
+        return this.ordersService.delete(id);
     }
 }
