@@ -42,7 +42,7 @@ export default function AdminInvitePage() {
     const [copied, setCopied] = React.useState(false);
     const [invites, setInvites] = React.useState<InviteToken[]>([]);
     const [isSendingEmail, setIsSendingEmail] = React.useState(false);
-    const [emailResult, setEmailResult] = React.useState<{ success: boolean; message: string; previewUrl?: string } | null>(null);
+    const [emailResult, setEmailResult] = React.useState<{ success: boolean; message: string; previewUrl?: string; details?: any[] } | null>(null);
 
     React.useEffect(() => {
         const saved = localStorage.getItem('marketplace-invites') || '[]';
