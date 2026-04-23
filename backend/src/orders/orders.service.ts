@@ -119,6 +119,7 @@ export class OrdersService {
                     }
                 },
                 history: true,
+                shipment: true,
             },
         });
 

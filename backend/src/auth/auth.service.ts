@@ -215,7 +215,7 @@ export class AuthService {
                                     title: 'New Registration Pending Approval',
                                     message: `${user.name} (${user.companyName}) has registered as a ${data.role} and is waiting for approval.`,
                                     type: 'INFO',
-                                    metadata: { userId: user.id }
+                                    data: { userId: user.id }
                                 }
                             });
                         }
