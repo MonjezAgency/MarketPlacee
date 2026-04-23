@@ -3,15 +3,16 @@
 import * as React from 'react';
 
 const BRAND_LOGOS = [
-    { name: 'Trusted Partner 1', image: '/Logos/brand1.jpg' },
-    { name: 'Trusted Partner 2', image: '/Logos/brand2.jpg' },
-    { name: 'Trusted Partner 3', image: '/Logos/brand3.jpg' },
-    { name: 'Trusted Partner 4', image: '/Logos/brand4.jpg' },
-    // Fillers with high-end brands if needed
-    { name: 'Coca-Cola', color: '#E8001C', bg: '#FFF5F5' },
-    { name: 'Pepsi', color: '#0032A0', bg: '#F0F4FF' },
-    { name: 'Red Bull', color: '#CC0000', bg: '#FFF5F5' },
-    { name: 'Lipton', color: '#D4A017', bg: '#FFFBEB' },
+    { name: 'Dove', image: '/Logos/dove.png' },
+    { name: 'Chanel', image: '/Logos/chanel.png' },
+    { name: 'Axe', image: '/Logos/axe.png' },
+    { name: 'Persil', image: '/Logos/persil.png' },
+    { name: 'Coca-Cola', image: '/Logos/cocacola.png' },
+    { name: 'Pepsi', image: '/Logos/pepsi.png' },
+    { name: 'Red Bull', image: '/Logos/redbull.png' },
+    { name: 'Lux', image: '/Logos/lux.png' },
+    { name: 'Dior', image: '/Logos/dior.png' },
+    { name: 'Gucci', image: '/Logos/gucci.png' },
 ];
 
 // Duplicate for seamless infinite loop
@@ -35,7 +36,7 @@ export function BrandLogosMarquee() {
                             className="inline-flex items-center gap-3 px-6 py-3 rounded-2xl border border-black/8 dark:border-white/10 shrink-0 bg-white dark:bg-white/5 shadow-sm"
                         >
                             {brand.image ? (
-                                <img src={brand.image} alt={brand.name} className="h-8 w-auto object-contain brightness-0 dark:brightness-100 invert-0 dark:invert opacity-80 group-hover:opacity-100 transition-opacity" />
+                                <img src={brand.image} alt={brand.name} className="h-8 w-auto object-contain opacity-100 transition-opacity" />
                             ) : (
                                 <>
                                     <div
