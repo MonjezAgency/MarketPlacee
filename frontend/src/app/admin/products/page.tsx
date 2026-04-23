@@ -6,7 +6,8 @@ import {
     XCircle, AlertCircle, MoreHorizontal, ChevronRight,
     ArrowUpRight, Info, User, Sparkles, MessageSquare,
     Trash2, Eye, ExternalLink, Filter, Download,
-    CheckCircle, ShieldAlert, Activity, Pencil
+    CheckCircle, ShieldAlert, Activity, Pencil,
+    Image as ImageIcon, ListFilter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -114,6 +115,8 @@ export default function ProductsModerationPage() {
     const [isEditing, setIsEditing] = React.useState(false);
     const [editData, setEditData] = React.useState<any>(null);
     const [isSavingEdit, setIsSavingEdit] = React.useState(false);
+    const [isUploadingImage, setIsUploadingImage] = React.useState(false);
+    const imageInputRef = React.useRef<HTMLInputElement>(null);
 
     const startEditing = (product: any) => {
         setEditData({ ...product });
@@ -177,6 +180,36 @@ export default function ProductsModerationPage() {
         window.addEventListener('resize', check);
         return () => window.removeEventListener('resize', check);
     }, []);
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file || !editData) return;
+
+        setIsUploadingImage(true);
+        const tid = toast.loading(`Uploading ${file.name}...`);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const res = await apiFetch('/products/upload-image', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (res.ok) {
+                const { url } = await res.json();
+                setEditData({ ...editData, images: [...(editData.images || []), url] });
+                toast.success('Image uploaded', { id: tid });
+            } else {
+                toast.error('Upload failed', { id: tid });
+            }
+        } catch (err) {
+            toast.error('Connection error', { id: tid });
+        } finally {
+            setIsUploadingImage(false);
+            if (imageInputRef.current) imageInputRef.current.value = '';
+        }
+    };
 
     const handleApprove = async (id: string) => {
         const tid = toast.loading('Approving product...');
@@ -522,7 +555,12 @@ export default function ProductsModerationPage() {
                                             <img src={selectedProduct.images?.[0]} className="w-full h-full object-cover" />
                                         </div>
                                         <div>
-                                            <h3 className="text-base font-bold text-slate-900 truncate max-w-[200px]">{selectedProduct.name}</h3>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-base font-bold text-slate-900 truncate max-w-[150px]">{selectedProduct.name}</h3>
+                                                {selectedProduct.supplier?.email === 'Info@atlantisfmcg.com' && (
+                                                    <span className="px-1.5 py-0.5 bg-indigo-600 text-[8px] text-white font-bold rounded uppercase tracking-tighter shadow-sm shadow-indigo-600/20">Founder</span>
+                                                )}
+                                            </div>
                                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">ID: {selectedProduct.id.slice(0, 8)}</p>
                                         </div>
                                     </div>
@@ -565,18 +603,45 @@ export default function ProductsModerationPage() {
                                                 </div>
                                                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                                                     {(isEditing ? editData.images : selectedProduct.images).map((img: string, i: number) => (
-                                                        <img key={i} src={img} className="w-16 h-16 rounded-xl object-cover border border-slate-100 shrink-0" />
+                                                        <div key={i} className="relative group shrink-0">
+                                                            <img src={img} className="w-16 h-16 rounded-xl object-cover border border-slate-100" />
+                                                            {isEditing && (
+                                                                <button 
+                                                                    onClick={() => setEditData({...editData, images: editData.images.filter((_:any, idx:number) => idx !== i)})}
+                                                                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg"
+                                                                >
+                                                                    <Trash2 size={10} />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     ))}
                                                     {isEditing && (
-                                                        <button 
-                                                            onClick={() => {
-                                                                const url = window.prompt('Enter image URL:');
-                                                                if (url) setEditData({...editData, images: [...editData.images, url]});
-                                                            }}
-                                                            className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center text-slate-400 hover:bg-slate-50 shrink-0"
-                                                        >
-                                                            <Plus size={20} />
-                                                        </button>
+                                                        <div className="flex gap-2">
+                                                            <input 
+                                                                type="file" 
+                                                                hidden 
+                                                                ref={imageInputRef} 
+                                                                onChange={handleImageUpload}
+                                                                accept="image/*"
+                                                            />
+                                                            <button 
+                                                                onClick={() => imageInputRef.current?.click()}
+                                                                className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 hover:border-teal-200 transition-all shrink-0"
+                                                            >
+                                                                <Upload size={16} />
+                                                                <span className="text-[8px] font-bold mt-1">DEVICE</span>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    const url = window.prompt('Enter professional image URL:');
+                                                                    if (url) setEditData({...editData, images: [...(editData.images || []), url]});
+                                                                }}
+                                                                className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 hover:border-teal-200 transition-all shrink-0"
+                                                            >
+                                                                <ImageIcon size={16} />
+                                                                <span className="text-[8px] font-bold mt-1">URL</span>
+                                                            </button>
+                                                        </div>
                                                     )}
                                                 </div>
                                             </div>
@@ -670,57 +735,82 @@ export default function ProductsModerationPage() {
                                                 <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-3">Unit Configuration</p>
                                                 <div className="grid grid-cols-1 gap-4">
                                                     <div className="space-y-1">
-                                                        <label className="text-[10px] text-slate-500 font-bold uppercase">Basic Unit (e.g. Carton, Bag)</label>
+                                                        <label className="text-[10px] text-slate-500 font-bold uppercase">Pricing Unit</label>
                                                         {isEditing ? (
-                                                            <input 
-                                                                className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm"
-                                                                value={editData.unit || 'carton'}
+                                                            <select 
+                                                                className="w-full h-11 px-4 bg-white border border-teal-200 rounded-xl text-sm font-bold outline-none"
+                                                                value={editData.unit || 'piece'}
                                                                 onChange={(e) => setEditData({...editData, unit: e.target.value})}
-                                                            />
+                                                            >
+                                                                <option value="piece">Base Piece / Item</option>
+                                                                <option value="pallet">Pallet (Wholesale)</option>
+                                                                <option value="shipment">Full Shipment / Container</option>
+                                                            </select>
                                                         ) : (
-                                                            <p className="text-sm font-bold text-slate-900 capitalize">{selectedProduct.unit || 'Carton'}</p>
+                                                            <p className="text-sm font-bold text-slate-900 capitalize">{selectedProduct.unit || 'Piece'}</p>
                                                         )}
                                                     </div>
-                                                    <div className="grid grid-cols-2 gap-4">
-                                                        <div className="space-y-1">
-                                                            <label className="text-[10px] text-slate-500 font-bold uppercase">Units Per Pallet</label>
+
+                                                    {(isEditing ? editData.unit : selectedProduct.unit) === 'pallet' && (
+                                                        <div className="space-y-1 animate-in slide-in-from-top-2">
+                                                            <label className="text-[10px] text-slate-500 font-bold uppercase">Pieces Per Pallet</label>
                                                             {isEditing ? (
                                                                 <input 
                                                                     type="number"
-                                                                    className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm"
+                                                                    className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
                                                                     value={editData.unitsPerPallet || 0}
                                                                     onChange={(e) => setEditData({...editData, unitsPerPallet: parseInt(e.target.value)})}
                                                                 />
                                                             ) : (
-                                                                <p className="text-sm font-bold text-slate-900">{selectedProduct.unitsPerPallet || 0}</p>
+                                                                <p className="text-sm font-bold text-slate-900">{selectedProduct.unitsPerPallet || 0} pieces</p>
                                                             )}
                                                         </div>
-                                                        <div className="space-y-1">
-                                                            <label className="text-[10px] text-slate-500 font-bold uppercase">Pallets Per Shipment</label>
-                                                            {isEditing ? (
-                                                                <input 
-                                                                    type="number"
-                                                                    className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm"
-                                                                    value={editData.palletsPerShipment || 0}
-                                                                    onChange={(e) => setEditData({...editData, palletsPerShipment: parseInt(e.target.value)})}
-                                                                />
-                                                            ) : (
-                                                                <p className="text-sm font-bold text-slate-900">{selectedProduct.palletsPerShipment || 0}</p>
-                                                            )}
+                                                    )}
+
+                                                    {(isEditing ? editData.unit : selectedProduct.unit) === 'shipment' && (
+                                                        <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Pallets / Shipment</label>
+                                                                {isEditing ? (
+                                                                    <input 
+                                                                        type="number"
+                                                                        className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
+                                                                        value={editData.palletsPerShipment || 0}
+                                                                        onChange={(e) => setEditData({...editData, palletsPerShipment: parseInt(e.target.value)})}
+                                                                    />
+                                                                ) : (
+                                                                    <p className="text-sm font-bold text-slate-900">{selectedProduct.palletsPerShipment || 0}</p>
+                                                                )}
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Pieces / Pallet</label>
+                                                                {isEditing ? (
+                                                                    <input 
+                                                                        type="number"
+                                                                        className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
+                                                                        value={editData.unitsPerPallet || 0}
+                                                                        onChange={(e) => setEditData({...editData, unitsPerPallet: parseInt(e.target.value)})}
+                                                                    />
+                                                                ) : (
+                                                                    <p className="text-sm font-bold text-slate-900">{selectedProduct.unitsPerPallet || 0}</p>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                    </div>
+                                                    )}
                                                 </div>
                                             </div>
 
                                             <div className="space-y-3">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Base Cost & MOQ</p>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                    Order Requirements <Info size={12} className="text-teal-500"/>
+                                                </p>
                                                 <div className="grid grid-cols-2 gap-3">
-                                                    <div className="p-4 border border-slate-100 rounded-2xl">
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Base Price</p>
+                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
+                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Unit Price ($)</p>
                                                         {isEditing ? (
                                                             <input 
                                                                 type="number"
-                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-slate-100"
+                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
                                                                 value={editData.basePrice || 0}
                                                                 onChange={(e) => setEditData({...editData, basePrice: parseFloat(e.target.value)})}
                                                             />
@@ -728,19 +818,32 @@ export default function ProductsModerationPage() {
                                                             <p className="text-sm font-bold text-slate-900">${selectedProduct.basePrice || 0}</p>
                                                         )}
                                                     </div>
-                                                    <div className="p-4 border border-slate-100 rounded-2xl">
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Min. Order (MOQ)</p>
-                                                        {isEditing ? (
-                                                            <input 
-                                                                type="number"
-                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-slate-100"
-                                                                value={editData.moq || 1}
-                                                                onChange={(e) => setEditData({...editData, moq: parseInt(e.target.value)})}
-                                                            />
-                                                        ) : (
-                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.moq || 1} {selectedProduct.unit}s</p>
-                                                        )}
+                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
+                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Min Order (MOQ)</p>
+                                                        <div className="flex items-center gap-1.5">
+                                                            {isEditing ? (
+                                                                <input 
+                                                                    type="number"
+                                                                    className="w-12 h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
+                                                                    value={editData.moq || 1}
+                                                                    onChange={(e) => setEditData({...editData, moq: parseInt(e.target.value)})}
+                                                                />
+                                                            ) : (
+                                                                <span className="text-sm font-bold text-slate-900">{selectedProduct.moq || 1}</span>
+                                                            )}
+                                                            <span className="text-[10px] font-bold text-slate-500 uppercase">{(isEditing ? editData.unit : selectedProduct.unit) || 'Piece'}(s)</span>
+                                                        </div>
                                                     </div>
+                                                </div>
+                                                <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
+                                                    <p className="text-[9px] text-amber-700 font-medium leading-tight">
+                                                        {((isEditing ? editData.unit : selectedProduct.unit) === 'pallet') ? 
+                                                            `The customer must purchase at least ${(isEditing ? editData.moq : selectedProduct.moq) || 1} pallet(s) (${((isEditing ? editData.moq : selectedProduct.moq) || 1) * ((isEditing ? editData.unitsPerPallet : selectedProduct.unitsPerPallet) || 0)} pieces total).` :
+                                                         ((isEditing ? editData.unit : selectedProduct.unit) === 'shipment') ?
+                                                            `The customer must purchase at least ${(isEditing ? editData.moq : selectedProduct.moq) || 1} shipment(s).` :
+                                                            `The customer must purchase at least ${(isEditing ? editData.moq : selectedProduct.moq) || 1} piece(s).`
+                                                        }
+                                                    </p>
                                                 </div>
                                             </div>
                                         </div>

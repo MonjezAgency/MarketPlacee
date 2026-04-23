@@ -28,13 +28,17 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { plainToInstance } from 'class-transformer';
 import { ExcelService } from '../admin/excel.service';
 import { EanService } from './ean.service';
+import { SupabaseStorageService } from '../storage/supabase-storage.service';
+import { AiAgentService } from '../ai-agent/ai-agent.service';
 
 @Controller('products')
 export class ProductsController {
     constructor(
         private readonly productsService: ProductsService,
         private readonly excelService: ExcelService,
-        private readonly eanService: EanService
+        private readonly eanService: EanService,
+        private readonly storageService: SupabaseStorageService,
+        private readonly aiAgent: AiAgentService
     ) { }
 
     private readonly logger = new Logger(ProductsController.name);
@@ -129,12 +133,38 @@ export class ProductsController {
         const isAdmin = req.user.role === Role.ADMIN;
         const supplierId = isAdmin ? (createProductDto.supplierId || req.user.sub) : req.user.sub;
 
+        // AI Auto-Categorization
+        if (!createProductDto.category || createProductDto.category === 'General') {
+            const categories = ['Food & Beverages', 'Personal Care', 'Household', 'Packaging'];
+            const autoCat = await this.aiAgent.categorizeProduct(
+                createProductDto.name, 
+                createProductDto.description || '', 
+                categories
+            );
+            if (autoCat) createProductDto.category = autoCat;
+            else if (!createProductDto.category) createProductDto.category = 'General';
+        }
+
         const product = await this.productsService.create({
             ...createProductDto,
             supplierId,
         }, isAdmin);
 
         return plainToInstance(ProductDto, product);
+    }
+
+    @Post('upload-image')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPPLIER, Role.ADMIN)
+    @UseInterceptors(FileInterceptor('file'))
+    async uploadImage(@UploadedFile() file: any) {
+        if (!file) throw new BadRequestException('No file uploaded');
+        const url = await this.storageService.uploadProductImage(
+            file.buffer,
+            file.originalname,
+            file.mimetype
+        );
+        return { url };
     }
 
     @Post('bulk-upload')
@@ -199,6 +229,16 @@ export class ProductsController {
     @Roles(Role.SUPPLIER, Role.ADMIN)
     @CheckOwnership('PRODUCT')
     async update(@Param('id') id: string, @Body() updateProductDto: any) {
+        // AI Auto-Categorization on update if name changed and category is missing/General
+        if (updateProductDto.name && (!updateProductDto.category || updateProductDto.category === 'General')) {
+            const categories = ['Food & Beverages', 'Personal Care', 'Household', 'Packaging'];
+            const autoCat = await this.aiAgent.categorizeProduct(
+                updateProductDto.name, 
+                updateProductDto.description || '', 
+                categories
+            );
+            if (autoCat) updateProductDto.category = autoCat;
+        }
         return this.productsService.update(id, updateProductDto);
     }
 

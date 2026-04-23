@@ -411,8 +411,8 @@ model CustomerGroupMember {
 model Invoice {
   id            String   @id @default(uuid())
   invoiceNumber String   @unique
-  orderId       String
-  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId       String?
+  order         Order?   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   customerId    String
   customer      User     @relation("CustomerInvoices", fields: [customerId], references: [id])
   amount        Float

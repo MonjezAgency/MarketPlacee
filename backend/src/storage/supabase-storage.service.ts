@@ -3,7 +3,8 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { extname } from 'path';
 import * as crypto from 'crypto';
 
-const BUCKET = 'kyc-documents';
+const KYC_BUCKET = 'kyc-documents';
+const PRODUCT_BUCKET = 'product-images';
 // Signed URL valid for 1 hour — admin reviews within this window
 const SIGNED_URL_EXPIRES_IN = 3600;
 
@@ -26,6 +27,38 @@ export class SupabaseStorageService {
     }
 
     /**
+     * Upload a product image to a public bucket.
+     * Returns a public URL.
+     */
+    async uploadProductImage(
+        fileBuffer: Buffer,
+        originalName: string,
+        mimeType: string,
+    ): Promise<string> {
+        const ext = extname(originalName) || '.jpg';
+        const uniqueName = `${crypto.randomBytes(16).toString('hex')}${ext}`;
+        const storagePath = `public/${uniqueName}`;
+
+        const { error } = await this.client.storage
+            .from(PRODUCT_BUCKET)
+            .upload(storagePath, fileBuffer, {
+                contentType: mimeType,
+                upsert: false,
+            });
+
+        if (error) {
+            this.logger.error(`[PRODUCT_UPLOAD_FAIL] ${error.message}`);
+            throw new InternalServerErrorException('Failed to upload product image.');
+        }
+
+        const { data } = this.client.storage
+            .from(PRODUCT_BUCKET)
+            .getPublicUrl(storagePath);
+
+        return data.publicUrl;
+    }
+
+    /**
      * Upload a KYC file buffer to Supabase Storage.
      * Returns the storage path (not a public URL — use getSignedUrl to view it).
      */
@@ -40,7 +73,7 @@ export class SupabaseStorageService {
         const storagePath = `${userId}/${uniqueName}`;
 
         const { error } = await this.client.storage
-            .from(BUCKET)
+            .from(KYC_BUCKET)
             .upload(storagePath, fileBuffer, {
                 contentType: mimeType,
                 upsert: false,
@@ -53,7 +86,7 @@ export class SupabaseStorageService {
 
         this.logger.log(`[SUPABASE_UPLOAD] Uploaded KYC file: ${storagePath}`);
         // Return the storage path — we generate signed URLs on-demand
-        return `supabase://${BUCKET}/${storagePath}`;
+        return `supabase://${KYC_BUCKET}/${storagePath}`;
     }
 
     /**
@@ -65,7 +98,7 @@ export class SupabaseStorageService {
         const path = storagePath.replace(/^supabase:\/\/[^/]+\//, '');
 
         const { data, error } = await this.client.storage
-            .from(BUCKET)
+            .from(KYC_BUCKET)
             .createSignedUrl(path, SIGNED_URL_EXPIRES_IN);
 
         if (error || !data?.signedUrl) {
@@ -81,33 +114,30 @@ export class SupabaseStorageService {
      */
     async deleteKycFile(storagePath: string): Promise<void> {
         const path = storagePath.replace(/^supabase:\/\/[^/]+\//, '');
-        const { error } = await this.client.storage.from(BUCKET).remove([path]);
+        const { error } = await this.client.storage.from(KYC_BUCKET).remove([path]);
         if (error) {
             this.logger.warn(`[SUPABASE_DELETE_FAIL] ${error.message} — path: ${path}`);
         }
     }
 
     /**
-     * Ensure the KYC bucket exists (called on app startup).
-     * Creates the bucket if it doesn't exist yet.
+     * Ensure buckets exist (called on app startup).
      */
     async ensureBucketExists(): Promise<void> {
         const { data: buckets } = await this.client.storage.listBuckets();
-        const exists = buckets?.some(b => b.name === BUCKET);
+        
+        // KYC Bucket
+        if (!buckets?.some(b => b.name === KYC_BUCKET)) {
+            await this.client.storage.createBucket(KYC_BUCKET, { public: false });
+        }
 
-        if (!exists) {
-            const { error } = await this.client.storage.createBucket(BUCKET, {
-                public: false,
-                fileSizeLimit: 10 * 1024 * 1024, // 10MB
-                allowedMimeTypes: ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'],
+        // Product Bucket
+        if (!buckets?.some(b => b.name === PRODUCT_BUCKET)) {
+            await this.client.storage.createBucket(PRODUCT_BUCKET, { 
+                public: true,
+                fileSizeLimit: 15 * 1024 * 1024 // 15MB
             });
-            if (error) {
-                this.logger.error(`[SUPABASE_BUCKET_FAIL] Could not create bucket: ${error.message}`);
-            } else {
-                this.logger.log(`[SUPABASE_BUCKET] Created private bucket: ${BUCKET}`);
-            }
-        } else {
-            this.logger.log(`[SUPABASE_BUCKET] Bucket "${BUCKET}" ready`);
         }
     }
+}
 }

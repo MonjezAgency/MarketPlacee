@@ -58,8 +58,11 @@ function AdminFinanceContent() {
     // ── Warehouses State ───────────────────────────────────
     const [warehouses, setWarehouses] = React.useState<any[]>([]);
     const [showNewWarehouse, setShowNewWarehouse] = React.useState(false);
+    const [showNewInvoice, setShowNewInvoice] = React.useState(false);
+    const [newInvoice, setNewInvoice] = React.useState({ customerId: '', amount: 0, notes: '' });
     const [newWarehouse, setNewWarehouse] = React.useState({ name: '', address: '', city: '', country: '', zipCode: '', supplierId: '' });
     const [suppliers, setSuppliers] = React.useState<any[]>([]);
+    const [userSearch, setUserSearch] = React.useState('');
 
     // ── Analytics State ─────────────────────────────────────
     const stats = {
@@ -176,6 +179,25 @@ function AdminFinanceContent() {
         } catch (_e) { showToast('error', 'Failed'); }
     };
 
+    const createManualInvoice = async () => {
+        if (!newInvoice.customerId || newInvoice.amount <= 0) return;
+        try {
+            const res = await apiFetch(`/finance/manual-invoice`, {
+                method: 'POST',
+                body: JSON.stringify(newInvoice),
+            });
+            if (res.ok) {
+                showToast('success', 'Manual invoice created');
+                fetchInvoices();
+                setShowNewInvoice(false);
+                setNewInvoice({ customerId: '', amount: 0, notes: '' });
+            } else {
+                const e = await res.json();
+                showToast('error', e.message || 'Failed to create invoice');
+            }
+        } catch (_e) { showToast('error', 'Network error'); }
+    };
+
     const statusColor = (s: string) => {
         const map: Record<string, string> = { 
             ISSUED: 'bg-amber-50 text-amber-600 border-amber-100', 
@@ -217,6 +239,11 @@ function AdminFinanceContent() {
                     {tab === 'credit' && (
                         <button onClick={() => setShowNewCredit(true)} className="h-10 px-6 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20">
                             <Plus size={16} /> Set Credit Term
+                        </button>
+                    )}
+                    {tab === 'invoices' && (
+                        <button onClick={() => setShowNewInvoice(true)} className="h-10 px-6 bg-slate-900 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-md shadow-slate-900/20">
+                            <Plus size={16} /> Create Manual Invoice
                         </button>
                     )}
                 </div>
@@ -309,8 +336,12 @@ function AdminFinanceContent() {
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col">
-                                                            <span className="text-sm font-semibold text-slate-900">{inv.order?.buyer?.name || 'Unknown Buyer'}</span>
-                                                            <span className="text-[10px] text-slate-500 font-medium">{inv.order?.buyer?.companyName || 'Retail Customer'}</span>
+                                                            <span className="text-sm font-semibold text-slate-900">
+                                                                {inv.order?.buyer?.name || inv.customer?.name || 'Manual Customer'}
+                                                            </span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">
+                                                                {inv.order?.buyer?.companyName || inv.customer?.companyName || 'Retail / Manual'}
+                                                            </span>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
@@ -514,10 +545,80 @@ function AdminFinanceContent() {
 
             {/* Modals & Overlays */}
             <AnimatePresence>
-                {(showNewCredit || showNewWarehouse) && (
+                {(showNewCredit || showNewWarehouse || showNewInvoice) && (
                     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowNewCredit(false); setShowNewWarehouse(false); }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => { setShowNewCredit(false); setShowNewWarehouse(false); setShowNewInvoice(false); }} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
                         <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-lg relative z-10 overflow-hidden shadow-2xl">
+                            {showNewInvoice && (
+                                <div className="p-8 space-y-6">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h3 className="text-xl font-bold text-slate-900">Manual Invoice</h3>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Record offline payment or manual billing</p>
+                                        </div>
+                                        <button onClick={() => setShowNewInvoice(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400"><X size={20} /></button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select Account (Customer/Supplier)</label>
+                                            <div className="relative">
+                                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <input 
+                                                    type="text"
+                                                    placeholder="Search by name or email..."
+                                                    className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 outline-none focus:border-teal-500 text-sm font-medium transition-all"
+                                                    value={userSearch}
+                                                    onChange={(e) => setUserSearch(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="max-h-32 overflow-y-auto border border-slate-100 rounded-xl bg-slate-50/50 p-2 space-y-1 scrollbar-hide">
+                                                {[...buyers, ...suppliers]
+                                                    .filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase()))
+                                                    .slice(0, 10)
+                                                    .map(u => (
+                                                        <button 
+                                                            key={u.id}
+                                                            onClick={() => { setNewInvoice({...newInvoice, customerId: u.id}); setUserSearch(u.name); }}
+                                                            className={cn(
+                                                                "w-full p-2.5 rounded-lg text-left text-xs font-bold transition-all flex items-center justify-between group",
+                                                                newInvoice.customerId === u.id ? "bg-teal-600 text-white" : "hover:bg-white text-slate-600 border border-transparent hover:border-slate-100"
+                                                            )}
+                                                        >
+                                                            <span>{u.name} <span className={cn("ml-1 font-medium text-[9px] opacity-70", newInvoice.customerId === u.id ? "text-white" : "text-slate-400")}>({u.role})</span></span>
+                                                            {newInvoice.customerId === u.id && <Check size={14} />}
+                                                        </button>
+                                                    ))
+                                                }
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount (USD)</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-bold text-lg"
+                                                value={newInvoice.amount}
+                                                onChange={(e) => setNewInvoice({...newInvoice, amount: parseFloat(e.target.value) || 0})}
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description / Notes</label>
+                                            <textarea 
+                                                className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-teal-500 text-sm font-medium resize-none"
+                                                placeholder="What is this payment for?"
+                                                value={newInvoice.notes}
+                                                onChange={(e) => setNewInvoice({...newInvoice, notes: e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={createManualInvoice}
+                                        disabled={!newInvoice.customerId || newInvoice.amount <= 0}
+                                        className="w-full h-14 bg-slate-900 text-white rounded-2xl font-bold uppercase text-xs tracking-widest shadow-lg shadow-slate-900/20 hover:bg-black transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                        <FileText size={18} /> Generate Manual Invoice
+                                    </button>
+                                </div>
+                            )}
                             {showNewCredit && (
                                 <div className="p-8 space-y-6">
                                     <div className="flex items-center justify-between">

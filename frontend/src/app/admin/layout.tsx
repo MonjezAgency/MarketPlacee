@@ -68,7 +68,6 @@ const OWNER_GROUP: SidebarGroup = {
     icon: Crown,
     links: [
         { label: 'Owner Dashboard', translationKey: 'ownerDashboard', href: '/admin/owner', icon: Crown },
-        { label: 'Team & Permissions', translationKey: 'teamPermissions', href: '/admin/owner', icon: KeyRound },
     ],
 };
 
@@ -105,6 +104,15 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             { label: 'Reports', translationKey: 'reports', href: '/admin/security', icon: Activity },
             { label: 'Settings', translationKey: 'settings', href: '/admin/settings', icon: Settings },
             { label: 'AI Agent', translationKey: 'aiAgent', href: '/admin/ai-agent', icon: Bot },
+        ]
+    },
+    {
+        title: 'ADMINISTRATION',
+        titleKey: 'groupUsers',
+        icon: Shield,
+        links: [
+            { label: 'Team Force', translationKey: 'teamMembers', href: '/admin/team', icon: KeyRound },
+            { label: 'Invite Center', translationKey: 'inviteCenter', href: '/admin/invite', icon: UserPlus },
         ]
     },
 ];

@@ -10,6 +10,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
 import { ExcelService } from '../admin/excel.service';
+import { InvoiceService } from '../invoices/invoice.service';
 
 @Controller('finance')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -19,6 +20,7 @@ export class FinanceController {
         private readonly reportsService: ReportsService,
         private readonly auditService: FinancialAuditService,
         private readonly excelService: ExcelService,
+        private readonly invoiceService: InvoiceService,
     ) {}
 
     @Get('export/statement')
@@ -165,5 +167,11 @@ export class FinanceController {
     @Get('reports/supplier-earnings')
     getSupplierEarnings(@Request() req) {
         return this.financeService.getSupplierEarnings(req.user.sub);
+    }
+
+    @Post('manual-invoice')
+    @Roles(Role.ADMIN)
+    createManualInvoice(@Body() body: { customerId: string; amount: number; notes?: string }) {
+        return this.invoiceService.createManualInvoice(body);
     }
 }

@@ -78,6 +78,42 @@ export class InvoiceService {
         return invoice;
     }
 
+    async createManualInvoice(data: { customerId: string; amount: number; notes?: string }) {
+        const { customerId, amount, notes } = data;
+
+        // Check for tax exemption
+        const exemption = await this.prisma.taxExemption.findFirst({
+            where: { userId: customerId, status: 'APPROVED' },
+        });
+
+        const taxRate = exemption ? 0 : 0.05;
+        const tax = amount * taxRate;
+        const totalAmount = amount + tax;
+        const invoiceNumber = await this.generateInvoiceNumber();
+
+        const invoice = await this.prisma.invoice.create({
+            data: {
+                invoiceNumber,
+                customerId,
+                amount,
+                tax,
+                totalAmount,
+                notes,
+                status: 'ISSUED',
+                dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            },
+        });
+
+        await this.audit.log({
+            eventType: 'INVOICE_GENERATED',
+            userId: customerId,
+            amount: totalAmount,
+            metadata: { invoiceNumber, invoiceId: invoice.id, manual: true },
+        });
+
+        return invoice;
+    }
+
     async getInvoicesByBuyer(customerId: string) {
         return this.prisma.invoice.findMany({
             where: { customerId },
@@ -88,7 +124,10 @@ export class InvoiceService {
 
     async getAllInvoices() {
         return this.prisma.invoice.findMany({
-            include: { order: { include: { customer: { select: { id: true, name: true, email: true, companyName: true } } } } },
+            include: { 
+                customer: { select: { id: true, name: true, email: true, companyName: true } },
+                order: { include: { customer: { select: { id: true, name: true, email: true, companyName: true } } } } 
+            },
             orderBy: { createdAt: 'desc' },
         });
     }

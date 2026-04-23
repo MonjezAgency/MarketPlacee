@@ -10,8 +10,10 @@ import { ExcelService } from '../admin/excel.service';
 import { ReviewsService } from './reviews.service';
 import { ReviewsController, AdminReviewsController } from './reviews.controller';
 
+import { StorageModule } from '../storage/storage.module';
+
 @Module({
-    imports: [PricingModule, AiAgentModule],
+    imports: [PricingModule, AiAgentModule, StorageModule],
     providers: [ProductsService, PlacementService, EanService, ExcelService, ReviewsService],
     controllers: [ProductsController, PlacementController, ReviewsController, AdminReviewsController],
     exports: [ProductsService, PlacementService],
