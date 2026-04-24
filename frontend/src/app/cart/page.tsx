@@ -9,10 +9,12 @@ import { useRouter } from 'next/navigation';
 import RecommendationsSidebar from '@/components/cart/RecommendationsSidebar';
 import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 export default function CartPage() {
     const { items, removeItem, updateQuantity, total, clearCart } = useCart();
     const { t } = useLanguage();
+    const { currency } = useCurrency();
 
     if (items.length === 0) {
         return (
@@ -90,7 +92,7 @@ export default function CartPage() {
                                                 <ShieldCheck size={14} className="text-accent" />
                                                 <span className="font-bold">{t('cart', 'verifiedSKU')}</span>
                                             </div>
-                                            <p className="font-heading font-bold text-xl text-secondary">{formatPrice(item.price, false)}<span className="text-muted-foreground text-xs font-medium ms-1">/ {item.unit}</span></p>
+                                            <p className="font-heading font-bold text-xl text-secondary">{formatPrice(item.price, currency)}<span className="text-muted-foreground text-xs font-medium ms-1">/ {item.unit}</span></p>
                                         </div>
                                     </div>
 
@@ -114,7 +116,7 @@ export default function CartPage() {
 
                                         <div className="text-end hidden xl:block min-w-[120px]">
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest block mb-1">{t('cart', 'subtotal')}</span>
-                                            <p className="font-heading font-black text-xl">{formatPrice(item.price * item.quantity, false)}</p>
+                                            <p className="font-heading font-black text-xl">{formatPrice(item.price * item.quantity, currency)}</p>
                                         </div>
 
                                         <button
@@ -137,12 +139,12 @@ export default function CartPage() {
                             <div className="space-y-4">
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-muted-foreground font-medium">{t('cart', 'coreInventory')}</span>
-                                    <span className="font-bold text-foreground font-heading">{formatPrice(total, false)}</span>
+                                    <span className="font-bold text-foreground font-heading">{formatPrice(total, currency)}</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-muted-foreground font-medium">{t('cart', 'distributionFee')}</span>
                                     <span className={total >= 500 ? 'text-accent font-black' : 'text-foreground font-bold font-heading'}>
-                                        {total >= 500 ? t('cart', 'free') : formatPrice(25, false)}
+                                        {total >= 500 ? t('cart', 'free') : formatPrice(25, currency)}
                                     </span>
                                 </div>
                                 {total >= 500 && (
@@ -156,7 +158,7 @@ export default function CartPage() {
                                 <div className="flex justify-between items-end mb-8">
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('cart', 'totalPayable')}</span>
-                                        <p className="font-heading font-black text-3xl text-secondary">{formatPrice(total + (total >= 500 ? 0 : 25), false)}</p>
+                                        <p className="font-heading font-black text-3xl text-secondary">{formatPrice(total + (total >= 500 ? 0 : 25), currency)}</p>
                                     </div>
                                     <span className="text-xs text-muted-foreground font-medium mb-1">{t('cart', 'exclTax')}</span>
                                 </div>

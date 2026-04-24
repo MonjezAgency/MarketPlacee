@@ -246,6 +246,7 @@ export class EmailService {
 
   async sendOrderStatusUpdateEmail(email: string, name: string, orderId: string, newStatus: string, trackingUrl?: string) {
     const statusMessages: Record<string, { title: string; body: string; color: string }> = {
+      PAID: { title: 'Order Confirmed ✅', body: 'Your payment has been received and your order is now confirmed. The supplier is preparing your shipment.', color: '#10B981' },
       PROCESSING: { title: 'Order is Being Processed 🔄', body: 'Your order is now being processed by the supplier.', color: '#F59E0B' },
       SHIPPED: { title: 'Order Shipped 🚚', body: `Great news! Your order has been shipped and is on its way.${trackingUrl ? ' You can track it using the link below.' : ''}`, color: '#3B82F6' },
       DELIVERED: { title: 'Order Delivered ✅', body: 'Your order has been delivered successfully. Thank you for choosing Atlantis!', color: '#10B981' },

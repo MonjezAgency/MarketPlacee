@@ -137,7 +137,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                 {/* Price & Min Order */}
                 <div className="mt-auto space-y-3">
                     <div className="flex items-baseline gap-1">
-                        <span className="text-xl font-bold text-foreground">{formatPrice(displayPrice, false)}</span>
+                        <span className="text-xl font-bold text-foreground">{formatPrice(displayPrice, currency)}</span>
                         <span className="text-muted-foreground text-xs font-medium">/ {product.unit}</span>
                         {isOwnProduct && (
                             <span className="ms-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Your Price</span>

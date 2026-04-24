@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { formatPrice } from '@/lib/currency';
 import { cn } from '@/lib/utils';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -28,6 +29,7 @@ export default function CheckoutPage() {
     const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
     const { items, total, clearCart } = useCart();
     const { user } = useAuth();
+    const { currency } = useCurrency();
 
     // Address state — pre-filled from localStorage (last used) or user profile
     const savedAddr = typeof window !== 'undefined'
@@ -322,7 +324,7 @@ export default function CheckoutPage() {
                                                                 </div>
                                                             </div>
                                                             <div className="text-end">
-                                                                <p className="font-heading font-black text-xl text-foreground">{formatPrice(rate.cost, false)}</p>
+                                                                <p className="font-heading font-black text-xl text-foreground">{formatPrice(rate.cost, currency)}</p>
                                                                 <div className="mt-2 w-6 h-6 rounded-full border-2 border-border mx-auto flex items-center justify-center">
                                                                     {selectedShipping?.id === rate.id && <div className="w-3 h-3 bg-secondary rounded-full animate-in zoom-in" />}
                                                                 </div>
@@ -444,7 +446,7 @@ export default function CheckoutPage() {
                                                         <p className="text-sm font-bold truncate">{item.name}</p>
                                                         <p className="text-xs text-muted-foreground">{item.brand} • Qty: {item.quantity}</p>
                                                     </div>
-                                                    <p className="text-sm font-black text-foreground shrink-0">{formatPrice(item.price * item.quantity, false)}</p>
+                                                    <p className="text-sm font-black text-foreground shrink-0">{formatPrice(item.price * item.quantity, currency)}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -456,11 +458,11 @@ export default function CheckoutPage() {
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Shipping cost</span>
-                                                <span className="font-bold">{formatPrice(selectedShipping?.cost || 0, false)}</span>
+                                                <span className="font-bold">{formatPrice(selectedShipping?.cost || 0, currency)}</span>
                                             </div>
                                             <div className="flex justify-between text-base font-black pt-2 border-t border-border/50">
                                                 <span>Total Due</span>
-                                                <span className="text-secondary">{formatPrice(grandTotal, false)}</span>
+                                                <span className="text-secondary">{formatPrice(grandTotal, currency)}</span>
                                             </div>
                                         </div>
 
@@ -523,22 +525,17 @@ export default function CheckoutPage() {
                                 <div className="space-y-5 text-sm">
                                     <div className="flex justify-between items-center">
                                         <span className="text-muted-foreground font-medium">Batch Value</span>
-                                        <span className="font-heading font-bold text-base">{formatPrice(total, false)}</span>
+                                        <span className="font-heading font-bold text-base">{formatPrice(total, currency)}</span>
                                     </div>
                                     {couponDiscount > 0 && (
                                         <div className="flex justify-between items-center">
                                             <span className="text-accent font-medium">Coupon ({couponDiscount}% off)</span>
-                                            <span className="text-accent font-heading font-black">-{formatPrice(discountAmount, false)}</span>
+                                            <span className="text-accent font-heading font-black">-{formatPrice(discountAmount, currency)}</span>
                                         </div>
                                     )}
-                                    {/* Sourcing Credit Hidden for Buyers */}
-                                    {/* <div className="flex justify-between items-center">
-                                        <span className="text-muted-foreground font-medium">Sourcing Credit (5%)</span>
-                                        <span className="text-accent font-heading font-black">-{formatPrice((total - discountAmount) * 0.05, false)}</span>
-                                    </div> */}
                                     <div className="flex justify-between items-center">
                                         <span className="text-muted-foreground font-medium">Logistics Allocation</span>
-                                        <span className="font-heading font-bold text-base">{selectedShipping ? formatPrice(selectedShipping.cost, false) : 'Pending'}</span>
+                                        <span className="font-heading font-bold text-base">{selectedShipping ? formatPrice(selectedShipping.cost, currency) : 'Pending'}</span>
                                     </div>
                                     {selectedShipping && (
                                         <div className="flex justify-between items-center ps-4 border-s-2 border-primary/20">
@@ -549,7 +546,7 @@ export default function CheckoutPage() {
                                     <div className="pt-8 border-t border-border flex justify-between items-end">
                                         <div className="space-y-1">
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Grand Total</span>
-                                            <p className="font-heading font-black text-3xl text-primary">{formatPrice(grandTotal, false)}</p>
+                                            <p className="font-heading font-black text-3xl text-primary">{formatPrice(grandTotal, currency)}</p>
                                         </div>
                                     </div>
                                 </div>

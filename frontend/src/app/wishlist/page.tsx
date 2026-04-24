@@ -9,6 +9,7 @@ import { useCart } from '@/lib/cart';
 import { cn } from '@/lib/utils';
 import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 import { apiFetch } from '@/lib/api';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
@@ -28,6 +29,7 @@ export default function WishlistPage() {
     const { user } = useAuth();
     const { t } = useLanguage();
     const { addItem } = useCart();
+    const { currency } = useCurrency();
     const [items, setItems] = React.useState<WishlistProduct[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [removing, setRemoving] = React.useState<string | null>(null);
@@ -175,7 +177,7 @@ export default function WishlistPage() {
                                         <p className="text-[11px] text-muted-foreground mt-0.5">{item.supplier?.name}</p>
                                     </div>
 
-                                    <p className="text-xl font-black text-primary">{formatPrice(item.price, false)}</p>
+                                    <p className="text-xl font-black text-primary">{formatPrice(item.price, currency)}</p>
 
                                     <div className="flex gap-2 pt-1">
                                         <button

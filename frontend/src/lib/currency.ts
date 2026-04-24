@@ -47,29 +47,50 @@ export function convertFromUSD(amountEGP: number, toCurrency: string): number {
     return amountEGP * rate;
 }
 
+let cachedCurrency: string | null = null;
+let lastCacheTime = 0;
+
 /**
  * Get the currently selected currency code.
- * Priority: localStorage override → timezone heuristic → USD fallback.
+ * Priority: localStorage override → timezone heuristic → EGP fallback.
  */
 export function getActiveCurrency(): string {
     if (typeof window === 'undefined') return 'EGP';
+    
+    // Cache for 100ms to avoid slamming localStorage in tight loops (like product lists)
+    const now = Date.now();
+    if (cachedCurrency && (now - lastCacheTime < 100)) {
+        return cachedCurrency;
+    }
+
     const saved = localStorage.getItem('platform-currency');
-    if (saved && EGP_RATES[saved]) return saved;
+    if (saved && EGP_RATES[saved]) {
+        cachedCurrency = saved;
+        lastCacheTime = now;
+        return saved;
+    }
 
     // Timezone-based default
     try {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-        if (tz.startsWith('Africa/Cairo'))   return 'EGP';
-        if (tz.startsWith('Asia/Dubai'))     return 'AED';
-        if (tz.startsWith('Asia/Riyadh'))    return 'SAR';
-        if (tz.startsWith('Asia/Kuwait'))    return 'KWD';
-        if (tz.startsWith('Asia/Qatar'))     return 'QAR';
-        if (tz.startsWith('Europe/London'))  return 'GBP';
-        if (tz.startsWith('Europe/'))        return 'EUR';
-        if (tz.startsWith('Asia/Kolkata'))   return 'INR';
-        if (tz.startsWith('Europe/Istanbul')) return 'TRY';
+        let detected = 'EGP';
+        if (tz.startsWith('Africa/Cairo'))   detected = 'EGP';
+        else if (tz.startsWith('Asia/Dubai'))     detected = 'AED';
+        else if (tz.startsWith('Asia/Riyadh'))    detected = 'SAR';
+        else if (tz.startsWith('Asia/Kuwait'))    detected = 'KWD';
+        else if (tz.startsWith('Asia/Qatar'))     detected = 'QAR';
+        else if (tz.startsWith('Europe/London'))  detected = 'GBP';
+        else if (tz.startsWith('Europe/'))        detected = 'EUR';
+        else if (tz.startsWith('Asia/Kolkata'))   detected = 'INR';
+        else if (tz.startsWith('Europe/Istanbul')) detected = 'TRY';
+        
+        cachedCurrency = detected;
+        lastCacheTime = now;
+        return detected;
     } catch (_e) { /* ignore */ }
 
+    cachedCurrency = 'EGP';
+    lastCacheTime = now;
     return 'EGP';
 }
 
@@ -79,6 +100,8 @@ export function getActiveCurrency(): string {
 export function setActiveCurrency(code: string): void {
     if (typeof window !== 'undefined') {
         localStorage.setItem('platform-currency', code);
+        cachedCurrency = code;
+        lastCacheTime = Date.now();
         // Trigger a storage event so other tabs / components react
         window.dispatchEvent(new Event('currency-changed'));
     }
@@ -87,20 +110,20 @@ export function setActiveCurrency(code: string): void {
 /**
  * Format an EGP amount in the currently active display currency.
  * @param amountEGP  Price in EGP (as stored in the database)
- * @param forceEuro  Legacy flag — kept for backwards compatibility
+ * @param currencyCode Optional explicit currency code to use (e.g. from Context)
  */
-export function formatPrice(amountEGP: number, forceEuro: boolean = false): string {
+export function formatPrice(amountEGP: number, currencyCode?: string): string {
     const safeAmount = amountEGP ?? 0;
 
-    const currencyCode = forceEuro ? 'EUR' : getActiveCurrency();
-    const converted   = convertFromUSD(safeAmount, currencyCode);
-    const info        = SUPPORTED_CURRENCIES.find(c => c.code === currencyCode);
+    const activeCode = currencyCode || getActiveCurrency();
+    const converted   = convertFromUSD(safeAmount, activeCode);
+    const info        = SUPPORTED_CURRENCIES.find(c => c.code === activeCode);
     const locale      = info?.locale ?? 'en-US';
 
     try {
         return new Intl.NumberFormat(locale, {
             style: 'currency',
-            currency: currencyCode,
+            currency: activeCode,
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
         }).format(converted);

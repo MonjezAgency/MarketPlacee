@@ -143,9 +143,37 @@ function SupportHQContent() {
                 setConversations(convs);
                 
                 // Auto-select if searching
-                if (initialSearch && convs.length > 0) {
-                    const match = convs.find(c => c.name?.toLowerCase().includes(initialSearch.toLowerCase()));
-                    if (match) setSelectedUser(match);
+                if (initialSearch) {
+                    const match = convs.find(c => 
+                        c.id === initialSearch || 
+                        c.userId === initialSearch ||
+                        c.name?.toLowerCase().includes(initialSearch.toLowerCase())
+                    );
+                    
+                    if (match) {
+                        setSelectedUser(match);
+                    } else if (initialSearch.length > 20) { 
+                        // Likely a UUID (customerId). If not in conversations, fetch user and add a temporary entry.
+                        apiFetch(`/users/${initialSearch}`)
+                            .then(r => r.json())
+                            .then(usr => {
+                                if (usr && usr.id) {
+                                    const tempConv = {
+                                        id: usr.id,
+                                        userId: usr.id,
+                                        name: usr.name || usr.companyName || 'Customer',
+                                        lastMessage: 'Ready to help...',
+                                        unread: false
+                                    };
+                                    setConversations(prev => {
+                                        if (prev.find(p => p.userId === usr.id)) return prev;
+                                        return [tempConv, ...prev];
+                                    });
+                                    setSelectedUser(tempConv);
+                                }
+                            })
+                            .catch(() => { /* silent fail */ });
+                    }
                 }
             }
         } catch (_e) {

@@ -186,7 +186,7 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
                                     </div>
                                     
                                     <div className="flex items-center justify-between mt-3">
-                                        <p className="font-black text-lg text-primary">{formatPrice(product.price, false)}</p>
+                                        <p className="font-black text-lg text-primary">{formatPrice(product.price, currency)}</p>
                                         <button 
                                             onClick={() => addItem({
                                                 id: product.id,

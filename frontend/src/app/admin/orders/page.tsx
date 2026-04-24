@@ -23,6 +23,7 @@ import { formatPrice } from '@/lib/currency';
 interface AdminOrder {
     id: string;
     customer: string;
+    customerId: string;
     customerEmail?: string;
     customerPhone?: string;
     supplier: string;
@@ -165,7 +166,7 @@ export default function AdminOrdersPage() {
     const handleContactCustomer = (order: AdminOrder) => {
         // Redirect to Support HQ and pass the customer name/id in the query
         // The Support HQ page can then use this to auto-select the conversation
-        router.push(`/admin/support?search=${encodeURIComponent(order.customer)}`);
+        router.push(`/admin/support?search=${encodeURIComponent(order.customerId)}`);
     };
 
     const handleSaveShipment = async (orderId: string) => {

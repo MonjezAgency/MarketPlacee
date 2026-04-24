@@ -161,6 +161,7 @@ export class OrdersService {
             return {
                 id: order.id,
                 customer: customerName,
+                customerId: order.customer?.id,
                 customerEmail: order.customer?.email,
                 customerPhone: order.customer?.phone,
                 supplier: supplierNames,

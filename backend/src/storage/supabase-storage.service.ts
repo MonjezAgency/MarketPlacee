@@ -1,4 +1,4 @@
-import { Injectable, Logger, InternalServerErrorException } from '@nestjs/common';
+import { Injectable, Logger, InternalServerErrorException, OnModuleInit } from '@nestjs/common';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { extname } from 'path';
 import * as crypto from 'crypto';
@@ -9,7 +9,7 @@ const PRODUCT_BUCKET = 'product-images';
 const SIGNED_URL_EXPIRES_IN = 3600;
 
 @Injectable()
-export class SupabaseStorageService {
+export class SupabaseStorageService implements OnModuleInit {
     private readonly client: SupabaseClient;
     private readonly logger = new Logger(SupabaseStorageService.name);
 
@@ -24,6 +24,15 @@ export class SupabaseStorageService {
         this.client = createClient(url ?? '', key ?? '', {
             auth: { persistSession: false },
         });
+    }
+
+    async onModuleInit() {
+        try {
+            await this.ensureBucketExists();
+            this.logger.log('Supabase buckets verified.');
+        } catch (err) {
+            this.logger.error('Failed to initialize Supabase buckets:', err.message);
+        }
     }
 
     /**

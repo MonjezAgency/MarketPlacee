@@ -41,6 +41,11 @@ export default function Navbar() {
 
     const handleCurrencySelect = (code: string) => {
         setCurrency(code);
+        // Mark that the user has manually chosen a currency,
+        // so the platform default doesn't overwrite it on reload
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('user-currency-chosen', 'true');
+        }
         setIsCurrencyOpen(false);
     };
 

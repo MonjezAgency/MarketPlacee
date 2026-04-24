@@ -111,13 +111,23 @@ export default function SettingsDashboard() {
     const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-    // Initialize from user data
+    // Initialize from user data and platform config
     React.useEffect(() => {
         if (user) {
             setAvatarPreview(user.avatar || null);
             setPlatformName(user.companyName || 'Atlantis Marketplace');
             setAdminFullName(user.name || '');
         }
+
+        // Fetch current platform currency configuration
+        apiFetch('/config/currency')
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.currency) {
+                    setCurrency(data.currency);
+                }
+            })
+            .catch(err => console.error('Failed to fetch platform currency:', err));
     }, [user]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -150,14 +160,29 @@ export default function SettingsDashboard() {
     const handleSave = async () => {
         setIsSaving(true);
         try {
+            // Update user profile info
             await updateUser({
                 avatar: avatarPreview || undefined,
                 companyName: platformName,
                 name: adminFullName
             });
-            toast.success('Settings saved successfully');
+
+            // Update platform-wide currency configuration
+            const res = await apiFetch('/admin/config/currency', {
+                method: 'POST',
+                body: JSON.stringify({ currency })
+            });
+
+            if (res.ok) {
+                toast.success('Settings saved successfully');
+                // Trigger a global currency change event if the platform currency was updated
+                window.dispatchEvent(new Event('currency-changed'));
+            } else {
+                toast.error('Failed to save platform currency');
+            }
         } catch (err) {
             toast.error('Failed to save settings');
+            console.error(err);
         } finally {
             setIsSaving(false);
         }
