@@ -713,10 +713,40 @@ export default function ProductsModerationPage() {
                                                         value={editData.category}
                                                         onChange={(e) => setEditData({...editData, category: e.target.value})}
                                                     >
-                                                        <option value="Food & Beverages">Food & Beverages</option>
+                                                        <option value="Beverages">Beverages</option>
+                                                        <option value="Soft Drinks">Soft Drinks</option>
+                                                        <option value="Energy Drinks">Energy Drinks</option>
+                                                        <option value="Water">Water</option>
+                                                        <option value="Juices">Juices</option>
+                                                        <option value="Snacks">Snacks</option>
+                                                        <option value="Chips">Chips</option>
+                                                        <option value="Chocolate">Chocolate</option>
+                                                        <option value="Candy">Candy</option>
+                                                        <option value="Biscuits">Biscuits</option>
+                                                        <option value="Dairy">Dairy</option>
+                                                        <option value="Milk">Milk</option>
+                                                        <option value="Cheese">Cheese</option>
+                                                        <option value="Yogurt">Yogurt</option>
                                                         <option value="Personal Care">Personal Care</option>
+                                                        <option value="Skincare">Skincare</option>
+                                                        <option value="Haircare">Haircare</option>
+                                                        <option value="Oral Care">Oral Care</option>
+                                                        <option value="Cleaning">Cleaning</option>
                                                         <option value="Household">Household</option>
-                                                        <option value="Packaging">Packaging</option>
+                                                        <option value="Detergent">Detergent</option>
+                                                        <option value="Frozen Food">Frozen Food</option>
+                                                        <option value="Ice Cream">Ice Cream</option>
+                                                        <option value="Meat">Meat</option>
+                                                        <option value="Seafood">Seafood</option>
+                                                        <option value="Bakery">Bakery</option>
+                                                        <option value="Bread">Bread</option>
+                                                        <option value="Pastries">Pastries</option>
+                                                        <option value="Tobacco">Tobacco</option>
+                                                        <option value="Coffee">Coffee</option>
+                                                        <option value="Tea">Tea</option>
+                                                        <option value="Baby Products">Baby Products</option>
+                                                        <option value="Pet Food">Pet Food</option>
+                                                        <option value="Other">Other</option>
                                                     </select>
                                                 ) : (
                                                     <div className="flex items-center gap-2">

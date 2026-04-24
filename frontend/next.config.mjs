@@ -2,7 +2,10 @@
 const nextConfig = {
     images: {
         unoptimized: true,
-        domains: ['images.unsplash.com', 'plus.unsplash.com'],
+        remotePatterns: [
+            { protocol: 'https', hostname: '**' },
+            { protocol: 'http', hostname: '**' }
+        ],
     },
     // Rewrites handled by src/middleware.ts
 };

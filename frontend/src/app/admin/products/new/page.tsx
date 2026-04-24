@@ -273,16 +273,40 @@ export default function AdminNewProductPage() {
                                                         required
                                                     >
                                                         <option value="" disabled>Select Category</option>
+                                                        <option value="Beverages">Beverages</option>
                                                         <option value="Soft Drinks">Soft Drinks</option>
                                                         <option value="Energy Drinks">Energy Drinks</option>
-                                                        <option value="Coffee & Tea">Coffee & Tea</option>
-                                                        <option value="Snacks & Sweets">Snacks & Sweets</option>
+                                                        <option value="Water">Water</option>
+                                                        <option value="Juices">Juices</option>
+                                                        <option value="Snacks">Snacks</option>
+                                                        <option value="Chips">Chips</option>
+                                                        <option value="Chocolate">Chocolate</option>
+                                                        <option value="Candy">Candy</option>
+                                                        <option value="Biscuits">Biscuits</option>
+                                                        <option value="Dairy">Dairy</option>
+                                                        <option value="Milk">Milk</option>
+                                                        <option value="Cheese">Cheese</option>
+                                                        <option value="Yogurt">Yogurt</option>
                                                         <option value="Personal Care">Personal Care</option>
-                                                        <option value="Home Care">Home Care</option>
-                                                        <option value="Makeup">Makeup</option>
-                                                        <option value="Perfume">Perfume</option>
-                                                        <option value="Food">Food</option>
-                                                        <option value="Detergents">Detergents</option>
+                                                        <option value="Skincare">Skincare</option>
+                                                        <option value="Haircare">Haircare</option>
+                                                        <option value="Oral Care">Oral Care</option>
+                                                        <option value="Cleaning">Cleaning</option>
+                                                        <option value="Household">Household</option>
+                                                        <option value="Detergent">Detergent</option>
+                                                        <option value="Frozen Food">Frozen Food</option>
+                                                        <option value="Ice Cream">Ice Cream</option>
+                                                        <option value="Meat">Meat</option>
+                                                        <option value="Seafood">Seafood</option>
+                                                        <option value="Bakery">Bakery</option>
+                                                        <option value="Bread">Bread</option>
+                                                        <option value="Pastries">Pastries</option>
+                                                        <option value="Tobacco">Tobacco</option>
+                                                        <option value="Coffee">Coffee</option>
+                                                        <option value="Tea">Tea</option>
+                                                        <option value="Baby Products">Baby Products</option>
+                                                        <option value="Pet Food">Pet Food</option>
+                                                        <option value="Other">Other</option>
                                                     </select>
                                                 </div>
                                             </div>

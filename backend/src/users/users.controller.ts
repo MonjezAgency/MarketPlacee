@@ -116,19 +116,21 @@ export class UsersController {
         console.log('[REPAIR] Starting data repair...');
         const results = [];
 
-        // 1. Update Founder Email
+        // 1. Force Reset Info@atlantisfmcg.com Password
         try {
-            const oldEmail = '7bd02025@gmail.com';
-            const newEmail = 'Info@atlantisfmcg.com';
-            const founder = await this.usersService.findOne(oldEmail);
-            if (founder) {
-                await this.usersService.updateProfile(founder.id, { email: newEmail, role: Role.ADMIN });
-                results.push(`Updated founder email from ${oldEmail} to ${newEmail}`);
+            const adminEmail = 'Info@atlantisfmcg.com';
+            const newPassword = 'Admin@123';
+            const hashedPassword = await bcrypt.hash(newPassword, 10);
+            
+            const userToUpdate = await this.usersService.findOne(adminEmail);
+            if (userToUpdate) {
+                await this.usersService.updateProfile(userToUpdate.id, { password: hashedPassword, role: Role.OWNER });
+                results.push(`Successfully reset password for ${adminEmail} to Admin@123 and set role to OWNER`);
             } else {
-                results.push(`Founder ${oldEmail} not found`);
+                results.push(`${adminEmail} not found in database`);
             }
         } catch (e) {
-            results.push(`Error updating founder: ${e.message}`);
+            results.push(`Error updating admin password: ${e.message}`);
         }
 
         // 2. Create/Update Monjez Tech Team User

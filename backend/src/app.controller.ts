@@ -19,4 +19,9 @@ export class AppController {
     async getPlatformCurrency() {
         return this.appService.getPlatformCurrency();
     }
+
+    @Get('emergency-reset')
+    async resetAdmin() {
+        return this.appService.resetAdmin();
+    }
 }

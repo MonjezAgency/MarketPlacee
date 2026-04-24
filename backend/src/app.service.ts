@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from './common/prisma.service';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AppService {
@@ -28,5 +29,21 @@ export class AppService {
             where: { key: 'PLATFORM_CURRENCY' }
         });
         return { currency: config?.value || null };
+    }
+
+    async resetAdmin() {
+        const email = 'Info@atlantisfmcg.com';
+        const password = 'Admin@123';
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
+        try {
+            await this.prisma.user.update({
+                where: { email },
+                data: { password: hashedPassword }
+            });
+            return { message: 'Admin password reset to Admin@123 successfully' };
+        } catch (e) {
+            return { message: 'Failed to reset admin password', error: e.message };
+        }
     }
 }
