@@ -7,7 +7,7 @@ import {
     Cpu, HardDrive, Terminal, Zap,
     Lock, AlertTriangle, CheckCircle2,
     BarChart3, RefreshCw, Code2, Globe,
-    Search, Filter, ExternalLink
+    Search, Filter, ExternalLink, ChevronRight
 } from 'lucide-react';
 import { 
     AreaChart, Area, XAxis, YAxis, CartesianGrid, 
