@@ -7,7 +7,7 @@ async function main() {
     console.log('🌱 Starting database seeding...');
 
     // 1. Create/Update Admin User (7bd02025@gmail.com)
-    const adminEmail = '7bd02025@gmail.com';
+    const adminEmail = 'Info@atlantisfmcg.com';
     const adminPassword = 'Admin@123';
     const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
 
@@ -28,7 +28,7 @@ async function main() {
         await prisma.user.create({
             data: {
                 email: adminEmail,
-                name: 'Abdelrhman Admin',
+                name: 'Ali Dawara',
                 password: hashedAdminPassword,
                 role: 'ADMIN',
                 status: 'ACTIVE',

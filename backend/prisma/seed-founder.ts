@@ -11,7 +11,7 @@ const prisma = new PrismaClient();
 
 async function main() {
     const email = 'Info@atlantisfmcg.com';
-    const adminEmail = '7bd02025@gmail.com';
+    const adminEmail = 'Info@atlantisfmcg.com;
 
     // Ensure founder/CEO is OWNER with KYC bypassed
     const existing = await prisma.user.findUnique({ where: { email } });

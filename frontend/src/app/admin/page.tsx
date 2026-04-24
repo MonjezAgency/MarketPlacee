@@ -21,6 +21,8 @@ import {
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '@/lib/auth';
+import DeveloperDashboard from './components/DeveloperDashboard';
 
 // ─── Constants for Fallback ────────────────────────────────────────────────
 // These will only be used if the API returns absolutely nothing and we want to show empty states
@@ -88,7 +90,9 @@ function DashboardKPICard({ icon: Icon, label, value, subtext, trend, trendValue
 
 export default function AdminOverviewPage() {
     const { locale, t } = useLanguage();
+    const { user } = useAuth();
     const isAr = locale === 'ar';
+    const isDeveloper = (user?.role || '').toUpperCase() === 'DEVELOPER';
     const [stats, setStats] = React.useState({ 
         pendingUsers: 0, 
         pendingOrdersCount: 0,
@@ -170,6 +174,10 @@ export default function AdminOverviewPage() {
     React.useEffect(() => {
         fetchStats();
     }, [fetchStats]);
+
+    if (isDeveloper) {
+        return <DeveloperDashboard />;
+    }
 
     return (
         <div className="space-y-8 animate-in fade-in duration-700 pb-20">
