@@ -43,15 +43,30 @@ export default function AdminNewProductPage() {
         setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
     };
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setFormData(prev => ({ ...prev, images: [...prev.images, reader.result as string] }));
-            };
-            reader.readAsDataURL(file);
-        });
+        if (files.length === 0) return;
+
+        for (const file of files) {
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+
+                const res = await apiFetch('/products/upload-image', {
+                    method: 'POST',
+                    body: fd,
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    setFormData(prev => ({ ...prev, images: [...prev.images, data.url] }));
+                } else {
+                    console.error(`Upload failed for ${file.name}: ${res.status}`);
+                }
+            } catch (err) {
+                console.error(`Upload error for ${file.name}:`, err);
+            }
+        }
     };
 
     const removeImage = (index: number) => {

@@ -516,49 +516,47 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
 
-        const processFile = (file: File): Promise<string> => {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const img = new globalThis.Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        let { width, height } = img;
-                        const maxDim = 1000; // Increased quality
+        // Upload each file to the backend (Supabase Storage) and get permanent URLs
+        const uploadFile = async (file: File): Promise<string | null> => {
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
 
-                        if (width > height && width > maxDim) {
-                            height = Math.round((height * maxDim) / width);
-                            width = maxDim;
-                        } else if (height > maxDim) {
-                            width = Math.round((width * maxDim) / height);
-                            height = maxDim;
-                        }
+                const { apiFetch } = await import('@/lib/api');
+                const res = await apiFetch('/products/upload-image', {
+                    method: 'POST',
+                    body: fd,
+                });
 
-                        canvas.width = width;
-                        canvas.height = height;
-                        const ctx = canvas.getContext('2d');
-                        if (ctx) {
-                            ctx.drawImage(img, 0, 0, width, height);
-                            resolve(canvas.toDataURL('image/webp', 0.8));
-                        } else {
-                            resolve(reader.result as string);
-                        }
-                    };
-                    img.onerror = () => reject(new Error('Image load failed'));
-                    img.src = reader.result as string;
-                };
-                reader.readAsDataURL(file);
-            });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.url;
+                } else {
+                    console.error(`Upload failed for ${file.name}: ${res.status}`);
+                    return null;
+                }
+            } catch (err) {
+                console.error(`Upload error for ${file.name}:`, err);
+                return null;
+            }
         };
 
         try {
-            const results = await Promise.all(files.map(processFile));
-            setFormData((prev: Product) => {
-                const existing = prev.images || [];
-                const newOnes = results.filter(r => !existing.includes(r));
-                const combined = [...existing, ...newOnes];
-                return { ...prev, images: combined, image: combined[0] };
-            });
+            const results = await Promise.all(files.map(uploadFile));
+            const validUrls = results.filter((url): url is string => url !== null);
+
+            if (validUrls.length > 0) {
+                setFormData((prev: Product) => {
+                    const existing = prev.images || [];
+                    const newOnes = validUrls.filter(r => !existing.includes(r));
+                    const combined = [...existing, ...newOnes];
+                    return { ...prev, images: combined, image: combined[0] };
+                });
+            }
+
+            if (validUrls.length < files.length) {
+                console.warn(`${files.length - validUrls.length} image(s) failed to upload`);
+            }
         } catch (err) {
             console.error('Image upload failed:', err);
         }
