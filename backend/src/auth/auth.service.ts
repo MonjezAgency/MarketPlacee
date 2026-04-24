@@ -557,4 +557,25 @@ export class AuthService {
         if (!user) throw new UnauthorizedException('User not found');
         return user;
     }
+
+    async changePassword(userId: string, currentPassword: string, newPassword: string) {
+        const user = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!user) throw new UnauthorizedException('User not found');
+
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) throw new BadRequestException('كلمة المرور الحالية غير صحيحة');
+
+        const isStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/.test(newPassword);
+        if (!isStrong) {
+            throw new BadRequestException('كلمة المرور الجديدة ضعيفة. يجب أن تحتوي على 8 أحرف على الأقل، حرف كبير، حرف صغير، رقم، ورمز خاص.');
+        }
+
+        const hashed = await bcrypt.hash(newPassword, 12);
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { password: hashed },
+        });
+
+        return { success: true, message: 'تم تغيير كلمة المرور بنجاح' };
+    }
 }
