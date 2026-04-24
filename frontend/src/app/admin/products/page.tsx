@@ -485,7 +485,7 @@ export default function ProductsModerationPage() {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-200">
-                                                        <img src={p.images?.[0] || 'https://via.placeholder.com/40'} className="w-full h-full object-cover" />
+                                                        <img src={p.images?.[0] || 'https://via.placeholder.com/40'} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/40?text=NA'; }} className="w-full h-full object-cover" />
                                                     </div>
                                                     <span className="text-sm font-semibold text-slate-900 truncate max-w-[200px]">{p.name}</span>
                                                 </div>
@@ -513,7 +513,7 @@ export default function ProductsModerationPage() {
                         {filteredProducts.map(p => (
                             <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm active:scale-95 transition-all">
                                 <div className="flex items-center gap-4">
-                                    <img src={p.images?.[0]} className="w-16 h-16 rounded-xl object-cover border border-slate-100" />
+                                    <img src={p.images?.[0] || 'https://via.placeholder.com/64'} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=NA'; }} className="w-16 h-16 rounded-xl object-cover border border-slate-100" />
                                     <div className="flex-1 min-w-0">
                                         <h4 className="text-sm font-bold text-slate-900 truncate">{p.name}</h4>
                                         <p className="text-xs text-slate-500 mt-0.5">{p.supplier?.name || 'Admin Upload'}</p>
@@ -552,7 +552,7 @@ export default function ProductsModerationPage() {
                                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden">
-                                            <img src={selectedProduct.images?.[0]} className="w-full h-full object-cover" />
+                                            <img src={selectedProduct.images?.[0] || 'https://via.placeholder.com/64'} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=NA'; }} className="w-full h-full object-cover" />
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2">
@@ -594,7 +594,7 @@ export default function ProductsModerationPage() {
                                         <>
                                             <div className="space-y-4">
                                                 <div className="aspect-video w-full rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden relative group">
-                                                    <img src={isEditing ? editData.images?.[0] : selectedProduct.images?.[0]} className="w-full h-full object-cover" />
+                                                    <img src={isEditing ? editData.images?.[0] : selectedProduct.images?.[0]} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Invalid+URL'; }} className="w-full h-full object-cover" />
                                                     {isEditing && (
                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                                                             <p className="text-white text-[10px] font-bold uppercase tracking-widest">Editing Mode</p>
@@ -604,7 +604,7 @@ export default function ProductsModerationPage() {
                                                 <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                                                     {(isEditing ? editData.images : selectedProduct.images).map((img: string, i: number) => (
                                                         <div key={i} className="relative group shrink-0">
-                                                            <img src={img} className="w-16 h-16 rounded-xl object-cover border border-slate-100" />
+                                                            <img src={img} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=NA'; }} className="w-16 h-16 rounded-xl object-cover border border-slate-100" />
                                                             {isEditing && (
                                                                 <button 
                                                                     onClick={() => setEditData({...editData, images: editData.images.filter((_:any, idx:number) => idx !== i)})}
@@ -634,7 +634,7 @@ export default function ProductsModerationPage() {
                                                             <button 
                                                                 onClick={() => {
                                                                     const url = window.prompt('Enter professional image URL:');
-                                                                    if (url) setEditData({...editData, images: [...(editData.images || []), url]});
+                                                                    if (url && url.trim()) setEditData({...editData, images: [...(editData.images || []), url.trim()]});
                                                                 }}
                                                                 className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 hover:border-teal-200 transition-all shrink-0"
                                                             >

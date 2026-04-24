@@ -64,8 +64,11 @@ export default function AdminNewProductPage() {
     const addImageUrl = () => {
         const urlInput = document.getElementById('image-url-input') as HTMLInputElement;
         if (urlInput && urlInput.value) {
-            setFormData(prev => ({ ...prev, images: [...prev.images, urlInput.value] }));
-            urlInput.value = '';
+            const cleanUrl = urlInput.value.trim();
+            if (cleanUrl) {
+                setFormData(prev => ({ ...prev, images: [...prev.images, cleanUrl] }));
+                urlInput.value = '';
+            }
         }
     };
 
@@ -219,6 +222,8 @@ export default function AdminNewProductPage() {
                                                 <img
                                                     src={img}
                                                     alt={`Preview ${idx + 1}`}
+                                                    referrerPolicy="no-referrer"
+                                                    onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Invalid+URL'; }}
                                                     className="max-w-full max-h-full object-contain transition-transform duration-700 group-hover/img:scale-110"
                                                 />
                                                 <button

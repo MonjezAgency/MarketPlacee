@@ -114,7 +114,7 @@ function ModalPortalContent({
                                                 <div className="grid grid-cols-2 gap-4">
                                                     {(formData.images || []).map((img, idx) => (
                                                         <div key={idx} className="relative group/img aspect-square bg-white rounded-2xl border border-border/50 overflow-hidden shadow-sm">
-                                                            <img src={img} alt={`Preview ${idx}`} className="w-full h-full object-contain p-2" />
+                                                            <img src={img} alt={`Preview ${idx}`} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Invalid+URL'; }} className="w-full h-full object-contain p-2" />
                                                             <button
                                                                 type="button"
                                                                 onClick={() => removeImage(idx)}
@@ -195,7 +195,7 @@ function ModalPortalContent({
                                             <div className="bg-background rounded-2xl border border-border shadow-sm group-hover:shadow-lg transition-all">
                                                 <div className="aspect-[4/3] bg-muted/10 flex items-center justify-center">
                                                     {(formData.images || [])[0] ? (
-                                                        <img src={formData.images?.[0]} alt="Preview" className="w-full h-full object-contain p-4" />
+                                                        <img src={formData.images?.[0]} alt="Preview" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Invalid+URL'; }} className="w-full h-full object-contain p-4" />
                                                     ) : (
                                                         <ImageIcon size={32} className="text-muted-foreground/20" />
                                                     )}

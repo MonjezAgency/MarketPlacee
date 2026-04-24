@@ -78,6 +78,8 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                     <img
                         src={product.image}
                         alt={product.name}
+                        referrerPolicy="no-referrer"
+                        onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/160?text=Invalid+Image'; }}
                         className="max-h-[160px] max-w-full object-contain mix-blend-multiply"
                         loading="lazy"
                         decoding="async"
