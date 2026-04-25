@@ -58,6 +58,39 @@ export default function AddProductWorkspace() {
 
     const progress = (completionItems.filter(i => i.done).length / completionItems.length) * 100;
 
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0) return;
+
+        const uploadFile = async (file: File): Promise<string | null> => {
+            try {
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await apiFetch('/products/upload-image', {
+                    method: 'POST',
+                    body: fd,
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    return data.url;
+                }
+                return null;
+            } catch (err) {
+                console.error('Upload error:', err);
+                return null;
+            }
+        };
+
+        const results = await Promise.all(files.map(uploadFile));
+        const validUrls = results.filter((url): url is string => url !== null);
+        if (validUrls.length > 0) {
+            setFormData(prev => ({
+                ...prev,
+                images: [...prev.images, ...validUrls]
+            }));
+        }
+    };
+
     const handleLaunch = async () => {
         if (!formData.name || !formData.price) {
             alert('Please fill in required fields (Name and Price)');
