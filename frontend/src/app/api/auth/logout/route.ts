@@ -10,9 +10,7 @@ export async function POST(request: Request) {
     path: '/',
   };
 
-  if (isCustomDomain) {
-    cookieOptions.domain = '.atlantisfmcg.com';
-  }
+  /* Domain logic removed to match login route - browser defaults to current host */
 
   cookieStore.delete({ name: 'token', ...cookieOptions });
   cookieStore.delete({ name: 'refreshToken', ...cookieOptions });

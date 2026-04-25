@@ -14,6 +14,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { getServerSession } from "next-auth/next";
+import { authOptions } from "@/lib/auth-options";
 
 const getBackendUrl = () =>
   (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app').trim().replace(/\/+$/, '');
@@ -35,7 +37,10 @@ async function handler(
   const backendPath = params.path.join('/');
   const isPublic = PUBLIC_PATHS.some(p => backendPath === p || backendPath.startsWith(p + '?'));
 
-  const token = cookies().get('token')?.value;
+  // Get token from either cookie (standard login) or session (Google login)
+  const session = await getServerSession(authOptions);
+  const token = (session as any)?.backendToken || cookies().get('token')?.value;
+
   if (!token && !isPublic) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
@@ -46,6 +51,7 @@ async function handler(
   const forwardHeaders: Record<string, string> = {};
   if (token) {
     forwardHeaders['Cookie'] = `token=${token}`;
+    forwardHeaders['Authorization'] = `Bearer ${token}`;
   }
 
   // Forward Content-Type if present (needed for JSON/FormData bodies)

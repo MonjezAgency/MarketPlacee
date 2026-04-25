@@ -66,25 +66,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Load from backend /auth/me on mount
     useEffect(() => {
-        const checkAuth = async () => {
-            // Add a safety timeout to prevent hanging forever if backend is unreachable
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Auth check timed out')), 8000)
-            );
-
+        let isMounted = true;
+        
+        const checkAuth = async (retryCount = 0) => {
+            if (!isMounted) return;
+            
             try {
+                // Add a small initial delay to ensure cookies are ready (esp. on Safari/Mac)
+                if (retryCount === 0) await new Promise(r => setTimeout(r, 300));
+
                 const fetchPromise = apiFetch('/auth/me');
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('Timeout')), 8000)
+                );
+
                 const res = await Promise.race([fetchPromise, timeoutPromise]) as Response;
                 
                 if (res.ok) {
                     const userData = await res.json();
-                    setUser(userData);
-                    if (typeof window !== 'undefined' && userData?.id) {
-                        sessionStorage.setItem('bev-uid', userData.id);
-                        window.dispatchEvent(new Event('bev-auth-changed'));
+                    if (isMounted) {
+                        setUser(userData);
+                        if (typeof window !== 'undefined' && userData?.id) {
+                            sessionStorage.setItem('bev-uid', userData.id);
+                            window.dispatchEvent(new Event('bev-auth-changed'));
+                        }
                     }
+                } else if (res.status === 401 && retryCount < 2) {
+                    // One-time retry for 401s right after boot (potential race condition)
+                    console.warn(`[AUTH] Retrying auth check (${retryCount + 1}/2)...`);
+                    await new Promise(r => setTimeout(r, 800));
+                    return checkAuth(retryCount + 1);
                 } else {
-                    setUser(null);
+                    if (isMounted) setUser(null);
                     // Clear cookie if token is invalid/expired to prevent redirect loops
                     if (res.status === 401 || res.status === 403) {
                         fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
@@ -92,12 +105,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
             } catch (err) {
                 console.error("Auth hydration failed or timed out:", err);
-                setUser(null);
+                if (isMounted) setUser(null);
             } finally {
-                setIsAuthReady(true);
+                if (isMounted) setIsAuthReady(true);
             }
         };
+
         checkAuth();
+        return () => { isMounted = false; };
     }, []);
 
     const register = async (data: {
@@ -210,6 +225,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ partialToken, code }),
             });
+            /* 
+       We no longer set an explicit domain here. 
+       Removing the domain allows the browser to default to the current host (e.g. atlantisfmcg.com or www.atlantisfmcg.com).
+       This is safer and avoids issues with sub-subdomains or proxy misconfigurations.
+    */
             if (!res.ok) {
                 const error = await res.json();
                 return { success: false, message: error.message || 'Invalid verification code.' };

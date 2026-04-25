@@ -83,15 +83,17 @@ export async function POST(request: Request) {
     const isCustomDomain = host.includes('atlantisfmcg.com');
     const cookieOptions: any = {
         httpOnly: true,
-        secure: true,
+        secure: process.env.NODE_ENV === 'production',
         sameSite: 'lax',
         path: '/',
         maxAge: 7 * 24 * 60 * 60,
     };
 
-    if (isCustomDomain) {
-        cookieOptions.domain = '.atlantisfmcg.com';
-    }
+    /* 
+       We no longer set an explicit domain here. 
+       Removing the domain allows the browser to default to the current host (e.g. atlantisfmcg.com or www.atlantisfmcg.com).
+       This is safer and avoids issues with sub-subdomains or proxy misconfigurations.
+    */
 
     if (access_token) {
       cookieStore.set('token', access_token, cookieOptions);
