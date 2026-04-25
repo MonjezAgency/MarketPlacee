@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
     LayoutDashboard,
     Box,
@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { apiFetch } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
+import { GuidedTour } from '@/components/ui/GuidedTour';
 
 const SUPPLIER_LINKS = [
     { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
@@ -47,9 +48,59 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     const [isOpen, setIsOpen] = React.useState(true);
     const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
     const pathname = usePathname();
-    const { user, logout } = useAuth();
+    const { user, logout, isAuthReady } = useAuth();
     const { theme, setTheme } = useTheme();
+    const router = useRouter();
     const [stats, setStats] = React.useState<any>(null);
+    const [showTour, setShowTour] = React.useState(false);
+
+    // Role Guard: Only Suppliers allowed in /supplier
+    React.useEffect(() => {
+        if (isAuthReady) {
+            if (!user) {
+                router.replace('/auth/login');
+            } else if (user.role?.toUpperCase() !== 'SUPPLIER') {
+                // Redirect non-suppliers to their appropriate home
+                if (user.role?.toUpperCase() === 'ADMIN' || user.role?.toUpperCase() === 'OWNER') {
+                    router.replace('/admin');
+                } else {
+                    router.replace('/dashboard/customer');
+                }
+            }
+        }
+    }, [isAuthReady, user, router]);
+
+
+    React.useEffect(() => {
+        const hasSeenTour = localStorage.getItem('atlantis-tour-supplier');
+        if (!hasSeenTour && user?.status === 'ACTIVE') {
+            const timer = setTimeout(() => setShowTour(true), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [user]);
+
+    const tourSteps = [
+        {
+            targetId: 'tour-business-hub',
+            title: 'Your Command Center',
+            description: 'This is where you monitor your entire wholesale operation at a glance. Real-time data, injected directly from the platform core.'
+        },
+        {
+            targetId: 'tour-inventory',
+            title: 'Inventory Control',
+            description: 'Manage your product catalog, update prices, and monitor stock levels across all your distribution centers.'
+        },
+        {
+            targetId: 'tour-revenue',
+            title: 'Financial Insights',
+            description: 'Track your month-to-date revenue and active order volume. All figures are automatically converted to your preferred currency.'
+        },
+        {
+            targetId: 'tour-notifications',
+            title: 'Priority Alerts',
+            description: 'Never miss a wholesale lead or urgent order. Stay updated with real-time notifications from buyers.'
+        }
+    ];
 
     React.useEffect(() => {
         const fetchStats = async () => {
@@ -99,6 +150,16 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
         return () => clearInterval(interval);
     }, []);
 
+    // Show nothing while checking auth to prevent layout flash
+    // This MUST be after all hooks to avoid "Rendered more hooks" error
+    if (!isAuthReady || (user && user.role?.toUpperCase() !== 'SUPPLIER')) {
+        return (
+            <div className="h-screen w-full flex items-center justify-center bg-background">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
+
     return (
         <div className="flex h-screen bg-background overflow-hidden transition-colors duration-500">
             {/* Sidebar */}
@@ -109,11 +170,18 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 {/* Sidebar Header */}
                 <div className="h-20 flex items-center justify-between px-6 border-b border-border/50">
                     {isOpen ? (
-                        <Link href="/" className="font-heading font-black text-xl tracking-tighter text-foreground uppercase">
-                            Atlantis
+                        <Link href="/" className="flex items-center gap-3 group">
+                            <div className="w-10 h-10 bg-white border-2 border-primary/20 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg shadow-primary/5">
+                                <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
+                            </div>
+                            <span className="font-heading font-black text-xl tracking-tighter text-foreground uppercase flex items-center">
+                                Atlan<span className="text-primary">tis.</span>
+                            </span>
                         </Link>
                     ) : (
-                        <div className="w-8 h-8 bg-primary rounded flex items-center justify-center font-black text-xs text-primary-foreground uppercase">A</div>
+                        <div className="w-10 h-10 bg-white border-2 border-primary/20 rounded-xl overflow-hidden flex items-center justify-center">
+                            <img src="/icon.png" alt="A" className="w-full h-full object-cover" />
+                        </div>
                     )}
                     <button onClick={() => setIsOpen(!isOpen)} className="text-muted-foreground hover:text-foreground transition-colors">
                         {isOpen ? <X size={20} /> : <Menu size={20} />}
@@ -145,6 +213,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             <Link
                                 key={link.href}
                                 href={link.href}
+                                id={link.key === 'products' ? 'tour-inventory' : undefined}
                                 className={cn(
                                     "flex items-center gap-4 px-4 py-3 rounded-xl transition-all group",
                                     isActive
@@ -184,13 +253,13 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 {/* Header Row */}
                 <header className="h-20 bg-background/80 backdrop-blur-xl border-b border-border/50 flex items-center justify-between px-8 z-40">
                     <div className="flex items-center gap-8">
-                        <div className="flex flex-col">
+                        <div id="tour-business-hub" className="flex flex-col">
                             <h2 className="text-foreground font-black tracking-tight text-xl">Business Hub</h2>
                             <p className="text-emerald-500 text-[10px] font-black uppercase tracking-[0.2em] leading-none mt-1">Direct Sales Access</p>
                         </div>
 
                         {/* Quick KPIs in Header */}
-                        <div className="hidden lg:flex items-center gap-8 border-s border-border/50 ps-8">
+                        <div id="tour-revenue" className="hidden lg:flex items-center gap-8 border-s border-border/50 ps-8">
                             <div className="flex flex-col">
                                 <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Revenue (MTD)</span>
                                 <span className="text-sm font-black text-foreground">{stats ? formatPrice(stats.totalRevenue) : '—'}</span>
@@ -212,6 +281,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
 
                         <div className="relative group">
                             <button
+                                id="tour-notifications"
                                 onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                                 className="p-2 rounded-xl hover:bg-muted transition-all outline-none"
                             >
@@ -294,6 +364,19 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                     {children}
                 </div>
             </main>
+
+            <GuidedTour 
+                show={showTour}
+                steps={tourSteps}
+                onComplete={() => {
+                    localStorage.setItem('atlantis-tour-supplier', 'true');
+                    setShowTour(false);
+                }}
+                onDismiss={() => {
+                    localStorage.setItem('atlantis-tour-supplier', 'true');
+                    setShowTour(false);
+                }}
+            />
         </div>
     );
 }

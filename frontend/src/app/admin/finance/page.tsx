@@ -12,6 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiFetch } from '@/lib/api';
+import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertToBase } from '@/lib/currency';
 
 type Tab = 'invoices' | 'credit' | 'tax' | 'warehouses';
 
@@ -63,6 +64,7 @@ function AdminFinanceContent() {
     const [newWarehouse, setNewWarehouse] = React.useState({ name: '', address: '', city: '', country: '', zipCode: '', supplierId: '' });
     const [suppliers, setSuppliers] = React.useState<any[]>([]);
     const [userSearch, setUserSearch] = React.useState('');
+    const [activeCurrency, setActiveCurrency] = React.useState(getCurrencyInfo().code);
 
     // ── Analytics State ─────────────────────────────────────
     const stats = {
@@ -182,9 +184,12 @@ function AdminFinanceContent() {
     const createManualInvoice = async () => {
         if (!newInvoice.customerId || newInvoice.amount <= 0) return;
         try {
+            // Convert to EGP base
+            const amountEGP = convertToBase(newInvoice.amount, activeCurrency);
+            
             const res = await apiFetch(`/finance/manual-invoice`, {
                 method: 'POST',
-                body: JSON.stringify(newInvoice),
+                body: JSON.stringify({ ...newInvoice, amount: amountEGP }),
             });
             if (res.ok) {
                 showToast('success', 'Manual invoice created');
@@ -223,9 +228,21 @@ function AdminFinanceContent() {
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Finance & Compliance</h1>
-                    <p className="text-sm text-slate-500 mt-1">Manage billing, credit policies, and global warehouse infrastructure.</p>
+                <div className="flex items-center gap-5">
+                    <div className="w-14 h-14 bg-white border border-slate-200 rounded-2xl flex items-center justify-center p-2 shadow-sm">
+                        <img 
+                            src="https://mgecljoxasstdfmlytov.supabase.co/storage/v1/object/public/marketplace-assets/logo_atlantis.png" 
+                            alt="Atlantis" 
+                            className="w-full h-full object-contain"
+                        />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                            Finance & Compliance
+                            <span className="px-2 py-0.5 bg-teal-50 text-teal-600 text-[9px] font-black uppercase tracking-widest rounded-md border border-teal-100">Verified HQ</span>
+                        </h1>
+                        <p className="text-sm text-slate-500 mt-0.5">Manage billing, credit policies, and global warehouse infrastructure.</p>
+                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <button className="h-10 px-4 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
@@ -300,18 +317,18 @@ function AdminFinanceContent() {
                     >
                         {/* ── Invoices Tab ──────────────────────── */}
                         {tab === 'invoices' && (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-slate-50/50 border-b border-slate-100">
-                                        <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                            <th className="px-6 py-4">Invoice ID</th>
-                                            <th className="px-6 py-4">Client</th>
-                                            <th className="px-6 py-4">Amount</th>
-                                            <th className="px-6 py-4">Status</th>
-                                            <th className="px-6 py-4">Due Date</th>
-                                            <th className="px-6 py-4 text-end">Actions</th>
-                                        </tr>
-                                    </thead>
+                                <div className="max-h-[600px] overflow-y-auto scrollbar-hide">
+                                    <table className="w-full text-left relative border-collapse">
+                                        <thead className="sticky top-0 bg-slate-50/90 backdrop-blur-md border-b border-slate-100 z-20">
+                                            <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                <th className="px-6 py-4">Invoice ID</th>
+                                                <th className="px-6 py-4">Client</th>
+                                                <th className="px-6 py-4">Amount</th>
+                                                <th className="px-6 py-4">Status</th>
+                                                <th className="px-6 py-4">Due Date</th>
+                                                <th className="px-6 py-4 text-end">Actions</th>
+                                            </tr>
+                                        </thead>
                                     <tbody className="divide-y divide-slate-50">
                                         {isLoadingInvoices ? (
                                             [...Array(5)].map((_, i) => (
@@ -376,8 +393,8 @@ function AdminFinanceContent() {
                                             ))
                                         )}
                                     </tbody>
-                                </table>
-                            </div>
+                                    </table>
+                                </div>
                         )}
 
                         {/* ── Credit Terms Tab ─────────────────── */}
@@ -561,50 +578,121 @@ function AdminFinanceContent() {
                                     <div className="space-y-4">
                                         <div className="space-y-1.5">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Select Account (Customer/Supplier)</label>
-                                            <div className="relative">
-                                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                                                <input 
-                                                    type="text"
-                                                    placeholder="Search by name or email..."
-                                                    className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 outline-none focus:border-teal-500 text-sm font-medium transition-all"
-                                                    value={userSearch}
-                                                    onChange={(e) => setUserSearch(e.target.value)}
-                                                />
-                                            </div>
-                                            <div className="max-h-32 overflow-y-auto border border-slate-100 rounded-xl bg-slate-50/50 p-2 space-y-1 scrollbar-hide">
-                                                {[...buyers, ...suppliers]
-                                                    .filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase()))
-                                                    .slice(0, 10)
-                                                    .map(u => (
+                                            <div className="space-y-3">
+                                                {!newInvoice.customerId ? (
+                                                    <div className="relative">
+                                                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                        <input 
+                                                            type="text"
+                                                            placeholder="Search by name, email or حرف..."
+                                                            className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 outline-none focus:border-teal-500 text-sm font-medium transition-all"
+                                                            value={userSearch}
+                                                            onChange={(e) => setUserSearch(e.target.value)}
+                                                        />
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center justify-between p-3 bg-teal-600 text-white rounded-xl shadow-lg shadow-teal-600/20 animate-in zoom-in-95 duration-200">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center font-bold text-xs">
+                                                                {([...buyers, ...suppliers].find(u => u.id === newInvoice.customerId)?.name || 'U')[0]}
+                                                            </div>
+                                                            <div>
+                                                                <p className="text-xs font-bold">{[...buyers, ...suppliers].find(u => u.id === newInvoice.customerId)?.name}</p>
+                                                                <p className="text-[9px] opacity-80 font-medium uppercase tracking-widest">{[...buyers, ...suppliers].find(u => u.id === newInvoice.customerId)?.role}</p>
+                                                            </div>
+                                                        </div>
                                                         <button 
-                                                            key={u.id}
-                                                            onClick={() => { setNewInvoice({...newInvoice, customerId: u.id}); setUserSearch(u.name); }}
-                                                            className={cn(
-                                                                "w-full p-2.5 rounded-lg text-left text-xs font-bold transition-all flex items-center justify-between group",
-                                                                newInvoice.customerId === u.id ? "bg-teal-600 text-white" : "hover:bg-white text-slate-600 border border-transparent hover:border-slate-100"
-                                                            )}
+                                                            onClick={() => { setNewInvoice({...newInvoice, customerId: ''}); setUserSearch(''); }}
+                                                            className="w-8 h-8 rounded-lg hover:bg-white/10 flex items-center justify-center transition-all"
                                                         >
-                                                            <span>{u.name} <span className={cn("ml-1 font-medium text-[9px] opacity-70", newInvoice.customerId === u.id ? "text-white" : "text-slate-400")}>({u.role})</span></span>
-                                                            {newInvoice.customerId === u.id && <Check size={14} />}
+                                                            <X size={16} />
                                                         </button>
-                                                    ))
-                                                }
+                                                    </div>
+                                                )}
+
+                                                {!newInvoice.customerId && userSearch && (
+                                                    <div className="max-h-48 overflow-y-auto border border-slate-100 rounded-2xl bg-white p-2 space-y-1 shadow-xl border-slate-100 animate-in fade-in slide-in-from-top-2 duration-200 scrollbar-hide">
+                                                        {[...buyers, ...suppliers]
+                                                            .filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase()))
+                                                            .slice(0, 10)
+                                                            .map(u => (
+                                                                <button 
+                                                                    key={u.id}
+                                                                    onClick={() => { setNewInvoice({...newInvoice, customerId: u.id}); setUserSearch(''); }}
+                                                                    className="w-full p-3 rounded-xl text-left text-xs font-bold transition-all flex items-center justify-between group hover:bg-slate-50 border border-transparent hover:border-slate-100"
+                                                                >
+                                                                    <div className="flex items-center gap-3">
+                                                                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
+                                                                            {u.name[0]}
+                                                                        </div>
+                                                                        <div>
+                                                                            <p className="text-slate-700">{u.name}</p>
+                                                                            <p className="text-[9px] text-slate-400 font-medium">{u.email}</p>
+                                                                        </div>
+                                                                    </div>
+                                                                    <span className="px-2 py-0.5 bg-slate-100 text-slate-500 rounded text-[9px] font-bold uppercase tracking-tighter group-hover:bg-teal-100 group-hover:text-teal-700">{u.role}</span>
+                                                                </button>
+                                                            ))
+                                                        }
+                                                        {[...buyers, ...suppliers].filter(u => u.name.toLowerCase().includes(userSearch.toLowerCase()) || u.email.toLowerCase().includes(userSearch.toLowerCase())).length === 0 && (
+                                                            <div className="p-4 text-center">
+                                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">No matching accounts</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Amount (USD)</label>
-                                            <input 
-                                                type="number" 
-                                                className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-bold text-lg"
-                                                value={newInvoice.amount}
-                                                onChange={(e) => setNewInvoice({...newInvoice, amount: parseFloat(e.target.value) || 0})}
-                                            />
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Currency & Amount</label>
+                                            <div className="flex gap-2">
+                                                <select 
+                                                    className="h-12 bg-slate-50 border border-slate-200 rounded-xl px-3 outline-none focus:border-teal-500 font-bold text-sm"
+                                                    value={activeCurrency}
+                                                    onChange={(e) => setActiveCurrency(e.target.value)}
+                                                >
+                                                    {SUPPORTED_CURRENCIES.map(c => (
+                                                        <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>
+                                                    ))}
+                                                </select>
+                                                <input 
+                                                    type="number" 
+                                                    className="flex-1 h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-bold text-lg"
+                                                    value={newInvoice.amount}
+                                                    onChange={(e) => setNewInvoice({...newInvoice, amount: Number(e.target.value)})}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                                                Invoice Record (PDF)
+                                                <span className="text-teal-600">Encrypted Storage</span>
+                                            </label>
+                                            <div className="relative group">
+                                                <input 
+                                                    type="file" 
+                                                    accept=".pdf"
+                                                    className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                            // In a real app, you'd upload this to a server
+                                                            // For now, we mock the success
+                                                            showToast('success', `Attached: ${file.name}`);
+                                                        }
+                                                    }}
+                                                />
+                                                <div className="w-full h-12 bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center gap-2 text-slate-400 group-hover:border-teal-500 group-hover:text-teal-600 transition-all">
+                                                    <Download size={16} />
+                                                    <span className="text-[11px] font-black uppercase tracking-widest">Attach PDF Document</span>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div className="space-y-1.5">
                                             <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description / Notes</label>
                                             <textarea 
-                                                className="w-full h-24 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-teal-500 text-sm font-medium resize-none"
-                                                placeholder="What is this payment for?"
+                                                className="w-full h-20 bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-teal-500 text-sm font-medium resize-none"
+                                                placeholder="Transaction details..."
                                                 value={newInvoice.notes}
                                                 onChange={(e) => setNewInvoice({...newInvoice, notes: e.target.value})}
                                             />

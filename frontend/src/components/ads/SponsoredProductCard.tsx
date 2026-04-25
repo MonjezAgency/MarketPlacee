@@ -61,7 +61,7 @@ export default function SponsoredProductCard({ product, index }: SponsoredProduc
                 </p>
 
                 <div className="flex items-baseline gap-1 mb-2">
-                    <span className="text-xl font-medium text-[#0F1111]">{formatPrice(product.price, false)}</span>
+                    <span className="text-xl font-medium text-[#0F1111]">{formatPrice(product.price, currency)}</span>
                 </div>
 
                 {(product.stock ?? 0) > 0 ? (

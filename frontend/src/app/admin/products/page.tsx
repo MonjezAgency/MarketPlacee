@@ -7,7 +7,7 @@ import {
     ArrowUpRight, Info, User, Sparkles, MessageSquare,
     Trash2, Eye, ExternalLink, Filter, Download,
     CheckCircle, ShieldAlert, Activity, Pencil,
-    Image as ImageIcon, ListFilter
+    Image as ImageIcon, ListFilter, FileSpreadsheet, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -117,6 +117,7 @@ export default function ProductsModerationPage() {
     const [isSavingEdit, setIsSavingEdit] = React.useState(false);
     const [isUploadingImage, setIsUploadingImage] = React.useState(false);
     const imageInputRef = React.useRef<HTMLInputElement>(null);
+    const [showUploadGuide, setShowUploadGuide] = React.useState(false);
 
     const startEditing = (product: any) => {
         setEditData({ ...product });
@@ -384,7 +385,7 @@ export default function ProductsModerationPage() {
                         accept=".csv,.xlsx,.xls"
                     />
                     <button 
-                        onClick={() => fileInputRef.current?.click()}
+                        onClick={() => setShowUploadGuide(true)}
                         disabled={isUploading}
                         className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all disabled:opacity-50"
                     >
@@ -1089,6 +1090,99 @@ export default function ProductsModerationPage() {
                             </div>
                         </div>
                     </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Bulk Upload Guidelines Modal */}
+            <AnimatePresence>
+                {showUploadGuide && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setShowUploadGuide(false)}
+                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+                        />
+                        <motion.div 
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            className="bg-white rounded-[32px] w-full max-w-2xl relative z-10 overflow-hidden shadow-2xl border border-slate-200"
+                        >
+                            <div className="p-8">
+                                <div className="flex items-center justify-between mb-8">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-600">
+                                            <FileSpreadsheet size={24} />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-slate-900">Bulk Ingestion Guidelines</h3>
+                                            <p className="text-sm text-slate-500 mt-0.5">Please ensure your file meets these requirements</p>
+                                        </div>
+                                    </div>
+                                    <button onClick={() => setShowUploadGuide(false)} className="w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-all">
+                                        <XCircle size={20} />
+                                    </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div className="space-y-4">
+                                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                            <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Supported Formats</h4>
+                                            <div className="flex items-center gap-2">
+                                                <span className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600">.XLSX</span>
+                                                <span className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600">.CSV</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl">
+                                            <div className="flex items-start gap-3">
+                                                <ShieldCheck className="text-teal-600 mt-0.5" size={18} />
+                                                <div>
+                                                    <p className="text-sm font-bold text-teal-900">Validation Protocol</p>
+                                                    <p className="text-[12px] text-teal-700 mt-1 leading-relaxed">
+                                                        The system will verify each row. Invalid data (e.g. text in price column) will stop the ingestion.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-2">Mandatory Columns</h4>
+                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                                            {[
+                                                'Product Name', 'Brand', 'Category', 
+                                                'Price (Base)', 'Currency (USD/EUR/EGP)',
+                                                'Description', 'Weight (kg)', 'Shelf Life',
+                                                'Stock (Total Units)', 'Min Order (MOQ)', 
+                                                'Unit Type (PC/PL/SH)', 'Units per Pallet',
+                                                'Pallets per Shipment', 'SKU', 'EAN'
+                                            ].map(col => (
+                                                <div key={col} className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
+                                                    <span className="text-[10px] font-bold text-slate-600 truncate">{col}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="mt-10 flex items-center gap-3">
+                                    <button 
+                                        onClick={() => {
+                                            setShowUploadGuide(false);
+                                            setTimeout(() => fileInputRef.current?.click(), 100);
+                                        }}
+                                        className="flex-1 h-14 bg-teal-600 text-white rounded-2xl font-bold uppercase text-[12px] tracking-widest shadow-lg shadow-teal-600/20 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <CheckCircle size={18} /> I Understand, Start Upload
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
         </div>

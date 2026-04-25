@@ -85,6 +85,9 @@ function mapProduct(item: any): Product {
         ean: item.ean,
         rating: item.rating || 0,
         reviews: item.reviewsCount || 0,
+        weight: item.weight || undefined,
+        shelfLife: item.shelfLife || undefined,
+        origin: item.origin || undefined,
         status: item.status || ProductStatus.APPROVED,
     };
 }

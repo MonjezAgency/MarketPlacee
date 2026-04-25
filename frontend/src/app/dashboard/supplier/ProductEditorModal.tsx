@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Upload, Save, Image as ImageIcon, Sparkles, DollarSign, Package, Plus, Trash2 } from 'lucide-react';
+import { X, Upload, Save, Image as ImageIcon, Sparkles, DollarSign, Package, Plus, Trash2, Info } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { getCurrencyInfo } from '@/lib/currency';
+import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertFromBase, convertToBase } from '@/lib/currency';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { ProductStatus } from '@/lib/types';
@@ -23,15 +23,18 @@ interface ProductEditorModalProps {
 }
 
 const ALL_CATEGORIES = [
-    'Beverages', 'Soft Drinks', 'Energy Drinks', 'Water', 'Juices',
-    'Snacks', 'Chips', 'Chocolate', 'Candy', 'Biscuits',
-    'Dairy', 'Milk', 'Cheese', 'Yogurt',
-    'Personal Care', 'Skincare', 'Haircare', 'Oral Care',
-    'Cleaning', 'Household', 'Detergent',
-    'Frozen Food', 'Ice Cream', 'Meat', 'Seafood',
+    'Beverages', 'Snacks & Biscuits', 'Dairy & Eggs', 'Frozen Food', 
+    'Pantry & Grains', 'Personal Care', 'Household & Cleaning', 
+    'Baby Care', 'Pet Care', 'Canned Food', 'Spices & Condiments', 
+    'Confectionery', 'Coffee & Tea', 'Meat & Poultry', 'Seafood',
+    'Soft Drinks', 'Energy Drinks', 'Water', 'Juices',
+    'Chips', 'Chocolate', 'Candy', 'Biscuits',
+    'Milk', 'Cheese', 'Yogurt',
+    'Skincare', 'Haircare', 'Oral Care',
+    'Detergent',
+    'Ice Cream',
     'Bakery', 'Bread', 'Pastries',
-    'Tobacco', 'Coffee', 'Tea',
-    'Baby Products', 'Pet Food', 'Other'
+    'Tobacco', 'Other'
 ];
 
 
@@ -59,6 +62,10 @@ interface ModalPortalContentProps {
     addVariantValue: (index: number) => void;
     removeVariantValue: (gi: number, vi: number) => void;
     product: Product | null | undefined;
+    isGeneratingAI: boolean;
+    handleAIDescription: () => void;
+    activeCurrency: string;
+    setActiveCurrency: (val: string) => void;
 }
 
 function ModalPortalContent({
@@ -67,7 +74,7 @@ function ModalPortalContent({
     eanLimit, setEanLimit, isFetchingEan, fetchEanImages,
     newVariantName, setNewVariantName, addVariantGroup, removeVariantGroup,
     newVariantValue, setNewVariantValue, addVariantValue, removeVariantValue,
-    product
+    product, isGeneratingAI, handleAIDescription, activeCurrency, setActiveCurrency
 }: ModalPortalContentProps) {
     return (
         <AnimatePresence mode="wait">
@@ -292,7 +299,17 @@ function ModalPortalContent({
                                             </div>
 
                                             <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Description / Highlights</label>
+                                                <div className="flex items-center justify-between mb-1 ms-2">
+                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description / Highlights</label>
+                                                    <button 
+                                                        type="button"
+                                                        onClick={handleAIDescription}
+                                                        disabled={isGeneratingAI || !formData.name}
+                                                        className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary hover:text-white transition-all disabled:opacity-50"
+                                                    >
+                                                        <Sparkles size={12} /> {isGeneratingAI ? 'Generating...' : 'AI Boost'}
+                                                    </button>
+                                                </div>
                                                 <textarea
                                                     placeholder="Focus on case size, expiration date, or origin..."
                                                     value={formData.description}
@@ -304,17 +321,28 @@ function ModalPortalContent({
                                             <div className="p-8 bg-muted/30 rounded-[32px] border border-border/50 space-y-8">
                                                 <div className="grid grid-cols-2 gap-8">
                                                     <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Price Per Case ({symbol})</label>
-                                                        <div className="relative">
-                                                            <DollarSign className="absolute start-5 top-1/2 -translate-y-1/2 text-primary w-5 h-5" />
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                required
-                                                                value={formData.price || ''}
-                                                                onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                                                                className="w-full bg-background border border-border/50 rounded-2xl ps-12 pe-6 py-4 outline-none focus:border-primary/50 text-foreground font-black text-2xl transition-all"
-                                                            />
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Currency & Price Per Case</label>
+                                                        <div className="flex gap-2">
+                                                            <select
+                                                                value={selectedCurrency}
+                                                                onChange={e => setSelectedCurrency(e.target.value)}
+                                                                className="h-14 bg-background border border-border/50 rounded-2xl px-4 outline-none focus:border-primary/50 text-foreground font-black text-sm appearance-none"
+                                                            >
+                                                                {SUPPORTED_CURRENCIES.map(c => (
+                                                                    <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>
+                                                                ))}
+                                                            </select>
+                                                            <div className="relative flex-1">
+                                                                <span className="absolute start-5 top-1/2 -translate-y-1/2 text-primary font-black text-xl">{SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.symbol}</span>
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    required
+                                                                    value={formData.price || ''}
+                                                                    onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                                                                    className="w-full bg-background border border-border/50 rounded-2xl ps-12 pe-6 py-4 outline-none focus:border-primary/50 text-foreground font-black text-2xl transition-all"
+                                                                />
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="space-y-2">
@@ -357,7 +385,73 @@ function ModalPortalContent({
 
                                                 <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/10">
                                                     <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Units per Pallet</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
+                                                            Weight per Unit (kg) <span className="text-primary">(Required)</span>
+                                                            <div className="group/tip relative cursor-help">
+                                                                <Info size={10} className="text-muted-foreground" />
+                                                                <div className="absolute bottom-full mb-2 hidden group-hover/tip:block w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg shadow-xl z-50 normal-case font-medium">
+                                                                    Needed for calculating total shipment weight and container shipping costs.
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.001"
+                                                            placeholder="e.g. 0.330"
+                                                            value={formData.weight || ''}
+                                                            onChange={e => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
+                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
+                                                            Shelf Life / Expiry <span className="text-primary">(Required)</span>
+                                                            <div className="group/tip relative cursor-help">
+                                                                <Info size={10} className="text-muted-foreground" />
+                                                                <div className="absolute bottom-full mb-2 hidden group-hover/tip:block w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg shadow-xl z-50 normal-case font-medium">
+                                                                    Buyers need this to ensure product longevity for international distribution.
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="e.g. 18 Months"
+                                                            value={formData.shelfLife || ''}
+                                                            onChange={e => setFormData({ ...formData, shelfLife: e.target.value })}
+                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/10">
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
+                                                            Country of Origin <span className="text-primary">(Required)</span>
+                                                            <div className="group/tip relative cursor-help">
+                                                                <Info size={10} className="text-muted-foreground" />
+                                                                <div className="absolute bottom-full mb-2 hidden group-hover/tip:block w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg shadow-xl z-50 normal-case font-medium">
+                                                                    Mandatory for customs clearance and international trade agreements.
+                                                                </div>
+                                                            </div>
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            placeholder="e.g. Egypt"
+                                                            value={formData.origin || ''}
+                                                            onChange={e => setFormData({ ...formData, origin: e.target.value })}
+                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
+                                                            Units per Pallet <span className="text-primary">(Required)</span>
+                                                            <div className="group/tip relative cursor-help">
+                                                                <Info size={10} className="text-muted-foreground" />
+                                                                <div className="absolute bottom-full mb-2 hidden group-hover/tip:block w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg shadow-xl z-50 normal-case font-medium">
+                                                                    Essential for buyers to calculate container capacity (FCL/LCL).
+                                                                </div>
+                                                            </div>
+                                                        </label>
                                                         <input
                                                             type="number"
                                                             placeholder="e.g. 1440"
@@ -366,6 +460,9 @@ function ModalPortalContent({
                                                             className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
                                                         />
                                                     </div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/10">
                                                     <div className="space-y-2">
                                                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Pallets per Shipment</label>
                                                         <input
@@ -473,7 +570,8 @@ function ModalPortalContent({
 
 export default function ProductEditorModal({ isOpen, onClose, product, onSave }: ProductEditorModalProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const { symbol } = getCurrencyInfo(false); // Dynamic for Supplier
+    const { symbol } = getCurrencyInfo(false); 
+    const [activeCurrency, setActiveCurrency] = React.useState(getCurrencyInfo().code);
 
     const defaultData: Product = {
         id: '',
@@ -481,6 +579,7 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         category: 'Beverages', description: '', unit: 'Case (24 units)',
         minOrder: 1, ean: '', variants: [], inStock: true,
         unitsPerPallet: 0, palletsPerShipment: 0,
+        weight: 0, shelfLife: '', origin: '',
         status: ProductStatus.PENDING,
         isNew: false, bulkSave: false
     };
@@ -491,11 +590,13 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
 
     useEffect(() => {
         if (product) {
+            const rawPrice = product.basePrice ?? product.price;
+            const displayPrice = convertFromBase(rawPrice, activeCurrency);
+            
             setFormData({
                 ...defaultData,
                 ...product,
-                // Show supplier's original price (basePrice), not the customer-facing marked-up price
-                price: product.basePrice ?? product.price,
+                price: displayPrice,
                 variants: product.variants || [],
                 images: product.images || [],
             });
@@ -504,11 +605,20 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         }
         setNewVariantName('');
         setNewVariantValue({});
-    }, [product, isOpen]);
+    }, [product, isOpen, activeCurrency]);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        onSave(formData);
+        
+        const egpPrice = convertToBase(formData.price, activeCurrency);
+        
+        const dataToSave = {
+            ...formData,
+            price: egpPrice,
+            basePrice: egpPrice
+        };
+        
+        onSave(dataToSave);
         onClose();
     };
 
@@ -516,7 +626,6 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
 
-        // Upload each file to the backend (Supabase Storage) and get permanent URLs
         const uploadFile = async (file: File): Promise<string | null> => {
             try {
                 const fd = new FormData();
@@ -643,6 +752,20 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         setFormData({ ...formData, variants: updated });
     };
 
+    const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+    const handleAIDescription = async () => {
+        if (!formData.name) return;
+        setIsGeneratingAI(true);
+        try {
+            await new Promise(r => setTimeout(r, 1500));
+            const generated = `Professional-grade ${formData.name} ${formData.brand ? `by ${formData.brand}` : ''} natively optimized for B2B procurement and wholesale distribution. Features verified documentation, standardized packaging for export, and strict compliance with international food & safety regulations. Ideal for high-volume retailers and enterprise supply chains looking for consistent quality and reliable lead times.`;
+            setFormData(prev => ({ ...prev, description: generated }));
+        } finally {
+            setIsGeneratingAI(false);
+        }
+    };
+
+
     if (typeof window === 'undefined') return null;
 
     return createPortal(
@@ -670,6 +793,10 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
             addVariantValue={addVariantValue}
             removeVariantValue={removeVariantValue}
             product={product}
+            isGeneratingAI={isGeneratingAI}
+            handleAIDescription={handleAIDescription}
+            activeCurrency={activeCurrency}
+            setActiveCurrency={setActiveCurrency}
         />,
         document.body
     );

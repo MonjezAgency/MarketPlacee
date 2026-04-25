@@ -130,17 +130,19 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
     return (
         <aside style={{ backgroundColor: '#0A1A2F', color: '#F5F7FA' }} className="w-72 border-e border-border min-h-screen hidden md:flex flex-col flex-shrink-0 sticky top-0 h-screen overflow-hidden group/sidebar transition-all duration-300">
             {/* Branding Header */}
-            <div className="p-6 flex items-center gap-4 border-b border-border/50">
-                <div className="w-12 h-12 bg-teal-500 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-lg shadow-teal-500/20 overflow-hidden border-2 border-white/10">
-                    <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
+            <div className="p-6 flex items-center gap-4 border-b border-white/10 bg-white/[0.02]">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden border-2 border-white/10 group-hover/sidebar:scale-110 transition-transform">
+                    <img 
+                        src="https://mgecljoxasstdfmlytov.supabase.co/storage/v1/object/public/marketplace-assets/logo_atlantis.png" 
+                        alt="Atlantis" 
+                        className="w-full h-full object-contain p-1" 
+                    />
                 </div>
                 <div className="flex flex-col">
-                    <h2 className="text-lg font-poppins font-bold tracking-tight text-white leading-none">
+                    <h2 className="text-xl font-poppins font-black tracking-tighter text-white leading-none">
                         Atlan<span className="text-teal-400">tis.</span>
                     </h2>
-                    <span className="text-[10px] text-teal-500 font-black uppercase tracking-[0.2em] mt-1">
-                        {portalLabel}
-                    </span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-teal-400/50 mt-1">Supplier Hub</span>
                 </div>
             </div>
 

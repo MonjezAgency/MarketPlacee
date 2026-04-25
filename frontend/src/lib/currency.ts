@@ -40,11 +40,18 @@ const EGP_RATES: Record<string, number> = {
 
 /**
  * Convert an EGP amount to the target currency.
- * Kept name generic so callers don't need updating.
  */
-export function convertFromUSD(amountEGP: number, toCurrency: string): number {
+export function convertFromBase(amountEGP: number, toCurrency: string): number {
     const rate = EGP_RATES[toCurrency] ?? 1;
     return amountEGP * rate;
+}
+
+/**
+ * Convert an amount from a target currency back to the base currency (EGP).
+ */
+export function convertToBase(amount: number, fromCurrency: string): number {
+    const rate = EGP_RATES[fromCurrency] ?? 1;
+    return amount / rate;
 }
 
 let cachedCurrency: string | null = null;
@@ -116,7 +123,7 @@ export function formatPrice(amountEGP: number, currencyCode?: string): string {
     const safeAmount = amountEGP ?? 0;
 
     const activeCode = currencyCode || getActiveCurrency();
-    const converted   = convertFromUSD(safeAmount, activeCode);
+    const converted   = convertFromBase(safeAmount, activeCode);
     const info        = SUPPORTED_CURRENCIES.find(c => c.code === activeCode);
     const locale      = info?.locale ?? 'en-US';
 

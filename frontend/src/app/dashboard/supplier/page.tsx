@@ -3,6 +3,7 @@ import { apiFetch } from '@/lib/api';
 
 
 import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Package, Plus, Upload, Search, MoreHorizontal,
     Loader2, AlertTriangle, CheckCircle2, XCircle, FileSpreadsheet,
@@ -28,6 +29,7 @@ interface UploadReport {
 
 export default function SupplierDashboard() {
     const { user } = useAuth();
+    const router = useRouter();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
@@ -90,8 +92,7 @@ export default function SupplierDashboard() {
     }, []);
 
     const handleNewProduct = () => {
-        setEditingProduct(null);
-        setIsProductModalOpen(true);
+        router.push('/dashboard/supplier/products/new');
     };
 
     const handleEditProduct = (product: any) => {
@@ -100,8 +101,8 @@ export default function SupplierDashboard() {
             price: product.price,
             category: product.category || 'Beverages',
             description: product.description || '',
-            unit: 'Case',
-            minOrder: 1,
+            unit: product.unit || 'Case',
+            minOrder: product.minOrder || 1,
             image: product.images?.[0] || '',
             variants: product.variants || [],
         });
@@ -116,12 +117,20 @@ export default function SupplierDashboard() {
                 price: data.price,
                 stock: data.stock,
                 category: data.category,
-                images: data.image ? [data.image] : [],
+                images: data.images || (data.image ? [data.image] : []),
                 ean: data.ean || undefined,
+                weight: data.weight || undefined,
+                shelfLife: data.shelfLife || undefined,
+                origin: data.origin || undefined,
+                unitsPerPallet: data.unitsPerPallet || undefined,
+                palletsPerShipment: data.palletsPerShipment || undefined,
+                brand: data.brand || undefined,
+                unit: data.unit || undefined,
+                minOrder: data.minOrder || undefined,
             };
 
-            const res = await apiFetch(`/products`, {
-                method: 'POST',
+            const res = await apiFetch(`/products${data.id ? `/${data.id}` : ''}`, {
+                method: data.id ? 'PUT' : 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
@@ -129,8 +138,12 @@ export default function SupplierDashboard() {
             });
 
             if (res.ok) {
-                const newProduct = await res.json();
-                setProducts(prev => [newProduct, ...prev]);
+                const savedProduct = await res.json();
+                if (data.id) {
+                    setProducts(prev => prev.map(p => p.id === data.id ? savedProduct : p));
+                } else {
+                    setProducts(prev => [savedProduct, ...prev]);
+                }
             } else {
                 const errData = await res.json().catch(() => ({}));
                 alert(`Failed to save product: ${errData.message || 'Unknown error'}`);
@@ -383,7 +396,7 @@ export default function SupplierDashboard() {
                                         </div>
                                     </td>
                                     <td className="px-8 py-6 font-bold text-green-500">
-                                        {formatPrice(product.totalRevenue, false)}
+                                        {formatPrice(product.totalRevenue)}
                                     </td>
                                 </tr>
                             ))}
@@ -418,6 +431,7 @@ export default function SupplierDashboard() {
                             <tr className="bg-muted/30">
                                 <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Product</th>
                                 <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Status</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40 text-center">Data Health</th>
                                 <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Category</th>
                                 <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Price</th>
                                 <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Stock</th>
@@ -444,6 +458,10 @@ export default function SupplierDashboard() {
                                 if (!product.description || product.description.trim() === '' || product.description === 'No description') missingFields.push('Description');
                                 if (!product.images || product.images.length === 0) missingFields.push('Image');
                                 if (!product.ean) missingFields.push('EAN');
+                                if (!product.weight) missingFields.push('Weight');
+                                if (!product.shelfLife) missingFields.push('Shelf Life');
+                                if (!product.origin) missingFields.push('Origin');
+                                if (!product.unitsPerPallet) missingFields.push('Pallet Units');
 
                                 return (
                                     <tr key={product.id} className="hover:bg-muted/20 transition-colors group">
@@ -474,8 +492,21 @@ export default function SupplierDashboard() {
                                                 {product.status}
                                             </Badge>
                                         </td>
+                                        <td className="px-8 py-6">
+                                            <div className="flex justify-center">
+                                                {missingFields.length === 0 ? (
+                                                    <div className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full">
+                                                        <CheckCircle2 size={12} /> Complete
+                                                    </div>
+                                                ) : (
+                                                    <div className="flex items-center gap-1 text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
+                                                        <AlertTriangle size={12} /> {missingFields.length} Missing
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="px-8 py-6 text-sm text-foreground/60">{product.category}</td>
-                                        <td className="px-8 py-6 font-bold">{formatPrice(product.basePrice ?? product.price, false)}</td>
+                                        <td className="px-8 py-6 font-bold">{formatPrice(product.basePrice ?? product.price)}</td>
                                         <td className="px-8 py-6">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-black">{product.stock}</span>

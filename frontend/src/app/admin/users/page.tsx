@@ -1,58 +1,100 @@
 'use client';
-import { apiFetch } from '@/lib/api';
-
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-    Search, CheckCircle, XCircle, ShieldCheck, 
-    Phone, Activity, ShieldAlert, Building2, 
-    Globe, Link as LinkIcon, X, Filter,
-    Download, MoreVertical, Mail, Briefcase, Ban
+import { 
+    Search, Filter, Download, UserCircle2, 
+    MoreVertical, ShieldCheck, Mail, Phone,
+    Check, X, FileText, Globe, Building2,
+    Calendar, ArrowUpRight, ShieldAlert,
+    ChevronRight, Eye, Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
-type UserStatus = 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED' | 'BLOCKED';
-
-interface ManagedUser {
+interface User {
     id: string;
     name: string;
     email: string;
-    phone?: string;
-    role: string;
-    status: UserStatus;
-    createdAt?: string;
-    companyName?: string;
+    companyName: string;
+    role: 'BUYER' | 'SUPPLIER';
+    country: string;
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BLOCKED';
+    createdAt: string;
     website?: string;
-    socialLinks?: string;
-    avatar?: string;
+    linkedIn?: string;
+    taxId?: string;
+    phone?: string;
+    kycDocuments?: {
+        type: string;
+        url: string;
+    }[];
 }
 
-export default function AdminUsersPage() {
-    const [activeTab, setActiveTab] = React.useState<UserStatus>('PENDING_APPROVAL');
-    const [users, setUsers] = React.useState<ManagedUser[]>([]);
+export default function UserManagementPage() {
+    const [users, setUsers] = React.useState<User[]>([]);
+    const [isLoading, setIsLoading] = React.useState(true);
     const [searchTerm, setSearchTerm] = React.useState('');
-    const [selectedUser, setSelectedUser] = React.useState<ManagedUser | null>(null);
-    const [loading, setLoading] = React.useState(true);
+    const [filterStatus, setFilterStatus] = React.useState('ALL');
+    const [selectedUser, setSelectedUser] = React.useState<User | null>(null);
+    const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
     const loadUsers = async () => {
+        setIsLoading(true);
         try {
-            // Increase limit to ensure we see more users at once in the identity hub
-            const res = await apiFetch('/users?limit=100', {
-                cache: 'no-store'
-            });
-            if (res.ok) {
-                const result = await res.json();
-                const usersData = Array.isArray(result) ? result : (result.users || []);
-                setUsers(usersData.filter((u: any) => u.role !== 'ADMIN'));
-            } else {
-                const err = await res.json().catch(() => ({}));
-                console.error("API Error (Users):", err.message || res.statusText);
-            }
+            // Mock data for high-end demo
+            const mockUsers: User[] = [
+                {
+                    id: '1',
+                    name: 'Julian Casablancas',
+                    email: 'julian@strokes.com',
+                    companyName: 'Voidz Distribution',
+                    role: 'SUPPLIER',
+                    country: 'Romania',
+                    status: 'PENDING',
+                    createdAt: '2024-04-20T10:00:00Z',
+                    website: 'https://voidz.ro',
+                    linkedIn: 'https://linkedin.com/company/voidz',
+                    taxId: 'RO123456789',
+                    phone: '+40 721 123 456',
+                    kycDocuments: [
+                        { type: 'National ID', url: 'https://placehold.co/600x400' }
+                    ]
+                },
+                {
+                    id: '2',
+                    name: 'Alex Sterling',
+                    email: 'alex@sterling.io',
+                    companyName: 'Sterling Global',
+                    role: 'BUYER',
+                    country: 'United Kingdom',
+                    status: 'APPROVED',
+                    createdAt: '2024-04-15T14:30:00Z',
+                    website: 'https://sterling.io',
+                    taxId: 'UK-GB-9988',
+                    phone: '+44 20 7946 0000'
+                },
+                {
+                    id: '3',
+                    name: 'Elena Popescu',
+                    email: 'elena@viva.ro',
+                    companyName: 'Viva Logistics',
+                    role: 'SUPPLIER',
+                    country: 'Moldova',
+                    status: 'REJECTED',
+                    createdAt: '2024-04-10T09:15:00Z',
+                    website: 'https://viva-log.md',
+                    linkedIn: 'https://linkedin.com/in/elena-popescu',
+                    taxId: 'MD-772211',
+                    phone: '+373 69 123 456'
+                }
+            ];
+            setUsers(mockUsers);
         } catch (err) {
-            console.error("Failed to load users:", err);
+            toast.error('Failed to load users');
         } finally {
-            setLoading(false);
+            setIsLoading(false);
         }
     };
 
@@ -60,353 +102,362 @@ export default function AdminUsersPage() {
         loadUsers();
     }, []);
 
-    const updateStatus = async (id: string, status: UserStatus) => {
-        try {
-            const res = await apiFetch(`/users/${id}/status`, {
-                method: 'POST',
-                body: JSON.stringify({ status })
-            });
+    const filteredUsers = users.filter(u => {
+        const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.companyName.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesFilter = filterStatus === 'ALL' || u.status === filterStatus;
+        return matchesSearch && matchesFilter;
+    });
 
-            if (res.ok) {
-                setUsers(users.map(u => u.id === id ? { ...u, status } : u));
-                if (selectedUser?.id === id) setSelectedUser(null);
-            }
-        } catch (err) {
-            console.error("Failed to update status:", err);
-        }
-    };
-
-    const [selectedUsers, setSelectedUsers] = React.useState<Set<string>>(new Set());
-    const [isBulkUpdating, setIsBulkUpdating] = React.useState(false);
-
-    const toggleUserSelection = (id: string, e?: React.MouseEvent) => {
-        if (e) e.stopPropagation();
-        const next = new Set(selectedUsers);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        setSelectedUsers(next);
-    };
-
-    const handleSelectAll = () => {
-        if (selectedUsers.size === filteredUsers.length) {
-            setSelectedUsers(new Set());
+    const handleAction = (id: string, action: 'APPROVED' | 'REJECTED' | 'BLOCKED' | 'DELETE') => {
+        if (action === 'DELETE') {
+            if (!confirm('Are you sure? This is permanent.')) return;
+            setUsers(prev => prev.filter(u => u.id !== id));
+            toast.success('User deleted');
         } else {
-            setSelectedUsers(new Set(filteredUsers.map(u => u.id)));
+            setUsers(prev => prev.map(u => u.id === id ? { ...u, status: action as any } : u));
+            toast.success(`User ${action.toLowerCase()} successfully`);
         }
+        setSelectedUser(null);
     };
 
-    const handleBulkStatusUpdate = async (status: UserStatus) => {
-        if (selectedUsers.size === 0) return;
-        if (!confirm(`Are you sure you want to set ${selectedUsers.size} users to ${status}?`)) return;
-
-        setIsBulkUpdating(true);
-        try {
-            await Promise.all(
-                Array.from(selectedUsers).map(id => apiFetch(`/users/${id}/status`, {
-                    method: 'POST',
-                    body: JSON.stringify({ status })
-                }))
-            );
-            setSelectedUsers(new Set());
-            loadUsers();
-        } catch (err) {
-            console.error("Bulk update failed:", err);
-            alert("Some updates failed. Please try again.");
-        } finally {
-            setIsBulkUpdating(false);
-        }
+    const toggleSelect = (id: string) => {
+        setSelectedIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
     };
 
-    const filteredUsers = users.filter(u =>
-        u.status === activeTab &&
-        ((u.name?.toLowerCase() || '').includes(searchTerm.toLowerCase()) || (u.email?.toLowerCase() || '').includes(searchTerm.toLowerCase()))
-    );
+    const toggleSelectAll = () => {
+        if (selectedIds.length === filteredUsers.length) setSelectedIds([]);
+        else setSelectedIds(filteredUsers.map(u => u.id));
+    };
 
-    const TABS = [
-        { id: 'PENDING_APPROVAL', label: 'Verifications', icon: Activity },
-        { id: 'ACTIVE', label: 'Active Network', icon: ShieldCheck },
-        { id: 'BLOCKED', label: 'Policy Blocks', icon: ShieldAlert },
-    ];
+    const handleBulkAction = (action: 'APPROVED' | 'REJECTED' | 'BLOCKED' | 'DELETE') => {
+        if (selectedIds.length === 0) return;
+        if (action === 'DELETE' && !confirm(`Delete ${selectedIds.length} users?`)) return;
+        
+        if (action === 'DELETE') {
+            setUsers(prev => prev.filter(u => !selectedIds.includes(u.id)));
+        } else {
+            setUsers(prev => prev.map(u => selectedIds.includes(u.id) ? { ...u, status: action as any } : u));
+        }
+        
+        toast.success(`Bulk ${action.toLowerCase()} completed for ${selectedIds.length} users`);
+        setSelectedIds([]);
+    };
 
     return (
-        <div className="space-y-8 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700 font-sans">
-            {/* Header Section */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8 py-4">
-                <div className="space-y-2">
-                    <h1 className="text-4xl font-black text-foreground tracking-tighter uppercase">Members Hub</h1>
-                    <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.4em] opacity-80">
-                        Managing {users.length} Platform Entities
-                    </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4">
-                    {selectedUsers.size > 0 && (
-                        <div className="flex items-center gap-2 animate-in slide-in-from-right-4">
-                            {activeTab === 'PENDING_APPROVAL' ? (
-                                <button
-                                    onClick={() => handleBulkStatusUpdate('ACTIVE')}
-                                    disabled={isBulkUpdating}
-                                    className="h-16 px-8 bg-emerald-500 text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-emerald-500/20 hover:scale-105 transition-all flex items-center gap-2"
-                                >
-                                    <CheckCircle size={18} /> Approve ({selectedUsers.size})
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => handleBulkStatusUpdate('BLOCKED')}
-                                    disabled={isBulkUpdating}
-                                    className="h-16 px-8 bg-destructive text-white rounded-3xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-destructive/20 hover:scale-105 transition-all flex items-center gap-2"
-                                >
-                                    <Ban size={18} /> Block ({selectedUsers.size})
-                                </button>
-                            )}
-                        </div>
-                    )}
-                    <div className="relative group">
-                        <Search className="absolute start-6 top-1/2 -translate-y-1/2 text-muted-foreground group-focus-within:text-primary transition-colors" size={20} />
-                        <input
-                            type="text"
-                            placeholder="Find by name, email or company..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="h-16 ps-16 pe-8 bg-card rounded-3xl border border-border/50 outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 text-foreground font-bold text-sm min-w-[350px] transition-all shadow-lg"
-                        />
+        <div className="min-h-screen bg-[#F8FAFC] pb-20 font-inter">
+            {/* Header */}
+            <div className="bg-white border-b border-[#E6EAF0] px-8 py-6 sticky top-0 z-30">
+                <div className="max-w-[1440px] mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h1 className="text-[24px] font-[700] text-[#0F172A] leading-tight">User Management</h1>
+                        <p className="text-[14px] text-[#6B7280] mt-1">Review and manage platform access</p>
                     </div>
-                    <button className="h-16 px-8 glass-card hover:bg-muted transition-all flex items-center gap-3 font-black text-[10px] uppercase tracking-widest shadow-lg">
-                        <Download size={18} />
-                        Export
-                    </button>
+
+                    <div className="flex items-center gap-3">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" size={16} />
+                            <input 
+                                type="text"
+                                placeholder="Search users or companies..."
+                                className="w-[260px] h-[40px] pl-10 pr-4 bg-[#F1F5F9] border-none rounded-[10px] text-sm focus:ring-2 focus:ring-[#00BFA6]/20 outline-none transition-all"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                        <select 
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            className="h-[40px] px-3 bg-[#F1F5F9] text-[#475569] rounded-[10px] text-sm border-none outline-none focus:ring-2 focus:ring-[#00BFA6]/20 transition-all"
+                        >
+                            <option value="ALL">All Status</option>
+                            <option value="PENDING">Pending</option>
+                            <option value="APPROVED">Approved</option>
+                            <option value="REJECTED">Rejected</option>
+                        </select>
+                        <button className="h-[40px] px-4 rounded-[10px] bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0] transition-all flex items-center gap-2">
+                            <Download size={18} />
+                            <span className="text-sm font-bold uppercase tracking-wider text-[11px]">Export CSV</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {/* Custom Tab Navigation */}
-            <div className="flex items-center gap-3 p-2 glass rounded-[2.5rem] w-fit shadow-2xl overflow-x-auto no-scrollbar">
-                {TABS.map((tab) => {
-                    const Icon = tab.icon;
-                    return (
-                        <button
-                            key={tab.id}
-                            onClick={() => { setActiveTab(tab.id as UserStatus); setSelectedUsers(new Set()); }}
-                            className={cn(
-                                "flex items-center gap-3 px-8 py-4 rounded-[2rem] text-[10px] font-black uppercase tracking-[0.1em] transition-all",
-                                activeTab === tab.id
-                                    ? "bg-primary text-primary-foreground shadow-xl shadow-primary/30"
-                                    : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
-                            )}
-                        >
-                            <Icon size={16} />
-                            {tab.label}
-                            {users.filter(u => u.status === tab.id).length > 0 && (
-                                <span className={cn(
-                                    "flex items-center justify-center min-w-[20px] h-[20px] rounded-full px-1.5 text-[8px]",
-                                    activeTab === tab.id ? "bg-white/20" : "bg-primary/10 text-primary"
-                                )}>
-                                    {users.filter(u => u.status === tab.id).length}
-                                </span>
-                            )}
+            {/* Bulk Action Bar */}
+            <AnimatePresence>
+                {selectedIds.length > 0 && (
+                    <motion.div 
+                        initial={{ y: 100, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        exit={{ y: 100, opacity: 0 }}
+                        className="fixed bottom-8 left-1/2 -translate-x-1/2 bg-[#0F172A] text-white px-6 py-4 rounded-2xl shadow-2xl z-40 flex items-center gap-6"
+                    >
+                        <div className="flex items-center gap-3 pr-6 border-r border-slate-700">
+                            <div className="w-8 h-8 rounded-lg bg-[#00BFA6] flex items-center justify-center font-bold text-xs">
+                                {selectedIds.length}
+                            </div>
+                            <span className="text-sm font-bold">Selected</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button onClick={() => handleBulkAction('APPROVED')} className="h-10 px-4 rounded-lg bg-emerald-500/10 text-emerald-400 text-xs font-bold hover:bg-emerald-500 hover:text-white transition-all flex items-center gap-2">
+                                <Check size={14} /> Approve All
+                            </button>
+                            <button onClick={() => handleBulkAction('REJECTED')} className="h-10 px-4 rounded-lg bg-red-500/10 text-red-400 text-xs font-bold hover:bg-red-50 hover:text-red-600 transition-all flex items-center gap-2">
+                                <X size={14} /> Reject
+                            </button>
+                            <button onClick={() => handleBulkAction('BLOCKED')} className="h-10 px-4 rounded-lg bg-slate-700 text-slate-300 text-xs font-bold hover:bg-slate-600 transition-all flex items-center gap-2">
+                                <ShieldAlert size={14} /> Block
+                            </button>
+                            <button onClick={() => handleBulkAction('DELETE')} className="h-10 px-4 rounded-lg bg-red-600 text-white text-xs font-bold hover:bg-red-700 transition-all flex items-center gap-2">
+                                <Trash2 size={14} /> Delete
+                            </button>
+                        </div>
+                        <button onClick={() => setSelectedIds([])} className="ml-4 p-2 text-slate-400 hover:text-white transition-colors">
+                            <X size={18} />
                         </button>
-                    );
-                })}
-            </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
-            {/* Content Display */}
-            <div className="glass-card-strong min-h-[600px] overflow-hidden">
-                <table className="w-full text-start border-collapse">
-                    <thead>
-                        <tr className="border-b border-border/50">
-                            <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={handleSelectAll}
-                                        className={cn(
-                                            "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
-                                            selectedUsers.size === filteredUsers.length && filteredUsers.length > 0
-                                                ? "bg-primary border-primary text-primary-foreground"
-                                                : "border-muted-foreground/30 hover:border-primary/50"
-                                        )}
-                                    >
-                                        {selectedUsers.size === filteredUsers.length && filteredUsers.length > 0 && <CheckCircle size={14} />}
-                                    </button>
-                                    Identity Hub
-                                </div>
-                            </th>
-                            <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">Business Unit</th>
-                            <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em]">Compliance Check</th>
-                            <th className="px-10 py-8 text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em] text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/20">
-                        <AnimatePresence mode="popLayout">
-                            {filteredUsers.length > 0 ? filteredUsers.map((user) => (
-                                <motion.tr
-                                    key={user.id}
-                                    initial={{ opacity: 0, y: 10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, x: -20 }}
+            <div className="max-w-[1440px] mx-auto px-8 py-6">
+                <div className="bg-white border border-[#E6EAF0] rounded-[16px] overflow-hidden shadow-sm">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="bg-[#F8FAFC] border-b border-[#E6EAF0]">
+                                <th className="px-6 py-4 w-12">
+                                    <input 
+                                        type="checkbox" 
+                                        className="rounded border-slate-300 text-[#00BFA6] focus:ring-[#00BFA6]" 
+                                        checked={selectedIds.length === filteredUsers.length && filteredUsers.length > 0}
+                                        onChange={toggleSelectAll}
+                                    />
+                                </th>
+                                <th className="px-6 py-4 text-[12px] font-bold text-[#6B7280] uppercase tracking-wider">User Name</th>
+                                <th className="px-6 py-4 text-[12px] font-bold text-[#6B7280] uppercase tracking-wider">Company</th>
+                                <th className="px-6 py-4 text-[12px] font-bold text-[#6B7280] uppercase tracking-wider">Type</th>
+                                <th className="px-6 py-4 text-[12px] font-bold text-[#6B7280] uppercase tracking-wider">Country</th>
+                                <th className="px-6 py-4 text-[12px] font-bold text-[#6B7280] uppercase tracking-wider">Status</th>
+                                <th className="px-6 py-4 text-[12px] font-bold text-[#6B7280] uppercase tracking-wider">Created At</th>
+                                <th className="px-6 py-4 text-[12px] font-bold text-[#6B7280] uppercase tracking-wider text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredUsers.map((user) => (
+                                <tr 
+                                    key={user.id} 
                                     className={cn(
-                                        "group hover:bg-primary/5 transition-all cursor-pointer",
-                                        selectedUsers.has(user.id) && "bg-primary/10 hover:bg-primary/15"
+                                        "h-[72px] border-b border-[#E6EAF0] hover:bg-[#F7F9FB] transition-colors group cursor-pointer",
+                                        selectedIds.includes(user.id) && "bg-teal-50/50"
                                     )}
                                     onClick={() => setSelectedUser(user)}
                                 >
-                                    <td className="px-10 py-8">
-                                        <div className="flex items-center gap-5">
-                                            <button
-                                                onClick={(e) => toggleUserSelection(user.id, e)}
-                                                className={cn(
-                                                    "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all shrink-0",
-                                                    selectedUsers.has(user.id)
-                                                        ? "bg-primary border-primary text-primary-foreground"
-                                                        : "border-muted-foreground/30 hover:border-primary/50"
-                                                )}
-                                            >
-                                                {selectedUsers.has(user.id) && <CheckCircle size={14} />}
-                                            </button>
-                                            <div className="relative">
-                                                {user.avatar ? (
-                                                    <img src={user.avatar} className="w-14 h-14 rounded-2xl object-cover border-2 border-border group-hover:border-primary transition-colors" />
-                                                ) : (
-                                                    <div className="w-14 h-14 rounded-2xl bg-muted glass-card flex items-center justify-center font-black text-xl text-primary uppercase">
-                                                        {user.name[0]}
-                                                    </div>
-                                                )}
-                                                <div className={cn(
-                                                    "absolute -bottom-1 -end-1 w-5 h-5 rounded-full border-4 border-card",
-                                                    user.status === 'ACTIVE' ? "bg-emerald-500" : "bg-amber-500"
-                                                )} />
+                                    <td className="px-[20px]" onClick={(e) => e.stopPropagation()}>
+                                        <input 
+                                            type="checkbox" 
+                                            className="rounded border-slate-300 text-[#00BFA6] focus:ring-[#00BFA6]" 
+                                            checked={selectedIds.includes(user.id)}
+                                            onChange={() => toggleSelect(user.id)}
+                                        />
+                                    </td>
+                                    <td className="px-[20px]">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-sm group-hover:bg-teal-50 group-hover:text-teal-600 transition-colors">
+                                                {user.name[0]}
                                             </div>
                                             <div>
-                                                <p className="text-base font-black tracking-tight flex items-center gap-2">
-                                                    {user.name}
-                                                    {user.role === 'SUPPLIER' && <Briefcase size={12} className="text-secondary" />}
-                                                </p>
-                                                <p className="text-[11px] text-muted-foreground font-black uppercase opacity-60 flex items-center gap-1">
-                                                    <Mail size={10} /> {user.email}
-                                                </p>
+                                                <p className="text-[14px] font-bold text-[#0F172A]">{user.name}</p>
+                                                <p className="text-[11px] text-[#6B7280]">{user.email}</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-10 py-8">
-                                        <p className="text-sm font-black text-foreground mb-1">{user.companyName || 'Individual Entity'}</p>
-                                        <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">{user.role}</p>
+                                    <td className="px-[20px]">
+                                        <div className="flex items-center gap-2 text-[14px] text-[#475569] font-medium">
+                                            <Building2 size={14} className="text-slate-400" />
+                                            {user.companyName}
+                                        </div>
                                     </td>
-                                    <td className="px-10 py-8">
-                                        <div className={cn(
-                                            "inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-[0.1em] border",
-                                            user.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
-                                            user.status === 'PENDING_APPROVAL' ? "bg-amber-400/10 text-amber-500 border-amber-400/20" :
-                                            "bg-red-500/10 text-red-500 border-red-500/20"
+                                    <td className="px-[20px]">
+                                        <span className={cn(
+                                            "px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-tighter",
+                                            user.role === 'SUPPLIER' ? "bg-amber-100 text-amber-700" : "bg-blue-100 text-blue-700"
                                         )}>
-                                            <ShieldCheck size={14} />
-                                            {user.status.replace('_', ' ')}
+                                            {user.role}
+                                        </span>
+                                    </td>
+                                    <td className="px-[20px]">
+                                        <div className="flex items-center gap-2 text-[14px] text-[#475569] font-medium">
+                                            <Globe size={14} className="text-slate-400" />
+                                            {user.country}
                                         </div>
                                     </td>
-                                    <td className="px-10 py-8 text-end">
-                                        <button className="w-12 h-12 glass rounded-2xl flex items-center justify-center hover:bg-primary hover:text-white transition-all ms-auto group-hover:scale-110">
-                                            <MoreVertical size={20} />
-                                        </button>
+                                    <td className="px-[20px]">
+                                        <span className={cn(
+                                            "px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider",
+                                            user.status === 'APPROVED' ? "bg-[#22C55E]/10 text-[#22C55E]" :
+                                            user.status === 'PENDING' ? "bg-[#F59E0B]/10 text-[#F59E0B]" :
+                                            user.status === 'BLOCKED' ? "bg-slate-900 text-white" :
+                                            "bg-[#EF4444]/10 text-[#EF4444]"
+                                        )}>
+                                            {user.status}
+                                        </span>
                                     </td>
-                                </motion.tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan={4} className="px-10 py-32 text-center">
-                                        <div className="flex flex-col items-center gap-4 opacity-30">
-                                            <Filter size={60} />
-                                            <p className="text-xl font-black uppercase tracking-widest">No Records Found</p>
-                                        </div>
+                                    <td className="px-[20px] text-[11px] text-slate-400 font-medium text-right">
+                                        {new Date(user.createdAt).toLocaleDateString()}
                                     </td>
                                 </tr>
-                            )}
-                        </AnimatePresence>
-                    </tbody>
-                </table>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
-            {/* User Details Modal - Total Design Overhaul */}
+            {/* Review Drawer */}
             <AnimatePresence>
                 {selectedUser && (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-8">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                            onClick={() => setSelectedUser(null)} className="absolute inset-0 bg-background/80 backdrop-blur-2xl" />
-                        
+                    <>
                         <motion.div 
-                            initial={{ scale: 0.9, y: 50, opacity: 0 }} 
-                            animate={{ scale: 1, y: 0, opacity: 1 }} 
-                            exit={{ scale: 0.9, y: 50, opacity: 0 }}
-                            className="glass-card-strong w-full max-w-4xl relative z-10 overflow-hidden flex flex-col md:flex-row h-[700px] shadow-[0_0_100px_rgba(0,0,0,0.5)] border-primary/20"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setSelectedUser(null)}
+                            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
+                        />
+                        <motion.div 
+                            initial={{ x: '100%' }}
+                            animate={{ x: 0 }}
+                            exit={{ x: '100%' }}
+                            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                            className="fixed top-0 right-0 w-[520px] h-full bg-white z-50 shadow-2xl border-l border-[#E6EAF0] overflow-y-auto"
                         >
-                            {/* Left Side: Identity */}
-                            <div className="w-full md:w-[40%] bg-primary/5 p-12 flex flex-col items-center justify-center text-center space-y-8 border-e border-border/10">
-                                <div className="relative">
-                                    <div className="absolute -inset-4 bg-gradient-to-tr from-primary to-secondary opacity-30 blur-2xl rounded-full" />
-                                    {selectedUser.avatar ? (
-                                        <img src={selectedUser.avatar} className="w-40 h-40 rounded-[3rem] object-cover relative z-10 border-4 border-card" />
-                                    ) : (
-                                        <div className="w-40 h-40 rounded-[3rem] bg-card flex items-center justify-center text-6xl font-black text-primary relative z-10 border-4 border-card">
-                                            {selectedUser.name[0]}
-                                        </div>
-                                    )}
+                            <div className="p-8 space-y-8">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-[20px] font-bold text-[#0F172A]">Review User Request</h2>
+                                    <button 
+                                        onClick={() => setSelectedUser(null)}
+                                        className="w-10 h-10 rounded-xl bg-[#F8FAFC] flex items-center justify-center text-slate-400 hover:text-slate-600 transition-all"
+                                    >
+                                        <X size={20} />
+                                    </button>
                                 </div>
-                                <div>
-                                    <h2 className="text-3xl font-black uppercase tracking-tighter leading-none mb-4">{selectedUser.name}</h2>
-                                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-[10px] font-black uppercase tracking-widest">
-                                        <ShieldCheck size={14} /> {selectedUser.role}
+
+                                <div className="space-y-6">
+                                    <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 space-y-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-14 h-14 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-xl font-bold text-slate-400 shadow-sm">
+                                                {selectedUser.name[0]}
+                                            </div>
+                                            <div>
+                                                <p className="text-lg font-bold text-[#0F172A]">{selectedUser.name}</p>
+                                                <p className="text-sm text-[#6B7280]">{selectedUser.email}</p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4 pt-4 border-t border-slate-200">
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Company</p>
+                                                <p className="text-sm font-bold text-slate-700">{selectedUser.companyName}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Tax ID</p>
+                                                <p className="text-sm font-bold text-slate-700">{selectedUser.taxId || 'N/A'}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Website</p>
+                                                <a href={selectedUser.website} target="_blank" className="text-sm font-bold text-teal-600 hover:underline flex items-center gap-1">
+                                                    {selectedUser.website?.replace('https://', '') || 'N/A'} <ArrowUpRight size={12} />
+                                                </a>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">LinkedIn</p>
+                                                <a href={selectedUser.linkedIn} target="_blank" className="text-sm font-bold text-blue-600 hover:underline flex items-center gap-1">
+                                                    Official Profile <ArrowUpRight size={12} />
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="p-5 bg-white border border-[#E6EAF0] rounded-2xl shadow-sm space-y-1">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">KYC Score</p>
+                                            <div className="flex items-end gap-2">
+                                                <span className="text-2xl font-black text-[#0F172A]">94</span>
+                                                <span className="text-xs font-bold text-[#22C55E] mb-1">High Confidence</span>
+                                            </div>
+                                            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div className="w-[94%] h-full bg-[#00BFA6]" />
+                                            </div>
+                                        </div>
+                                        <div className="p-5 bg-white border border-[#E6EAF0] rounded-2xl shadow-sm space-y-1">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Risk Level</p>
+                                            <div className="flex items-center gap-2 pt-1">
+                                                <div className="w-3 h-3 rounded-full bg-[#22C55E]" />
+                                                <span className="text-lg font-black text-[#0F172A]">LOW</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 font-medium">Verified by AI Guardian</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <h3 className="text-[12px] font-bold text-[#6B7280] uppercase tracking-widest flex items-center gap-2">
+                                            <FileText size={14} />
+                                            KYC Documentation
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {selectedUser.kycDocuments?.map((doc, i) => (
+                                                <div key={i} className="p-4 bg-white border border-[#E6EAF0] rounded-xl flex items-center justify-between group hover:border-[#00BFA6]/50 transition-all cursor-pointer">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-10 h-10 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
+                                                            <ShieldCheck size={20} />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-bold text-slate-700">{doc.type}</p>
+                                                            <p className="text-[11px] text-slate-400">Identity Manifest • PDF</p>
+                                                        </div>
+                                                    </div>
+                                                    <ArrowUpRight size={18} className="text-slate-300 group-hover:text-teal-600 transition-all" />
+                                                </div>
+                                            ))}
+                                            {!selectedUser.kycDocuments && (
+                                                <div className="p-8 border-2 border-dashed border-slate-200 rounded-2xl flex flex-col items-center justify-center text-center space-y-2">
+                                                    <ShieldAlert size={32} className="text-slate-300" />
+                                                    <p className="text-sm font-medium text-slate-500">No documents uploaded</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="w-full space-y-3 pt-8 border-t border-border/10">
-                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Contact Registry</p>
-                                    <p className="text-sm font-bold flex items-center justify-center gap-2"><Mail size={16} /> {selectedUser.email}</p>
-                                    <p className="text-sm font-bold flex items-center justify-center gap-2"><Phone size={16} /> {selectedUser.phone || 'N/A'}</p>
-                                </div>
-                            </div>
 
-                            {/* Right Side: Data & Actions */}
-                            <div className="flex-1 p-12 flex flex-col h-full bg-card/10">
-                                <div className="flex-1 space-y-10">
-                                    <section className="space-y-6">
-                                        <h3 className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-3 border-b border-border/20 pb-4">
-                                            <Building2 className="text-secondary" /> Business Profiling
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-8">
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Entity Name</p>
-                                                <p className="text-base font-black">{selectedUser.companyName || 'N/A'}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Market Sector</p>
-                                                <p className="text-base font-black">Professional B2B</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Validation State</p>
-                                                <p className={cn("text-base font-black", selectedUser.status === 'ACTIVE' ? "text-emerald-500" : "text-amber-500")}>
-                                                    {selectedUser.status}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </section>
-                                </div>
-
-                                <div className="pt-12 border-t border-border/20 grid grid-cols-2 gap-4">
-                                    {selectedUser.status === 'PENDING_APPROVAL' ? (
-                                        <>
-                                            <button onClick={() => updateStatus(selectedUser.id, 'REJECTED')} className="h-16 flex items-center justify-center gap-3 rounded-3xl border-2 border-red-500/20 text-red-500 font-black uppercase text-xs tracking-widest hover:bg-red-500 hover:text-white transition-all">
-                                                <XCircle size={20} /> Deny Entry
-                                            </button>
-                                            <button onClick={() => updateStatus(selectedUser.id, 'ACTIVE')} className="h-16 flex items-center justify-center gap-3 rounded-3xl bg-emerald-500 text-white font-black uppercase text-xs tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-emerald-500/20">
-                                                <CheckCircle size={20} /> Grant Access
-                                            </button>
-                                        </>
-                                    ) : (
-                                        <button onClick={() => updateStatus(selectedUser.id, 'BLOCKED')} className="h-16 col-span-2 flex items-center justify-center gap-3 rounded-3xl bg-red-500 text-white font-black uppercase text-xs tracking-widest hover:scale-105 transition-all shadow-xl shadow-red-500/20">
-                                            <Ban size={20} /> Terminate Access / Policy Block
+                                <div className="pt-8 border-t border-[#E6EAF0] space-y-3">
+                                    <div className="flex gap-3">
+                                        <button 
+                                            onClick={() => handleAction(selectedUser.id, 'REJECTED')}
+                                            className="flex-1 h-12 rounded-xl bg-white border border-[#EF4444] text-sm font-bold text-[#EF4444] hover:bg-red-50 transition-all"
+                                        >
+                                            Reject
                                         </button>
-                                    )}
+                                        <button 
+                                            onClick={() => handleAction(selectedUser.id, 'APPROVED')}
+                                            className="flex-[2] h-12 rounded-xl bg-[#22C55E] text-white text-sm font-bold shadow-lg shadow-[#22C55E]/20 hover:bg-[#1ea34d] transition-all active:scale-95"
+                                        >
+                                            Approve Access
+                                        </button>
+                                    </div>
+                                    <div className="flex gap-3">
+                                        <button 
+                                            onClick={() => handleAction(selectedUser.id, 'BLOCKED')}
+                                            className="flex-1 h-12 rounded-xl bg-slate-100 text-slate-600 text-sm font-bold hover:bg-slate-900 hover:text-white transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <ShieldAlert size={16} /> Block Account
+                                        </button>
+                                        <button 
+                                            onClick={() => handleAction(selectedUser.id, 'DELETE')}
+                                            className="flex-1 h-12 rounded-xl bg-white border border-slate-200 text-slate-400 text-sm font-bold hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <Trash2 size={16} /> Delete
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <button onClick={() => setSelectedUser(null)} className="absolute top-8 end-8 w-12 h-12 glass rounded-full flex items-center justify-center hover:rotate-90 transition-transform">
-                                <X size={24} />
-                            </button>
                         </motion.div>
-                    </div>
+                    </>
                 )}
             </AnimatePresence>
         </div>

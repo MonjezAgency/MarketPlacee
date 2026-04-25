@@ -310,7 +310,6 @@ export default function CheckoutPage() {
                                                         >
                                                             <div className="flex items-center gap-6">
                                                                 <div className="w-16 h-16 bg-white rounded-xl border border-border flex items-center justify-center p-2 shadow-sm">
-                                                                    {/* Mocking logo with text if image missing */}
                                                                     <span className="text-[10px] font-black text-center text-foreground uppercase tracking-tighter leading-tight">
                                                                         {rate.name.split(' ').join('\n')}
                                                                     </span>
@@ -318,9 +317,21 @@ export default function CheckoutPage() {
                                                                 <div>
                                                                     <p className="font-heading font-bold text-lg">{rate.name}</p>
                                                                     <p className="text-sm text-muted-foreground font-medium">{rate.serviceType || 'Road Freight'}</p>
-                                                                    <p className="text-xs text-muted-foreground mt-0.5">Transit: <span className="text-foreground font-semibold">{rate.estimatedDays} days</span>
-                                                                        {rate.note && <span className="ml-2 text-primary/70">• {rate.note}</span>}
-                                                                    </p>
+                                                                    
+                                                                    <AnimatePresence>
+                                                                        {selectedShipping?.id === rate.id && (
+                                                                            <motion.div 
+                                                                                initial={{ opacity: 0, height: 0 }}
+                                                                                animate={{ opacity: 1, height: 'auto' }}
+                                                                                className="mt-2 pt-2 border-t border-secondary/20"
+                                                                            >
+                                                                                <p className="text-xs text-muted-foreground">Transit: <span className="text-foreground font-semibold">{rate.estimatedDays} days</span>
+                                                                                    {rate.note && <span className="ml-2 text-primary/70">• {rate.note}</span>}
+                                                                                </p>
+                                                                                <p className="text-[10px] text-secondary font-bold uppercase mt-1">Certified B2B Rate</p>
+                                                                            </motion.div>
+                                                                        )}
+                                                                    </AnimatePresence>
                                                                 </div>
                                                             </div>
                                                             <div className="text-end">
@@ -333,6 +344,16 @@ export default function CheckoutPage() {
                                                     ))}
                                                 </div>
                                             )}
+
+                                            <div className="p-4 bg-muted/30 border border-dashed border-border rounded-2xl flex items-start gap-3">
+                                                <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
+                                                <div>
+                                                    <p className="text-xs font-bold text-foreground">Need a custom quote?</p>
+                                                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                                        If the automated rates above don't fit your needs, tell us what you're looking for and we'll obtain a certified quote directly from our logistics partners for you.
+                                                    </p>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <div className="pt-6 border-t border-border/50">

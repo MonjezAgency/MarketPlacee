@@ -19,7 +19,6 @@ const FOOTER_COLUMNS = [
         title: 'forSuppliers',
         links: [
             { name: 'registerSupplier', href: '/auth/register' },
-            { name: 'supplierDashboard', href: '/supplier' },
             { name: 'marketingTools', href: '/marketing' },
             { name: 'aboutUs', href: '/about' },
         ],

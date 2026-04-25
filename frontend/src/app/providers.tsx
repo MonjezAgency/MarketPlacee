@@ -14,20 +14,27 @@ export function Providers({ children }: { children: React.ReactNode }) {
         // Only set the platform default currency if the user hasn't manually
         // chosen one yet. This prevents overwriting user preferences on every
         // page navigation.
-        const userHasChosen = localStorage.getItem('user-currency-chosen') === 'true';
-        if (userHasChosen) return;
+        const checkAndSetDefault = async () => {
+            const userHasChosen = localStorage.getItem('user-currency-chosen') === 'true';
+            if (userHasChosen) return;
 
-        fetch('/api/proxy/config/currency')
-            .then(res => res.ok ? res.json() : null)
-            .then(data => {
-                if (data && data.currency) {
-                    localStorage.setItem('platform-currency', data.currency);
-                    window.dispatchEvent(new Event('currency-changed'));
+            try {
+                const res = await fetch('/api/proxy/config/currency');
+                if (res.ok) {
+                    const data = await res.json();
+                    // Double check in case user chose while we were fetching
+                    const userHasChosenNow = localStorage.getItem('user-currency-chosen') === 'true';
+                    if (data && data.currency && !userHasChosenNow) {
+                        localStorage.setItem('platform-currency', data.currency);
+                        window.dispatchEvent(new Event('currency-changed'));
+                    }
                 }
-                // If no platform default is set, leave whatever is in localStorage
-                // (timezone heuristic will handle the fallback).
-            })
-            .catch(() => {/* non-critical — silently ignore */});
+            } catch (err) {
+                // non-critical — silently ignore
+            }
+        };
+
+        checkAndSetDefault();
     }, []);
     return (
         <SessionProvider>

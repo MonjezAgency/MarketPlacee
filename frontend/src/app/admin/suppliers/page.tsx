@@ -354,16 +354,23 @@ export default function AdminSuppliersPage() {
                                                         <p className="text-sm font-bold text-slate-900">{selectedSupplier.phone || 'N/A'}</p>
                                                     </div>
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-4">
+                                                <div className="grid grid-cols-3 gap-3">
                                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Onboarding</p>
-                                                        <p className="text-sm font-bold text-slate-900">{new Date(selectedSupplier.createdAt).toLocaleDateString()}</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Onboarding</p>
+                                                        <p className="text-xs font-bold text-slate-900">{new Date(selectedSupplier.createdAt).toLocaleDateString()}</p>
                                                     </div>
                                                     <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Rating</p>
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Total Products</p>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Package size={14} className="text-teal-600" />
+                                                            <span className="text-xs font-bold text-slate-900">{selectedSupplier._count?.products || 0}</span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                                                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Rating</p>
                                                         <div className="flex items-center gap-1">
-                                                            <Check size={14} className="text-teal-600" />
-                                                            <span className="text-sm font-bold text-slate-900">4.9/5.0</span>
+                                                            <Star size={14} className="fill-amber-400 text-amber-400" />
+                                                            <span className="text-xs font-bold text-slate-900">4.9/5.0</span>
                                                         </div>
                                                     </div>
                                                 </div>

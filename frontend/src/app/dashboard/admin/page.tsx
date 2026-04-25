@@ -314,7 +314,7 @@ export default function AdminDashboard() {
                                         <h3 className="font-bold text-lg">{product.name}</h3>
                                         <div className="flex flex-wrap items-center gap-2 text-xs text-foreground/40 mt-1">
                                             <Badge variant="outline" className="text-[10px]">{product.category}</Badge>
-                                            <span className="font-mono text-primary">{formatPrice(product.price, true)} (/w markup)</span>
+                                            <span className="font-mono text-primary">{formatPrice(product.price)} (/w markup)</span>
                                             <span>Stock: {product.stock}</span>
                                         </div>
                                         {product.adminNotes && (
@@ -349,7 +349,7 @@ export default function AdminDashboard() {
                                         <h3 className="font-bold text-lg">{product.name}</h3>
                                         <div className="flex flex-wrap items-center gap-2 text-xs text-foreground/40 mt-1">
                                             <Badge variant="outline" className="text-[10px]">{product.category}</Badge>
-                                            <span className="font-mono text-primary">{formatPrice(product.price, true)} (Live Price)</span>
+                                            <span className="font-mono text-primary">{formatPrice(product.price)} (Live Price)</span>
                                             <span>Stock: {product.stock}</span>
                                         </div>
                                     </div>

@@ -47,6 +47,9 @@ export interface Product {
     status?: ProductStatus | string;
     
     // Advanced Data
+    weight?: number;
+    shelfLife?: string;
+    origin?: string;
     basePrice?: number | null;
     variants?: ProductVariant[];
     adminNotes?: string;

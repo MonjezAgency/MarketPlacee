@@ -6,7 +6,7 @@ import NotificationBell from '@/components/ui/NotificationBell';
 import * as React from 'react';
 import Link from 'next/link';
 import '../globals.css';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
     LayoutDashboard,
     Users,
@@ -53,6 +53,8 @@ import { UserMenu } from '@/components/dashboard/UserMenu';
 import { useTheme } from 'next-themes';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Locale } from '@/locales';
+import { GuidedTour } from '@/components/ui/GuidedTour';
+import { WorldClock } from '@/components/dashboard/WorldClock';
 
 interface SidebarGroup {
     title: string;
@@ -78,32 +80,31 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         icon: LayoutDashboard,
         links: [
             { label: 'Dashboard', translationKey: 'overview', href: '/admin', icon: Home },
-            { label: 'Products', translationKey: 'allProducts', href: '/admin/products', icon: Package },
-            { label: 'Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
-            { label: 'Sellers', translationKey: 'suppliers', href: '/admin/suppliers', icon: Store },
-            { label: 'Customers', translationKey: 'buyers', href: '/admin/buyers', icon: Users },
+            { label: 'Inventory Hub', translationKey: 'allProducts', href: '/admin/products', icon: Package },
+            { label: 'Global Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
+            { label: 'Supply Chain', translationKey: 'suppliers', href: '/admin/suppliers', icon: Store },
+            { label: 'B2B Customers', translationKey: 'buyers', href: '/admin/buyers', icon: Users },
             { label: 'Finance & Logistics', translationKey: 'groupFinance', href: '/admin/finance', icon: DollarSign },
         ]
     },
     {
-        title: 'SUPPORT',
-        titleKey: 'groupSupport',
-        icon: LifeBuoy,
+        title: 'GROWTH & CAMPAIGNS',
+        titleKey: 'groupGrowth',
+        icon: Megaphone,
         links: [
-            { label: 'Overview', translationKey: 'overview', href: '/admin/support', icon: LayoutDashboard },
-            { label: 'Disputes', translationKey: 'disputes', href: '/admin/disputes', icon: AlertCircle },
-            { label: 'Live Chat', translationKey: 'liveChat', href: '/admin/support?tab=chat', icon: MessageCircle },
-            { label: 'KYC Queue', translationKey: 'kycQueue', href: '/admin/kyc', icon: ShieldCheck },
+            { label: 'Coupons & Codes', translationKey: 'coupons', href: '/admin/coupons', icon: Ticket },
+            { label: 'Ads & Placements', translationKey: 'ads', href: '/admin/placements', icon: Star },
         ]
     },
     {
-        title: 'REPORTS & SYSTEM',
-        titleKey: 'groupSystem',
-        icon: Wrench,
+        title: 'SUPPORT & KYC',
+        titleKey: 'groupSupport',
+        icon: LifeBuoy,
         links: [
-            { label: 'Reports', translationKey: 'reports', href: '/admin/security', icon: Activity },
-            { label: 'Settings', translationKey: 'settings', href: '/admin/settings', icon: Settings },
-            { label: 'AI Agent', translationKey: 'aiAgent', href: '/admin/ai-agent', icon: Bot },
+            { label: 'Support Overview', translationKey: 'overview', href: '/admin/support', icon: LayoutDashboard },
+            { label: 'Dispute Center', translationKey: 'disputes', href: '/admin/disputes', icon: AlertCircle },
+            { label: 'Live Assistance', translationKey: 'liveChat', href: '/admin/support?tab=chat', icon: MessageCircle },
+            { label: 'KYC Verification', translationKey: 'kycQueue', href: '/admin/kyc', icon: ShieldCheck },
         ]
     },
     {
@@ -111,8 +112,19 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         titleKey: 'groupUsers',
         icon: Shield,
         links: [
-            { label: 'Team Force', translationKey: 'teamMembers', href: '/admin/team', icon: KeyRound },
+            { label: 'User Directory', translationKey: 'users', href: '/admin/users', icon: Users },
+            { label: 'Internal Team', translationKey: 'teamMembers', href: '/admin/team', icon: KeyRound },
             { label: 'Invite Center', translationKey: 'inviteCenter', href: '/admin/invite', icon: UserPlus },
+        ]
+    },
+    {
+        title: 'REPORTS & SYSTEM',
+        titleKey: 'groupSystem',
+        icon: Wrench,
+        links: [
+            { label: 'Security Reports', translationKey: 'reports', href: '/admin/security', icon: Activity },
+            { label: 'System Settings', translationKey: 'settings', href: '/admin/settings', icon: Settings },
+            { label: 'AI Intelligence', translationKey: 'aiAgent', href: '/admin/ai-agent', icon: Bot },
         ]
     },
 ];
@@ -215,6 +227,8 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
 
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
+    const router = useRouter();
+    const { user, logout, isAuthReady } = useAuth();
     const [isOpen, setIsOpen] = React.useState(true); // Open by default
     const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
     const [notifications, setNotifications] = React.useState<NotificationCounts>({
@@ -225,16 +239,61 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
     const [kycBlocked, setKycBlocked] = React.useState(false);
     const pathname = usePathname();
-    const { user, logout } = useAuth();
     const { resolvedTheme, setTheme } = useTheme();
     const { locale, setLocale, t } = useLanguage();
     const [mounted, setMounted] = React.useState(false);
+    const [showTour, setShowTour] = React.useState(false);
+
+    React.useEffect(() => {
+        setMounted(true);
+        const hasSeenTour = localStorage.getItem('atlantis-tour-admin');
+        if (!hasSeenTour && user) {
+            const timer = setTimeout(() => setShowTour(true), 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [user]);
+
+    const tourSteps = [
+        {
+            targetId: 'tour-admin-panel',
+            title: 'Master Control',
+            description: 'Monitor global system health and access cross-border entity verification tools from this centralized dashboard.'
+        },
+        {
+            targetId: 'tour-admin-nav',
+            title: 'Enterprise Registry',
+            description: 'Manage the complete B2B registry including Suppliers, Buyers, and Multi-Currency Product Catalogs.'
+        },
+        {
+            targetId: 'tour-admin-alerts',
+            title: 'Action Center',
+            description: 'Execute pending approvals for high-value transactions and new entity registrations here.'
+        }
+    ];
 
     // ... (keep role logic)
-    const isOwner = user?.role === 'OWNER' || user?.role === 'owner';
-    const isDeveloper = (user?.role || '').toUpperCase() === 'DEVELOPER';
+    const isOwner = user?.role?.toUpperCase() === 'OWNER';
     const isTeamMember = ['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS']
-        .includes((user?.role || '').toUpperCase());
+        .includes((user?.role || '').toUpperCase()) || isOwner;
+
+    // Role Guard: Only Admin/Team allowed in /admin
+    React.useEffect(() => {
+        if (isAuthReady) {
+            if (!user) {
+                router.replace('/auth/login');
+            } else if (!isTeamMember) {
+                // Redirect non-admins to their appropriate home
+                if (user.role?.toUpperCase() === 'SUPPLIER') {
+                    router.replace('/supplier');
+                } else {
+                    router.replace('/dashboard/customer');
+                }
+            }
+        }
+    }, [isAuthReady, user, isTeamMember, router]);
+
+
+    const isDeveloper = (user?.role || '').toUpperCase() === 'DEVELOPER';
 
     const getFilteredSidebarGroups = () => {
         if (isDeveloper) {
@@ -267,6 +326,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         '/admin/orders': notifications.pendingOrders,
         '/admin/placements': notifications.pendingPlacements,
     };
+
+    // Show nothing while checking auth to prevent layout flash
+    // This MUST be after all hooks to avoid "Rendered more hooks" error
+    if (!isAuthReady || (user && !isTeamMember)) {
+        return (
+            <div className="h-screen w-full flex items-center justify-center bg-[#0F172A]">
+                <div className="w-12 h-12 border-4 border-[#14B8A6] border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
 
     if (kycBlocked) {
         return (
@@ -304,18 +373,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 )}>
                 {/* Sidebar Header */}
                 <div className="h-28 flex items-center px-8 border-b border-white/5">
-                    <Link href="/" className="flex items-center gap-3 group">
-                        <div className="w-10 h-10 border-2 border-[#14B8A6]/30 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-110 shadow-[0_0_20px_rgba(20,184,166,0.1)]">
-                            <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
+                    <Link href="/" className="flex items-center gap-4 group">
+                        <div className="w-12 h-12 bg-white rounded-2xl overflow-hidden flex items-center justify-center transition-all group-hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.1)] border-2 border-white/10">
+                            <img 
+                                src="https://mgecljoxasstdfmlytov.supabase.co/storage/v1/object/public/marketplace-assets/logo_atlantis.png" 
+                                alt="Atlantis" 
+                                className="w-full h-full object-contain p-1" 
+                            />
                         </div>
-                        <span className="font-heading font-black text-2xl tracking-tighter uppercase text-white flex items-center">
-                            Atlan<span className="text-[#14B8A6]">tis.</span>
-                        </span>
+                        <div className="flex flex-col">
+                            <span className="font-heading font-black text-2xl tracking-tighter uppercase text-white leading-none">
+                                Atlan<span className="text-[#14B8A6]">tis.</span>
+                            </span>
+                            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-[#14B8A6]/60 mt-1">Enterprise HQ</span>
+                        </div>
                     </Link>
                 </div>
 
                 {/* Sidebar Content */}
-                <nav className="flex-1 py-6 px-4 space-y-1 overflow-y-auto no-scrollbar">
+                <nav id="tour-admin-nav" className="flex-1 py-6 px-4 space-y-1 overflow-y-auto no-scrollbar">
                     {isOwner && (
                         <div className="mb-10">
                             {isOpen && (
@@ -420,7 +496,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                                 <LayoutDashboard size={18} />
                             </Link>
                         )}
-                        <div className="flex flex-col">
+                        <div id="tour-admin-panel" className="flex flex-col">
                             <h1 className="text-[#0F172A] font-semibold text-2xl tracking-tight uppercase leading-none">
                                 {isDeveloper ? 'Support HQ' : t('admin', 'panelTitle')}
                             </h1>
@@ -457,8 +533,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             </button>
                         )}
 
+                        {/* World Clock */}
+                        <WorldClock />
+
+                        <div className="h-6 w-[1px] bg-[#DDD] dark:bg-white/10" />
+
                         {/* Unified Notification Bell */}
-                        <div className="flex items-center">
+                        <div id="tour-admin-alerts" className="flex items-center">
                             <NotificationBell isLight={resolvedTheme !== 'dark'} />
                         </div>
 
@@ -476,6 +557,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </div>
                 </div>
             </main>
+
+            <GuidedTour 
+                show={showTour}
+                steps={tourSteps}
+                onComplete={() => {
+                    localStorage.setItem('atlantis-tour-admin', 'true');
+                    setShowTour(false);
+                }}
+                onDismiss={() => {
+                    localStorage.setItem('atlantis-tour-admin', 'true');
+                    setShowTour(false);
+                }}
+            />
         </div>
     );
 }
