@@ -79,25 +79,26 @@ export async function POST(request: Request) {
     }
 
     const cookieStore = cookies();
-
-    if (access_token) {
-      cookieStore.set('token', access_token, {
+    const host = request.headers.get('host') || '';
+    const isCustomDomain = host.includes('atlantisfmcg.com');
+    const cookieOptions: any = {
         httpOnly: true,
         secure: true,
         sameSite: 'lax',
         path: '/',
         maxAge: 7 * 24 * 60 * 60,
-      });
+    };
+
+    if (isCustomDomain) {
+        cookieOptions.domain = '.atlantisfmcg.com';
+    }
+
+    if (access_token) {
+      cookieStore.set('token', access_token, cookieOptions);
     }
 
     if (refresh_token) {
-      cookieStore.set('refreshToken', refresh_token, {
-        httpOnly: true,
-        secure: true,
-        sameSite: 'lax',
-        path: '/',
-        maxAge: 7 * 24 * 60 * 60,
-      });
+      cookieStore.set('refreshToken', refresh_token, cookieOptions);
     }
 
     return NextResponse.json({ success: true, user });
