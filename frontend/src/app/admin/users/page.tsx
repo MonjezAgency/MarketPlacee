@@ -7,7 +7,7 @@ import {
     MoreVertical, ShieldCheck, Mail, Phone,
     Check, X, FileText, Globe, Building2,
     Calendar, ArrowUpRight, ShieldAlert,
-    ChevronRight, Eye, Briefcase
+    ChevronRight, Eye, Briefcase, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
