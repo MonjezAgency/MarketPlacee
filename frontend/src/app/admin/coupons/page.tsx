@@ -9,7 +9,7 @@ import {
     TrendingUp, MousePointer2, Users,
     DollarSign, X, ChevronRight,
     Percent, Tag, ArrowUpRight,
-    Zap, Hash, LayoutDashboard
+    Zap, Hash, LayoutDashboard, Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
