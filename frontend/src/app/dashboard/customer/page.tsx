@@ -315,5 +315,6 @@ export default function CustomerDashboard() {
                 </div>
             </div>
         </div>
-    );
+    </div>
+);
 }

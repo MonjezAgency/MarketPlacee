@@ -37,27 +37,23 @@ export const PRODUCTS: Product[] = [
 ];
 
 export const CATEGORIES_LIST: string[] = [
-    'Soft Drinks',
-    'Energy Drinks',
-    'Coffee & Tea',
-    'Snacks & Sweets',
-    'Personal Care',
-    'Home Care',
-    'Makeup',
-    'Perfume',
+    'Beverages', 'Soft Drinks', 'Energy Drinks', 'Coffee & Tea',
+    'Snacks & Biscuits', 'Chocolates & Sweets', 'Confectionery',
+    'Dairy & Eggs', 'Frozen Food', 'Bakery & Bread',
+    'Pantry & Grains', 'Canned & Jarred Food', 'Spices & Condiments',
+    'Meat & Poultry', 'Seafood',
+    'Personal Care', 'Beauty & Makeup', 'Fragrances & Perfumes',
+    'Hair Care', 'Skincare', 'Oral Care', 'Health & Wellness',
+    'Baby Care', 'Pet Care',
+    'Household & Cleaning', 'Laundry & Detergents', 'Paper & Plastic',
+    'Home & Kitchen', 'Electronics & Accessories', 'Office & Stationery',
+    'Tobacco & Accessories', 'Toys & Games', 'Other'
 ];
 
 export const BRANDS: string[] = [
-    'Eucerin',
-    'Vitabiotics',
-    'Mexx',
-    'Nivea',
-    'L\'Oreal',
-    'Unilever',
-    'Henkel',
-    'Reckitt',
-    'Johnson & Johnson',
-    'P&G',
-    'Beiersdorf',
-    'Colgate',
+    'Coca-Cola', 'Pepsi', 'Red Bull', 'Monster', 'Nescafe', 'Starbucks',
+    'L\'Oreal', 'Nivea', 'Dove', 'Colgate', 'Oral-B', 'Gillette',
+    'P&G', 'Unilever', 'Henkel', 'Reckitt', 'Johnson & Johnson', 'Beiersdorf',
+    'Ferrero', 'Mars', 'Mondelez', 'Nestle', 'Kellogg\'s', 'Danone',
+    'Vitabiotics', 'Eucerin', 'La Roche-Posay', 'Vichy', 'Mexx'
 ];

@@ -16,6 +16,7 @@ import { apiFetch } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertToBase } from '@/lib/currency';
 import { Loader2 } from 'lucide-react';
+import { CATEGORIES_LIST } from '@/lib/products';
 
 export default function AdminAddProductWorkspace() {
     const router = useRouter();
@@ -67,6 +68,11 @@ export default function AdminAddProductWorkspace() {
                     const data = await res.json();
                     const suppliersList = Array.isArray(data) ? data : (data.users || []);
                     setSuppliers(suppliersList);
+                    
+                    // Auto-select if only one supplier exists (e.g. the admin's own team)
+                    if (suppliersList.length === 1) {
+                        setFormData(prev => ({ ...prev, supplierId: suppliersList[0].id }));
+                    }
                 }
             } catch (err) {
                 console.error('Failed to fetch suppliers', err);
@@ -88,12 +94,8 @@ export default function AdminAddProductWorkspace() {
         }
     };
 
-    const categories = [
-        'Beverages', 'Snacks & Biscuits', 'Dairy & Eggs', 'Frozen Food', 
-        'Pantry & Grains', 'Personal Care', 'Household & Cleaning', 
-        'Baby Care', 'Pet Care', 'Canned Food', 'Spices & Condiments', 
-        'Confectionery', 'Coffee & Tea', 'Meat & Poultry', 'Seafood'
-    ];
+    const categories = CATEGORIES_LIST;
+
 
     const completionItems = [
         { label: 'Basic Info', done: !!formData.name && !!formData.brand },
@@ -351,43 +353,45 @@ export default function AdminAddProductWorkspace() {
                             </div>
                         </div>
 
-                        {/* CARD: SUPPLIER SELECTION (ADMIN ONLY) */}
-                        <div className="bg-white border border-[#E5E7EB] rounded-[14px] p-4 shadow-sm">
-                            <h3 className="text-[16px] font-semibold mb-4 flex items-center gap-2">
-                                <Store size={18} className="text-teal-600" /> Source Supplier
-                            </h3>
-                            <div className="space-y-4">
-                                <div className="relative">
-                                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Search suppliers..."
-                                        value={searchTerm}
-                                        onChange={e => setSearchTerm(e.target.value)}
-                                        className="w-full h-[44px] bg-[#F8FAFC] border border-[#E5E7EB] rounded-[10px] ps-10 pe-4 text-[14px] outline-none focus:border-[#14B8A6] transition-all"
-                                    />
-                                </div>
-                                <div className="max-h-[160px] overflow-y-auto border border-[#E5E7EB] rounded-xl divide-y divide-[#E5E7EB]">
-                                    {suppliers.filter(s => s.name?.toLowerCase().includes(searchTerm.toLowerCase()) || s.email?.toLowerCase().includes(searchTerm.toLowerCase())).map((s) => (
-                                        <button 
-                                            key={s.id}
-                                            type="button"
-                                            onClick={() => setFormData({ ...formData, supplierId: s.id })}
-                                            className={cn(
-                                                "w-full px-4 py-3 flex items-center justify-between hover:bg-[#F1F5F9] transition-all text-left",
-                                                formData.supplierId === s.id && "bg-teal-50"
-                                            )}
-                                        >
-                                            <div>
-                                                <p className="text-[13px] font-bold">{s.name}</p>
-                                                <p className="text-[11px] text-[#6B7280]">{s.email}</p>
-                                            </div>
-                                            {formData.supplierId === s.id && <CheckCircle2 size={16} className="text-teal-600" />}
-                                        </button>
-                                    ))}
+                        {/* CARD: SUPPLIER SELECTION (SHOW ONLY IF MULTIPLE SUPPLIERS EXIST) */}
+                        {suppliers.length > 1 && (
+                            <div className="bg-white border border-[#E5E7EB] rounded-[14px] p-4 shadow-sm">
+                                <h3 className="text-[16px] font-semibold mb-4 flex items-center gap-2">
+                                    <Store size={18} className="text-teal-600" /> Source Supplier
+                                </h3>
+                                <div className="space-y-4">
+                                    <div className="relative">
+                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
+                                        <input 
+                                            type="text" 
+                                            placeholder="Search suppliers..."
+                                            value={searchTerm}
+                                            onChange={e => setSearchTerm(e.target.value)}
+                                            className="w-full h-[44px] bg-[#F8FAFC] border border-[#E5E7EB] rounded-[10px] ps-10 pe-4 text-[14px] outline-none focus:border-[#14B8A6] transition-all"
+                                        />
+                                    </div>
+                                    <div className="max-h-[160px] overflow-y-auto border border-[#E5E7EB] rounded-xl divide-y divide-[#E5E7EB]">
+                                        {suppliers.filter(s => s.name?.toLowerCase().includes(searchTerm.toLowerCase()) || s.email?.toLowerCase().includes(searchTerm.toLowerCase())).map((s) => (
+                                            <button 
+                                                key={s.id}
+                                                type="button"
+                                                onClick={() => setFormData({ ...formData, supplierId: s.id })}
+                                                className={cn(
+                                                    "w-full px-4 py-3 flex items-center justify-between hover:bg-[#F1F5F9] transition-all text-left",
+                                                    formData.supplierId === s.id && "bg-teal-50"
+                                                )}
+                                            >
+                                                <div>
+                                                    <p className="text-[13px] font-bold">{s.name}</p>
+                                                    <p className="text-[11px] text-[#6B7280]">{s.email}</p>
+                                                </div>
+                                                {formData.supplierId === s.id && <CheckCircle2 size={16} className="text-teal-600" />}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* CARD 3: LOGISTICS & COMPLIANCE */}
                         <div className="bg-white border border-[#E5E7EB] rounded-[14px] p-5 shadow-sm space-y-5">

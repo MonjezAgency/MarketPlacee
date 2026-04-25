@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { ProductStatus } from '@/lib/types';
 import type { Product } from '@/lib/types';
+import { CATEGORIES_LIST } from '@/lib/products';
 
 interface VariantGroup {
     name: string;
@@ -22,20 +23,8 @@ interface ProductEditorModalProps {
     onSave: (data: Product) => void;
 }
 
-const ALL_CATEGORIES = [
-    'Beverages', 'Snacks & Biscuits', 'Dairy & Eggs', 'Frozen Food', 
-    'Pantry & Grains', 'Personal Care', 'Household & Cleaning', 
-    'Baby Care', 'Pet Care', 'Canned Food', 'Spices & Condiments', 
-    'Confectionery', 'Coffee & Tea', 'Meat & Poultry', 'Seafood',
-    'Soft Drinks', 'Energy Drinks', 'Water', 'Juices',
-    'Chips', 'Chocolate', 'Candy', 'Biscuits',
-    'Milk', 'Cheese', 'Yogurt',
-    'Skincare', 'Haircare', 'Oral Care',
-    'Detergent',
-    'Ice Cream',
-    'Bakery', 'Bread', 'Pastries',
-    'Tobacco', 'Other'
-];
+const ALL_CATEGORIES = CATEGORIES_LIST;
+
 
 
 interface ModalPortalContentProps {
