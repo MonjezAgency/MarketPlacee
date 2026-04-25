@@ -86,7 +86,29 @@ export default function CustomerDashboard() {
     const openCount = orders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED').length;
 
     return (
-        <div className="max-w-7xl mx-auto space-y-10 p-4 md:p-8 pt-24 min-h-screen bg-[#F5F7F7] dark:bg-[#0A0D12]">
+        <div className="min-h-screen bg-[#F5F7F7] dark:bg-[#0A0D12]">
+            {/* Dashboard Header */}
+            <header className="fixed top-0 start-0 end-0 h-20 bg-white/80 dark:bg-[#131921]/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5 z-[100] px-4 md:px-8 flex items-center justify-between">
+                <Link href="/" className="flex items-center gap-3 group">
+                    <div className="w-10 h-10 bg-white rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-105 shadow-lg shadow-black/5 border border-black/5">
+                        <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
+                    </div>
+                    <span className="font-heading font-black text-xl tracking-tighter text-[#111] dark:text-white uppercase">
+                        Atlan<span className="text-primary">tis.</span>
+                    </span>
+                </Link>
+                
+                <div className="flex items-center gap-4">
+                    <Link href="/" className="text-[11px] font-black uppercase tracking-widest text-[#888] hover:text-primary transition-colors">
+                        Back to Shop
+                    </Link>
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+                        <Star size={18} fill="currentColor" />
+                    </div>
+                </div>
+            </header>
+
+            <div className="max-w-7xl mx-auto space-y-10 p-4 md:p-8 pt-28 pb-20">
             {/* Greeting */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 <div className="space-y-1">

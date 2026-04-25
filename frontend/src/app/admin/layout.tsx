@@ -246,19 +246,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     React.useEffect(() => {
         setMounted(true);
-        const hasSeenTour = localStorage.getItem('atlantis-tour-admin');
-        if (!hasSeenTour && user) {
+        if (!user?.id) return;
+        const tourKey = `atlantis-tour-admin-${user.id}`;
+        const hasSeenTour = localStorage.getItem(tourKey);
+        if (!hasSeenTour) {
             const timer = setTimeout(() => setShowTour(true), 2000);
             return () => clearTimeout(timer);
         }
     }, [user]);
 
     const tourSteps = [
-        {
-            targetId: 'tour-admin-panel',
-            title: 'Master Control',
-            description: 'Monitor global system health and access cross-border entity verification tools from this centralized dashboard.'
-        },
         {
             targetId: 'tour-admin-nav',
             title: 'Enterprise Registry',
@@ -374,11 +371,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {/* Sidebar Header */}
                 <div className="h-28 flex items-center px-8 border-b border-white/5">
                     <Link href="/" className="flex items-center gap-4 group">
-                        <div className="w-12 h-12 bg-white rounded-2xl overflow-hidden flex items-center justify-center transition-all group-hover:scale-105 shadow-[0_0_40px_rgba(255,255,255,0.1)] border-2 border-white/10">
+                        <div className="w-12 h-12 bg-white rounded-2xl overflow-hidden flex items-center justify-center transition-all group-hover:scale-105 shadow-[0_0_40px_rgba(20,184,166,0.2)] border border-white/20">
                             <img 
-                                src="https://mgecljoxasstdfmlytov.supabase.co/storage/v1/object/public/marketplace-assets/logo_atlantis.png" 
+                                src="/icon.png" 
                                 alt="Atlantis" 
-                                className="w-full h-full object-contain p-1" 
+                                className="w-full h-full object-cover" 
                             />
                         </div>
                         <div className="flex flex-col">
@@ -562,11 +559,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 show={showTour}
                 steps={tourSteps}
                 onComplete={() => {
-                    localStorage.setItem('atlantis-tour-admin', 'true');
+                    localStorage.setItem(`atlantis-tour-admin-${user?.id}`, 'true');
                     setShowTour(false);
                 }}
                 onDismiss={() => {
-                    localStorage.setItem('atlantis-tour-admin', 'true');
+                    localStorage.setItem(`atlantis-tour-admin-${user?.id}`, 'true');
                     setShowTour(false);
                 }}
             />

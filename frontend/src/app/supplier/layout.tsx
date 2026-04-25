@@ -72,7 +72,9 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
 
 
     React.useEffect(() => {
-        const hasSeenTour = localStorage.getItem('atlantis-tour-supplier');
+        if (!user?.id) return;
+        const tourKey = `atlantis-tour-supplier-${user.id}`;
+        const hasSeenTour = localStorage.getItem(tourKey);
         if (!hasSeenTour && user?.status === 'ACTIVE') {
             const timer = setTimeout(() => setShowTour(true), 2000);
             return () => clearTimeout(timer);
@@ -80,11 +82,6 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     }, [user]);
 
     const tourSteps = [
-        {
-            targetId: 'tour-business-hub',
-            title: 'Your Command Center',
-            description: 'This is where you monitor your entire wholesale operation at a glance. Real-time data, injected directly from the platform core.'
-        },
         {
             targetId: 'tour-inventory',
             title: 'Inventory Control',
@@ -94,11 +91,6 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
             targetId: 'tour-revenue',
             title: 'Financial Insights',
             description: 'Track your month-to-date revenue and active order volume. All figures are automatically converted to your preferred currency.'
-        },
-        {
-            targetId: 'tour-notifications',
-            title: 'Priority Alerts',
-            description: 'Never miss a wholesale lead or urgent order. Stay updated with real-time notifications from buyers.'
         }
     ];
 
@@ -171,7 +163,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 <div className="h-20 flex items-center justify-between px-6 border-b border-border/50">
                     {isOpen ? (
                         <Link href="/" className="flex items-center gap-3 group">
-                            <div className="w-10 h-10 bg-white border-2 border-primary/20 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg shadow-primary/5">
+                            <div className="w-10 h-10 bg-white border border-primary/20 rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-110 shadow-lg shadow-primary/5">
                                 <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
                             </div>
                             <span className="font-heading font-black text-xl tracking-tighter text-foreground uppercase flex items-center">
@@ -179,7 +171,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             </span>
                         </Link>
                     ) : (
-                        <div className="w-10 h-10 bg-white border-2 border-primary/20 rounded-xl overflow-hidden flex items-center justify-center">
+                        <div className="w-10 h-10 bg-white border border-primary/20 rounded-xl overflow-hidden flex items-center justify-center">
                             <img src="/icon.png" alt="A" className="w-full h-full object-cover" />
                         </div>
                     )}
@@ -369,11 +361,11 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 show={showTour}
                 steps={tourSteps}
                 onComplete={() => {
-                    localStorage.setItem('atlantis-tour-supplier', 'true');
+                    localStorage.setItem(`atlantis-tour-supplier-${user?.id}`, 'true');
                     setShowTour(false);
                 }}
                 onDismiss={() => {
-                    localStorage.setItem('atlantis-tour-supplier', 'true');
+                    localStorage.setItem(`atlantis-tour-supplier-${user?.id}`, 'true');
                     setShowTour(false);
                 }}
             />
