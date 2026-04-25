@@ -10,7 +10,7 @@ import {
     Clock, Package, FileText, Download,
     Check, AlertCircle, MoreVertical, 
     ArrowUpRight, BarChart3, Briefcase,
-    Zap, DollarSign, Target, Award
+    Zap, DollarSign, Target, Award, Star
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
