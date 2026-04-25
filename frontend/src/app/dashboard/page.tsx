@@ -28,7 +28,7 @@ export default function DashboardIndex() {
         if (!isAuthReady) return;
 
         if (!isLoggedIn) {
-            router.push('/auth/login');
+            router.push('/auth/login?session=expired');
             return;
         }
 

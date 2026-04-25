@@ -58,7 +58,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     React.useEffect(() => {
         if (isAuthReady) {
             if (!user) {
-                router.replace('/auth/login');
+                router.replace('/auth/login?session=expired');
             } else if (user.role?.toUpperCase() !== 'SUPPLIER') {
                 // Redirect non-suppliers to their appropriate home
                 if (user.role?.toUpperCase() === 'ADMIN' || user.role?.toUpperCase() === 'OWNER') {

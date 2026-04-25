@@ -20,7 +20,8 @@ export function middleware(request: NextRequest) {
   }
 
   // Logged in + trying to visit login/register → redirect to dashboard
-  if (isAuthRoute && token) {
+  // Safeguard: Allow auth routes if ?session= is present (prevents infinite loops with bad tokens)
+  if (isAuthRoute && token && !request.nextUrl.searchParams.has('session')) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 

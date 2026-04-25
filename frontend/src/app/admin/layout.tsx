@@ -280,7 +280,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     React.useEffect(() => {
         if (isAuthReady) {
             if (!user) {
-                router.replace('/auth/login');
+                router.replace('/auth/login?session=expired');
             } else if (!isTeamMember) {
                 // Redirect non-admins to their appropriate home
                 if (user.role?.toUpperCase() === 'SUPPLIER') {

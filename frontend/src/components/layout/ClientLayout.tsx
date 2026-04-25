@@ -34,7 +34,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         // 2. Not logged in? Protect dashboards strictly, redirect once for public pages.
         if (!isLoggedIn) {
             if (isDashboard) {
-                router.push('/auth/login');
+                router.push('/auth/login?session=expired');
                 return;
             }
 
@@ -42,7 +42,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
                 const hasRedirected = sessionStorage.getItem('has_redirected_to_login');
                 if (!hasRedirected) {
                     sessionStorage.setItem('has_redirected_to_login', 'true');
-                    router.push('/auth/login');
+                    router.push('/auth/login?session=expired');
                     return;
                 }
             }

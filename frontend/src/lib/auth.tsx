@@ -85,6 +85,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     }
                 } else {
                     setUser(null);
+                    // Clear cookie if token is invalid/expired to prevent redirect loops
+                    if (res.status === 401 || res.status === 403) {
+                        fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+                    }
                 }
             } catch (err) {
                 console.error("Auth hydration failed or timed out:", err);
