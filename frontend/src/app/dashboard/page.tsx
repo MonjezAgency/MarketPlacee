@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth';
 import { Loader2 } from 'lucide-react';
@@ -14,6 +14,15 @@ import { Loader2 } from 'lucide-react';
 export default function DashboardIndex() {
     const { user, isLoggedIn, isAuthReady } = useAuth();
     const router = useRouter();
+
+    const [showTimeoutMessage, setShowTimeoutMessage] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (!isAuthReady) setShowTimeoutMessage(true);
+        }, 5000);
+        return () => clearTimeout(timer);
+    }, [isAuthReady]);
 
     useEffect(() => {
         if (!isAuthReady) return;
@@ -44,9 +53,33 @@ export default function DashboardIndex() {
                         <div className="w-8 h-8 bg-primary/20 rounded-full animate-pulse" />
                     </div>
                 </div>
-                <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400 animate-pulse">
-                    Routing to your workspace...
-                </p>
+                <div className="space-y-3 flex flex-col items-center">
+                    <p className="text-sm font-black uppercase tracking-[0.2em] text-slate-400 animate-pulse">
+                        Routing to your workspace...
+                    </p>
+                    {showTimeoutMessage && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-700 max-w-xs">
+                            <p className="text-[10px] font-bold text-slate-400 leading-relaxed uppercase tracking-wider">
+                                Connection is taking longer than expected. <br/>
+                                Please verify the backend service status.
+                            </p>
+                            <div className="flex flex-col gap-2">
+                                <button 
+                                    onClick={() => window.location.reload()}
+                                    className="px-4 py-2 bg-primary text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-transform"
+                                >
+                                    Retry Connection
+                                </button>
+                                <button 
+                                    onClick={() => router.push('/')}
+                                    className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors"
+                                >
+                                    Back to Marketplace
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );

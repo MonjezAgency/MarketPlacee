@@ -67,8 +67,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Load from backend /auth/me on mount
     useEffect(() => {
         const checkAuth = async () => {
+            // Add a safety timeout to prevent hanging forever if backend is unreachable
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Auth check timed out')), 8000)
+            );
+
             try {
-                const res = await apiFetch('/auth/me');
+                const fetchPromise = apiFetch('/auth/me');
+                const res = await Promise.race([fetchPromise, timeoutPromise]) as Response;
+                
                 if (res.ok) {
                     const userData = await res.json();
                     setUser(userData);
@@ -80,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setUser(null);
                 }
             } catch (err) {
-                console.error("Auth hydration failed:", err);
+                console.error("Auth hydration failed or timed out:", err);
                 setUser(null);
             } finally {
                 setIsAuthReady(true);

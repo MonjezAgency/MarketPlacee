@@ -55,9 +55,13 @@ async function handler(
   }
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
       const fetchOptions: RequestInit = {
         method: req.method,
         headers: forwardHeaders,
+        signal: controller.signal,
       };
 
       if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -67,17 +71,21 @@ async function handler(
       }
 
       const res = await fetch(backendUrl, fetchOptions);
+      clearTimeout(timeoutId);
 
-    const responseData = await res.arrayBuffer();
-    return new NextResponse(responseData, {
-      status: res.status,
-      headers: {
-        'Content-Type': res.headers.get('content-type') || 'application/json',
-      },
-    });
-  } catch (err: any) {
-    return NextResponse.json({ message: err.message || 'Proxy error' }, { status: 500 });
-  }
+      const responseData = await res.arrayBuffer();
+      return new NextResponse(responseData, {
+        status: res.status,
+        headers: {
+          'Content-Type': res.headers.get('content-type') || 'application/json',
+        },
+      });
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        return NextResponse.json({ message: 'Backend request timed out' }, { status: 504 });
+      }
+      return NextResponse.json({ message: err.message || 'Proxy error' }, { status: 500 });
+    }
 }
 
 export { handler as GET, handler as POST, handler as PUT, handler as PATCH, handler as DELETE };
