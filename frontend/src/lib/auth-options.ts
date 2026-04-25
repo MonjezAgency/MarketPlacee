@@ -16,7 +16,7 @@ export const authOptions: NextAuthOptions = {
             const profile = rawProfile as GoogleProfile;
             if (account?.provider === 'google' && profile) {
                 try {
-                    const res = await apiFetch(`/auth/google`, {
+                    const res = await apiFetch(`/auth/google-login`, {
                         method: 'POST',
                         body: JSON.stringify({
                             email: profile.email,

@@ -97,8 +97,8 @@ export class AuthController {
     }
 
     @Post('google-login')
-    async googleLogin(@Body('email') email: string, @Body('name') name: string, @Body('avatar') avatar: string, @Res({ passthrough: true }) res: any) {
-        const result = await this.authService.googleLogin({ email, name, avatar });
+    async googleLogin(@Body('email') email: string, @Body('name') name: string, @Body('avatar') avatar: string, @Body('googleId') googleId: string, @Res({ passthrough: true }) res: any) {
+        const result = await this.authService.googleLogin({ email, name, avatar, googleId });
         if (result && 'access_token' in result) {
             res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
             res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
