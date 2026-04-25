@@ -324,8 +324,8 @@ function ModalPortalContent({
                                                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Currency & Price Per Case</label>
                                                         <div className="flex gap-2">
                                                             <select
-                                                                value={selectedCurrency}
-                                                                onChange={e => setSelectedCurrency(e.target.value)}
+                                                                value={activeCurrency}
+                                                                onChange={e => setActiveCurrency(e.target.value)}
                                                                 className="h-14 bg-background border border-border/50 rounded-2xl px-4 outline-none focus:border-primary/50 text-foreground font-black text-sm appearance-none"
                                                             >
                                                                 {SUPPORTED_CURRENCIES.map(c => (
@@ -333,7 +333,7 @@ function ModalPortalContent({
                                                                 ))}
                                                             </select>
                                                             <div className="relative flex-1">
-                                                                <span className="absolute start-5 top-1/2 -translate-y-1/2 text-primary font-black text-xl">{SUPPORTED_CURRENCIES.find(c => c.code === selectedCurrency)?.symbol}</span>
+                                                                <span className="absolute start-5 top-1/2 -translate-y-1/2 text-primary font-black text-xl">{SUPPORTED_CURRENCIES.find(c => c.code === activeCurrency)?.symbol}</span>
                                                                 <input
                                                                     type="number"
                                                                     step="0.01"
