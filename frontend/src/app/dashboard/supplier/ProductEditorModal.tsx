@@ -656,6 +656,11 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
             price: egpPrice,
             basePrice: egpPrice
         };
+
+        // Ensure we don't send an empty ID for new products
+        if (!dataToSave.id) {
+            delete (dataToSave as any).id;
+        }
         
         onSave(dataToSave);
         onClose();

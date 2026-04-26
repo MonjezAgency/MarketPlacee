@@ -6,6 +6,7 @@ import { EmailService } from '../email/email.service';
 import { CryptoService } from '../security/crypto.service';
 import { TwoFaService } from './twofa.service';
 import { Logger } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.service';
 
 import { PrismaService } from '../common/prisma.service';
 
@@ -34,6 +35,7 @@ export class AuthService {
         private emailService: EmailService,
         private cryptoService: CryptoService,
         private twoFaService: TwoFaService,
+        private notificationsService: NotificationsService,
     ) { }
 
     async findByEmail(email: string) {
@@ -204,22 +206,13 @@ export class AuthService {
                         this.logger.log(`[AUTH] Admin signup alert email sent for ${user.email}`);
 
                         // 4. Create In-App Notifications for Admins
-                        const admins = await this.prisma.user.findMany({
-                            where: { role: { in: ['ADMIN', 'OWNER'] }, status: 'ACTIVE' },
-                            select: { id: true },
-                        });
-                        for (const admin of admins) {
-                            await this.prisma.notification.create({
-                                data: {
-                                    userId: admin.id,
-                                    title: 'New Registration Pending Approval',
-                                    message: `${user.name} (${user.companyName}) has registered as a ${data.role} and is waiting for approval.`,
-                                    type: 'NEW_REGISTRATION',
-                                    data: { userId: user.id }
-                                }
-                            });
-                        }
-                        this.logger.log(`[AUTH] In-app notifications created for ${admins.length} admins regarding ${user.email}`);
+                        await this.notificationsService.notifyAdmins(
+                            'New Registration Pending Approval',
+                            `${user.name} (${user.companyName}) has registered as a ${data.role} and is waiting for approval.`,
+                            'INFO',
+                            { userId: user.id }
+                        ).catch(() => {});
+                        this.logger.log(`[AUTH] In-app notifications created for admins regarding ${user.email}`);
                     } else if (isInvited) {
                         // For invited users, send welcome email immediately since they bypass approval
                         await this.emailService.sendWelcomeEmail(user.email, user.name, user.role);
@@ -424,21 +417,13 @@ export class AuthService {
                         role: 'CUSTOMER',
                         registeredAt: googleUser.createdAt || new Date(),
                     });
-                    const admins = await this.prisma.user.findMany({
-                        where: { role: { in: ['ADMIN', 'OWNER'] }, status: 'ACTIVE' },
-                        select: { id: true },
-                    });
-                    for (const admin of admins) {
-                        await this.prisma.notification.create({
-                            data: {
-                                userId: admin.id,
-                                title: 'New Google Registration Pending',
-                                message: `${googleUser.name} (${googleUser.email}) signed up via Google and needs approval.`,
-                                type: 'GOOGLE_REGISTRATION',
-                                data: { userId: googleUser.id, email: googleUser.email, role: 'CUSTOMER', provider: 'google' },
-                            },
-                        });
-                    }
+                    // Notify admins about new Google registration
+                    await this.notificationsService.notifyAdmins(
+                        'New Google Registration Pending',
+                        `${googleUser.name} (${googleUser.email}) signed up via Google and needs approval.`,
+                        'INFO',
+                        { userId: googleUser.id, email: googleUser.email, role: 'CUSTOMER', provider: 'google' }
+                    ).catch(() => {});
                 } catch (err: any) {
                     this.logger.error('[AUTH] Google reg admin notification failed:', err.message);
                 }

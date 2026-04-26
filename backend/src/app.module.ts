@@ -33,6 +33,7 @@ import { OwnerModule } from './owner/owner.module';
 import { HealthModule } from './health/health.module';
 import { StorageModule } from './storage/storage.module';
 import { AiAgentModule } from './ai-agent/ai-agent.module';
+import { NewsletterModule } from './newsletter/newsletter.module';
 
 @Module({
     imports: [
@@ -65,6 +66,7 @@ import { AiAgentModule } from './ai-agent/ai-agent.module';
         HealthModule,
         StorageModule,
         AiAgentModule,
+        NewsletterModule,
     ],
     controllers: [AppController],
     providers: [

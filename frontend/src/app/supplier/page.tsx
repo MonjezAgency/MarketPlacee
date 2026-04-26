@@ -18,11 +18,48 @@ export default function SupplierOverviewPage() {
     const { t } = useLanguage();
     const { user } = useAuth();
     const [dashboardStats, setDashboardStats] = React.useState<any>(null);
+    const [dateRange, setDateRange] = React.useState('7d');
+    const [isDateOpen, setIsDateOpen] = React.useState(false);
+
+    // MOCK: In a real app, user.createdAt comes from the DB
+    // We'll use a fallback or mock it for the demo logic
+    const joinedAt = user?.createdAt ? new Date(user.createdAt) : new Date('2025-05-20'); 
+    
+    const RANGES = [
+        { id: 'today', label: 'Today', days: 0 },
+        { id: '7d', label: 'Last 7 Days', days: 7 },
+        { id: '30d', label: 'Last 30 Days', days: 30 },
+        { id: '90d', label: 'Last 90 Days', days: 90 },
+        { id: 'all', label: 'All Time', days: Infinity },
+    ];
+
+    const filteredRanges = RANGES.filter(range => {
+        const now = new Date();
+        const diffDays = Math.ceil((now.getTime() - joinedAt.getTime()) / (1000 * 60 * 60 * 24));
+        if (range.id === 'all' || range.id === 'today') return true;
+        return diffDays >= range.days;
+    });
+
+    const getRangeLabel = () => {
+        return RANGES.find(r => r.id === dateRange)?.label || 'Last 7 Days';
+    };
+
+    const getDateString = () => {
+        const now = new Date();
+        const start = new Date();
+        const range = RANGES.find(r => r.id === dateRange);
+        
+        if (range?.id === 'all') return `Since ${joinedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+        if (range?.id === 'today') return start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        
+        start.setDate(now.getDate() - (range?.days || 7));
+        return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+    };
 
     React.useEffect(() => {
         const fetchStats = async () => {
             try {
-                const res = await apiFetch(`/dashboard/supplier`);
+                const res = await apiFetch(`/dashboard/supplier?range=${dateRange}`);
                 if (res.ok) {
                     const data = await res.json();
                     setDashboardStats(data);
@@ -32,7 +69,7 @@ export default function SupplierOverviewPage() {
             }
         };
         fetchStats();
-    }, []);
+    }, [dateRange]);
 
     const KPI_DATA = [
         { label: 'Revenue (MTD)', value: dashboardStats?.totalRevenue ? formatPrice(dashboardStats.totalRevenue) : '€0.00', trend: '+0.0%', icon: BarChart3, color: 'text-[#10B981]' },
@@ -50,14 +87,57 @@ export default function SupplierOverviewPage() {
                         Welcome back, {user?.name?.split(' ')[0] || 'Monjez'}! 👋
                     </h2>
                     <p className="text-[#64748B] text-sm font-medium mt-1">
-                        Here's what's happening with your business today.
+                        Here's what's happening with your business {dateRange === 'today' ? 'today' : 'over this period'}.
                     </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm font-semibold text-[#64748B]">
-                        <Clock size={16} />
-                        <span>May 20 – May 26, 2025</span>
+                    <div className="relative">
+                        <button 
+                            onClick={() => setIsDateOpen(!isDateOpen)}
+                            className="flex items-center gap-3 px-5 py-3 bg-white border border-[#E2E8F0] rounded-xl text-sm font-bold text-[#64748B] hover:border-[#0EA5A4] transition-all shadow-sm group"
+                        >
+                            <Clock size={18} className="text-[#0EA5A4]" />
+                            <div className="flex flex-col items-start leading-none">
+                                <span className="text-[10px] text-[#94A3B8] uppercase tracking-wider mb-1">{getRangeLabel()}</span>
+                                <span className="text-[#0F172A]">{getDateString()}</span>
+                            </div>
+                        </button>
+
+                        <AnimatePresence>
+                            {isDateOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-20" onClick={() => setIsDateOpen(false)} />
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="absolute right-0 mt-2 w-[220px] bg-white border border-[#E2E8F0] rounded-2xl shadow-2xl z-30 overflow-hidden"
+                                    >
+                                        <div className="p-2">
+                                            {filteredRanges.map((range) => (
+                                                <button
+                                                    key={range.id}
+                                                    onClick={() => {
+                                                        setDateRange(range.id);
+                                                        setIsDateOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                                                        dateRange === range.id 
+                                                            ? 'bg-[#0EA5A4]/10 text-[#0EA5A4]' 
+                                                            : 'text-[#64748B] hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    {range.label}
+                                                    {dateRange === range.id && <div className="w-1.5 h-1.5 rounded-full bg-[#0EA5A4]" />}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                </>
+                            )}
+                        </AnimatePresence>
                     </div>
+                    
                     <Link href="/supplier/products" className="flex items-center gap-2 px-6 py-3 bg-[#0EA5A4] text-white font-bold text-sm rounded-xl hover:shadow-lg hover:shadow-[#0EA5A4]/20 transition-all active:scale-95">
                         <Plus size={18} strokeWidth={3} /> Add New Product
                     </Link>

@@ -92,6 +92,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         titleKey: 'groupGrowth',
         icon: Megaphone,
         links: [
+            { label: 'Newsletter Hub', translationKey: 'newsletter', href: '/admin/newsletter', icon: MessageCircle },
             { label: 'Coupons & Codes', translationKey: 'coupons', href: '/admin/coupons', icon: Ticket },
             { label: 'Ads & Placements', translationKey: 'ads', href: '/admin/placements', icon: Star },
         ]
@@ -379,8 +380,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             />
                         </div>
                         <div className="flex flex-col">
-                            <span className="font-heading font-black text-2xl tracking-tighter uppercase text-white leading-none">
-                                Atlan<span className="text-[#14B8A6]">tis.</span>
+                            <span className="font-heading font-black text-2xl tracking-tighter uppercase leading-none">
+                                <span className="text-white">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
                             </span>
                             <span className="text-[9px] font-black uppercase tracking-[0.4em] text-[#14B8A6]/60 mt-1">Enterprise HQ</span>
                         </div>

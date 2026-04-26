@@ -227,7 +227,6 @@ export default function OffersAndAdsPage() {
                             <thead>
                                 <tr className="bg-[#F8FAFC] border-b border-[#E5E7EB] h-[48px]">
                                     <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Campaign Name</th>
-                                    <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Placement Type</th>
                                     <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Budget</th>
                                     <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Status</th>
                                     <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">CTR</th>
@@ -239,12 +238,6 @@ export default function OffersAndAdsPage() {
                                 {campaigns.length > 0 ? campaigns.map((campaign) => (
                                     <tr key={campaign.id} className="h-[64px] hover:bg-slate-50 transition-colors group">
                                         <td className="px-8 font-semibold text-[#0F172A]">{campaign.product?.name || 'Spring Collection Boost'}</td>
-                                        <td className="px-8">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6]" />
-                                                <span className="text-[14px] font-medium text-[#64748B]">{campaign.placementType}</span>
-                                            </div>
-                                        </td>
                                         <td className="px-8 font-medium text-[#0F172A]">${campaign.price || '500'}</td>
                                         <td className="px-8">
                                             <span className={cn(

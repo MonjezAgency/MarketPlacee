@@ -30,11 +30,11 @@ import { UserMenu } from '@/components/dashboard/UserMenu';
 import { apiFetch } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
 import { GuidedTour } from '@/components/ui/GuidedTour';
+import NotificationBell from '@/components/ui/NotificationBell';
 
 const SUPPLIER_LINKS = [
     { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
     { label: 'Inventory Manager', href: '/supplier/products', icon: Box, key: 'products' },
-    { label: 'Placements', href: '/supplier/placements', icon: Star },
     { label: 'Offers & Ads', href: '/supplier/offers', icon: ListPlus },
     { label: 'My Sales', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
     { label: 'Analytics', href: '/supplier/analytics', icon: TrendingUp },
@@ -273,15 +273,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                         </button>
 
                         {/* Notifications */}
-                        <div className="relative">
-                            <button
-                                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
-                                className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-[#64748B] relative transition-all"
-                            >
-                                <Bell size={20} />
-                                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#EF4444] rounded-full border-2 border-white" />
-                            </button>
-                        </div>
+                        <NotificationBell isLight={theme !== 'dark'} />
 
                         <div className="h-8 w-[1px] bg-[#E2E8F0]" />
 

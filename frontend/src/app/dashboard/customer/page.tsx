@@ -122,8 +122,8 @@ export default function CustomerDashboard() {
                         <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-sm border border-[#E6EAF0]">
                             <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
                         </div>
-                        <span className="font-heading font-black text-xl tracking-tight text-[#0B1F3A] uppercase">
-                            Atlan<span className="text-[#1ABC9C]">tis.</span>
+                        <span className="font-heading font-black text-xl tracking-tight uppercase">
+                            <span className="text-[#0B1F3A]">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
                         </span>
                     </Link>
 

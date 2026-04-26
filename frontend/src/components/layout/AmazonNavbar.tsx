@@ -76,7 +76,9 @@ export default function AmazonNavbar() {
                             <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
                         </div>
                         <div className="hidden sm:flex flex-col leading-none">
-                            <span className="font-bold text-lg text-white tracking-tight">Atlan<span className="text-secondary">tis</span></span>
+                            <span className="font-black text-lg tracking-tighter uppercase">
+                                <span className="text-white">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
+                            </span>
                             <span className="text-[10px] text-white/60 font-medium uppercase tracking-widest">Premium B2B Platform</span>
                         </div>
                     </Link>

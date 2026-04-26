@@ -9,6 +9,7 @@ import { KYCStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
 import { AiAgentService } from '../ai-agent/ai-agent.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class KycService {
@@ -18,6 +19,7 @@ export class KycService {
     private prisma: PrismaService,
     private emailService: EmailService,
     private aiAgent: AiAgentService,
+    private notificationsService: NotificationsService,
   ) {}
 
   /** Submit or re-submit KYC documents */
@@ -92,15 +94,21 @@ export class KycService {
       select: { email: true, name: true },
     });
 
-    // Platform notification
-    await this.prisma.notification.create({
-      data: {
-        userId,
-        title: 'KYC Submitted Successfully',
-        message: 'Your identity documents have been submitted and are under review. We\'ll notify you once reviewed — usually within 24 hours.',
-        type: 'INFO',
-      },
-    }).catch(() => {});
+    // Platform notification for User
+    await this.notificationsService.notifyUser(
+      userId,
+      'KYC Submitted Successfully',
+      'Your identity documents have been submitted and are under review. We\'ll notify you once reviewed — usually within 24 hours.',
+      'INFO'
+    ).catch(() => {});
+
+    // Platform notification for Admins
+    await this.notificationsService.notifyAdmins(
+      'New KYC Submission',
+      `${updatedUser.name} (${updatedUser.email}) has submitted KYC documents for review.`,
+      'INFO',
+      { userId, docId: doc.id }
+    ).catch(() => {});
 
     // Email notification
     if (updatedUser.email) {
@@ -224,6 +232,14 @@ export class KycService {
       this.emailService.sendKycStatusEmail(doc.user.email, doc.user.name || 'Partner', 'VERIFIED').catch(() => {});
     }
 
+    // Platform notification
+    await this.notificationsService.notifyUser(
+      doc.userId,
+      'Identity Verified',
+      'Congratulations! Your identity has been verified. You now have full access to listing and trading.',
+      'SUCCESS'
+    ).catch(() => {});
+
     return updated;
   }
 
@@ -254,6 +270,14 @@ export class KycService {
     if (doc.user?.email) {
       this.emailService.sendKycStatusEmail(doc.user.email, doc.user.name || 'Partner', 'REJECTED', adminNotes).catch(() => {});
     }
+
+    // Platform notification
+    await this.notificationsService.notifyUser(
+      doc.userId,
+      'Identity Verification Failed',
+      `Your KYC submission was rejected. Reason: ${adminNotes}`,
+      'ERROR'
+    ).catch(() => {});
 
     return updated;
   }

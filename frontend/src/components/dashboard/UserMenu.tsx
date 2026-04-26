@@ -65,41 +65,7 @@ export function UserMenu({ role }: UserMenuProps) {
             icon: LayoutDashboard,
             href: isTeamMember ? '/admin' : normalizedRole === 'supplier' ? '/supplier' : '/dashboard/customer',
         },
-        {
-            label: t('userMenu', 'myProfile'),
-            icon: User,
-            href: isTeamMember ? '/admin/settings' : normalizedRole === 'supplier' ? '/supplier/settings' : '/dashboard/settings'
-        },
-        {
-            label: t('userMenu', 'techDashboard'),
-            icon: Shield,
-            href: '/admin/tech',
-            hidden: normalizedRole !== 'developer'
-        },
-        {
-            label: t('userMenu', 'supportCenter'),
-            icon: Shield,
-            href: '/dashboard/support',
-            hidden: normalizedRole !== 'support' && normalizedRole !== 'admin' && normalizedRole !== 'owner'
-        },
-        {
-            label: t('userMenu', 'settings'),
-            icon: Settings,
-            href: isTeamMember ? '/admin/settings' : normalizedRole === 'supplier' ? '/supplier/settings' : '/dashboard/settings'
-        },
-        {
-            label: t('userMenu', 'trackOrder'),
-            icon: Truck,
-            href: '/dashboard/track',
-            hidden: isTeamMember || normalizedRole === 'supplier'
-        },
-        {
-            label: t('userMenu', 'identityVerification'),
-            icon: ShieldCheck,
-            href: '/dashboard/kyc',
-            hidden: normalizedRole === 'admin' || normalizedRole === 'owner' || normalizedRole === 'support'
-        },
-    ].filter(item => !item.hidden);
+    ];
 
     return (
         <div className="relative" ref={menuRef}>

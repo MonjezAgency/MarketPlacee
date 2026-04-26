@@ -28,6 +28,27 @@ export class NotificationsService {
         return notification;
     }
 
+    async notifyAdmins(title: string, message: string, type: NotificationType = 'INFO', data?: any) {
+        const admins = await this.prisma.user.findMany({
+            where: {
+                role: {
+                    in: ['ADMIN', 'OWNER']
+                }
+            },
+            select: { id: true }
+        });
+
+        const promises = admins.map(admin => 
+            this.create(admin.id, title, message, type, data)
+        );
+
+        return Promise.all(promises);
+    }
+
+    async notifyUser(userId: string, title: string, message: string, type: NotificationType = 'INFO', data?: any) {
+        return this.create(userId, title, message, type, data);
+    }
+
     async findByUser(userId: string) {
         return this.prisma.notification.findMany({
             where: { userId },

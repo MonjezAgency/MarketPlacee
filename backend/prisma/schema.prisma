@@ -667,3 +667,15 @@ model EscrowTransaction {
   updatedAt        DateTime     @updatedAt
 }
 
+model NewsletterSubscriber {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  status    String   @default("ACTIVE") // ACTIVE, BOUNCED, UNSUBSCRIBED
+  source    String?  // e.g., "Homepage Footer", "Direct RFQ"
+  region    String?  // e.g., "Europe", "MENA"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@index([status])
+}

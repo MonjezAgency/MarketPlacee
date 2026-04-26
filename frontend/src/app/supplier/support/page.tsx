@@ -88,16 +88,30 @@ export default function SupplierSupportPage() {
         // Simulate AI Response
         setTimeout(() => {
             setIsTyping(false);
+            
+            let response = "I'm looking into this for you. I've analyzed your store status and see some discrepancies in the API logs.";
+            const input = userMsg.content.toLowerCase();
+
+            if (input.includes('hi') || input.includes('hello') || input.includes('hey')) {
+                response = `Hello ${user?.name?.split(' ')[0] || 'there'}! 👋 How can I help you with your Atlantis business hub today?`;
+            } else if (input.includes('order')) {
+                response = "I can help with that. Are you looking for a specific order ID or do you have a question about shipping rates?";
+            } else if (input.includes('product') || input.includes('inventory')) {
+                response = "Your inventory looks mostly healthy, but I can help you update stock levels or categories if needed. What's the product name?";
+            } else if (input.includes('pay') || input.includes('money') || input.includes('earning')) {
+                response = "Financial settlements are processed every Friday. You can check your pending balance in the Earnings tab. Do you have a specific payout question?";
+            }
+
             const aiMsg: Message = {
                 id: (Date.now() + 1).toString(),
                 type: 'ai',
-                content: "I'm looking into this for you. I've analyzed your store status and see some discrepancies in the API logs.",
+                content: response,
                 timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
             setMessages(prev => [...prev, aiMsg]);
 
             // Simulate Escalation for "complex" keywords
-            if (userMsg.content.toLowerCase().includes('urgent') || userMsg.content.toLowerCase().includes('error')) {
+            if (input.includes('urgent') || input.includes('error') || input.includes('human') || input.includes('help')) {
                 setTimeout(() => {
                     setIsEscalated(true);
                     const systemMsg: Message = {

@@ -5,6 +5,7 @@ import { PrismaService } from '../common/prisma.service';
 import { EanService } from './ean.service';
 
 import { AiAgentService } from '../ai-agent/ai-agent.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ProductsService {
@@ -12,6 +13,7 @@ export class ProductsService {
         private prisma: PrismaService, 
         private eanService: EanService,
         private aiAgent: AiAgentService,
+        private notificationsService: NotificationsService,
     ) { }
 
     async create(createProductDto: CreateProductDto, isAdmin: boolean = false) {
@@ -88,9 +90,10 @@ export class ProductsService {
         }
 
         try {
-            return await this.prisma.product.create({
+            const { id, ...productData } = createProductDto as any;
+            const product = await this.prisma.product.create({
                 data: {
-                    ...createProductDto,
+                    ...productData,
                     category: finalCategory || 'General',
                     adminNotes,
                     status: finalStatus,
@@ -107,6 +110,18 @@ export class ProductsService {
                     warehouseId: createProductDto.warehouseId || null,
                 },
             });
+
+            // Notify Admins if created by supplier
+            if (!isAdmin && product.supplierId) {
+                this.notificationsService.notifyAdmins(
+                    'New Product Submitted',
+                    `New product "${product.name}" from supplier ID: ${product.supplierId} is waiting for review.`,
+                    'INFO',
+                    { productId: product.id }
+                ).catch(() => {});
+            }
+
+            return product;
         } catch (error) {
             throw error;
         }
@@ -224,15 +239,13 @@ export class ProductsService {
                 });
 
                 // Create a notification for the supplier
-                await this.prisma.notification.create({
-                    data: {
-                        userId: product.supplierId,
-                        title: 'Product Approval Failed',
-                        message: `Your product "${product.name}" could not be approved due to missing information.`,
-                        type: 'ERROR',
-                        data: { productId: product.id, errors: errors }
-                    }
-                });
+                await this.notificationsService.notifyUser(
+                    product.supplierId,
+                    'Product Approval Failed',
+                    `Your product "${product.name}" could not be approved due to missing information.`,
+                    'ERROR',
+                    { productId: product.id, errors: errors }
+                ).catch(() => {});
 
                 throw new BadRequestException({
                     message: 'Incomplete product cannot be approved.',
@@ -241,10 +254,28 @@ export class ProductsService {
             }
         }
 
-        return this.prisma.product.update({
+        const updated = await this.prisma.product.update({
             where: { id },
             data: { status, adminNotes },
         });
+
+        // Notify Supplier on status change
+        if (updated.supplierId) {
+            const title = status === ProductStatus.APPROVED ? 'Product Approved' : 'Product Status Updated';
+            const message = status === ProductStatus.APPROVED 
+                ? `Your product "${updated.name}" has been approved and is now live on the marketplace!`
+                : `Your product "${updated.name}" status has been updated to ${status}.`;
+            
+            this.notificationsService.notifyUser(
+                updated.supplierId,
+                title,
+                message,
+                status === ProductStatus.APPROVED ? 'SUCCESS' : 'INFO',
+                { productId: updated.id }
+            ).catch(() => {});
+        }
+
+        return updated;
     }
 
     async deleteProduct(id: string) {
@@ -290,17 +321,57 @@ export class ProductsService {
     }
 
     async bulkApprove(ids: string[]) {
-        return this.prisma.product.updateMany({
+        const products = await this.prisma.product.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, name: true, supplierId: true }
+        });
+
+        const result = await this.prisma.product.updateMany({
             where: { id: { in: ids } },
             data: { status: ProductStatus.APPROVED, adminNotes: '' }
         });
+
+        // Notify Suppliers
+        for (const p of products) {
+            if (p.supplierId) {
+                this.notificationsService.notifyUser(
+                    p.supplierId,
+                    'Product Approved',
+                    `Your product "${p.name}" was approved in a bulk action and is now live!`,
+                    'SUCCESS',
+                    { productId: p.id }
+                ).catch(() => {});
+            }
+        }
+
+        return result;
     }
 
     async bulkReject(ids: string[]) {
-        return this.prisma.product.updateMany({
+        const products = await this.prisma.product.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, name: true, supplierId: true }
+        });
+
+        const result = await this.prisma.product.updateMany({
             where: { id: { in: ids } },
             data: { status: ProductStatus.REJECTED }
         });
+
+        // Notify Suppliers
+        for (const p of products) {
+            if (p.supplierId) {
+                this.notificationsService.notifyUser(
+                    p.supplierId,
+                    'Product Rejected',
+                    `Your product "${p.name}" was rejected in a bulk action.`,
+                    'ERROR',
+                    { productId: p.id }
+                ).catch(() => {});
+            }
+        }
+
+        return result;
     }
 
     async update(id: string, data: any) {
