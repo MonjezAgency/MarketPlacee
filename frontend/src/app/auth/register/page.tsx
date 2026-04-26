@@ -16,6 +16,7 @@ import { apiFetch } from '@/lib/api';
 import { signIn } from 'next-auth/react';
 import { Suspense } from 'react';
 import { cn } from '@/lib/utils';
+import { COUNTRIES } from '@/lib/countries';
 
 const EU_COUNTRIES = [
     'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus', 'Czechia', 'Czech Republic',
@@ -296,13 +297,11 @@ function RegisterForm() {
                                                 value={form.phoneCode}
                                                 onChange={e => update('phoneCode', e.target.value)}
                                             >
-                                                <option value="+20">🇪🇬 +20</option>
-                                                <option value="+966">🇸🇦 +966</option>
-                                                <option value="+971">🇦🇪 +971</option>
-                                                <option value="+49">🇩🇪 +49</option>
-                                                <option value="+33">🇫🇷 +33</option>
-                                                <option value="+44">🇬🇧 +44</option>
-                                                <option value="+1">🇺🇸 +1</option>
+                                                {COUNTRIES.map(c => (
+                                                    <option key={c.iso} value={c.dialCode}>
+                                                        {c.flag} {c.dialCode}
+                                                    </option>
+                                                ))}
                                             </select>
                                             <input 
                                                 className={inputClass} 
@@ -365,14 +364,11 @@ function RegisterForm() {
                                                 onChange={e => update('country', e.target.value)}
                                             >
                                                 <option value="">Select Country</option>
-                                                <option value="Egypt">Egypt</option>
-                                                <option value="Saudi Arabia">Saudi Arabia</option>
-                                                <option value="UAE">UAE</option>
-                                                <option value="Germany">Germany</option>
-                                                <option value="France">France</option>
-                                                <option value="USA">USA</option>
-                                                <option value="UK">UK</option>
-                                                <option value="Other">Other</option>
+                                                {COUNTRIES.map(c => (
+                                                    <option key={c.iso} value={c.name}>
+                                                        {c.flag} {c.name}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
                                         {form.taxId !== 'NOT_APPLICABLE' && (

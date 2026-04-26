@@ -7,6 +7,7 @@ import { Building2, Phone, Globe, Briefcase, ArrowRight, Loader2, ShieldCheck } 
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { COUNTRIES } from '@/lib/countries';
 
 export default function OnboardingPage() {
     const { user, updateUser } = useAuth();
@@ -157,13 +158,11 @@ export default function OnboardingPage() {
                                 onChange={e => setForm({ ...form, country: e.target.value })}
                                 className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-primary/50 transition-all appearance-none"
                             >
-                                <option value="United Arab Emirates" className="bg-slate-900">United Arab Emirates</option>
-                                <option value="Saudi Arabia" className="bg-slate-900">Saudi Arabia</option>
-                                <option value="Kuwait" className="bg-slate-900">Kuwait</option>
-                                <option value="Qatar" className="bg-slate-900">Qatar</option>
-                                <option value="Oman" className="bg-slate-900">Oman</option>
-                                <option value="Bahrain" className="bg-slate-900">Bahrain</option>
-                                <option value="Egypt" className="bg-slate-900">Egypt</option>
+                                {COUNTRIES.map(c => (
+                                    <option key={c.iso} value={c.name} className="bg-slate-900">
+                                        {c.flag} {c.name}
+                                    </option>
+                                ))}
                             </select>
                         </div>
                     </div>

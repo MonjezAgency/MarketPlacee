@@ -48,16 +48,18 @@ export class UsersService {
     }
 
     async findAll(status?: any, page = 1, limit = 1000, search?: string, role?: string) {
-        const whereCondition: any = {};
-        if (!status) {
-            // By default, don't show users who have been "deleted" (anonymized)
-            // We use the email pattern as it's more reliable than the status enum if migration hasn't run
-            whereCondition.email = { not: { contains: '@removed.invalid' } };
-        } else {
+        const whereCondition: any = {
+            // ALWAYS filter out anonymized (deleted) users unless explicitly searching for them
+            email: { not: { contains: '@removed.invalid' } }
+        };
+
+        if (status) {
             whereCondition.status = status;
         }
 
-        if (role) whereCondition.role = role;
+        if (role) {
+            whereCondition.role = role;
+        }
         
         if (search) {
             whereCondition.OR = [

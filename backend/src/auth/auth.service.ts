@@ -214,12 +214,16 @@ export class AuthService {
                                     userId: admin.id,
                                     title: 'New Registration Pending Approval',
                                     message: `${user.name} (${user.companyName}) has registered as a ${data.role} and is waiting for approval.`,
-                                    type: 'INFO',
+                                    type: 'NEW_REGISTRATION',
                                     data: { userId: user.id }
                                 }
                             });
                         }
                         this.logger.log(`[AUTH] In-app notifications created for ${admins.length} admins regarding ${user.email}`);
+                    } else if (isInvited) {
+                        // For invited users, send welcome email immediately since they bypass approval
+                        await this.emailService.sendWelcomeEmail(user.email, user.name, user.role);
+                        this.logger.log(`[AUTH] Welcome email sent to invited user ${user.email}`);
                     }
                 } catch (error: any) {
                     this.logger.error(`[AUTH] Background tasks failed for ${user.email}: ${error.message}`);

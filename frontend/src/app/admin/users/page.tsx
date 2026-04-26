@@ -43,56 +43,16 @@ export default function UserManagementPage() {
     const loadUsers = async () => {
         setIsLoading(true);
         try {
-            // Mock data for high-end demo
-            const mockUsers: User[] = [
-                {
-                    id: '1',
-                    name: 'Julian Casablancas',
-                    email: 'julian@strokes.com',
-                    companyName: 'Voidz Distribution',
-                    role: 'SUPPLIER',
-                    country: 'Romania',
-                    status: 'PENDING',
-                    createdAt: '2024-04-20T10:00:00Z',
-                    website: 'https://voidz.ro',
-                    linkedIn: 'https://linkedin.com/company/voidz',
-                    taxId: 'RO123456789',
-                    phone: '+40 721 123 456',
-                    kycDocuments: [
-                        { type: 'National ID', url: 'https://placehold.co/600x400' }
-                    ]
-                },
-                {
-                    id: '2',
-                    name: 'Alex Sterling',
-                    email: 'alex@sterling.io',
-                    companyName: 'Sterling Global',
-                    role: 'BUYER',
-                    country: 'United Kingdom',
-                    status: 'APPROVED',
-                    createdAt: '2024-04-15T14:30:00Z',
-                    website: 'https://sterling.io',
-                    taxId: 'UK-GB-9988',
-                    phone: '+44 20 7946 0000'
-                },
-                {
-                    id: '3',
-                    name: 'Elena Popescu',
-                    email: 'elena@viva.ro',
-                    companyName: 'Viva Logistics',
-                    role: 'SUPPLIER',
-                    country: 'Moldova',
-                    status: 'REJECTED',
-                    createdAt: '2024-04-10T09:15:00Z',
-                    website: 'https://viva-log.md',
-                    linkedIn: 'https://linkedin.com/in/elena-popescu',
-                    taxId: 'MD-772211',
-                    phone: '+373 69 123 456'
-                }
-            ];
-            setUsers(mockUsers);
+            const res = await apiFetch('/users?limit=100', { cache: 'no-store' });
+            if (res.ok) {
+                const data = await res.json();
+                setUsers(data.users || []);
+            } else {
+                toast.error('Failed to fetch users');
+            }
         } catch (err) {
-            toast.error('Failed to load users');
+            console.error('Failed to load users:', err);
+            toast.error('Connection error while loading users');
         } finally {
             setIsLoading(false);
         }
@@ -103,19 +63,52 @@ export default function UserManagementPage() {
     }, []);
 
     const filteredUsers = users.filter(u => {
-        const matchesSearch = u.name.toLowerCase().includes(searchTerm.toLowerCase()) || u.companyName.toLowerCase().includes(searchTerm.toLowerCase());
+        const name = (u.name || '').toLowerCase();
+        const company = (u.companyName || '').toLowerCase();
+        const search = searchTerm.toLowerCase();
+        const matchesSearch = name.includes(search) || company.includes(search);
         const matchesFilter = filterStatus === 'ALL' || u.status === filterStatus;
         return matchesSearch && matchesFilter;
     });
 
-    const handleAction = (id: string, action: 'APPROVED' | 'REJECTED' | 'BLOCKED' | 'DELETE') => {
-        if (action === 'DELETE') {
-            if (!confirm('Are you sure? This is permanent.')) return;
-            setUsers(prev => prev.filter(u => u.id !== id));
-            toast.success('User deleted');
-        } else {
-            setUsers(prev => prev.map(u => u.id === id ? { ...u, status: action as any } : u));
-            toast.success(`User ${action.toLowerCase()} successfully`);
+    const handleAction = async (id: string, action: 'APPROVED' | 'REJECTED' | 'BLOCKED' | 'DELETE') => {
+        const tid = toast.loading(`${action === 'DELETE' ? 'Deleting' : 'Updating'} user...`);
+        try {
+            if (action === 'DELETE') {
+                if (!confirm('Are you sure? This is permanent.')) {
+                    toast.dismiss(tid);
+                    return;
+                }
+                const res = await apiFetch(`/users/${id}`, { method: 'DELETE' });
+                if (res.ok) {
+                    toast.success('User deleted successfully', { id: tid });
+                    loadUsers();
+                } else {
+                    const error = await res.json().catch(() => ({}));
+                    toast.error(error.message || 'Failed to delete user', { id: tid });
+                }
+            } else {
+                const statusMap = {
+                    'APPROVED': 'ACTIVE',
+                    'REJECTED': 'REJECTED',
+                    'BLOCKED': 'BLOCKED'
+                };
+                const status = statusMap[action as keyof typeof statusMap] || action;
+                const res = await apiFetch(`/users/${id}/status`, {
+                    method: 'POST',
+                    body: JSON.stringify({ status })
+                });
+                
+                if (res.ok) {
+                    toast.success(`User ${action.toLowerCase()} successfully`, { id: tid });
+                    loadUsers();
+                } else {
+                    const error = await res.json().catch(() => ({}));
+                    toast.error(error.message || `Failed to ${action.toLowerCase()} user`, { id: tid });
+                }
+            }
+        } catch (err) {
+            toast.error('Network error', { id: tid });
         }
         setSelectedUser(null);
     };
@@ -129,18 +122,40 @@ export default function UserManagementPage() {
         else setSelectedIds(filteredUsers.map(u => u.id));
     };
 
-    const handleBulkAction = (action: 'APPROVED' | 'REJECTED' | 'BLOCKED' | 'DELETE') => {
+    const handleBulkAction = async (action: 'APPROVED' | 'REJECTED' | 'BLOCKED' | 'DELETE') => {
         if (selectedIds.length === 0) return;
-        if (action === 'DELETE' && !confirm(`Delete ${selectedIds.length} users?`)) return;
         
-        if (action === 'DELETE') {
-            setUsers(prev => prev.filter(u => !selectedIds.includes(u.id)));
-        } else {
-            setUsers(prev => prev.map(u => selectedIds.includes(u.id) ? { ...u, status: action as any } : u));
+        const tid = toast.loading(`Performing bulk ${action.toLowerCase()}...`);
+        try {
+            const statusMap = {
+                'APPROVED': 'bulk-approve',
+                'BLOCKED': 'bulk-block',
+                'DELETE': 'bulk-delete',
+                'REJECTED': 'bulk-block'
+            };
+            
+            const endpoint = `/users/${statusMap[action as keyof typeof statusMap] || 'bulk-block'}`;
+            
+            if (action === 'DELETE' && !confirm(`Delete ${selectedIds.length} users?`)) {
+                toast.dismiss(tid);
+                return;
+            }
+
+            const res = await apiFetch(endpoint, {
+                method: 'POST',
+                body: JSON.stringify({ ids: selectedIds })
+            });
+
+            if (res.ok) {
+                toast.success(`Bulk ${action.toLowerCase()} completed`, { id: tid });
+                setSelectedIds([]);
+                loadUsers();
+            } else {
+                toast.error('Bulk action failed', { id: tid });
+            }
+        } catch (err) {
+            toast.error('Network error during bulk action', { id: tid });
         }
-        
-        toast.success(`Bulk ${action.toLowerCase()} completed for ${selectedIds.length} users`);
-        setSelectedIds([]);
     };
 
     return (
