@@ -155,7 +155,7 @@ export default function SettingsPage() {
                                         className="h-14 px-10 bg-[#0B1F3A] text-white rounded-2xl text-sm font-black uppercase tracking-widest flex items-center gap-3 hover:bg-[#1ABC9C] transition-all shadow-xl shadow-black/10 active:scale-95 disabled:opacity-50"
                                     >
                                         {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                                        {isSending ? 'Synchronizing...' : 'Save Changes'}
+                                        {isSaving ? 'Synchronizing...' : 'Save Changes'}
                                     </button>
                                 </div>
                             </form>
