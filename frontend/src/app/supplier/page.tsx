@@ -3,7 +3,7 @@ import { apiFetch } from '@/lib/api';
 
 
 import * as React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { BarChart3, Package, ShoppingCart, Eye, TrendingUp, ArrowUpRight, Plus, Loader2, Clock, Lock } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid } from 'recharts';
 import { useAuth } from '@/lib/auth';
