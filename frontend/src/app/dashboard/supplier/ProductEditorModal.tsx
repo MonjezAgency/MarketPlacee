@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Upload, Save, Image as ImageIcon, Sparkles, DollarSign, Package, Plus, Trash2, Info } from 'lucide-react';
+import { X, Upload, Save, Image as ImageIcon, Sparkles, DollarSign, Package, Plus, Trash2, Info, Truck, Check } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertFromBase, convertToBase } from '@/lib/currency';
 import { Button } from '@/components/ui/Button';
