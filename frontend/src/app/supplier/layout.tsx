@@ -43,9 +43,9 @@ const SUPPLIER_LINKS = [
     { label: 'Settings', href: '/supplier/settings', icon: Settings },
 ];
 
-
 export default function SupplierLayout({ children }: { children: React.ReactNode }) {
     const [isOpen, setIsOpen] = React.useState(true);
+    const [isMobileOpen, setIsMobileOpen] = React.useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
     const pathname = usePathname();
     const { user, logout, isAuthReady } = useAuth();
@@ -53,6 +53,21 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     const router = useRouter();
     const [stats, setStats] = React.useState<any>(null);
     const [showTour, setShowTour] = React.useState(false);
+    const [pendingCounts, setPendingCounts] = React.useState<Record<string, number>>({
+        orders: 0,
+        products: 0
+    });
+
+    // Auto-collapse sidebar on smaller screens
+    React.useEffect(() => {
+        const handleResize = () => {
+            if (window.innerWidth < 1024) setIsOpen(false);
+            else setIsOpen(true);
+        };
+        handleResize(); // Initial check
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
 
     // Role Guard: Only Suppliers allowed in /supplier
     React.useEffect(() => {
@@ -60,7 +75,6 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
             if (!user) {
                 router.replace('/auth/login?session=expired');
             } else if (user.role?.toUpperCase() !== 'SUPPLIER') {
-                // Redirect non-suppliers to their appropriate home
                 if (user.role?.toUpperCase() === 'ADMIN' || user.role?.toUpperCase() === 'OWNER') {
                     router.replace('/admin');
                 } else {
@@ -70,7 +84,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
         }
     }, [isAuthReady, user, router]);
 
-
+    // Tour Logic
     React.useEffect(() => {
         if (!user?.id) return;
         const tourKey = `atlantis-tour-supplier-${user.id}`;
@@ -94,6 +108,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
         }
     ];
 
+    // Stats Polling
     React.useEffect(() => {
         const fetchStats = async () => {
             try {
@@ -104,16 +119,14 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
             }
         };
         fetchStats();
+        const interval = setInterval(fetchStats, 60000);
+        return () => clearInterval(interval);
     }, []);
-    const [pendingCounts, setPendingCounts] = React.useState<Record<string, number>>({
-        orders: 0,
-        products: 0
-    });
 
+    // Counts Polling
     React.useEffect(() => {
         const fetchCounts = async () => {
             try {
-                // Fetch orders and products to count pending status
                 const [ordersRes, prodsRes] = await Promise.all([
                     apiFetch('/orders'),
                     apiFetch('/products/my-products')
@@ -138,58 +151,8 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
         };
 
         fetchCounts();
-        const interval = setInterval(fetchCounts, 60000); // 1 min poll
+        const interval = setInterval(fetchCounts, 60000);
         return () => clearInterval(interval);
-    }, []);
-
-    // Show nothing while checking auth to prevent layout flash
-    // This MUST be after all hooks to avoid "Rendered more hooks" error
-export default function SupplierLayout({ children }: { children: React.ReactNode }) {
-    const [isOpen, setIsOpen] = React.useState(true);
-    const [isMobileOpen, setIsMobileOpen] = React.useState(false);
-    const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
-    const pathname = usePathname();
-    const { user, logout, isAuthReady } = useAuth();
-    const { theme, setTheme } = useTheme();
-    const router = useRouter();
-    const [stats, setStats] = React.useState<any>(null);
-
-    // Auto-collapse sidebar on smaller screens
-    React.useEffect(() => {
-        const handleResize = () => {
-            if (window.innerWidth < 1024) setIsOpen(false);
-            else setIsOpen(true);
-        };
-        handleResize(); // Initial check
-        window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, []);
-
-    // Role Guard
-    React.useEffect(() => {
-        if (isAuthReady) {
-            if (!user) {
-                router.replace('/auth/login?session=expired');
-            } else if (user.role?.toUpperCase() !== 'SUPPLIER') {
-                if (user.role?.toUpperCase() === 'ADMIN' || user.role?.toUpperCase() === 'OWNER') {
-                    router.replace('/admin');
-                } else {
-                    router.replace('/dashboard/customer');
-                }
-            }
-        }
-    }, [isAuthReady, user, router]);
-
-    React.useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await apiFetch(`/dashboard/supplier`);
-                if (res.ok) setStats(await res.json());
-            } catch (err) {
-                console.error('Failed to fetch header stats:', err);
-            }
-        };
-        fetchStats();
     }, []);
 
     if (!isAuthReady || (user && user.role?.toUpperCase() !== 'SUPPLIER')) {
@@ -233,6 +196,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                     {SUPPLIER_LINKS.map((link) => {
                         const Icon = link.icon;
                         const isActive = pathname === link.href;
+                        const badgeCount = link.key ? pendingCounts[link.key] : 0;
 
                         return (
                             <Link
@@ -248,6 +212,11 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             >
                                 <Icon size={20} className={cn(isActive ? "text-[#0EA5A4]" : "text-[#94A3B8] group-hover:text-white")} />
                                 {isOpen && <span className="text-[14px] font-medium flex-1 truncate">{link.label}</span>}
+                                {isOpen && badgeCount > 0 && (
+                                    <span className="bg-[#EF4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                        {badgeCount}
+                                    </span>
+                                )}
                                 {link.locked && isOpen && <Lock size={14} className="text-[#94A3B8]/50" />}
                             </Link>
                         );
@@ -312,7 +281,6 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                 <Bell size={20} />
                                 <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-[#EF4444] rounded-full border-2 border-white" />
                             </button>
-                            {/* Dropdown would go here - simplified for redesign */}
                         </div>
 
                         <div className="h-8 w-[1px] bg-[#E2E8F0]" />
@@ -336,35 +304,50 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 </main>
             </div>
 
-            {/* Mobile Overlay Sidebar (Simplified) */}
-            {isMobileOpen && (
-                <div className="fixed inset-0 z-[100] md:hidden">
-                    <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setIsMobileOpen(false)} />
-                    <motion.aside 
-                        initial={{ x: -260 }}
-                        animate={{ x: 0 }}
-                        className="absolute top-0 left-0 h-full w-[260px] bg-[#0F172A] flex flex-col"
-                    >
-                        <div className="h-[72px] flex items-center justify-between px-6 border-b border-white/5">
-                            <span className="font-black text-lg text-white uppercase">Atlan<span className="text-[#0EA5A4]">tis.</span></span>
-                            <button onClick={() => setIsMobileOpen(false)} className="text-white/60"><X size={20} /></button>
-                        </div>
-                        <nav className="flex-1 p-4 space-y-1">
-                            {SUPPLIER_LINKS.map((link) => (
-                                <Link
-                                    key={link.href}
-                                    href={link.locked ? '#' : link.href}
-                                    onClick={() => !link.locked && setIsMobileOpen(false)}
-                                    className="flex items-center gap-3 px-4 py-3 rounded-xl text-[#94A3B8] hover:text-white"
-                                >
-                                    <link.icon size={20} />
-                                    <span className="text-[14px] font-medium">{link.label}</span>
-                                </Link>
-                            ))}
-                        </nav>
-                    </motion.aside>
-                </div>
-            )}
+            {/* Mobile Overlay Sidebar */}
+            <AnimatePresence>
+                {isMobileOpen && (
+                    <div className="fixed inset-0 z-[100] md:hidden">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-black/50 backdrop-blur-sm" 
+                            onClick={() => setIsMobileOpen(false)} 
+                        />
+                        <motion.aside 
+                            initial={{ x: -260 }}
+                            animate={{ x: 0 }}
+                            exit={{ x: -260 }}
+                            className="absolute top-0 left-0 h-full w-[260px] bg-[#0F172A] flex flex-col shadow-2xl"
+                        >
+                            <div className="h-[72px] flex items-center justify-between px-6 border-b border-white/5">
+                                <span className="font-black text-lg text-white uppercase">Atlan<span className="text-[#0EA5A4]">tis.</span></span>
+                                <button onClick={() => setIsMobileOpen(false)} className="text-white/60"><X size={20} /></button>
+                            </div>
+                            <nav className="flex-1 p-4 space-y-1">
+                                {SUPPLIER_LINKS.map((link) => (
+                                    <Link
+                                        key={link.href}
+                                        href={link.locked ? '#' : link.href}
+                                        onClick={() => !link.locked && setIsMobileOpen(false)}
+                                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-[#94A3B8] hover:text-white transition-colors"
+                                    >
+                                        <link.icon size={20} />
+                                        <span className="text-[14px] font-medium">{link.label}</span>
+                                    </Link>
+                                ))}
+                            </nav>
+                        </motion.aside>
+                    </div>
+                )}
+            </AnimatePresence>
+
+            {/* Guided Tour Component */}
+            {showTour && <GuidedTour steps={tourSteps} onComplete={() => {
+                if (user?.id) localStorage.setItem(`atlantis-tour-supplier-${user.id}`, 'true');
+                setShowTour(false);
+            }} />}
         </div>
     );
 }
