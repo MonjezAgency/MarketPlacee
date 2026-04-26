@@ -15,17 +15,14 @@ const REVENUE_SPARKLINE: any[] = [];
 const ORDERS_SPARKLINE: any[] = [];
 
 export default function SupplierOverviewPage() {
-    const { t, locale } = useLanguage();
+    const { t } = useLanguage();
     const { user } = useAuth();
     const [dashboardStats, setDashboardStats] = React.useState<any>(null);
 
     React.useEffect(() => {
         const fetchStats = async () => {
             try {
-                
-                const API_URL = '/api';
-                const res = await apiFetch(`/dashboard/supplier`, {
-                });
+                const res = await apiFetch(`/dashboard/supplier`);
                 if (res.ok) {
                     const data = await res.json();
                     setDashboardStats(data);
@@ -37,180 +34,193 @@ export default function SupplierOverviewPage() {
         fetchStats();
     }, []);
 
-    const STATS = [
-        { label: t('supplier', 'revenueMtd'), value: dashboardStats?.totalRevenue ? formatPrice(dashboardStats.totalRevenue) : '$0.00', trend: '+0.0%', up: true, icon: BarChart3, color: 'text-emerald-500' },
-        { label: t('supplier', 'activeProducts'), value: dashboardStats?.activeProductsCount?.toString() || '0', trend: 'Stable', up: true, icon: Package, color: 'text-primary' },
-        { label: t('supplier', 'totalOrders'), value: dashboardStats?.totalOrders?.toString() || '0', trend: '+0%', up: true, icon: ShoppingCart, color: 'text-blue-500' },
-        { label: t('supplier', 'digitalImpressions'), value: dashboardStats?.impressions?.toString() || '0', trend: '+0%', up: true, icon: Eye, color: 'text-purple-500' },
+    const KPI_DATA = [
+        { label: 'Revenue (MTD)', value: dashboardStats?.totalRevenue ? formatPrice(dashboardStats.totalRevenue) : '€0.00', trend: '+0.0%', icon: BarChart3, color: 'text-[#10B981]' },
+        { label: 'Active Products', value: dashboardStats?.activeProductsCount?.toString() || '0', trend: 'Stable', icon: Package, color: 'text-[#0EA5A4]' },
+        { label: 'Total Orders', value: dashboardStats?.totalOrders?.toString() || '0', trend: '+0.0%', icon: ShoppingCart, color: 'text-blue-500' },
+        { label: 'Digital Impressions', value: dashboardStats?.impressions?.toString() || '0', trend: '+0.0%', icon: Eye, color: 'text-[#FF8A00]' },
     ];
 
     return (
-        <div className="space-y-10 max-w-7xl mx-auto">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div className="space-y-1">
-                    <h1 className="text-3xl font-black text-foreground tracking-tight">{t('supplier', 'businessHub')}</h1>
-                    <p className="text-muted-foreground font-medium">{t('supplier', 'performanceMetrics')}</p>
+        <div className="space-y-8 animate-in fade-in duration-500">
+            {/* Welcome & Action Row */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                <div>
+                    <h2 className="text-[28px] font-black text-[#0F172A] tracking-tight">
+                        Welcome back, {user?.name?.split(' ')[0] || 'Monjez'}! 👋
+                    </h2>
+                    <p className="text-[#64748B] text-sm font-medium mt-1">
+                        Here's what's happening with your business today.
+                    </p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <Link href="/supplier/products" className="px-6 py-2.5 bg-primary text-primary-foreground font-black text-sm rounded-xl hover:scale-105 transition-transform shadow-md shadow-primary/10 flex items-center gap-2">
-                        <Plus size={18} strokeWidth={3} /> {t('supplier', 'addNewProduct')}
+                    <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white border border-[#E2E8F0] rounded-xl text-sm font-semibold text-[#64748B]">
+                        <Clock size={16} />
+                        <span>May 20 – May 26, 2025</span>
+                    </div>
+                    <Link href="/supplier/products" className="flex items-center gap-2 px-6 py-3 bg-[#0EA5A4] text-white font-bold text-sm rounded-xl hover:shadow-lg hover:shadow-[#0EA5A4]/20 transition-all active:scale-95">
+                        <Plus size={18} strokeWidth={3} /> Add New Product
                     </Link>
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {STATS.map((stat, i) => {
-                    const Icon = stat.icon;
-                    return (
-                        <motion.div
-                            key={stat.label}
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            transition={{ delay: i * 0.1 }}
-                            className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm"
-                        >
-                            <div className="flex items-center justify-between mb-4">
-                                <div className={`w-12 h-12 rounded-xl bg-muted flex items-center justify-center ${stat.color}`}>
-                                    <Icon size={24} />
-                                </div>
-                                <div className={`flex items-center gap-1 text-[10px] font-black uppercase tracking-tighter ${stat.up ? 'text-emerald-500' : 'text-red-500'}`}>
-                                    {stat.trend} <ArrowUpRight size={14} />
-                                </div>
+            {/* KPI Cards Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {KPI_DATA.map((kpi, i) => (
+                    <motion.div
+                        key={kpi.label}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="bg-white p-5 rounded-[16px] border border-[#E2E8F0] h-[140px] flex flex-col justify-between group hover:border-[#0EA5A4]/30 transition-colors"
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="w-10 h-10 rounded-xl bg-[#F1F5F9] flex items-center justify-center text-[#64748B] group-hover:bg-[#0EA5A4]/10 group-hover:text-[#0EA5A4] transition-colors">
+                                <kpi.icon size={20} />
                             </div>
-                            <div className="space-y-1">
-                                <p className="text-muted-foreground text-[10px] font-black uppercase tracking-widest">{stat.label}</p>
-                                <p className="text-2xl font-black text-foreground tracking-tight">{stat.value}</p>
+                            <div className="text-[12px] font-bold text-[#10B981] bg-[#10B981]/5 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                {kpi.trend} <ArrowUpRight size={12} />
                             </div>
-                        </motion.div>
-                    );
-                })}
+                        </div>
+                        <div className="flex items-end justify-between">
+                            <div className="space-y-0.5">
+                                <p className="text-[13px] font-medium text-[#64748B]">{kpi.label}</p>
+                                <p className="text-2xl font-bold text-[#0F172A] tracking-tight">{kpi.value}</p>
+                            </div>
+                            <div className="w-20 h-10">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={[{v:10}, {v:15}, {v:12}, {v:18}, {v:20}]}>
+                                        <Area type="monotone" dataKey="v" stroke={i === 0 ? '#10B981' : '#0EA5A4'} strokeWidth={2} fillOpacity={0.1} fill={i === 0 ? '#10B981' : '#0EA5A4'} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    </motion.div>
+                ))}
             </div>
 
-            {/* Charts Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Revenue Chart */}
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.25 }}
-                    className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow"
-                >
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('supplier', 'monthlyRevenue')}</p>
-                            <p className="text-2xl font-black text-foreground">{dashboardStats?.totalRevenue ? formatPrice(dashboardStats.totalRevenue) : '$0.00'}</p>
+            {/* Analytics & Payments Row */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Revenue Analytics */}
+                <div className="lg:col-span-2 bg-white p-6 rounded-[16px] border border-[#E2E8F0] h-[320px] flex flex-col">
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-[#0EA5A4]/10 flex items-center justify-center text-[#0EA5A4]">
+                                <TrendingUp size={18} />
+                            </div>
+                            <h3 className="text-base font-bold text-[#0F172A]">Monthly Revenue</h3>
                         </div>
-                        <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase">
-                            +0.0% <ArrowUpRight size={12} />
-                        </span>
+                        <select className="text-xs font-bold text-[#64748B] bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2 py-1 outline-none">
+                            <option>Last 7 Days</option>
+                            <option>Last 30 Days</option>
+                        </select>
                     </div>
-                    <ResponsiveContainer width="100%" height={120}>
-                        <AreaChart data={REVENUE_SPARKLINE} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                            <defs>
-                                <linearGradient id="grad1" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#FF9900" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#FF9900" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <XAxis dataKey="month" tick={{ fontSize: 10, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                            <Tooltip
-                                formatter={(v) => [formatPrice(v as number), 'Revenue']}
-                                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 10, fontSize: 11 }}
-                            />
-                            <Area type="monotone" dataKey="value" stroke="#FF9900" strokeWidth={2.5} fill="url(#grad1)" />
-                        </AreaChart>
-                    </ResponsiveContainer>
-                </motion.div>
-
-                {/* Orders Chart */}
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.3 }}
-                    className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow"
-                >
-                    <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{t('supplier', 'monthlyOrders')}</p>
-                            <p className="text-2xl font-black text-foreground">{dashboardStats?.totalOrders || '0'}</p>
-                        </div>
-                        <span className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase">
-                            +0% <ArrowUpRight size={12} />
-                        </span>
+                    <div className="flex-1 min-h-0">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={REVENUE_SPARKLINE.length > 0 ? REVENUE_SPARKLINE : [{month:'Mon', value:0}, {month:'Tue', value:0}, {month:'Wed', value:0}, {month:'Thu', value:0}, {month:'Fri', value:0}]}>
+                                <defs>
+                                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#0EA5A4" stopOpacity={0.1}/>
+                                        <stop offset="95%" stopColor="#0EA5A4" stopOpacity={0}/>
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8'}} />
+                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8'}} />
+                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
+                                <Area type="monotone" dataKey="value" stroke="#0EA5A4" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
+                            </AreaChart>
+                        </ResponsiveContainer>
                     </div>
-                    <ResponsiveContainer width="100%" height={120}>
-                        <BarChart data={ORDERS_SPARKLINE} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} vertical={false} />
-                            <XAxis dataKey="month" tick={{ fontSize: 10, fontWeight: 700, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
-                            <Tooltip
-                                formatter={(v) => [v, 'Orders']}
-                                contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 10, fontSize: 11 }}
-                            />
-                            <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </motion.div>
-            </div>
-
-            {/* Main Content Grid: Top 5 Best-Selling Products */}
-            <div className="bg-card rounded-3xl border border-border/50 p-8 space-y-8 shadow-sm">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-black text-foreground tracking-tight flex items-center gap-3">
-                        <TrendingUp className="text-primary" /> {t('supplier', 'topProductsTitle')}
-                    </h3>
-                    <button className="text-xs font-bold text-muted-foreground hover:text-foreground transition-colors">{t('supplier', 'viewSalesReport')}</button>
                 </div>
 
+                {/* CRITICAL: LOCKED PAYMENT MODULE */}
+                <div className="relative group overflow-hidden">
+                    <div className="bg-white p-6 rounded-[16px] border border-[#E2E8F0] h-full min-h-[320px]">
+                        <div className="space-y-6">
+                            <h3 className="text-base font-bold text-[#0F172A]">Payment Methods</h3>
+                            <div className="space-y-4 opacity-20 grayscale">
+                                <div className="h-14 bg-slate-50 rounded-xl border border-dashed border-slate-200" />
+                                <div className="h-14 bg-slate-50 rounded-xl border border-dashed border-slate-200" />
+                                <div className="h-14 bg-slate-50 rounded-xl border border-dashed border-slate-200" />
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* LOCKED OVERLAY SYSTEM */}
+                    <div className="absolute inset-0 z-10 bg-[#0F172A]/55 backdrop-blur-[4px] flex flex-col items-center justify-center text-center p-8 rounded-[16px]">
+                        <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center mb-6 border border-white/20">
+                            <Lock size={32} className="text-white" />
+                        </div>
+                        <h4 className="text-[18px] font-bold text-white mb-2">Payments Coming Soon</h4>
+                        <p className="text-[13px] text-[#E2E8F0] mb-8 leading-relaxed max-w-[200px]">
+                            This feature will be enabled once payment systems are activated.
+                        </p>
+                        <button className="px-8 py-3 bg-[#1E293B] text-[#94A3B8] font-bold text-[13px] rounded-xl cursor-not-allowed border border-white/5 shadow-2xl">
+                            Enable Payments
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Top Selling Products Table */}
+            <div className="bg-white rounded-[16px] border border-[#E2E8F0] overflow-hidden">
+                <div className="px-8 py-6 border-b border-[#E2E8F0] flex items-center justify-between">
+                    <h3 className="text-base font-bold text-[#0F172A]">Top 5 Selling Products</h3>
+                    <Link href="/supplier/analytics" className="text-[12px] font-bold text-[#0EA5A4] hover:underline">View Sales Report →</Link>
+                </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-start">
+                    <table className="w-full">
                         <thead>
-                            <tr className="bg-muted/30">
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">{t('supplier', 'product')}</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">{t('supplier', 'totalSold')}</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-muted-foreground">{t('supplier', 'revenueGenerated')}</th>
+                            <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
+                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">#</th>
+                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Product</th>
+                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Price</th>
+                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Sales (Units)</th>
+                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Revenue</th>
+                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Trend</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-border/50">
-                            {!dashboardStats?.topProducts && (
-                                <tr>
-                                    <td colSpan={3} className="px-8 py-10 text-center">
-                                        <Loader2 className="w-6 h-6 animate-spin mx-auto text-primary" />
-                                    </td>
-                                </tr>
-                            )}
-                            {(!dashboardStats?.topProducts || dashboardStats.topProducts.length === 0) && (
-                                <tr>
-                                    <td colSpan={3} className="px-8 py-10 text-center text-muted-foreground text-sm font-bold">
-                                        {t('supplier', 'noSalesData')}
-                                    </td>
-                                </tr>
-                            )}
-                            {dashboardStats?.topProducts?.map((product: any) => (
-                                <tr key={product.productId} className="hover:bg-muted/20 transition-colors group">
-                                    <td className="px-8 py-6">
+                        <tbody className="divide-y divide-[#E2E8F0]">
+                            {dashboardStats?.topProducts?.length > 0 ? dashboardStats.topProducts.map((product: any, idx: number) => (
+                                <tr key={product.productId} className="hover:bg-slate-50 transition-colors">
+                                    <td className="px-8 py-4 text-sm font-medium text-[#64748B]">{idx + 1}</td>
+                                    <td className="px-8 py-4">
                                         <div className="flex items-center gap-3">
-                                            {product.image ? (
-                                                <img src={product.image} alt="" className="w-10 h-10 rounded-xl object-cover border border-border/50 shadow-sm" />
-                                            ) : (
-                                                <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center text-muted-foreground shadow-sm">
-                                                    <Package size={16} />
-                                                </div>
-                                            )}
+                                            <div className="w-10 h-10 rounded-lg bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200">
+                                                {product.image ? <img src={product.image} className="w-full h-full object-cover" /> : <Package className="w-full h-full p-2 text-slate-400" />}
+                                            </div>
+                                            <span className="text-sm font-bold text-[#0F172A]">{product.name}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-8 py-4 text-sm font-semibold text-[#0F172A]">€{product.price || '0.00'}</td>
+                                    <td className="px-8 py-4 text-sm font-bold text-[#0F172A]">{product.totalQuantitySold} units</td>
+                                    <td className="px-8 py-4 text-sm font-bold text-[#10B981]">{formatPrice(product.totalRevenue)}</td>
+                                    <td className="px-8 py-4">
+                                        <div className="w-16 h-6">
+                                            <ResponsiveContainer width="100%" height="100%">
+                                                <AreaChart data={[{v:10}, {v:12}, {v:15}]}>
+                                                    <Area type="monotone" dataKey="v" stroke="#10B981" fillOpacity={0.1} fill="#10B981" />
+                                                </AreaChart>
+                                            </ResponsiveContainer>
+                                        </div>
+                                    </td>
+                                </tr>
+                            )) : (
+                                <tr>
+                                    <td colSpan={6} className="px-8 py-16 text-center">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center">
+                                                <Package size={32} className="text-slate-300" />
+                                            </div>
                                             <div>
-                                                <p className="font-bold text-sm text-foreground">{product.name}</p>
+                                                <p className="text-base font-bold text-[#0F172A]">No sales yet</p>
+                                                <p className="text-sm text-[#64748B]">Start adding products to see your top selling items here.</p>
                                             </div>
                                         </div>
                                     </td>
-                                    <td className="px-8 py-6">
-                                        <p className="font-black text-foreground">{product.totalQuantitySold} <span className="text-[10px] text-muted-foreground uppercase">{t('supplier', 'units')}</span></p>
-                                    </td>
-                                    <td className="px-8 py-6">
-                                        <p className="font-black text-emerald-500">{formatPrice(product.totalRevenue)}</p>
-                                    </td>
                                 </tr>
-                            ))}
+                            )}
                         </tbody>
                     </table>
                 </div>

@@ -2,464 +2,607 @@
 
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { fetchSupplierAds, requestAdPlacement, deleteAdPlacement, fetchMyProducts } from '@/lib/api';
 import {
     Tag,
     Plus,
-    Search,
-    Calendar,
-    Clock,
-    Zap,
-    CircleDollarSign,
-    Info,
-    CheckCircle2,
-    XCircle,
-    LayoutList,
-    Image as ImageIcon,
+    Layout,
+    BarChart3,
+    MoreHorizontal,
     Edit2,
-    Trash,
-    Eye
+    Pause,
+    Play,
+    Trash2,
+    ChevronRight,
+    Upload,
+    Target,
+    Settings,
+    CheckCircle2,
+    X,
+    TrendingUp,
+    MousePointer2,
+    Eye,
+    DollarSign,
+    Info,
+    Smartphone,
+    Monitor
 } from 'lucide-react';
+import {
+    AreaChart,
+    Area,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+    LineChart,
+    Line
+} from 'recharts';
 import { cn } from '@/lib/utils';
+import { apiFetch } from '@/lib/api';
+import toast from 'react-hot-toast';
 
-type OfferType = 'Flash Sale' | 'Bundle' | 'Discount';
-type OfferSlot = 'HERO' | 'FEATURED' | 'BANNER' | 'LISTING';
-
-interface OfferPlacement {
-    id: string;
-    title: string;
-    type: OfferType;
-    slot: OfferSlot;
-    price: number;
-    status: 'ACTIVE' | 'PENDING' | 'REJECTED' | 'EXPIRED';
-    startDate?: string;
-    startTime?: string;
-    expiry: string;
-    impressions: number;
-}
-
-const SLOT_PRICES = {
-    'HERO': 500,
-    'FEATURED': 300,
-    'BANNER': 200,
-    'LISTING': 100
+// Colors System
+const COLORS = {
+    primaryDark: '#0B1F3A',
+    accentBlue: '#2EC4B6',
+    success: '#22C55E',
+    warning: '#F59E0B',
+    danger: '#EF4444',
+    background: '#F8FAFC',
+    border: '#E5E7EB',
+    textPrimary: '#0F172A',
+    textSecondary: '#64748B'
 };
 
-const SLOT_DIMENSIONS = {
-    'HERO': '1920 x 600px',
-    'FEATURED': '800 x 800px',
-    'BANNER': '1200 x 200px',
-    'LISTING': '400 x 400px'
-};
+// Mock Analytics Data
+const ANALYTICS_DATA = [
+    { name: 'Mon', impressions: 4000, clicks: 240, conversions: 24 },
+    { name: 'Tue', impressions: 3000, clicks: 139, conversions: 18 },
+    { name: 'Wed', impressions: 2000, clicks: 980, conversions: 50 },
+    { name: 'Thu', impressions: 2780, clicks: 390, conversions: 35 },
+    { name: 'Fri', impressions: 1890, clicks: 480, conversions: 42 },
+    { name: 'Sat', impressions: 2390, clicks: 380, conversions: 30 },
+    { name: 'Sun', impressions: 3490, clicks: 430, conversions: 38 },
+];
 
-export default function SupplierOffersPage() {
-    const [offers, setOffers] = React.useState<OfferPlacement[]>([]);
+const AD_TYPES = [
+    {
+        id: 'HERO',
+        title: 'HERO',
+        price: 500,
+        description: 'Maximum visibility. Homepage hero placement.',
+        color: '#2EC4B6',
+        estimated: '45k'
+    },
+    {
+        id: 'FEATURED',
+        title: 'FEATURED',
+        price: 300,
+        description: 'Feature your products in search and category sections.',
+        color: '#8B5CF6',
+        estimated: '28k'
+    },
+    {
+        id: 'BANNER',
+        title: 'BANNER',
+        price: 200,
+        description: 'Display banner on footer and sidebar across pages.',
+        color: '#F59E0B',
+        estimated: '15k'
+    },
+    {
+        id: 'LISTING',
+        title: 'LISTING',
+        price: 100,
+        description: 'Highlight your products in specific categories.',
+        color: '#EF4444',
+        estimated: '10k'
+    }
+];
+
+export default function OffersAndAdsPage() {
+    const [isModalOpen, setIsModalOpen] = React.useState(false);
+    const [currentStep, setCurrentStep] = React.useState(1);
+    const [campaigns, setCampaigns] = React.useState<any[]>([]);
     const [loading, setLoading] = React.useState(true);
-
-    const loadOffers = React.useCallback(async () => {
-        setLoading(true);
-        const data = await fetchSupplierAds();
-        setOffers(data.map(item => ({
-            id: item.id,
-            title: item.product?.name || 'Untitled Campaign',
-            type: (item.placementType === 'HERO' ? 'Flash Sale' : item.placementType === 'FEATURED' ? 'Bundle' : 'Discount') as OfferType,
-            slot: item.placementType as OfferSlot,
-            price: item.price,
-            status: item.status as any,
-            expiry: item.endDate,
-            impressions: Math.floor(Math.random() * 1000) // Impressions mock until backend tracking is ready
-        })));
-        setLoading(false);
-    }, []);
+    const [selectedPlacement, setSelectedPlacement] = React.useState<string | null>(null);
 
     React.useEffect(() => {
-        loadOffers();
-    }, [loadOffers]);
-
-    const [isModalOpen, setIsModalOpen] = React.useState(false);
-    const [editingId, setEditingId] = React.useState<string | null>(null);
-    const [formData, setFormData] = React.useState<{
-        title: string;
-        type: OfferType;
-        slot: OfferSlot;
-        startDate: string;
-        startTime: string;
-        expiry: string;
-        image: File | null;
-    }>({
-        title: '',
-        type: 'Discount',
-        slot: 'FEATURED',
-        startDate: '',
-        startTime: '',
-        expiry: '',
-        image: null
-    });
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        try {
-            // Find productId by title or similar if needed, but the form should ideally select products
-            // For now, we'll assume the title is helpful or we'll need to update the form to pick a productId
-            const products = await fetchMyProducts();
-            const product = products.find(p => p.name === formData.title) || products[0];
-
-            if (!product) {
-                alert('Please ensure you have products before requesting ads.');
-                return;
+        const loadData = async () => {
+            try {
+                const res = await apiFetch('/ads/my-ads');
+                if (res.ok) {
+                    const data = await res.json();
+                    setCampaigns(data);
+                }
+            } catch (err) {
+                console.error('Failed to load campaigns:', err);
+            } finally {
+                setLoading(false);
             }
+        };
+        loadData();
+    }, []);
 
-            await requestAdPlacement({
-                productId: product.id,
-                type: formData.slot,
-                durationDays: 30 // Default duration
-            });
-
-            setIsModalOpen(false);
-            setEditingId(null);
-            loadOffers();
-        } catch (err) {
-            console.error('Failed to create offer:', err);
-        }
-    };
-
-    const handleDelete = async (id: string) => {
-        if (confirm('Are you sure you want to cancel this placement?')) {
-            const success = await deleteAdPlacement(id);
-            if (success) loadOffers();
-        }
-    };
-
-    const openEditModal = (offer: OfferPlacement) => {
-        setFormData({
-            title: offer.title,
-            type: offer.type,
-            slot: offer.slot,
-            startDate: offer.startDate || '',
-            startTime: offer.startTime || '',
-            expiry: offer.expiry,
-            image: null
-        });
-        setEditingId(offer.id);
-        setIsModalOpen(true);
-    };
+    const nextStep = () => setCurrentStep(prev => Math.min(prev + 1, 5));
+    const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
 
     return (
-        <div className="space-y-12 max-w-[1400px] mx-auto pb-24 px-6 lg:px-12 animate-in fade-in slide-in-from-bottom-8 duration-1000">
-            {/* Header */}
-            <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 relative z-10">
-                <div className="space-y-2">
-                    <h1 className="text-4xl lg:text-5xl font-black text-foreground tracking-tight flex items-center gap-4">
-                        <span className="p-3 bg-primary/10 rounded-2xl border border-primary/20 shadow-lg shadow-primary/20">
-                            <Tag className="text-primary w-8 h-8" />
-                        </span>
-                        Offers & Ad Placements
-                    </h1>
-                    <p className="text-muted-foreground font-medium text-lg max-w-2xl ps-16">Supercharge your visibility. Deploy performance-driven campaigns directly to enterprise buyers.</p>
+        <div className="min-h-screen bg-[#F8FAFC] font-sans selection:bg-[#2EC4B6]/10 pb-20">
+            {/* 1. HEADER SECTION */}
+            <header className="h-[88px] border-b border-[#E5E7EB] bg-white px-8 flex items-center justify-between sticky top-0 z-40">
+                <div>
+                    <h1 className="text-[32px] font-bold text-[#0F172A] leading-tight tracking-tight">Offers & Ad Placements</h1>
+                    <p className="text-[14px] text-[#64748B] font-medium mt-1">Boost your visibility and reach enterprise buyers through optimized campaigns.</p>
                 </div>
-
-                <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                <button 
                     onClick={() => {
-                        setEditingId(null);
-                        setFormData({
-                            title: '',
-                            type: 'Discount' as any,
-                            slot: 'FEATURED' as 'HERO' | 'FEATURED' | 'BANNER' | 'LISTING',
-                            startDate: '',
-                            startTime: '',
-                            expiry: '',
-                            image: null
-                        });
+                        setCurrentStep(1);
                         setIsModalOpen(true);
                     }}
-                    className="h-14 px-8 bg-primary text-primary-foreground font-black text-base rounded-2xl shadow-2xl shadow-primary/30 flex items-center gap-3 overflow-hidden relative group"
+                    className="h-12 px-6 bg-[#0B1F3A] text-white font-bold rounded-xl flex items-center gap-2 hover:bg-[#152D4F] transition-all active:scale-95 shadow-lg shadow-[#0B1F3A]/10"
                 >
-                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out" />
-                    <span className="relative z-10 flex items-center gap-2"><Plus size={20} strokeWidth={3} /> Launch Campaign</span>
-                </motion.button>
-            </div>
+                    <Plus size={18} strokeWidth={3} /> Launch Campaign
+                </button>
+            </header>
 
-            {/* Pricing Tiers */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
-                {Object.entries(SLOT_PRICES).map(([slot, price], index) => (
-                    <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
-                        key={slot}
-                        className="relative group overflow-hidden bg-card border border-border/50 rounded-[2rem] p-8 hover:border-primary/30 transition-all duration-500 shadow-sm"
-                    >
-                        <div className={cn(
-                            "absolute -top-24 -end-24 w-48 h-48 rounded-full blur-[80px] opacity-0 group-hover:opacity-30 transition-opacity duration-700",
-                            slot === 'HERO' ? "bg-primary" : slot === 'FEATURED' ? "bg-purple-500" : slot === 'BANNER' ? "bg-blue-500" : "bg-emerald-500"
-                        )} />
-
-                        <div className="relative z-10 space-y-5">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className={cn(
-                                        "w-2.5 h-2.5 rounded-full",
-                                        slot === 'HERO' ? "bg-primary" : slot === 'FEATURED' ? "bg-purple-500" : slot === 'BANNER' ? "bg-blue-500" : "bg-emerald-500"
-                                    )} />
-                                    <p className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em]">{slot}</p>
+            <div className="max-w-[1200px] mx-auto px-8 py-10 space-y-[48px]">
+                
+                {/* 2. OFFERS & ADS CARDS */}
+                <section className="space-y-[24px]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-[24px]">
+                        {AD_TYPES.map((type) => (
+                            <motion.div
+                                key={type.id}
+                                whileHover={{ y: -4, boxShadow: '0 12px 30px rgba(0,0,0,0.06)' }}
+                                className="bg-white border border-[#E5E7EB] rounded-[16px] p-[24px] h-[220px] flex flex-col group transition-all"
+                            >
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: type.color }} />
+                                    <span className="text-[12px] font-bold text-[#64748B] uppercase tracking-widest">{type.title}</span>
                                 </div>
-                                <ImageIcon size={20} className="text-muted-foreground/40 group-hover:text-muted-foreground transition-colors" />
-                            </div>
-
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-xl font-bold text-muted-foreground">$</span>
-                                <h3 className="text-5xl font-black text-foreground tracking-tighter">{price}</h3>
-                            </div>
-
-                            <p className="text-sm font-medium text-muted-foreground leading-relaxed border-t border-border/50 pt-5 min-h-[80px]">
-                                {slot === 'HERO' && "Maximum platform visibility. Premium homepage hero section display."}
-                                {slot === 'FEATURED' && "High visibility in search results and category featured sections."}
-                                {slot === 'BANNER' && "Consistent brand awareness via footer and sidebar banner placements."}
-                                {slot === 'LISTING' && "Highlighted standard product listing within specific categories."}
-                            </p>
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-
-            <div className="w-full h-px bg-gradient-to-r from-transparent via-border to-transparent my-12" />
-
-            {/* Offers Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-8 relative z-10">
-                <AnimatePresence>
-                    {offers.map((offer, index) => (
-                        <motion.div
-                            layout
-                            key={offer.id}
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.9 }}
-                            transition={{ delay: index * 0.05 }}
-                            className="bg-card border border-border/50 rounded-[2.5rem] p-8 hover:border-primary/40 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden relative shadow-sm"
-                        >
-                            <div className="absolute top-0 end-0 w-64 h-64 bg-primary/5 rounded-full -me-32 -mt-32 blur-[100px] group-hover:bg-primary/10 transition-colors duration-700" />
-
-                            <div className="flex justify-between items-start mb-8 relative z-10">
-                                <div className="flex items-start gap-4">
-                                    <div className="w-14 h-14 bg-muted rounded-2xl flex items-center justify-center border border-border/50 shadow-inner overflow-hidden">
-                                        <div className="w-full h-full bg-gradient-to-br from-primary/20 to-transparent flex items-center justify-center">
-                                            <Zap className="text-primary group-hover:scale-110 transition-transform duration-500" size={24} />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h3 className="text-xl font-black text-foreground line-clamp-1 group-hover:text-primary transition-colors">{offer.title}</h3>
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-2 py-0.5 rounded text-[10px] font-black text-primary-foreground bg-primary uppercase tracking-widest leading-none">{offer.type}</span>
-                                            <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{offer.slot} SLOT</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className={cn(
-                                    "px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border shadow-sm",
-                                    offer.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20" :
-                                        offer.status === 'PENDING' ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                                            "bg-red-500/10 text-red-500 border-red-500/20"
-                                )}>
-                                    {offer.status}
-                                </div>
-                            </div>
-
-                            <div className="bg-muted/30 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 mb-8 relative z-10 border border-border/50 shadow-inner">
-                                <div className="flex flex-col gap-1 w-[calc(50%-0.5rem)] sm:w-auto">
-                                    <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                                        <CircleDollarSign size={12} className="text-emerald-500" />
-                                        Investment
-                                    </div>
-                                    <p className="text-xl font-black text-foreground tracking-tight">${offer.price}</p>
-                                </div>
-                                <div className="flex flex-col gap-1 w-[calc(50%-0.5rem)] sm:w-auto sm:border-s border-border/50 sm:ps-6">
-                                    <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                                        <Calendar size={12} className="text-amber-500" />
-                                        Expires
-                                    </div>
-                                    <p className="text-sm font-bold text-foreground/80 mt-1">{new Date(offer.expiry).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</p>
-                                </div>
-                                <div className="flex flex-col gap-1 w-full sm:w-auto sm:border-s border-border/50 sm:ps-6 pt-3 sm:pt-0 border-t sm:border-t-0 border-border/50">
-                                    <div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                                        <Eye size={12} className="text-blue-500" />
-                                        Platform Views
-                                    </div>
+                                <div className="mt-auto">
                                     <div className="flex items-baseline gap-1">
-                                        <p className="text-xl font-black text-emerald-500">{offer.impressions.toLocaleString()}</p>
-                                        <span className="text-[10px] text-muted-foreground font-bold uppercase">Imp</span>
+                                        <span className="text-4xl font-bold text-[#0F172A]">${type.price}</span>
+                                        <span className="text-[#64748B] text-[12px] font-medium">/ month</span>
+                                    </div>
+                                    <div className="h-px bg-[#E5E7EB] w-full my-[16px]" />
+                                    <p className="text-[14px] text-[#64748B] leading-snug">{type.description}</p>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* 3. PLACEMENT VISUAL MAP */}
+                <section className="space-y-[16px]">
+                    <h2 className="text-[20px] font-semibold text-[#0F172A]">Placement Preview</h2>
+                    <div className="bg-[#F1F5F9] rounded-[16px] h-[320px] relative p-8 border border-[#E5E7EB] overflow-hidden group">
+                        {/* Mock Wireframe */}
+                        <div className="w-full h-full border-2 border-dashed border-[#E5E7EB] rounded-lg flex gap-4">
+                            {/* Sidebar Wireframe */}
+                            <div className="w-48 h-full bg-white/50 rounded-md border border-[#E5E7EB]/50 hidden md:block p-4 space-y-4">
+                                <div className="h-4 w-2/3 bg-slate-200 rounded" />
+                                <div className="h-4 w-1/2 bg-slate-200 rounded" />
+                                <div className="h-24 w-full bg-[#F59E0B]/10 border border-[#F59E0B]/20 rounded-md flex items-center justify-center relative cursor-help" title="Estimated impressions: 15k / week">
+                                    <span className="text-[10px] font-bold text-[#F59E0B] uppercase">Banner</span>
+                                </div>
+                            </div>
+                            {/* Main Content Wireframe */}
+                            <div className="flex-1 space-y-4">
+                                {/* Hero Wireframe */}
+                                <div className="h-24 w-full bg-[#2EC4B6]/10 border border-[#2EC4B6]/20 rounded-md flex items-center justify-center relative cursor-help" title="Estimated impressions: 45k / week">
+                                    <span className="text-[12px] font-bold text-[#2EC4B6] uppercase">Hero Ad Placement</span>
+                                </div>
+                                {/* Featured Row */}
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="h-32 bg-[#8B5CF6]/10 border border-[#8B5CF6]/20 rounded-md flex items-center justify-center relative cursor-help" title="Estimated impressions: 28k / week">
+                                        <span className="text-[10px] font-bold text-[#8B5CF6] uppercase">Featured</span>
+                                    </div>
+                                    <div className="h-32 bg-white rounded-md border border-[#E5E7EB]" />
+                                    <div className="h-32 bg-white rounded-md border border-[#E5E7EB]" />
+                                </div>
+                                {/* Grid Row */}
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="h-32 bg-white rounded-md border border-[#E5E7EB]" />
+                                    <div className="h-32 bg-[#EF4444]/10 border border-[#EF4444]/20 rounded-md flex items-center justify-center relative cursor-help" title="Estimated impressions: 10k / week">
+                                        <span className="text-[10px] font-bold text-[#EF4444] uppercase">Listing</span>
+                                    </div>
+                                    <div className="h-32 bg-white rounded-md border border-[#E5E7EB]" />
+                                </div>
+                            </div>
+                        </div>
+                        {/* Interactive overlay instructions */}
+                        <div className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm px-3 py-1.5 rounded-full text-[12px] font-medium text-[#64748B] flex items-center gap-2">
+                            <Info size={14} /> Hover over zones to see reach
+                        </div>
+                    </div>
+                </section>
+
+                {/* 4. ACTIVE CAMPAIGNS TABLE */}
+                <section className="space-y-[16px]">
+                    <h2 className="text-[20px] font-semibold text-[#0F172A]">Active Campaigns</h2>
+                    <div className="bg-white border border-[#E5E7EB] rounded-[16px] overflow-hidden">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="bg-[#F8FAFC] border-b border-[#E5E7EB] h-[48px]">
+                                    <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Campaign Name</th>
+                                    <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Placement Type</th>
+                                    <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Budget</th>
+                                    <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Status</th>
+                                    <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">CTR</th>
+                                    <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Impressions</th>
+                                    <th className="px-8 text-[12px] font-bold text-[#64748B] uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[#E5E7EB]">
+                                {campaigns.length > 0 ? campaigns.map((campaign) => (
+                                    <tr key={campaign.id} className="h-[64px] hover:bg-slate-50 transition-colors group">
+                                        <td className="px-8 font-semibold text-[#0F172A]">{campaign.product?.name || 'Spring Collection Boost'}</td>
+                                        <td className="px-8">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6]" />
+                                                <span className="text-[14px] font-medium text-[#64748B]">{campaign.placementType}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-8 font-medium text-[#0F172A]">${campaign.price || '500'}</td>
+                                        <td className="px-8">
+                                            <span className={cn(
+                                                "px-3 py-1 rounded-full text-[12px] font-bold",
+                                                campaign.status === 'ACTIVE' ? "bg-[#22C55E]/10 text-[#22C55E]" : 
+                                                campaign.status === 'PENDING' ? "bg-slate-100 text-slate-500" : 
+                                                "bg-[#3B82F6]/10 text-[#3B82F6]"
+                                            )}>
+                                                {campaign.status}
+                                            </span>
+                                        </td>
+                                        <td className="px-8 text-[14px] font-medium text-[#0F172A]">2.4%</td>
+                                        <td className="px-8 text-[14px] font-medium text-[#0F172A]">12,450</td>
+                                        <td className="px-8">
+                                            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button className="p-2 text-[#64748B] hover:text-[#0F172A] hover:bg-slate-100 rounded-lg transition-colors" title="Edit">
+                                                    <Edit2 size={16} />
+                                                </button>
+                                                <button className="p-2 text-[#64748B] hover:text-[#0F172A] hover:bg-slate-100 rounded-lg transition-colors" title="Pause">
+                                                    <Pause size={16} />
+                                                </button>
+                                                <button className="p-2 text-[#64748B] hover:text-[#2EC4B6] hover:bg-[#2EC4B6]/10 rounded-lg transition-colors" title="View Analytics">
+                                                    <BarChart3 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )) : (
+                                    <tr>
+                                        <td colSpan={7} className="px-8 py-12 text-center">
+                                            <div className="flex flex-col items-center gap-3 opacity-50">
+                                                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center">
+                                                    <Layout size={24} className="text-[#64748B]" />
+                                                </div>
+                                                <p className="text-[14px] font-medium text-[#64748B]">No campaigns yet — launch your first campaign</p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                {/* 5. ANALYTICS SECTION */}
+                <section className="space-y-[16px]">
+                    <h2 className="text-[20px] font-semibold text-[#0F172A]">Campaign Performance Analytics</h2>
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-[24px]">
+                        {/* Left: Performance Chart */}
+                        <div className="lg:col-span-8 bg-white border border-[#E5E7EB] rounded-[16px] p-6 h-[380px] flex flex-col">
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-6">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-[#2EC4B6]" />
+                                        <span className="text-[12px] font-bold text-[#64748B] uppercase">Impressions</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-[#8B5CF6]" />
+                                        <span className="text-[12px] font-bold text-[#64748B] uppercase">Clicks</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-2 h-2 rounded-full bg-[#F59E0B]" />
+                                        <span className="text-[12px] font-bold text-[#64748B] uppercase">Conversions</span>
                                     </div>
                                 </div>
+                                <select className="bg-slate-50 border border-[#E5E7EB] rounded-lg px-3 py-1 text-[12px] font-semibold text-[#64748B] outline-none">
+                                    <option>Last 7 Days</option>
+                                    <option>Last 30 Days</option>
+                                </select>
                             </div>
+                            <div className="flex-1 w-full min-h-0">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={ANALYTICS_DATA} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="colorImp" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#2EC4B6" stopOpacity={0.1}/>
+                                                <stop offset="95%" stopColor="#2EC4B6" stopOpacity={0}/>
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8'}} dy={10} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8'}} />
+                                        <Tooltip 
+                                            contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', padding: '12px' }}
+                                        />
+                                        <Area type="monotone" dataKey="impressions" stroke="#2EC4B6" strokeWidth={3} fillOpacity={1} fill="url(#colorImp)" />
+                                        <Area type="monotone" dataKey="clicks" stroke="#8B5CF6" strokeWidth={3} fill="transparent" />
+                                        <Area type="monotone" dataKey="conversions" stroke="#F59E0B" strokeWidth={3} fill="transparent" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
 
-                            <div className="flex items-center justify-between pt-2 relative z-10">
-                                <div className="flex items-center gap-2 text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
-                                    <Clock size={12} />
-                                    <span className="text-[10px] font-bold uppercase tracking-wider">Updated 2h ago</span>
+                        {/* Right: KPI Cards */}
+                        <div className="lg:col-span-4 space-y-[16px]">
+                            {[
+                                { label: 'Total Impressions', value: '142.8k', trend: '+12.5%', icon: Eye, color: '#2EC4B6' },
+                                { label: 'Avg. CTR', value: '2.48%', trend: '+0.4%', icon: MousePointer2, color: '#8B5CF6' },
+                                { label: 'Conversion Rate', value: '1.2%', trend: '-0.2%', icon: TrendingUp, color: '#F59E0B' },
+                                { label: 'Total Spend', value: '$1,240', trend: 'Budget tracking', icon: DollarSign, color: '#0F172A' },
+                            ].map((kpi) => (
+                                <div key={kpi.label} className="bg-white border border-[#E5E7EB] rounded-[16px] p-[16px] h-[100px] flex items-center gap-4 group hover:border-[#2EC4B6]/30 transition-colors">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center transition-colors group-hover:bg-[#2EC4B6]/10">
+                                        <kpi.icon size={20} style={{ color: kpi.color }} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-[12px] font-bold text-[#64748B] uppercase tracking-wider leading-none mb-1">{kpi.label}</p>
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-[20px] font-bold text-[#0F172A]">{kpi.value}</span>
+                                            <span className={cn(
+                                                "text-[10px] font-bold",
+                                                kpi.trend.startsWith('+') ? "text-[#22C55E]" : 
+                                                kpi.trend.startsWith('-') ? "text-[#EF4444]" : "text-[#64748B]"
+                                            )}>{kpi.trend}</span>
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <button onClick={() => openEditModal(offer)} className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors hover:bg-muted rounded-xl bg-muted/50">
-                                        <Edit2 size={16} />
-                                    </button>
-                                    <button onClick={() => handleDelete(offer.id)} className="w-10 h-10 flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors hover:bg-red-500/10 rounded-xl bg-muted/50">
-                                        <Trash size={16} />
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
-                    ))}
-                </AnimatePresence>
+                            ))}
+                        </div>
+                    </div>
+                </section>
             </div>
 
-            {/* Create Offer Modal */}
+            {/* 6. CAMPAIGN CREATION FLOW (MODAL) */}
             <AnimatePresence>
                 {isModalOpen && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-xl flex items-center justify-center p-6"
-                    >
-                        <motion.form
-                            onSubmit={handleSubmit}
-                            initial={{ scale: 0.9, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            className="bg-card w-full max-w-xl max-h-[85vh] overflow-y-auto no-scrollbar rounded-[40px] border border-border/50 shadow-2xl p-10 space-y-8"
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+                        <motion.div 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            onClick={() => setIsModalOpen(false)}
+                            className="absolute inset-0 bg-[#0B1F3A]/40 backdrop-blur-sm"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="bg-white w-full max-w-[640px] rounded-[20px] overflow-hidden relative z-10 shadow-2xl"
                         >
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-1">
-                                    <h2 className="text-2xl font-black text-foreground tracking-tight">{editingId ? 'Edit Offer' : 'Create New Offer'}</h2>
-                                    <p className="text-muted-foreground text-xs font-medium">Configure your promotion and ad placement.</p>
+                            {/* Modal Header */}
+                            <div className="px-8 py-6 border-b border-[#E5E7EB] flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-[20px] font-bold text-[#0F172A]">Launch New Campaign</h3>
+                                    <div className="flex items-center gap-1 mt-1">
+                                        {[1, 2, 3, 4, 5].map((step) => (
+                                            <div 
+                                                key={step} 
+                                                className={cn(
+                                                    "h-1 rounded-full transition-all duration-300",
+                                                    step === currentStep ? "w-8 bg-[#2EC4B6]" : 
+                                                    step < currentStep ? "w-4 bg-[#22C55E]" : "w-4 bg-slate-200"
+                                                )} 
+                                            />
+                                        ))}
+                                    </div>
                                 </div>
-                                <button type="button" onClick={() => setIsModalOpen(false)} className="w-10 h-10 bg-muted rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
-                                    <XCircle size={24} />
+                                <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-slate-100 rounded-full text-[#64748B] transition-colors">
+                                    <X size={20} />
                                 </button>
                             </div>
 
-                            <div className="space-y-6">
-                                <div className="space-y-2">
-                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Offer Title</label>
-                                    <input
-                                        required
-                                        type="text"
-                                        placeholder="e.g. Weekend Beverage Special"
-                                        value={formData.title}
-                                        onChange={e => setFormData({ ...formData, title: e.target.value })}
-                                        className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium placeholder:text-muted-foreground/50"
-                                    />
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Offer Type</label>
-                                        <select
-                                            value={formData.type}
-                                            onChange={e => setFormData({ ...formData, type: e.target.value as OfferType })}
-                                            className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium appearance-none"
-                                        >
-                                            <option value="Discount">Percentage Discount</option>
-                                            <option value="Bundle">Product Bundle</option>
-                                            <option value="Flash Sale">Flash Sale</option>
-                                        </select>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Placement Slot</label>
-                                        <select
-                                            value={formData.slot}
-                                            onChange={e => setFormData({ ...formData, slot: e.target.value as OfferSlot })}
-                                            className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-6 outline-none focus:border-primary/50 text-foreground font-medium appearance-none"
-                                        >
-                                            <option value="HERO">Hero Slot ($500)</option>
-                                            <option value="FEATURED">Featured Slot ($300)</option>
-                                            <option value="BANNER">Banner Slot ($200)</option>
-                                            <option value="LISTING">Listing Slot ($100)</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest flex items-center justify-between">
-                                        <span>Ad Creative (Image Upload)</span>
-                                        <span className="text-primary bg-primary/10 px-2 py-0.5 rounded-md">Required Size: {SLOT_DIMENSIONS[formData.slot]}</span>
-                                    </label>
-                                    <div className="border border-dashed border-border rounded-2xl p-6 flex flex-col items-center justify-center text-center hover:bg-muted/50 transition-colors cursor-pointer relative overflow-hidden group">
-                                        <input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={e => setFormData({ ...formData, image: e.target.files?.[0] || null })}
-                                            className="absolute inset-0 opacity-0 cursor-pointer z-10"
-                                        />
-                                        {formData.image ? (
-                                            <div className="text-primary font-bold z-20 flex items-center gap-2">
-                                                <CheckCircle2 size={20} />
-                                                {formData.image.name}
-                                            </div>
-                                        ) : (
-                                            <>
-                                                <ImageIcon size={32} className="text-muted-foreground/40 mb-3 group-hover:text-primary transition-colors z-20" />
-                                                <p className="text-sm font-medium text-foreground z-20">Click or drag image to upload</p>
-                                                <p className="text-xs text-muted-foreground mt-1 z-20">PNG, JPG up to 5MB</p>
-                                                <p className="text-xs font-black text-primary mt-3 uppercase tracking-widest z-20">Optimum Dimensions: {SLOT_DIMENSIONS[formData.slot]}</p>
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Start Date</label>
-                                        <input
-                                            required
-                                            type="date"
-                                            value={formData.startDate}
-                                            onChange={e => setFormData({ ...formData, startDate: e.target.value })}
-                                            className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-4 outline-none focus:border-primary/50 text-foreground font-medium"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Start Time</label>
-                                        <input
-                                            required
-                                            type="time"
-                                            value={formData.startTime}
-                                            onChange={e => setFormData({ ...formData, startTime: e.target.value })}
-                                            className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-4 outline-none focus:border-primary/50 text-foreground font-medium"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest">Expiry Date</label>
-                                        <input
-                                            required
-                                            type="date"
-                                            value={formData.expiry}
-                                            onChange={e => setFormData({ ...formData, expiry: e.target.value })}
-                                            className="w-full h-14 bg-muted rounded-2xl border border-border/50 px-4 outline-none focus:border-primary/50 text-foreground font-medium"
-                                        />
-                                    </div>
-                                </div>
-
-                                {formData.slot === 'HERO' && (
-                                    <div className="p-6 bg-primary/10 rounded-3xl border border-primary/20 flex items-start gap-4 animate-in fade-in slide-in-from-top-2">
-                                        <Info className="text-primary mt-1" size={24} />
-                                        <div className="space-y-1">
-                                            <p className="text-sm font-black text-foreground">Admin Approval Required</p>
-                                            <p className="text-[10px] text-muted-foreground font-medium leading-relaxed">Hero placements are highly competitive and require review by our moderation team. Your offer will go live once approved.</p>
+                            {/* Modal Content */}
+                            <div className="p-8 min-h-[400px]">
+                                {currentStep === 1 && (
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+                                        <div className="space-y-2">
+                                            <h4 className="text-[16px] font-semibold text-[#0F172A]">Step 1: Select Placement Type</h4>
+                                            <p className="text-[13px] text-[#64748B]">Choose where your ad will appear to maximize engagement.</p>
                                         </div>
-                                    </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            {AD_TYPES.map((type) => (
+                                                <button
+                                                    key={type.id}
+                                                    onClick={() => setSelectedPlacement(type.id)}
+                                                    className={cn(
+                                                        "p-5 rounded-xl border text-left transition-all relative overflow-hidden group",
+                                                        selectedPlacement === type.id 
+                                                            ? "border-[#2EC4B6] bg-[#2EC4B6]/5 shadow-md shadow-[#2EC4B6]/10" 
+                                                            : "border-[#E5E7EB] hover:border-[#2EC4B6]/30 hover:bg-slate-50"
+                                                    )}
+                                                >
+                                                    <div className="w-8 h-8 rounded-lg bg-white border border-[#E5E7EB] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                                        <Layout size={16} className={selectedPlacement === type.id ? "text-[#2EC4B6]" : "text-[#64748B]"} />
+                                                    </div>
+                                                    <p className="text-[14px] font-bold text-[#0F172A]">{type.title}</p>
+                                                    <p className="text-[11px] font-medium text-[#64748B] mt-1 line-clamp-1">{type.description}</p>
+                                                    <p className="text-[12px] font-bold text-[#0F172A] mt-3">${type.price} / mo</p>
+                                                    {selectedPlacement === type.id && (
+                                                        <div className="absolute top-2 right-2 text-[#2EC4B6]">
+                                                            <CheckCircle2 size={16} />
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {currentStep === 2 && (
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+                                        <div className="space-y-2">
+                                            <h4 className="text-[16px] font-semibold text-[#0F172A]">Step 2: Upload Creative</h4>
+                                            <p className="text-[13px] text-[#64748B]">Ensure your visuals meet the dimension requirements for the selected slot.</p>
+                                        </div>
+                                        <div className="aspect-[16/7] border-2 border-dashed border-[#E5E7EB] rounded-2xl flex flex-col items-center justify-center bg-slate-50 group hover:bg-[#2EC4B6]/5 hover:border-[#2EC4B6]/30 transition-all cursor-pointer p-8 text-center">
+                                            <div className="w-16 h-16 rounded-full bg-white border border-[#E5E7EB] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform shadow-sm">
+                                                <Upload size={24} className="text-[#64748B] group-hover:text-[#2EC4B6]" />
+                                            </div>
+                                            <p className="text-[14px] font-bold text-[#0F172A]">Drag and drop your ad creative</p>
+                                            <p className="text-[12px] text-[#64748B] mt-1">Recommended size: 1920x600px for Hero (JPG/PNG)</p>
+                                            <button className="mt-6 px-6 py-2 bg-white border border-[#E5E7EB] rounded-lg text-[13px] font-bold text-[#0F172A] hover:border-[#2EC4B6] transition-colors">
+                                                Browse Files
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-3 p-4 bg-[#F59E0B]/10 rounded-xl border border-[#F59E0B]/20">
+                                            <Info size={18} className="text-[#F59E0B]" />
+                                            <p className="text-[12px] text-[#0F172A] leading-relaxed">
+                                                <b>Pro-Tip:</b> Use high-contrast imagery with minimal text for maximum reach.
+                                            </p>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {currentStep === 3 && (
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                                        <div className="space-y-2">
+                                            <h4 className="text-[16px] font-semibold text-[#0F172A]">Step 3: Set Campaign Budget</h4>
+                                            <p className="text-[13px] text-[#64748B]">Define how much you're willing to spend on this specific campaign.</p>
+                                        </div>
+                                        <div className="space-y-6">
+                                            <div className="p-6 bg-slate-50 border border-[#E5E7EB] rounded-2xl">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <span className="text-[12px] font-bold text-[#64748B] uppercase">Placement Price</span>
+                                                    <span className="text-[14px] font-bold text-[#0F172A]">$500.00</span>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[12px] font-bold text-[#64748B] uppercase">Additional Boost</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-[12px] font-medium text-[#64748B]">$</span>
+                                                        <input 
+                                                            type="number" 
+                                                            className="w-24 h-10 border border-[#E5E7EB] rounded-lg px-3 text-[14px] font-bold text-[#0F172A] outline-none focus:border-[#2EC4B6]"
+                                                            placeholder="0.00"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="h-px bg-[#E5E7EB] my-4" />
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[14px] font-bold text-[#0F172A]">Total Monthly Budget</span>
+                                                    <span className="text-[20px] font-black text-[#2EC4B6]">$500.00</span>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[12px] font-bold text-[#0F172A]">Daily Limit (Optional)</span>
+                                                    <span className="text-[12px] font-medium text-[#64748B]">$16.67 / day</span>
+                                                </div>
+                                                <input type="range" className="w-full accent-[#2EC4B6]" />
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {currentStep === 4 && (
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                                        <div className="space-y-2">
+                                            <h4 className="text-[16px] font-semibold text-[#0F172A]">Step 4: Precision Targeting</h4>
+                                            <p className="text-[13px] text-[#64748B]">Reach the specific buyer segments most likely to convert.</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-6">
+                                            <div className="space-y-3">
+                                                <label className="text-[12px] font-bold text-[#0F172A] flex items-center gap-2">
+                                                    <Target size={14} className="text-[#2EC4B6]" /> Business Category
+                                                </label>
+                                                <select className="w-full h-12 bg-white border border-[#E5E7EB] rounded-xl px-4 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#2EC4B6]">
+                                                    <option>Industrial Equipment</option>
+                                                    <option>Raw Materials</option>
+                                                    <option>Supply Chain Solutions</option>
+                                                    <option>Consumer Electronics (Wholesale)</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-3">
+                                                <label className="text-[12px] font-bold text-[#0F172A] flex items-center gap-2">
+                                                    <Target size={14} className="text-[#2EC4B6]" /> Region
+                                                </label>
+                                                <select className="w-full h-12 bg-white border border-[#E5E7EB] rounded-xl px-4 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#2EC4B6]">
+                                                    <option>Middle East & Africa</option>
+                                                    <option>Europe</option>
+                                                    <option>North America</option>
+                                                    <option>Asia Pacific</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-4">
+                                            <label className="text-[12px] font-bold text-[#0F172A]">Buyer Device Targeting</label>
+                                            <div className="flex gap-4">
+                                                <button className="flex-1 h-14 border border-[#2EC4B6] bg-[#2EC4B6]/5 rounded-xl flex items-center justify-center gap-3 text-[13px] font-bold text-[#0F172A]">
+                                                    <Monitor size={18} className="text-[#2EC4B6]" /> Desktop
+                                                </button>
+                                                <button className="flex-1 h-14 border border-[#E5E7EB] bg-white rounded-xl flex items-center justify-center gap-3 text-[13px] font-bold text-[#64748B] hover:border-[#E5E7EB]">
+                                                    <Smartphone size={18} /> Mobile
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {currentStep === 5 && (
+                                    <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+                                        <div className="text-center space-y-4">
+                                            <div className="w-20 h-20 bg-[#22C55E]/10 rounded-full flex items-center justify-center mx-auto shadow-sm">
+                                                <CheckCircle2 size={40} className="text-[#22C55E]" />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <h4 className="text-[20px] font-bold text-[#0F172A]">Ready to Launch?</h4>
+                                                <p className="text-[14px] text-[#64748B]">Review your campaign details before activation.</p>
+                                            </div>
+                                        </div>
+                                        <div className="bg-slate-50 border border-[#E5E7EB] rounded-2xl overflow-hidden divide-y divide-[#E5E7EB]">
+                                            <div className="px-6 py-4 flex justify-between">
+                                                <span className="text-[12px] font-bold text-[#64748B] uppercase">Campaign</span>
+                                                <span className="text-[13px] font-bold text-[#0F172A]">Industrial Supply Hero Ad</span>
+                                            </div>
+                                            <div className="px-6 py-4 flex justify-between">
+                                                <span className="text-[12px] font-bold text-[#64748B] uppercase">Placement</span>
+                                                <span className="text-[13px] font-bold text-[#0F172A]">Hero (Homepage)</span>
+                                            </div>
+                                            <div className="px-6 py-4 flex justify-between">
+                                                <span className="text-[12px] font-bold text-[#64748B] uppercase">Budget</span>
+                                                <span className="text-[13px] font-bold text-[#2EC4B6]">$500.00 / month</span>
+                                            </div>
+                                        </div>
+                                        <p className="text-[11px] text-center text-[#64748B]">
+                                            By clicking Launch, you agree to Atlantis's Advertising Terms of Service.
+                                        </p>
+                                    </motion.div>
                                 )}
                             </div>
 
-                            <button
-                                type="submit"
-                                className="w-full h-16 bg-primary text-primary-foreground font-black rounded-2xl shadow-xl shadow-primary/10 hover:scale-[1.02] active:scale-[0.98] transition-all flex items-center justify-center gap-3 group"
-                            >
-                                <CircleDollarSign size={20} className="group-hover:rotate-12 transition-transform" />
-                                {editingId ? 'Update & Re-submit Offer' : 'Pay & Launch Offer'}
-                            </button>
-                        </motion.form>
-                    </motion.div>
+                            {/* Modal Footer */}
+                            <div className="px-8 py-6 bg-slate-50 border-t border-[#E5E7EB] flex items-center justify-between">
+                                <button 
+                                    onClick={prevStep}
+                                    disabled={currentStep === 1}
+                                    className="px-6 py-2.5 font-bold text-[14px] text-[#64748B] hover:text-[#0F172A] disabled:opacity-30 transition-colors"
+                                >
+                                    {currentStep === 1 ? 'Cancel' : 'Back'}
+                                </button>
+                                <button 
+                                    onClick={currentStep === 5 ? () => setIsModalOpen(false) : nextStep}
+                                    className="h-12 px-10 bg-[#0B1F3A] text-white font-bold rounded-xl flex items-center gap-2 hover:bg-[#152D4F] transition-all shadow-lg shadow-[#0B1F3A]/10"
+                                >
+                                    {currentStep === 5 ? 'Activate Campaign' : 'Next Step'} <ChevronRight size={18} />
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
                 )}
             </AnimatePresence>
         </div>
