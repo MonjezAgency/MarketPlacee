@@ -86,9 +86,14 @@ export default function Footer() {
             {/* Bottom Bar */}
             <div className="border-t border-white/10 py-8 bg-[#131921]">
                 <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-                    <p className="text-white/60 text-xs font-medium">
-                        {t('footer', 'copyright')}
-                    </p>
+                    <div className="flex flex-col gap-1">
+                        <p className="text-white/60 text-xs font-medium">
+                            {t('footer', 'copyright')}
+                        </p>
+                        <p className="text-white/40 text-[10px] uppercase tracking-widest font-bold">
+                            {t('footer', 'developedBy')}
+                        </p>
+                    </div>
                     <div className="flex items-center gap-6 text-xs font-semibold text-white/60">
                         <Link href="/privacy-policy" className="hover:text-white transition-colors">{t('footer', 'privacy')}</Link>
                         <Link href="/terms" className="hover:text-white transition-colors">{t('footer', 'terms')}</Link>

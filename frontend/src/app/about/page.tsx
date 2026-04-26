@@ -98,7 +98,7 @@ export default function AboutPage() {
                                         Traditional B2B sourcing involves endless email chains, PDF catalogs, wire transfers with no protection, and supplier relationships built on nothing more than hope.
                                     </p>
                                     <p>
-                                        We built Atlantis to change that. Our platform brings together KYC-verified suppliers and buyers in a secure, escrow-protected marketplace where every transaction is tracked, every supplier is verified, and every payment is protected until delivery is confirmed.
+                                        We built Atlantis to change that. Developed by Monjez Company, our platform brings together KYC-verified suppliers and buyers in a secure, escrow-protected marketplace where every transaction is tracked, every supplier is verified, and every payment is protected until delivery is confirmed.
                                     </p>
                                     <p>
                                         Headquartered with a focus on Romania and the broader European market, we understand the regulatory requirements, currency considerations, and trust dynamics that make EU B2B commerce unique.

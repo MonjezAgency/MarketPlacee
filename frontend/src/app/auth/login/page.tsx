@@ -304,12 +304,15 @@ export default function LoginPage() {
 
 
 
-                    <div className="mt-8 text-center">
-                        <p className="text-[#64748B] font-medium text-sm">
+                    <div className="mt-12 text-center">
+                        <p className="text-[#64748B] font-medium text-sm mb-4">
                             {t('auth', 'partnershipInquiry')}{' '}
                             <Link href="/auth/register" className="text-[#FF8A00] font-black hover:underline ms-1 uppercase text-xs tracking-widest">
                                 {t('auth', 'createBrandProfile')}
                             </Link>
+                        </p>
+                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">
+                            {t('footer', 'developedBy')}
                         </p>
                     </div>
 

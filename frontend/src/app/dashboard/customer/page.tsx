@@ -1,19 +1,34 @@
 'use client';
 
 import * as React from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import {
     Package, Truck, CheckCircle2, Clock,
-    ChevronRight, ShoppingBag, Heart, Star,
-    Loader2, XCircle, RefreshCw, Trash2
+    ChevronRight, ShoppingCart, Bell, Search,
+    Loader2, LogOut, MapPin, Hash, Ship,
+    Star, ArrowRight, Menu, X
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { fetchProducts, apiFetch } from '@/lib/api';
 import type { Product } from '@/lib/types';
-import ProductCard from '@/components/product/ProductCard';
 import { cn } from '@/lib/utils';
-import { toast } from 'react-hot-toast';
+import { useCart } from '@/lib/cart';
+import { useLanguage } from '@/contexts/LanguageContext';
+
+// Design Constants
+const COLORS = {
+    navy: '#0B1F3A',
+    teal: '#1ABC9C',
+    background: '#F7F9FC',
+    card: '#FFFFFF',
+    border: '#E6EAF0',
+    textPrimary: '#1A1F36',
+    textSecondary: '#6B7280',
+    success: '#22C55E',
+    warning: '#F59E0B',
+    pending: '#9CA3AF'
+};
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -23,298 +38,336 @@ interface Order {
     totalAmount: number;
     createdAt: string;
     shippingCompany: string | null;
+    trackingNumber?: string;
+    origin?: string;
+    destination?: string;
     items: { id: string; quantity: number; price: number; product?: { name: string; images?: string[] } }[];
 }
 
-const STATUS_STYLES: Record<OrderStatus, string> = {
-    PENDING: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    PROCESSING: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
-    SHIPPED: 'bg-primary/10 text-primary border-primary/20',
-    DELIVERED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    CANCELLED: 'bg-red-500/10 text-red-400 border-red-500/20',
-};
-
-const STATUS_ICONS: Record<OrderStatus, React.ElementType> = {
-    PENDING: Clock,
-    PROCESSING: CheckCircle2,
-    SHIPPED: Truck,
-    DELIVERED: Package,
-    CANCELLED: XCircle,
-};
-
-const TRACKING_STEPS: OrderStatus[] = ['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
+const TRACKING_STEPS = [
+    { label: 'Confirmed', key: 'PENDING' },
+    { label: 'Processing', key: 'PROCESSING' },
+    { label: 'Shipped', key: 'SHIPPED' },
+    { label: 'In Transit', key: 'IN_TRANSIT' },
+    { label: 'Delivered', key: 'DELIVERED' }
+];
 
 export default function CustomerDashboard() {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
+    const { items } = useCart();
+    const { t } = useLanguage();
     const [orders, setOrders] = React.useState<Order[]>([]);
     const [products, setProducts] = React.useState<Product[]>([]);
     const [isLoadingOrders, setIsLoadingOrders] = React.useState(true);
     const [isLoadingProducts, setIsLoadingProducts] = React.useState(true);
+    const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
     const fetchOrders = React.useCallback(async () => {
         setIsLoadingOrders(true);
         try {
             const res = await apiFetch(`/orders/my-orders`);
-            if (res.ok) setOrders(await res.json());
+            if (res.ok) {
+                const data = await res.json();
+                // Add some mock logistics data if missing
+                const enrichedData = data.map((o: any) => ({
+                    ...o,
+                    trackingNumber: o.trackingNumber || `ATL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
+                    origin: o.origin || 'Istanbul, Turkey',
+                    destination: o.destination || 'Dubai, UAE',
+                    shippingCompany: o.shippingCompany || 'Scan Cargo'
+                }));
+                setOrders(enrichedData);
+            }
         } catch (_e) { /* offline */ }
         finally { setIsLoadingOrders(false); }
     }, []);
 
-    const handleDeleteOrder = async (orderId: string) => {
-        const tid = toast.loading('Hiding order...');
-        try {
-            const res = await apiFetch(`/orders/${orderId}/customer-hide`, {
-                method: 'DELETE'
-            });
-            if (res.ok) {
-                toast.success('Order removed from your dashboard', { id: tid });
-                setOrders(prev => prev.filter(o => o.id !== orderId));
-            } else {
-                toast.error('Failed to remove order', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Network error', { id: tid });
-        }
-    };
-
     React.useEffect(() => {
         fetchOrders();
-        fetchProducts().then(data => { setProducts(data); setIsLoadingProducts(false); });
+        fetchProducts().then(data => { 
+            setProducts(data); 
+            setIsLoadingProducts(false); 
+        });
     }, [fetchOrders]);
 
-    const activeOrder = orders.find(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED');
-    const openCount = orders.filter(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED').length;
+    const activeOrder = orders.find(o => o.status !== 'DELIVERED' && o.status !== 'CANCELLED') || orders[0];
+
+    const getStepStatus = (stepKey: string, currentStatus: OrderStatus) => {
+        const orderOfStatus: Record<string, number> = {
+            'PENDING': 0,
+            'PROCESSING': 1,
+            'SHIPPED': 2,
+            'IN_TRANSIT': 3,
+            'DELIVERED': 4
+        };
+        const currentIdx = orderOfStatus[currentStatus] ?? 0;
+        const stepIdx = orderOfStatus[stepKey] ?? 0;
+
+        if (stepIdx < currentIdx) return 'completed';
+        if (stepIdx === currentIdx) return 'active';
+        return 'upcoming';
+    };
+
+    const handleLogout = async () => {
+        await logout();
+        window.location.href = '/auth/login';
+    };
 
     return (
-        <div className="min-h-screen bg-[#F5F7F7] dark:bg-[#0A0D12]">
-            {/* Dashboard Header */}
-            <header className="fixed top-0 start-0 end-0 h-20 bg-white/80 dark:bg-[#131921]/80 backdrop-blur-xl border-b border-black/5 dark:border-white/5 z-[100] px-4 md:px-8 flex items-center justify-between">
-                <Link href="/" className="flex items-center gap-3 group">
-                    <div className="w-10 h-10 bg-white rounded-xl overflow-hidden flex items-center justify-center transition-transform group-hover:scale-105 shadow-lg shadow-black/5 border border-black/5">
-                        <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
-                    </div>
-                    <span className="font-heading font-black text-xl tracking-tighter text-[#111] dark:text-white uppercase">
-                        Atlan<span className="text-primary">tis.</span>
-                    </span>
-                </Link>
-                
-                <div className="flex items-center gap-4">
-                    <Link href="/" className="text-[11px] font-black uppercase tracking-widest text-[#888] hover:text-primary transition-colors">
-                        Back to Shop
+        <div className="min-h-screen bg-[#F7F9FC] font-inter text-[#1A1F36] selection:bg-[#1ABC9C]/20">
+            {/* Header Section (72px height) */}
+            <header className="h-[72px] bg-white border-b border-[#E6EAF0] sticky top-0 z-[100] px-8 flex items-center justify-between">
+                <div className="flex items-center gap-8">
+                    <Link href="/" className="flex items-center gap-2 group shrink-0">
+                        <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-sm border border-[#E6EAF0]">
+                            <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
+                        </div>
+                        <span className="font-heading font-black text-xl tracking-tight text-[#0B1F3A] uppercase">
+                            Atlan<span className="text-[#1ABC9C]">tis.</span>
+                        </span>
                     </Link>
-                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
-                        <Star size={18} fill="currentColor" />
+
+                    {/* Search Bar */}
+                    <div className="relative hidden md:block">
+                        <Search className="absolute start-4 top-1/2 -translate-y-1/2 text-[#6B7280]" size={16} />
+                        <input 
+                            type="text" 
+                            placeholder="Search products, orders, or suppliers..."
+                            className="w-[420px] h-10 bg-[#F7F9FC] border border-[#E6EAF0] rounded-[10px] ps-11 pe-4 text-sm font-medium focus:border-[#1ABC9C] focus:bg-white transition-all outline-none"
+                        />
                     </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <button className="w-10 h-10 rounded-[10px] border border-[#E6EAF0] flex items-center justify-center text-[#1A1F36] hover:bg-[#F7F9FC] transition-all relative">
+                        <Bell size={18} />
+                        <span className="absolute top-2 right-2 w-2 h-2 bg-[#1ABC9C] rounded-full border-2 border-white"></span>
+                    </button>
+                    <Link href="/cart" className="w-10 h-10 rounded-[10px] border border-[#E6EAF0] flex items-center justify-center text-[#1A1F36] hover:bg-[#F7F9FC] transition-all relative">
+                        <ShoppingCart size={18} />
+                        {cartCount > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-[#1ABC9C] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
+                                {cartCount}
+                            </span>
+                        )}
+                    </Link>
+                    <div className="w-px h-6 bg-[#E6EAF0] mx-2" />
+                    <button 
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 px-4 h-10 rounded-[10px] text-red-500 hover:bg-red-50 font-bold text-xs uppercase tracking-widest transition-all"
+                    >
+                        <LogOut size={16} />
+                        <span>Sign Out</span>
+                    </button>
                 </div>
             </header>
 
-            <div className="max-w-7xl mx-auto space-y-10 p-4 md:p-8 pt-28 pb-20">
-            {/* Greeting */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div className="space-y-1">
-                    <h1 className="text-3xl font-black text-[#111] dark:text-white tracking-tight">
-                        Welcome back, <span className="text-primary">{user?.name?.split(' ')[0]}</span>
+            <main className="max-w-[1280px] mx-auto px-8 py-8 space-y-8">
+                {/* Welcome Section */}
+                <div>
+                    <h1 className="text-[28px] font-bold text-[#1A1F36] leading-tight">
+                        Welcome back, {user?.name?.split(' ')[0] || 'Partner'}! 👋
                     </h1>
-                    <p className="text-[#555] dark:text-white/40 font-medium italic">Track your wholesale orders and curated recommendations.</p>
+                    <p className="text-sm text-[#6B7280] mt-2 font-medium">
+                        Track your wholesale orders and curated recommendations in real-time.
+                    </p>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="p-4 bg-white dark:bg-[#131921] rounded-2xl shadow-sm border border-black/5 dark:border-white/5 flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-                            <ShoppingBag size={20} />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="text-[10px] uppercase font-black text-[#888] tracking-widest leading-none">Open Orders</span>
-                            <span className="text-lg font-black text-[#111] dark:text-white">
-                                {isLoadingOrders ? '—' : String(openCount).padStart(2, '0')}
-                            </span>
-                        </div>
-                    </div>
-                    <button
-                        onClick={fetchOrders}
-                        className="w-11 h-11 bg-white dark:bg-[#131921] rounded-2xl border border-black/5 dark:border-white/5 flex items-center justify-center text-muted-foreground hover:text-primary transition-colors"
-                    >
-                        <RefreshCw size={16} className={isLoadingOrders ? 'animate-spin text-primary' : ''} />
-                    </button>
-                </div>
-            </div>
-
-            {/* Active Order Tracking */}
-            <div className="bg-white dark:bg-[#131921] rounded-3xl border border-black/5 dark:border-white/5 p-8 space-y-8 layered-3d-shadow">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-black text-[#111] dark:text-white tracking-tight flex items-center gap-3">
-                        <Truck className="text-primary" /> Active Shipment
-                    </h3>
-                    <Link href="/dashboard/customer/orders" className="text-xs font-bold text-primary hover:underline">
-                        View All Orders
-                    </Link>
-                </div>
-
-                {isLoadingOrders ? (
-                    <div className="flex items-center justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    </div>
-                ) : !activeOrder ? (
-                    <div className="flex flex-col items-center gap-3 py-8 text-muted-foreground">
-                        <ShoppingBag className="w-10 h-10 opacity-20" />
-                        <p className="font-bold text-sm">No active orders</p>
-                        <Link href="/categories" className="text-primary text-xs font-black hover:underline uppercase tracking-widest">
-                            Browse Products →
-                        </Link>
-                    </div>
-                ) : (
-                    <>
-                        {/* Stepper */}
-                        <div className="relative pt-4 pb-2 px-4">
-                            <div className="absolute top-10 start-8 end-8 h-1 bg-[#E6E6E6] dark:bg-white/5 rounded-full" />
-                            <div
-                                className="absolute top-10 start-8 h-1 bg-primary rounded-full shadow-[0_0_10px_rgba(255,107,0,0.4)] transition-all duration-700"
-                                style={{
-                                    width: `${(Math.max(0, TRACKING_STEPS.indexOf(activeOrder.status)) / (TRACKING_STEPS.length - 1)) * 100}%`
-                                }}
-                            />
-                            <div className="flex justify-between relative z-10">
-                                {TRACKING_STEPS.map((status) => {
-                                    const Icon = STATUS_ICONS[status];
-                                    const done = TRACKING_STEPS.indexOf(status) <= TRACKING_STEPS.indexOf(activeOrder.status);
-                                    const active = status === activeOrder.status;
-                                    const labels: Record<string, string> = {
-                                        PENDING: 'Ordered', PROCESSING: 'Confirmed', SHIPPED: 'In Transit', DELIVERED: 'Delivered'
-                                    };
-                                    return (
-                                        <div key={status} className="flex flex-col items-center gap-3">
-                                            <div className={cn(
-                                                'w-12 h-12 rounded-full flex items-center justify-center border-4 transition-all',
-                                                done ? 'bg-primary border-[#F5F7F7] dark:border-[#131921] text-white' :
-                                                    'bg-white dark:bg-gray-800 border-[#E6E6E6] dark:border-white/10 text-muted-foreground',
-                                                active && 'animate-pulse'
-                                            )}>
-                                                <Icon size={20} />
-                                            </div>
-                                            <p className={cn('text-xs font-black uppercase tracking-tight', done ? 'text-[#111] dark:text-white' : 'text-muted-foreground')}>
-                                                {labels[status]}
-                                            </p>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Order details */}
-                        <div className="flex items-center justify-between p-4 bg-[#F5F7F7] dark:bg-white/5 rounded-2xl border border-black/5 dark:border-white/5">
+                {/* Active Shipment Card */}
+                <section className="bg-white rounded-[16px] border border-[#E6EAF0] shadow-sm overflow-hidden">
+                    <div className="p-6">
+                        <div className="flex items-center justify-between mb-8">
                             <div className="flex items-center gap-4">
-                                {activeOrder.items[0]?.product?.images?.[0] ? (
-                                    <img src={activeOrder.items[0].product.images[0]} alt="" className="w-14 h-14 rounded-xl object-cover border border-border/50" />
-                                ) : (
-                                    <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center">
-                                        <Package size={20} className="text-muted-foreground" />
-                                    </div>
-                                )}
+                                <div className="w-10 h-10 rounded-xl bg-[#1ABC9C]/10 flex items-center justify-center text-[#1ABC9C]">
+                                    <Truck size={20} />
+                                </div>
                                 <div>
-                                    <p className="text-sm font-bold text-[#111] dark:text-white">
-                                        {activeOrder.items[0]?.product?.name || `${activeOrder.items.length} item(s)`}
-                                        {activeOrder.items.length > 1 && ` +${activeOrder.items.length - 1} more`}
-                                    </p>
-                                    <p className="text-xs text-[#888]">
-                                        Order #{activeOrder.id.slice(-8).toUpperCase()} • ${activeOrder.totalAmount.toFixed(2)}
-                                    </p>
+                                    <h3 className="text-base font-bold text-[#1A1F36]">Active Shipment</h3>
+                                    <p className="text-xs text-[#6B7280] font-medium">Track your current orders in real-time</p>
                                 </div>
                             </div>
-                            <Link
-                                href={`/dashboard/customer/orders/${activeOrder.id}`}
-                                className="flex items-center gap-1 text-xs font-black text-primary hover:underline"
-                            >
-                                Track <ChevronRight size={14} />
+                            <Link href="/dashboard/customer/orders" className="text-sm font-semibold text-[#1ABC9C] hover:underline flex items-center gap-1">
+                                View All Orders <ChevronRight size={16} />
                             </Link>
                         </div>
-                    </>
-                )}
-            </div>
 
-            {/* Recent Orders */}
-            {!isLoadingOrders && orders.length > 0 && (
-                <div className="bg-white dark:bg-[#131921] rounded-3xl border border-black/5 dark:border-white/5 p-8 space-y-5">
-                    <div className="flex items-center justify-between">
-                        <h3 className="text-lg font-black text-[#111] dark:text-white">Recent Orders</h3>
-                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{orders.length} total</span>
-                    </div>
-                    <div className="space-y-3">
-                        {orders.slice(0, 5).map(order => {
-                            const Icon = STATUS_ICONS[order.status];
-                            return (
-                                <Link
-                                    key={order.id}
-                                    href={`/dashboard/customer/orders/${order.id}`}
-                                    className="flex items-center justify-between p-4 rounded-2xl border border-black/5 dark:border-white/5 hover:border-primary/20 hover:bg-primary/5 transition-all group"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center border', STATUS_STYLES[order.status])}>
-                                            <Icon size={16} />
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-black">#{order.id.slice(-8).toUpperCase()}</p>
-                                            <p className="text-[10px] text-muted-foreground">
-                                                {new Date(order.createdAt).toLocaleDateString()} • {order.items.length} item(s)
+                        {isLoadingOrders ? (
+                            <div className="flex items-center justify-center py-12">
+                                <Loader2 className="w-8 h-8 animate-spin text-[#1ABC9C]" />
+                            </div>
+                        ) : activeOrder ? (
+                            <div className="space-y-10">
+                                {/* Timeline Wrapper */}
+                                <div className="relative py-4">
+                                    {/* Tracking ID & Status */}
+                                    <div className="mb-10">
+                                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#6B7280] mb-1">Order #AT-{activeOrder.id.slice(-8).toUpperCase()}</p>
+                                        <div className="flex items-end gap-3">
+                                            <h2 className="text-3xl font-bold text-[#0B1F3A]">{activeOrder.status.replace(/_/g, ' ')}</h2>
+                                            <p className="text-sm font-medium text-[#6B7280] pb-1">
+                                                Estimated Delivery: <span className="text-[#1A1F36] font-bold">May 28, 2025</span>
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-3">
-                                        <div className="text-end">
-                                            <p className="text-sm font-black">${order.totalAmount.toFixed(2)}</p>
-                                            <span className={cn('text-[9px] font-black uppercase tracking-widest', STATUS_STYLES[order.status].split(' ')[1])}>
-                                                {order.status}
-                                            </span>
-                                        </div>
-                                        <button 
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                handleDeleteOrder(order.id);
+
+                                    {/* Timeline */}
+                                    <div className="relative px-4">
+                                        {/* Progress Line */}
+                                        <div className="absolute top-5 start-8 end-8 h-[2px] bg-[#E6EAF0] z-0" />
+                                        <div 
+                                            className="absolute top-5 start-8 h-[2px] bg-[#1ABC9C] transition-all duration-1000 ease-out z-0"
+                                            style={{ 
+                                                width: `${(TRACKING_STEPS.findIndex(s => s.key === activeOrder.status) / (TRACKING_STEPS.length - 1)) * 100}%` 
                                             }}
-                                            className="p-2 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl transition-all"
-                                        >
-                                            <Trash2 size={14} />
-                                        </button>
-                                        <ChevronRight size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
+                                        />
+
+                                        {/* Steps */}
+                                        <div className="flex justify-between relative z-10">
+                                            {TRACKING_STEPS.map((step) => {
+                                                const status = getStepStatus(step.key, activeOrder.status);
+                                                return (
+                                                    <div key={step.key} className="flex flex-col items-center gap-4 text-center">
+                                                        <div className={cn(
+                                                            "w-10 h-10 rounded-full flex items-center justify-center transition-all duration-500 border-[3px]",
+                                                            status === 'completed' ? "bg-[#22C55E] border-white text-white shadow-lg" :
+                                                            status === 'active' ? "bg-[#1ABC9C] border-white text-white shadow-lg scale-110" :
+                                                            "bg-white border-[#E6EAF0] text-[#9CA3AF]"
+                                                        )}>
+                                                            {status === 'completed' ? <CheckCircle2 size={18} /> : 
+                                                             step.key === 'SHIPPED' ? <Truck size={18} /> : 
+                                                             step.key === 'DELIVERED' ? <Package size={18} /> :
+                                                             <div className="w-2 h-2 rounded-full bg-current" />}
+                                                        </div>
+                                                        <div className="space-y-1">
+                                                            <p className={cn(
+                                                                "text-xs font-bold",
+                                                                status !== 'upcoming' ? "text-[#1A1F36]" : "text-[#9CA3AF]"
+                                                            )}>{step.label}</p>
+                                                            <p className="text-[10px] text-[#6B7280] font-medium uppercase">
+                                                                {status === 'active' ? 'May 24, 09:20 AM' : status === 'upcoming' ? 'Pending' : 'Completed'}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </Link>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            {/* Personalized Recommendations */}
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <h2 className="text-2xl font-black text-[#111] dark:text-white tracking-tight flex items-center gap-3">
-                        <Heart className="text-primary" fill="currentColor" /> Handpicked for You
-                    </h2>
-                    <Link href="/categories" className="text-sm font-bold text-[#888] hover:text-primary transition-colors inline-flex items-center gap-2">
-                        Browse all <ChevronRight size={16} />
-                    </Link>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                    {isLoadingProducts ? (
-                        <div className="col-span-full py-8 text-center text-muted-foreground font-medium">Loading recommendations...</div>
-                    ) : (
-                        products.slice(4, 8).map((product, i) => (
-                            <div key={product.id} className="group relative">
-                                <div className="absolute -inset-1 bg-gradient-to-r from-primary to-[#FF8C33] rounded-3xl blur opacity-0 group-hover:opacity-20 transition duration-500" />
-                                <div className="relative">
-                                    <ProductCard product={product} index={i} />
                                 </div>
-                                <div className="absolute top-2 start-2 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg border border-black/5 flex items-center gap-1.5 shadow-sm">
-                                    <Star size={10} className="text-primary" fill="currentColor" />
-                                    <span className="text-[9px] font-black uppercase text-primary">Best Match</span>
+
+                                {/* Order Info Row */}
+                                <div className="border-t border-[#E6EAF0] pt-6 flex flex-col md:flex-row items-center justify-between gap-8">
+                                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-4 flex-1">
+                                        <div className="flex items-center gap-3">
+                                            <Ship size={20} className="text-[#6B7280]" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">Carrier</span>
+                                                <span className="text-sm font-bold text-[#1A1F36]">{activeOrder.shippingCompany}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <Hash size={20} className="text-[#6B7280]" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">Tracking Number</span>
+                                                <span className="text-sm font-bold text-[#1A1F36]">{activeOrder.trackingNumber}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <MapPin size={20} className="text-[#6B7280]" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">Origin</span>
+                                                <span className="text-sm font-bold text-[#1A1F36]">{activeOrder.origin}</span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <MapPin size={20} className="text-[#6B7280]" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[10px] font-bold text-[#6B7280] uppercase tracking-wider">Destination</span>
+                                                <span className="text-sm font-bold text-[#1A1F36]">{activeOrder.destination}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Action Buttons */}
+                                    <div className="flex items-center gap-3 shrink-0">
+                                        <button className="h-10 px-5 border border-[#E6EAF0] rounded-[10px] text-sm font-bold text-[#1A1F36] hover:bg-[#F7F9FC] transition-all">
+                                            View Details
+                                        </button>
+                                        <button className="h-10 px-6 bg-[#1ABC9C] text-white rounded-[10px] text-sm font-bold hover:bg-[#16a085] transition-all shadow-md flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                            Track Live
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                        ))
-                    )}
-                </div>
-            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-12 gap-4 text-center">
+                                <div className="w-16 h-16 rounded-full bg-[#F7F9FC] flex items-center justify-center text-[#9CA3AF]">
+                                    <Package size={32} />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-[#1A1F36]">No active orders found</p>
+                                    <p className="text-sm text-[#6B7280] mt-1">Start sourcing products from our catalog to see updates here.</p>
+                                </div>
+                                <Link href="/categories" className="h-10 px-8 bg-[#0B1F3A] text-white rounded-[10px] text-sm font-bold flex items-center justify-center gap-2 hover:opacity-90 transition-all">
+                                    Start Shopping <ArrowRight size={16} />
+                                </Link>
+                            </div>
+                        )}
+                    </div>
+                </section>
+
+                {/* Handpicked Section */}
+                <section className="space-y-6">
+                    <div className="flex items-center justify-between">
+                        <h2 className="text-[18px] font-bold text-[#1A1F36]">Handpicked for You</h2>
+                        <Link href="/categories" className="text-sm font-bold text-[#1ABC9C] hover:underline flex items-center gap-1">
+                            Browse all <ArrowRight size={14} />
+                        </Link>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        {isLoadingProducts ? (
+                            Array(5).fill(0).map((_, i) => (
+                                <div key={i} className="w-[220px] h-[280px] bg-white rounded-2xl border border-[#E6EAF0] animate-pulse" />
+                            ))
+                        ) : (
+                            products.slice(0, 5).map((product) => (
+                                <Link 
+                                    key={product.id}
+                                    href={`/products/${product.id}`}
+                                    className="w-full bg-white rounded-[16px] border border-[#E6EAF0] overflow-hidden group hover:shadow-xl transition-all"
+                                >
+                                    <div className="h-[140px] relative overflow-hidden bg-slate-50">
+                                        <img 
+                                            src={product.images?.[0] || '/placeholder.png'} 
+                                            alt={product.name}
+                                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        />
+                                        <div className="absolute top-2 start-2">
+                                            <span className="bg-[#1ABC9C]/10 text-[#1ABC9C] text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-md border border-[#1ABC9C]/20 backdrop-blur-sm">
+                                                Top Rated
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="p-4 space-y-2">
+                                        <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">{product.brand || 'Premium Brand'}</p>
+                                        <h4 className="text-sm font-bold text-[#1A1F36] line-clamp-1 group-hover:text-[#1ABC9C] transition-colors">{product.name}</h4>
+                                        <div className="pt-2 flex items-center justify-between">
+                                            <span className="text-base font-bold text-[#1A1F36]">${product.price.toFixed(2)}<span className="text-[10px] text-[#6B7280] font-medium ms-0.5">/unit</span></span>
+                                            <div className="w-8 h-8 rounded-lg bg-[#F7F9FC] flex items-center justify-center text-[#1A1F36] group-hover:bg-[#1ABC9C] group-hover:text-white transition-all">
+                                                <ShoppingCart size={14} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </Link>
+                            ))
+                        )}
+                    </div>
+                </section>
+            </main>
+
+            {/* Bottom Spacing */}
+            <div className="h-20" />
         </div>
-    </div>
-);
+    );
 }

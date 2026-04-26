@@ -137,7 +137,8 @@ export const en = {
         shippingPolicy: "Shipping Policy",
         returnsRefunds: "Returns & Refunds",
         description: "The premier B2B wholesale platform for beverages and more, connecting global brands with local distributors as Atlantis.",
-        copyright: "© 2026 Atlantis. Built for Performance & Security.",
+        copyright: "© 2026 Atlantis. All Rights Reserved.",
+        developedBy: "Developed by Monjez Company",
         privacy: "Privacy",
         terms: "Terms",
         cookies: "Cookies"

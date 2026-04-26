@@ -454,6 +454,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             <LogOut size={20} />
                         </button>
                     )}
+
+                    {isOpen && (
+                        <div className="mt-4 px-4 py-2 text-center">
+                            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20">
+                                {t('footer', 'developedBy')}
+                            </p>
+                        </div>
+                    )}
                 </div>
             </aside>
 
