@@ -19,6 +19,7 @@ export interface User {
     role: string;
     status: 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED' | 'BLOCKED';
     kycStatus?: 'UNVERIFIED' | 'PENDING' | 'VERIFIED' | 'REJECTED';
+    createdAt?: string;
 }
 
 interface AuthContextType {
