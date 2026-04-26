@@ -88,9 +88,7 @@ export default function Footer() {
                     {/* Brand Column */}
                     <div className="col-span-1 space-y-6">
                         <Link href="/" className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-lg bg-[#2EC4B6] flex items-center justify-center shadow-lg shadow-[#2EC4B6]/20">
-                                <img src="/icon.png" alt="Atlantis" className="w-6 h-6 object-contain" />
-                            </div>
+                            <img src="/icon.png" alt="Atlantis" className="w-9 h-9 object-contain rounded-xl" />
                             <span className="text-[22px] font-black tracking-tighter uppercase">
                                 <span className="text-white">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
                             </span>

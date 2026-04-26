@@ -88,9 +88,7 @@ export default function Navbar() {
                 {/* Logo & Category Menu */}
                 <div className="flex items-center gap-6 shrink-0">
                     <Link href="/" className="flex items-center gap-3 group">
-                        <div className="w-10 h-10 rounded-xl bg-[#0B1F3A] flex items-center justify-center shadow-lg group-hover:bg-[#2EC4B6] transition-all duration-300">
-                            <img src="/icon.png" alt="Atlantis" className="w-6 h-6 object-contain" />
-                        </div>
+                        <img src="/icon.png" alt="Atlantis" className="w-10 h-10 object-contain rounded-xl" />
                         <span className="text-[24px] font-black tracking-tighter uppercase">
                             <span className="text-[#0B1F3A]">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
                         </span>

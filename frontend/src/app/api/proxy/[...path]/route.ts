@@ -28,6 +28,7 @@ const PUBLIC_PATHS = [
   'auth/verify-email',
   'auth/google-login',
   'auth/refresh',
+  'newsletter/subscribe',
 ];
 
 async function handler(
