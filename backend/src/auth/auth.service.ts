@@ -110,9 +110,9 @@ export class AuthService {
                 this.logger.warn(`[AUTH] Login blocked: User ${email} pending approval`);
                 throw new UnauthorizedException('حسابك قيد المراجعة في انتظار موافقة الإدارة');
             }
-            if (user.status === 'REJECTED' || user.status === 'BLOCKED') {
+            if (user.status === 'REJECTED' || user.status === 'BLOCKED' || user.status === 'DELETED') {
                 this.logger.warn(`[AUTH] Login blocked: User ${email} status is ${user.status}`);
-                throw new UnauthorizedException(`حسابك موقوف أو مرفوض: ${user.status}`);
+                throw new UnauthorizedException(`حسابك موقوف أو مرفوض أو محذوف: ${user.status}`);
             }
 
             this.logger.log(`[AUTH] User ${email} validated successfully in ${Date.now() - startTime}ms`);
@@ -310,7 +310,7 @@ export class AuthService {
             select: { id: true, email: true, role: true, status: true, name: true, onboardingCompleted: true,
                       avatar: true, companyName: true, phone: true, country: true, emailVerified: true },
         });
-        if (!user || user.status === 'BLOCKED' || user.status === 'REJECTED') {
+        if (!user || user.status === 'BLOCKED' || user.status === 'REJECTED' || user.status === 'DELETED') {
             throw new UnauthorizedException('Account is not active');
         }
 
@@ -443,7 +443,7 @@ export class AuthService {
             return { pendingApproval: true, email: user.email, needsCompanyDetails: true };
         }
 
-        if (user.status === 'BLOCKED' || user.status === 'REJECTED') {
+        if (user.status === 'BLOCKED' || user.status === 'REJECTED' || user.status === 'DELETED') {
             throw new UnauthorizedException(`Your account has been ${user.status.toLowerCase()}`);
         }
 

@@ -102,6 +102,8 @@ export class ProductsService {
                     moq: createProductDto.moq ?? null,
                     unitsPerPallet: createProductDto.unitsPerPallet ?? null,
                     palletsPerShipment: createProductDto.palletsPerShipment ?? null,
+                    readyForDispatch: createProductDto.readyForDispatch ?? true,
+                    leadTime: createProductDto.leadTime ?? 0,
                     warehouseId: createProductDto.warehouseId || null,
                 },
             });
@@ -314,6 +316,8 @@ export class ProductsService {
         if (data.moq !== undefined) updateData.moq = data.moq;
         if (data.unitsPerPallet !== undefined) updateData.unitsPerPallet = data.unitsPerPallet;
         if (data.palletsPerShipment !== undefined) updateData.palletsPerShipment = data.palletsPerShipment;
+        if (data.readyForDispatch !== undefined) updateData.readyForDispatch = data.readyForDispatch;
+        if (data.leadTime !== undefined) updateData.leadTime = data.leadTime;
         if (data.warehouseId !== undefined) updateData.warehouseId = data.warehouseId;
         if (data.price !== undefined || data.unit !== undefined) {
             const currentUnit = data.unit || (await this.findOne(id))?.unit || 'piece';

@@ -68,6 +68,13 @@ export class CreateProductDto {
     @IsOptional()
     @IsString()
     warehouseId?: string;
+
+    @IsOptional()
+    readyForDispatch?: boolean;
+
+    @IsOptional()
+    @IsInt()
+    leadTime?: number;
 }
 
 

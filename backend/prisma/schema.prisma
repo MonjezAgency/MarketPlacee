@@ -27,6 +27,7 @@ enum UserStatus {
   ACTIVE
   REJECTED
   BLOCKED
+  DELETED
 }
 
 enum KYCStatus {
@@ -161,6 +162,8 @@ model Product {
   moq         Int?          // Minimum Order Quantity
   unitsPerPallet Int?
   palletsPerShipment Int?
+  readyForDispatch Boolean @default(true)
+  leadTime       Int?     @default(0) // Preparation time in days if not ready for dispatch
 
   rating       Float @default(0.0)
   reviewsCount Int   @default(0)

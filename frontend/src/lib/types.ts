@@ -58,6 +58,8 @@ export interface Product {
     reviewsCount?: number;
     isNew?: boolean;
     bulkSave?: boolean;
+    readyForDispatch?: boolean;
+    leadTime?: number;
 
     // Timestamps
     createdAt?: string;

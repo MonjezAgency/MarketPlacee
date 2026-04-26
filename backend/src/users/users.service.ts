@@ -49,7 +49,14 @@ export class UsersService {
 
     async findAll(status?: any, page = 1, limit = 1000, search?: string, role?: string) {
         const whereCondition: any = {};
-        if (status) whereCondition.status = status;
+        if (!status) {
+            // By default, don't show users who have been "deleted" (anonymized)
+            // We use the email pattern as it's more reliable than the status enum if migration hasn't run
+            whereCondition.email = { not: { contains: '@removed.invalid' } };
+        } else {
+            whereCondition.status = status;
+        }
+
         if (role) whereCondition.role = role;
         
         if (search) {
@@ -138,9 +145,36 @@ export class UsersService {
     }
 
     async deleteUser(id: string) {
-        return this.prisma.user.delete({
-            where: { id },
-        });
+        try {
+            // 1. Try to hard delete first (works if no orders/products exist)
+            return await this.prisma.user.delete({
+                where: { id },
+            });
+        } catch (error) {
+            // 2. Fallback to Anonymization (Soft Delete)
+            // This handles the "Foreign key constraint failed on the field" error (Prisma P2003)
+            console.warn(`[UsersService] User ${id} cannot be hard-deleted (likely has orders/products). Anonymizing instead.`);
+            
+            return await this.prisma.user.update({
+                where: { id },
+                data: {
+                    status: 'BLOCKED', 
+                    email: `deleted_${id}_${Date.now()}@removed.invalid`,
+                    name: 'Deleted User (Archived)',
+                    password: 'DELETED_' + Math.random().toString(36).substring(7),
+                    phone: null,
+                    avatar: null,
+                    companyName: 'Archived Entity',
+                    iban: null,
+                    swiftCode: null,
+                    taxId: null,
+                    vatNumber: null,
+                    stripeAccountId: null,
+                    twoFactorSecret: null,
+                    onboardingCompleted: false
+                },
+            });
+        }
     }
 
     async bulkUpdateStatus(ids: string[], status: string) {

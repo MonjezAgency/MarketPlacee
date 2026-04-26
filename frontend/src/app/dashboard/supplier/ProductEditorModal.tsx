@@ -463,6 +463,56 @@ function ModalPortalContent({
                                                         />
                                                     </div>
                                                 </div>
+
+                                                <div className="pt-6 border-t border-border/10 space-y-6">
+                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                                                        <Truck size={14} /> Logistics & Readiness
+                                                    </h4>
+                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-background/50 p-6 rounded-2xl border border-border/30">
+                                                        <div className="space-y-4">
+                                                            <label className="flex items-center gap-3 cursor-pointer group">
+                                                                <div className={cn(
+                                                                    "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
+                                                                    formData.readyForDispatch ? "bg-primary border-primary shadow-lg shadow-primary/20" : "border-muted-foreground/30 group-hover:border-primary/50"
+                                                                )}>
+                                                                    {formData.readyForDispatch && <Check size={16} className="text-white" />}
+                                                                </div>
+                                                                <input 
+                                                                    type="checkbox" 
+                                                                    className="hidden" 
+                                                                    checked={formData.readyForDispatch}
+                                                                    onChange={e => setFormData({ ...formData, readyForDispatch: e.target.checked })}
+                                                                />
+                                                                <div>
+                                                                    <p className="text-sm font-black text-foreground uppercase tracking-tight">Ready for Dispatch</p>
+                                                                    <p className="text-[10px] text-muted-foreground font-medium">Item is in stock and can ship immediately</p>
+                                                                </div>
+                                                            </label>
+                                                        </div>
+
+                                                        <div className="space-y-2">
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
+                                                                Production Lead Time (Days)
+                                                                {!formData.readyForDispatch && <span className="text-primary">(Required)</span>}
+                                                            </label>
+                                                            <div className="relative">
+                                                                <input
+                                                                    type="number"
+                                                                    disabled={formData.readyForDispatch}
+                                                                    placeholder="e.g. 7"
+                                                                    value={formData.leadTime || ''}
+                                                                    onChange={e => setFormData({ ...formData, leadTime: parseInt(e.target.value) || 0 })}
+                                                                    className={cn(
+                                                                        "w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none transition-all text-sm font-bold",
+                                                                        formData.readyForDispatch ? "opacity-30 grayscale cursor-not-allowed" : "focus:border-primary/50"
+                                                                    )}
+                                                                />
+                                                                <span className="absolute end-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Days</span>
+                                                            </div>
+                                                            <p className="text-[9px] text-muted-foreground/60 italic px-2">Time needed to prepare product if not in stock.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             <div className="bg-card rounded-[32px] p-8 border border-border/50 space-y-6">

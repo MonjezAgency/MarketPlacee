@@ -285,7 +285,9 @@ export default function ProductDetailClient() {
                                 </div>
                                 <div className="space-y-1.5">
                                     <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Inventory Status</p>
-                                    <p className="text-[18px] font-bold text-[#14B8A6]">Immediate Availability</p>
+                                    <p className={cn("text-[18px] font-bold", product.readyForDispatch ? "text-[#14B8A6]" : "text-amber-500")}>
+                                        {product.readyForDispatch ? 'Immediate Availability' : 'Made to Order'}
+                                    </p>
                                 </div>
                                 <div className="space-y-1.5">
                                     <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Reference SKU</p>
@@ -363,8 +365,13 @@ export default function ProductDetailClient() {
                                         <Package size={18} className="text-slate-400" />
                                     </div>
                                     <div>
-                                        <p className="text-[13px] font-bold text-[#111827]">Delivery: 48–72h</p>
-                                        <p className="text-[11px] text-[#6B7280]">Distribution center arrival</p>
+                                        <p className="text-[13px] font-bold text-[#111827]">
+                                            Delivery: {product.readyForDispatch ? '2–5 days' : `${(product.leadTime || 7) + 3}–${(product.leadTime || 7) + 7} days`}
+                                        </p>
+                                        <p className="text-[11px] text-[#6B7280]">
+                                            {product.readyForDispatch ? 'Ready to ship' : `Made to order (${product.leadTime || 7}d lead time)`} 
+                                            {user?.country && ` • Shipping to ${user.country}`}
+                                        </p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
