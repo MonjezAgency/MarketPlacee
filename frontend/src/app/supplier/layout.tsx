@@ -344,10 +344,17 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
             </AnimatePresence>
 
             {/* Guided Tour Component */}
-            {showTour && <GuidedTour steps={tourSteps} onComplete={() => {
-                if (user?.id) localStorage.setItem(`atlantis-tour-supplier-${user.id}`, 'true');
-                setShowTour(false);
-            }} />}
+            {showTour && <GuidedTour 
+                steps={tourSteps} 
+                onDismiss={() => {
+                    if (user?.id) localStorage.setItem(`atlantis-tour-supplier-${user.id}`, 'true');
+                    setShowTour(false);
+                }}
+                onComplete={() => {
+                    if (user?.id) localStorage.setItem(`atlantis-tour-supplier-${user.id}`, 'true');
+                    setShowTour(false);
+                }} 
+            />}
         </div>
     );
 }
