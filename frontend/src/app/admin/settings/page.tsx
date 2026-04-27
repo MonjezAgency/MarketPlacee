@@ -435,49 +435,49 @@ export default function SettingsDashboard() {
 
                         {activeSection === 'Pricing & Markup' && (
                             <SettingSection key="pricing" title="Global Pricing & Margin Control">
-                                <SettingCard title="Wholesale Unit Markup">
+                                <SettingCard title="Wholesale Unit Markup (%)">
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                         <div className="space-y-1.5">
                                             <label className="text-[12px] font-medium text-slate-500">Piece/Carton Markup</label>
                                             <div className="relative">
                                                 <input 
-                                                    type="number" step="0.01"
-                                                    value={markupPiece}
-                                                    onChange={(e) => setMarkupPiece(parseFloat(e.target.value))}
+                                                    type="number" step="0.1"
+                                                    value={Math.round((markupPiece - 1) * 100 * 10) / 10}
+                                                    onChange={(e) => setMarkupPiece(1 + parseFloat(e.target.value || "0") / 100)}
                                                     className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
                                                 />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">x Factor</span>
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
                                             </div>
-                                            <p className="text-[10px] text-slate-400">Example: 1.10 = 10% markup</p>
+                                            <p className="text-[10px] text-slate-400">Example: 10% profit margin</p>
                                         </div>
                                         <div className="space-y-1.5">
                                             <label className="text-[12px] font-medium text-slate-500">Pallet Markup</label>
                                             <div className="relative">
                                                 <input 
-                                                    type="number" step="0.01"
-                                                    value={markupPallet}
-                                                    onChange={(e) => setMarkupPallet(parseFloat(e.target.value))}
+                                                    type="number" step="0.1"
+                                                    value={Math.round((markupPallet - 1) * 100 * 10) / 10}
+                                                    onChange={(e) => setMarkupPallet(1 + parseFloat(e.target.value || "0") / 100)}
                                                     className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
                                                 />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">x Factor</span>
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
                                             </div>
                                         </div>
                                         <div className="space-y-1.5">
                                             <label className="text-[12px] font-medium text-slate-500">Container Markup</label>
                                             <div className="relative">
                                                 <input 
-                                                    type="number" step="0.01"
-                                                    value={markupContainer}
-                                                    onChange={(e) => setMarkupContainer(parseFloat(e.target.value))}
+                                                    type="number" step="0.1"
+                                                    value={Math.round((markupContainer - 1) * 100 * 10) / 10}
+                                                    onChange={(e) => setMarkupContainer(1 + parseFloat(e.target.value || "0") / 100)}
                                                     className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
                                                 />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">x Factor</span>
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
                                             </div>
                                         </div>
                                     </div>
                                 </SettingCard>
 
-                                <SettingCard title="Platform Fees & Logistics">
+                                <SettingCard title="Platform Fees & Logistics (%)">
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <div className="space-y-1.5 flex-1">
                                             <label className="text-[12px] font-medium text-slate-500">Platform Commission (%)</label>
@@ -485,7 +485,7 @@ export default function SettingsDashboard() {
                                                 <input 
                                                     type="number"
                                                     value={platformFee}
-                                                    onChange={(e) => setPlatformFee(parseFloat(e.target.value))}
+                                                    onChange={(e) => setPlatformFee(parseFloat(e.target.value || "0"))}
                                                     className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
                                                 />
                                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span>
@@ -493,17 +493,17 @@ export default function SettingsDashboard() {
                                             <p className="text-[10px] text-slate-400 mt-1 italic">Percentage taken from total product value of approved orders.</p>
                                         </div>
                                         <div className="space-y-1.5 flex-1">
-                                            <label className="text-[12px] font-medium text-slate-500">Shipping Markup Factor</label>
+                                            <label className="text-[12px] font-medium text-slate-500">Shipping Markup (%)</label>
                                             <div className="relative">
                                                 <input 
-                                                    type="number" step="0.01"
-                                                    value={shippingMarkup}
-                                                    onChange={(e) => setShippingMarkup(parseFloat(e.target.value))}
+                                                    type="number" step="0.1"
+                                                    value={Math.round((shippingMarkup - 1) * 100 * 10) / 10}
+                                                    onChange={(e) => setShippingMarkup(1 + parseFloat(e.target.value || "0") / 100)}
                                                     className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
                                                 />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">x Factor</span>
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
                                             </div>
-                                            <p className="text-[10px] text-slate-400 mt-1 italic">Applied to the base shipping cost provided by logistics companies.</p>
+                                            <p className="text-[10px] text-slate-400 mt-1 italic">Additional percentage added to base shipping costs.</p>
                                         </div>
                                     </div>
                                 </SettingCard>
