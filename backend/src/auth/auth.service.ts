@@ -75,9 +75,10 @@ export class AuthService {
         this.logger.log(`[AUTH] Validating user: ${email} from IP: ${ip}`);
 
         // ── Run lockout check and user fetch in parallel to save ~500ms ────────
+        const normalizedEmail = email.toLowerCase();
         const [locked, user] = await Promise.all([
-            this.isAccountLocked(email),
-            this.prisma.user.findUnique({ where: { email } }),
+            this.isAccountLocked(normalizedEmail),
+            this.prisma.user.findUnique({ where: { email: normalizedEmail } }),
         ]);
         this.logger.debug(`[AUTH] Parallel lockout+fetch took: ${Date.now() - startTime}ms`);
 
@@ -139,7 +140,8 @@ export class AuthService {
     async register(data: any) {
         this.logger.log(`[AUTH] Registration attempt for email: ${data.email}, role: ${data.role}`);
         
-        const existing = await this.prisma.user.findUnique({ where: { email: data.email } });
+        const normalizedEmail = data.email.toLowerCase();
+        const existing = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
         if (existing) {
             console.warn(`[AUTH] Registration failed: User ${data.email} already exists.`);
             throw new UnauthorizedException('User already exists');
@@ -148,14 +150,15 @@ export class AuthService {
         const hashedPassword = await bcrypt.hash(data.password, 10);
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
-        // All users now activate immediately as requested by the user, bypassing approval.
-        const status = 'ACTIVE';
+        const isInvited = !!data.inviteToken;
+        // User's request: "Approved if we did invite him", otherwise "appears to admin to do approve".
+        const status = isInvited ? 'ACTIVE' : 'PENDING_APPROVAL';
 
         try {
-            this.logger.log(`[AUTH] Attempting database creation for ${data.email}`);
+            this.logger.log(`[AUTH] Attempting database creation for ${data.email} with status ${status}`);
             const user = await this.prisma.user.create({
                 data: {
-                    email: data.email,
+                    email: normalizedEmail,
                     password: hashedPassword,
                     name: data.name,
                     phone: data.phone,
@@ -178,7 +181,7 @@ export class AuthService {
 
             this.logger.log(`[AUTH] User created successfully: ${user.id} (${user.email})`);
 
-            // Generate tokens for auto-login
+            // Generate tokens for auto-login (Only useful if status is ACTIVE)
             const tokens = await this.generateTokens(user as any);
 
             (async () => {
@@ -188,8 +191,10 @@ export class AuthService {
                     // 1. Send Registration Confirmation Email
                     await this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, data.locale);
                     
-                    // 2. Send Welcome Email
-                    await this.emailService.sendWelcomeEmail(user.email, user.name, user.role);
+                    // 2. Send Welcome Email (if active)
+                    if (status === 'ACTIVE') {
+                        await this.emailService.sendWelcomeEmail(user.email, user.name, user.role);
+                    }
 
                     // 3. Send Admin Alert Email
                     await this.emailService.sendAdminSignupAlert({
@@ -202,8 +207,8 @@ export class AuthService {
                     
                     // 4. Notify Admins about the new registration
                     await this.notificationsService.notifyAdmins(
-                        'New Registration',
-                        `${user.name} (${user.companyName}) has registered as a ${data.role} and is now active.`,
+                        status === 'ACTIVE' ? 'New Registration (Auto-Approved)' : 'New Registration Pending Approval',
+                        `${user.name} (${user.companyName}) has registered as a ${data.role}${status === 'ACTIVE' ? ' and is now active.' : ' and is waiting for your approval.'}`,
                         'INFO',
                         { userId: user.id }
                     ).catch(() => {});
@@ -220,9 +225,10 @@ export class AuthService {
             } = user;
 
             return { 
-                ...tokens,
+                ...(status === 'ACTIVE' ? tokens : {}),
                 user: safeUser,
-                isInvited 
+                isInvited,
+                pendingApproval: status === 'PENDING_APPROVAL'
             };
         } catch (error) {
             this.logger.error('[AUTH] Registration database error:', error);

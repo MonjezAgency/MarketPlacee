@@ -377,113 +377,187 @@ export default function SupplierProductsPage() {
                 </div>
             </div>
 
-            {/* Products Grid */}
+            {/* Products List (Table on Desktop, Cards on Mobile) */}
             {isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {[1, 2, 3].map(i => (
-                        <div key={i} className="h-64 bg-card rounded-3xl border border-border/50 animate-pulse" />
+                <div className="space-y-4">
+                    {[1, 2, 3, 4, 5].map(i => (
+                        <div key={i} className="h-20 bg-card rounded-2xl border border-border/50 animate-pulse" />
                     ))}
                 </div>
             ) : filteredProducts.length > 0 ? (
-                <div className="space-y-8">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="space-y-6">
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block bg-card border border-border/50 rounded-[32px] overflow-hidden shadow-sm">
+                        <div className="overflow-x-auto scrollbar-hide">
+                            <table className="w-full text-left border-collapse">
+                                <thead className="bg-muted/30 border-b border-border/50">
+                                    <tr className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
+                                        <th className="px-8 py-6 w-12 text-center">
+                                            <input 
+                                                type="checkbox" 
+                                                checked={selectedProducts.size === filteredProducts.length && filteredProducts.length > 0}
+                                                onChange={handleSelectAll}
+                                                className="w-5 h-5 rounded border-muted-foreground/30 text-primary focus:ring-primary/20"
+                                            />
+                                        </th>
+                                        <th className="px-6 py-6">{locale === 'ar' ? 'المنتج' : 'Product'}</th>
+                                        <th className="px-6 py-6">{locale === 'ar' ? 'التصنيف' : 'Category'}</th>
+                                        <th className="px-6 py-6">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
+                                        <th className="px-6 py-6">{locale === 'ar' ? 'السعر' : 'Price'}</th>
+                                        <th className="px-6 py-6">{locale === 'ar' ? 'المخزون' : 'Stock'}</th>
+                                        <th className="px-8 py-6 text-end">{locale === 'ar' ? 'الإجراءات' : 'Actions'}</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/30">
+                                    <AnimatePresence mode="popLayout">
+                                        {paginatedProducts.map((product) => (
+                                            <motion.tr
+                                                key={product.id}
+                                                layout
+                                                initial={{ opacity: 0 }}
+                                                animate={{ opacity: 1 }}
+                                                exit={{ opacity: 0 }}
+                                                className={cn(
+                                                    "group hover:bg-muted/20 transition-all cursor-default",
+                                                    selectedProducts.has(product.id) && "bg-primary/[0.03]"
+                                                )}
+                                            >
+                                                <td className="px-8 py-5 text-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={selectedProducts.has(product.id)}
+                                                        onChange={() => toggleProductSelection(product.id)}
+                                                        className="w-5 h-5 rounded border-muted-foreground/30 text-primary focus:ring-primary/20 cursor-pointer"
+                                                    />
+                                                </td>
+                                                <td className="px-6 py-5">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className="w-12 h-12 rounded-xl bg-muted border border-border/50 overflow-hidden flex-shrink-0 flex items-center justify-center p-1">
+                                                            {product.images?.[0] ? (
+                                                                <img
+                                                                    src={product.images[0]}
+                                                                    alt={product.name}
+                                                                    className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
+                                                                />
+                                                            ) : (
+                                                                <Camera size={18} className="text-muted-foreground/30" />
+                                                            )}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="font-black text-foreground text-sm line-clamp-1">{product.name}</p>
+                                                            <p className="text-[10px] font-medium text-muted-foreground mt-0.5 truncate max-w-[150px]">ID: {product.id.slice(0,8)}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-5">
+                                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">{product.category}</span>
+                                                </td>
+                                                <td className="px-6 py-5">
+                                                    <div className={cn(
+                                                        "inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-[10px] font-black",
+                                                        getStatusColor(product.status)
+                                                    )}>
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                                                        {product.status?.toUpperCase() || 'UNKNOWN'}
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-5">
+                                                    <p className="text-sm font-black text-foreground">€{(product.basePrice ?? product.price).toFixed(2)}</p>
+                                                </td>
+                                                <td className="px-6 py-5">
+                                                    <div className="space-y-1">
+                                                        <p className={cn("text-sm font-black", (product.stock ?? 0) < 10 ? "text-destructive" : "text-foreground")}>
+                                                            {product.stock ?? 0}
+                                                        </p>
+                                                        <p className="text-[9px] font-bold text-muted-foreground uppercase">{product.unit || 'units'}</p>
+                                                    </div>
+                                                </td>
+                                                <td className="px-8 py-5 text-end">
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button
+                                                            onClick={() => { setEditingProduct(product); setIsEditorOpen(true); }}
+                                                            className="w-9 h-9 rounded-lg bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all flex items-center justify-center"
+                                                            title="Edit"
+                                                        >
+                                                            <Edit2 size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleQuickBoost(product.id, product.name)}
+                                                            className="w-9 h-9 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-white transition-all flex items-center justify-center shadow-lg shadow-primary/5"
+                                                            title="Boost"
+                                                        >
+                                                            <Zap size={16} />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDeleteProduct(product.id, product.name)}
+                                                            className="w-9 h-9 rounded-lg bg-muted hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-all flex items-center justify-center"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </motion.tr>
+                                        ))}
+                                    </AnimatePresence>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Mobile Card View */}
+                    <div className="grid grid-cols-1 gap-4 md:hidden">
                         <AnimatePresence mode="popLayout">
                             {paginatedProducts.map((product) => (
                                 <motion.div
-                                key={product.id}
-                                layout
-                                initial={{ opacity: 0, scale: 0.9 }}
-                                animate={{ opacity: 1, scale: 1 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                className={cn(
-                                    "bg-card border border-border/50 rounded-3xl overflow-hidden group transition-all flex flex-col relative",
-                                    selectedProducts.has(product.id) ? "ring-2 ring-primary border-primary hover:border-primary" : "hover:border-primary/30"
-                                )}
-                            >
-                                <button
-                                    onClick={() => toggleProductSelection(product.id)}
-                                    className="absolute top-4 end-4 z-20 w-8 h-8 rounded-full bg-background/80 backdrop-blur-md border border-border/50 flex items-center justify-center shadow-lg transition-transform hover:scale-110"
-                                >
-                                    <div className={cn(
-                                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors",
-                                        selectedProducts.has(product.id)
-                                            ? "bg-primary border-primary text-primary-foreground"
-                                            : "border-muted-foreground/30 hover:border-primary/50"
-                                    )}>
-                                        {selectedProducts.has(product.id) && <CheckCircle2 size={12} />}
-                                    </div>
-                                </button>
-                                <div className="aspect-[4/3] relative bg-muted flex items-center justify-center overflow-hidden">
-                                    {product.images?.[0] ? (
-                                        <img
-                                            src={product.images[0]}
-                                            alt={product.name}
-                                            className="w-full h-full object-contain p-4 group-hover:scale-110 transition-transform duration-500"
-                                        />
-                                    ) : (
-                                        <div className="flex flex-col items-center gap-2 opacity-20">
-                                            <Camera size={32} />
-                                            <span className="text-[10px] font-black uppercase tracking-tighter">No Preview</span>
-                                        </div>
+                                    key={product.id}
+                                    layout
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.95 }}
+                                    className={cn(
+                                        "bg-card border border-border/50 rounded-2xl p-4 flex gap-4 relative",
+                                        selectedProducts.has(product.id) && "ring-2 ring-primary border-primary"
                                     )}
-                                    <div className={cn(
-                                        "absolute top-4 start-4 h-6 px-3 rounded-full border text-[10px] font-black flex items-center gap-1.5 backdrop-blur-md",
-                                        getStatusColor(product.status)
-                                    )}>
-                                        {product.status?.toUpperCase() || 'UNKNOWN'}
+                                >
+                                    <div className="w-20 h-20 rounded-xl bg-muted border border-border/50 overflow-hidden flex-shrink-0 flex items-center justify-center p-2">
+                                        {product.images?.[0] ? (
+                                            <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain" />
+                                        ) : (
+                                            <Camera size={24} className="text-muted-foreground/20" />
+                                        )}
                                     </div>
-                                </div>
-
-                                <div className="p-6 space-y-4 flex-1 flex flex-col">
-                                    <div className="space-y-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-primary">{product.category}</p>
-                                        <h3 className="font-black text-foreground leading-tight line-clamp-1">{product.name}</h3>
-                                        <p className="text-xs text-muted-foreground font-medium line-clamp-2 min-h-[32px]">{product.description}</p>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-border/10 mt-auto">
-                                        <div className="space-y-0.5">
-                                            <p className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground flex items-center gap-1">
-                                                <DollarSign size={8} /> Price
-                                            </p>
-                                            <p className="text-base font-black text-foreground">€{(product.basePrice ?? product.price).toFixed(2)}</p>
+                                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
+                                        <div>
+                                            <div className="flex items-start justify-between gap-2">
+                                                <h3 className="font-black text-foreground text-sm line-clamp-1">{product.name}</h3>
+                                                <input 
+                                                    type="checkbox" 
+                                                    checked={selectedProducts.has(product.id)}
+                                                    onChange={() => toggleProductSelection(product.id)}
+                                                    className="w-5 h-5 rounded border-muted-foreground/30 text-primary focus:ring-primary/20"
+                                                />
+                                            </div>
+                                            <p className="text-[10px] font-bold text-primary/70 uppercase tracking-widest mt-0.5">{product.category}</p>
                                         </div>
-                                        <div className="space-y-0.5">
-                                            <p className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground flex items-center gap-1">
-                                                <Archive size={8} /> Stock
-                                            </p>
-                                            <p className={cn("text-base font-black", (product.stock ?? 0) < 10 ? "text-destructive" : "text-foreground")}>
-                                                {product.stock ?? 0} <span className="text-[10px]">{product.unit || 'units'}</span>
-                                            </p>
+                                        <div className="flex items-center justify-between mt-2">
+                                            <p className="font-black text-foreground">€{(product.basePrice ?? product.price).toFixed(2)}</p>
+                                            <div className={cn(
+                                                "h-6 px-2.5 rounded-full border text-[9px] font-black flex items-center gap-1",
+                                                getStatusColor(product.status)
+                                            )}>
+                                                {product.status?.toUpperCase()}
+                                            </div>
                                         </div>
                                     </div>
-
-                                    <div className="flex gap-2 pt-2">
-                                        <button
-                                            onClick={() => { setEditingProduct(product); setIsEditorOpen(true); }}
-                                            className="flex-1 h-10 bg-muted hover:bg-muted/80 text-foreground rounded-xl flex items-center justify-center gap-2 transition-colors text-xs font-bold"
-                                        >
-                                            <Edit2 size={14} /> Edit
-                                        </button>
-                                        <button
-                                            onClick={() => handleQuickBoost(product.id, product.name)}
-                                            className="w-10 h-10 bg-primary/10 hover:bg-primary text-primary hover:text-white rounded-xl flex items-center justify-center transition-all shadow-lg shadow-primary/5 group/boost"
-                                            title="Quick Boost"
-                                        >
-                                            <Zap size={16} className="group-hover/boost:scale-125 transition-transform" />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDeleteProduct(product.id, product.name)}
-                                            className="w-10 h-10 bg-muted hover:bg-destructive/10 text-muted-foreground hover:text-destructive rounded-xl flex items-center justify-center transition-all"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
+                                    <div className="absolute bottom-4 end-4 flex gap-2">
+                                        <button onClick={() => { setEditingProduct(product); setIsEditorOpen(true); }} className="p-2 text-muted-foreground hover:text-primary"><Edit2 size={16} /></button>
+                                        <button onClick={() => handleDeleteProduct(product.id, product.name)} className="p-2 text-muted-foreground hover:text-destructive"><Trash2 size={16} /></button>
                                     </div>
-                                </div>
-                            </motion.div>
-                        ))}
-                    </AnimatePresence>
-                </div>
+                                </motion.div>
+                            ))}
+                        </AnimatePresence>
+                    </div>
 
                     {/* Pagination Controls */}
                     {totalPages > 1 && (

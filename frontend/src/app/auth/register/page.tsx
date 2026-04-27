@@ -150,14 +150,20 @@ function RegisterForm() {
                 setLoading(false);
                 return;
             }
+            const result = success as any;
             setIsSuccess(true);
             setLoading(false);
 
-            // Redirect to dashboard after 1.5 seconds for all users
+            // If user needs admin approval, don't redirect, let them see the success screen
+            if (result && result.pendingApproval) {
+                return;
+            }
+
+            // For auto-approved users, redirect after a short delay
             setTimeout(() => {
                 const dashboardPath = form.role === 'supplier' ? '/supplier' : '/';
                 router.push(dashboardPath);
-            }, 1500);
+            }, 2000);
         };
         submitRegister();
     };

@@ -159,7 +159,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     window.dispatchEvent(new Event('bev-auth-changed'));
                 }
             }
-            return true;
+            return result;
         } catch (err) {
             console.error("Registration failed:", err);
             return 'Server is currently unreachable. Please try again later.';
