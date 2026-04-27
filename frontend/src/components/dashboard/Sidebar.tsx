@@ -41,11 +41,11 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
     ];
 
     const BUYER_ITEMS: SidebarItem[] = [
-        { name: t('sidebar', 'myDashboard'), icon: LayoutDashboard, href: '/dashboard/buyer' },
-        { name: t('sidebar', 'ordersHistory'), icon: History, href: '/dashboard/buyer/orders' },
-        { name: t('sidebar', 'notifications'), icon: Bell, href: '/dashboard/buyer/notifications' },
+        { name: t('sidebar', 'myDashboard'), icon: LayoutDashboard, href: '/dashboard/customer' },
+        { name: t('sidebar', 'ordersHistory'), icon: History, href: '/dashboard/customer/orders' },
+        { name: t('sidebar', 'notifications'), icon: Bell, href: '/dashboard/customer/notifications' },
         { name: t('sidebar', 'support'), icon: MessageCircle, href: '/dashboard/support' },
-        { name: t('sidebar', 'settings'), icon: Settings, href: '/dashboard/buyer/settings' },
+        { name: t('sidebar', 'settings'), icon: Settings, href: '/dashboard/customer/settings' },
     ];
 
     const ADMIN_ITEMS: SidebarItem[] = [

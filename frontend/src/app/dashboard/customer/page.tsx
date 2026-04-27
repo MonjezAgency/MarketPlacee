@@ -114,64 +114,19 @@ export default function CustomerDashboard() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F7F9FC] font-inter text-[#1A1F36] selection:bg-[#1ABC9C]/20">
-            {/* Header Section (72px height) */}
-            <header className="h-[72px] bg-white border-b border-[#E6EAF0] sticky top-0 z-[100] px-8 flex items-center justify-between">
-                <div className="flex items-center gap-8">
-                    <Link href="/" className="flex items-center gap-2 group shrink-0">
-                        <div className="w-8 h-8 rounded-lg overflow-hidden flex items-center justify-center bg-white shadow-sm border border-[#E6EAF0]">
-                            <img src="/icon.png" alt="Atlantis" className="w-full h-full object-cover" />
-                        </div>
-                        <span className="font-heading font-black text-xl tracking-tight uppercase">
-                            <span className="text-[#0B1F3A]">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
-                        </span>
-                    </Link>
+    return (
+        <div className="space-y-8 animate-in fade-in duration-700">
+            {/* Header Section */}
+            <div>
+                <h1 className="text-3xl font-black text-[#0B1F3A] tracking-tight">
+                    Welcome back, {user?.name?.split(' ')[0] || 'Partner'}! 👋
+                </h1>
+                <p className="text-sm text-[#6B7280] mt-2 font-medium">
+                    Track your wholesale orders and curated recommendations in real-time.
+                </p>
+            </div>
 
-                    {/* Search Bar */}
-                    <div className="relative hidden md:block">
-                        <Search className="absolute start-4 top-1/2 -translate-y-1/2 text-[#6B7280]" size={16} />
-                        <input 
-                            type="text" 
-                            placeholder="Search products, orders, or suppliers..."
-                            className="w-[420px] h-10 bg-[#F7F9FC] border border-[#E6EAF0] rounded-[10px] ps-11 pe-4 text-sm font-medium focus:border-[#1ABC9C] focus:bg-white transition-all outline-none"
-                        />
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    <button className="w-10 h-10 rounded-[10px] border border-[#E6EAF0] flex items-center justify-center text-[#1A1F36] hover:bg-[#F7F9FC] transition-all relative">
-                        <Bell size={18} />
-                        <span className="absolute top-2 right-2 w-2 h-2 bg-[#1ABC9C] rounded-full border-2 border-white"></span>
-                    </button>
-                    <Link href="/cart" className="w-10 h-10 rounded-[10px] border border-[#E6EAF0] flex items-center justify-center text-[#1A1F36] hover:bg-[#F7F9FC] transition-all relative">
-                        <ShoppingCart size={18} />
-                        {cartCount > 0 && (
-                            <span className="absolute -top-1 -right-1 bg-[#1ABC9C] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
-                                {cartCount}
-                            </span>
-                        )}
-                    </Link>
-                    <div className="w-px h-6 bg-[#E6EAF0] mx-2" />
-                    <button 
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 px-4 h-10 rounded-[10px] text-red-500 hover:bg-red-50 font-bold text-xs uppercase tracking-widest transition-all"
-                    >
-                        <LogOut size={16} />
-                        <span>Sign Out</span>
-                    </button>
-                </div>
-            </header>
-
-            <main className="max-w-[1280px] mx-auto px-8 py-8 space-y-8">
-                {/* Welcome Section */}
-                <div>
-                    <h1 className="text-[28px] font-bold text-[#1A1F36] leading-tight">
-                        Welcome back, {user?.name?.split(' ')[0] || 'Partner'}! 👋
-                    </h1>
-                    <p className="text-sm text-[#6B7280] mt-2 font-medium">
-                        Track your wholesale orders and curated recommendations in real-time.
-                    </p>
-                </div>
+            <main className="space-y-8">
 
                 {/* Active Shipment Card */}
                 <section className="bg-white rounded-[16px] border border-[#E6EAF0] shadow-sm overflow-hidden">

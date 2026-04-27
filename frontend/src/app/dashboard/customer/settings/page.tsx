@@ -42,23 +42,15 @@ export default function SettingsPage() {
     ];
 
     return (
-        <div className="min-h-screen bg-[#F7F9FC] pb-20">
-            {/* Header Area */}
-            <div className="bg-white border-b border-[#E6EAF0] sticky top-0 z-50">
-                <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Link href="/dashboard/customer" className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
-                            <ArrowLeft size={20} />
-                        </Link>
-                        <div>
-                            <h1 className="text-xl font-black text-[#0B1F3A] tracking-tight">Account Settings</h1>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Manage your global business identity</p>
-                        </div>
-                    </div>
-                </div>
+    return (
+        <div className="space-y-8 animate-in fade-in duration-700">
+            {/* Header Section */}
+            <div>
+                <h1 className="text-3xl font-black text-[#0B1F3A] tracking-tight">Account Settings</h1>
+                <p className="text-sm text-slate-500 font-medium mt-1">Manage your global business identity and preferences.</p>
             </div>
 
-            <main className="max-w-5xl mx-auto px-6 py-10">
+            <main className="space-y-8">
                 <div className="flex flex-col lg:flex-row gap-8">
                     {/* Sidebar Tabs */}
                     <aside className="w-full lg:w-72 space-y-2">

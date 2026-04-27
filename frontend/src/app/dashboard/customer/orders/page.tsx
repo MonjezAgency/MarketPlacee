@@ -78,23 +78,14 @@ export default function OrdersPage() {
     );
 
     return (
-        <div className="min-h-screen bg-[#F7F9FC] pb-20">
-            {/* Header Area */}
-            <div className="bg-white border-b border-[#E6EAF0] sticky top-0 z-50">
-                <div className="max-w-5xl mx-auto px-6 h-20 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Link href="/dashboard/customer" className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-50 transition-all">
-                            <ArrowLeft size={20} />
-                        </Link>
-                        <div>
-                            <h1 className="text-xl font-black text-[#0B1F3A] tracking-tight">Order History</h1>
-                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Manage your wholesale acquisitions</p>
-                        </div>
-                    </div>
-                </div>
+        <div className="space-y-8 animate-in fade-in duration-700">
+            {/* Header Section */}
+            <div>
+                <h1 className="text-3xl font-black text-[#0B1F3A] tracking-tight">Order History</h1>
+                <p className="text-sm text-slate-500 font-medium mt-1">Manage and track your global wholesale acquisitions.</p>
             </div>
 
-            <main className="max-w-5xl mx-auto px-6 py-10 space-y-8">
+            <main className="space-y-8">
                 {/* Search & Filter Bar */}
                 <div className="flex flex-col md:flex-row gap-4 items-center">
                     <div className="relative flex-1 group">
@@ -134,30 +125,34 @@ export default function OrdersPage() {
                                         </div>
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-3">
-                                                <h3 className="text-base font-black text-[#0B1F3A]">Order #AT-{order.id.slice(-8).toUpperCase()}</h3>
-                                                <div className={cn(
-                                                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5",
-                                                    getStatusStyles(order.status)
-                                                )}>
-                                                    {getStatusIcon(order.status)}
-                                                    {order.status}
-                                                </div>
+                                                <h3 className="text-base font-black text-[#0B1F3A]">Order #AT-{(order?.id || '0000').slice(-8).toUpperCase()}</h3>
+                                                {order?.status && (
+                                                    <div className={cn(
+                                                        "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border flex items-center gap-1.5",
+                                                        getStatusStyles(order.status)
+                                                    )}>
+                                                        {getStatusIcon(order.status)}
+                                                        {order.status}
+                                                    </div>
+                                                )}
                                             </div>
-                                            <p className="text-xs text-slate-500 font-medium">Placed on {new Date(order.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                                            <p className="text-xs text-slate-500 font-medium">
+                                                Placed on {order?.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'Unknown Date'}
+                                            </p>
                                             <div className="flex items-center gap-2 pt-2">
                                                 <div className="flex -space-x-2">
-                                                    {order.items.slice(0, 3).map((item, idx) => (
+                                                    {(order?.items || []).slice(0, 3).map((item, idx) => (
                                                         <div key={idx} className="w-8 h-8 rounded-lg border-2 border-white bg-slate-100 overflow-hidden shadow-sm">
-                                                            <img src={item.product?.images?.[0] || '/placeholder.png'} className="w-full h-full object-cover" />
+                                                            <img src={item.product?.images?.[0] || '/placeholder.png'} className="w-full h-full object-cover" alt="Product" />
                                                         </div>
                                                     ))}
-                                                    {order.items.length > 3 && (
+                                                    {(order?.items?.length || 0) > 3 && (
                                                         <div className="w-8 h-8 rounded-lg border-2 border-white bg-slate-900 text-white text-[8px] font-black flex items-center justify-center shadow-sm">
-                                                            +{order.items.length - 3}
+                                                            +{(order?.items?.length || 0) - 3}
                                                         </div>
                                                     )}
                                                 </div>
-                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider ml-2">{order.items.length} Product Items</span>
+                                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider ml-2">{(order?.items?.length || 0)} Product Items</span>
                                             </div>
                                         </div>
                                     </div>
@@ -165,7 +160,9 @@ export default function OrdersPage() {
                                     <div className="flex items-center justify-between md:flex-col md:items-end gap-2 border-t md:border-t-0 pt-6 md:pt-0">
                                         <div className="text-right">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Value</p>
-                                            <p className="text-2xl font-black text-[#0B1F3A]">${order.totalAmount.toLocaleString()}</p>
+                                            <p className="text-2xl font-black text-[#0B1F3A]">
+                                                ${(order?.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </p>
                                         </div>
                                         <Link 
                                             href={`/dashboard/customer/orders/${order.id}`}
