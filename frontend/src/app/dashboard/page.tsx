@@ -39,6 +39,8 @@ export default function DashboardIndex() {
             router.replace('/admin');
         } else if (role === 'SUPPLIER') {
             router.replace('/dashboard/supplier');
+        } else if (role === 'CUSTOMER' || role === 'BUYER') {
+            router.replace('/dashboard/customer');
         } else {
             router.replace('/');
         }

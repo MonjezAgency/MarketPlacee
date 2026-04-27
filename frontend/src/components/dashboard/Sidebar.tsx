@@ -142,7 +142,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
             <div className="p-6 flex items-center gap-4 border-b border-white/10 bg-white/[0.02]">
                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden border-2 border-white/10 group-hover/sidebar:scale-110 transition-transform">
                     <img 
-                        src="https://mgecljoxasstdfmlytov.supabase.co/storage/v1/object/public/marketplace-assets/logo_atlantis.png" 
+                        src="/icon.png" 
                         alt="Atlantis" 
                         className="w-full h-full object-contain p-1" 
                     />

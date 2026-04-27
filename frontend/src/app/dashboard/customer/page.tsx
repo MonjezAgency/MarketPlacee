@@ -7,7 +7,7 @@ import {
     Package, Truck, CheckCircle2, Clock,
     ChevronRight, ShoppingCart, Bell, Search,
     Loader2, LogOut, MapPin, Hash, Ship,
-    Star, ArrowRight, Menu, X
+    Star, ArrowRight, Menu, X, DollarSign
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { fetchProducts, apiFetch } from '@/lib/api';
@@ -126,6 +126,25 @@ export default function CustomerDashboard() {
             </div>
 
             <main className="space-y-8">
+                {/* Stats Overview */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    {[
+                        { label: 'Total Spending', value: `$${orders.reduce((sum, o) => sum + (o.status === 'DELIVERED' ? o.totalAmount : 0), 0).toLocaleString()}`, icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50' },
+                        { label: 'Active Orders', value: orders.filter(o => !['DELIVERED', 'CANCELLED'].includes(o.status)).length, icon: Package, color: 'text-teal-600', bg: 'bg-teal-50' },
+                        { label: 'Pending Delivery', value: orders.filter(o => o.status === 'SHIPPED').length, icon: Truck, color: 'text-amber-600', bg: 'bg-amber-50' },
+                        { label: 'Platform Alerts', value: '2 New', icon: Bell, color: 'text-purple-600', bg: 'bg-purple-50' }
+                    ].map((stat, i) => (
+                        <div key={i} className="bg-white p-6 rounded-2xl border border-[#E6EAF0] shadow-sm flex items-center gap-4 hover:shadow-md transition-all">
+                            <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", stat.bg, stat.color)}>
+                                <stat.icon size={24} />
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">{stat.label}</p>
+                                <p className="text-xl font-black text-[#0B1F3A]">{stat.value}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
 
                 {/* Active Shipment Card */}
                 <section className="bg-white rounded-[16px] border border-[#E6EAF0] shadow-sm overflow-hidden">
