@@ -18,7 +18,7 @@ export class AppConfigController {
     }
 
     @Post('markup')
-    async setMarkup(@Body() body: { piece: number; pallet: number; container: number }) {
+    async setMarkup(@Body() body: { piece: number; pallet: number; container: number; platformFee?: number; shippingMarkup?: number }) {
         await this.appConfigService.setMarkupPercentage(body);
         return { message: 'Markup percentages updated', data: body };
     }

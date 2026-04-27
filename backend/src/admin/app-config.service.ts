@@ -6,24 +6,30 @@ import { PrismaService } from '../common/prisma.service';
 export class AppConfigService {
     constructor(private prisma: PrismaService) { }
 
-    async getMarkupPercentage(): Promise<{ piece: number; pallet: number; container: number }> {
+    async getMarkupPercentage(): Promise<{ piece: number; pallet: number; container: number; platformFee: number; shippingMarkup: number }> {
         const pieceConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PIECE' } });
         const legacyConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE' } });
         const palletConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PALLET' } });
         const containerConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_CONTAINER' } });
+        const feeConfig = await this.prisma.appConfig.findUnique({ where: { key: 'PLATFORM_FEE_PERCENT' } });
+        const shipConfig = await this.prisma.appConfig.findUnique({ where: { key: 'SHIPPING_MARKUP' } });
 
         const piece = pieceConfig ? parseFloat(pieceConfig.value) : (legacyConfig ? parseFloat(legacyConfig.value) : 1.10);
         const pallet = palletConfig ? parseFloat(palletConfig.value) : 1.05;
         const container = containerConfig ? parseFloat(containerConfig.value) : 1.02;
+        const platformFee = feeConfig ? parseFloat(feeConfig.value) : (Number(process.env.PLATFORM_FEE_PERCENT) || 5);
+        const shippingMarkup = shipConfig ? parseFloat(shipConfig.value) : 1.10; // Default 10% on shipping
 
         return {
             piece: isNaN(piece) ? 1.10 : piece,
             pallet: isNaN(pallet) ? 1.05 : pallet,
             container: isNaN(container) ? 1.02 : container,
+            platformFee: isNaN(platformFee) ? 5 : platformFee,
+            shippingMarkup: isNaN(shippingMarkup) ? 1.10 : shippingMarkup,
         };
     }
 
-    async setMarkupPercentage(data: { piece: number; pallet: number; container: number }): Promise<any> {
+    async setMarkupPercentage(data: { piece: number; pallet: number; container: number; platformFee?: number; shippingMarkup?: number }): Promise<any> {
         await this.prisma.appConfig.upsert({
             where: { key: 'MARKUP_PERCENTAGE_PIECE' },
             create: { key: 'MARKUP_PERCENTAGE_PIECE', value: data.piece.toString() },
@@ -44,6 +50,20 @@ export class AppConfigService {
             create: { key: 'MARKUP_PERCENTAGE_CONTAINER', value: data.container.toString() },
             update: { value: data.container.toString() }
         });
+        if (data.platformFee !== undefined) {
+            await this.prisma.appConfig.upsert({
+                where: { key: 'PLATFORM_FEE_PERCENT' },
+                create: { key: 'PLATFORM_FEE_PERCENT', value: data.platformFee.toString() },
+                update: { value: data.platformFee.toString() }
+            });
+        }
+        if (data.shippingMarkup !== undefined) {
+            await this.prisma.appConfig.upsert({
+                where: { key: 'SHIPPING_MARKUP' },
+                create: { key: 'SHIPPING_MARKUP', value: data.shippingMarkup.toString() },
+                update: { value: data.shippingMarkup.toString() }
+            });
+        }
         return true;
     }
 

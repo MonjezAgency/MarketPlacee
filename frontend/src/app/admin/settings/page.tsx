@@ -107,6 +107,13 @@ export default function SettingsDashboard() {
     const [newPassword, setNewPassword] = React.useState('');
     const [confirmPassword, setConfirmPassword] = React.useState('');
     const [isUpdatingPassword, setIsUpdatingPassword] = React.useState(false);
+    
+    // Pricing & Markup States
+    const [markupPiece, setMarkupPiece] = React.useState(1.10);
+    const [markupPallet, setMarkupPallet] = React.useState(1.05);
+    const [markupContainer, setMarkupContainer] = React.useState(1.02);
+    const [platformFee, setPlatformFee] = React.useState(5);
+    const [shippingMarkup, setShippingMarkup] = React.useState(1.10);
 
     const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -128,6 +135,20 @@ export default function SettingsDashboard() {
                 }
             })
             .catch(err => console.error('Failed to fetch platform currency:', err));
+
+        // Fetch markup configs
+        apiFetch('/admin/config/markup')
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.markup) {
+                    setMarkupPiece(data.markup.piece);
+                    setMarkupPallet(data.markup.pallet);
+                    setMarkupContainer(data.markup.container);
+                    setPlatformFee(data.markup.platformFee);
+                    setShippingMarkup(data.markup.shippingMarkup);
+                }
+            })
+            .catch(err => console.error('Failed to fetch markup settings:', err));
     }, [user]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,6 +165,7 @@ export default function SettingsDashboard() {
 
     const navItems = [
         { id: 'General', icon: Globe },
+        { id: 'Pricing & Markup', icon: DollarSign },
         { id: 'Users & Roles', icon: Users },
         { id: 'Notifications', icon: Bell },
         { id: 'Security', icon: Shield },
@@ -173,7 +195,19 @@ export default function SettingsDashboard() {
                 body: JSON.stringify({ currency })
             });
 
-            if (res.ok) {
+            // Update Pricing & Markup configuration
+            const markupRes = await apiFetch('/admin/config/markup', {
+                method: 'POST',
+                body: JSON.stringify({
+                    piece: markupPiece,
+                    pallet: markupPallet,
+                    container: markupContainer,
+                    platformFee,
+                    shippingMarkup
+                })
+            });
+
+            if (res.ok && markupRes.ok) {
                 toast.success('Settings saved successfully');
                 // Trigger a global currency change event if the platform currency was updated
                 window.dispatchEvent(new Event('currency-changed'));
@@ -396,6 +430,94 @@ export default function SettingsDashboard() {
                                         </div>
                                     </div>
                                 </SettingCard>
+                            </SettingSection>
+                        )}
+
+                        {activeSection === 'Pricing & Markup' && (
+                            <SettingSection key="pricing" title="Global Pricing & Margin Control">
+                                <SettingCard title="Wholesale Unit Markup">
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[12px] font-medium text-slate-500">Piece/Carton Markup</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" step="0.01"
+                                                    value={markupPiece}
+                                                    onChange={(e) => setMarkupPiece(parseFloat(e.target.value))}
+                                                    className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
+                                                />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">x Factor</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400">Example: 1.10 = 10% markup</p>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[12px] font-medium text-slate-500">Pallet Markup</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" step="0.01"
+                                                    value={markupPallet}
+                                                    onChange={(e) => setMarkupPallet(parseFloat(e.target.value))}
+                                                    className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
+                                                />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">x Factor</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[12px] font-medium text-slate-500">Container Markup</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" step="0.01"
+                                                    value={markupContainer}
+                                                    onChange={(e) => setMarkupContainer(parseFloat(e.target.value))}
+                                                    className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
+                                                />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">x Factor</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </SettingCard>
+
+                                <SettingCard title="Platform Fees & Logistics">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-1.5 flex-1">
+                                            <label className="text-[12px] font-medium text-slate-500">Platform Commission (%)</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number"
+                                                    value={platformFee}
+                                                    onChange={(e) => setPlatformFee(parseFloat(e.target.value))}
+                                                    className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
+                                                />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">%</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 mt-1 italic">Percentage taken from total product value of approved orders.</p>
+                                        </div>
+                                        <div className="space-y-1.5 flex-1">
+                                            <label className="text-[12px] font-medium text-slate-500">Shipping Markup Factor</label>
+                                            <div className="relative">
+                                                <input 
+                                                    type="number" step="0.01"
+                                                    value={shippingMarkup}
+                                                    onChange={(e) => setShippingMarkup(parseFloat(e.target.value))}
+                                                    className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
+                                                />
+                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">x Factor</span>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400 mt-1 italic">Applied to the base shipping cost provided by logistics companies.</p>
+                                        </div>
+                                    </div>
+                                </SettingCard>
+
+                                <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl flex items-start gap-4">
+                                    <AlertCircle className="text-teal-600 shrink-0 mt-0.5" size={18} />
+                                    <div className="space-y-1">
+                                        <p className="text-sm font-bold text-teal-900">Financial Impact Alert</p>
+                                        <p className="text-xs text-teal-700 leading-relaxed">
+                                            Changes to these values will affect all **future** transactions and product approvals. 
+                                            Existing orders will retain the commission rates they were created with.
+                                        </p>
+                                    </div>
+                                </div>
                             </SettingSection>
                         )}
 
