@@ -39,8 +39,13 @@ export class AuthController {
     }
 
     @Post('register')
-    async register(@Body() registerDto: any) {
-        return this.authService.register(registerDto);
+    async register(@Body() registerDto: any, @Res({ passthrough: true }) res: any) {
+        const result = await this.authService.register(registerDto);
+        if (result && 'access_token' in result) {
+            res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
+            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+        }
+        return result;
     }
 
     @Post('forgot-password')

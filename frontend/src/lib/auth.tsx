@@ -149,8 +149,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
                 return errorMessage;
             }
-
-            // Since they are pending approval, we do NOT log them in automatically.
+            const result = await res.json();
+            
+            // Auto-login: If the backend returns user data, update the local state immediately
+            if (result && result.user) {
+                setUser(result.user);
+                if (typeof window !== 'undefined' && result.user.id) {
+                    sessionStorage.setItem('bev-uid', result.user.id);
+                    window.dispatchEvent(new Event('bev-auth-changed'));
+                }
+            }
             return true;
         } catch (err) {
             console.error("Registration failed:", err);

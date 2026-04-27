@@ -153,13 +153,11 @@ function RegisterForm() {
             setIsSuccess(true);
             setLoading(false);
 
-            // If invited user, redirect to dashboard after 2 seconds
-            if (inviteToken) {
-                setTimeout(() => {
-                    const dashboardPath = form.role === 'supplier' ? '/supplier' : '/';
-                    router.push(dashboardPath);
-                }, 2500);
-            }
+            // Redirect to dashboard after 1.5 seconds for all users
+            setTimeout(() => {
+                const dashboardPath = form.role === 'supplier' ? '/supplier' : '/';
+                router.push(dashboardPath);
+            }, 1500);
         };
         submitRegister();
     };

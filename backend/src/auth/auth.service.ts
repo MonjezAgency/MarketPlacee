@@ -148,10 +148,8 @@ export class AuthService {
         const hashedPassword = await bcrypt.hash(data.password, 10);
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
-        // If user is registering via invite link, we activate them immediately 
-        // as requested by the user, bypassing the manual approval queue.
-        const isInvited = !!data.inviteToken;
-        const status = (isInvited || data.status === 'ACTIVE') ? 'ACTIVE' : (data.status || 'PENDING_APPROVAL');
+        // All users now activate immediately as requested by the user, bypassing approval.
+        const status = 'ACTIVE';
 
         try {
             this.logger.log(`[AUTH] Attempting database creation for ${data.email}`);
@@ -172,76 +170,62 @@ export class AuthService {
                     swiftCode: data.swiftCode ? this.cryptoService.encrypt(data.swiftCode) : null,
                     role: data.role.toUpperCase(),
                     status,
-                    verificationToken: isInvited ? null : verificationToken,
-                    emailVerified: isInvited || data.status === 'ACTIVE',
-                    onboardingCompleted: true, // Email signup collects all business data in the form
+                    verificationToken: null,
+                    emailVerified: true,
+                    onboardingCompleted: true, 
                 },
             });
 
             this.logger.log(`[AUTH] User created successfully: ${user.id} (${user.email})`);
 
+            // Generate tokens for auto-login
+            const tokens = await this.generateTokens(user as any);
+
             (async () => {
                 try {
                     this.logger.log(`[AUTH] Background tasks started for ${user.email}`);
 
-                    // 1. Send Verification Email (if needed)
-                    if (user.verificationToken) {
-                        await this.emailService.sendVerificationEmail(user.email, user.verificationToken);
-                        this.logger.log(`[AUTH] Verification email sent to ${user.email}`);
-                    }
-
-                    // 2. Send Registration Confirmation Email
+                    // 1. Send Registration Confirmation Email
                     await this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, data.locale);
-                    this.logger.log(`[AUTH] Registration confirmation email sent to ${user.email}`);
+                    
+                    // 2. Send Welcome Email
+                    await this.emailService.sendWelcomeEmail(user.email, user.name, user.role);
 
-                    if (user.status === 'PENDING_APPROVAL') {
-                        // 3. Send Admin Alert Email
-                        await this.emailService.sendAdminSignupAlert({
-                            name: user.name || 'N/A',
-                            email: user.email,
-                            role: data.role,
-                            companyName: data.companyName,
-                            registeredAt: user.createdAt || new Date(),
-                        });
-                        this.logger.log(`[AUTH] Admin signup alert email sent for ${user.email}`);
-
-                        // 4. Create In-App Notifications for Admins
-                        await this.notificationsService.notifyAdmins(
-                            'New Registration Pending Approval',
-                            `${user.name} (${user.companyName}) has registered as a ${data.role} and is waiting for approval.`,
-                            'INFO',
-                            { userId: user.id }
-                        ).catch(() => {});
-                        this.logger.log(`[AUTH] In-app notifications created for admins regarding ${user.email}`);
-                    } else if (isInvited) {
-                        // For invited users, send welcome email immediately since they bypass approval
-                        await this.emailService.sendWelcomeEmail(user.email, user.name, user.role);
-                        this.logger.log(`[AUTH] Welcome email sent to invited user ${user.email}`);
-                    }
+                    // 3. Send Admin Alert Email
+                    await this.emailService.sendAdminSignupAlert({
+                        name: user.name || 'N/A',
+                        email: user.email,
+                        role: data.role,
+                        companyName: user.companyName,
+                        registeredAt: user.createdAt || new Date(),
+                    });
+                    
+                    // 4. Notify Admins about the new registration
+                    await this.notificationsService.notifyAdmins(
+                        'New Registration',
+                        `${user.name} (${user.companyName}) has registered as a ${data.role} and is now active.`,
+                        'INFO',
+                        { userId: user.id }
+                    ).catch(() => {});
                 } catch (error: any) {
                     this.logger.error(`[AUTH] Background tasks failed for ${user.email}: ${error.message}`);
-                    console.error('[AUTH] Task Error Stack:', error.stack);
                 }
             })();
 
-            if (user.status === 'ACTIVE') {
-                 // Background email sending for active users
-                 this.emailService.sendWelcomeEmail(user.email, user.name, user.role).catch((err: any) => {
-                     this.logger.error('[AUTH] Welcome email background error:', err.message);
-                 });
-            }
-
-            // Strict scrubbing before returning the newly registered user
+            // Strict scrubbing
             const {
                 password, iban, swiftCode, taxId, bankAddress, vatNumber,
                 verificationToken: vt, resetPasswordToken, resetPasswordExpires,
                 ...safeUser
             } = user;
 
-            return { ...safeUser, isInvited };
+            return { 
+                ...tokens,
+                user: safeUser,
+                isInvited 
+            };
         } catch (error) {
             this.logger.error('[AUTH] Registration database error:', error);
-            require('fs').appendFileSync('/tmp/auth_errors.log', `[${new Date().toISOString()}] Database error for ${data.email}: ${error.message}\n`);
             throw error;
         }
     }
@@ -387,7 +371,7 @@ export class AuthService {
         let user = await this.prisma.user.findUnique({ where: { email: data.email } });
 
         if (!user) {
-            // New user via Google — create with PENDING_APPROVAL (B2B platform requires admin review)
+            // New user via Google — activate immediately as requested
             const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
             user = await this.prisma.user.create({
                 data: {
@@ -396,40 +380,23 @@ export class AuthService {
                     password: randomPassword,
                     avatar: data.avatar,
                     role: 'CUSTOMER',
-                    status: 'PENDING_APPROVAL',
+                    status: 'ACTIVE',
                     emailVerified: true, // Google verified the email
-                    onboardingCompleted: false, // Must finish details flow
+                    onboardingCompleted: true, 
                 },
             });
 
-            // Non-blocking: Send registration email and notify admins
-            this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, 'en').catch((err) => {
-                this.logger.error('[AUTH] Google registration email failed:', err.message);
-            });
+            // Background notifications
+            this.emailService.sendWelcomeEmail(user.email, user.name, user.role).catch(() => {});
+            this.notificationsService.notifyAdmins(
+                'New Google Registration',
+                `${user.name} (${user.email}) signed up via Google and is now active.`,
+                'INFO',
+                { userId: user.id }
+            ).catch(() => {});
 
-            // Notify admins about new Google registration
-            const googleUser = user;
-            (async () => {
-                try {
-                    await this.emailService.sendAdminSignupAlert({
-                        name: googleUser.name || 'N/A',
-                        email: googleUser.email,
-                        role: 'CUSTOMER',
-                        registeredAt: googleUser.createdAt || new Date(),
-                    });
-                    // Notify admins about new Google registration
-                    await this.notificationsService.notifyAdmins(
-                        'New Google Registration Pending',
-                        `${googleUser.name} (${googleUser.email}) signed up via Google and needs approval.`,
-                        'INFO',
-                        { userId: googleUser.id, email: googleUser.email, role: 'CUSTOMER', provider: 'google' }
-                    ).catch(() => {});
-                } catch (err: any) {
-                    this.logger.error('[AUTH] Google reg admin notification failed:', err.message);
-                }
-            })();
-
-            return { pendingApproval: true, email: user.email, needsCompanyDetails: true };
+            const { password, ...safeUser } = user;
+            return this.login(safeUser);
         }
 
         if (user.status === 'BLOCKED' || user.status === 'REJECTED' || user.status === 'DELETED') {
