@@ -334,14 +334,22 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
                         animate={{ opacity: 1, scale: 1 }}
                         className="flex flex-col items-center gap-6 pt-8"
                     >
-                        <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl text-center">
-                            <h2 className="text-xl font-black text-white mb-2 uppercase tracking-tight">How can we help?</h2>
+                        <div className={cn(
+                            "backdrop-blur-2xl border rounded-[2.5rem] p-8 max-w-sm w-full shadow-2xl text-center",
+                            isLight ? "bg-white border-slate-100 shadow-slate-200/50" : "bg-white/5 border-white/10 shadow-black/20"
+                        )}>
+                            <h2 className={cn("text-xl font-black mb-2 uppercase tracking-tight", isLight ? "text-slate-900" : "text-white")}>How can we help?</h2>
                             <div className="flex flex-col gap-3 mt-8">
                                 {ISSUE_CATEGORIES.map((cat) => (
                                     <button
                                         key={cat.id}
                                         onClick={() => handleCategorySelect(cat)}
-                                        className="w-full text-center px-6 py-4 rounded-2xl bg-white/5 border border-white/5 hover:border-primary/50 hover:bg-primary/10 transition-all text-xs font-black text-white uppercase tracking-widest"
+                                        className={cn(
+                                            "w-full text-center px-6 py-4 rounded-2xl border transition-all text-xs font-black uppercase tracking-widest",
+                                            isLight 
+                                                ? "bg-slate-50 border-slate-100 text-slate-700 hover:border-teal-500/50 hover:bg-teal-50" 
+                                                : "bg-white/5 border-white/5 text-white hover:border-primary/50 hover:bg-primary/10"
+                                        )}
                                     >
                                         {cat.label}
                                     </button>

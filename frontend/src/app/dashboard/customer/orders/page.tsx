@@ -42,7 +42,9 @@ export default function OrdersPage() {
             const res = await apiFetch(`/orders/my-orders`);
             if (res.ok) {
                 const data = await res.json();
-                setOrders(data);
+                // Handle both direct array and paginated object { data: [...] }
+                const ordersList = Array.isArray(data) ? data : (data.data || []);
+                setOrders(ordersList);
             }
         } catch (_e) { /* offline */ }
         finally { setIsLoading(false); }
@@ -72,9 +74,9 @@ export default function OrdersPage() {
         }
     };
 
-    const filteredOrders = orders.filter(o => 
-        o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        o.status.toLowerCase().includes(searchQuery.toLowerCase())
+    const filteredOrders = (Array.isArray(orders) ? orders : []).filter(o => 
+        (o?.id || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (o?.status || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     return (

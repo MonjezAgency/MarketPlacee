@@ -241,6 +241,10 @@ export class ProductsService {
         if (filters?.sort === 'price_asc') orderBy = { price: 'asc' };
         else if (filters?.sort === 'price_desc') orderBy = { price: 'desc' };
         else if (filters?.sort === 'name_asc') orderBy = { name: 'asc' };
+        else if (filters?.sort === 'popular') orderBy = [
+            { rating: 'desc' },
+            { reviewsCount: 'desc' }
+        ];
         else if (filters?.sort === 'newest') orderBy = { createdAt: 'desc' };
 
         const page = Math.max(1, parseInt(filters?.page || '1', 10));

@@ -74,15 +74,17 @@ const CATEGORIES = [
 
 const BRANDS = [
     { name: 'Coca Cola', logo: '/Logos/cocacola.png' },
-    { name: 'Pepsi', logo: '/Logos/pepsi.png' },
-    { name: 'Lipton', logo: '/Logos/lipton.png' },
     { name: 'Red Bull', logo: '/Logos/redbull.png' },
+    { name: 'Starbucks', logo: '/Logos/starbucks.png' },
+    { name: 'Oreo', logo: '/Logos/oreo.png' },
     { name: 'Fanta', logo: '/Logos/fanta.png' },
     { name: 'Ferrero', logo: '/Logos/ferrero.png' },
     { name: 'AXE', logo: '/Logos/axe.png' },
-    { name: 'Lifebuoy', logo: '/Logos/lifebuoy.png' },
-    { name: 'Nestle', logo: '/Logos/nescafe.png' },
+    { name: 'Nutella', logo: '/Logos/nutella.png' },
     { name: 'Kinder', logo: '/Logos/kinder.png' },
+    { name: 'Twix', logo: '/Logos/twix.png' },
+    { name: 'Nescafe', logo: '/Logos/nescafe.png' },
+    { name: 'L\'Or', logo: '/Logos/lor.png' },
 ];
 
 const TOP_CAT_CARDS = [
@@ -326,7 +328,7 @@ export default function Home() {
     React.useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const res = await apiFetch('/products?limit=6&status=APPROVED');
+                const res = await apiFetch('/products?limit=6&status=APPROVED&sort=popular');
                 if (res.ok) {
                     const data = await res.json();
                     setProducts(data.data || []);
@@ -617,7 +619,7 @@ export default function Home() {
                 <section className="space-y-8">
                     <div className="flex items-center justify-between">
                         <h2 className="text-[20px] font-bold text-[#111827]">Popular Wholesale Products</h2>
-                        <Link href="/categories" className="text-[13px] font-bold text-[#2EC4B6] flex items-center gap-1 hover:underline">
+                        <Link href="/categories" className="text-[13px] font-bold text-[#2EC4B6] flex items-center gap-1 hover:underline no-underline">
                             View all products <ArrowRight size={14} />
                         </Link>
                     </div>

@@ -22,6 +22,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const { locale } = useLanguage();
 
     const [translatedName, setTranslatedName] = useState(product.name);
+    const isOutOfStock = product.inStock === false || (product.stock !== undefined && product.stock <= 0);
 
     useEffect(() => {
         const rawName = product.name?.trim() || '';
@@ -105,9 +106,9 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                     )}
                 </div>
 
-                {!product.inStock && (
-                    <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center">
-                        <span className="bg-foreground text-background px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-widest">Out of Stock</span>
+                {isOutOfStock && (
+                    <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10">
+                        <span className="bg-[#0B1F3A] text-white px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-widest">Out of Stock</span>
                     </div>
                 )}
             </div>
@@ -157,7 +158,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
                         <button
                             onClick={handleAddToCart}
-                            disabled={!product.inStock || isAdded}
+                            disabled={isOutOfStock || isAdded}
                             className={cn(
                                 "h-9 px-4 rounded-full flex items-center justify-center gap-2 transition-all duration-300 text-xs font-bold w-1/2",
                                 isAdded
