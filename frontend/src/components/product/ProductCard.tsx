@@ -12,6 +12,7 @@ import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { translateText } from '@/lib/translator';
+import { getDisplayCategory } from '@/lib/product-utils';
 
 export default function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
     const { currency } = useCurrency();

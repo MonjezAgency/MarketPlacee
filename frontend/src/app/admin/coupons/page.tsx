@@ -40,50 +40,30 @@ export default function AdminCouponsPage() {
     const loadCoupons = async () => {
         setIsLoading(true);
         try {
-            // In a real app: const res = await apiFetch('/coupons');
-            // Mocking data for high-end preview as requested
-            const mockData: Coupon[] = [
-                {
-                    id: '1',
-                    code: 'WELCOME20',
-                    type: 'PERCENTAGE',
-                    value: 20,
-                    usageCount: 142,
-                    usageLimit: 500,
-                    minOrderValue: 1000,
-                    startDate: '2024-01-01',
-                    endDate: '2024-12-31',
-                    status: 'ACTIVE',
-                    applyTo: 'ALL'
-                },
-                {
-                    id: '2',
-                    code: 'SUMMER_B2B',
-                    type: 'FIXED',
-                    value: 500,
-                    usageCount: 89,
-                    usageLimit: 200,
-                    minOrderValue: 5000,
-                    startDate: '2024-06-01',
-                    endDate: '2024-08-31',
-                    status: 'SCHEDULED',
-                    applyTo: 'CATEGORY'
-                },
-                {
-                    id: '3',
-                    code: 'EXPIRED10',
-                    type: 'PERCENTAGE',
-                    value: 10,
-                    usageCount: 500,
-                    usageLimit: 500,
-                    minOrderValue: 500,
-                    startDate: '2023-01-01',
-                    endDate: '2023-12-31',
-                    status: 'EXPIRED',
-                    applyTo: 'SKUS'
-                }
-            ];
-            setCoupons(mockData);
+            const res = await apiFetch('/coupons');
+            if (res.ok) {
+                const data = await res.json();
+                // Map backend Coupon to frontend Coupon interface
+                const mapped: Coupon[] = data.map((c: any) => {
+                    const isExpired = new Date(c.expirationDate) < new Date();
+                    let status: Coupon['status'] = c.isActive ? 'ACTIVE' : 'EXPIRED';
+                    if (isExpired) status = 'EXPIRED';
+                    
+                    return {
+                        id: c.id,
+                        code: c.code,
+                        type: 'PERCENTAGE', // Currently backend only supports percentage
+                        value: c.discountPercent,
+                        usageCount: 0, // Backend doesn't track usage count yet
+                        usageLimit: 0,
+                        startDate: c.createdAt,
+                        endDate: c.expirationDate,
+                        status: status,
+                        applyTo: 'ALL'
+                    };
+                });
+                setCoupons(mapped);
+            }
         } catch (err) {
             toast.error('Failed to load coupons');
         } finally {
@@ -98,21 +78,34 @@ export default function AdminCouponsPage() {
     const [applyTo, setApplyTo] = React.useState<'all' | 'category' | 'sku'>('all');
 
     // Real-time Action Handlers
-    const toggleStatus = (id: string) => {
-        setCoupons(prev => prev.map(c => {
-            if (c.id === id) {
-                const newStatus = c.status === 'ACTIVE' ? 'EXPIRED' : 'ACTIVE';
-                toast.success(`Coupon ${c.code} is now ${newStatus}`);
-                return { ...c, status: newStatus as any };
+    const toggleStatus = async (id: string) => {
+        try {
+            const res = await apiFetch(`/coupons/${id}/toggle`, { method: 'POST' });
+            if (res.ok) {
+                const updatedCoupon = await res.json();
+                toast.success(`Status updated for ${updatedCoupon.code}`);
+                loadCoupons();
+            } else {
+                toast.error('Failed to update status');
             }
-            return c;
-        }));
+        } catch (error) {
+            toast.error('Network error');
+        }
     };
 
-    const deleteCoupon = (id: string) => {
+    const deleteCoupon = async (id: string) => {
         if (!confirm('Are you sure you want to delete this coupon?')) return;
-        setCoupons(prev => prev.filter(c => c.id !== id));
-        toast.success('Coupon deleted successfully');
+        try {
+            const res = await apiFetch(`/coupons/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                toast.success('Coupon deleted successfully');
+                loadCoupons();
+            } else {
+                toast.error('Failed to delete coupon');
+            }
+        } catch (error) {
+            toast.error('Network error');
+        }
     };
 
     const filteredCoupons = coupons.filter(c => 

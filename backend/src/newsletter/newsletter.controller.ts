@@ -1,8 +1,8 @@
 import { Controller, Post, Get, Delete, Body, Param, UseGuards } from '@nestjs/common';
 import { NewsletterService } from './newsletter.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 
 @Controller('newsletter')
 export class NewsletterController {

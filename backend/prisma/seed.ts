@@ -6,49 +6,18 @@ const prisma = new PrismaClient();
 async function main() {
     console.log('🌱 Starting database seeding...');
 
-    // 1. Create/Update Admin User (7bd02025@gmail.com)
-    const adminEmail = 'Info@atlantisfmcg.com';
-    const adminPassword = 'Admin@123';
-    const existingAdmin = await prisma.user.findUnique({ where: { email: adminEmail } });
-
-    if (existingAdmin) {
-        await prisma.user.update({
-            where: { email: adminEmail },
-            data: {
-                role: 'ADMIN',
-                status: 'ACTIVE',
-                kycStatus: 'VERIFIED',
-                emailVerified: true,
-                onboardingCompleted: true,
-            },
-        });
-        console.log(`✅ Updated Admin: ${adminEmail}`);
-    } else {
-        const hashedAdminPassword = await bcrypt.hash(adminPassword, 10);
-        await prisma.user.create({
-            data: {
-                email: adminEmail,
-                name: 'Ali Dawara',
-                password: hashedAdminPassword,
-                role: 'ADMIN',
-                status: 'ACTIVE',
-                kycStatus: 'VERIFIED',
-                emailVerified: true,
-                onboardingCompleted: true,
-            },
-        });
-        console.log(`✅ Created Admin: ${adminEmail}`);
-    }
-
-    // 2. Create/Update Founder & CEO (Info@atlantisfmcg.com)
+    // 1. Create/Update Admin & Founder (Ali Dawara)
     const founderEmail = 'Info@atlantisfmcg.com';
-    const founderPassword = process.env.FOUNDER_PASSWORD || 'Atlantis@2025!';
+    const founderPassword = 'AliDawara@22';
     const existingFounder = await prisma.user.findUnique({ where: { email: founderEmail } });
 
     if (existingFounder) {
+        const hashedFounderPassword = await bcrypt.hash(founderPassword, 10);
         await prisma.user.update({
             where: { email: founderEmail },
             data: {
+                name: 'Ali Dawara',
+                password: hashedFounderPassword,
                 role: 'OWNER',
                 status: 'ACTIVE',
                 kycStatus: 'VERIFIED',
@@ -62,7 +31,7 @@ async function main() {
         await prisma.user.create({
             data: {
                 email: founderEmail,
-                name: 'Founder & CEO',
+                name: 'Ali Dawara',
                 password: hashedFounderPassword,
                 role: 'OWNER',
                 status: 'ACTIVE',

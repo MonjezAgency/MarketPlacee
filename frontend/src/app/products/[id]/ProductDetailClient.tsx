@@ -21,6 +21,7 @@ import ReviewSection from '@/components/product/ReviewSection';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { useWishlist } from '@/hooks/useWishlist';
+import { getDisplayCategory } from '@/lib/product-utils';
 
 
 export default function ProductDetailClient() {
@@ -161,7 +162,7 @@ export default function ProductDetailClient() {
     const breadcrumbs = [
         { label: 'Home', href: '/' },
         { label: 'Inventory', href: '/categories' },
-        { label: product.category || 'General', href: `/categories?category=${product.category}` },
+        { label: getDisplayCategory(product), href: `/categories?category=${encodeURIComponent(getDisplayCategory(product))}` },
         { label: product.name, href: '#' },
     ];
 
@@ -240,7 +241,7 @@ export default function ProductDetailClient() {
                         <div className="flex flex-col gap-6">
                             <div className="flex">
                                 <span className="text-[12px] font-bold text-[#14B8A6] bg-[#14B8A6]/5 px-4 py-1.5 rounded-full uppercase tracking-widest border border-[#14B8A6]/10">
-                                    {product.category || 'General Distribution'}
+                                    {getDisplayCategory(product)}
                                 </span>
                             </div>
 

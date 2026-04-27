@@ -52,4 +52,18 @@ export class CouponsService {
         if (new Date() > coupon.expirationDate) throw new BadRequestException('Coupon has expired');
         return { code: coupon.code, discountPercent: coupon.discountPercent };
     }
+
+    async toggleStatus(id: string) {
+        const coupon = await this.prisma.coupon.findUnique({ where: { id } });
+        if (!coupon) throw new NotFoundException('Coupon not found');
+
+        return this.prisma.coupon.update({
+            where: { id },
+            data: { isActive: !coupon.isActive }
+        });
+    }
+
+    async remove(id: string) {
+        return this.prisma.coupon.delete({ where: { id } });
+    }
 }

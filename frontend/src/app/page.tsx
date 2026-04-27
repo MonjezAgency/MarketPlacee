@@ -62,25 +62,25 @@ const TOP_VALUE_PROPS = [
 ];
 
 const CATEGORIES = [
+    { name: 'Beverages & Drinks', count: '0 products', icon: ShoppingCart },
+    { name: 'Food & Snacks', count: '0 products', icon: Store },
     { name: 'Electronics & Accessories', count: '0 products', icon: Monitor },
     { name: 'Industrial & Machinery', count: '0 products', icon: Factory },
     { name: 'Packaging & Materials', count: '0 products', icon: Box },
-    { name: 'Office & Stationery', count: '0 products', icon: FileText },
     { name: 'Home & Kitchen Supplies', count: '0 products', icon: HomeIcon },
     { name: 'Health & Personal Care', count: '0 products', icon: Stethoscope },
-    { name: 'Fashion & Textiles', count: '0 products', icon: Shirt },
     { name: 'Automotive & Parts', count: '0 products', icon: Car },
 ];
 
 const BRANDS = [
-    { name: 'Coca Cola', logo: '/Logos/Coca Cola.png' },
-    { name: 'Pepsi', logo: '/Logos/Pepsi.png' },
-    { name: 'Lipton', logo: '/Logos/Lipton.png' },
-    { name: 'Red Bull', logo: '/Logos/Red Bull.png' },
-    { name: 'Fanta', logo: '/Logos/Fanta.png' },
-    { name: 'Ferrero', logo: '/Logos/Ferrero Rocher.png' },
-    { name: 'AXE', logo: '/Logos/AXE.png' },
-    { name: 'Lifebuoy', logo: '/Logos/Lifebuoy.png' },
+    { name: 'Coca Cola', logo: '/Logos/cocacola.png' },
+    { name: 'Pepsi', logo: '/Logos/pepsi.png' },
+    { name: 'Lipton', logo: '/Logos/lipton.png' },
+    { name: 'Red Bull', logo: '/Logos/redbull.png' },
+    { name: 'Fanta', logo: '/Logos/fanta.png' },
+    { name: 'Ferrero', logo: '/Logos/ferrero.png' },
+    { name: 'AXE', logo: '/Logos/axe.png' },
+    { name: 'Lifebuoy', logo: '/Logos/lifebuoy.png' },
 ];
 
 const TOP_CAT_CARDS = [
@@ -327,7 +327,7 @@ export default function Home() {
                 const res = await apiFetch('/products?limit=6&status=APPROVED');
                 if (res.ok) {
                     const data = await res.json();
-                    setProducts(data.products || []);
+                    setProducts(data.data || []);
                 }
             } catch (err) {
                 console.error('Failed to fetch products:', err);

@@ -35,4 +35,18 @@ export class CouponsController {
     async findAll() {
         return this.couponsService.findAll();
     }
+
+    @Post(':id/toggle')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    async toggleStatus(@Param('id') id: string) {
+        return this.couponsService.toggleStatus(id);
+    }
+
+    @Delete(':id')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    async remove(@Param('id') id: string) {
+        return this.couponsService.remove(id);
+    }
 }

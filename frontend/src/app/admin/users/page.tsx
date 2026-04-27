@@ -453,12 +453,14 @@ export default function UserManagementPage() {
                                         >
                                             Reject
                                         </button>
-                                        <button 
-                                            onClick={() => handleAction(selectedUser.id, 'APPROVED')}
-                                            className="flex-[2] h-12 rounded-xl bg-[#22C55E] text-white text-sm font-bold shadow-lg shadow-[#22C55E]/20 hover:bg-[#1ea34d] transition-all active:scale-95"
-                                        >
-                                            Approve Access
-                                        </button>
+                                        {(selectedUser.status !== 'ACTIVE' && selectedUser.status !== 'APPROVED') && (
+                                            <button 
+                                                onClick={() => handleAction(selectedUser.id, 'APPROVED')}
+                                                className="flex-[2] h-12 rounded-xl bg-[#22C55E] text-white text-sm font-bold shadow-lg shadow-[#22C55E]/20 hover:bg-[#1ea34d] transition-all active:scale-95"
+                                            >
+                                                Approve Access
+                                            </button>
+                                        )}
                                     </div>
                                     <div className="flex gap-3">
                                         <button 

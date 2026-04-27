@@ -16,6 +16,43 @@ export class ProductsService {
         private notificationsService: NotificationsService,
     ) { }
 
+    private extractCategoryFromName(name: string, currentCategory?: string): string {
+        const unitKeywords = ['CARTON', 'PALLET', 'UNIT', 'CASE', 'BOX', 'PACK', 'KG', 'GRAM', 'LITER', 'PCS', 'PIECES', 'PIECE'];
+        const cat = currentCategory?.toUpperCase() || '';
+
+        // Only attempt to fix if category is missing, generic, or a unit
+        if (!cat || cat === 'GENERAL' || cat === 'OTHERS' || unitKeywords.includes(cat)) {
+            const n = name.toLowerCase();
+            
+            // Beverages
+            if (n.includes('pepsi') || n.includes('cola') || n.includes('fanta') || n.includes('sprite') || n.includes('soda')) return 'Soft Drinks';
+            if (n.includes('red bull') || n.includes('monster') || n.includes('energy drink') || n.includes('v-energy')) return 'Energy Drinks';
+            if (n.includes('water') || n.includes('evian') || n.includes('aquafina')) return 'Beverages';
+            if (n.includes('coffee') || n.includes('nescafe') || n.includes('tea') || n.includes('lipton')) return 'Coffee & Tea';
+            if (n.includes('juice') || n.includes('frootz')) return 'Juice & Nectars';
+            
+            // Personal Care & Beauty
+            if (n.includes('shampoo') || n.includes('conditioner') || n.includes('hair')) return 'Hair Care';
+            if (n.includes('cream') || n.includes('lotion') || n.includes('nivea') || n.includes('dove')) return 'Skincare';
+            if (n.includes('makeup') || n.includes('lipstick') || n.includes('mascara')) return 'Beauty & Makeup';
+            if (n.includes('perfume') || n.includes('fragrance') || n.includes('scent')) return 'Fragrances & Perfumes';
+            
+            // Snacks & Food
+            if (n.includes('chocolate') || n.includes('ferrero') || n.includes('nutella') || n.includes('kinder')) return 'Chocolates & Sweets';
+            if (n.includes('biscuit') || n.includes('cookie') || n.includes('oreo')) return 'Snacks & Biscuits';
+            if (n.includes('pasta') || n.includes('rice') || n.includes('flour')) return 'Pantry & Grains';
+            
+            // Home & Cleaning
+            if (n.includes('detergent') || n.includes('ariel') || n.includes('persil') || n.includes('laundry')) return 'Laundry & Detergents';
+            if (n.includes('soap') || n.includes('dettol') || n.includes('cleaning')) return 'Household & Cleaning';
+
+            // If it was a unit, return a better default
+            if (unitKeywords.includes(cat)) return 'General Distribution';
+        }
+
+        return currentCategory || 'General';
+    }
+
     async getAppConfigs() {
         return this.prisma.appConfig.findMany();
     }
@@ -103,8 +140,9 @@ export class ProductsService {
             adminNotes = adminNotes ? `${adminNotes} | ${msg}` : msg;
         }
 
-        // Auto-categorize if missing
-        let finalCategory = createProductDto.category;
+        // Auto-categorize if missing or incorrect (unit-based)
+        let finalCategory = this.extractCategoryFromName(createProductDto.name, createProductDto.category);
+        
         if (!skipAi && (!finalCategory || finalCategory.toLowerCase() === 'general' || finalCategory.toLowerCase() === 'others')) {
             let catList = options?.preFetchedCategories;
             if (!catList) {
@@ -406,7 +444,13 @@ export class ProductsService {
         const updateData: any = {};
         if (data.name !== undefined) updateData.name = data.name;
         if (data.description !== undefined) updateData.description = data.description;
-        if (data.category !== undefined) updateData.category = data.category;
+        
+        // Re-categorize if name or category is updated
+        if (data.category !== undefined || data.name !== undefined) {
+            const currentName = data.name !== undefined ? data.name : (await this.findOne(id))?.name;
+            const currentCategory = data.category !== undefined ? data.category : (await this.findOne(id))?.category;
+            updateData.category = this.extractCategoryFromName(currentName || '', currentCategory);
+        }
         if (data.stock !== undefined) updateData.stock = data.stock;
         if (data.images !== undefined) updateData.images = data.images;
         if (data.ean !== undefined) updateData.ean = data.ean;
@@ -516,28 +560,41 @@ export class ProductsService {
     }
 
     async fixupIncompleteProducts() {
-        const products = await this.prisma.product.findMany({
-            where: { status: ProductStatus.APPROVED }
-        });
+        const products = await this.prisma.product.findMany({});
 
         let count = 0;
+        let catFixCount = 0;
         for (const p of products) {
+            let needsUpdate = false;
+            const updateData: any = {};
+
             const hasRealImage = p.images?.some(img => img && img.trim() !== '');
             const hasName = p.name && p.name.trim() !== '';
             const hasDesc = p.description && p.description.trim() !== '';
 
-            if (!hasRealImage || !hasName || !hasDesc) {
-                await this.prisma.product.update({
-                    where: { id: p.id },
-                    data: {
-                        status: ProductStatus.PENDING,
-                        adminNotes: `(System Fix) Set to PENDING due to missing content.`
-                    }
-                });
+            if (p.status === ProductStatus.APPROVED && (!hasRealImage || !hasName || !hasDesc)) {
+                updateData.status = ProductStatus.PENDING;
+                updateData.adminNotes = `(System Fix) Set to PENDING due to missing content.`;
+                needsUpdate = true;
                 count++;
             }
+
+            // Fix categories
+            const newCat = this.extractCategoryFromName(p.name, p.category);
+            if (newCat !== p.category) {
+                updateData.category = newCat;
+                needsUpdate = true;
+                catFixCount++;
+            }
+
+            if (needsUpdate) {
+                await this.prisma.product.update({
+                    where: { id: p.id },
+                    data: updateData
+                });
+            }
         }
-        return { message: `Fixed ${count} products`, count };
+        return { message: `Fixed ${count} products content and ${catFixCount} categories`, count, catFixCount };
     }
 
     async search(query: string) {
