@@ -245,6 +245,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
     const [kycBlocked, setKycBlocked] = React.useState(false);
     const pathname = usePathname();
+    const isOwner = user?.role?.toUpperCase() === 'OWNER';
+    const isTeamMember = ['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'].includes(user?.role?.toUpperCase() || '') || isOwner;
 
     // Fetch Admin Notification Counts
     React.useEffect(() => {
@@ -296,9 +298,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ];
 
     // ... (keep role logic)
-    const isOwner = user?.role?.toUpperCase() === 'OWNER';
-    const isTeamMember = ['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS']
-        .includes((user?.role || '').toUpperCase()) || isOwner;
+
 
     // Role Guard: Only Admin/Team allowed in /admin
     React.useEffect(() => {
