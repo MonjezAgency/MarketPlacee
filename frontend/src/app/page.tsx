@@ -41,6 +41,8 @@ import { cn } from '@/lib/utils';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/layout/Footer';
 import { Marquee } from '@/components/ui/Marquee';
+import { apiFetch } from '@/lib/api';
+import ProductCard from '@/components/product/ProductCard';
 
 // SPEC COLORS:
 // Primary Teal: #14B8A6
@@ -635,27 +637,8 @@ export default function Home() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-6 gap-6">
-                            {products.map((prod) => (
-                                <Link 
-                                    key={prod.id} 
-                                    href={`/product/${prod.id}`}
-                                    className="group bg-white border border-[#E5E7EB] rounded-2xl p-4 hover:shadow-xl transition-all no-underline"
-                                >
-                                    <div className="aspect-square rounded-xl overflow-hidden bg-slate-50 mb-4">
-                                        <img 
-                                            src={prod.images?.[0] || 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=300&h=300&fit=crop'} 
-                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                                            alt={prod.name}
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <h3 className="text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-[#2EC4B6] transition-colors">{prod.name}</h3>
-                                        <div className="flex items-center justify-between pt-1">
-                                            <p className="text-sm font-black text-[#0B1F3A]">${prod.price || '0.00'}</p>
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">MOQ: {prod.moq || '1'}</p>
-                                        </div>
-                                    </div>
-                                </Link>
+                            {products.map((prod, idx) => (
+                                <ProductCard key={prod.id} product={prod} index={idx} />
                             ))}
                         </div>
                     )}

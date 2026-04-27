@@ -348,21 +348,21 @@ export class ExcelService {
     async generateOrdersExcel(orders: any[]): Promise<Buffer> {
         const data = orders.map(order => ({
             'Order ID': order.id,
-            'Date': order.date,
-            'Customer': order.customer,
-            'Supplier': order.supplier,
-            'Total Amount': order.total,
-            'Supplier Profit': order.supplierProfit,
-            'Admin Profit': order.adminProfit,
+            'Date': new Date(order.date).toLocaleDateString(),
             'Status': order.status,
+            'Customer Name': order.customer,
+            'Supplier Name': order.supplier,
+            'Total Amount': order.total,
+            'Supplier Share': order.supplierProfit || 0,
+            'Admin Commission': order.adminProfit || 0,
             'Shipping Company': order.shippingCompany || 'N/A',
             'Shipping Cost': order.shippingCost || 0,
-            'Items': order.items.map((i: any) => `${i.product} (x${i.quantity})`).join(', ')
+            'Order Items': order.items.map((i: any) => `${i.product} (x${i.quantity})`).join('; ')
         }));
 
         const worksheet = XLSX.utils.json_to_sheet(data);
         const workbook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Orders');
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Detailed Orders');
         
         return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     }
@@ -401,6 +401,19 @@ export class ExcelService {
         }));
         const txSheet = XLSX.utils.json_to_sheet(txData);
         XLSX.utils.book_append_sheet(workbook, txSheet, 'Transactions');
+
+        // 3. Full Details Sheet (Combined)
+        const fullDetailsData = [
+            ['Financial Statement Full Export'],
+            ['Total Platform Revenue', summary.totalRevenue],
+            ['Platform Gross Profit', summary.platformRevenue],
+            ['Supplier Net Payouts', summary.supplierRevenue],
+            [],
+            ['Transaction Details'],
+            ...txData.map(tx => Object.values(tx))
+        ];
+        const fullDetailsSheet = XLSX.utils.aoa_to_sheet(fullDetailsData);
+        XLSX.utils.book_append_sheet(workbook, fullDetailsSheet, 'Full Details');
 
         return XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
     }

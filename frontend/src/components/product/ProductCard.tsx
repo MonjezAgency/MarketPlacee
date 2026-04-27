@@ -74,9 +74,9 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             className="group bg-card text-card-foreground rounded-lg border border-border/60 hover:shadow-lg transition-shadow duration-300 flex flex-col h-full overflow-hidden"
         >
             <div className="relative p-4 flex justify-center items-center h-[200px] border-b border-border/30 bg-white">
-                {product.image && product.image.length > 5 ? (
+                { (product.image || (product.images && product.images.length > 0)) ? (
                     <img
-                        src={product.image}
+                        src={product.image || (product.images && product.images[0]) || ''}
                         alt={product.name}
                         referrerPolicy="no-referrer"
                         onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/160?text=Invalid+Image'; }}
