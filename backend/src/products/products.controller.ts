@@ -181,6 +181,13 @@ export class ProductsController {
             const isAdmin = req.user.role === Role.ADMIN;
             const report = await this.excelService.processProductsExcel(file.buffer, CreateProductDto);
 
+            // PRE-FETCH FOR PERFORMANCE
+            const [configs, categories, user] = await Promise.all([
+                this.productsService.getAppConfigs(),
+                this.productsService.getDistinctCategories(),
+                isAdmin ? null : this.productsService.getUserKycStatus(req.user.sub)
+            ]);
+
             const createdProducts = [];
             for (const result of report.results) {
                 if (result.success && result.data) {
@@ -191,7 +198,11 @@ export class ProductsController {
                         const product = await this.productsService.create({
                             ...dto,
                             supplierId,
-                        }, isAdmin, true); // skipAi = true for bulk performance
+                        }, isAdmin, true, { 
+                            preFetchedConfigs: configs, 
+                            preFetchedCategories: categories,
+                            supplierKycStatus: isAdmin ? undefined : user?.kycStatus
+                        }); // skipAi = true for bulk performance
                         createdProducts.push(product);
                         (result as any).message = 'Created successfully';
                     } catch (e) {

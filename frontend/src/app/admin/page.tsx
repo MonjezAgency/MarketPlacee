@@ -179,6 +179,28 @@ export default function AdminOverviewPage() {
         return <DeveloperDashboard />;
     }
 
+    const [timeMenuOpen, setTimeMenuOpen] = React.useState(false);
+    const timeOptions = [
+        { label: 'Today', value: 'Daily', subtext: 'Updated real-time' },
+        { label: 'Last 7 Days', value: 'Weekly', subtext: 'Rolling week stats' },
+        { label: 'Last 30 Days', value: 'Monthly', subtext: 'Monthly aggregate' },
+    ];
+
+    const getDateRangeLabel = () => {
+        const now = new Date();
+        const start = new Date();
+        if (timeframe === 'Daily') {
+            return now.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        } else if (timeframe === 'Weekly') {
+            start.setDate(now.getDate() - 7);
+        } else {
+            start.setDate(now.getDate() - 30);
+        }
+        
+        const opt = { month: 'short', day: 'numeric', year: 'numeric' };
+        return `${start.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', opt as any)} - ${now.toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', opt as any)}`;
+    };
+
     return (
         <div className="space-y-8 animate-in fade-in duration-700 pb-20">
             {/* Page Header */}
@@ -188,10 +210,47 @@ export default function AdminOverviewPage() {
                     <p className="text-sm text-slate-500 mt-1">Welcome back, Admin! Here's what's happening with your marketplace today.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
-                        <Clock size={16} />
-                        May 20, 2025 - May 26, 2025
-                    </button>
+                    <div className="relative">
+                        <button 
+                            onClick={() => setTimeMenuOpen(!timeMenuOpen)}
+                            className={cn(
+                                "h-10 px-4 bg-white border rounded-xl text-xs font-semibold flex items-center gap-2 transition-all shadow-sm",
+                                timeMenuOpen ? "border-teal-500 ring-2 ring-teal-500/10 text-teal-600" : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                            )}
+                        >
+                            <Clock size={16} />
+                            {getDateRangeLabel()}
+                        </button>
+                        
+                        {timeMenuOpen && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setTimeMenuOpen(false)} />
+                                <motion.div 
+                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                                    className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-2xl shadow-xl z-50 p-2 overflow-hidden"
+                                >
+                                    {timeOptions.map((opt) => (
+                                        <button
+                                            key={opt.value}
+                                            onClick={() => {
+                                                setTimeframe(opt.value);
+                                                setTimeMenuOpen(false);
+                                            }}
+                                            className={cn(
+                                                "w-full text-start p-3 rounded-xl transition-all flex flex-col gap-0.5",
+                                                timeframe === opt.value ? "bg-teal-50 text-teal-700" : "hover:bg-slate-50 text-slate-600"
+                                            )}
+                                        >
+                                            <span className="text-[11px] font-bold">{opt.label}</span>
+                                            <span className="text-[9px] opacity-60 font-medium">{opt.subtext}</span>
+                                        </button>
+                                    ))}
+                                </motion.div>
+                            </>
+                        )}
+                    </div>
+                    
                     <button 
                         onClick={handleExportReport}
                         className="h-10 px-4 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20"

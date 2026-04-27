@@ -16,14 +16,31 @@ export class ProductsService {
         private notificationsService: NotificationsService,
     ) { }
 
-    async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false) {
+    async getAppConfigs() {
+        return this.prisma.appConfig.findMany();
+    }
+
+    async getDistinctCategories() {
+        const categories = await this.prisma.product.findMany({ select: { category: true }, distinct: ['category'] });
+        return categories.map(c => c.category).filter(c => c && c !== 'General');
+    }
+
+    async getUserKycStatus(userId: string) {
+        return this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { kycStatus: true }
+        });
+    }
+
+    async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false, options?: { preFetchedConfigs?: any[], preFetchedCategories?: string[], supplierKycStatus?: string }) {
         // KYC enforcement: suppliers must be verified or pending approval before listing products
         if (!isAdmin && createProductDto.supplierId) {
-            const supplier = await this.prisma.user.findUnique({
+            const kycStatus = options?.supplierKycStatus || (await this.prisma.user.findUnique({
                 where: { id: createProductDto.supplierId },
                 select: { kycStatus: true },
-            });
-            if (supplier && supplier.kycStatus === 'UNVERIFIED') {
+            }))?.kycStatus;
+
+            if (kycStatus === 'UNVERIFIED') {
                 throw new ForbiddenException('Identity verification required. Please submit your documents before listing products.');
             }
         }
@@ -36,13 +53,21 @@ export class ProductsService {
         else if (unit.includes('container') || unit.includes('truck')) configKey = 'MARKUP_PERCENTAGE_CONTAINER';
         else configKey = 'MARKUP_PERCENTAGE_PIECE';
 
-        let config = await this.prisma.appConfig.findUnique({
-            where: { key: configKey }
-        });
+        let config = options?.preFetchedConfigs?.find(c => c.key === configKey);
 
         // Fallback to general markup if specific unit markup not found
-        if (!config) {
-            config = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE' } });
+        if (!config && options?.preFetchedConfigs) {
+            config = options.preFetchedConfigs.find(c => c.key === 'MARKUP_PERCENTAGE');
+        }
+
+        // If not pre-fetched, fetch from DB
+        if (!config && !options?.preFetchedConfigs) {
+            config = await this.prisma.appConfig.findUnique({
+                where: { key: configKey }
+            });
+            if (!config) {
+                config = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE' } });
+            }
         }
 
         // Default markups based on unit if nothing is set in DB: piece=10%, pallet=5%, container=2%
@@ -81,9 +106,12 @@ export class ProductsService {
         // Auto-categorize if missing
         let finalCategory = createProductDto.category;
         if (!skipAi && (!finalCategory || finalCategory.toLowerCase() === 'general' || finalCategory.toLowerCase() === 'others')) {
-            const categories = await this.prisma.product.findMany({ select: { category: true }, distinct: ['category'] });
-            const catList = categories.map(c => c.category).filter(c => c && c !== 'General');
-            if (catList.length > 0 && createProductDto.name) {
+            let catList = options?.preFetchedCategories;
+            if (!catList) {
+                const categories = await this.prisma.product.findMany({ select: { category: true }, distinct: ['category'] });
+                catList = categories.map(c => c.category).filter(c => c && c !== 'General');
+            }
+            if (catList && catList.length > 0 && createProductDto.name) {
                 const suggested = await this.aiAgent.categorizeProduct(createProductDto.name, createProductDto.description || '', catList);
                 if (suggested) finalCategory = suggested;
             }
