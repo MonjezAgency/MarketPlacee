@@ -149,21 +149,35 @@ export default function AdminOverviewPage() {
     const handleExportReport = async () => {
         const tid = toast.loading('Generating platform report...');
         try {
+            const dateStr = new Date().toLocaleDateString(locale === 'ar' ? 'ar-EG' : 'en-US', { 
+                year: 'numeric', month: 'long', day: 'numeric' 
+            });
+
             const data = [
-                ['Metric', 'Value'],
-                ['Total Sales', stats.totalSales.toString()],
-                ['Pending Orders', stats.pendingOrdersCount.toString()],
-                ['Active Products', stats.activeProducts.toString()],
-                ['Pending Users', stats.pendingUsers.toString()],
-                ['Active Disputes', stats.activeDisputes.toString()]
+                [`ATLANTIS MARKETPLACE - PERFORMANCE REPORT`],
+                [`Generated on: ${dateStr}`],
+                [`Timeframe: ${timeframe}`],
+                [''],
+                ['--- SECTION 1: EXECUTIVE SUMMARY ---'],
+                ['Metric', 'Value', 'Status'],
+                ['Total Platform Revenue', `$${stats.totalSales.toLocaleString()}`, 'LIVE'],
+                ['Pending Order Count', stats.pendingOrdersCount.toString(), 'ACTION REQUIRED'],
+                ['Active Product Catalog', stats.activeProducts.toString(), 'HEALTHY'],
+                ['Pending User Registrations', stats.pendingUsers.toString(), stats.pendingUsers > 0 ? 'ATTENTION' : 'CLEAR'],
+                ['Open Disputes', stats.activeDisputes.toString(), stats.activeDisputes > 0 ? 'REVIEW' : 'STABLE'],
+                [''],
+                ['--- SECTION 2: TOP PERFORMANCE LEADERS ---'],
+                ['Category', 'Entity Name', 'Performance Metric'],
+                ...topProducts.slice(0, 5).map(p => ['Top Product', p.name, `${p.sales || 0} units sold`]),
+                ...topSuppliers.slice(0, 5).map(s => ['Top Supplier', s.name, 'High Volume']),
             ];
 
-            const csvContent = data.map(row => row.join(',')).join('\n');
+            const csvContent = data.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
             const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', `atlantis-report-${new Date().toISOString().split('T')[0]}.csv`);
+            link.setAttribute('download', `atlantis-admin-report-${new Date().toISOString().split('T')[0]}.csv`);
             link.click();
             toast.success('Report exported successfully', { id: tid });
         } catch (err) {

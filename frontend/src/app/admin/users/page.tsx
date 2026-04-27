@@ -20,7 +20,7 @@ interface User {
     companyName: string;
     role: 'BUYER' | 'SUPPLIER';
     country: string;
-    status: 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED' | 'BLOCKED';
+    status: 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED' | 'BLOCKED' | 'PENDING' | 'APPROVED';
     createdAt: string;
     website?: string;
     linkedIn?: string;

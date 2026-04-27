@@ -1,5 +1,6 @@
 'use client';
 import { apiFetch } from '@/lib/api';
+import { toast } from 'react-hot-toast';
 
 
 import * as React from 'react';
@@ -138,6 +139,48 @@ export default function SupplierOverviewPage() {
                         </AnimatePresence>
                     </div>
                     
+                    <button 
+                        onClick={async () => {
+                            const tid = toast.loading('Generating business report...');
+                            try {
+                                const data = [
+                                    [`BUSINESS PERFORMANCE REPORT - ${user?.companyName || user?.name}`],
+                                    [`Generated on: ${new Date().toLocaleDateString()}`],
+                                    [`Period: ${getRangeLabel()}`],
+                                    [''],
+                                    ['--- SECTION 1: BUSINESS SUMMARY ---'],
+                                    ['Metric', 'Value'],
+                                    ['Total Revenue', formatPrice(dashboardStats?.totalRevenue || 0)],
+                                    ['Total Orders', dashboardStats?.totalOrders?.toString() || '0'],
+                                    ['Active Products', dashboardStats?.activeProductsCount?.toString() || '0'],
+                                    ['Digital Impressions', dashboardStats?.impressions?.toString() || '0'],
+                                    [''],
+                                    ['--- SECTION 2: TOP PRODUCT PERFORMANCE ---'],
+                                    ['Product Name', 'Price', 'Units Sold', 'Revenue'],
+                                    ...(dashboardStats?.topProducts || []).map((p: any) => [
+                                        p.name, 
+                                        `€${p.price || 0}`, 
+                                        p.totalQuantitySold, 
+                                        formatPrice(p.totalRevenue)
+                                    ]),
+                                ];
+
+                                const csvContent = data.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                                const link = document.createElement('a');
+                                const url = URL.createObjectURL(blob);
+                                link.setAttribute('href', url);
+                                link.setAttribute('download', `business-report-${new Date().toISOString().split('T')[0]}.csv`);
+                                link.click();
+                                toast.success('Report exported successfully', { id: tid });
+                            } catch (err) {
+                                toast.error('Failed to export report', { id: tid });
+                            }
+                        }}
+                        className="flex items-center gap-2 px-6 py-3 bg-white border border-[#E2E8F0] text-[#64748B] font-bold text-sm rounded-xl hover:bg-slate-50 transition-all"
+                    >
+                        <TrendingUp size={18} /> Export
+                    </button>
                     <Link href="/supplier/products" className="flex items-center gap-2 px-6 py-3 bg-[#0EA5A4] text-white font-bold text-sm rounded-xl hover:shadow-lg hover:shadow-[#0EA5A4]/20 transition-all active:scale-95">
                         <Plus size={18} strokeWidth={3} /> Add New Product
                     </Link>
