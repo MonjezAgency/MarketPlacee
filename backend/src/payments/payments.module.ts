@@ -10,8 +10,10 @@ import { OrdersModule } from '../orders/orders.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { EmailModule } from '../email/email.module';
 
+import { AdminModule } from '../admin/admin.module';
+
 @Module({
-    imports: [PrismaModule, UsersModule, forwardRef(() => OrdersModule), NotificationsModule, EmailModule],
+    imports: [PrismaModule, UsersModule, forwardRef(() => OrdersModule), NotificationsModule, EmailModule, forwardRef(() => AdminModule)],
     controllers: [PaymentsController, StripeWebhookController],
     providers: [PaymentsService, EscrowService, StripeGateway, Logger],
     exports: [PaymentsService, EscrowService],

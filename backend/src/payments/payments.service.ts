@@ -4,6 +4,7 @@ import { UsersService } from '../users/users.service';
 import { StripeGateway } from './stripe.gateway';
 import { EscrowStatus, Role } from '@prisma/client';
 import { OrdersService } from '../orders/orders.service';
+import { AppConfigService } from '../admin/app-config.service';
 
 @Injectable()
 export class PaymentsService {
@@ -15,6 +16,7 @@ export class PaymentsService {
         private stripe: StripeGateway,
         @Inject(forwardRef(() => OrdersService))
         private ordersService: OrdersService,
+        private appConfigService: AppConfigService,
     ) {}
 
     async createConnectOnboardingUrl(userId: string) {
@@ -150,7 +152,7 @@ export class PaymentsService {
         }
 
         // Calculate split
-        const feePercent = this.getPlatformFeePercent();
+        const feePercent = await this.getPlatformFeePercent();
         const platformFee = order.totalAmount * (feePercent / 100);
         const supplierAmount = order.totalAmount - platformFee;
 
@@ -298,17 +300,16 @@ export class PaymentsService {
         }
     }
 
-    private getPlatformFeePercent(): number {
-        const fee = Number(
-            process.env.PLATFORM_FEE_PERCENT
-        );
-        if (isNaN(fee) || fee <= 0 || fee > 100) {
+    private async getPlatformFeePercent(): Promise<number> {
+        try {
+            const markupData = await this.appConfigService.getMarkupPercentage();
+            return markupData.platformFee;
+        } catch (err) {
             this.logger.warn(
-                'PLATFORM_FEE_PERCENT invalid — defaulting to 5%',
+                'Failed to fetch platform fee from DB — defaulting to 5%',
                 'PaymentsService'
             );
             return 5;
         }
-        return fee;
     }
 }

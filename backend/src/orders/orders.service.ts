@@ -23,6 +23,7 @@ export class OrdersService {
         private notificationsService: NotificationsService,
         private invoiceService: InvoiceService,
         private escrowService: EscrowService,
+        private appConfigService: AppConfigService,
     ) { }
 
     async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number) {
@@ -148,7 +149,8 @@ export class OrdersService {
             for (const item of order.items) {
                 supplierProfit += item.price * item.quantity;
             }
-            const feePercent = Number(process.env.PLATFORM_FEE_PERCENT) || 5;
+            const markupData = await this.appConfigService.getMarkupPercentage();
+            const feePercent = markupData.platformFee;
             const adminProfit = order.totalAmount * (feePercent / 100);
 
             return {
