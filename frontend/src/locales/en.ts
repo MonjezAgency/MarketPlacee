@@ -208,6 +208,8 @@ export const en = {
         subtotal: "Subtotal",
         coreInventory: "Core Inventory",
         distributionFee: "Distribution Fee",
+        manualQuote: "Manual Quote",
+        tbd: "TBD",
         free: "FREE",
         bulkThreshold: "Bulk Shipment Threshold Met",
         totalPayable: "Total Payable",

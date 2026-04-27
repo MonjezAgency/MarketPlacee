@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/Input';
 import { formatPrice } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -30,6 +31,7 @@ export default function CheckoutPage() {
     const { items, total, clearCart } = useCart();
     const { user } = useAuth();
     const { currency } = useCurrency();
+    const { t } = useLanguage();
 
     // Address state — pre-filled from localStorage (last used) or user profile
     const savedAddr = typeof window !== 'undefined'
@@ -142,7 +144,7 @@ export default function CheckoutPage() {
     const removeCoupon = () => { setCouponDiscount(0); setCouponApplied(''); setCouponError(''); };
 
     const discountAmount = total * (couponDiscount / 100);
-    const grandTotal = (total - discountAmount) + (selectedShipping?.cost || 0);
+    const grandTotal = total - discountAmount; // Shipping is TBD and handled manually now
 
     const handlePlaceOrder = async () => {
         if (!items || items.length === 0) {
@@ -335,7 +337,7 @@ export default function CheckoutPage() {
                                                                 </div>
                                                             </div>
                                                             <div className="text-end">
-                                                                <p className="font-heading font-black text-xl text-foreground">{formatPrice(rate.cost, currency)}</p>
+                                                                <p className="font-heading font-black text-sm text-secondary uppercase tracking-widest">{t('cart', 'tbd')}</p>
                                                                 <div className="mt-2 w-6 h-6 rounded-full border-2 border-border mx-auto flex items-center justify-center">
                                                                     {selectedShipping?.id === rate.id && <div className="w-3 h-3 bg-secondary rounded-full animate-in zoom-in" />}
                                                                 </div>
@@ -479,7 +481,7 @@ export default function CheckoutPage() {
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Shipping cost</span>
-                                                <span className="font-bold">{formatPrice(selectedShipping?.cost || 0, currency)}</span>
+                                                <span className="font-bold text-secondary uppercase tracking-widest text-xs">{t('cart', 'manualQuote')}</span>
                                             </div>
                                             <div className="flex justify-between text-base font-black pt-2 border-t border-border/50">
                                                 <span>Total Due</span>
@@ -556,7 +558,7 @@ export default function CheckoutPage() {
                                     )}
                                     <div className="flex justify-between items-center">
                                         <span className="text-muted-foreground font-medium">Logistics Allocation</span>
-                                        <span className="font-heading font-bold text-base">{selectedShipping ? formatPrice(selectedShipping.cost, currency) : 'Pending'}</span>
+                                        <span className="font-heading font-bold text-xs text-secondary uppercase tracking-widest">{t('cart', 'tbd')}</span>
                                     </div>
                                     {selectedShipping && (
                                         <div className="flex justify-between items-center ps-4 border-s-2 border-primary/20">

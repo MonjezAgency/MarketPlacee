@@ -208,6 +208,8 @@ export const ar = {
         subtotal: "المجموع الفرعي",
         coreInventory: "المخزون الأساسي",
         distributionFee: "رسوم التوصيل",
+        manualQuote: "يحدد لاحقاً",
+        tbd: "قيد التحديد",
         free: "مجاناً",
         bulkThreshold: "تم تحقيق حد الشحن بالجملة",
         totalPayable: "الإجمالي المستحق",

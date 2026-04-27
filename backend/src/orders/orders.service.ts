@@ -81,20 +81,13 @@ export class OrdersService {
             ).catch(() => {});
         }
 
-        // Notify Admins
-        this.prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true } })
-            .then(admins => {
-                for (const admin of admins) {
-                    this.notificationsService.create(
-                        admin.id,
-                        'New Order Received',
-                        `Order #${order.id.slice(-8).toUpperCase()} has been placed by ${order.customer?.name}.`,
-                        'INFO',
-                        { orderId: order.id }
-                    ).catch(() => {});
-                }
-            })
-            .catch(() => {});
+        // Notify Admins & Owners
+        this.notificationsService.notifyAdmins(
+            'New Order Received',
+            `Order #${order.id.slice(-8).toUpperCase()} has been placed by ${order.customer?.name}.`,
+            'INFO',
+            { orderId: order.id }
+        ).catch(() => {});
 
         return order;
     }

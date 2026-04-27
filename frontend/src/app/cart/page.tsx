@@ -143,8 +143,8 @@ export default function CartPage() {
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-muted-foreground font-medium">{t('cart', 'distributionFee')}</span>
-                                    <span className={total >= 500 ? 'text-accent font-black' : 'text-foreground font-bold font-heading'}>
-                                        {total >= 500 ? t('cart', 'free') : formatPrice(25, currency)}
+                                    <span className="text-secondary font-black uppercase tracking-widest text-xs">
+                                        {t('cart', 'manualQuote')}
                                     </span>
                                 </div>
                                 {total >= 500 && (
@@ -158,7 +158,7 @@ export default function CartPage() {
                                 <div className="flex justify-between items-end mb-8">
                                     <div className="space-y-1">
                                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{t('cart', 'totalPayable')}</span>
-                                        <p className="font-heading font-black text-3xl text-secondary">{formatPrice(total + (total >= 500 ? 0 : 25), currency)}</p>
+                                        <p className="font-heading font-black text-3xl text-secondary">{formatPrice(total, currency)}</p>
                                     </div>
                                     <span className="text-xs text-muted-foreground font-medium mb-1">{t('cart', 'exclTax')}</span>
                                 </div>

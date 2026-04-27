@@ -182,12 +182,17 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
                 className="px-6 py-2 mb-2 flex items-center justify-between group/header cursor-pointer" 
                 onClick={() => setExpanded(!expanded)}
             >
-                <span className={cn(
-                    "text-[11px] font-semibold uppercase tracking-widest transition-all",
-                    hasActiveLink ? "text-teal-500" : "text-slate-500 group-hover/header:text-slate-400"
-                )}>
-                    {t('admin', group.titleKey) || group.title}
-                </span>
+                <div className="flex items-center gap-2">
+                    <span className={cn(
+                        "text-[11px] font-semibold uppercase tracking-widest transition-all",
+                        hasActiveLink ? "text-teal-500" : "text-slate-500 group-hover/header:text-slate-400"
+                    )}>
+                        {t('admin', group.titleKey) || group.title}
+                    </span>
+                    {!expanded && group.links.some(l => (badgeCounts[l.href] || 0) > 0) && (
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                    )}
+                </div>
                 <ChevronDown size={14} className={cn("text-slate-600 transition-transform duration-300", expanded && "rotate-180")} />
             </div>
             
@@ -240,6 +245,27 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
     const [kycBlocked, setKycBlocked] = React.useState(false);
     const pathname = usePathname();
+
+    // Fetch Admin Notification Counts
+    React.useEffect(() => {
+        if (!user || !isTeamMember) return;
+
+        const fetchCounts = async () => {
+            try {
+                const res = await apiFetch('/dashboard/admin/notifications');
+                if (res.ok) {
+                    const data = await res.json();
+                    setNotifications(data);
+                }
+            } catch (err) {
+                console.error('Failed to fetch admin notifications:', err);
+            }
+        };
+
+        fetchCounts();
+        const interval = setInterval(fetchCounts, 30000); // Polling every 30s
+        return () => clearInterval(interval);
+    }, [user, isTeamMember]);
     const { resolvedTheme, setTheme } = useTheme();
     const { locale, setLocale, t } = useLanguage();
     const [mounted, setMounted] = React.useState(false);
@@ -559,6 +585,50 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 {/* Scrollable Content with Perfect Spacing */}
                 <div className="flex-1 overflow-y-auto no-scrollbar bg-[#F8FAFC]">
                     <div className="max-w-[1440px] mx-auto px-6 py-8 lg:py-10 min-h-full">
+                        {/* Global Action Banner */}
+                        {Object.values(notifications).some(v => v > 0) && (
+                            <motion.div 
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="mb-8 p-4 bg-teal-50 border border-teal-200 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-sm"
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-teal-600 text-white rounded-xl flex items-center justify-center animate-pulse">
+                                        <AlertCircle size={20} />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Pending Actions Required</p>
+                                        <p className="text-[11px] text-slate-500 font-bold">The following items require your immediate attention to maintain platform flow.</p>
+                                    </div>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    {notifications.pendingOrders > 0 && (
+                                        <Link href="/admin/orders" className="h-8 px-3 bg-white border border-teal-200 rounded-lg text-[10px] font-black text-teal-700 hover:bg-teal-600 hover:text-white transition-all flex items-center gap-2">
+                                            <ShoppingCart size={12} />
+                                            {notifications.pendingOrders} NEW ORDERS
+                                        </Link>
+                                    )}
+                                    {notifications.pendingProducts > 0 && (
+                                        <Link href="/admin/products" className="h-8 px-3 bg-white border border-teal-200 rounded-lg text-[10px] font-black text-teal-700 hover:bg-teal-600 hover:text-white transition-all flex items-center gap-2">
+                                            <Package size={12} />
+                                            {notifications.pendingProducts} PRODUCT REVIEWS
+                                        </Link>
+                                    )}
+                                    {notifications.pendingUsers > 0 && (
+                                        <Link href="/admin/users" className="h-8 px-3 bg-white border border-teal-200 rounded-lg text-[10px] font-black text-teal-700 hover:bg-teal-600 hover:text-white transition-all flex items-center gap-2">
+                                            <Users size={12} />
+                                            {notifications.pendingUsers} USER APPROVALS
+                                        </Link>
+                                    )}
+                                    {notifications.pendingPlacements > 0 && (
+                                        <Link href="/admin/placements" className="h-8 px-3 bg-white border border-teal-200 rounded-lg text-[10px] font-black text-teal-700 hover:bg-teal-600 hover:text-white transition-all flex items-center gap-2">
+                                            <Star size={12} />
+                                            {notifications.pendingPlacements} AD REQUESTS
+                                        </Link>
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
                         {children}
                     </div>
                 </div>

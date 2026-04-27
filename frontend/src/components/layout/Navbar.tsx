@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { useCart } from '@/lib/cart';
 import NotificationBell from '@/components/ui/NotificationBell';
 
 const LANGUAGES = [
@@ -48,6 +49,7 @@ const NAV_CATEGORIES = [
 
 export default function Navbar() {
     const { user, logout } = useAuth();
+    const { items } = useCart();
     const { locale, setLocale } = useLanguage();
     const { currency, setCurrency } = useCurrency();
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -309,7 +311,11 @@ export default function Navbar() {
 
                         <Link href="/cart" className="relative w-12 h-12 flex items-center justify-center rounded-full bg-[#0B1F3A] text-white hover:bg-[#2EC4B6] transition-all shadow-lg active:scale-90">
                             <ShoppingCart size={22} />
-                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#2EC4B6] text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm">0</span>
+                            {items.length > 0 && (
+                                <span className="absolute -top-1 -right-1 w-5 h-5 bg-[#2EC4B6] text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-in zoom-in duration-300">
+                                    {items.length}
+                                </span>
+                            )}
                         </Link>
                     </div>
                 </div>
