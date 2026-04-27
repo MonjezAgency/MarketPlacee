@@ -78,6 +78,13 @@ export class UsersController {
         return { message: 'User deleted successfully' };
     }
 
+    @Get(':id')
+    @Roles(Role.ADMIN, Role.SUPPORT, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
+    async findById(@Param('id') id: string) {
+        const user = await this.usersService.findById(id);
+        return plainToInstance(UserDto, user);
+    }
+
     @Get(':id/notifications')
     @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER)
     async getNotifications(@Param('id') id: string) {

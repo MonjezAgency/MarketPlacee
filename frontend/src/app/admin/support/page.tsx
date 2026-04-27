@@ -152,8 +152,10 @@ function SupportHQContent() {
                     
                     if (match) {
                         setSelectedUser(match);
-                    } else if (initialSearch.length > 20) { 
-                        // Likely a UUID (customerId). If not in conversations, fetch user and add a temporary entry.
+                    } else { 
+                        // If not in conversations, try to fetch user and add a temporary entry.
+                        // This allows admins to start chats with any user (e.g. from Orders)
+                        setSwitchingId(initialSearch);
                         apiFetch(`/users/${initialSearch}`)
                             .then(r => r.json())
                             .then(usr => {
@@ -161,18 +163,21 @@ function SupportHQContent() {
                                     const tempConv = {
                                         id: usr.id,
                                         userId: usr.id,
-                                        name: usr.name || usr.companyName || 'Customer',
-                                        lastMessage: 'Ready to help...',
-                                        unread: false
+                                        name: usr.name || usr.companyName || usr.email || 'Customer',
+                                        lastMessage: 'Starting conversation...',
+                                        unread: 0,
+                                        isBot: false,
+                                        lastMessageAt: new Date().toISOString()
                                     };
                                     setConversations(prev => {
-                                        if (prev.find(p => p.userId === usr.id)) return prev;
+                                        if (prev.find(p => p.userId === usr.id || p.id === usr.id)) return prev;
                                         return [tempConv, ...prev];
                                     });
                                     setSelectedUser(tempConv);
                                 }
                             })
-                            .catch(() => { /* silent fail */ });
+                            .catch(() => { /* silent fail */ })
+                            .finally(() => setSwitchingId(null));
                     }
                 }
             }
@@ -364,7 +369,9 @@ function SupportHQContent() {
                                                 <h3 className="text-sm font-semibold text-slate-900">{selectedUser.name}</h3>
                                                 <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider">High Priority</span>
                                             </div>
-                                            <p className="text-[10px] text-slate-400 font-medium">Order #AT-78451 · Placed on May 20, 2024</p>
+                                            <p className="text-[10px] text-slate-400 font-medium">
+                                                Active Support Session · {new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -400,9 +407,17 @@ function SupportHQContent() {
                                 </div>
 
                                 <div className="flex-1 overflow-hidden">
-                                    <SupportChat isSupport={true} targetUserId={selectedUser.id} isLight={true} />
+                                    <SupportChat isSupport={true} targetUserId={selectedUser.id || selectedUser.userId} isLight={true} />
                                 </div>
                             </>
+                        ) : switchingId ? (
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-12 space-y-4">
+                                <Loader2 className="w-10 h-10 animate-spin text-teal-600" />
+                                <div>
+                                    <h4 className="text-sm font-black text-slate-900">Creating Conversation...</h4>
+                                    <p className="text-[11px] text-slate-400 font-bold mt-1">Establishing secure link with customer {switchingId.slice(-8)}</p>
+                                </div>
+                            </div>
                         ) : (
                             <div className="flex-1 flex flex-col items-center justify-center text-center p-12 space-y-4">
                                 <div className="w-20 h-20 rounded-full bg-slate-50 flex items-center justify-center text-slate-200">

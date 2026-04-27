@@ -53,58 +53,68 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
         { name: t('sidebar', 'controlCenter'), icon: ShieldCheck, href: '/admin/users' },
         { name: t('sidebar', 'managePlacements'), icon: Star, href: '/admin/placements' },
         { name: t('sidebar', 'globalOrders'), icon: ShoppingCart, href: '/admin/orders' },
-        { name: t('sidebar', 'supportHub'), icon: MessageCircle, href: '/dashboard/support' },
+        { name: t('sidebar', 'supportHub'), icon: MessageCircle, href: '/admin/support' },
         { name: t('sidebar', 'settings'), icon: Settings, href: '/admin/settings' },
     ];
 
     // Dynamic items state to hold badges
     const [supplierItems, setSupplierItems] = useState<SidebarItem[]>(SUPPLIER_ITEMS);
+    const [buyerItems, setBuyerItems] = useState<SidebarItem[]>(BUYER_ITEMS);
 
     useEffect(() => { setMounted(true); }, []);
 
-    // Update supplier items when language changes
+    // Update items when language changes
     useEffect(() => {
         setSupplierItems(SUPPLIER_ITEMS);
+        setBuyerItems(BUYER_ITEMS);
     }, [t]);
 
     useEffect(() => {
-        if (role === 'supplier' && user?.id) {
+        if ((role === 'supplier' || role === 'buyer') && user?.id) {
             const fetchNotifications = async () => {
                 try {
                     const res = await apiFetch(`/users/${user.id}/notifications`);
 
                     if (res.ok) {
                         const notifications = await res.json();
-                        const unreadErrors = notifications.filter((n: any) => n.type === 'ERROR' && !n.read);
+                        
+                        if (role === 'supplier') {
+                            const unreadErrors = notifications.filter((n: any) => n.type === 'ERROR' && !n.read);
+                            if (unreadErrors.length > 0) {
+                                setSupplierItems(prev => prev.map(item =>
+                                    item.href === '/supplier/products'
+                                        ? { ...item, badge: `${unreadErrors.length} Errors` }
+                                        : item
+                                ));
+                            } else {
+                                setSupplierItems(prev => prev.map(item =>
+                                    item.href === '/supplier/products' ? { ...item, badge: undefined } : item
+                                ));
+                            }
+                        }
 
-                        if (unreadErrors.length > 0) {
-                            // Update badge for My Products tab
-                            setSupplierItems(prev => prev.map(item =>
-                                item.href === '/supplier/products'
-                                    ? { ...item, badge: `${unreadErrors.length} Errors` }
-                                    : item
-                            ));
-
-                            // Trigger iPhone toast for the most recent unread error
-                            const latestError = unreadErrors[0];
-
-                            // Only show if we haven't shown it this session (simple sessionStorage check)
-                            const shownKey = `notif_shown_${latestError.id}`;
-                            if (!sessionStorage.getItem(shownKey)) {
-                                import('@/components/ui/IPhoneToast').then(({ showIPhoneToast }) => {
-                                    showIPhoneToast(
-                                        latestError.title,
-                                        latestError.message,
-                                        "error"
-                                    );
-                                });
-                                sessionStorage.setItem(shownKey, 'true');
+                        // Also check for unread support messages (INFO type from ChatService)
+                        const unreadSupport = notifications.filter((n: any) => n.title === 'New Support Message' && !n.read);
+                        if (unreadSupport.length > 0) {
+                            if (role === 'supplier') {
+                                setSupplierItems(prev => prev.map(item =>
+                                    item.href === '/supplier/support' ? { ...item, badge: 'New' } : item
+                                ));
+                            } else {
+                                setBuyerItems(prev => prev.map(item =>
+                                    item.href === '/dashboard/support' ? { ...item, badge: 'New' } : item
+                                ));
                             }
                         } else {
-                            // Clear badge
-                            setSupplierItems(prev => prev.map(item =>
-                                item.href === '/supplier/products' ? { ...item, badge: undefined } : item
-                            ));
+                            if (role === 'supplier') {
+                                setSupplierItems(prev => prev.map(item =>
+                                    item.href === '/supplier/support' ? { ...item, badge: undefined } : item
+                                ));
+                            } else {
+                                setBuyerItems(prev => prev.map(item =>
+                                    item.href === '/dashboard/support' ? { ...item, badge: undefined } : item
+                                ));
+                            }
                         }
                     }
                 } catch (err) {
@@ -113,13 +123,12 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
             };
 
             fetchNotifications();
-            // Optional: Poll every 30 seconds
             const interval = setInterval(fetchNotifications, 30000);
             return () => clearInterval(interval);
         }
     }, [role, user?.id]);
 
-    const items = role === 'admin' ? ADMIN_ITEMS : role === 'buyer' ? BUYER_ITEMS : supplierItems;
+    const items = role === 'admin' ? ADMIN_ITEMS : role === 'buyer' ? buyerItems : supplierItems;
 
     const portalLabel = role === 'admin' 
         ? t('sidebar', 'adminPortal') 
