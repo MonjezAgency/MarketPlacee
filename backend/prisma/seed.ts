@@ -8,7 +8,7 @@ async function main() {
 
     // 1. Create/Update Admin & Founder (Ali Dawara)
     const founderEmail = 'Info@atlantisfmcg.com';
-    const founderPassword = 'AliDawara@22';
+    const founderPassword = 'Admin@123';
     const existingFounder = await prisma.user.findUnique({ where: { email: founderEmail } });
 
     if (existingFounder) {
@@ -41,6 +41,14 @@ async function main() {
             },
         });
         console.log(`✅ Created Founder: ${founderEmail}`);
+    }
+
+    // 2. Remove Legacy Admin if exists
+    const oldAdminEmail = '7bd02025@gmail.com';
+    const oldAdmin = await prisma.user.findUnique({ where: { email: oldAdminEmail } });
+    if (oldAdmin) {
+        await prisma.user.delete({ where: { email: oldAdminEmail } });
+        console.log(`🗑️ Removed Legacy Admin: ${oldAdminEmail}`);
     }
 
     // 3. Create/Update Tech Team User (Monjez@monjez-agency.com)

@@ -11,7 +11,7 @@ import { PrismaService } from '../common/prisma.service';
  */
 const TEAM_ROLES = new Set(['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS']);
 // Emails that bypass KYC verification (Founder/CEO and platform admin)
-const KYC_EXEMPT_EMAILS = new Set(['7bd02025@gmail.com', 'Info@atlantisfmcg.com', 'info@atlantisfmcg.com']);
+const KYC_EXEMPT_EMAILS = new Set(['Info@atlantisfmcg.com', 'info@atlantisfmcg.com']);
 
 @Injectable()
 export class TeamKycGuard implements CanActivate {
