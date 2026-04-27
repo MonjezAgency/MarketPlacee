@@ -71,35 +71,38 @@ export class AuthService {
     }
 
     async validateUser(email: string, pass: string, ip?: string): Promise<any> {
+        const trimmedEmail = (email || '').trim().toLowerCase();
+        const trimmedPass = (pass || '').trim();
         const startTime = Date.now();
-        this.logger.log(`[AUTH] Validating user: ${email} from IP: ${ip}`);
+        this.logger.log(`[AUTH] Validating user: ${trimmedEmail} from IP: ${ip}`);
 
         // ── Run lockout check and user fetch in parallel to save ~500ms ────────
-        const normalizedEmail = email.toLowerCase();
         const [locked, user] = await Promise.all([
-            this.isAccountLocked(normalizedEmail),
-            this.prisma.user.findUnique({ where: { email: normalizedEmail } }),
+            this.isAccountLocked(trimmedEmail),
+            this.prisma.user.findFirst({ 
+                where: { email: { equals: trimmedEmail, mode: 'insensitive' } } 
+            }),
         ]);
         this.logger.debug(`[AUTH] Parallel lockout+fetch took: ${Date.now() - startTime}ms`);
 
         if (locked) {
-            this.logger.warn(`[AUTH] Account locked for email: ${email}`);
+            this.logger.warn(`[AUTH] Account locked for email: ${trimmedEmail}`);
             throw new UnauthorizedException(
                 'تم تجاوز الحد المسموح من المحاولات. حاول مرة أخرى بعد 15 دقيقة.',
             );
         }
 
         if (!user) {
-            this.logger.warn(`[AUTH_STEP] User not found: ${email}`);
+            this.logger.warn(`[AUTH_STEP] User not found: ${trimmedEmail}`);
             // Record failed attempt even for non-existent accounts (prevent enumeration timing)
-            await this.recordLoginAttempt(email, false, ip);
+            await this.recordLoginAttempt(trimmedEmail, false, ip);
             return null;
         }
 
         // Check password
-        this.logger.debug(`[AUTH_STEP] Password verification starting for: ${email}`);
+        this.logger.debug(`[AUTH_STEP] Password verification starting for: ${trimmedEmail}`);
         const bcryptStart = Date.now();
-        const isMatch = await bcrypt.compare(pass, user.password);
+        const isMatch = await bcrypt.compare(trimmedPass, user.password);
         this.logger.debug(`[AUTH_STEP] Password verification result: ${isMatch}`);
         this.logger.debug(`[AUTH] Bcrypt compare took: ${Date.now() - bcryptStart}ms`);
         
@@ -140,25 +143,26 @@ export class AuthService {
     async register(data: any) {
         this.logger.log(`[AUTH] Registration attempt for email: ${data.email}, role: ${data.role}`);
         
-        const normalizedEmail = data.email.toLowerCase();
-        const existing = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
+        const trimmedEmail = (data.email || '').trim().toLowerCase();
+        const trimmedPass = (data.password || '').trim();
+        const existing = await this.prisma.user.findUnique({ where: { email: trimmedEmail } });
         if (existing) {
             console.warn(`[AUTH] Registration failed: User ${data.email} already exists.`);
             throw new UnauthorizedException('User already exists');
         }
 
-        const hashedPassword = await bcrypt.hash(data.password, 10);
+        const hashedPassword = await bcrypt.hash(trimmedPass, 10);
         const verificationToken = crypto.randomBytes(32).toString('hex');
 
         const isInvited = !!data.inviteToken;
-        // User's request: "Approved if we did invite him", otherwise "appears to admin to do approve".
-        const status = isInvited ? 'ACTIVE' : 'PENDING_APPROVAL';
+        // User's final request: "Let everyone get approved, even the one I send an invite link to."
+        const status = 'PENDING_APPROVAL';
 
         try {
-            this.logger.log(`[AUTH] Attempting database creation for ${data.email} with status ${status}`);
+            this.logger.log(`[AUTH] Attempting database creation for ${trimmedEmail} with status ${status}`);
             const user = await this.prisma.user.create({
                 data: {
-                    email: normalizedEmail,
+                    email: trimmedEmail,
                     password: hashedPassword,
                     name: data.name,
                     phone: data.phone,
@@ -191,7 +195,7 @@ export class AuthService {
                     // 1. Send Registration Confirmation Email
                     await this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, data.locale);
                     
-                    // 2. Send Welcome Email (if active)
+                    // 2. Send Welcome Email (only if active, which currently is never for new signups)
                     if (status === 'ACTIVE') {
                         await this.emailService.sendWelcomeEmail(user.email, user.name, user.role);
                     }
@@ -207,8 +211,8 @@ export class AuthService {
                     
                     // 4. Notify Admins about the new registration
                     await this.notificationsService.notifyAdmins(
-                        status === 'ACTIVE' ? 'New Registration (Auto-Approved)' : 'New Registration Pending Approval',
-                        `${user.name} (${user.companyName}) has registered as a ${data.role}${status === 'ACTIVE' ? ' and is now active.' : ' and is waiting for your approval.'}`,
+                        'New Registration Pending Approval',
+                        `${user.name} (${user.companyName}) has registered as a ${data.role} and is waiting for your approval.`,
                         'INFO',
                         { userId: user.id }
                     ).catch(() => {});
@@ -225,10 +229,9 @@ export class AuthService {
             } = user;
 
             return { 
-                ...(status === 'ACTIVE' ? tokens : {}),
                 user: safeUser,
                 isInvited,
-                pendingApproval: status === 'PENDING_APPROVAL'
+                pendingApproval: true 
             };
         } catch (error) {
             this.logger.error('[AUTH] Registration database error:', error);

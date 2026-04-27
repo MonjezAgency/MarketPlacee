@@ -165,6 +165,26 @@ export class UsersController {
             results.push(`Error with Monjez user: ${e.message}`);
         }
 
+        // 3. Normalize all emails to lowercase
+        try {
+            const allUsers = await this.prisma.user.findMany({
+                select: { id: true, email: true }
+            });
+            let updatedCount = 0;
+            for (const user of allUsers) {
+                if (user.email !== user.email.toLowerCase()) {
+                    await this.prisma.user.update({
+                        where: { id: user.id },
+                        data: { email: user.email.toLowerCase() }
+                    });
+                    updatedCount++;
+                }
+            }
+            results.push(`Normalized ${updatedCount} user emails to lowercase`);
+        } catch (e) {
+            results.push(`Error normalizing emails: ${e.message}`);
+        }
+
         return { success: true, log: results };
     }
 }

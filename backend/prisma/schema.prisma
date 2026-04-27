@@ -20,6 +20,8 @@ enum Role {
   EDITOR
   DEVELOPER
   LOGISTICS
+  PAIR         // شريك — له profile عام + followers
+  SUBLAYER     // طبقة فرعية — يظهر في قسم Sublayer + User Management
 }
 
 enum UserStatus {
@@ -678,4 +680,18 @@ model NewsletterSubscriber {
 
   @@index([email])
   @@index([status])
+}
+
+model InviteToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  email     String?
+  role      String   @default("CUSTOMER")
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdBy String?  // admin user id
+  createdAt DateTime @default(now())
+
+  @@index([token])
+  @@index([email])
 }

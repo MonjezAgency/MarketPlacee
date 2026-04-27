@@ -117,7 +117,7 @@ export default function AdminOverviewPage() {
                 apiFetch('/products?limit=1'),
                 apiFetch('/orders/stats'),
                 apiFetch('/disputes/stats').catch(() => null),
-                apiFetch(`/orders/admin-analytics?timeframe=${timeframeParam}`).catch(() => null)
+                apiFetch(`/orders/admin-analytics?timeframe=${timeframeParam}&_t=${Date.now()}`).catch(() => null)
             ]);
 
             const usersData = usersRes.ok ? await usersRes.json() : { total: 0 };
@@ -428,6 +428,33 @@ export default function AdminOverviewPage() {
                 {/* RIGHT COLUMN (35%) */}
                 <div className="col-span-12 lg:col-span-4 space-y-8">
                     
+                    {/* Attention Required */}
+                    {stats.pendingUsers > 0 && (
+                        <motion.div 
+                            initial={{ x: 20, opacity: 0 }}
+                            animate={{ x: 0, opacity: 1 }}
+                            className="bg-amber-50 border border-amber-200 rounded-2xl p-6 shadow-sm relative overflow-hidden"
+                        >
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                                <UserCheck2 size={80} className="text-amber-600" />
+                            </div>
+                            <div className="relative z-10">
+                                <div className="flex items-center gap-2 text-amber-700 font-bold mb-2">
+                                    <AlertCircle size={18} />
+                                    <span className="text-sm uppercase tracking-wider">Attention Required</span>
+                                </div>
+                                <h4 className="text-xl font-black text-slate-900 mb-1">{stats.pendingUsers} New Registrations</h4>
+                                <p className="text-sm text-slate-600 font-medium mb-6">There are users waiting for your approval to join the platform.</p>
+                                <Link 
+                                    href="/admin/users" 
+                                    className="inline-flex items-center gap-2 px-5 py-2.5 bg-amber-600 text-white text-xs font-bold rounded-xl hover:bg-amber-700 transition-all shadow-lg shadow-amber-600/20"
+                                >
+                                    Review Requests <ArrowRight size={14} />
+                                </Link>
+                            </div>
+                        </motion.div>
+                    )}
+
                     {/* Top Suppliers / Vendors */}
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                         <div className="p-6 border-b border-slate-100 flex items-center justify-between">

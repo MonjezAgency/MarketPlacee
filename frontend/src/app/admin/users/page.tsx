@@ -20,7 +20,7 @@ interface User {
     companyName: string;
     role: 'BUYER' | 'SUPPLIER';
     country: string;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'BLOCKED';
+    status: 'PENDING_APPROVAL' | 'ACTIVE' | 'REJECTED' | 'BLOCKED';
     createdAt: string;
     website?: string;
     linkedIn?: string;
@@ -67,7 +67,10 @@ export default function UserManagementPage() {
         const company = (u.companyName || '').toLowerCase();
         const search = searchTerm.toLowerCase();
         const matchesSearch = name.includes(search) || company.includes(search);
-        const matchesFilter = filterStatus === 'ALL' || u.status === filterStatus;
+        const matchesFilter = filterStatus === 'ALL' || 
+                             (filterStatus === 'PENDING' && u.status === 'PENDING_APPROVAL') ||
+                             (filterStatus === 'APPROVED' && u.status === 'ACTIVE') ||
+                             u.status === filterStatus;
         return matchesSearch && matchesFilter;
     });
 
@@ -307,12 +310,14 @@ export default function UserManagementPage() {
                                     <td className="px-[20px]">
                                         <span className={cn(
                                             "px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider",
-                                            user.status === 'APPROVED' ? "bg-[#22C55E]/10 text-[#22C55E]" :
-                                            user.status === 'PENDING' ? "bg-[#F59E0B]/10 text-[#F59E0B]" :
+                                            (user.status === 'ACTIVE' || user.status === 'APPROVED') ? "bg-[#22C55E]/10 text-[#22C55E]" :
+                                            (user.status === 'PENDING_APPROVAL' || user.status === 'PENDING') ? "bg-[#F59E0B]/10 text-[#F59E0B]" :
                                             user.status === 'BLOCKED' ? "bg-slate-900 text-white" :
                                             "bg-[#EF4444]/10 text-[#EF4444]"
                                         )}>
-                                            {user.status}
+                                            {user.status === 'PENDING_APPROVAL' ? 'PENDING' : 
+                                             user.status === 'ACTIVE' ? 'APPROVED' : 
+                                             user.status}
                                         </span>
                                     </td>
                                     <td className="px-[20px] text-[11px] text-slate-400 font-medium text-right">
