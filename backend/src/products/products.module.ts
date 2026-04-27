@@ -11,9 +11,10 @@ import { ReviewsService } from './reviews.service';
 import { ReviewsController, AdminReviewsController } from './reviews.controller';
 
 import { StorageModule } from '../storage/storage.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-    imports: [PricingModule, AiAgentModule, StorageModule],
+    imports: [PricingModule, AiAgentModule, StorageModule, NotificationsModule],
     providers: [ProductsService, PlacementService, EanService, ExcelService, ReviewsService],
     controllers: [ProductsController, PlacementController, ReviewsController, AdminReviewsController],
     exports: [ProductsService, PlacementService],

@@ -16,7 +16,7 @@ export class ProductsService {
         private notificationsService: NotificationsService,
     ) { }
 
-    async create(createProductDto: CreateProductDto, isAdmin: boolean = false) {
+    async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false) {
         // KYC enforcement: suppliers must be verified or pending approval before listing products
         if (!isAdmin && createProductDto.supplierId) {
             const supplier = await this.prisma.user.findUnique({
@@ -55,7 +55,7 @@ export class ProductsService {
 
         // Fetch EAN images if ean is provided and no images are uploaded
         let productImages = createProductDto.images || [];
-        if (createProductDto.ean && productImages.length === 0) {
+        if (!skipAi && createProductDto.ean && productImages.length === 0) {
             const fetchedImages = await this.eanService.fetchImagesByEan(createProductDto.ean, 3);
             if (fetchedImages && fetchedImages.length > 0) {
                 productImages = fetchedImages;
@@ -80,7 +80,7 @@ export class ProductsService {
 
         // Auto-categorize if missing
         let finalCategory = createProductDto.category;
-        if (!finalCategory || finalCategory.toLowerCase() === 'general' || finalCategory.toLowerCase() === 'others') {
+        if (!skipAi && (!finalCategory || finalCategory.toLowerCase() === 'general' || finalCategory.toLowerCase() === 'others')) {
             const categories = await this.prisma.product.findMany({ select: { category: true }, distinct: ['category'] });
             const catList = categories.map(c => c.category).filter(c => c && c !== 'General');
             if (catList.length > 0 && createProductDto.name) {
@@ -112,7 +112,7 @@ export class ProductsService {
             });
 
             // Notify Admins if created by supplier
-            if (!isAdmin && product.supplierId) {
+            if (!isAdmin && product.supplierId && !skipAi) {
                 this.notificationsService.notifyAdmins(
                     'New Product Submitted',
                     `New product "${product.name}" from supplier ID: ${product.supplierId} is waiting for review.`,

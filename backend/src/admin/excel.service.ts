@@ -22,8 +22,13 @@ export interface ExcelReport {
 export class ExcelService {
     async processProductsExcel(buffer: Buffer, dtoClass: any): Promise<ExcelReport> {
         const workbook = XLSX.read(buffer, { type: 'buffer' });
+        if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+            throw new Error('Excel file has no sheets');
+        }
+        
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
+        if (!sheet) throw new Error(`Sheet "${sheetName}" not found`);
 
         // 1. Extract embedded images mapping
         const imageMapping = await this.extractImagesFromZip(buffer, sheetName);
@@ -33,8 +38,6 @@ export class ExcelService {
         if (rows.length === 0) throw new Error('Sheet is empty');
 
         console.log(`[ExcelService] Processing ${rows.length} raw rows from sheet: ${sheetName}`);
-        console.log(`[ExcelService] First row:`, JSON.stringify(rows[0]));
-        if (rows.length > 1) console.log(`[ExcelService] Second row:`, JSON.stringify(rows[1]));
 
         const normalize = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '').trim();
 
@@ -43,7 +46,7 @@ export class ExcelService {
             'اسمبالعربي': 'name', 'الاسم': 'name', 'اسم': 'name', 'اسمالمنتج': 'name', 'المنتج': 'name', 'اسمباحث': 'name',
             'description': 'description', 'desc': 'description', 'details': 'description', 'info': 'description', 'note': 'description', 'notes': 'description',
             'الوصف': 'description', 'التفاصيل': 'description', 'وصف': 'description', 'ملاحظات': 'description',
-            'price': 'price', 'cost': 'price', 'rate': 'price', 'amount': 'price', 'unitprice': 'price', 'saleprice': 'price', 'sellingprice': 'price',
+            'price': 'price', 'cost': 'price', 'rate': 'price', 'amount': 'price', 'unitprice': 'price', 'saleprice': 'price', 'sellingprice': 'price', 'baseprice': 'price',
             'السعر': 'price', 'سعرالبيع': 'price', 'سعر': 'price', 'القيمة': 'price', 'ثمن': 'price',
             'stock': 'stock', 'stockcount': 'stock', 'quantity': 'stock', 'qty': 'stock', 'count': 'stock', 'inventory': 'stock', 'available': 'stock',
             'الكمية': 'stock', 'المخزون': 'stock', 'العدد': 'stock', 'كمية': 'stock',
@@ -55,13 +58,15 @@ export class ExcelService {
             'عددالوحداتفيالبالتة': 'unitsPerPallet', 'وحداتالبالتة': 'unitsPerPallet', 'البالتةفيهاكام': 'unitsPerPallet',
             'palletspershipment': 'palletsPerShipment', 'palletsperload': 'palletsPerShipment', 'shipmentpallets': 'palletsPerShipment',
             'عددالبالتاتفيالشحنة': 'palletsPerShipment', 'البالتاتفيالشحنة': 'palletsPerShipment', 'بالتاتالشحنة': 'palletsPerShipment',
+            'brand': 'brand', 'make': 'brand', 'manufacturer': 'brand', 'براند': 'brand', 'الماركة': 'brand', 'الشركةالمصنعة': 'brand',
+            'unit': 'unit', 'measure': 'unit', 'packaging': 'unit', 'الوحدة': 'unit', 'التعبئة': 'unit',
         };
 
-        // Find header row
+        // Find header row - scan up to 30 rows, looking for a row with at least 2 matching headers
         let headerRowIndex = -1;
         let mapping: Record<number, string> = {};
 
-        for (let i = 0; i < Math.min(rows.length, 10); i++) {
+        for (let i = 0; i < Math.min(rows.length, 30); i++) {
             const row = rows[i];
             if (!row || row.length === 0) continue;
             const tempMapping: Record<number, string> = {};
@@ -76,7 +81,7 @@ export class ExcelService {
                 } else {
                     // Partial match
                     for (const [alias, target] of Object.entries(headerAliases)) {
-                        if (normalizedCell.includes(alias) || alias.includes(normalizedCell)) {
+                        if (normalizedCell.length > 2 && (normalizedCell.includes(alias) || alias.includes(normalizedCell))) {
                             tempMapping[idx] = target;
                             matches++;
                             break;
@@ -88,19 +93,17 @@ export class ExcelService {
             if (matches >= 2) {
                 headerRowIndex = i;
                 mapping = tempMapping;
-                console.log(`[ExcelService] Header found at row ${i} with ${matches} matches`);
+                console.log(`[ExcelService] Header found at row ${i} with ${matches} matches. Mapping:`, mapping);
                 break;
             }
         }
 
         // FALLBACK: try sheet_to_json with auto headers
         if (headerRowIndex === -1) {
-            console.warn('[ExcelService] No header via 2D array, trying auto-json...');
+            console.warn('[ExcelService] No header via matching, trying auto-json fallback...');
             const jsonRows = XLSX.utils.sheet_to_json(sheet, { defval: '' }) as Record<string, any>[];
             if (jsonRows.length > 0) {
                 const firstKeys = Object.keys(jsonRows[0]);
-                console.log('[ExcelService] Auto keys:', firstKeys);
-
                 const autoMapping: Record<string, string> = {};
                 for (const key of firstKeys) {
                     const nk = normalize(key);
@@ -108,26 +111,17 @@ export class ExcelService {
                         autoMapping[key] = headerAliases[nk];
                     } else {
                         for (const [alias, target] of Object.entries(headerAliases)) {
-                            if (nk.includes(alias) || alias.includes(nk)) {
+                            if (nk.length > 2 && (nk.includes(alias) || alias.includes(nk))) {
                                 autoMapping[key] = target;
                                 break;
                             }
                         }
                     }
                 }
-                console.log('[ExcelService] Auto mapping:', autoMapping);
                 return this.processJsonRows(jsonRows, autoMapping, dtoClass);
             }
-
-            // Last resort
-            headerRowIndex = 0;
-            rows[0].forEach((cell, idx) => {
-                const normalizedCell = normalize(String(cell));
-                mapping[idx] = headerAliases[normalizedCell] || normalizedCell;
-            });
+            throw new Error('Could not identify header row in Excel file. Please use the provided template.');
         }
-
-        console.log('[ExcelService] Final Mapping:', mapping);
 
         const results: ValidationRow[] = [];
         let successCount = 0;
@@ -135,7 +129,8 @@ export class ExcelService {
 
         for (let i = headerRowIndex + 1; i < rows.length; i++) {
             const row = rows[i];
-            if (!row || row.length === 0) continue;
+            if (!row) continue;
+            
             const hasData = row.some(c => c !== undefined && c !== null && String(c).trim() !== '');
             if (!hasData) continue;
 
@@ -147,13 +142,9 @@ export class ExcelService {
 
             this.coerceTypes(normalizedRow);
 
-            // 2. Attach embedded image if exists for this row
+            // Attach embedded image if exists for this row
             if (imageMapping[i]) {
                 normalizedRow.images = [imageMapping[i]];
-            }
-
-            if (i === headerRowIndex + 1) {
-                console.log('[ExcelService] First data row after coercion:', JSON.stringify(normalizedRow));
             }
 
             const instance = plainToInstance(dtoClass, normalizedRow, { enableImplicitConversion: true });
@@ -175,37 +166,48 @@ export class ExcelService {
     }
 
     private coerceTypes(row: Record<string, any>) {
+        const arabicToEnglish = (s: string) => {
+            const map: any = { '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9' };
+            return s.replace(/[٠-٩]/g, m => map[m]);
+        };
+
         // Force strings
         if (row.name !== undefined && row.name !== null) row.name = String(row.name).trim();
         if (row.description !== undefined && row.description !== null) row.description = String(row.description).trim();
         if (row.category !== undefined && row.category !== null) row.category = String(row.category).trim();
         if (row.ean !== undefined && row.ean !== null) row.ean = String(row.ean).trim();
+        if (row.brand !== undefined && row.brand !== null) row.brand = String(row.brand).trim();
+        if (row.unit !== undefined && row.unit !== null) row.unit = String(row.unit).trim().toLowerCase();
 
         // Force price to number
         if (row.price !== undefined && row.price !== null) {
-            const p = parseFloat(String(row.price).replace(/[^0-9.-]/g, ''));
+            const cleanStr = arabicToEnglish(String(row.price)).replace(/[^0-9.-]/g, '');
+            const p = parseFloat(cleanStr);
             row.price = isNaN(p) ? 0 : p;
         }
-        // Force stock to number and clamp to max INT4 to prevent Prisma crashes
+
+        // Force stock to number
         if (row.stock !== undefined && row.stock !== null) {
-            const s = parseInt(String(row.stock).replace(/[^0-9-]/g, ''), 10);
+            const cleanStr = arabicToEnglish(String(row.stock)).replace(/[^0-9-]/g, '');
+            const s = parseInt(cleanStr, 10);
             row.stock = isNaN(s) ? 10 : Math.min(Math.max(s, 0), 2147483647);
         }
 
         if (row.unitsPerPallet !== undefined && row.unitsPerPallet !== null) {
-            const val = parseInt(String(row.unitsPerPallet).replace(/[^0-9]/g, ''), 10);
+            const cleanStr = arabicToEnglish(String(row.unitsPerPallet)).replace(/[^0-9]/g, '');
+            const val = parseInt(cleanStr, 10);
             row.unitsPerPallet = isNaN(val) ? 0 : val;
         }
 
         if (row.palletsPerShipment !== undefined && row.palletsPerShipment !== null) {
-            const val = parseInt(String(row.palletsPerShipment).replace(/[^0-9]/g, ''), 10);
+            const cleanStr = arabicToEnglish(String(row.palletsPerShipment)).replace(/[^0-9]/g, '');
+            const val = parseInt(cleanStr, 10);
             row.palletsPerShipment = isNaN(val) ? 0 : val;
         }
 
         // Defaults for missing required fields
         if (!row.name || String(row.name).trim() === '') row.name = 'Unnamed Product';
         if (!row.category || String(row.category).trim() === '') row.category = 'General';
-        // Note: Do NOT default description to name to preserve the warning state for users
         if (!row.description) row.description = "";
         if (row.price === undefined || row.price === null) row.price = 0;
         if (row.stock === undefined || row.stock === null) row.stock = 10;

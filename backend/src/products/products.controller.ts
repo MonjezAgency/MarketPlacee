@@ -30,6 +30,7 @@ import { ExcelService } from '../admin/excel.service';
 import { EanService } from './ean.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { AiAgentService } from '../ai-agent/ai-agent.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Controller('products')
 export class ProductsController {
@@ -38,7 +39,8 @@ export class ProductsController {
         private readonly excelService: ExcelService,
         private readonly eanService: EanService,
         private readonly storageService: SupabaseStorageService,
-        private readonly aiAgent: AiAgentService
+        private readonly aiAgent: AiAgentService,
+        private readonly notificationsService: NotificationsService
     ) { }
 
     private readonly logger = new Logger(ProductsController.name);
@@ -189,7 +191,7 @@ export class ProductsController {
                         const product = await this.productsService.create({
                             ...dto,
                             supplierId,
-                        }, isAdmin);
+                        }, isAdmin, true); // skipAi = true for bulk performance
                         createdProducts.push(product);
                         (result as any).message = 'Created successfully';
                     } catch (e) {
@@ -201,6 +203,16 @@ export class ProductsController {
                         report.errorCount++;
                     }
                 }
+            }
+
+            // Notify Admins ONCE after bulk upload if products were created by a supplier
+            if (!isAdmin && createdProducts.length > 0) {
+                this.notificationsService.notifyAdmins(
+                    'Bulk Products Uploaded',
+                    `${createdProducts.length} new products submitted by supplier: ${req.user.name || req.user.sub}`,
+                    'INFO',
+                    { count: createdProducts.length }
+                ).catch(() => {});
             }
 
             return { 
