@@ -71,10 +71,10 @@ export default function CustomerDashboard() {
                 // Add some mock logistics data if missing
                 const enrichedData = data.map((o: any) => ({
                     ...o,
-                    trackingNumber: o.trackingNumber || `ATL-${Math.random().toString(36).slice(2, 8).toUpperCase()}`,
-                    origin: o.origin || 'Istanbul, Turkey',
-                    destination: o.destination || 'Dubai, UAE',
-                    shippingCompany: o.shippingCompany || 'Scan Cargo'
+                    trackingNumber: o.trackingNumber || 'Pending Assignment',
+                    origin: o.origin || 'Awaiting Logistics Update',
+                    destination: o.destination || 'Awaiting Logistics Update',
+                    shippingCompany: o.shippingCompany || 'Awaiting Carrier Assignment'
                 }));
                 setOrders(enrichedData);
             }
@@ -181,7 +181,7 @@ export default function CustomerDashboard() {
                                 <div className="w-10 h-10 rounded-xl bg-[#1ABC9C]/10 flex items-center justify-center text-[#1ABC9C]">
                                     <Truck size={20} />
                                 </div>
-                                <div>
+                               <div>
                                     <h3 className="text-base font-bold text-[#1A1F36]">Active Shipment</h3>
                                     <p className="text-xs text-[#6B7280] font-medium">Track your current orders in real-time</p>
                                 </div>
@@ -205,7 +205,7 @@ export default function CustomerDashboard() {
                                         <div className="flex items-end gap-3">
                                             <h2 className="text-3xl font-bold text-[#0B1F3A]">{activeOrder.status.replace(/_/g, ' ')}</h2>
                                             <p className="text-sm font-medium text-[#6B7280] pb-1">
-                                                Estimated Delivery: <span className="text-[#1A1F36] font-bold">May 28, 2025</span>
+                                                Estimated Delivery: <span className="text-[#1A1F36] font-bold">Awaiting Update</span>
                                             </p>
                                         </div>
                                     </div>
@@ -244,7 +244,7 @@ export default function CustomerDashboard() {
                                                                 status !== 'upcoming' ? "text-[#1A1F36]" : "text-[#9CA3AF]"
                                                             )}>{step.label}</p>
                                                             <p className="text-[10px] text-[#6B7280] font-medium uppercase">
-                                                                {status === 'active' ? 'May 24, 09:20 AM' : status === 'upcoming' ? 'Pending' : 'Completed'}
+                                                                {status === 'active' ? 'Updating...' : status === 'upcoming' ? 'Pending' : 'Completed'}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -350,7 +350,7 @@ export default function CustomerDashboard() {
                                         </div>
                                     </div>
                                     <div className="p-4 space-y-2">
-                                        <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">{product.brand || 'Premium Brand'}</p>
+                                        <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">Verified Supplier</p>
                                         <h4 className="text-sm font-bold text-[#1A1F36] line-clamp-1 group-hover:text-[#1ABC9C] transition-colors">{product.name}</h4>
                                         <div className="pt-2 flex items-center justify-between">
                                             <span className="text-base font-bold text-[#1A1F36]">${product.price.toFixed(2)}<span className="text-[10px] text-[#6B7280] font-medium ms-0.5">/unit</span></span>

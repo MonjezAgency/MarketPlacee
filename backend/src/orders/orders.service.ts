@@ -179,6 +179,11 @@ export class OrdersService {
                     quantity: i.quantity,
                     price: i.price,
                 })),
+                history: order.history.map(h => ({
+                    status: h.newStatus,
+                    time: h.createdAt,
+                    reason: h.reason
+                }))
             };
         });
     }

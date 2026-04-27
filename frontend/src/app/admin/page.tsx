@@ -303,8 +303,8 @@ export default function AdminOverviewPage() {
                     color="bg-slate-50" iconColor="text-slate-600" sparklineColor="#475569"
                 />
                 <DashboardKPICard 
-                    icon={MousePointer2} label="Conversion Rate" value="3.42%" 
-                    subtext="vs last week" trend="up" trendValue={6.1} 
+                    icon={MousePointer2} label="Conversion Rate" value="0.00%" 
+                    subtext="vs last week" trend="up" trendValue={0} 
                     color="bg-emerald-50" iconColor="text-emerald-600" sparklineColor="#059669"
                 />
             </div>
@@ -431,7 +431,7 @@ export default function AdminOverviewPage() {
                                                 </button>
                                             </td>
                                         </tr>
-                                    ))}
+                                    ) )}
                                 </tbody>
                             </table>
                         </div>
@@ -514,7 +514,7 @@ export default function AdminOverviewPage() {
                                     <p className="text-xl font-bold text-slate-900">${stats.totalSales.toLocaleString()}</p>
                                     <div className="flex items-center gap-1 text-emerald-500 text-[10px] font-bold">
                                         <TrendingUp size={12} />
-                                        +15.3%
+                                        +0.0%
                                     </div>
                                 </div>
                             </div>
@@ -524,16 +524,16 @@ export default function AdminOverviewPage() {
                                         <Briefcase size={14} />
                                         <span className="text-[10px] font-bold uppercase tracking-widest">Expenses</span>
                                     </div>
-                                    <p className="text-lg font-bold text-slate-900">$24,680</p>
-                                    <p className="text-[9px] text-red-500 font-bold mt-1">+7.6% increase</p>
+                                    <p className="text-lg font-bold text-slate-900">$0.00</p>
+                                    <p className="text-[9px] text-slate-500 font-bold mt-1">Awaiting data</p>
                                 </div>
                                 <div className="p-4 bg-red-50/50 border border-red-100 rounded-xl">
                                     <div className="flex items-center gap-2 text-red-600 mb-1">
                                         <RotateCcw size={14} />
                                         <span className="text-[10px] font-bold uppercase tracking-widest">Refund Ratio</span>
                                     </div>
-                                    <p className="text-lg font-bold text-slate-900">2.34%</p>
-                                    <p className="text-[9px] text-emerald-500 font-bold mt-1">-0.6% vs last week</p>
+                                    <p className="text-lg font-bold text-slate-900">0.00%</p>
+                                    <p className="text-[9px] text-slate-500 font-bold mt-1">Awaiting data</p>
                                 </div>
                             </div>
                         </div>

@@ -140,7 +140,7 @@ export default function AmazonNavbar() {
                         {user && (
                             <Link href={getDashboardLink()} className="hidden md:flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-colors">
                                 <LayoutDashboard size={16} />
-                                <span>Dashboard</span>
+                                <span>{user.role?.toLowerCase() === 'buyer' ? t('sidebar', 'orders') : 'Dashboard'}</span>
                             </Link>
                         )}
                         <Link href="/cart" className="relative flex items-center gap-2 px-3 py-2 rounded-lg bg-accent hover:bg-accent/90 text-white font-semibold text-sm transition-colors shadow-sm" aria-label={`Cart (${cartCount} items)`}>

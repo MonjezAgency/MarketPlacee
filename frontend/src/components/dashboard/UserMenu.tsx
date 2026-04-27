@@ -61,9 +61,9 @@ export function UserMenu({ role }: UserMenuProps) {
 
     const menuItems = [
         {
-            label: t('userMenu', 'dashboard'),
-            icon: LayoutDashboard,
-            href: isTeamMember ? '/admin' : normalizedRole === 'supplier' ? '/supplier' : '/dashboard/customer',
+            label: normalizedRole === 'buyer' ? t('sidebar', 'orders') : t('userMenu', 'dashboard'),
+            icon: normalizedRole === 'buyer' ? Truck : LayoutDashboard,
+            href: isTeamMember ? '/admin' : normalizedRole === 'supplier' ? '/supplier' : '/dashboard/customer/orders',
         },
     ];
 

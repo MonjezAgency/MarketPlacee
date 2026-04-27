@@ -322,20 +322,30 @@ export class EmailService {
 
   async sendWelcomeEmail(email: string, name: string, role: string) {
     const frontendUrl = this.getFrontendUrl();
-    const ctaUrl = role.toUpperCase() === 'SUPPLIER'
+    const isSupplier = role.toUpperCase() === 'SUPPLIER';
+    
+    const ctaUrl = isSupplier
       ? `${frontendUrl}/dashboard/supplier`
-      : `${frontendUrl}/dashboard/buyer`;
+      : `${frontendUrl}/`; // Land on marketplace directly for buyers
+
+    const ctaText = isSupplier
+      ? 'Go to Your Dashboard →'
+      : 'Start Shopping Now →';
+
+    const welcomeBody = isSupplier
+      ? 'Excellent news! Our team has verified your business profile. You can now access the full power of the Atlantis supplier hub.'
+      : 'Excellent news! Your account is active and you can now start sourcing premium products directly from our global partners.';
 
     await this.sendMail(email, 'Welcome to Atlantis — Your account is approved! 🎉', `
       <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
         <div style="background: #0A1A2F; padding: 50px 40px; text-align: center;">
           <h1 style="color: white; font-size: 32px; margin: 0 0 10px; font-weight: 900;">Welcome, ${name}! 👋</h1>
-          <p style="color: #1BC7C9; font-size: 18px; margin: 0;">Your account has been approved.</p>
+          <p style="color: #1BC7C9; font-size: 18px; margin: 0;">Your account is ready.</p>
         </div>
         <div style="padding: 40px 30px; background: #fff; text-align: center;">
-          <p style="font-size: 16px; color: #2E2E2E; margin-bottom: 25px;">Excellent news! Our team has verified your business profile. You can now access the full power of the Atlantis marketplace.</p>
+          <p style="font-size: 16px; color: #2E2E2E; margin-bottom: 25px;">${welcomeBody}</p>
           <a href="${ctaUrl}" style="display: inline-block; background:#f97316; color:#fff; padding:16px 32px; border-radius:12px; text-decoration:none; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
-            Go to Your Dashboard →
+            ${ctaText}
           </a>
         </div>
         <div style="background: #0A1A2F; padding: 20px; text-align: center;">

@@ -114,7 +114,11 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             <div className="flex flex-col flex-1 p-4">
                 {/* Brand & Stats */}
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-bold uppercase tracking-widest text-primary/80">{product.brand}</span>
+                    {(user?.role === 'ADMIN' || isOwnProduct) ? (
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-primary/80">{product.brand}</span>
+                    ) : (
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Verified Supplier</span>
+                    )}
                     <div className="flex items-center gap-1">
                         {rating > 0 ? (
                             <>

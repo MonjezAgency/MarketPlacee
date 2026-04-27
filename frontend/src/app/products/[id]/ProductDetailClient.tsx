@@ -522,7 +522,11 @@ export default function ProductDetailClient() {
                                         <img src={p.image} alt={p.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
                                     </div>
                                     <div className="flex-1 space-y-2">
-                                        <p className="text-[10px] font-bold text-[#14B8A6] uppercase tracking-widest truncate">{p.brand}</p>
+                                        {(user?.role === 'ADMIN' || (user?.role === 'SUPPLIER' && p.supplierId === user?.id)) ? (
+                                            <p className="text-[10px] font-bold text-[#14B8A6] uppercase tracking-widest truncate">{p.brand}</p>
+                                        ) : (
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Verified Supplier</p>
+                                        )}
                                         <h3 className="text-[13px] font-bold text-[#111827] line-clamp-2 leading-snug group-hover:text-[#14B8A6] transition-colors">{p.name}</h3>
                                         <div className="flex items-center gap-1">
                                             {[...Array(5)].map((_, i) => (

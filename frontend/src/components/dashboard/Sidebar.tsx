@@ -142,7 +142,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                     <h2 className="text-xl font-poppins font-black tracking-tighter text-white leading-none">
                         Atlan<span className="text-teal-400">tis.</span>
                     </h2>
-                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-teal-400/50 mt-1">Supplier Hub</span>
+                    <span className="text-[9px] font-black uppercase tracking-[0.3em] text-teal-400/50 mt-1">{portalLabel}</span>
                 </div>
             </div>
 

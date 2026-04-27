@@ -650,10 +650,8 @@ export default function AdminOrdersPage() {
                                             </div>
                                             <div className="space-y-3">
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shipping Address</p>
-                                                <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-600 leading-relaxed">
-                                                    123 Commerce Avenue, Building 4<br />
-                                                    Tech City, Digital District<br />
-                                                    Cairo, Egypt
+                                                <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-600 leading-relaxed italic">
+                                                    Address details not provided by customer during registration.
                                                 </div>
                                             </div>
                                             <button 
@@ -682,7 +680,7 @@ export default function AdminOrdersPage() {
                                                 <div className="space-y-3">
                                                     <div className="flex justify-between text-xs">
                                                         <span className="text-slate-400">Transaction ID</span>
-                                                        <span className="font-mono text-slate-900">txn_894125741</span>
+                                                        <span className="font-mono text-slate-900 uppercase">INTERNAL_B2B_{selectedOrder.id.slice(0, 8)}</span>
                                                     </div>
                                                     <div className="flex justify-between text-xs">
                                                         <span className="text-slate-400">Status</span>
@@ -700,18 +698,21 @@ export default function AdminOrdersPage() {
                                     {detailTab === 'timeline' && (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
                                             <div className="space-y-6 ps-4 border-s-2 border-slate-100">
-                                                {[
-                                                    { title: 'Order Placed', time: 'May 20, 09:42 AM', color: 'bg-emerald-500' },
-                                                    { title: 'Payment Confirmed', time: 'May 20, 09:45 AM', color: 'bg-emerald-500' },
-                                                    { title: 'Processing Order', time: 'May 20, 02:30 PM', color: 'bg-blue-500' },
-                                                    { title: 'Awaiting Pickup', time: 'May 21, 08:00 AM', color: 'bg-slate-300' },
-                                                ].map((step, idx) => (
-                                                    <div key={idx} className="relative">
-                                                        <div className={cn("absolute -left-[25px] top-1 w-4 h-4 rounded-full ring-4 ring-white", step.color)} />
-                                                        <p className="text-xs font-bold text-slate-900">{step.title}</p>
-                                                        <p className="text-[10px] text-slate-400 mt-0.5">{step.time}</p>
+                                                {(selectedOrder as any).history && (selectedOrder as any).history.length > 0 ? (
+                                                    (selectedOrder as any).history.map((h: any, idx: number) => (
+                                                        <div key={idx} className="relative">
+                                                            <div className={cn("absolute -left-[25px] top-1 w-4 h-4 rounded-full ring-4 ring-white bg-emerald-500")} />
+                                                            <p className="text-xs font-bold text-slate-900">{h.status}</p>
+                                                            <p className="text-[10px] text-slate-400 mt-0.5">{new Date(h.time).toLocaleString()} • {h.reason || 'No details'}</p>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="relative">
+                                                        <div className={cn("absolute -left-[25px] top-1 w-4 h-4 rounded-full ring-4 ring-white bg-slate-300")} />
+                                                        <p className="text-xs font-bold text-slate-900">Initial Request</p>
+                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(selectedOrder.date).toLocaleString()}</p>
                                                     </div>
-                                                ))}
+                                                )}
                                             </div>
                                         </div>
                                     )}

@@ -316,8 +316,25 @@ export default function Home() {
         return () => clearInterval(timer);
     }, []);
 
-    // Since the user wants no fake data, we'll keep it empty.
-    const products: any[] = [];
+    const [products, setProducts] = React.useState<any[]>([]);
+    const [isLoadingProducts, setIsLoadingProducts] = React.useState(true);
+
+    React.useEffect(() => {
+        const fetchProducts = async () => {
+            try {
+                const res = await apiFetch('/products?limit=6&status=APPROVED');
+                if (res.ok) {
+                    const data = await res.json();
+                    setProducts(data.products || []);
+                }
+            } catch (err) {
+                console.error('Failed to fetch products:', err);
+            } finally {
+                setIsLoadingProducts(false);
+            }
+        };
+        fetchProducts();
+    }, []);
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans text-[#111827]">
@@ -593,7 +610,17 @@ export default function Home() {
                         </Link>
                     </div>
                     
-                    {products.length === 0 ? (
+                    {isLoadingProducts ? (
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+                            {[...Array(6)].map((_, i) => (
+                                <div key={i} className="animate-pulse space-y-4">
+                                    <div className="aspect-square bg-slate-200 rounded-2xl" />
+                                    <div className="h-4 bg-slate-200 rounded w-3/4" />
+                                    <div className="h-4 bg-slate-200 rounded w-1/2" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : products.length === 0 ? (
                         <div className="h-[300px] border-2 border-dashed border-[#E5E7EB] rounded-[20px] flex flex-col items-center justify-center space-y-4 bg-white/50">
                             <div className="w-16 h-16 rounded-full bg-[#F8FAFC] flex items-center justify-center text-[#94A3B8]">
                                 <Package size={32} />
@@ -607,8 +634,29 @@ export default function Home() {
                             </button>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                            {/* Products would go here */}
+                        <div className="grid grid-cols-2 md:grid-cols-6 gap-6">
+                            {products.map((prod) => (
+                                <Link 
+                                    key={prod.id} 
+                                    href={`/product/${prod.id}`}
+                                    className="group bg-white border border-[#E5E7EB] rounded-2xl p-4 hover:shadow-xl transition-all no-underline"
+                                >
+                                    <div className="aspect-square rounded-xl overflow-hidden bg-slate-50 mb-4">
+                                        <img 
+                                            src={prod.images?.[0] || 'https://images.unsplash.com/photo-1586771107445-d3ca888129ff?w=300&h=300&fit=crop'} 
+                                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                            alt={prod.name}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <h3 className="text-xs font-bold text-slate-900 line-clamp-1 group-hover:text-[#2EC4B6] transition-colors">{prod.name}</h3>
+                                        <div className="flex items-center justify-between pt-1">
+                                            <p className="text-sm font-black text-[#0B1F3A]">${prod.price || '0.00'}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">MOQ: {prod.moq || '1'}</p>
+                                        </div>
+                                    </div>
+                                </Link>
+                            ))}
                         </div>
                     )}
                 </section>

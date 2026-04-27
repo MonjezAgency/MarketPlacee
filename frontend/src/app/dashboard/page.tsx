@@ -40,7 +40,7 @@ export default function DashboardIndex() {
         } else if (role === 'SUPPLIER') {
             router.replace('/dashboard/supplier');
         } else {
-            router.replace('/dashboard/customer');
+            router.replace('/');
         }
     }, [user, isLoggedIn, isAuthReady, router]);
 
