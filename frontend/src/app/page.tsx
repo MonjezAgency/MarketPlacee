@@ -649,7 +649,7 @@ export default function Home() {
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-6 gap-6">
-                            {products.map((prod, idx) => (
+                            {products.slice(0, 6).map((prod, idx) => (
                                 <ProductCard key={prod.id} product={prod} index={idx} />
                             ))}
                         </div>
