@@ -30,6 +30,7 @@ function RegisterForm() {
     const inviteEmail = searchParams.get('email') || '';
     const inviteToken = searchParams.get('invite') || '';
     const inviteRole = searchParams.get('role') || '';
+    const isFixedRole = searchParams.get('fixed') === 'true';
     const [form, setForm] = useState({
         name: '', email: inviteEmail, phone: '', phoneCode: '+20', companyName: '', website: '', socialLinks: '', password: '', confirmPassword: '', role: inviteRole || 'customer',
         vatNumber: '', taxId: '', country: 'Egypt', bankAddress: '', iban: '', swiftCode: ''
@@ -504,7 +505,7 @@ function RegisterForm() {
                                     ))}
                                 </div>
 
-                                {!inviteToken && (
+                                {!inviteToken && !isFixedRole && (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
                                         <label className={labelClass}>Platform Operation Mode</label>
                                         <div className="grid grid-cols-2 gap-4">

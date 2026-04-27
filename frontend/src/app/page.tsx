@@ -685,9 +685,12 @@ export default function Home() {
                             </div>
                         </div>
 
-                        <button className="h-[52px] px-10 bg-[#2EC4B6] hover:brightness-110 text-white rounded-[14px] text-[15px] font-bold transition-all shadow-xl shadow-[#2EC4B6]/20 active:scale-95">
+                        <Link 
+                            href="/auth/register?role=customer&fixed=true"
+                            className="h-[52px] px-10 bg-[#2EC4B6] hover:brightness-110 text-white rounded-[14px] text-[15px] font-bold transition-all shadow-xl shadow-[#2EC4B6]/20 active:scale-95 flex items-center justify-center no-underline"
+                        >
                             Become a Buyer
-                        </button>
+                        </Link>
                     </div>
                 </section>
 

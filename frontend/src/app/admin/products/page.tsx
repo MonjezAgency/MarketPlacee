@@ -1153,12 +1153,9 @@ export default function ProductsModerationPage() {
                                         <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-2">Mandatory Columns</h4>
                                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                             {[
-                                                'Product Name', 'Brand', 'Category', 
-                                                'Price (Base)', 'Currency (USD/EUR/EGP)',
-                                                'Description', 'Weight (kg)', 'Shelf Life',
-                                                'Stock (Total Units)', 'Min Order (MOQ)', 
-                                                'Unit Type (PC/PL/SH)', 'Units per Pallet',
-                                                'Pallets per Shipment', 'SKU', 'EAN'
+                                                'Product Name', 'Description', 'Product image',
+                                                'UnitBarcode', 'BBD (Shelf Life)', 'Units / Carton',
+                                                'Cartons / Pallet', 'UnitPriceEUR', 'MOQ'
                                             ].map(col => (
                                                 <div key={col} className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />

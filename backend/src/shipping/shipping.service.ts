@@ -35,7 +35,7 @@ export class ShippingService {
     async getRates(cartTotal: number, destination: string, productIds?: string[]): Promise<ShippingQuote[]> {
         const baseWeight = cartTotal * 0.1;
         const { factor: distanceFactor, warehouseCity } = await this.resolveDistanceFactor(destination, productIds);
-        return this.buildQuotes(baseWeight, distanceFactor, warehouseCity);
+        return await this.buildQuotes(baseWeight, distanceFactor, warehouseCity);
     }
 
     // ─── Public: Agent endpoint — full address-aware pricing ────────────────
@@ -49,7 +49,7 @@ export class ShippingService {
 
         this.logger.log(`[ShippingAgent] Weight=${estimatedWeight}kg | Zone factor=${factor} | From: ${warehouseCity || 'unknown'}`);
 
-        return this.buildQuotes(estimatedWeight, factor, warehouseCity);
+        return await this.buildQuotes(estimatedWeight, factor, warehouseCity);
     }
 
     // ─── Agent: estimate shipment weight from products ──────────────────────
@@ -157,16 +157,21 @@ export class ShippingService {
     }
 
     // ─── Build quotes from weight + zone factor ──────────────────────────────
-    private buildQuotes(weightKg: number, factor: number, warehouseCity: string): ShippingQuote[] {
+    private async buildQuotes(weightKg: number, factor: number, warehouseCity: string): Promise<ShippingQuote[]> {
         const note = warehouseCity ? `Dispatched from: ${warehouseCity}` : null;
         const currency = (process.env.DEFAULT_CURRENCY || 'eur').toUpperCase();
 
+        // Fetch Shipping Markup from DB
+        const config = await this.prisma.appConfig.findUnique({ where: { key: 'SHIPPING_MARKUP' } });
+        const shippingMarkup = config?.value ? parseFloat(config.value) : 1.15; // default 15% if not set
+        const finalMarkup = isNaN(shippingMarkup) ? 1.15 : shippingMarkup;
+
         // DB SCHENKER — Road & Express, strong in Central/Eastern EU
-        const schenkerCost = parseFloat(((45 + weightKg * 1.8) * factor).toFixed(2));
+        const schenkerCost = parseFloat(((45 + weightKg * 1.8) * factor * finalMarkup).toFixed(2));
         // LKW WALTER — Road freight specialist, best for heavy loads
-        const walterCost   = parseFloat(((38 + weightKg * 2.1) * factor).toFixed(2));
+        const walterCost   = parseFloat(((38 + weightKg * 2.1) * factor * finalMarkup).toFixed(2));
         // Raben Group — Eastern EU specialist, fastest in region
-        const rabenCost    = parseFloat(((42 + weightKg * 1.9) * factor).toFixed(2));
+        const rabenCost    = parseFloat(((42 + weightKg * 1.9) * factor * finalMarkup).toFixed(2));
 
         return [
             {
