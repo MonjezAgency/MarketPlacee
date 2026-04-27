@@ -42,7 +42,6 @@ export default function SettingsPage() {
     ];
 
     return (
-    return (
         <div className="space-y-8 animate-in fade-in duration-700">
             {/* Header Section */}
             <div>
