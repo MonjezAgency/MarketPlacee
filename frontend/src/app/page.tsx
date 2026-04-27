@@ -81,6 +81,8 @@ const BRANDS = [
     { name: 'Ferrero', logo: '/Logos/ferrero.png' },
     { name: 'AXE', logo: '/Logos/axe.png' },
     { name: 'Lifebuoy', logo: '/Logos/lifebuoy.png' },
+    { name: 'Nestle', logo: '/Logos/nescafe.png' },
+    { name: 'Kinder', logo: '/Logos/kinder.png' },
 ];
 
 const TOP_CAT_CARDS = [
@@ -538,8 +540,16 @@ export default function Home() {
                         <Marquee baseVelocity={-2}>
                             <div className="flex gap-6 pr-6 shrink-0 w-max">
                                 {BRANDS.map((brand, i) => (
-                                    <div key={i} className="h-[80px] px-10 bg-white border border-[#E5E7EB] rounded-[24px] flex items-center justify-center shrink-0 grayscale hover:grayscale-0 transition-all cursor-pointer shadow-sm hover:shadow-xl hover:border-[#2EC4B6]/30 group">
-                                        <img src={brand.logo} alt={brand.name} className="h-10 w-auto object-contain opacity-50 group-hover:opacity-100 transition-opacity" />
+                                    <div key={`${brand.name}-${i}`} className="h-[80px] px-10 bg-white border border-[#E5E7EB] rounded-[24px] flex items-center justify-center shrink-0 grayscale hover:grayscale-0 transition-all cursor-pointer shadow-sm hover:shadow-xl hover:border-[#2EC4B6]/30 group">
+                                        <img 
+                                            src={brand.logo} 
+                                            alt={brand.name} 
+                                            className="h-10 w-auto object-contain opacity-50 group-hover:opacity-100 transition-opacity" 
+                                            onError={(e) => {
+                                                (e.target as HTMLImageElement).style.display = 'none';
+                                                (e.target as HTMLImageElement).parentElement!.innerHTML = `<span class="text-[14px] font-black text-slate-300 uppercase tracking-widest">${brand.name}</span>`;
+                                            }}
+                                        />
                                     </div>
                                 ))}
                             </div>
