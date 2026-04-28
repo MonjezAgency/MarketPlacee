@@ -200,12 +200,27 @@ export default function NewsletterPage() {
                                         <tr key={sub.id} className="hover:bg-slate-50/80 transition-colors group">
                                             <td className="px-10 py-6">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="w-11 h-11 rounded-2xl bg-[#2EC4B6]/10 flex items-center justify-center text-[#2EC4B6] font-black text-[14px] border border-[#2EC4B6]/10">
-                                                        {sub.email[0].toUpperCase()}
-                                                    </div>
+                                                    {sub.user ? (
+                                                        <div className="w-11 h-11 rounded-2xl bg-slate-100 flex items-center justify-center border border-slate-200 overflow-hidden">
+                                                            {sub.user.avatar ? (
+                                                                <img src={sub.user.avatar} alt={sub.user.name} className="w-full h-full object-cover" />
+                                                            ) : (
+                                                                <span className="text-slate-500 font-black text-[14px]">{sub.user.name?.[0]?.toUpperCase()}</span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <div className="w-11 h-11 rounded-2xl bg-[#2EC4B6]/10 flex items-center justify-center text-[#2EC4B6] font-black text-[14px] border border-[#2EC4B6]/10">
+                                                            {sub.email[0].toUpperCase()}
+                                                        </div>
+                                                    )}
                                                     <div className="flex flex-col">
-                                                        <span className="text-[14px] font-black text-[#0F172A]">{sub.email}</span>
-                                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{sub.region || 'Global'} Entity</span>
+                                                        <span className="text-[14px] font-black text-[#0F172A]">{sub.user ? sub.user.name : sub.email}</span>
+                                                        <div className="flex items-center gap-2">
+                                                            {sub.user && <span className="text-[10px] text-slate-500 font-medium">{sub.email}</span>}
+                                                            <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
+                                                                {sub.user ? sub.user.role : `${sub.region || 'Global'} Entity`}
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </td>

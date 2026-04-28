@@ -30,9 +30,22 @@ export class NewsletterService {
     }
 
     async findAll() {
-        return this.prisma.newsletterSubscriber.findMany({
+        const subscribers = await this.prisma.newsletterSubscriber.findMany({
             orderBy: { createdAt: 'desc' }
         });
+
+        const emails = subscribers.map(s => s.email);
+        const users = await this.prisma.user.findMany({
+            where: { email: { in: emails } },
+            select: { email: true, id: true, name: true, avatar: true, role: true }
+        });
+
+        const userMap = new Map(users.map(u => [u.email, u]));
+
+        return subscribers.map(sub => ({
+            ...sub,
+            user: userMap.get(sub.email) || null
+        }));
     }
 
     async remove(id: string) {
