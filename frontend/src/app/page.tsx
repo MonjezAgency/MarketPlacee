@@ -137,46 +137,46 @@ function HeroCarousel() {
     const { t } = useLanguage();
     const slides = [
         {
-            label: t('home', 'hero', 'globalLogistics'),
-            title: t('home', 'hero', 'globalSourcing'),
-            desc: t('home', 'hero', 'logisticsDesc'),
+            label: t('home', 'hero.globalLogistics'),
+            title: t('home', 'hero.globalSourcing'),
+            desc: t('home', 'hero.logisticsDesc'),
             features: [
-                { icon: Package, title: t('home', 'hero', 'lowMoq'), sub: t('home', 'hero', 'startSmall') },
-                { icon: Truck, title: t('home', 'hero', 'globalShipping'), sub: t('home', 'hero', 'reliableDelivery') },
-                { icon: ShieldCheck, title: t('home', 'hero', 'verifiedSources'), sub: t('home', 'hero', 'factoryInspection') }
+                { icon: Package, title: t('home', 'hero.lowMoq'), sub: t('home', 'hero.startSmall') },
+                { icon: Truck, title: t('home', 'hero.globalShipping'), sub: t('home', 'hero.reliableDelivery') },
+                { icon: ShieldCheck, title: t('home', 'hero.verifiedSources'), sub: t('home', 'hero.factoryInspection') }
             ],
             image: "/hero/1.png"
         },
         {
-            label: t('home', 'hero', 'premiumNetwork'),
-            title: t('home', 'hero', 'bulkOrders'),
-            desc: t('home', 'hero', 'savingsDesc'),
+            label: t('home', 'hero.premiumNetwork'),
+            title: t('home', 'hero.bulkOrders'),
+            desc: t('home', 'hero.savingsDesc'),
             features: [
-                { icon: TrendingUp, title: t('home', 'hero', 'volumeDiscounts'), sub: t('home', 'hero', 'buyMore') },
-                { icon: CircleDollarSign, title: t('home', 'hero', 'flexiblePayments'), sub: t('home', 'hero', 'tradeTerms') },
-                { icon: Headphones, title: t('home', 'hero', 'dedicatedSupport'), sub: t('home', 'hero', 'accountHelp') }
+                { icon: TrendingUp, title: t('home', 'hero.volumeDiscounts'), sub: t('home', 'hero.buyMore') },
+                { icon: CircleDollarSign, title: t('home', 'hero.flexiblePayments'), sub: t('home', 'hero.tradeTerms') },
+                { icon: Headphones, title: t('home', 'hero.dedicatedSupport'), sub: t('home', 'hero.accountHelp') }
             ],
             image: "/hero/2.png"
         },
         {
-            label: t('home', 'hero', 'smartChain'),
-            title: t('home', 'hero', 'factoriesVerified'),
-            desc: t('home', 'hero', 'vettedDesc'),
+            label: t('home', 'hero.smartChain'),
+            title: t('home', 'hero.factoriesVerified'),
+            desc: t('home', 'hero.vettedDesc'),
             features: [
-                { icon: ShieldCheck, title: t('home', 'hero', 'vettedSources'), sub: t('home', 'hero', 'verifiedSources') },
-                { icon: CheckCircle2, title: t('home', 'hero', 'qualityControl'), sub: t('home', 'hero', 'inspectionProtocols') },
-                { icon: Star, title: t('home', 'hero', 'premiumBrands'), sub: t('home', 'hero', 'topGlobalNames') }
+                { icon: ShieldCheck, title: t('home', 'hero.vettedSources'), sub: t('home', 'hero.verifiedSources') },
+                { icon: CheckCircle2, title: t('home', 'hero.qualityControl'), sub: t('home', 'hero.inspectionProtocols') },
+                { icon: Star, title: t('home', 'hero.premiumBrands'), sub: t('home', 'hero.topGlobalNames') }
             ],
             image: "/hero/3.png"
         },
         {
-            label: t('home', 'hero', 'integratedWarehouse'),
-            title: t('home', 'hero', 'fasterGrowth'),
-            desc: t('home', 'hero', 'streamlineDesc'),
+            label: t('home', 'hero.integratedWarehouse'),
+            title: t('home', 'hero.fasterGrowth'),
+            desc: t('home', 'hero.streamlineDesc'),
             features: [
-                { icon: Zap, title: t('home', 'hero', 'fastTransit'), sub: t('home', 'hero', 'reducedTime') },
-                { icon: History, title: t('home', 'hero', 'liveTracking'), sub: t('home', 'hero', 'realTimeVisibility') },
-                { icon: Box, title: t('home', 'hero', 'safeHandling'), sub: t('home', 'hero', 'premiumStandards') }
+                { icon: Zap, title: t('home', 'hero.fastTransit'), sub: t('home', 'hero.reducedTime') },
+                { icon: History, title: t('home', 'hero.liveTracking'), sub: t('home', 'hero.realTimeVisibility') },
+                { icon: Box, title: t('home', 'hero.safeHandling'), sub: t('home', 'hero.premiumStandards') }
             ],
             image: "/hero/4.png"
         }
@@ -249,7 +249,7 @@ function HeroCarousel() {
                             {/* 4. CTA Button */}
                             <div className="pt-2">
                                 <Link href="/categories" className="h-[52px] px-[28px] bg-[#2EC4B6] hover:brightness-110 text-white rounded-[14px] text-[16px] font-semibold transition-all shadow-lg hover:shadow-[#2EC4B6]/25 active:scale-95 flex items-center gap-3 no-underline">
-                                    {t('home', 'hero', 'startSourcing')} <ChevronRight size={18} />
+                                    {t('home', 'hero.startSourcing')} <ChevronRight size={18} />
                                 </Link>
                             </div>
                         </div>
@@ -295,23 +295,23 @@ export default function HomePage() {
     // HERO CAROUSEL DATA
     const HERO_SLIDES = [
         {
-            title: t('home', 'hero', 'yourB2BPartner'),
-            desc: t('home', 'hero', 'bulkDesc'),
+            title: t('home', 'hero.yourB2BPartner'),
+            desc: t('home', 'hero.bulkDesc'),
             image: "/Images/4.png"
         },
         {
-            title: t('home', 'hero', 'directSourcing'),
-            desc: t('home', 'hero', 'eliminateMiddlemen'),
+            title: t('home', 'hero.directSourcing'),
+            desc: t('home', 'hero.eliminateMiddlemen'),
             image: "/Images/1.png"
         },
         {
-            title: t('home', 'hero', 'seamlessLogistics'),
-            desc: t('home', 'hero', 'expertHandling'),
+            title: t('home', 'hero.seamlessLogistics'),
+            desc: t('home', 'hero.expertHandling'),
             image: "/Images/2.png"
         },
         {
-            title: t('home', 'hero', 'globalExpansion'),
-            desc: t('home', 'hero', 'scaleBrand'),
+            title: t('home', 'hero.globalExpansion'),
+            desc: t('home', 'hero.scaleBrand'),
             image: "/Images/3.png"
         }
     ];
@@ -400,10 +400,10 @@ export default function HomePage() {
                                     {/* Constant Feature Icons */}
                                     <div className="flex items-center gap-8 py-2">
                                         {[
-                                            { icon: ShieldCheck, label: t('home', 'verifiedGlobalSuppliers'), sub: t('home', 'hero', 'verifiedSources') },
-                                            { icon: TrendingUp, label: t('home', 'competitiveWholesalePrices'), sub: t('home', 'hero', 'buyMore') },
-                                            { icon: Truck, label: t('home', 'globalShippingSolutions'), sub: t('home', 'hero', 'reliableDelivery') },
-                                            { icon: Shield, label: t('home', 'paymentDesc'), sub: t('home', 'hero', 'tradeTerms') }
+                                            { icon: ShieldCheck, label: t('home', 'verifiedGlobalSuppliers'), sub: t('home', 'hero.verifiedSources') },
+                                            { icon: TrendingUp, label: t('home', 'competitiveWholesalePrices'), sub: t('home', 'hero.buyMore') },
+                                            { icon: Truck, label: t('home', 'globalShippingSolutions'), sub: t('home', 'hero.reliableDelivery') },
+                                            { icon: Shield, label: t('home', 'paymentDesc'), sub: t('home', 'hero.tradeTerms') }
                                         ].map((item, i) => (
                                             <div key={i} className="flex items-center gap-3">
                                                 <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-[#2EC4B6] border border-white/10">
@@ -419,10 +419,10 @@ export default function HomePage() {
 
                                     <div className="flex items-center gap-4 pt-4">
                                         <Link href="/categories" className="h-[56px] px-10 bg-[#2EC4B6] hover:brightness-110 text-white rounded-[16px] text-[16px] font-bold transition-all shadow-xl shadow-[#2EC4B6]/20 active:scale-95 flex items-center gap-3 no-underline">
-                                            {t('home', 'hero', 'startSourcing')} <ArrowRight size={20} />
+                                            {t('home', 'hero.startSourcing')} <ArrowRight size={20} />
                                         </Link>
                                         <Link href="/how-it-works" className="h-[56px] px-8 bg-white/5 hover:bg-white/10 text-white rounded-[16px] text-[15px] font-bold transition-all border border-white/10 backdrop-blur-sm flex items-center justify-center no-underline">
-                                            {t('home', 'hero', 'howItWorks')}
+                                            {t('home', 'hero.howItWorks')}
                                         </Link>
                                     </div>
                                 </motion.div>
