@@ -286,15 +286,31 @@ export default function Navbar() {
                                     {user && (
                                         <div className="absolute top-full right-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
                                             <div className="w-56 bg-white border border-[#E5E7EB] rounded-2xl shadow-2xl p-2 overflow-hidden">
-                                                <Link href={dashboardLink} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F8FAFC] text-[13px] font-bold text-[#64748B] hover:text-[#2EC4B6] transition-all">
-                                                    <Monitor size={16} /> {t('userMenu', 'techDashboard')}
-                                                </Link>
-                                                <Link href="/dashboard/customer/orders" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F8FAFC] text-[13px] font-bold text-[#64748B] hover:text-[#2EC4B6] transition-all">
-                                                    <Package size={16} /> {t('userMenu', 'trackOrder')}
-                                                </Link>
-                                                <Link href="/dashboard/customer/settings" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F8FAFC] text-[13px] font-bold text-[#64748B] hover:text-[#2EC4B6] transition-all">
-                                                    <User size={16} /> {t('userMenu', 'settings')}
-                                                </Link>
+                                                {(() => {
+                                                    const role = user.role?.toUpperCase() || '';
+                                                    const isAdmin = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'].includes(role);
+                                                    const isSupplier = role === 'SUPPLIER';
+
+                                                    let settingsLink = "/dashboard/customer/settings";
+                                                    if (isAdmin) settingsLink = "/admin/settings";
+                                                    if (isSupplier) settingsLink = "/supplier/settings";
+
+                                                    return (
+                                                        <>
+                                                            <Link href={dashboardLink} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F8FAFC] text-[13px] font-bold text-[#64748B] hover:text-[#2EC4B6] transition-all">
+                                                                <Monitor size={16} /> {isAdmin ? t('userMenu', 'techDashboard') : t('userMenu', 'dashboard')}
+                                                            </Link>
+                                                            {!isAdmin && !isSupplier && (
+                                                                <Link href="/dashboard/customer/orders" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F8FAFC] text-[13px] font-bold text-[#64748B] hover:text-[#2EC4B6] transition-all">
+                                                                    <Package size={16} /> {t('userMenu', 'trackOrder')}
+                                                                </Link>
+                                                            )}
+                                                            <Link href={settingsLink} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F8FAFC] text-[13px] font-bold text-[#64748B] hover:text-[#2EC4B6] transition-all">
+                                                                <User size={16} /> {t('userMenu', 'settings')}
+                                                            </Link>
+                                                        </>
+                                                    );
+                                                })()}
                                                 <div className="h-px bg-[#E5E7EB] my-1" />
                                                 <button 
                                                     onClick={logout}
