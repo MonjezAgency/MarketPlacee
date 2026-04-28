@@ -12,6 +12,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
+import { formatPrice } from '@/lib/currency';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -40,6 +41,10 @@ interface Product {
     palletsPerShipment?: number;
     basePrice?: number;
     moq?: number;
+    ean?: string;
+    origin?: string;
+    shelfLife?: string;
+    weight?: number;
 }
 
 // ─── Components ─────────────────────────────────────────────────────────────
@@ -494,7 +499,7 @@ export default function ProductsModerationPage() {
                                             <td className="px-6 py-4 text-sm text-slate-600">{p.supplier?.name || 'Admin Upload'}</td>
                                             <td className="px-6 py-4"><StatusBadge status={p.status} /></td>
                                             <td className="px-6 py-4"><CompletenessBar value={p.completeness || 0} /></td>
-                                            <td className="px-6 py-4 text-sm font-bold text-slate-900">${p.price.toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-900">{formatPrice(p.price)}</td>
                                             <td className="px-6 py-4 text-sm text-slate-600">{p.stock.toLocaleString()}</td>
                                             <td className="px-6 py-4 text-xs text-slate-400 font-medium">{new Date(p.createdAt).toLocaleDateString()}</td>
                                             <td className="px-6 py-4 text-end">
@@ -520,7 +525,7 @@ export default function ProductsModerationPage() {
                                         <p className="text-xs text-slate-500 mt-0.5">{p.supplier?.name || 'Admin Upload'}</p>
                                         <div className="flex items-center gap-2 mt-2">
                                             <StatusBadge status={p.status} />
-                                            <span className="text-[10px] font-bold text-slate-900">${p.price.toLocaleString()}</span>
+                                            <span className="text-[10px] font-bold text-slate-900">{formatPrice(p.price)}</span>
                                         </div>
                                     </div>
                                     <ChevronRight size={18} className="text-slate-300" />
@@ -660,11 +665,63 @@ export default function ProductsModerationPage() {
                                                         <p className="text-sm font-bold text-slate-900">{selectedProduct.name}</p>
                                                     )}
                                                 </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">EAN / UPC</label>
+                                                    {isEditing ? (
+                                                        <input 
+                                                            className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
+                                                            value={editData.ean || ''}
+                                                            onChange={(e) => setEditData({...editData, ean: e.target.value})}
+                                                        />
+                                                    ) : (
+                                                        <p className="text-sm font-bold text-slate-900">{selectedProduct.ean || 'N/A'}</p>
+                                                    )}
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-4">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Origin</label>
+                                                        {isEditing ? (
+                                                            <input 
+                                                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
+                                                                value={editData.origin || ''}
+                                                                onChange={(e) => setEditData({...editData, origin: e.target.value})}
+                                                            />
+                                                        ) : (
+                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.origin || 'N/A'}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shelf Life</label>
+                                                        {isEditing ? (
+                                                            <input 
+                                                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
+                                                                value={editData.shelfLife || ''}
+                                                                onChange={(e) => setEditData({...editData, shelfLife: e.target.value})}
+                                                            />
+                                                        ) : (
+                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.shelfLife || 'N/A'}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Weight (kg)</label>
+                                                        {isEditing ? (
+                                                            <input 
+                                                                type="number"
+                                                                step="0.01"
+                                                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
+                                                                value={editData.weight || 0}
+                                                                onChange={(e) => setEditData({...editData, weight: parseFloat(e.target.value) || 0})}
+                                                            />
+                                                        ) : (
+                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.weight || 0}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
 
                                             <div className="grid grid-cols-2 gap-4">
                                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Display Price ($)</p>
+                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Display Price</p>
                                                     {isEditing ? (
                                                         <input 
                                                             type="number"
@@ -673,7 +730,7 @@ export default function ProductsModerationPage() {
                                                             onChange={(e) => setEditData({...editData, price: parseFloat(e.target.value)})}
                                                         />
                                                     ) : (
-                                                        <p className="text-lg font-bold text-slate-900">${selectedProduct.price.toLocaleString()}</p>
+                                                        <p className="text-lg font-bold text-slate-900">{formatPrice(selectedProduct.price)}</p>
                                                     )}
                                                 </div>
                                                 <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -837,7 +894,7 @@ export default function ProductsModerationPage() {
                                                 </p>
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Unit Price ($)</p>
+                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Unit Price</p>
                                                         {isEditing ? (
                                                             <input 
                                                                 type="number"
@@ -846,7 +903,7 @@ export default function ProductsModerationPage() {
                                                                 onChange={(e) => setEditData({...editData, basePrice: parseFloat(e.target.value)})}
                                                             />
                                                         ) : (
-                                                            <p className="text-sm font-bold text-slate-900">${selectedProduct.basePrice || 0}</p>
+                                                            <p className="text-sm font-bold text-slate-900">{formatPrice(selectedProduct.basePrice || 0)}</p>
                                                         )}
                                                     </div>
                                                     <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
