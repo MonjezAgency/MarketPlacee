@@ -175,7 +175,7 @@ export class ProductsController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.SUPPLIER, Role.ADMIN)
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
-    async bulkUpload(@UploadedFile() file: any, @Request() req) {
+    async bulkUpload(@UploadedFile() file: any, @Body('currency') currency: string, @Request() req) {
         this.logger.log(`[BulkUpload] User=${req.user?.sub} role=${req.user?.role} file=${file ? file.originalname : 'MISSING'}`);
         try {
             if (!file) throw new Error('File is required');
@@ -197,8 +197,17 @@ export class ProductsController {
                     const supplierId = isAdmin ? (dto.supplierId || req.user.sub) : req.user.sub;
 
                     try {
+                        const EGP_RATES: Record<string, number> = {
+                            EGP: 1, USD: 1 / 48.5, EUR: 1 / 52.8, GBP: 1 / 61.4,
+                            AED: 1 / 13.2, SAR: 1 / 12.9, KWD: 1 / 158.0, QAR: 1 / 13.3,
+                            TRY: 1 / 1.49, INR: 1 / 0.583,
+                        };
+                        const rate = EGP_RATES[currency] ?? 1;
+                        const priceInBase = dto.price ? (dto.price / rate) : 0;
+
                         const product = await this.productsService.create({
                             ...dto,
+                            price: priceInBase,
                             supplierId,
                         }, isAdmin, true, { 
                             preFetchedConfigs: configs, 

@@ -168,6 +168,7 @@ export default function AdminAddProductWorkspace() {
         try {
             const fd = new FormData();
             fd.append('file', file);
+            fd.append('currency', activeCurrency);
             const res = await apiFetch('/products/bulk-upload', {
                 method: 'POST',
                 body: fd,

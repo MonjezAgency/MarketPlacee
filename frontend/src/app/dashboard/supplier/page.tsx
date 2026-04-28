@@ -174,6 +174,8 @@ export default function SupplierDashboard() {
             for (const file of files) {
                 const formData = new FormData();
                 formData.append('file', file);
+                const currentCurrency = (typeof window !== 'undefined' ? localStorage.getItem('platform-currency') : null) || 'USD'; // Default fallback, backend EGP_RATES handles it
+                formData.append('currency', currentCurrency);
                 
                 const res = await apiFetch(`/products/bulk-upload`, {
                     method: 'POST',
