@@ -802,7 +802,18 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         setIsGeneratingAI(true);
         try {
             await new Promise(r => setTimeout(r, 1500));
-            const generated = `Professional-grade ${formData.name} ${formData.brand ? `by ${formData.brand}` : ''} natively optimized for B2B procurement and wholesale distribution. Features verified documentation, standardized packaging for export, and strict compliance with international food & safety regulations. Ideal for high-volume retailers and enterprise supply chains looking for consistent quality and reliable lead times.`;
+            const existingDesc = formData.description?.trim() || '';
+            const brandStr = formData.brand ? ` by ${formData.brand}` : '';
+            const categoryStr = formData.category ? ` in the ${formData.category} category` : '';
+            
+            let generated: string;
+            if (existingDesc.length > 10) {
+                // Enhance existing description
+                generated = `${existingDesc}\n\n${formData.name}${brandStr}${categoryStr} — professionally sourced and optimized for B2B wholesale distribution. Features verified quality documentation, standardized export-ready packaging, and full compliance with international food & safety regulations. Ideal for high-volume retailers and enterprise supply chains seeking consistent quality with reliable lead times.`;
+            } else {
+                // Generate from scratch
+                generated = `${formData.name}${brandStr}${categoryStr} — a premium-grade product natively optimized for B2B procurement and wholesale distribution. Featuring verified documentation, standardized packaging for international export, and strict compliance with food & safety regulations. Designed for high-volume retailers and enterprise supply chains looking for consistent quality and reliable lead times across global markets.`;
+            }
             setFormData(prev => ({ ...prev, description: generated }));
         } finally {
             setIsGeneratingAI(false);

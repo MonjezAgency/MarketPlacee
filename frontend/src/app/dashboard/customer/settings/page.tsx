@@ -17,10 +17,14 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/lib/auth';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 
 export default function SettingsPage() {
     const { user } = useAuth();
+    const { currency: currentCurrency, setCurrency } = useCurrency();
+    const [selectedCurrency, setSelectedCurrency] = React.useState(currentCurrency);
     const [activeTab, setActiveTab] = React.useState('profile');
     const [isSaving, setIsSaving] = React.useState(false);
 
@@ -121,11 +125,17 @@ export default function SettingsPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Preferred Currency</label>
-                                        <select className="w-full h-14 px-6 bg-[#F7F9FC] border-2 border-transparent rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-[#1ABC9C] transition-all appearance-none">
-                                            <option>USD - US Dollar</option>
-                                            <option>EUR - Euro</option>
-                                            <option>TRY - Turkish Lira</option>
-                                            <option>AED - UAE Dirham</option>
+                                        <select 
+                                            value={selectedCurrency}
+                                            onChange={(e) => {
+                                                setSelectedCurrency(e.target.value);
+                                                setCurrency(e.target.value);
+                                            }}
+                                            className="w-full h-14 px-6 bg-[#F7F9FC] border-2 border-transparent rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-[#1ABC9C] transition-all appearance-none"
+                                        >
+                                            {SUPPORTED_CURRENCIES.map(c => (
+                                                <option key={c.code} value={c.code}>{c.symbol} {c.code} - {c.name}</option>
+                                            ))}
                                         </select>
                                     </div>
                                 </div>

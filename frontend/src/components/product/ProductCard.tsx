@@ -30,12 +30,27 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             setTranslatedName('');
             return;
         }
-        if (locale !== 'en') {
-            translateText(rawName, locale).then(setTranslatedName);
-        } else {
+
+        if (locale === 'en') {
             setTranslatedName(rawName);
+            return;
         }
-    }, [locale, product.name]);
+
+        // Check for stored translations in variants
+        const storedTranslations = product.variants?.find((v: any) => v.name === '__translations')?.values?.[0];
+        if (storedTranslations) {
+            try {
+                const parsed = JSON.parse(storedTranslations);
+                if (parsed[locale]?.name) {
+                    setTranslatedName(parsed[locale].name);
+                    return;
+                }
+            } catch (e) {}
+        }
+
+        // Fallback to dynamic translation
+        translateText(rawName, locale).then(setTranslatedName);
+    }, [locale, product.name, product.variants]);
 
     // Suppliers see their own base price (no markup)
     const isOwnProduct = user?.role?.toUpperCase() === 'SUPPLIER' && product.supplierId && user?.id === product.supplierId;

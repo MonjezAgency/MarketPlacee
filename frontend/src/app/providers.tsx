@@ -25,7 +25,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
                     // Double check in case user chose while we were fetching
                     const userHasChosenNow = localStorage.getItem('user-currency-chosen') === 'true';
                     if (data && data.currency && !userHasChosenNow) {
-                        localStorage.setItem('platform-currency', data.currency);
+                        const normalizedCurrency = data.currency.toUpperCase();
+                        localStorage.setItem('platform-currency', normalizedCurrency);
                         window.dispatchEvent(new Event('currency-changed'));
                     }
                 }

@@ -3,6 +3,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EanService } from './ean.service';
+import { translateProduct } from '../common/translator';
 
 import { AiAgentService } from '../ai-agent/ai-agent.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -176,6 +177,27 @@ export class ProductsService {
                     warehouseId: createProductDto.warehouseId || null,
                 },
             });
+
+            // Automatic Translation
+            try {
+                const translations = await translateProduct({ 
+                    name: product.name, 
+                    description: product.description || '' 
+                });
+                const variants = (product.variants as any[]) || [];
+                // Check if already exists to avoid duplicates
+                const transIndex = variants.findIndex(v => v.name === '__translations');
+                const transObj = { name: '__translations', values: [JSON.stringify(translations)] };
+                if (transIndex > -1) variants[transIndex] = transObj;
+                else variants.push(transObj);
+
+                await this.prisma.product.update({
+                    where: { id: product.id },
+                    data: { variants }
+                });
+            } catch (err) {
+                this.logger.error(`Auto-translation failed for product ${product.id}: ${err.message}`);
+            }
 
             // Notify Admins if created by supplier
             if (!isAdmin && product.supplierId && !skipAi) {
@@ -488,7 +510,32 @@ export class ProductsService {
             if (data.price !== undefined) updateData.basePrice = data.price;
             updateData.price = priceToUse * (isNaN(markup) ? defaultMarkup : markup);
         }
-        return this.prisma.product.update({ where: { id }, data: updateData });
+
+        const updated = await this.prisma.product.update({ where: { id }, data: updateData });
+
+        // Update translations if name or description changed
+        if (data.name !== undefined || data.description !== undefined) {
+            try {
+                const translations = await translateProduct({ 
+                    name: updated.name, 
+                    description: updated.description || '' 
+                });
+                const variants = (updated.variants as any[]) || [];
+                const transIndex = variants.findIndex(v => v.name === '__translations');
+                const transObj = { name: '__translations', values: [JSON.stringify(translations)] };
+                if (transIndex > -1) variants[transIndex] = transObj;
+                else variants.push(transObj);
+
+                return this.prisma.product.update({
+                    where: { id },
+                    data: { variants }
+                });
+            } catch (err) {
+                this.logger.error(`Auto-translation update failed for product ${id}: ${err.message}`);
+            }
+        }
+
+        return updated;
     }
 
     async findOne(id: string) {

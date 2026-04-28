@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Facebook, Twitter, Instagram, Linkedin, Send, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { apiFetch } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 function cn(...classes: string[]) {
     return classes.filter(Boolean).join(' ');
@@ -14,6 +15,7 @@ export default function Footer() {
     const [email, setEmail] = React.useState('');
     const [loading, setLoading] = React.useState(false);
     const [success, setSuccess] = React.useState(false);
+    const { t, locale } = useLanguage();
 
     const handleSubscribe = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -21,7 +23,6 @@ export default function Footer() {
         
         setLoading(true);
         try {
-            // Call the real newsletter API
             await apiFetch('/newsletter/subscribe', { 
                 method: 'POST', 
                 body: JSON.stringify({ 
@@ -46,13 +47,14 @@ export default function Footer() {
     return (
         <footer className="bg-[#0F172A] text-[#CBD5F5] pt-16 pb-8">
             <div className="max-w-[1440px] mx-auto px-6">
-                {/* 1. CHIC NEWSLETTER SECTION (Above Links) */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-16 pb-12 border-b border-white/10">
                     <div className="space-y-2 text-center md:text-left">
                         <h4 className="text-white text-[22px] font-black tracking-tight flex items-center gap-2 justify-center md:justify-start">
-                            Join the <span className="text-[#2EC4B6]">Future</span> of B2B
+                            {locale === 'ar' ? 'انضم إلى مستقبل التجارة' : 'Join the Future of B2B'}
                         </h4>
-                        <p className="text-[14px] opacity-70 font-medium">Subscribe for global trade insights and exclusive wholesale deals.</p>
+                        <p className="text-[14px] opacity-70 font-medium">
+                            {locale === 'ar' ? 'اشترك للحصول على رؤى التجارة العالمية وعروض الجملة الحصرية.' : 'Subscribe for global trade insights and exclusive wholesale deals.'}
+                        </p>
                     </div>
                     <form onSubmit={handleSubscribe} className="flex w-full max-w-lg bg-white/5 rounded-[16px] p-1.5 border border-white/10 focus-within:border-[#2EC4B6] focus-within:bg-white/10 transition-all shadow-2xl">
                         <input 
@@ -60,7 +62,7 @@ export default function Footer() {
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder="Enter your business email"
+                            placeholder={locale === 'ar' ? 'أدخل بريدك الإلكتروني' : 'Enter your business email'}
                             className="flex-1 bg-transparent border-none outline-none px-5 py-3 text-[14px] text-white placeholder:text-white/30"
                         />
                         <button 
@@ -75,17 +77,15 @@ export default function Footer() {
                             {loading ? (
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : success ? (
-                                <>Subscribed <CheckCircle2 size={18} /></>
+                                <>{locale === 'ar' ? 'تم الاشتراك' : 'Subscribed'} <CheckCircle2 size={18} /></>
                             ) : (
-                                <>Subscribe <Send size={16} /></>
+                                <>{locale === 'ar' ? 'اشترك' : 'Subscribe'} <Send size={16} /></>
                             )}
                         </button>
                     </form>
                 </div>
 
-                {/* 2. MAIN LINKS GRID */}
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-16">
-                    {/* Brand Column */}
                     <div className="col-span-1 space-y-6">
                         <Link href="/" className="flex items-center gap-3">
                             <img src="/icon.png" alt="Atlantis" className="w-9 h-9 object-contain rounded-xl" />
@@ -94,7 +94,7 @@ export default function Footer() {
                             </span>
                         </Link>
                         <p className="text-[13px] leading-relaxed max-w-xs opacity-70">
-                            Connecting businesses worldwide with quality products, reliable suppliers, and seamless wholesale solutions.
+                            {t('footer', 'description')}
                         </p>
                         <div className="flex gap-4">
                             {[Linkedin, Facebook, Twitter, Instagram].map((Icon, i) => (
@@ -105,62 +105,55 @@ export default function Footer() {
                         </div>
                     </div>
 
-                    {/* Links Columns */}
                     <div className="col-span-1">
-                        <h4 className="text-white text-[14px] font-bold mb-6">Platform</h4>
+                        <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'sourcing')}</h4>
                         <ul className="space-y-4 text-[13px] opacity-70">
-                            <li><Link href="/how-it-works" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">How it Works</Link></li>
-                            <li><Link href="/categories" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">For Buyers</Link></li>
-                            <li><Link href="/auth/register" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">For Suppliers</Link></li>
-                            <li><Link href="/deals" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Bulk Orders</Link></li>
-                            <li><Link href="/contact" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Request a Quote</Link></li>
+                            <li><Link href="/how-it-works" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'howItWorks')}</Link></li>
+                            <li><Link href="/categories" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'browseCategories')}</Link></li>
+                            <li><Link href="/auth/register" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'registerSupplier')}</Link></li>
+                            <li><Link href="/deals" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'bulkWholesale')}</Link></li>
                         </ul>
                     </div>
 
                     <div className="col-span-1">
-                        <h4 className="text-white text-[14px] font-bold mb-6">Resources</h4>
+                        <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'support')}</h4>
                         <ul className="space-y-4 text-[13px] opacity-70">
-                            <li><Link href="/help" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Help Center</Link></li>
-                            <li><Link href="/shipping" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Shipping Info</Link></li>
-                            <li><Link href="/returns" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Returns & Refunds</Link></li>
+                            <li><Link href="/help" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'helpCenter')}</Link></li>
+                            <li><Link href="/shipping" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'shippingPolicy')}</Link></li>
+                            <li><Link href="/returns" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'returnsRefunds')}</Link></li>
                             <li><Link href="/trade-assurance" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Trade Assurance</Link></li>
-                            <li><Link href="/api-docs" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">API & Integrations</Link></li>
                         </ul>
                     </div>
 
                     <div className="col-span-1">
-                        <h4 className="text-white text-[14px] font-bold mb-6">Company</h4>
+                        <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'aboutUs')}</h4>
                         <ul className="space-y-4 text-[13px] opacity-70">
-                            <li><Link href="/about" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">About Us</Link></li>
-                            <li><Link href="/careers" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Careers</Link></li>
-                            <li><Link href="/news" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">News & Blog</Link></li>
-                            <li><Link href="/contact" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Contact Us</Link></li>
+                            <li><Link href="/about" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'aboutUs')}</Link></li>
+                            <li><Link href="/news" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'brandSpotlights')}</Link></li>
+                            <li><Link href="/contact" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'contactUs')}</Link></li>
                         </ul>
                     </div>
 
                     <div className="col-span-1">
-                        <h4 className="text-white text-[14px] font-bold mb-6">Legal</h4>
+                        <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'terms')}</h4>
                         <ul className="space-y-4 text-[13px] opacity-70">
-                            <li><Link href="/terms" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Terms of Service</Link></li>
-                            <li><Link href="/privacy" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Privacy Policy</Link></li>
-                            <li><Link href="/cookies" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Cookie Policy</Link></li>
-                            <li><Link href="/compliance" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Compliance</Link></li>
+                            <li><Link href="/terms" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'terms')}</Link></li>
+                            <li><Link href="/privacy" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'privacy')}</Link></li>
+                            <li><Link href="/cookies" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'cookies')}</Link></li>
                         </ul>
                     </div>
                 </div>
 
-                {/* 3. BOTTOM BAR */}
                 <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-8">
                     <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 text-[12px] opacity-60">
-                        <p>© 2024 Atlantis Marketplace. All rights reserved.</p>
+                        <p>{t('footer', 'copyright')}</p>
                         <span className="hidden md:block text-white/10">|</span>
                         <p className="flex items-center gap-1">
-                            Created with ❤️ by <span className="text-[#2EC4B6] font-black tracking-tighter">MONJEZ</span>
+                            {t('footer', 'developedBy')}
                         </p>
                     </div>
-                    <div className="flex items-center gap-6 text-[12px] opacity-60">
-                        <button className="hover:text-white transition-colors">English (EN)</button>
-                        <button className="hover:text-white transition-colors">USD ($)</button>
+                    <div className="flex items-center gap-6 text-[12px] opacity-60 uppercase font-black">
+                        <span>{locale}</span>
                     </div>
                 </div>
             </div>

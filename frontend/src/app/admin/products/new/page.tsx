@@ -32,16 +32,17 @@ export default function AdminAddProductWorkspace() {
         brand: '',
         category: 'Beverages',
         barcode: '',
-        sku: '',
         price: '',
         quantity: '',
         minOrder: '1',
-        unitType: 'Case',
+        unitType: 'Piece',
+        unitsPerPallet: '',
+        palletsPerShipment: '',
         description: '',
         supplierId: '',
         isAdvancedOpen: false,
         images: [] as string[],
-        // New Logistics & Documentation Fields
+        // Logistics & Documentation Fields
         weight: '',
         shelfLife: '',
         origin: '',
@@ -86,8 +87,18 @@ export default function AdminAddProductWorkspace() {
         setIsGeneratingAI(true);
         try {
             await new Promise(r => setTimeout(r, 1500));
-            // Professional B2B Prompt Logic
-            const generated = `Professional-grade ${formData.name} ${formData.brand ? `by ${formData.brand}` : ''} natively optimized for B2B procurement and wholesale distribution. Features verified documentation, standardized packaging for export, and strict compliance with international food & safety regulations. Ideal for high-volume retailers and enterprise supply chains looking for consistent quality and reliable lead times.`;
+            const existingDesc = formData.description?.trim() || '';
+            const brandStr = formData.brand ? ` by ${formData.brand}` : '';
+            const categoryStr = formData.category ? ` in the ${formData.category} category` : '';
+            
+            let generated: string;
+            if (existingDesc.length > 10) {
+                // Enhance existing description
+                generated = `${existingDesc}\n\n${formData.name}${brandStr}${categoryStr} — professionally sourced and optimized for B2B wholesale distribution. Features verified quality documentation, standardized export-ready packaging, and full compliance with international food & safety regulations. Ideal for high-volume retailers and enterprise supply chains seeking consistent quality with reliable lead times.`;
+            } else {
+                // Generate from scratch
+                generated = `${formData.name}${brandStr}${categoryStr} — a premium-grade product natively optimized for B2B procurement and wholesale distribution. Featuring verified documentation, standardized packaging for international export, and strict compliance with food & safety regulations. Designed for high-volume retailers and enterprise supply chains looking for consistent quality and reliable lead times across global markets.`;
+            }
             setFormData(prev => ({ ...prev, description: generated }));
         } finally {
             setIsGeneratingAI(false);
@@ -125,19 +136,41 @@ export default function AdminAddProductWorkspace() {
         }
     };
 
-    const handleBulkUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const [bulkReport, setBulkReport] = useState<any>(null);
+    const [isBulkUploading, setIsBulkUploading] = useState(false);
+
+    const handleBulkUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        import('react-hot-toast').then(({ toast }) => {
-            toast.promise(
-                new Promise(r => setTimeout(r, 2000)),
-                {
-                    loading: 'Validating enterprise catalog schema...',
-                    success: 'File validated. Catalog ready for ingestion.',
-                    error: 'Schema validation failed'
-                }
-            );
-        });
+        setIsBulkUploading(true);
+        setBulkReport(null);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await apiFetch('/products/bulk-upload', {
+                method: 'POST',
+                body: fd,
+            });
+            const report = await res.json();
+            setBulkReport(report);
+            if (report.createdCount > 0) {
+                import('react-hot-toast').then(({ toast }) => {
+                    toast.success(`${report.createdCount} products created successfully`);
+                });
+            }
+            if (report.errorCount > 0) {
+                import('react-hot-toast').then(({ toast }) => {
+                    toast.error(`${report.errorCount} rows had errors — see report below`);
+                });
+            }
+        } catch (err: any) {
+            import('react-hot-toast').then(({ toast }) => {
+                toast.error(err.message || 'Bulk upload failed');
+            });
+        } finally {
+            setIsBulkUploading(false);
+            if (e.target) e.target.value = '';
+        }
     };
 
     const handleLaunch = async () => {
@@ -150,7 +183,7 @@ export default function AdminAddProductWorkspace() {
         try {
             const priceInBase = convertToBase(Number(formData.price), activeCurrency);
             
-            const payload = {
+            const payload: any = {
                 name: formData.name,
                 brand: formData.brand,
                 category: formData.category,
@@ -160,10 +193,18 @@ export default function AdminAddProductWorkspace() {
                 unit: formData.unitType,
                 description: formData.description,
                 ean: formData.barcode,
-                sku: formData.sku,
                 images: formData.images,
-                supplierId: formData.supplierId
+                supplierId: formData.supplierId,
+                weight: formData.weight || undefined,
+                shelfLife: formData.shelfLife || undefined,
+                origin: formData.origin || undefined,
             };
+            if (formData.unitType === 'Pallet' || formData.unitType === 'Shipment') {
+                payload.unitsPerPallet = parseInt(formData.unitsPerPallet) || undefined;
+            }
+            if (formData.unitType === 'Shipment') {
+                payload.palletsPerShipment = parseInt(formData.palletsPerShipment) || undefined;
+            }
 
             const res = await apiFetch('/products', {
                 method: 'POST',
@@ -341,14 +382,16 @@ export default function AdminAddProductWorkspace() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[12px] font-medium text-[#6B7280]">SKU</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="Internal SKU"
-                                        value={formData.sku}
-                                        onChange={e => setFormData({ ...formData, sku: e.target.value })}
-                                        className="w-full h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#14B8A6] transition-all"
-                                    />
+                                    <label className="text-[12px] font-medium text-[#6B7280]">Unit Type <span className="text-red-400">*</span></label>
+                                    <select 
+                                        value={formData.unitType}
+                                        onChange={e => setFormData({ ...formData, unitType: e.target.value, unitsPerPallet: '', palletsPerShipment: '' })}
+                                        className="w-full h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#14B8A6] appearance-none font-medium"
+                                    >
+                                        <option value="Piece">📦 Piece</option>
+                                        <option value="Pallet">🏗️ Pallet</option>
+                                        <option value="Shipment">🚢 Shipment</option>
+                                    </select>
                                 </div>
                             </div>
                         </div>
@@ -448,6 +491,49 @@ export default function AdminAddProductWorkspace() {
                                     />
                                 </div>
                             </div>
+
+                            {/* Conditional Unit Hierarchy Fields */}
+                            {(formData.unitType === 'Pallet' || formData.unitType === 'Shipment') && (
+                                <>
+                                    <div className="h-px bg-[#F3F4F6]" />
+                                    <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-3">
+                                        <p className="text-[11px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
+                                            <Info size={12} /> Unit Hierarchy Configuration
+                                        </p>
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[12px] font-medium text-blue-600">Units per Pallet</label>
+                                                <input 
+                                                    type="number" 
+                                                    placeholder="e.g. 48"
+                                                    value={formData.unitsPerPallet}
+                                                    onChange={e => setFormData({ ...formData, unitsPerPallet: e.target.value })}
+                                                    className="w-full h-[44px] bg-white border border-blue-200 rounded-[10px] px-4 text-[14px] outline-none focus:border-blue-400 transition-all font-bold"
+                                                />
+                                                <p className="text-[10px] text-blue-500">How many pieces fit on one pallet</p>
+                                            </div>
+                                            {formData.unitType === 'Shipment' && (
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[12px] font-medium text-blue-600">Pallets per Shipment</label>
+                                                    <input 
+                                                        type="number" 
+                                                        placeholder="e.g. 20"
+                                                        value={formData.palletsPerShipment}
+                                                        onChange={e => setFormData({ ...formData, palletsPerShipment: e.target.value })}
+                                                        className="w-full h-[44px] bg-white border border-blue-200 rounded-[10px] px-4 text-[14px] outline-none focus:border-blue-400 transition-all font-bold"
+                                                    />
+                                                    <p className="text-[10px] text-blue-500">How many pallets per shipment container</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {formData.unitType === 'Shipment' && formData.unitsPerPallet && formData.palletsPerShipment && (
+                                            <div className="p-3 bg-white border border-blue-100 rounded-lg text-[12px] text-blue-700 font-medium">
+                                                📊 Total units per shipment: <span className="font-black">{parseInt(formData.unitsPerPallet) * parseInt(formData.palletsPerShipment) || '—'}</span> pieces
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
 
                             <div className="h-px bg-[#F3F4F6]" />
 
@@ -625,24 +711,26 @@ export default function AdminAddProductWorkspace() {
 
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
-                                    { label: 'Product Name', desc: 'Required' },
-                                    { label: 'Brand', desc: 'Required' },
-                                    { label: 'Category', desc: 'System Match' },
-                                    { label: 'Price (Base)', desc: 'Numeric' },
-                                    { label: 'Currency', desc: 'USD/EUR/EGP' },
-                                    { label: 'Description', desc: 'Marketing' },
-                                    { label: 'Weight (kg)', desc: 'Logistics' },
-                                    { label: 'Shelf Life', desc: 'e.g. 12M' },
-                                    { label: 'Stock', desc: 'Total units' },
-                                    { label: 'MOQ', desc: 'Min order' },
-                                    { label: 'Unit Type', desc: 'PC/PL/SH' },
-                                    { label: 'Units/Pallet', desc: 'Numeric' },
-                                    { label: 'Pallets/Ship', desc: 'Numeric' },
-                                    { label: 'SKU', desc: 'Unique' },
-                                    { label: 'EAN', desc: 'Barcode' },
+                                    { label: 'Product Name', desc: 'Required', required: true },
+                                    { label: 'Brand', desc: 'Required', required: true },
+                                    { label: 'Category', desc: 'System Match', required: false },
+                                    { label: 'Price (Base)', desc: 'Numeric', required: true },
+                                    { label: 'Description', desc: 'Marketing', required: false },
+                                    { label: 'Weight (kg)', desc: 'Logistics', required: false },
+                                    { label: 'Shelf Life', desc: 'e.g. 12M', required: false },
+                                    { label: 'Stock', desc: 'Total units', required: true },
+                                    { label: 'MOQ', desc: 'Min order', required: false },
+                                    { label: 'Unit Type', desc: 'Piece/Pallet/Shipment', required: false },
+                                    { label: 'Units/Pallet', desc: 'Numeric', required: false },
+                                    { label: 'Pallets/Shipment', desc: 'Numeric', required: false },
+                                    { label: 'EAN', desc: 'Barcode', required: false },
+                                    { label: 'Origin', desc: 'Country', required: false },
                                 ].map((col) => (
-                                    <div key={col.label} className="p-3 bg-[#F8FAFC] border border-[#E5E7EB] rounded-2xl">
-                                        <p className="text-[10px] font-black text-[#111827] uppercase tracking-wider truncate">{col.label}</p>
+                                    <div key={col.label} className={`p-3 border rounded-2xl ${col.required ? 'bg-teal-50/50 border-teal-200' : 'bg-[#F8FAFC] border-[#E5E7EB]'}`}>
+                                        <p className="text-[10px] font-black text-[#111827] uppercase tracking-wider truncate flex items-center gap-1">
+                                            {col.label}
+                                            {col.required && <span className="text-red-400">*</span>}
+                                        </p>
                                         <p className="text-[9px] text-[#6B7280] mt-1 font-medium">{col.desc}</p>
                                     </div>
                                 ))}
@@ -662,30 +750,72 @@ export default function AdminAddProductWorkspace() {
                             </div>
                         </div>
 
+                        {/* BULK UPLOAD REPORT */}
+                        {bulkReport && (
+                            <div className="bg-white border border-[#E5E7EB] rounded-3xl p-6 shadow-sm space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <h3 className="text-lg font-bold flex items-center gap-2">
+                                        <FileSpreadsheet size={20} className="text-[#14B8A6]" />
+                                        Upload Report
+                                    </h3>
+                                    <button onClick={() => setBulkReport(null)} className="text-[#6B7280] hover:text-[#111827]">
+                                        <AlertCircle size={18} />
+                                    </button>
+                                </div>
+                                <div className="flex gap-6 text-sm">
+                                    <span className="font-bold">Total Rows: <span className="text-[#111827]">{bulkReport.totalRows}</span></span>
+                                    <span className="font-bold text-emerald-600 flex items-center gap-1"><CheckCircle2 size={14} /> {bulkReport.successCount} Success</span>
+                                    <span className="font-bold text-red-500 flex items-center gap-1"><AlertCircle size={14} /> {bulkReport.errorCount} Errors</span>
+                                    <span className="font-bold text-blue-600">Created: {bulkReport.createdCount}</span>
+                                </div>
+                                {bulkReport.results?.filter((r: any) => !r.success).length > 0 && (
+                                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                                        <p className="text-[11px] font-black text-red-500 uppercase tracking-widest">Error Details — Fix these in your file and re-upload</p>
+                                        {bulkReport.results.filter((r: any) => !r.success).map((r: any, i: number) => (
+                                            <div key={i} className="flex items-start gap-2 text-xs bg-red-50 text-red-600 rounded-xl px-4 py-3 border border-red-100">
+                                                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                                                <span><strong>Row {r.rowNumber}:</strong> {r.errors?.join(', ') || 'Unknown error'}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* UPLOAD ZONE */}
                         <div 
-                            className="h-[300px] bg-white border-4 border-dashed border-[#F1F5F9] rounded-[40px] flex flex-col items-center justify-center cursor-pointer hover:border-[#14B8A6] hover:bg-[#14B8A6]/5 transition-all group"
-                            onClick={() => fileInputRef.current?.click()}
+                            className={`h-[300px] bg-white border-4 border-dashed rounded-[40px] flex flex-col items-center justify-center cursor-pointer hover:border-[#14B8A6] hover:bg-[#14B8A6]/5 transition-all group ${isBulkUploading ? 'border-[#14B8A6] bg-[#14B8A6]/5 pointer-events-none' : 'border-[#F1F5F9]'}`}
+                            onClick={() => !isBulkUploading && bulkInputRef.current?.click()}
                         >
                             <input 
                                 type="file" 
-                                ref={fileInputRef} 
+                                ref={bulkInputRef} 
                                 className="hidden" 
-                                accept=".csv,.xlsx" 
+                                accept=".csv,.xlsx,.xls" 
                                 onChange={handleBulkUpload}
                             />
                             <div className="w-20 h-20 bg-[#F1F5F9] rounded-[30px] flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-6 transition-all duration-500">
-                                <Database size={32} className="text-[#6B7280] group-hover:text-[#14B8A6]" />
+                                {isBulkUploading ? (
+                                    <Loader2 size={32} className="text-[#14B8A6] animate-spin" />
+                                ) : (
+                                    <Database size={32} className="text-[#6B7280] group-hover:text-[#14B8A6]" />
+                                )}
                             </div>
-                            <h4 className="text-xl font-black text-[#111827] uppercase tracking-tighter">Inject Enterprise Catalog</h4>
-                            <p className="text-sm text-[#6B7280] mt-2">Drop your .xlsx or .csv file here</p>
+                            <h4 className="text-xl font-black text-[#111827] uppercase tracking-tighter">
+                                {isBulkUploading ? 'Processing Catalog...' : 'Inject Enterprise Catalog'}
+                            </h4>
+                            <p className="text-sm text-[#6B7280] mt-2">
+                                {isBulkUploading ? 'Validating and creating products...' : 'Drop your .xlsx or .csv file here'}
+                            </p>
                             
-                            <button 
-                                type="button"
-                                className="mt-8 h-12 px-8 bg-[#0F172A] text-white rounded-2xl font-black uppercase text-[11px] tracking-widest flex items-center gap-2 hover:bg-black transition-all"
-                            >
-                                <Plus size={16} /> Choose File
-                            </button>
+                            {!isBulkUploading && (
+                                <button 
+                                    type="button"
+                                    className="mt-8 h-12 px-8 bg-[#0F172A] text-white rounded-2xl font-black uppercase text-[11px] tracking-widest flex items-center gap-2 hover:bg-black transition-all"
+                                >
+                                    <Plus size={16} /> Choose File
+                                </button>
+                            )}
                         </div>
                     </div>
                 )}

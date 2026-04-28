@@ -50,7 +50,7 @@ const NAV_CATEGORIES = [
 export default function Navbar() {
     const { user, logout } = useAuth();
     const { items } = useCart();
-    const { locale, setLocale } = useLanguage();
+    const { locale, setLocale, t } = useLanguage();
     const { currency, setCurrency } = useCurrency();
     const [searchQuery, setSearchQuery] = React.useState('');
     const [isLangOpen, setIsLangOpen] = React.useState(false);
@@ -71,7 +71,7 @@ export default function Navbar() {
                 <div className="flex items-center gap-6">
                     <span className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6] animate-pulse" />
-                        Global B2B Wholesale Marketplace
+                        {t('navbar', 'marketplace')} Global B2B Wholesale
                     </span>
                     <span className="opacity-40">|</span>
                     <span className="flex items-center gap-2">
@@ -80,8 +80,8 @@ export default function Navbar() {
                     </span>
                 </div>
                 <div className="flex items-center gap-8">
-                    <Link href="/shipping" className="hover:text-[#2EC4B6] transition-colors">Bulk Shipping Solutions</Link>
-                    <Link href="/help" className="hover:text-[#2EC4B6] transition-colors">Business Support</Link>
+                    <Link href="/shipping" className="hover:text-[#2EC4B6] transition-colors">{t('navbar', 'volumeDeals')}</Link>
+                    <Link href="/help" className="hover:text-[#2EC4B6] transition-colors">{t('navbar', 'logisticsHelp')}</Link>
                 </div>
             </div>
 
@@ -106,7 +106,7 @@ export default function Navbar() {
                             isCatMenuOpen && "border-[#2EC4B6] bg-white shadow-md text-[#2EC4B6]"
                         )}>
                             <Menu size={18} />
-                            Categories
+                            {t('navbar', 'categories')}
                             <ChevronDown size={16} className={cn("transition-transform duration-300", isCatMenuOpen && "rotate-180")} />
                         </button>
 
@@ -134,7 +134,7 @@ export default function Navbar() {
                                                 href="/categories"
                                                 className="flex items-center justify-center gap-2 w-full py-3 bg-[#0B1F3A] text-white rounded-xl text-[12px] font-bold hover:bg-[#2EC4B6] transition-all shadow-md"
                                             >
-                                                Explore All Categories <ArrowRight size={14} />
+                                                {t('navbar', 'browseAll')} <ArrowRight size={14} />
                                             </Link>
                                         </div>
                                     </div>
@@ -151,12 +151,12 @@ export default function Navbar() {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search products, brands or manufacturing parts..."
+                            placeholder={t('navbar', 'searchPlaceholder')}
                             className="w-full h-[48px] bg-[#F1F5F9] border-2 border-transparent rounded-full pl-14 pr-24 text-[14px] font-medium outline-none focus:bg-white focus:border-[#2EC4B6] transition-all shadow-inner"
                         />
                         <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-[#94A3B8] group-focus-within:text-[#2EC4B6] transition-colors" size={20} />
                         <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 h-[36px] px-6 bg-[#0B1F3A] hover:bg-[#2EC4B6] text-white rounded-full text-[13px] font-black uppercase transition-all shadow-md active:scale-95">
-                            Search
+                            {t('common', 'search')}
                         </button>
                     </div>
                 </form>
@@ -274,9 +274,9 @@ export default function Navbar() {
                                             )}
                                         </div>
                                         <div className="hidden sm:flex flex-col items-start leading-tight">
-                                            <span className="text-[11px] text-[#64748B] font-bold uppercase tracking-tight">Account</span>
+                                            <span className="text-[11px] text-[#64748B] font-bold uppercase tracking-tight">{t('navbar', 'account')}</span>
                                             <span className="text-[13px] text-[#111827] font-black truncate max-w-[80px]">
-                                                {user?.name?.split(' ')[0] || 'Sign In'}
+                                                {user?.name?.split(' ')[0] || t('navbar', 'signIn')}
                                             </span>
                                         </div>
                                         <ChevronDown size={14} className="text-[#94A3B8] hidden sm:block group-hover/acc:text-[#2EC4B6] transition-all" />
@@ -287,20 +287,20 @@ export default function Navbar() {
                                         <div className="absolute top-full right-0 pt-2 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50">
                                             <div className="w-56 bg-white border border-[#E5E7EB] rounded-2xl shadow-2xl p-2 overflow-hidden">
                                                 <Link href={dashboardLink} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F8FAFC] text-[13px] font-bold text-[#64748B] hover:text-[#2EC4B6] transition-all">
-                                                    <Monitor size={16} /> Business Dashboard
+                                                    <Monitor size={16} /> {t('userMenu', 'techDashboard')}
                                                 </Link>
                                                 <Link href="/dashboard/customer/orders" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F8FAFC] text-[13px] font-bold text-[#64748B] hover:text-[#2EC4B6] transition-all">
-                                                    <Package size={16} /> My Orders
+                                                    <Package size={16} /> {t('userMenu', 'trackOrder')}
                                                 </Link>
                                                 <Link href="/dashboard/customer/settings" className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#F8FAFC] text-[13px] font-bold text-[#64748B] hover:text-[#2EC4B6] transition-all">
-                                                    <User size={16} /> Settings
+                                                    <User size={16} /> {t('userMenu', 'settings')}
                                                 </Link>
                                                 <div className="h-px bg-[#E5E7EB] my-1" />
                                                 <button 
                                                     onClick={logout}
                                                     className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-[#FEF2F2] text-[13px] font-bold text-[#EF4444] transition-all"
                                                 >
-                                                    <LogOut size={16} /> Logout
+                                                    <LogOut size={16} /> {t('navbar', 'logout')}
                                                 </button>
                                             </div>
                                         </div>

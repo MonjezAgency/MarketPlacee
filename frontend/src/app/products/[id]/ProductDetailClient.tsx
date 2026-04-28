@@ -77,8 +77,24 @@ export default function ProductDetailClient() {
             }
 
             if (locale !== 'en') {
-                translateText(currentProduct.name, locale).then(setTranslatedName);
-                translateText(currentProduct.description || '', locale).then(setTranslatedDesc);
+                // Check for stored translations in variants
+                const storedTranslations = currentProduct.variants?.find((v: any) => v.name === '__translations')?.values?.[0];
+                let usedStored = false;
+                if (storedTranslations) {
+                    try {
+                        const parsed = JSON.parse(storedTranslations);
+                        if (parsed[locale]) {
+                            setTranslatedName(parsed[locale].name || currentProduct.name);
+                            setTranslatedDesc(parsed[locale].description || currentProduct.description || '');
+                            usedStored = true;
+                        }
+                    } catch (e) {}
+                }
+
+                if (!usedStored) {
+                    translateText(currentProduct.name, locale).then(setTranslatedName);
+                    translateText(currentProduct.description || '', locale).then(setTranslatedDesc);
+                }
             } else {
                 setTranslatedName(currentProduct.name);
                 setTranslatedDesc(currentProduct.description || '');

@@ -2,7 +2,7 @@
   "env": {
     "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
     "ANTHROPIC_BASE_URL": "https://openrouter.ai/api",
-    "ANTHROPIC_AUTH_TOKEN": "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",
+    "ANTHROPIC_AUTH_TOKEN": "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",
     "ANTHROPIC_API_KEY": "",
     "ANTHROPIC_MODEL": "anthropic/claude-sonnet-4.6",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "anthropic/claude-sonnet-4.6",
@@ -22,7 +22,8 @@
       "Bash(npx ts-node *)",
       "Bash(docker-compose ps *)",
       "Bash(curl -s http://localhost:3005/health)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(xargs grep *)"
     ],
     "deny": [
       "Skills"

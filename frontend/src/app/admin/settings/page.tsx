@@ -14,6 +14,7 @@ import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useAuth } from '@/lib/auth';
+import { setActiveCurrency, SUPPORTED_CURRENCIES } from '@/lib/currency';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ export default function SettingsDashboard() {
             .then(res => res.json())
             .then(data => {
                 if (data && data.currency) {
-                    setCurrency(data.currency);
+                    setCurrency(data.currency.toUpperCase());
                 }
             })
             .catch(err => console.error('Failed to fetch platform currency:', err));
@@ -209,8 +210,8 @@ export default function SettingsDashboard() {
 
             if (res.ok && markupRes.ok) {
                 toast.success('Settings saved successfully');
-                // Trigger a global currency change event if the platform currency was updated
-                window.dispatchEvent(new Event('currency-changed'));
+                // Sync currency to localStorage so all components pick it up
+                setActiveCurrency(currency);
             } else {
                 toast.error('Failed to save platform currency');
             }
@@ -387,29 +388,17 @@ export default function SettingsDashboard() {
                                         <div className="space-y-1.5 flex-1">
                                             <label className="text-[12px] font-medium text-slate-500">Default Currency</label>
                                             <div className="relative">
-                                                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-bold">
+                                                    {SUPPORTED_CURRENCIES.find(c => c.code === currency)?.symbol || '$'}
+                                                </span>
                                                 <select 
                                                     value={currency}
                                                     onChange={(e) => setCurrency(e.target.value)}
                                                     className="h-10 w-full pl-10 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500 appearance-none cursor-pointer"
                                                 >
-                                                    <optgroup label="Popular">
-                                                        <option value="EGP">EGP - Egyptian Pound</option>
-                                                        <option value="USD">USD - US Dollar</option>
-                                                        <option value="SAR">SAR - Saudi Riyal</option>
-                                                        <option value="AED">AED - UAE Dirham</option>
-                                                        <option value="EUR">EUR - Euro</option>
-                                                        <option value="GBP">GBP - British Pound</option>
-                                                    </optgroup>
-                                                    <optgroup label="All Currencies">
-                                                        <option value="KWD">KWD - Kuwaiti Dinar</option>
-                                                        <option value="QAR">QAR - Qatari Rial</option>
-                                                        <option value="BHD">BHD - Bahraini Dinar</option>
-                                                        <option value="OMR">OMR - Omani Rial</option>
-                                                        <option value="JOD">JOD - Jordanian Dinar</option>
-                                                        <option value="TRY">TRY - Turkish Lira</option>
-                                                        <option value="CNY">CNY - Chinese Yuan</option>
-                                                    </optgroup>
+                                                    {SUPPORTED_CURRENCIES.map(c => (
+                                                        <option key={c.code} value={c.code}>{c.symbol} {c.code} - {c.name}</option>
+                                                    ))}
                                                 </select>
                                             </div>
                                         </div>

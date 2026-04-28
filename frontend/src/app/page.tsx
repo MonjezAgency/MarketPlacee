@@ -43,6 +43,7 @@ import Footer from '@/components/layout/Footer';
 import { Marquee } from '@/components/ui/Marquee';
 import { apiFetch } from '@/lib/api';
 import ProductCard from '@/components/product/ProductCard';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // SPEC COLORS:
 // Primary Teal: #14B8A6
@@ -133,48 +134,49 @@ const FEATURED_PRODUCTS = [
 ];
 
 function HeroCarousel() {
+    const { t } = useLanguage();
     const slides = [
         {
-            label: "GLOBAL LOGISTICS SOLUTIONS",
-            title: "Global Sourcing.\nSeamless Delivery",
-            desc: "From factory to your warehouse, we handle the logistics so you can focus on growth.",
+            label: t('home', 'hero', 'globalLogistics'),
+            title: t('home', 'hero', 'globalSourcing'),
+            desc: t('home', 'hero', 'logisticsDesc'),
             features: [
-                { icon: Package, title: "Low MOQs", sub: "Start small, grow big" },
-                { icon: Truck, title: "Global Shipping", sub: "Reliable & fast delivery" },
-                { icon: ShieldCheck, title: "Verified Sources", sub: "100% factory inspection" }
+                { icon: Package, title: t('home', 'hero', 'lowMoq'), sub: t('home', 'hero', 'startSmall') },
+                { icon: Truck, title: t('home', 'hero', 'globalShipping'), sub: t('home', 'hero', 'reliableDelivery') },
+                { icon: ShieldCheck, title: t('home', 'hero', 'verifiedSources'), sub: t('home', 'hero', 'factoryInspection') }
             ],
             image: "/hero/1.png"
         },
         {
-            label: "PREMIUM B2B NETWORK",
-            title: "Bulk Orders.\nBigger Savings",
-            desc: "Access exclusive wholesale prices and flexible ordering for verified business entities.",
+            label: t('home', 'hero', 'premiumNetwork'),
+            title: t('home', 'hero', 'bulkOrders'),
+            desc: t('home', 'hero', 'savingsDesc'),
             features: [
-                { icon: TrendingUp, title: "Volume Discounts", sub: "Buy more, pay less" },
-                { icon: CircleDollarSign, title: "Flexible Payments", sub: "Secure trade terms" },
-                { icon: Headphones, title: "24/7 Support", sub: "Dedicated account help" }
+                { icon: TrendingUp, title: t('home', 'hero', 'volumeDiscounts'), sub: t('home', 'hero', 'buyMore') },
+                { icon: CircleDollarSign, title: t('home', 'hero', 'flexiblePayments'), sub: t('home', 'hero', 'tradeTerms') },
+                { icon: Headphones, title: t('home', 'hero', 'dedicatedSupport'), sub: t('home', 'hero', 'accountHelp') }
             ],
             image: "/hero/2.png"
         },
         {
-            label: "SMART SUPPLY CHAIN",
-            title: "Verified Factories.\nQuality Assured",
-            desc: "Every supplier on Atlantis is strictly vetted to ensure premium quality and reliability.",
+            label: t('home', 'hero', 'smartChain'),
+            title: t('home', 'hero', 'factoriesVerified'),
+            desc: t('home', 'hero', 'vettedDesc'),
             features: [
-                { icon: ShieldCheck, title: "Vetted Sources", sub: "100% verified factories" },
-                { icon: CheckCircle2, title: "Quality Control", sub: "Strict inspection protocols" },
-                { icon: Star, title: "Premium Brands", sub: "Top global names" }
+                { icon: ShieldCheck, title: t('home', 'hero', 'vettedSources'), sub: t('home', 'hero', 'verifiedSources') },
+                { icon: CheckCircle2, title: t('home', 'hero', 'qualityControl'), sub: t('home', 'hero', 'inspectionProtocols') },
+                { icon: Star, title: t('home', 'hero', 'premiumBrands'), sub: t('home', 'hero', 'topGlobalNames') }
             ],
             image: "/hero/3.png"
         },
         {
-            label: "INTEGRATED WAREHOUSING",
-            title: "Smart Logistics.\nFaster Growth",
-            desc: "Streamline your supply chain with our integrated logistics and warehousing solutions.",
+            label: t('home', 'hero', 'integratedWarehouse'),
+            title: t('home', 'hero', 'fasterGrowth'),
+            desc: t('home', 'hero', 'streamlineDesc'),
             features: [
-                { icon: Zap, title: "Fast Transit", sub: "Reduced shipping times" },
-                { icon: History, title: "Live Tracking", sub: "Real-time visibility" },
-                { icon: Box, title: "Safe Handling", sub: "Premium standards" }
+                { icon: Zap, title: t('home', 'hero', 'fastTransit'), sub: t('home', 'hero', 'reducedTime') },
+                { icon: History, title: t('home', 'hero', 'liveTracking'), sub: t('home', 'hero', 'realTimeVisibility') },
+                { icon: Box, title: t('home', 'hero', 'safeHandling'), sub: t('home', 'hero', 'premiumStandards') }
             ],
             image: "/hero/4.png"
         }
@@ -246,9 +248,9 @@ function HeroCarousel() {
 
                             {/* 4. CTA Button */}
                             <div className="pt-2">
-                                <button className="h-[52px] px-[28px] bg-[#2EC4B6] hover:brightness-110 text-white rounded-[14px] text-[16px] font-semibold transition-all shadow-lg hover:shadow-[#2EC4B6]/25 active:scale-95 flex items-center gap-3">
-                                    Start Sourcing Now <ChevronRight size={18} />
-                                </button>
+                                <Link href="/categories" className="h-[52px] px-[28px] bg-[#2EC4B6] hover:brightness-110 text-white rounded-[14px] text-[16px] font-semibold transition-all shadow-lg hover:shadow-[#2EC4B6]/25 active:scale-95 flex items-center gap-3 no-underline">
+                                    {t('home', 'hero', 'startSourcing')} <ChevronRight size={18} />
+                                </Link>
                             </div>
                         </div>
                     </div>
@@ -288,27 +290,28 @@ function HeroCarousel() {
     );
 }
 
-export default function Home() {
+export default function HomePage() {
+    const { t } = useLanguage();
     // HERO CAROUSEL DATA
     const HERO_SLIDES = [
         {
-            title: <>Your <span className="text-[#2EC4B6]">B2B</span> Partner for<br />Global Wholesale</>,
-            desc: "Source quality products in bulk from verified suppliers worldwide. Better prices, reliable shipping, and business growth—together.",
+            title: t('home', 'hero', 'yourB2BPartner'),
+            desc: t('home', 'hero', 'bulkDesc'),
             image: "/Images/4.png"
         },
         {
-            title: <>Direct <span className="text-[#2EC4B6]">Sourcing</span> from<br />Verified Factories</>,
-            desc: "Eliminate middlemen and get factory-direct pricing for your business inventory.",
+            title: t('home', 'hero', 'directSourcing'),
+            desc: t('home', 'hero', 'eliminateMiddlemen'),
             image: "/Images/1.png"
         },
         {
-            title: <>Seamless <span className="text-[#2EC4B6]">Logistics</span><br />to Your Door</>,
-            desc: "Expert handling of shipping, customs, and delivery so you can focus on selling.",
+            title: t('home', 'hero', 'seamlessLogistics'),
+            desc: t('home', 'hero', 'expertHandling'),
             image: "/Images/2.png"
         },
         {
-            title: <>Global <span className="text-[#2EC4B6]">Expansion</span><br />Made Simple</>,
-            desc: "Scale your brand by reaching new markets with our end-to-end trade infrastructure.",
+            title: t('home', 'hero', 'globalExpansion'),
+            desc: t('home', 'hero', 'scaleBrand'),
             image: "/Images/3.png"
         }
     ];
@@ -350,11 +353,11 @@ export default function Home() {
             <div className="bg-white border-b border-[#E5E7EB] py-3 hidden md:block">
                 <div className="max-w-[1440px] mx-auto px-10 flex items-center justify-between">
                     {[
-                        { icon: CheckCircle2, text: "Verified Global Suppliers" },
-                        { icon: TrendingUp, text: "Competitive Wholesale Prices" },
-                        { icon: Package, text: "Bulk Order Discounts" },
-                        { icon: Truck, text: "Global Shipping Solutions" },
-                        { icon: Headphones, text: "Dedicated B2B Support" }
+                        { icon: CheckCircle2, text: t('home', 'verifiedGlobalSuppliers') },
+                        { icon: TrendingUp, text: t('home', 'competitiveWholesalePrices') },
+                        { icon: Package, text: t('home', 'bulkOrderDiscounts') },
+                        { icon: Truck, text: t('home', 'globalShippingSolutions') },
+                        { icon: Headphones, text: t('home', 'dedicatedB2BSupport') }
                     ].map((item, i) => (
                         <div key={i} className="flex items-center gap-2">
                             <item.icon size={16} className="text-[#2EC4B6]" />
@@ -397,10 +400,10 @@ export default function Home() {
                                     {/* Constant Feature Icons */}
                                     <div className="flex items-center gap-8 py-2">
                                         {[
-                                            { icon: ShieldCheck, label: "Verified Partners", sub: "100% vetted" },
-                                            { icon: TrendingUp, label: "Direct Pricing", sub: "Lower costs" },
-                                            { icon: Truck, label: "Global Logistics", sub: "Fast & reliable" },
-                                            { icon: Shield, label: "Secure Payments", sub: "Safe transactions" }
+                                            { icon: ShieldCheck, label: t('home', 'verifiedGlobalSuppliers'), sub: t('home', 'hero', 'verifiedSources') },
+                                            { icon: TrendingUp, label: t('home', 'competitiveWholesalePrices'), sub: t('home', 'hero', 'buyMore') },
+                                            { icon: Truck, label: t('home', 'globalShippingSolutions'), sub: t('home', 'hero', 'reliableDelivery') },
+                                            { icon: Shield, label: t('home', 'paymentDesc'), sub: t('home', 'hero', 'tradeTerms') }
                                         ].map((item, i) => (
                                             <div key={i} className="flex items-center gap-3">
                                                 <div className="w-9 h-9 rounded-lg bg-white/5 flex items-center justify-center text-[#2EC4B6] border border-white/10">
@@ -416,10 +419,10 @@ export default function Home() {
 
                                     <div className="flex items-center gap-4 pt-4">
                                         <Link href="/categories" className="h-[56px] px-10 bg-[#2EC4B6] hover:brightness-110 text-white rounded-[16px] text-[16px] font-bold transition-all shadow-xl shadow-[#2EC4B6]/20 active:scale-95 flex items-center gap-3 no-underline">
-                                            Start Sourcing Now <ArrowRight size={20} />
+                                            {t('home', 'hero', 'startSourcing')} <ArrowRight size={20} />
                                         </Link>
                                         <Link href="/how-it-works" className="h-[56px] px-8 bg-white/5 hover:bg-white/10 text-white rounded-[16px] text-[15px] font-bold transition-all border border-white/10 backdrop-blur-sm flex items-center justify-center no-underline">
-                                            How it works?
+                                            {t('home', 'hero', 'howItWorks')}
                                         </Link>
                                     </div>
                                 </motion.div>
@@ -460,16 +463,16 @@ export default function Home() {
                     <div className="flex items-center">
                         {/* Title Section */}
                         <div className="space-y-1 pr-10 border-r border-[#E5E7EB] shrink-0">
-                            <h3 className="text-[18px] font-black text-[#0F172A] tracking-tight">Need a custom quote?</h3>
-                            <p className="text-[12px] text-[#64748B] font-medium">Get a tailored offer within 24 hours.</p>
+                            <h3 className="text-[18px] font-black text-[#0F172A] tracking-tight">{t('home', 'customQuote')}</h3>
+                            <p className="text-[12px] text-[#64748B] font-medium">{t('home', 'tailoredOffer')}</p>
                         </div>
 
                         {/* Steps Section (Expanded) */}
                         <div className="flex-1 flex items-center justify-start gap-12 px-10 overflow-hidden">
                             {[
-                                { icon: LayoutList, title: "Fill Requirements", desc: "Add products & quantities" },
-                                { icon: Headphones, title: "Expert Review", desc: "Our team validates specs" },
-                                { icon: Store, title: "Receive Quotes", desc: "Compare best wholesale offers" }
+                                { icon: LayoutList, title: t('home', 'fillRequirements'), desc: t('home', 'addProducts') },
+                                { icon: Headphones, title: t('home', 'expertReview'), desc: t('home', 'validateSpecs') },
+                                { icon: Store, title: t('home', 'receiveQuotes'), desc: t('home', 'compareOffers') }
                             ].map((step, i) => (
                                 <div key={i} className="flex items-center gap-4 whitespace-nowrap group cursor-pointer">
                                     <div className="w-12 h-12 rounded-2xl bg-[#F8FAFC] flex items-center justify-center text-[#2EC4B6] border border-[#E5E7EB] group-hover:bg-[#2EC4B6] group-hover:text-white group-hover:border-[#2EC4B6] transition-all duration-300 shadow-sm">
@@ -486,7 +489,7 @@ export default function Home() {
                         {/* Right Button (Minimal Gap) */}
                         <div className="shrink-0">
                             <button className="h-[52px] px-10 bg-[#0B1F3A] text-white hover:bg-[#2EC4B6] rounded-[16px] text-[14px] font-black uppercase transition-all active:scale-95 shadow-lg shadow-black/10">
-                                Request a Quote
+                                {t('home', 'requestQuote')}
                             </button>
                         </div>
                     </div>
@@ -495,9 +498,9 @@ export default function Home() {
                 {/* 4. BROWSE BY BUSINESS CATEGORY */}
                 <section className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-[18px] font-black text-[#0B1F3A] tracking-tight">Browse by Business Category</h2>
+                        <h2 className="text-[18px] font-black text-[#0B1F3A] tracking-tight">{t('home', 'browseByCategory')}</h2>
                         <Link href="/categories" className="text-[13px] font-bold text-[#2EC4B6] flex items-center gap-1 hover:underline group no-underline">
-                            View all categories <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                            {t('home', 'viewAllCategories')} <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
                         </Link>
                     </div>
                     <div className="bg-white border border-[#E5E7EB] rounded-[16px] p-6 shadow-sm">
@@ -533,9 +536,9 @@ export default function Home() {
                 {/* 5. BRAND LOGOS (Marquee) */}
                 <section className="space-y-4 overflow-hidden">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-[20px] font-bold">Trusted by Leading Global Brands</h2>
+                        <h2 className="text-[20px] font-bold">{t('home', 'trustedByBrands')}</h2>
                         <Link href="/brands" className="text-[13px] font-bold text-[#2EC4B6] flex items-center gap-1 hover:underline">
-                            View all brands <ArrowRight size={14} />
+                            {t('home', 'viewAllBrands')} <ArrowRight size={14} />
                         </Link>
                     </div>
                     <div className="relative py-4">
@@ -566,9 +569,9 @@ export default function Home() {
                 {/* 6. TOP CATEGORIES (Large Cards) */}
                 <section className="space-y-6">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-[20px] font-bold text-[#111827]">Top Categories for Your Business</h2>
+                        <h2 className="text-[20px] font-bold text-[#111827]">{t('home', 'topCategoriesTitle')}</h2>
                         <Link href="/categories" className="text-[13px] font-bold text-[#2EC4B6] flex items-center gap-1 hover:underline">
-                            View all categories <ArrowRight size={14} />
+                            {t('home', 'viewAllCategories')} <ArrowRight size={14} />
                         </Link>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -581,7 +584,7 @@ export default function Home() {
                                     <h3 className="text-[14px] font-bold group-hover:text-[#2EC4B6] transition-colors line-clamp-1">{cat.title}</h3>
                                     <p className="text-[11px] text-[#6B7280]">{cat.items}</p>
                                     <div className="pt-1 flex items-center text-[12px] font-bold text-[#2EC4B6]">
-                                        Explore <ChevronRight size={14} />
+                                        {t('home', 'explore')} <ChevronRight size={14} />
                                     </div>
                                 </div>
                             </Link>
@@ -592,15 +595,15 @@ export default function Home() {
                 {/* 7. WHY CHOOSE US */}
                 <section className="space-y-8 py-8">
                     <div className="text-center">
-                        <h2 className="text-[24px] font-bold text-[#111827]">Why Businesses Choose Atlantis</h2>
+                        <h2 className="text-[24px] font-bold text-[#111827]">{t('home', 'whyChooseUs')}</h2>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
                         {[
-                            { title: "B2B Wholesale Focus", desc: "Built specifically for business buyers and bulk purchasing.", icon: Package },
-                            { title: "Competitive Pricing", desc: "Lower wholesale prices with volume-based discounts.", icon: TrendingUp },
-                            { title: "Reliable Global Shipping", desc: "Fast and secure delivery to your business anywhere.", icon: Truck },
-                            { title: "Dedicated Account Support", desc: "Personal account managers and 24/7 business support.", icon: Headphones },
-                            { title: "Secure & Flexible Payments", desc: "Multiple payment options with trade assurance.", icon: ShieldCheck }
+                            { title: t('home', 'b2bFocus'), desc: t('home', 'b2bFocusDesc'), icon: Package },
+                            { title: t('home', 'competitiveWholesalePrices'), desc: t('home', 'pricingDesc'), icon: TrendingUp },
+                            { title: t('home', 'globalShippingSolutions'), desc: t('home', 'shippingDesc'), icon: Truck },
+                            { title: t('home', 'dedicatedB2BSupport'), desc: t('home', 'supportDesc'), icon: Headphones },
+                            { title: t('home', 'paymentDesc'), desc: t('home', 'paymentDesc'), icon: ShieldCheck }
                         ].map((item, i) => (
                             <div key={i} className="flex items-start gap-4 p-2">
                                 <div className="w-12 h-12 rounded-full bg-[#F8FAFC] flex items-center justify-center text-[#2EC4B6] shrink-0 border border-[#E5E7EB] group-hover:bg-[#2EC4B6] group-hover:text-white transition-all">
@@ -618,9 +621,9 @@ export default function Home() {
                 {/* 8. POPULAR WHOLESALE PRODUCTS (No Fake Data) */}
                 <section className="space-y-8">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-[20px] font-bold text-[#111827]">Popular Wholesale Products</h2>
+                        <h2 className="text-[20px] font-bold text-[#111827]">{t('home', 'popularWholesale')}</h2>
                         <Link href="/categories" className="text-[13px] font-bold text-[#2EC4B6] flex items-center gap-1 hover:underline no-underline">
-                            View all products <ArrowRight size={14} />
+                            {t('home', 'viewAllProducts')} <ArrowRight size={14} />
                         </Link>
                     </div>
                     
@@ -640,11 +643,11 @@ export default function Home() {
                                 <Package size={32} />
                             </div>
                             <div className="text-center">
-                                <h3 className="text-[16px] font-bold text-[#111827]">No products available yet</h3>
-                                <p className="text-[13px] text-[#64748B]">We are currently onboarding top suppliers. Check back soon!</p>
+                                <h3 className="text-[16px] font-bold text-[#111827]">{t('home', 'noProductsYet')}</h3>
+                                <p className="text-[13px] text-[#64748B]">{t('home', 'onboardingSuppliers')}</p>
                             </div>
                             <button className="px-6 py-2 bg-[#F8FAFC] border border-[#E5E7EB] rounded-[8px] text-[13px] font-bold hover:bg-white transition-all">
-                                Notify Me
+                                {t('home', 'notifyMe')}
                             </button>
                         </div>
                     ) : (
@@ -664,24 +667,24 @@ export default function Home() {
                             <div className="w-16 h-16 rounded-xl bg-white/10 flex items-center justify-center text-[#2EC4B6] border border-white/10 shadow-inner">
                                 <Package size={32} />
                             </div>
-                            <div className="space-y-1">
-                                <h2 className="text-[26px] font-bold text-white tracking-tight">Expanding Our Network.</h2>
-                                <p className="text-[15px] text-[#CBD5F5] opacity-80">Be part of the first wave of elite businesses on Atlantis.</p>
+                             <div className="space-y-1">
+                                <h2 className="text-[26px] font-bold text-white tracking-tight">{t('home', 'expandingNetwork')}</h2>
+                                <p className="text-[15px] text-[#CBD5F5] opacity-80">{t('home', 'firstWave')}</p>
                             </div>
                         </div>
                         
                         <div className="flex items-center gap-12 border-l border-white/10 pl-12 hidden lg:flex">
                             <div className="text-center">
                                 <p className="text-[32px] font-black text-[#2EC4B6]">0</p>
-                                <p className="text-[11px] text-[#CBD5F5] uppercase tracking-wider font-bold">Active Buyers</p>
+                                <p className="text-[11px] text-[#CBD5F5] uppercase tracking-wider font-bold">{t('home', 'activeBuyers')}</p>
                             </div>
                             <div className="text-center">
                                 <p className="text-[32px] font-black text-[#2EC4B6]">0</p>
-                                <p className="text-[11px] text-[#CBD5F5] uppercase tracking-wider font-bold">Verified Suppliers</p>
+                                <p className="text-[11px] text-[#CBD5F5] uppercase tracking-wider font-bold">{t('home', 'verifiedSuppliers')}</p>
                             </div>
                             <div className="text-center">
                                 <p className="text-[32px] font-black text-[#2EC4B6]">Global</p>
-                                <p className="text-[11px] text-[#CBD5F5] uppercase tracking-wider font-bold">Vision</p>
+                                <p className="text-[11px] text-[#CBD5F5] uppercase tracking-wider font-bold">{t('home', 'globalVision')}</p>
                             </div>
                         </div>
 
@@ -689,7 +692,7 @@ export default function Home() {
                             href="/auth/register?role=customer&fixed=true"
                             className="h-[52px] px-10 bg-[#2EC4B6] hover:brightness-110 text-white rounded-[14px] text-[15px] font-bold transition-all shadow-xl shadow-[#2EC4B6]/20 active:scale-95 flex items-center justify-center no-underline"
                         >
-                            Become a Buyer
+                            {t('home', 'becomeBuyer')}
                         </Link>
                     </div>
                 </section>
