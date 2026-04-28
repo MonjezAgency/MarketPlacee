@@ -24,8 +24,29 @@ export default function AdminAddProductWorkspace() {
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
     const [suppliers, setSuppliers] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
-    const [activeCurrency, setActiveCurrency] = useState(getCurrencyInfo().code);
+    const [activeCurrency, setActiveCurrencyState] = useState(() => {
+        // Read from localStorage first (admin settings), then fallback to detection
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('platform-currency');
+            if (saved) return saved;
+        }
+        return getCurrencyInfo().code;
+    });
     const selectedCurrencyInfo = SUPPORTED_CURRENCIES.find(c => c.code === activeCurrency) || SUPPORTED_CURRENCIES[0];
+
+    // Sync currency when admin changes it in settings
+    useEffect(() => {
+        const handleCurrencyChange = () => {
+            const saved = localStorage.getItem('platform-currency');
+            if (saved) setActiveCurrencyState(saved);
+        };
+        window.addEventListener('currency-changed', handleCurrencyChange);
+        window.addEventListener('storage', handleCurrencyChange);
+        return () => {
+            window.removeEventListener('currency-changed', handleCurrencyChange);
+            window.removeEventListener('storage', handleCurrencyChange);
+        };
+    }, []);
     
     const [formData, setFormData] = useState({
         name: '',
@@ -189,7 +210,7 @@ export default function AdminAddProductWorkspace() {
                 category: formData.category,
                 price: priceInBase,
                 stock: parseInt(formData.quantity) || 0,
-                minOrder: parseInt(formData.minOrder) || 1,
+                moq: parseInt(formData.minOrder) || 1,
                 unit: formData.unitType,
                 description: formData.description,
                 ean: formData.barcode,
@@ -451,7 +472,7 @@ export default function AdminAddProductWorkspace() {
                                     <div className="flex gap-2">
                                         <select 
                                             value={activeCurrency}
-                                            onChange={(e) => setActiveCurrency(e.target.value)}
+                                            onChange={(e) => setActiveCurrencyState(e.target.value)}
                                             className="h-[44px] bg-slate-50 border border-[#E5E7EB] rounded-[10px] px-2 text-[12px] font-black outline-none focus:border-[#14B8A6] transition-all"
                                         >
                                             {SUPPORTED_CURRENCIES.map(c => (
@@ -481,7 +502,7 @@ export default function AdminAddProductWorkspace() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[12px] font-medium text-[#6B7280]">Min. Order</label>
+                                    <label className="text-[12px] font-medium text-[#6B7280]">Min. Order ({formData.unitType}s)</label>
                                     <input 
                                         type="number" 
                                         placeholder="1"
@@ -489,6 +510,7 @@ export default function AdminAddProductWorkspace() {
                                         onChange={e => setFormData({ ...formData, minOrder: e.target.value })}
                                         className="w-full h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#14B8A6] transition-all"
                                     />
+                                    <p className="text-[10px] text-[#9CA3AF]">Minimum quantity a buyer must order in {formData.unitType.toLowerCase()}s</p>
                                 </div>
                             </div>
 

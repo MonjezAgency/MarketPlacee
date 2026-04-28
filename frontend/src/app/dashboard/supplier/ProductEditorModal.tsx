@@ -361,7 +361,7 @@ function ModalPortalContent({
                                                         />
                                                     </div>
                                                     <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Minimum Order (Cases)</label>
+                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Minimum Order ({(formData as any).unitType || formData.unit || 'Units'})</label>
                                                         <input
                                                             type="number"
                                                             placeholder="min cases"
@@ -610,7 +610,27 @@ function ModalPortalContent({
 export default function ProductEditorModal({ isOpen, onClose, product, onSave }: ProductEditorModalProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const { symbol } = getCurrencyInfo(false); 
-    const [activeCurrency, setActiveCurrency] = React.useState(getCurrencyInfo().code);
+    const [activeCurrency, setActiveCurrency] = React.useState(() => {
+        if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('platform-currency');
+            if (saved) return saved;
+        }
+        return getCurrencyInfo().code;
+    });
+
+    // Sync currency when changed elsewhere
+    React.useEffect(() => {
+        const handleCurrencyChange = () => {
+            const saved = localStorage.getItem('platform-currency');
+            if (saved) setActiveCurrency(saved);
+        };
+        window.addEventListener('currency-changed', handleCurrencyChange);
+        window.addEventListener('storage', handleCurrencyChange);
+        return () => {
+            window.removeEventListener('currency-changed', handleCurrencyChange);
+            window.removeEventListener('storage', handleCurrencyChange);
+        };
+    }, []);
 
     const defaultData: Product = {
         id: '',
