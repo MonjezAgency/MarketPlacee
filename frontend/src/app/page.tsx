@@ -74,25 +74,49 @@ const CATEGORIES = [
 ];
 
 const BRANDS = [
-    { name: 'Coca Cola', logo: '/Logos/cocacola.png' },
-    { name: 'Red Bull', logo: '/Logos/redbull.png' },
-    { name: 'Starbucks', logo: '/Logos/starbucks.png' },
-    { name: 'Oreo', logo: '/Logos/oreo.png' },
-    { name: 'Fanta', logo: '/Logos/fanta.png' },
-    { name: 'Ferrero', logo: '/Logos/ferrero.png' },
-    { name: 'AXE', logo: '/Logos/axe.png' },
-    { name: 'Nutella', logo: '/Logos/nutella.png' },
-    { name: 'Kinder', logo: '/Logos/kinder.png' },
-    { name: 'Twix', logo: '/Logos/twix.png' },
-    { name: 'Nescafe', logo: '/Logos/nescafe.png' },
-    { name: 'L\'Or', logo: '/Logos/lor.png' },
+    { name: 'Coca Cola',  logo: 'https://logo.clearbit.com/coca-colacompany.com' },
+    { name: 'Red Bull',   logo: 'https://logo.clearbit.com/redbull.com' },
+    { name: 'Starbucks',  logo: 'https://logo.clearbit.com/starbucks.com' },
+    { name: 'Oreo',       logo: 'https://logo.clearbit.com/oreo.com' },
+    { name: 'Fanta',      logo: 'https://logo.clearbit.com/fanta.com' },
+    { name: 'Ferrero',    logo: 'https://logo.clearbit.com/ferrero.com' },
+    { name: 'AXE',        logo: 'https://logo.clearbit.com/axe.com' },
+    { name: 'Nutella',    logo: 'https://logo.clearbit.com/nutella.com' },
+    { name: 'Kinder',     logo: 'https://logo.clearbit.com/kinder.com' },
+    { name: 'Twix',       logo: 'https://logo.clearbit.com/twix.com' },
+    { name: 'Nescafe',    logo: 'https://logo.clearbit.com/nescafe.com' },
+    { name: "L'Or",       logo: 'https://logo.clearbit.com/loreal.com' },
+    { name: 'Pepsi',      logo: 'https://logo.clearbit.com/pepsi.com' },
+    { name: 'Nestle',     logo: 'https://logo.clearbit.com/nestle.com' },
+    { name: 'Lipton',     logo: 'https://logo.clearbit.com/lipton.com' },
+    { name: 'Kellogg\'s', logo: 'https://logo.clearbit.com/kelloggs.com' },
+    { name: 'Heinz',      logo: 'https://logo.clearbit.com/heinz.com' },
+    { name: 'Unilever',   logo: 'https://logo.clearbit.com/unilever.com' },
+    { name: 'P&G',        logo: 'https://logo.clearbit.com/pg.com' },
+    { name: 'Mondelez',   logo: 'https://logo.clearbit.com/mondelezinternational.com' },
 ];
 
 const TOP_CAT_CARDS = [
-    { title: 'Electronics & Accessories', items: '0 products', image: '/marketplace/img1.png' },
-    { title: 'Industrial & Machinery', items: '0 products', image: '/marketplace/img2.png' },
-    { title: 'Packaging & Materials', items: '0 products', image: '/marketplace/img3.png' },
-    { title: 'Home & Kitchen Supplies', items: '0 products', image: '/marketplace/img4.png' },
+    {
+        title: 'Logistics & Transport',
+        items: '0 products',
+        image: 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&q=80&w=900',
+    },
+    {
+        title: 'Supply Chain Technology',
+        items: '0 products',
+        image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=900',
+    },
+    {
+        title: 'Industrial & Containers',
+        items: '0 products',
+        image: 'https://images.unsplash.com/photo-1494412519320-aa613dfb7738?auto=format&fit=crop&q=80&w=900',
+    },
+    {
+        title: 'Warehousing & Storage',
+        items: '0 products',
+        image: 'https://images.unsplash.com/photo-1553413077-190dd305871c?auto=format&fit=crop&q=80&w=900',
+    },
 ];
 
 const WHY_US = [
