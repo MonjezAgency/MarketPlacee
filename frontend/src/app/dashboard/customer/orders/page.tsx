@@ -19,6 +19,7 @@ import {
 import { apiFetch } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
+import { formatPrice } from '@/lib/currency';
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -163,7 +164,7 @@ export default function OrdersPage() {
                                         <div className="text-right">
                                             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Value</p>
                                             <p className="text-2xl font-black text-[#0B1F3A]">
-                                                ${(order?.totalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                {formatPrice(order?.totalAmount || 0)}
                                             </p>
                                         </div>
                                         <Link 

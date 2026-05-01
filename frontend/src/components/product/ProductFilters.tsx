@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getCurrencyInfo } from '@/lib/currency';
 
 interface FilterProps {
     brands: string[];
@@ -153,7 +154,7 @@ export default function ProductFilters(props: FilterProps) {
                 <div className="space-y-4 pt-2">
                     <div className="flex items-center gap-2">
                         <div className="relative flex-1">
-                            <span className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                            <span className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencyInfo().symbol}</span>
                             <input
                                 type="number"
                                 value={minVal}
@@ -164,7 +165,7 @@ export default function ProductFilters(props: FilterProps) {
                         </div>
                         <span className="text-muted-foreground">-</span>
                         <div className="relative flex-1">
-                            <span className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                            <span className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">{getCurrencyInfo().symbol}</span>
                             <input
                                 type="number"
                                 value={maxVal}

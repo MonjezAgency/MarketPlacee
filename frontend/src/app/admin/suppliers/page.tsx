@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
+import { formatPrice } from '@/lib/currency';
 
 interface Supplier {
     id: string;
@@ -421,7 +422,7 @@ export default function AdminSuppliersPage() {
                                                     <BarChart3 size={20} />
                                                     <div>
                                                         <p className="text-[9px] font-bold uppercase tracking-widest opacity-80">Sales Volume</p>
-                                                        <p className="text-lg font-bold">${selectedSupplier.revenue?.toLocaleString()}</p>
+                                                        <p className="text-lg font-bold">{formatPrice(selectedSupplier.revenue || 0)}</p>
                                                     </div>
                                                 </div>
                                                 <div className="p-5 bg-slate-900 rounded-3xl text-white space-y-2 shadow-lg shadow-slate-900/20">

@@ -20,16 +20,100 @@ const poppins = Poppins({
     display: "swap",
 });
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://atlantisfmcg.com';
+
 export const metadata: Metadata = {
-    title: "Atlantis — Premium Beverage Distribution",
-    description: "Your trusted B2B Atlantis for Pepsi, Coca-Cola, Red Bull, Lipton and more. Wholesale beverage distribution for businesses.",
+    metadataBase: new URL(SITE_URL),
+    title: {
+        default: "Atlantis Marketplace — Global B2B Wholesale Sourcing Platform",
+        template: "%s | Atlantis Marketplace",
+    },
+    description: "Atlantis is a global B2B wholesale marketplace connecting verified suppliers with retailers. Source bulk products at competitive wholesale prices with reliable global shipping, flexible payment terms, and dedicated business support.",
+    keywords: [
+        "B2B marketplace",
+        "wholesale platform",
+        "bulk sourcing",
+        "global suppliers",
+        "wholesale distribution",
+        "B2B procurement",
+        "verified suppliers",
+        "trade assurance",
+        "wholesale prices",
+        "bulk orders",
+        "FMCG wholesale",
+        "supplier network",
+        "Atlantis Marketplace",
+        "B2B sourcing",
+        "wholesale beverages",
+        "global trade",
+    ],
+    authors: [{ name: "Atlantis Marketplace" }],
+    creator: "Atlantis Marketplace",
+    publisher: "Atlantis Marketplace",
+    formatDetection: {
+        email: false,
+        address: false,
+        telephone: false,
+    },
+    alternates: {
+        canonical: '/',
+        languages: {
+            'en': '/en',
+            'ar': '/ar',
+            'fr': '/fr',
+            'ro': '/ro',
+        },
+    },
+    openGraph: {
+        type: 'website',
+        siteName: 'Atlantis Marketplace',
+        title: 'Atlantis Marketplace — Global B2B Wholesale Sourcing Platform',
+        description: 'Connect with verified global suppliers. Source bulk products at competitive wholesale prices with reliable global shipping and trade assurance.',
+        url: SITE_URL,
+        locale: 'en_US',
+        alternateLocale: ['ar_EG', 'fr_FR', 'ro_RO'],
+        images: [
+            {
+                url: '/icon.png',
+                width: 1200,
+                height: 630,
+                alt: 'Atlantis Marketplace — Global B2B Wholesale Platform',
+            },
+        ],
+    },
+    twitter: {
+        card: 'summary_large_image',
+        title: 'Atlantis Marketplace — Global B2B Wholesale Sourcing Platform',
+        description: 'Connect with verified global suppliers. Source bulk products at competitive wholesale prices.',
+        images: ['/icon.png'],
+    },
+    robots: {
+        index: true,
+        follow: true,
+        googleBot: {
+            index: true,
+            follow: true,
+            'max-video-preview': -1,
+            'max-image-preview': 'large',
+            'max-snippet': -1,
+        },
+    },
+    category: 'business',
+    icons: {
+        icon: [
+            { url: '/favicon.ico', sizes: 'any' },
+            { url: '/icon.png', type: 'image/png' },
+        ],
+        apple: '/icon.png',
+    },
+    manifest: '/manifest.json',
 };
 
 export const viewport = {
     width: 'device-width',
     initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
+    maximumScale: 5,
+    themeColor: '#0B1F3A',
 };
 
 export default function RootLayout({
@@ -40,11 +124,36 @@ export default function RootLayout({
     return (
         <html lang="ar" dir="rtl" suppressHydrationWarning>
             <head>
-                <link rel="icon" href="/favicon.ico?v=2" sizes="any" />
-                <link rel="icon" href="/icon.png?v=2" type="image/png" />
-                <link rel="apple-touch-icon" href="/icon.png?v=2" />
-                <link rel="manifest" href="/manifest.json" />
-                <meta name="theme-color" content="#0a0a0a" />
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify({
+                            '@context': 'https://schema.org',
+                            '@type': 'Organization',
+                            name: 'Atlantis Marketplace',
+                            url: SITE_URL,
+                            logo: `${SITE_URL}/icon.png`,
+                            description: 'Global B2B wholesale marketplace connecting verified suppliers with retailers.',
+                            sameAs: [],
+                        }),
+                    }}
+                />
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{
+                        __html: JSON.stringify({
+                            '@context': 'https://schema.org',
+                            '@type': 'WebSite',
+                            name: 'Atlantis Marketplace',
+                            url: SITE_URL,
+                            potentialAction: {
+                                '@type': 'SearchAction',
+                                target: `${SITE_URL}/categories?q={search_term_string}`,
+                                'query-input': 'required name=search_term_string',
+                            },
+                        }),
+                    }}
+                />
                 <script dangerouslySetInnerHTML={{
                     __html: `
                         if ('serviceWorker' in navigator) {

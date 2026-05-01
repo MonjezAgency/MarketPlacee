@@ -577,8 +577,24 @@ export default function HomePage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                         {TOP_CAT_CARDS.map((cat, i) => (
                             <Link key={i} href="/categories" className="bg-white border border-[#E5E7EB] rounded-[16px] overflow-hidden group hover:shadow-xl transition-all">
-                                <div className="h-[180px] overflow-hidden bg-[#F8FAFC]">
-                                    <img src={cat.image} alt={cat.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                <div className="h-[180px] overflow-hidden bg-gradient-to-br from-[#F8FAFC] to-[#E5E7EB] flex items-center justify-center">
+                                    <img
+                                        src={cat.image}
+                                        alt={cat.title}
+                                        loading="lazy"
+                                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                                        onError={(e) => {
+                                            const t = e.target as HTMLImageElement;
+                                            t.style.display = 'none';
+                                            const parent = t.parentElement;
+                                            if (parent && !parent.querySelector('.fallback-icon')) {
+                                                const div = document.createElement('div');
+                                                div.className = 'fallback-icon flex items-center justify-center w-full h-full text-[#94A3B8]';
+                                                div.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M16.5 9.4 7.55 4.24"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>';
+                                                parent.appendChild(div);
+                                            }
+                                        }}
+                                    />
                                 </div>
                                 <div className="p-5 space-y-2">
                                     <h3 className="text-[14px] font-bold group-hover:text-[#2EC4B6] transition-colors line-clamp-1">{cat.title}</h3>
@@ -603,7 +619,7 @@ export default function HomePage() {
                             { title: t('home', 'competitiveWholesalePrices'), desc: t('home', 'pricingDesc'), icon: TrendingUp },
                             { title: t('home', 'globalShippingSolutions'), desc: t('home', 'shippingDesc'), icon: Truck },
                             { title: t('home', 'dedicatedB2BSupport'), desc: t('home', 'supportDesc'), icon: Headphones },
-                            { title: t('home', 'paymentDesc'), desc: t('home', 'paymentDesc'), icon: ShieldCheck }
+                            { title: t('home', 'secureFlexiblePayments'), desc: t('home', 'paymentDesc'), icon: ShieldCheck }
                         ].map((item, i) => (
                             <div key={i} className="flex items-start gap-4 p-2">
                                 <div className="w-12 h-12 rounded-full bg-[#F8FAFC] flex items-center justify-center text-[#2EC4B6] shrink-0 border border-[#E5E7EB] group-hover:bg-[#2EC4B6] group-hover:text-white transition-all">

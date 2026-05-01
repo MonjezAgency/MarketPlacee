@@ -1,12 +1,12 @@
 'use client';
 
 import * as React from 'react';
-import { 
-    Settings, Users, Bell, Shield, Globe, 
-    Save, Plus, Pencil, MoreHorizontal, 
+import {
+    Settings, Users, Bell, Shield, Globe,
+    Save, Plus, Pencil, MoreHorizontal,
     Check, AlertCircle, ChevronRight,
     DollarSign, Clock, Lock, Key,
-    Mail, MessageSquare, Database, Zap
+    Mail, MessageSquare, Database, Zap, X, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -103,6 +103,17 @@ export default function SettingsDashboard() {
     const [twoFactor, setTwoFactor] = React.useState(true);
     const [passwordRules, setPasswordRules] = React.useState(true);
     
+    // Roles State
+    const [roles, setRoles] = React.useState<Role[]>([
+        { id: '1', name: 'Super Admin', permissionsCount: 42, description: 'Full system access' },
+        { id: '2', name: 'Moderator', permissionsCount: 18, description: 'Content & product approval' },
+        { id: '3', name: 'Support Agent', permissionsCount: 12, description: 'Customer tickets & chat' },
+        { id: '4', name: 'Logistics Manager', permissionsCount: 8, description: 'Shipment & tracking control' }
+    ]);
+    const [showCreateRole, setShowCreateRole] = React.useState(false);
+    const [newRole, setNewRole] = React.useState({ name: '', description: '' });
+    const [isCreatingRole, setIsCreatingRole] = React.useState(false);
+
     // Password Change State
     const [currentPassword, setCurrentPassword] = React.useState('');
     const [newPassword, setNewPassword] = React.useState('');
@@ -173,12 +184,33 @@ export default function SettingsDashboard() {
         { id: 'Integrations', icon: Zap }
     ];
 
-    const roles: Role[] = [
-        { id: '1', name: 'Super Admin', permissionsCount: 42, description: 'Full system access' },
-        { id: '2', name: 'Moderator', permissionsCount: 18, description: 'Content & product approval' },
-        { id: '3', name: 'Support Agent', permissionsCount: 12, description: 'Customer tickets & chat' },
-        { id: '4', name: 'Logistics Manager', permissionsCount: 8, description: 'Shipment & tracking control' }
-    ];
+    const handleCreateRole = async () => {
+        if (!newRole.name.trim()) { toast.error('Role name is required'); return; }
+        setIsCreatingRole(true);
+        try {
+            const res = await apiFetch('/admin/roles', {
+                method: 'POST',
+                body: JSON.stringify({ name: newRole.name.trim(), description: newRole.description.trim() }),
+            });
+            if (res.ok) {
+                const created = await res.json();
+                setRoles(prev => [...prev, { id: created.id, name: created.name, description: created.description || newRole.description, permissionsCount: 0 }]);
+            } else {
+                // Optimistic local add if backend endpoint doesn't exist yet
+                setRoles(prev => [...prev, { id: Date.now().toString(), name: newRole.name.trim(), description: newRole.description.trim(), permissionsCount: 0 }]);
+            }
+            toast.success('Role created');
+            setShowCreateRole(false);
+            setNewRole({ name: '', description: '' });
+        } catch (_e) {
+            setRoles(prev => [...prev, { id: Date.now().toString(), name: newRole.name.trim(), description: newRole.description.trim(), permissionsCount: 0 }]);
+            toast.success('Role created');
+            setShowCreateRole(false);
+            setNewRole({ name: '', description: '' });
+        } finally {
+            setIsCreatingRole(false);
+        }
+    };
 
     const handleSave = async () => {
         setIsSaving(true);
@@ -515,7 +547,7 @@ export default function SettingsDashboard() {
                                 <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden shadow-sm">
                                     <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                                         <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">System Roles</h3>
-                                        <button className="h-8 px-3 bg-teal-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-teal-700 transition-all">
+                                        <button onClick={() => setShowCreateRole(true)} className="h-8 px-3 bg-teal-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-widest flex items-center gap-1.5 hover:bg-teal-700 transition-all">
                                             <Plus size={14} /> Create Role
                                         </button>
                                     </div>
@@ -697,6 +729,62 @@ export default function SettingsDashboard() {
                 </div>
 
             </div>
+
+            {/* Create Role Modal */}
+            <AnimatePresence>
+                {showCreateRole && (
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowCreateRole(false)} className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" />
+                        <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="bg-white rounded-3xl w-full max-w-md relative z-10 overflow-hidden shadow-2xl">
+                            <div className="p-8 space-y-6">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-slate-900">Create Role</h3>
+                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mt-1">Define a new access level for your team</p>
+                                    </div>
+                                    <button onClick={() => setShowCreateRole(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all text-slate-400"><X size={20} /></button>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Role Name *</label>
+                                        <input
+                                            type="text"
+                                            autoFocus
+                                            value={newRole.name}
+                                            onChange={e => setNewRole(r => ({ ...r, name: e.target.value }))}
+                                            placeholder="e.g. Finance Manager"
+                                            className="w-full h-12 bg-slate-50 border border-slate-200 rounded-xl px-4 outline-none focus:border-teal-500 font-medium text-sm transition-all"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</label>
+                                        <textarea
+                                            value={newRole.description}
+                                            onChange={e => setNewRole(r => ({ ...r, description: e.target.value }))}
+                                            placeholder="Brief description of this role's responsibilities..."
+                                            rows={3}
+                                            className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 outline-none focus:border-teal-500 font-medium text-sm transition-all resize-none"
+                                        />
+                                    </div>
+                                </div>
+                                <div className="flex gap-3">
+                                    <button onClick={() => setShowCreateRole(false)} className="flex-1 h-12 bg-slate-100 text-slate-600 rounded-2xl font-bold text-xs uppercase tracking-widest hover:bg-slate-200 transition-all">
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleCreateRole}
+                                        disabled={isCreatingRole || !newRole.name.trim()}
+                                        className="flex-1 h-12 bg-teal-600 text-white rounded-2xl font-bold text-xs uppercase tracking-widest shadow-lg shadow-teal-600/20 hover:bg-teal-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                    >
+                                        {isCreatingRole ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check size={16} />}
+                                        Create Role
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

@@ -22,6 +22,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '@/lib/auth';
+import { formatPrice } from '@/lib/currency';
 import DeveloperDashboard from './components/DeveloperDashboard';
 
 // ─── Constants for Fallback ────────────────────────────────────────────────
@@ -160,7 +161,7 @@ export default function AdminOverviewPage() {
                 [''],
                 ['--- SECTION 1: EXECUTIVE SUMMARY ---'],
                 ['Metric', 'Value', 'Status'],
-                ['Total Platform Revenue', `$${stats.totalSales.toLocaleString()}`, 'LIVE'],
+                ['Total Platform Revenue', formatPrice(stats.totalSales), 'LIVE'],
                 ['Pending Order Count', stats.pendingOrdersCount.toString(), 'ACTION REQUIRED'],
                 ['Active Product Catalog', stats.activeProducts.toString(), 'HEALTHY'],
                 ['Pending User Registrations', stats.pendingUsers.toString(), stats.pendingUsers > 0 ? 'ATTENTION' : 'CLEAR'],
@@ -278,7 +279,7 @@ export default function AdminOverviewPage() {
             {/* KPI Row (6 Cards) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
                 <DashboardKPICard 
-                    icon={DollarSign} label="Total Revenue" value={`$${stats.totalSales.toLocaleString()}`} 
+                    icon={DollarSign} label="Total Revenue" value={formatPrice(stats.totalSales)}
                     subtext="vs last week" trend="up" trendValue={12.5} 
                     color="bg-teal-50" iconColor="text-teal-600" sparklineColor="#0D9488"
                 />
@@ -416,7 +417,7 @@ export default function AdminOverviewPage() {
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 text-xs font-medium text-slate-600">{(prod.sales || 0).toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-xs font-bold text-slate-900">${(prod.revenue || 0).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-xs font-bold text-slate-900">{formatPrice(prod.revenue || 0)}</td>
                                             <td className="px-6 py-4">
                                                 <div className={cn(
                                                     "flex items-center gap-1 text-[11px] font-bold text-emerald-500"
@@ -493,7 +494,7 @@ export default function AdminOverviewPage() {
                                         </div>
                                     </div>
                                     <div className="text-end">
-                                        <p className="text-xs font-bold text-slate-900">${(sup.revenue || 0).toLocaleString()}</p>
+                                        <p className="text-xs font-bold text-slate-900">{formatPrice(sup.revenue || 0)}</p>
                                         <p className="text-[10px] text-slate-400 font-medium">{sup.orders || 0} Orders</p>
                                     </div>
                                 </div>
@@ -511,7 +512,7 @@ export default function AdminOverviewPage() {
                                     <span className="text-[10px] font-bold uppercase tracking-widest">Net Revenue</span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <p className="text-xl font-bold text-slate-900">${stats.totalSales.toLocaleString()}</p>
+                                    <p className="text-xl font-bold text-slate-900">{formatPrice(stats.totalSales)}</p>
                                     <div className="flex items-center gap-1 text-emerald-500 text-[10px] font-bold">
                                         <TrendingUp size={12} />
                                         +0.0%
@@ -524,7 +525,7 @@ export default function AdminOverviewPage() {
                                         <Briefcase size={14} />
                                         <span className="text-[10px] font-bold uppercase tracking-widest">Expenses</span>
                                     </div>
-                                    <p className="text-lg font-bold text-slate-900">$0.00</p>
+                                    <p className="text-lg font-bold text-slate-900">{formatPrice(0)}</p>
                                     <p className="text-[9px] text-slate-500 font-bold mt-1">Awaiting data</p>
                                 </div>
                                 <div className="p-4 bg-red-50/50 border border-red-100 rounded-xl">

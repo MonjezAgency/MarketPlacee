@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiFetch } from '@/lib/api';
-import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertToBase } from '@/lib/currency';
+import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertToBase, formatPrice } from '@/lib/currency';
 
 type Tab = 'invoices' | 'credit' | 'tax' | 'warehouses';
 
@@ -181,6 +181,91 @@ function AdminFinanceContent() {
         } catch (_e) { showToast('error', 'Failed'); }
     };
 
+    const viewInvoice = (inv: any) => {
+        const clientName = inv.order?.buyer?.name || inv.customer?.name || 'Manual Customer';
+        const itemRows = (inv.order?.items || [])
+            .map((i: any) => `<tr><td style="padding:10px 12px;border-bottom:1px solid #f0f0f0">${i.product?.name || 'Item'}</td><td style="padding:10px 12px;border-bottom:1px solid #f0f0f0">${i.quantity}</td><td style="padding:10px 12px;border-bottom:1px solid #f0f0f0">$${(i.price ?? 0).toFixed(2)}</td><td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;font-weight:700">$${((i.price ?? 0) * (i.quantity ?? 1)).toFixed(2)}</td></tr>`)
+            .join('');
+        const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><title>Invoice ${inv.invoiceNumber}</title>
+<style>body{font-family:'Segoe UI',sans-serif;margin:0;padding:40px;color:#0A1A2F;background:#fff}
+.header{background:#0A1A2F;color:#fff;padding:32px;border-radius:12px;margin-bottom:32px;display:flex;justify-content:space-between;align-items:center}
+.logo{font-size:26px;font-weight:900}.logo span{color:#1BC7C9}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px}
+.meta-box{background:#F2F4F7;padding:16px;border-radius:8px}
+.meta-box label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#667085;display:block;margin-bottom:4px}
+.meta-box p{margin:0;font-weight:700;font-size:14px}
+table{width:100%;border-collapse:collapse;margin-bottom:24px}
+th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#667085;padding:8px 12px;border-bottom:2px solid #E5E7EB}
+.totals{margin-left:auto;width:280px}
+.total-row{display:flex;justify-content:space-between;padding:8px 0;font-size:14px}
+.total-final{display:flex;justify-content:space-between;padding:16px 0;font-size:18px;font-weight:900;color:#1BC7C9;border-top:2px solid #0A1A2F;margin-top:8px}
+</style></head><body>
+<div class="header"><div class="logo">Atlan<span>tis</span></div>
+<div style="text-align:right"><div style="font-size:22px;font-weight:900">${inv.invoiceNumber}</div>
+<div style="font-size:12px;color:#B0BCCF;margin-top:4px">Issued: ${inv.createdAt ? new Date(inv.createdAt).toLocaleDateString() : '-'}</div></div></div>
+<div class="meta">
+<div class="meta-box"><label>Client</label><p>${clientName}</p></div>
+<div class="meta-box"><label>Status</label><p>${inv.status}</p></div>
+<div class="meta-box"><label>Due Date</label><p>${inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '-'}</p></div>
+<div class="meta-box"><label>Currency</label><p>${inv.currency || 'USD'}</p></div>
+</div>
+${itemRows ? `<h2 style="font-size:16px;margin-bottom:12px">Order Items</h2>
+<table><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
+<tbody>${itemRows}</tbody></table>` : ''}
+<div class="totals">
+<div class="total-row"><span>Subtotal</span><span>$${(inv.amount ?? 0).toFixed(2)}</span></div>
+<div class="total-row"><span>Tax</span><span>$${(inv.tax ?? 0).toFixed(2)}</span></div>
+<div class="total-final"><span>Total</span><span>$${(inv.totalAmount ?? 0).toFixed(2)}</span></div>
+</div>
+<div style="text-align:center;color:#667085;font-size:11px;margin-top:40px;padding-top:16px;border-top:1px solid #E5E7EB">© 2026 Atlantis Marketplace — atlantisfmcg.com</div>
+</body></html>`;
+        const blob = new Blob([html], { type: 'text/html' });
+        const url = URL.createObjectURL(blob);
+        const win = window.open(url, '_blank');
+        if (win) win.addEventListener('load', () => { win.print(); URL.revokeObjectURL(url); });
+    };
+
+    const exportData = () => {
+        let csv = '';
+        let filename = '';
+        if (tab === 'invoices') {
+            filename = 'invoices_export.csv';
+            csv = 'Invoice #,Client,Amount,Tax,Total,Status,Due Date\n' +
+                invoices.map(inv => [
+                    inv.invoiceNumber,
+                    `"${inv.order?.buyer?.name || inv.customer?.name || 'Manual'}"`,
+                    (inv.amount ?? 0).toFixed(2),
+                    (inv.tax ?? 0).toFixed(2),
+                    (inv.totalAmount ?? 0).toFixed(2),
+                    inv.status,
+                    inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '-',
+                ].join(',')).join('\n');
+        } else if (tab === 'credit') {
+            filename = 'credit_terms_export.csv';
+            csv = 'Buyer,Credit Limit,Used Credit,Payment Days,Status\n' +
+                credits.map(c => {
+                    const buyer = buyers.find(b => b.id === c.userId);
+                    return [`"${buyer?.name || 'Unknown'}"`, c.creditLimit, c.usedCredit, c.paymentTermDays, c.status].join(',');
+                }).join('\n');
+        } else if (tab === 'tax') {
+            filename = 'tax_exemptions_export.csv';
+            csv = 'Buyer,Certificate Type,Status,Date\n' +
+                exemptions.map(ex => {
+                    const buyer = buyers.find(b => b.id === ex.userId);
+                    return [`"${buyer?.name || 'Unknown'}"`, ex.certificateType, ex.status, new Date(ex.createdAt).toLocaleDateString()].join(',');
+                }).join('\n');
+        } else {
+            filename = 'warehouses_export.csv';
+            csv = 'Name,City,Country,Address\n' +
+                warehouses.map(w => [`"${w.name}"`, `"${w.city}"`, `"${w.country}"`, `"${w.address}"`].join(',')).join('\n');
+        }
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = filename; a.click();
+        URL.revokeObjectURL(url);
+    };
+
     const createManualInvoice = async () => {
         if (!newInvoice.customerId || newInvoice.amount <= 0) return;
         try {
@@ -245,7 +330,7 @@ function AdminFinanceContent() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    <button className="h-10 px-4 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
+                    <button onClick={exportData} className="h-10 px-4 bg-white border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-slate-50 transition-all shadow-sm">
                         <Download size={16} /> Export Data
                     </button>
                     {tab === 'warehouses' && (
@@ -269,10 +354,10 @@ function AdminFinanceContent() {
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                    { label: 'Total Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50' },
+                    { label: 'Total Revenue', value: formatPrice(stats.totalRevenue), icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50' },
                     { label: 'Pending Invoices', value: stats.pendingInvoices, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
                     { label: 'Paid Invoices', value: stats.paidInvoices, icon: Check, color: 'text-teal-600', bg: 'bg-teal-50' },
-                    { label: 'Outstanding Balance', value: `$${stats.outstandingBalance.toLocaleString()}`, icon: BarChart3, color: 'text-red-600', bg: 'bg-red-50' },
+                    { label: 'Outstanding Balance', value: formatPrice(stats.outstandingBalance), icon: BarChart3, color: 'text-red-600', bg: 'bg-red-50' },
                 ].map((stat, i) => (
                     <div key={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                         <div className="flex items-center justify-between mb-4">
@@ -363,8 +448,8 @@ function AdminFinanceContent() {
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col">
-                                                            <span className="text-sm font-bold text-slate-900">${inv.totalAmount?.toLocaleString()}</span>
-                                                            <span className="text-[10px] text-slate-500 font-medium">Tax: ${inv.tax?.toFixed(2)}</span>
+                                                            <span className="text-sm font-bold text-slate-900">{formatPrice(inv.totalAmount || 0)}</span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">Tax: {formatPrice(inv.tax || 0)}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
@@ -384,7 +469,7 @@ function AdminFinanceContent() {
                                                                     Mark Paid
                                                                 </button>
                                                             )}
-                                                            <button className="p-2 text-slate-400 hover:text-slate-900 transition-all">
+                                                            <button onClick={() => viewInvoice(inv)} className="p-2 text-slate-400 hover:text-slate-900 transition-all" title="View Invoice">
                                                                 <Eye size={16} />
                                                             </button>
                                                         </div>
@@ -440,7 +525,7 @@ function AdminFinanceContent() {
                                                             />
                                                         </div>
                                                         <div className="flex items-center justify-between mt-2">
-                                                            <span className="text-xs font-bold text-slate-900">${c.usedCredit.toLocaleString()} <span className="text-slate-400 font-medium">/ ${c.creditLimit.toLocaleString()}</span></span>
+                                                            <span className="text-xs font-bold text-slate-900">{formatPrice(c.usedCredit)} <span className="text-slate-400 font-medium">/ {formatPrice(c.creditLimit)}</span></span>
                                                             <span className={cn("px-2 py-0.5 rounded-md text-[9px] font-bold uppercase border", statusColor(c.status))}>{c.status}</span>
                                                         </div>
                                                     </div>

@@ -37,6 +37,8 @@ interface Product {
     createdAt: string;
     completeness?: number; // Calculated field
     unit?: string;
+    unitsPerCase?: number;
+    casesPerPallet?: number;
     unitsPerPallet?: number;
     palletsPerShipment?: number;
     basePrice?: number;
@@ -831,6 +833,7 @@ export default function ProductsModerationPage() {
                                                                 onChange={(e) => setEditData({...editData, unit: e.target.value})}
                                                             >
                                                                 <option value="piece">Base Piece / Item</option>
+                                                                <option value="case">Case / Carton</option>
                                                                 <option value="pallet">Pallet (Wholesale)</option>
                                                                 <option value="shipment">Full Shipment / Container</option>
                                                             </select>
@@ -839,11 +842,54 @@ export default function ProductsModerationPage() {
                                                         )}
                                                     </div>
 
+                                                    {(isEditing ? editData.unit : selectedProduct.unit) === 'case' && (
+                                                        <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Pieces / Case</label>
+                                                                {isEditing ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
+                                                                        value={editData.unitsPerCase || 0}
+                                                                        onChange={(e) => setEditData({...editData, unitsPerCase: parseInt(e.target.value)})}
+                                                                    />
+                                                                ) : (
+                                                                    <p className="text-sm font-bold text-slate-900">{selectedProduct.unitsPerCase || 0} pcs</p>
+                                                                )}
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Cases / Pallet</label>
+                                                                {isEditing ? (
+                                                                    <input
+                                                                        type="number"
+                                                                        className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
+                                                                        value={editData.casesPerPallet || 0}
+                                                                        onChange={(e) => setEditData({...editData, casesPerPallet: parseInt(e.target.value)})}
+                                                                    />
+                                                                ) : (
+                                                                    <p className="text-sm font-bold text-slate-900">{selectedProduct.casesPerPallet || 0}</p>
+                                                                )}
+                                                            </div>
+                                                            {(() => {
+                                                                const pcs = (isEditing ? editData.unitsPerCase : selectedProduct.unitsPerCase) || 0;
+                                                                const cases = (isEditing ? editData.casesPerPallet : selectedProduct.casesPerPallet) || 0;
+                                                                if (!pcs || !cases) return null;
+                                                                return (
+                                                                    <div className="col-span-2 p-2 bg-teal-50 border border-teal-100 rounded-xl">
+                                                                        <p className="text-[10px] font-bold text-teal-700">
+                                                                            {pcs} pcs/case × {cases} cases/pallet = {pcs * cases} pieces per pallet
+                                                                        </p>
+                                                                    </div>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    )}
+
                                                     {(isEditing ? editData.unit : selectedProduct.unit) === 'pallet' && (
                                                         <div className="space-y-1 animate-in slide-in-from-top-2">
                                                             <label className="text-[10px] text-slate-500 font-bold uppercase">Pieces Per Pallet</label>
                                                             {isEditing ? (
-                                                                <input 
+                                                                <input
                                                                     type="number"
                                                                     className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
                                                                     value={editData.unitsPerPallet || 0}
@@ -925,12 +971,20 @@ export default function ProductsModerationPage() {
                                                 </div>
                                                 <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
                                                     <p className="text-[9px] text-amber-700 font-medium leading-tight">
-                                                        {((isEditing ? editData.unit : selectedProduct.unit) === 'pallet') ? 
-                                                            `The customer must purchase at least ${(isEditing ? editData.moq : selectedProduct.moq) || 1} pallet(s) (${((isEditing ? editData.moq : selectedProduct.moq) || 1) * ((isEditing ? editData.unitsPerPallet : selectedProduct.unitsPerPallet) || 0)} pieces total).` :
-                                                         ((isEditing ? editData.unit : selectedProduct.unit) === 'shipment') ?
-                                                            `The customer must purchase at least ${(isEditing ? editData.moq : selectedProduct.moq) || 1} shipment(s).` :
-                                                            `The customer must purchase at least ${(isEditing ? editData.moq : selectedProduct.moq) || 1} piece(s).`
-                                                        }
+                                                        {(() => {
+                                                            const unit = (isEditing ? editData.unit : selectedProduct.unit) || 'piece';
+                                                            const moq = (isEditing ? editData.moq : selectedProduct.moq) || 1;
+                                                            if (unit === 'case') {
+                                                                const pcs = (isEditing ? editData.unitsPerCase : selectedProduct.unitsPerCase) || 0;
+                                                                const cases = (isEditing ? editData.casesPerPallet : selectedProduct.casesPerPallet) || 0;
+                                                                return `Min ${moq} case(s) = ${moq * pcs} pieces. Each case has ${pcs} pieces; ${cases} cases per pallet.`;
+                                                            } else if (unit === 'pallet') {
+                                                                return `Min ${moq} pallet(s) = ${moq * ((isEditing ? editData.unitsPerPallet : selectedProduct.unitsPerPallet) || 0)} pieces total.`;
+                                                            } else if (unit === 'shipment') {
+                                                                return `Min ${moq} shipment(s).`;
+                                                            }
+                                                            return `Min ${moq} piece(s).`;
+                                                        })()}
                                                     </p>
                                                 </div>
                                             </div>
