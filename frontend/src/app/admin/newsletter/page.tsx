@@ -72,8 +72,19 @@ export default function NewsletterPage() {
     const handleSendCampaign = async (e: React.FormEvent) => {
         e.preventDefault();
         const formData = new FormData(e.currentTarget as HTMLFormElement);
-        const subject = formData.get('subject') as string;
-        const content = formData.get('content') as string;
+        const subject = (formData.get('subject') as string)?.trim();
+        const content = (formData.get('content') as string)?.trim();
+
+        if (!subject || !content) {
+            toast.error('Please fill in both subject and content fields');
+            return;
+        }
+
+        const activeSubs = subscribers.filter(s => s.status === 'ACTIVE');
+        if (activeSubs.length === 0) {
+            toast.error('No active subscribers to send the campaign to.');
+            return;
+        }
 
         setIsSending(true);
         try {
@@ -83,15 +94,24 @@ export default function NewsletterPage() {
             });
             if (res.ok) {
                 const result = await res.json();
-                toast.success(`Campaign transmitted to ${result.successCount} buyers!`, {
-                    style: { borderRadius: '12px', background: '#0F172A', color: '#fff' }
+                toast.success(`Campaign transmitted to ${result.successCount} of ${result.total} subscribers`, {
+                    style: { borderRadius: '12px', background: '#0F172A', color: '#fff' },
+                    duration: 5000,
                 });
                 setIsModalOpen(false);
             } else {
-                toast.error('Failed to send campaign');
+                let msg = 'Failed to send campaign';
+                try {
+                    const err = await res.json();
+                    if (err?.message) msg = Array.isArray(err.message) ? err.message.join(', ') : err.message;
+                } catch (_e) {}
+                if (res.status === 401 || res.status === 403) {
+                    msg = 'You don\'t have permission to send campaigns. Please log in as admin.';
+                }
+                toast.error(msg);
             }
         } catch (error) {
-            toast.error('Network error');
+            toast.error('Network error - check your connection and try again');
         } finally {
             setIsSending(false);
         }
@@ -138,7 +158,7 @@ export default function NewsletterPage() {
                     { label: 'Total Subscribers', value: subscribers.length.toLocaleString(), trend: '+ Real-time', icon: Users, color: '#2EC4B6' },
                     { label: 'Active Status', value: subscribers.filter(s => s.status === 'ACTIVE').length, trend: 'Verified', icon: CheckCircle2, color: '#10B981' },
                     { label: 'Open Rate', value: '42.5%', trend: '+5%', icon: Activity, color: '#3B82F6' },
-                    { label: 'Unsubscribes', value: subscribers.filter(s => s.status === 'UNSUBSCBSCRIBED').length, trend: 'Low', icon: Trash2, color: '#EF4444' },
+                    { label: 'Unsubscribes', value: subscribers.filter(s => s.status === 'UNSUBSCRIBED').length, trend: 'Low', icon: Trash2, color: '#EF4444' },
                 ].map((stat, i) => (
                     <div key={i} className="bg-white p-6 rounded-[28px] border border-slate-200 shadow-sm flex items-center gap-5 hover:shadow-xl hover:border-[#2EC4B6]/30 transition-all duration-500 group">
                         <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform" style={{ backgroundColor: stat.color }}>
