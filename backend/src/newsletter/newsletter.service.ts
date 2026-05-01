@@ -10,22 +10,29 @@ export class NewsletterService {
     ) {}
 
     async subscribe(email: string, source?: string, region?: string) {
+        // Validate email format
+        const trimmed = (email || '').trim().toLowerCase();
+        if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+            throw new ConflictException('Invalid email address');
+        }
+
         const existing = await this.prisma.newsletterSubscriber.findUnique({
-            where: { email }
+            where: { email: trimmed }
         });
 
         if (existing) {
             if (existing.status === 'ACTIVE') {
-                throw new ConflictException('Already subscribed');
+                throw new ConflictException('This email is already subscribed to our newsletter');
             }
+            // Re-activate previously unsubscribed accounts
             return this.prisma.newsletterSubscriber.update({
-                where: { email },
+                where: { email: trimmed },
                 data: { status: 'ACTIVE', source: source || existing.source }
             });
         }
 
         return this.prisma.newsletterSubscriber.create({
-            data: { email, source, region }
+            data: { email: trimmed, source, region }
         });
     }
 

@@ -20,25 +20,56 @@ export default function Footer() {
     const handleSubscribe = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email) return;
-        
+
+        // Basic email validation
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            toast.error(locale === 'ar' ? 'البريد الإلكتروني غير صالح' : 'Please enter a valid email address');
+            return;
+        }
+
         setLoading(true);
         try {
-            await apiFetch('/newsletter/subscribe', { 
-                method: 'POST', 
-                body: JSON.stringify({ 
+            const res = await apiFetch('/newsletter/subscribe', {
+                method: 'POST',
+                body: JSON.stringify({
                     email,
                     source: 'Homepage Footer'
-                }) 
+                })
             });
-            
-            setSuccess(true);
-            toast.success('Successfully subscribed to newsletter!', {
-                icon: '🚀',
-                style: { borderRadius: '12px', background: '#0F172A', color: '#fff', fontSize: '14px', fontWeight: 'bold' }
-            });
-            setEmail('');
+
+            if (res.ok) {
+                setSuccess(true);
+                toast.success(
+                    locale === 'ar' ? 'تم الاشتراك في النشرة بنجاح!' : 'Successfully subscribed to newsletter!',
+                    {
+                        icon: '🚀',
+                        style: { borderRadius: '12px', background: '#0F172A', color: '#fff', fontSize: '14px', fontWeight: 'bold' }
+                    }
+                );
+                setEmail('');
+                // Reset success state after 4s so user can subscribe again later
+                setTimeout(() => setSuccess(false), 4000);
+            } else {
+                // Parse error message from backend
+                let message = locale === 'ar' ? 'فشل الاشتراك. يرجى المحاولة مرة أخرى.' : 'Subscription failed. Please try again.';
+                try {
+                    const data = await res.json();
+                    const backendMsg = (data?.message || '').toString().toLowerCase();
+                    if (res.status === 409 || backendMsg.includes('already subscribed')) {
+                        message = locale === 'ar'
+                            ? 'هذا البريد الإلكتروني مشترك بالفعل في النشرة.'
+                            : 'This email is already subscribed to our newsletter.';
+                    } else if (data?.message) {
+                        message = data.message;
+                    }
+                } catch (_e) { /* keep default message */ }
+                toast.error(message, {
+                    icon: 'ℹ️',
+                    style: { borderRadius: '12px', background: '#0F172A', color: '#fff', fontSize: '14px', fontWeight: 'bold' }
+                });
+            }
         } catch (error) {
-            toast.error('Subscription failed. Please try again.');
+            toast.error(locale === 'ar' ? 'خطأ في الاتصال. يرجى المحاولة مرة أخرى.' : 'Network error. Please try again.');
         } finally {
             setLoading(false);
         }
