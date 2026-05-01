@@ -1,9 +1,8 @@
 'use client';
 import { apiFetch } from '@/lib/api';
 
-
-import React, { useState } from 'react';
-import { Sparkles, ArrowLeft, Save, Tag, CalendarClock, Hash } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Sparkles, ArrowLeft, Save, Tag, CalendarClock, Hash, User, Package } from 'lucide-react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
@@ -16,14 +15,45 @@ export default function AdminNewOfferPage() {
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
 
+    const [suppliers, setSuppliers] = useState<any[]>([]);
+    const [supplierProducts, setSupplierProducts] = useState<any[]>([]);
+    const [isLoadingProducts, setIsLoadingProducts] = useState(false);
+
     const [formData, setFormData] = useState({
+        supplierId: '',
         productId: '',
         type: 'FEATURED',
         durationDays: '7'
     });
 
+    useEffect(() => {
+        apiFetch('/admin/users')
+            .then(r => r.ok ? r.json() : [])
+            .then(data => {
+                const list = Array.isArray(data) ? data : (data.data || []);
+                setSuppliers(list.filter((u: any) => u.role === 'SUPPLIER'));
+            })
+            .catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        if (!formData.supplierId) { setSupplierProducts([]); return; }
+        setIsLoadingProducts(true);
+        apiFetch(`/admin/products?supplierId=${formData.supplierId}&limit=100`)
+            .then(r => r.ok ? r.json() : [])
+            .then(data => setSupplierProducts(Array.isArray(data) ? data : (data.data || [])))
+            .catch(() => {})
+            .finally(() => setIsLoadingProducts(false));
+    }, [formData.supplierId]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }));
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value,
+            // Reset product when supplier changes
+            ...(name === 'supplierId' ? { productId: '' } : {})
+        }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -35,12 +65,10 @@ export default function AdminNewOfferPage() {
             
             const res = await apiFetch('/placements/request', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     productId: formData.productId,
+                    supplierId: formData.supplierId || undefined,
                     type: formData.type,
                     durationDays: parseInt(formData.durationDays, 10)
                 })
@@ -97,18 +125,55 @@ export default function AdminNewOfferPage() {
                         </div>
 
                         <div className="space-y-6">
-                            <div className="space-y-2">
-                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ms-1 flex items-center gap-2">
-                                    Target Product ID <Hash size={12} />
-                                </label>
-                                <Input
-                                    name="productId"
-                                    value={formData.productId}
-                                    onChange={handleChange}
-                                    placeholder="Enter UUID of existing product..."
-                                    required
-                                />
-                                <p className="text-[10px] text-muted-foreground/50 ms-2 mt-1 font-medium">Find the UUID from the product catalog database.</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ms-1 flex items-center gap-2">
+                                        Supplier <User size={12} />
+                                    </label>
+                                    <select
+                                        name="supplierId"
+                                        value={formData.supplierId}
+                                        onChange={handleChange}
+                                        className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 text-foreground text-sm outline-none focus:border-primary/50 transition-colors cursor-pointer appearance-none"
+                                    >
+                                        <option value="">All suppliers...</option>
+                                        {suppliers.map(s => (
+                                            <option key={s.id} value={s.id}>{s.name}{s.companyName ? ` (${s.companyName})` : ''}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-xs font-bold text-muted-foreground uppercase tracking-widest ms-1 flex items-center gap-2">
+                                        Target Product <Package size={12} />
+                                    </label>
+                                    {formData.supplierId && supplierProducts.length > 0 ? (
+                                        <select
+                                            name="productId"
+                                            value={formData.productId}
+                                            onChange={handleChange}
+                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 text-foreground text-sm outline-none focus:border-primary/50 transition-colors cursor-pointer appearance-none"
+                                            required
+                                        >
+                                            <option value="">Select product...</option>
+                                            {supplierProducts.map(p => (
+                                                <option key={p.id} value={p.id}>{p.name}</option>
+                                            ))}
+                                        </select>
+                                    ) : (
+                                        <div className="relative">
+                                            <Input
+                                                name="productId"
+                                                value={formData.productId}
+                                                onChange={handleChange}
+                                                placeholder={isLoadingProducts ? 'Loading products...' : 'Enter product UUID...'}
+                                                required
+                                            />
+                                        </div>
+                                    )}
+                                    {!formData.supplierId && (
+                                        <p className="text-[10px] text-muted-foreground/50 ms-2 mt-1 font-medium">Select a supplier to pick from their products.</p>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

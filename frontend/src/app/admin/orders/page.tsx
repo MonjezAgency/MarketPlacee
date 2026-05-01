@@ -36,7 +36,18 @@ interface AdminOrder {
     shippingCost?: number;
     trackingNumber?: string;
     carrier?: string;
-    items: { product: string; quantity: number; price: number }[];
+    items: {
+        product: string;
+        productId?: string;
+        quantity: number;
+        price: number;
+        supplierName?: string;
+        unit?: string;
+        unitsPerCase?: number;
+        casesPerPallet?: number;
+        unitsPerPallet?: number;
+        palletsPerShipment?: number;
+    }[];
 }
 
 const STATUS_MAP = {
@@ -559,15 +570,54 @@ export default function AdminOrdersPage() {
                                 <div className="p-6 space-y-6 max-h-[500px] overflow-y-auto no-scrollbar">
                                     {detailTab === 'info' && (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
+                                            {/* Supplier banner */}
+                                            {selectedOrder.supplier && (
+                                                <div className="flex items-center gap-3 p-3 bg-slate-900 rounded-xl">
+                                                    <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center text-teal-400 shrink-0">
+                                                        <User size={14} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Supplier</p>
+                                                        <p className="text-xs font-bold text-white">{selectedOrder.supplier}</p>
+                                                    </div>
+                                                </div>
+                                            )}
                                             <div className="space-y-3">
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order Summary</p>
-                                                <div className="space-y-2">
-                                                    {selectedOrder.items.map((item, idx) => (
-                                                        <div key={idx} className="flex items-center justify-between text-xs">
-                                                            <span className="text-slate-600">{item.product} <span className="text-slate-400 font-medium">x{item.quantity}</span></span>
-                                                            <span className="font-bold text-slate-900">{formatPrice(item.price * item.quantity)}</span>
-                                                        </div>
-                                                    ))}
+                                                <div className="space-y-3">
+                                                    {selectedOrder.items.map((item, idx) => {
+                                                        const logisticsStr = (() => {
+                                                            if (item.unit === 'case' && item.unitsPerCase && item.casesPerPallet) {
+                                                                const totalPieces = item.quantity * item.unitsPerCase;
+                                                                return `${item.quantity}×${item.unitsPerCase} = ${totalPieces} pcs (${item.casesPerPallet} cases/pallet)`;
+                                                            }
+                                                            if (item.unit === 'pallet' && item.unitsPerPallet) {
+                                                                return `${item.quantity} pallet(s) × ${item.unitsPerPallet} = ${item.quantity * item.unitsPerPallet} pcs`;
+                                                            }
+                                                            if (item.unit === 'shipment' && item.palletsPerShipment && item.unitsPerPallet) {
+                                                                const total = item.quantity * item.palletsPerShipment * item.unitsPerPallet;
+                                                                return `${item.quantity}×${item.palletsPerShipment}×${item.unitsPerPallet}=${total.toLocaleString()} pcs`;
+                                                            }
+                                                            return null;
+                                                        })();
+                                                        return (
+                                                            <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
+                                                                <div className="flex items-start justify-between gap-2">
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-xs font-bold text-slate-900 truncate">{item.product}</p>
+                                                                        {item.supplierName && <p className="text-[10px] text-slate-400 font-medium">{item.supplierName}</p>}
+                                                                        {logisticsStr && (
+                                                                            <p className="text-[10px] font-bold text-teal-600 mt-0.5">{logisticsStr}</p>
+                                                                        )}
+                                                                        {!logisticsStr && (
+                                                                            <p className="text-[10px] text-slate-400">Qty: {item.quantity}</p>
+                                                                        )}
+                                                                    </div>
+                                                                    <span className="font-bold text-slate-900 text-xs shrink-0">{formatPrice(item.price * item.quantity)}</span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                             <div className="h-px bg-slate-100" />

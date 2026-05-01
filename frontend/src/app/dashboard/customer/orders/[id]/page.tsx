@@ -11,8 +11,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
+import { formatPrice } from '@/lib/currency';
 
-type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+type OrderStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
 interface OrderDetail {
     id: string;
@@ -38,12 +39,13 @@ const STEPS: { key: OrderStatus | 'CONFIRMED'; label: string; icon: React.Elemen
 ];
 
 const STATUS_ORDER: Record<string, number> = {
-    PENDING: 0, PROCESSING: 1, SHIPPED: 2, DELIVERED: 3, CANCELLED: -1,
+    PENDING: 0, PROCESSING: 1, PAID: 1, SHIPPED: 2, DELIVERED: 3, CANCELLED: -1,
 };
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
     PENDING: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
     PROCESSING: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
+    PAID: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
     SHIPPED: 'text-primary bg-primary/10 border-primary/20',
     DELIVERED: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
     CANCELLED: 'text-red-400 bg-red-500/10 border-red-500/20',
@@ -219,7 +221,7 @@ export default function OrderTrackingPage() {
 
     const currentStep = STATUS_ORDER[order.status] ?? 0;
     const isCancelled = order.status === 'CANCELLED';
-    const canDispute = ['SHIPPED', 'DELIVERED'].includes(order.status) && !existingDispute;
+    const canDispute = (['SHIPPED', 'DELIVERED'] as OrderStatus[]).includes(order.status) && !existingDispute;
 
     return (
         <div className="max-w-4xl mx-auto px-4 py-8 pt-24 pb-20 space-y-8">
@@ -339,7 +341,7 @@ export default function OrderTrackingPage() {
                                     <p className="text-[11px] text-muted-foreground">{item.product.supplier?.name}</p>
                                 </div>
                                 <div className="text-end shrink-0">
-                                    <p className="text-xs font-black text-primary">${(item.price * item.quantity).toFixed(2)}</p>
+                                    <p className="text-xs font-black text-primary">{formatPrice(item.price * item.quantity)}</p>
                                     <p className="text-[10px] text-muted-foreground">Qty: {item.quantity}</p>
                                 </div>
                             </div>
@@ -353,19 +355,19 @@ export default function OrderTrackingPage() {
                     <div className="space-y-3 text-sm">
                         <div className="flex justify-between">
                             <span className="text-muted-foreground">Subtotal</span>
-                            <span className="font-bold">${order.totalAmount.toFixed(2)}</span>
+                            <span className="font-bold">{formatPrice(order.totalAmount)}</span>
                         </div>
                         {order.shippingCost != null && (
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground flex items-center gap-1.5">
                                     <Truck size={12} /> {order.shippingCompany || 'Shipping'}
                                 </span>
-                                <span className="font-bold">${order.shippingCost.toFixed(2)}</span>
+                                <span className="font-bold">{formatPrice(order.shippingCost)}</span>
                             </div>
                         )}
                         <div className="flex justify-between pt-3 border-t border-border/50">
                             <span className="font-black text-primary">Total</span>
-                            <span className="font-black text-primary text-lg">${(order.totalAmount + (order.shippingCost || 0)).toFixed(2)}</span>
+                            <span className="font-black text-primary text-lg">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</span>
                         </div>
                     </div>
                     {order.shippingCompany && (

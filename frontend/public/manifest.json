@@ -1,21 +1,27 @@
 {
-  "name": "Atlantis B2B Marketplace",
+  "name": "Atlantis Marketplace — Global B2B Wholesale",
   "short_name": "Atlantis",
-  "description": "Premium B2B Marketplace",
+  "description": "Global B2B wholesale marketplace connecting verified suppliers with retailers worldwide.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#0a0a0a",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#0B1F3A",
+  "categories": ["business", "shopping", "productivity"],
+  "lang": "en",
+  "dir": "ltr",
   "icons": [
     {
       "src": "/icons/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/icons/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
