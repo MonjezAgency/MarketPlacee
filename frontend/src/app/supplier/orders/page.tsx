@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
+import { formatPrice } from '@/lib/currency';
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -169,7 +170,7 @@ export default function SupplierOrdersPage() {
                                     <div className="flex items-center gap-8">
                                         <div className="text-center">
                                             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Total</p>
-                                            <p className="text-lg font-black">${order.totalAmount.toFixed(2)}</p>
+                                            <p className="text-lg font-black">{formatPrice(order.totalAmount)}</p>
                                         </div>
                                         <div className="text-center">
                                             <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Items</p>
@@ -240,11 +241,11 @@ export default function SupplierOrdersPage() {
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Unit Price</p>
-                                                                    <p className="font-bold text-primary">${item.price.toFixed(2)}</p>
+                                                                    <p className="font-bold text-primary">{formatPrice(item.price)}</p>
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Subtotal</p>
-                                                                    <p className="font-black">${(item.price * item.quantity).toFixed(2)}</p>
+                                                                    <p className="font-black">{formatPrice(item.price * item.quantity)}</p>
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -257,7 +258,7 @@ export default function SupplierOrdersPage() {
                                                         <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Financial Summary</p>
                                                         <div className="flex justify-between text-sm">
                                                             <span className="text-muted-foreground">Gross Value</span>
-                                                            <span className="font-bold">${(order.totalAmount * 1.05).toFixed(2)}</span>
+                                                            <span className="font-bold">{formatPrice(order.totalAmount * 1.05)}</span>
                                                         </div>
                                                         <div className="flex justify-between text-sm">
                                                             <span className="text-red-400">Platform Fee (5%)</span>
@@ -265,7 +266,7 @@ export default function SupplierOrdersPage() {
                                                         </div>
                                                         <div className="flex justify-between text-sm pt-2 border-t border-border/50">
                                                             <span className="font-black text-primary">Your Net Revenue</span>
-                                                            <span className="font-black text-primary">${order.totalAmount.toFixed(2)}</span>
+                                                            <span className="font-black text-primary">{formatPrice(order.totalAmount)}</span>
                                                         </div>
                                                     </div>
                                                     {order.shippingCompany && (

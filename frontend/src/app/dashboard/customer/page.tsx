@@ -15,6 +15,7 @@ import type { Product } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/lib/cart';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatPrice } from '@/lib/currency';
 
 // Design Constants
 const COLORS = {
@@ -129,7 +130,7 @@ export default function CustomerDashboard() {
                 {/* Stats Overview */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                     {[
-                        { label: 'Total Spending', value: `$${orders.reduce((sum, o) => sum + (o.status === 'DELIVERED' ? o.totalAmount : 0), 0).toLocaleString()}`, icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50' },
+                        { label: 'Total Spending', value: formatPrice(orders.reduce((sum, o) => sum + (o.status === 'DELIVERED' ? o.totalAmount : 0), 0)), icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50' },
                         { label: 'Active Orders', value: orders.filter(o => !['DELIVERED', 'CANCELLED'].includes(o.status)).length, icon: Package, color: 'text-teal-600', bg: 'bg-teal-50' },
                         { label: 'Pending Delivery', value: orders.filter(o => o.status === 'SHIPPED').length, icon: Truck, color: 'text-amber-600', bg: 'bg-amber-50' },
                         { label: 'Platform Alerts', value: '2 New', icon: Bell, color: 'text-purple-600', bg: 'bg-purple-50' }
@@ -326,7 +327,7 @@ export default function CustomerDashboard() {
                                         <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">Verified Supplier</p>
                                         <h4 className="text-sm font-bold text-[#1A1F36] line-clamp-1 group-hover:text-[#1ABC9C] transition-colors">{product.name}</h4>
                                         <div className="pt-2 flex items-center justify-between">
-                                            <span className="text-base font-bold text-[#1A1F36]">${product.price.toFixed(2)}<span className="text-[10px] text-[#6B7280] font-medium ms-0.5">/unit</span></span>
+                                            <span className="text-base font-bold text-[#1A1F36]">{formatPrice(product.price)}<span className="text-[10px] text-[#6B7280] font-medium ms-0.5">/unit</span></span>
                                             <div className="w-8 h-8 rounded-lg bg-[#F7F9FC] flex items-center justify-center text-[#1A1F36] group-hover:bg-[#1ABC9C] group-hover:text-white transition-all">
                                                 <ShoppingCart size={14} />
                                             </div>

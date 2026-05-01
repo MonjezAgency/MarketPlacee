@@ -21,12 +21,17 @@ interface OrderDetail {
     totalAmount: number;
     shippingCompany: string | null;
     shippingCost: number | null;
+    trackingNumber?: string | null;
+    carrier?: string | null;
+    invoiceNumber?: string | null;
     createdAt: string;
+    deliveredAt?: string | null;
+    shippedAt?: string | null;
     items: {
         id: string;
         quantity: number;
         price: number;
-        product: { id: string; name: string; images: string[]; supplier: { name: string } };
+        product: { id: string; name: string; images: string[]; supplier: { name: string }; unit?: string; unitsPerCase?: number; casesPerPallet?: number; unitsPerPallet?: number; palletsPerShipment?: number };
     }[];
     history: { id: string; previousStatus: string | null; newStatus: string; createdAt: string; reason: string | null }[];
 }
@@ -127,6 +132,7 @@ export default function OrderTrackingPage() {
     const [disputeSuccess, setDisputeSuccess] = React.useState(false);
     const [disputeError, setDisputeError] = React.useState('');
     const [existingDispute, setExistingDispute] = React.useState<any>(null);
+    const [invoice, setInvoice] = React.useState<any>(null);
 
     const [isConfirming, setIsConfirming] = React.useState(false);
 
@@ -134,9 +140,10 @@ export default function OrderTrackingPage() {
         setIsLoading(true);
         setError('');
         try {
-            const [orderRes, disputesRes] = await Promise.all([
+            const [orderRes, disputesRes, invoicesRes] = await Promise.all([
                 apiFetch(`/orders/${id}`),
                 apiFetch(`/disputes/my`),
+                apiFetch(`/invoices/my`),
             ]);
             if (!orderRes.ok) { setError('Order not found'); return; }
             setOrder(await orderRes.json());
@@ -144,6 +151,11 @@ export default function OrderTrackingPage() {
                 const disputes = await disputesRes.json();
                 const found = disputes.find((d: any) => d.orderId === id);
                 if (found) setExistingDispute(found);
+            }
+            if (invoicesRes.ok) {
+                const invoices: any[] = await invoicesRes.json();
+                const inv = invoices.find((i: any) => i.orderId === id);
+                if (inv) setInvoice(inv);
             }
         } catch (_e) { setError('Failed to load order'); }
         finally { setIsLoading(false); }
@@ -282,6 +294,52 @@ export default function OrderTrackingPage() {
                 </div>
             </div>
 
+            {/* Order Reference Card - prominent for shipped/delivered orders */}
+            {(['SHIPPED', 'DELIVERED', 'PAID'] as OrderStatus[]).includes(order.status) && (
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-gradient-to-br from-primary/5 to-emerald-500/5 border border-primary/20 rounded-3xl p-6"
+                >
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Order Reference</p>
+                            <p className="text-base font-black mt-1 font-mono">#AT-{order.id.slice(-8).toUpperCase()}</p>
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Invoice Number</p>
+                            <p className="text-base font-black mt-1 font-mono">
+                                {invoice?.invoiceNumber || (order.status === 'DELIVERED' ? 'Generating...' : 'After delivery')}
+                            </p>
+                        </div>
+                        {order.trackingNumber && (
+                            <div>
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tracking #</p>
+                                <p className="text-base font-black mt-1 font-mono">{order.trackingNumber}</p>
+                                {order.carrier && <p className="text-[10px] text-muted-foreground font-medium">via {order.carrier}</p>}
+                            </div>
+                        )}
+                        <div>
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total</p>
+                            <p className="text-base font-black mt-1 text-primary">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</p>
+                        </div>
+                    </div>
+                    {(order.status === 'DELIVERED' && invoice) && (
+                        <div className="mt-4 pt-4 border-t border-primary/10 flex items-center justify-between">
+                            <div className="flex items-center gap-2 text-emerald-500">
+                                <CheckCircle2 size={16} />
+                                <span className="text-xs font-bold">Order delivered. Your invoice is ready.</span>
+                            </div>
+                            <button onClick={handleDownloadInvoice} disabled={isDownloading}
+                                className="h-9 px-4 bg-primary text-white font-black text-xs rounded-xl flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50">
+                                {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                                Download Invoice
+                            </button>
+                        </div>
+                    )}
+                </motion.div>
+            )}
+
             {/* Progress Stepper */}
             {!isCancelled ? (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border/50 rounded-3xl p-8">
@@ -327,25 +385,48 @@ export default function OrderTrackingPage() {
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-4">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Items ({order.items.length})</p>
                     <div className="space-y-3">
-                        {order.items.map(item => (
-                            <div key={item.id} className="flex items-center gap-3">
-                                {item.product.images?.[0] ? (
-                                    <img src={item.product.images[0]} alt={item.product.name} className="w-12 h-12 rounded-xl object-cover border border-border/50 shrink-0" />
-                                ) : (
-                                    <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                                        <Package size={16} className="text-muted-foreground" />
+                        {order.items.map(item => {
+                            const p = item.product;
+                            const u = (p.unit || 'piece').toLowerCase();
+                            const ppc = p.unitsPerCase || 0;
+                            const cpp = p.casesPerPallet || 0;
+                            const ppp = p.unitsPerPallet || (ppc * cpp) || 0;
+                            const pps = p.palletsPerShipment || 0;
+                            let logistics = '';
+                            if (u === 'case' && ppc > 0) logistics = `${item.quantity}×${ppc} = ${(item.quantity * ppc).toLocaleString()} pcs`;
+                            else if (u === 'pallet' && ppp > 0) {
+                                if (ppc > 0 && cpp > 0) logistics = `${item.quantity}×${cpp}×${ppc} = ${(item.quantity * cpp * ppc).toLocaleString()} pcs`;
+                                else logistics = `${item.quantity} × ${ppp} = ${(item.quantity * ppp).toLocaleString()} pcs`;
+                            } else if (u === 'shipment' && pps > 0 && ppp > 0) {
+                                logistics = `${item.quantity}×${pps}×${ppp} = ${(item.quantity * pps * ppp).toLocaleString()} pcs`;
+                            }
+                            return (
+                                <div key={item.id} className="flex items-start gap-3 p-3 bg-muted/30 rounded-2xl border border-border/30">
+                                    {p.images?.[0] ? (
+                                        <img src={p.images[0]} alt={p.name} className="w-14 h-14 rounded-xl object-cover border border-border/50 shrink-0" />
+                                    ) : (
+                                        <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                                            <Package size={18} className="text-muted-foreground" />
+                                        </div>
+                                    )}
+                                    <div className="flex-1 min-w-0 space-y-1">
+                                        <p className="font-bold text-sm">{p.name}</p>
+                                        {p.supplier?.name && (
+                                            <p className="text-[11px] text-muted-foreground">Supplier: <span className="font-bold text-foreground">{p.supplier.name}</span></p>
+                                        )}
+                                        {logistics ? (
+                                            <p className="text-[11px] font-black text-primary">Logistic {logistics}</p>
+                                        ) : (
+                                            <p className="text-[10px] text-muted-foreground">Qty: {item.quantity} {u}{item.quantity > 1 ? 's' : ''}</p>
+                                        )}
                                     </div>
-                                )}
-                                <div className="flex-1 min-w-0">
-                                    <p className="font-bold text-sm truncate">{item.product.name}</p>
-                                    <p className="text-[11px] text-muted-foreground">{item.product.supplier?.name}</p>
+                                    <div className="text-end shrink-0">
+                                        <p className="text-sm font-black text-primary">{formatPrice(item.price * item.quantity)}</p>
+                                        <p className="text-[10px] text-muted-foreground">{formatPrice(item.price)}/{u}</p>
+                                    </div>
                                 </div>
-                                <div className="text-end shrink-0">
-                                    <p className="text-xs font-black text-primary">{formatPrice(item.price * item.quantity)}</p>
-                                    <p className="text-[10px] text-muted-foreground">Qty: {item.quantity}</p>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </motion.div>
 

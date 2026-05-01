@@ -19,6 +19,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { apiFetch } from '@/lib/api';
+import { formatPrice } from '@/lib/currency';
 
 type MarkupData = { pallet: number; container: number };
 
@@ -240,7 +241,7 @@ export default function AdminPricingPage() {
                         <div className="space-y-4">
                             <div className="p-4 bg-[#F7F8F8] dark:bg-white/5 rounded-2xl border border-[#EAEDED] dark:border-white/10 space-y-1">
                                 <p className="text-[10px] font-black text-[#888] uppercase tracking-widest">Base Vendor Price</p>
-                                <p className="text-2xl font-black text-[#0F1111] dark:text-white">${exampleVendorPrice.toFixed(2)}</p>
+                                <p className="text-2xl font-black text-[#0F1111] dark:text-white">{formatPrice(exampleVendorPrice)}</p>
                             </div>
 
                             <div className="grid grid-cols-1 gap-3">
@@ -249,7 +250,7 @@ export default function AdminPricingPage() {
                                         <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Pallet Buyer</p>
                                         <p className="text-[10px] text-emerald-500/70 font-bold">+{((newMarkup.pallet - 1) * 100).toFixed(1)}%</p>
                                     </div>
-                                    <p className="text-lg font-black text-emerald-600">${(exampleVendorPrice * newMarkup.pallet).toFixed(2)}</p>
+                                    <p className="text-lg font-black text-emerald-600">{formatPrice(exampleVendorPrice * newMarkup.pallet)}</p>
                                 </div>
 
                                 <div className="p-3 bg-purple-50 dark:bg-purple-900/10 rounded-2xl border border-purple-100 dark:border-purple-900/30 flex justify-between items-center">
@@ -257,7 +258,7 @@ export default function AdminPricingPage() {
                                         <p className="text-[10px] font-black text-purple-600 uppercase tracking-widest">Container Buyer</p>
                                         <p className="text-[10px] text-purple-500/70 font-bold">+{((newMarkup.container - 1) * 100).toFixed(1)}%</p>
                                     </div>
-                                    <p className="text-lg font-black text-purple-600">${(exampleVendorPrice * newMarkup.container).toFixed(2)}</p>
+                                    <p className="text-lg font-black text-purple-600">{formatPrice(exampleVendorPrice * newMarkup.container)}</p>
                                 </div>
                             </div>
                         </div>

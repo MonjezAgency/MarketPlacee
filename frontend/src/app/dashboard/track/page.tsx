@@ -6,6 +6,7 @@ import { Search, Package, Truck, Calendar, MapPin, DollarSign } from 'lucide-rea
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { formatPrice } from '@/lib/currency';
 
 export default function TrackOrderPage() {
     const [trackingNumber, setTrackingNumber] = React.useState('');
@@ -104,7 +105,7 @@ export default function TrackOrderPage() {
                                     <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Order Total</p>
                                     <div className="flex items-center gap-2">
                                         <DollarSign size={16} className="text-emerald-500" />
-                                        <span className="font-black text-sm">${shipment.order.totalAmount}</span>
+                                        <span className="font-black text-sm">{formatPrice(shipment.order.totalAmount || 0)}</span>
                                     </div>
                                 </div>
                             </div>

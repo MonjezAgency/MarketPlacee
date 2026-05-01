@@ -10,6 +10,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth';
 import { apiFetch } from '@/lib/api';
+import { formatPrice } from '@/lib/currency';
 
 // ── Types ──────────────────────────────────────────────────
 import { Product } from '@/lib/types';
@@ -258,7 +259,7 @@ export default function AdminDiscountsPage() {
                                         )}
                                     >
                                         <span className="truncate">{p.name}</span>
-                                        <span className="text-[#FF9900] font-black text-xs ms-2 shrink-0">${p.price.toFixed(2)}</span>
+                                        <span className="text-[#FF9900] font-black text-xs ms-2 shrink-0">{formatPrice(p.price)}</span>
                                     </button>
                                 ))}
                                 {filteredProducts.length === 0 && <p className="text-sm text-[#888] text-center py-4">No products found.</p>}
@@ -373,7 +374,7 @@ export default function AdminDiscountsPage() {
                                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="space-y-3 pt-4 border-t border-[#EAEDED] dark:border-white/10">
                                             <div className="p-3 bg-[#F7F8F8] dark:bg-white/5 rounded-2xl flex justify-between items-center">
                                                 <span className="text-[10px] font-black text-[#888] uppercase tracking-widest">Base Price</span>
-                                                <span className="font-black text-[#0F1111] dark:text-white">${calcResult.basePrice.toFixed(2)}</span>
+                                                <span className="font-black text-[#0F1111] dark:text-white">{formatPrice(calcResult.basePrice)}</span>
                                             </div>
                                             {calcResult.tierDiscount > 0 && (
                                                 <div className="p-3 bg-emerald-50 dark:bg-emerald-900/10 rounded-2xl flex justify-between items-center border border-emerald-100 dark:border-emerald-900/30">
@@ -391,11 +392,11 @@ export default function AdminDiscountsPage() {
                                                 <div className="flex justify-between items-center">
                                                     <div>
                                                         <p className="text-[10px] font-black text-[#FF9900] uppercase tracking-widest">Final Unit Price</p>
-                                                        <p className="text-2xl font-black text-[#0F1111] dark:text-white">${calcResult.unitPrice.toFixed(2)}</p>
+                                                        <p className="text-2xl font-black text-[#0F1111] dark:text-white">{formatPrice(calcResult.unitPrice)}</p>
                                                     </div>
                                                     <div className="text-end">
                                                         <p className="text-[10px] font-black text-[#888] uppercase tracking-widest">Total ({calcResult.quantity} units)</p>
-                                                        <p className="text-2xl font-black text-[#FF9900]">${calcResult.totalPrice.toFixed(2)}</p>
+                                                        <p className="text-2xl font-black text-[#FF9900]">{formatPrice(calcResult.totalPrice)}</p>
                                                     </div>
                                                 </div>
                                             </div>

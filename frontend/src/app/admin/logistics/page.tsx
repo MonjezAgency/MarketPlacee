@@ -6,6 +6,7 @@ import { Truck, Search, Package, Calendar, Clock, X, TrendingUp, CheckCircle2, D
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { ShipmentTimeline } from '@/components/shipping/ShipmentTimeline';
+import { formatPrice } from '@/lib/currency';
 
 export default function AdminShipmentsPage() {
     const [shipments, setShipments] = React.useState<any[]>([]);
@@ -227,7 +228,7 @@ export default function AdminShipmentsPage() {
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="text-sm text-muted-foreground">Total Paid</span>
-                                                <span className="text-sm font-black text-emerald-600">${selectedShipment.order?.totalAmount}</span>
+                                                <span className="text-sm font-black text-emerald-600">{formatPrice(selectedShipment.order?.totalAmount || 0)}</span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="text-sm text-muted-foreground">Carrier</span>

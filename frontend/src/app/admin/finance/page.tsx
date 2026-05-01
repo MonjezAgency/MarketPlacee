@@ -12,7 +12,7 @@ import { useAuth } from '@/lib/auth';
 import { useSearchParams } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { apiFetch } from '@/lib/api';
-import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertToBase } from '@/lib/currency';
+import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertToBase, formatPrice } from '@/lib/currency';
 
 type Tab = 'invoices' | 'credit' | 'tax' | 'warehouses';
 
@@ -354,10 +354,10 @@ ${itemRows ? `<h2 style="font-size:16px;margin-bottom:12px">Order Items</h2>
             {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[
-                    { label: 'Total Revenue', value: `$${stats.totalRevenue.toLocaleString()}`, icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50' },
+                    { label: 'Total Revenue', value: formatPrice(stats.totalRevenue), icon: TrendingUp, color: 'text-teal-600', bg: 'bg-teal-50' },
                     { label: 'Pending Invoices', value: stats.pendingInvoices, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
                     { label: 'Paid Invoices', value: stats.paidInvoices, icon: Check, color: 'text-teal-600', bg: 'bg-teal-50' },
-                    { label: 'Outstanding Balance', value: `$${stats.outstandingBalance.toLocaleString()}`, icon: BarChart3, color: 'text-red-600', bg: 'bg-red-50' },
+                    { label: 'Outstanding Balance', value: formatPrice(stats.outstandingBalance), icon: BarChart3, color: 'text-red-600', bg: 'bg-red-50' },
                 ].map((stat, i) => (
                     <div key={i} className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
                         <div className="flex items-center justify-between mb-4">
@@ -448,8 +448,8 @@ ${itemRows ? `<h2 style="font-size:16px;margin-bottom:12px">Order Items</h2>
                                                     </td>
                                                     <td className="px-6 py-4">
                                                         <div className="flex flex-col">
-                                                            <span className="text-sm font-bold text-slate-900">${inv.totalAmount?.toLocaleString()}</span>
-                                                            <span className="text-[10px] text-slate-500 font-medium">Tax: ${inv.tax?.toFixed(2)}</span>
+                                                            <span className="text-sm font-bold text-slate-900">{formatPrice(inv.totalAmount || 0)}</span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">Tax: {formatPrice(inv.tax || 0)}</span>
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4">
@@ -525,7 +525,7 @@ ${itemRows ? `<h2 style="font-size:16px;margin-bottom:12px">Order Items</h2>
                                                             />
                                                         </div>
                                                         <div className="flex items-center justify-between mt-2">
-                                                            <span className="text-xs font-bold text-slate-900">${c.usedCredit.toLocaleString()} <span className="text-slate-400 font-medium">/ ${c.creditLimit.toLocaleString()}</span></span>
+                                                            <span className="text-xs font-bold text-slate-900">{formatPrice(c.usedCredit)} <span className="text-slate-400 font-medium">/ {formatPrice(c.creditLimit)}</span></span>
                                                             <span className={cn("px-2 py-0.5 rounded-md text-[9px] font-bold uppercase border", statusColor(c.status))}>{c.status}</span>
                                                         </div>
                                                     </div>
