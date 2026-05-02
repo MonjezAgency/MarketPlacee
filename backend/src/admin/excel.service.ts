@@ -101,7 +101,8 @@ export class ExcelService {
             'الوحدة': 'unit', 'التعبئة': 'unit',
             // ── shelfLife / expiry ────────────────────────────────────────────
             'expirydate': 'shelfLife', 'expiry': 'shelfLife', 'bestbefore': 'shelfLife',
-            'batchnumber': 'ean', 'batchno': 'ean', 'lot': 'ean', 'lotnumber': 'ean',
+            'batchnumber': 'shelfLife', 'batchno': 'shelfLife', 'lot': 'shelfLife',
+            'lotnumber': 'shelfLife', 'batchnumberexpirydate': 'shelfLife',
         };
 
         // ── Header detection ────────────────────────────────────────────────
@@ -216,12 +217,34 @@ export class ExcelService {
             if (!hasData) continue;
 
             const normalizedRow: Record<string, any> = {};
+            // First-wins: if multiple columns map to the same target field
+            // (e.g. 'Item number' AND 'Batch number' both → ean before
+            // disambiguation), the first non-empty value wins. This
+            // protects key fields like price/EAN from being overridden by
+            // a later column with the same alias.
             row.forEach((cell, idx) => {
                 const targetKey = mapping[idx];
-                if (targetKey) normalizedRow[targetKey] = cell;
+                if (!targetKey) return;
+                if (cell === undefined || cell === null || String(cell).trim() === '') return;
+                if (normalizedRow[targetKey] !== undefined) return;
+                normalizedRow[targetKey] = cell;
             });
 
             this.coerceTypes(normalizedRow);
+
+            // Log first 3 data rows so the operator can verify extraction
+            if (i - headerRowIndex <= 3) {
+                console.log(`[ExcelService] Row ${i + 1} extracted:`, JSON.stringify({
+                    name: normalizedRow.name,
+                    ean: normalizedRow.ean,
+                    price: normalizedRow.price,
+                    stock: normalizedRow.stock,
+                    unitsPerCase: normalizedRow.unitsPerCase,
+                    casesPerPallet: normalizedRow.casesPerPallet,
+                    unitsPerPallet: normalizedRow.unitsPerPallet,
+                    shelfLife: normalizedRow.shelfLife,
+                }));
+            }
 
             // Attach embedded image if exists for this row
             if (imageMapping[i]) {

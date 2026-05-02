@@ -450,7 +450,7 @@ export default function ProductsModerationPage() {
                 {/* LEFT: 65% Table Area */}
                 <div className={cn(
                     "space-y-6 transition-all duration-500",
-                    selectedProduct ? "col-span-12 lg:col-span-8" : "col-span-12"
+                    selectedProduct ? "col-span-12 lg:col-span-7" : "col-span-12"
                 )}>
                     {/* Tabs */}
                     <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-xl w-fit">
@@ -573,7 +573,7 @@ export default function ProductsModerationPage() {
                             animate={isMobile ? { opacity: 1, y: 0 } : { opacity: 1, x: 0 }}
                             exit={isMobile ? { opacity: 0, y: 100 } : { opacity: 0, x: 20 }}
                             className={cn(
-                                "col-span-12 lg:col-span-4",
+                                "col-span-12 lg:col-span-5",
                                 isMobile && "fixed inset-x-0 bottom-0 z-50 p-4"
                             )}
                         >
@@ -585,24 +585,40 @@ export default function ProductsModerationPage() {
                                     <div className="h-1.5 w-12 bg-slate-200 rounded-full mx-auto mt-3 mb-1 shrink-0" />
                                 )}
                                 {/* Panel Header */}
-                                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden">
-                                            <img src={selectedProduct.images?.[0] || 'https://via.placeholder.com/64'} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=NA'; }} className="w-full h-full object-cover" />
+                                <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
+                                    <div className="flex items-start gap-3 min-w-0 flex-1">
+                                        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                                            {selectedProduct.images?.[0] ? (
+                                                <img src={selectedProduct.images[0]} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Package size={20} className="text-slate-300" />
+                                            )}
                                         </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <h3 className="text-base font-bold text-slate-900 truncate max-w-[150px]">{selectedProduct.name}</h3>
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <h3 className="text-base font-black text-slate-900 leading-tight truncate" title={selectedProduct.name}>
+                                                    {selectedProduct.name}
+                                                </h3>
                                                 {selectedProduct.supplier?.email === 'Info@atlantisfmcg.com' && (
-                                                    <span className="px-1.5 py-0.5 bg-indigo-600 text-[8px] text-white font-bold rounded uppercase tracking-tighter shadow-sm shadow-indigo-600/20">Founder</span>
+                                                    <span className="px-1.5 py-0.5 bg-indigo-600 text-[8px] text-white font-bold rounded uppercase tracking-tighter shadow-sm shadow-indigo-600/20 shrink-0">Founder</span>
                                                 )}
                                             </div>
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">ID: {selectedProduct.id.slice(0, 8)}</p>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className={cn(
+                                                    "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest",
+                                                    selectedProduct.status === 'APPROVED' && "bg-emerald-50 text-emerald-700 border border-emerald-200",
+                                                    selectedProduct.status === 'PENDING' && "bg-amber-50 text-amber-700 border border-amber-200",
+                                                    selectedProduct.status === 'REJECTED' && "bg-red-50 text-red-700 border border-red-200"
+                                                )}>
+                                                    {selectedProduct.status}
+                                                </span>
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: {selectedProduct.id.slice(0, 8)}</p>
+                                            </div>
                                         </div>
                                     </div>
-                                    <button 
+                                    <button
                                         onClick={() => setSelectedProduct(null)}
-                                        className="w-10 h-10 rounded-xl hover:bg-slate-50 flex items-center justify-center text-slate-400 transition-all"
+                                        className="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-all shrink-0"
                                     >
                                         <XCircle size={20} />
                                     </button>
@@ -629,8 +645,15 @@ export default function ProductsModerationPage() {
                                     {activePanelTab === 'Product Info' && (
                                         <>
                                             <div className="space-y-4">
-                                                <div className="aspect-video w-full rounded-2xl bg-slate-50 border border-slate-100 overflow-hidden relative group">
-                                                    <img src={isEditing ? editData.images?.[0] : selectedProduct.images?.[0]} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Invalid+URL'; }} className="w-full h-full object-cover" />
+                                                <div className="aspect-video w-full rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 overflow-hidden relative group flex items-center justify-center">
+                                                    {(isEditing ? editData.images?.[0] : selectedProduct.images?.[0]) ? (
+                                                        <img src={isEditing ? editData.images?.[0] : selectedProduct.images?.[0]} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="w-full h-full object-cover" />
+                                                    ) : (
+                                                        <div className="flex flex-col items-center gap-2 text-slate-300">
+                                                            <ImageIcon size={48} strokeWidth={1.5} />
+                                                            <p className="text-xs font-bold uppercase tracking-widest">No image uploaded</p>
+                                                        </div>
+                                                    )}
                                                     {isEditing && (
                                                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
                                                             <p className="text-white text-[10px] font-bold uppercase tracking-widest">Editing Mode</p>
@@ -1148,22 +1171,24 @@ export default function ProductsModerationPage() {
                                             </div>
                                         </motion.div>
                                     ) : (
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <button 
-                                                onClick={() => setShowRejectInput(true)}
-                                                className="h-11 bg-white border border-red-100 text-red-600 rounded-xl text-xs font-bold hover:bg-red-50 transition-all"
-                                            >
-                                                Reject Product
-                                            </button>
-                                            <button 
-                                                onClick={() => handleApprove(selectedProduct.id)}
-                                                className="h-11 bg-teal-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-teal-600/20 hover:bg-teal-700 transition-all"
-                                            >
-                                                Approve Product
-                                            </button>
-                                            <button 
+                                        <div className="space-y-2.5">
+                                            <div className="grid grid-cols-2 gap-2.5">
+                                                <button
+                                                    onClick={() => setShowRejectInput(true)}
+                                                    className="h-12 bg-white border-2 border-red-200 text-red-600 rounded-2xl text-sm font-black hover:bg-red-50 hover:border-red-300 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <XCircle size={16} /> Reject
+                                                </button>
+                                                <button
+                                                    onClick={() => handleApprove(selectedProduct.id)}
+                                                    className="h-12 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-lg shadow-teal-600/30 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <CheckCircle2 size={16} /> Approve
+                                                </button>
+                                            </div>
+                                            <button
                                                 onClick={() => startEditing(selectedProduct)}
-                                                className="col-span-2 h-11 bg-slate-100 border border-slate-200 text-slate-900 rounded-xl text-xs font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                                                className="w-full h-11 bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs font-bold hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
                                             >
                                                 <Pencil size={14} /> Edit Product Details
                                             </button>
