@@ -17,6 +17,7 @@ import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
+import AddProductDrawer from '@/components/product/AddProductDrawer';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -319,6 +320,7 @@ export default function ProductsModerationPage() {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = React.useState(false);
     const [uploadCurrency, setUploadCurrency] = React.useState(() => getActiveCurrency());
+    const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -424,12 +426,12 @@ export default function ProductsModerationPage() {
                     >
                         <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload File'}
                     </button>
-                    <Link 
-                        href="/admin/products/new"
+                    <button
+                        onClick={() => setIsAddDrawerOpen(true)}
                         className="h-10 px-4 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20"
                     >
                         <Plus size={16} /> Add Product
-                    </Link>
+                    </button>
                 </div>
             </div>
 
@@ -1319,6 +1321,14 @@ export default function ProductsModerationPage() {
                     </div>
                 )}
             </AnimatePresence>
+
+            {/* ── Add Product Side Drawer ──────────────────────────────── */}
+            <AddProductDrawer
+                isOpen={isAddDrawerOpen}
+                onClose={() => setIsAddDrawerOpen(false)}
+                onCreated={fetchData}
+                role="admin"
+            />
         </div>
     );
 }

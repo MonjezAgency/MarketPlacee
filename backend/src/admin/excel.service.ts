@@ -42,36 +42,76 @@ export class ExcelService {
         const normalize = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '').trim();
 
         const headerAliases: Record<string, string> = {
-            'name': 'name', 'title': 'name', 'productname': 'name', 'product': 'name', 'label': 'name', 'item': 'name', 'itemname': 'name',
-            'اسمبالعربي': 'name', 'الاسم': 'name', 'اسم': 'name', 'اسمالمنتج': 'name', 'المنتج': 'name', 'اسمباحث': 'name',
-            'description': 'description', 'desc': 'description', 'details': 'description', 'info': 'description', 'note': 'description', 'notes': 'description',
+            // ── name ──────────────────────────────────────────────────────────
+            'name': 'name', 'title': 'name', 'productname': 'name', 'product': 'name',
+            'label': 'name', 'item': 'name', 'itemname': 'name',
+            'اسمبالعربي': 'name', 'الاسم': 'name', 'اسم': 'name', 'اسمالمنتج': 'name',
+            'المنتج': 'name', 'اسمباحث': 'name',
+            // ── description ───────────────────────────────────────────────────
+            'description': 'description', 'desc': 'description', 'details': 'description',
+            'info': 'description', 'note': 'description', 'notes': 'description',
             'الوصف': 'description', 'التفاصيل': 'description', 'وصف': 'description', 'ملاحظات': 'description',
-            'price': 'price', 'cost': 'price', 'rate': 'price', 'amount': 'price', 'unitprice': 'price', 'saleprice': 'price', 'sellingprice': 'price', 'baseprice': 'price',
+            // ── price ─────────────────────────────────────────────────────────
+            'price': 'price', 'cost': 'price', 'rate': 'price', 'amount': 'price',
+            'unitprice': 'price', 'saleprice': 'price', 'sellingprice': 'price', 'baseprice': 'price',
             'السعر': 'price', 'سعرالبيع': 'price', 'سعر': 'price', 'القيمة': 'price', 'ثمن': 'price',
-            'stock': 'stock', 'stockcount': 'stock', 'quantity': 'stock', 'qty': 'stock', 'count': 'stock', 'inventory': 'stock', 'available': 'stock',
+            // ── stock ─────────────────────────────────────────────────────────
+            'stock': 'stock', 'stockcount': 'stock', 'quantity': 'stock', 'qty': 'stock',
+            'count': 'stock', 'inventory': 'stock', 'available': 'stock',
+            'availablephysicalincases': 'stock', 'availableincases': 'stock',
+            'availablephysical': 'stock', 'physicalqty': 'stock',
             'الكمية': 'stock', 'المخزون': 'stock', 'العدد': 'stock', 'كمية': 'stock',
-            'category': 'category', 'type': 'category', 'dept': 'category', 'department': 'category', 'group': 'category', 'section': 'category',
-            'الفئة': 'category', 'القسم': 'category', 'التصنيف': 'category', 'نوع': 'category', 'فئة': 'category', 'صنف': 'category', 'المجموعة': 'category', 'مجموعة': 'category',
-            'ean': 'ean', 'barcode': 'ean', 'upc': 'ean', 'sku': 'ean', 'code': 'ean', 'productcode': 'ean',
+            // ── category ──────────────────────────────────────────────────────
+            'category': 'category', 'type': 'category', 'dept': 'category',
+            'department': 'category', 'group': 'category', 'section': 'category',
+            'الفئة': 'category', 'القسم': 'category', 'التصنيف': 'category',
+            'نوع': 'category', 'فئة': 'category', 'صنف': 'category',
+            'المجموعة': 'category', 'مجموعة': 'category',
+            // ── ean / item number ─────────────────────────────────────────────
+            'ean': 'ean', 'barcode': 'ean', 'upc': 'ean', 'sku': 'ean',
+            'code': 'ean', 'productcode': 'ean', 'itemnumber': 'ean', 'itemno': 'ean',
+            'itemnr': 'ean', 'artikelnummer': 'ean', 'articlenumber': 'ean',
             'الباركود': 'ean', 'كودالمنتج': 'ean', 'كود': 'ean', 'رقم': 'ean',
-            'unitsperpallet': 'unitsPerPallet', 'itemsperpallet': 'unitsPerPallet', 'palletunits': 'unitsPerPallet', 'palletqty': 'unitsPerPallet',
-            'عددالوحداتفيالبالتة': 'unitsPerPallet', 'وحداتالبالتة': 'unitsPerPallet', 'البالتةفيهاكام': 'unitsPerPallet',
-            'palletspershipment': 'palletsPerShipment', 'palletsperload': 'palletsPerShipment', 'shipmentpallets': 'palletsPerShipment',
-            'عددالبالتاتفيالشحنة': 'palletsPerShipment', 'البالتاتفيالشحنة': 'palletsPerShipment', 'بالتاتالشحنة': 'palletsPerShipment',
-            'brand': 'brand', 'make': 'brand', 'manufacturer': 'brand', 'براند': 'brand', 'الماركة': 'brand', 'الشركةالمصنعة': 'brand',
-            'unit': 'unit', 'measure': 'unit', 'packaging': 'unit', 'الوحدة': 'unit', 'التعبئة': 'unit',
+            // ── unitsPerCase (Pcs/case — values like "C24") ───────────────────
+            'unitspercase': 'unitsPerCase', 'pcspercase': 'unitsPerCase',
+            'pcscase': 'unitsPerCase', 'piecespercase': 'unitsPerCase',
+            'itemspercase': 'unitsPerCase', 'qtypercase': 'unitsPerCase',
+            'percase': 'unitsPerCase',
+            'عددالوحداتفيالكرتون': 'unitsPerCase', 'وحداتالكرتون': 'unitsPerCase',
+            // ── casesPerPallet ────────────────────────────────────────────────
+            'casesperpallet': 'casesPerPallet', 'boxesperpallet': 'casesPerPallet',
+            'cartonsperpallets': 'casesPerPallet', 'caseperpallet': 'casesPerPallet',
+            'كراتينالبالتة': 'casesPerPallet', 'عددالكراتينفيالبالتة': 'casesPerPallet',
+            // ── unitsPerPallet ────────────────────────────────────────────────
+            'unitsperpallet': 'unitsPerPallet', 'itemsperpallet': 'unitsPerPallet',
+            'palletunits': 'unitsPerPallet', 'palletqty': 'unitsPerPallet',
+            'availablephysicalinpallets': 'unitsPerPallet',
+            'عددالوحداتفيالبالتة': 'unitsPerPallet', 'وحداتالبالتة': 'unitsPerPallet',
+            'البالتةفيهاكام': 'unitsPerPallet',
+            // ── palletsPerShipment ────────────────────────────────────────────
+            'palletspershipment': 'palletsPerShipment', 'palletsperload': 'palletsPerShipment',
+            'shipmentpallets': 'palletsPerShipment',
+            'عددالبالتاتفيالشحنة': 'palletsPerShipment', 'البالتاتفيالشحنة': 'palletsPerShipment',
+            'بالتاتالشحنة': 'palletsPerShipment',
+            // ── brand ─────────────────────────────────────────────────────────
+            'brand': 'brand', 'make': 'brand', 'manufacturer': 'brand',
+            'براند': 'brand', 'الماركة': 'brand', 'الشركةالمصنعة': 'brand',
+            // ── unit ──────────────────────────────────────────────────────────
+            'unit': 'unit', 'measure': 'unit', 'packaging': 'unit',
+            'الوحدة': 'unit', 'التعبئة': 'unit',
+            // ── shelfLife / expiry ────────────────────────────────────────────
+            'expirydate': 'shelfLife', 'expiry': 'shelfLife', 'bestbefore': 'shelfLife',
+            'batchnumber': 'ean', 'batchno': 'ean', 'lot': 'ean', 'lotnumber': 'ean',
         };
 
-        // Find header row - scan up to 30 rows, looking for a row with at least 2 matching headers
-        let headerRowIndex = -1;
-        let mapping: Record<number, string> = {};
-
-        for (let i = 0; i < Math.min(rows.length, 30); i++) {
-            const row = rows[i];
-            if (!row || row.length === 0) continue;
+        // ── Header detection ────────────────────────────────────────────────
+        // Some supplier files split the header across TWO rows, e.g.:
+        //   Row 0: "Item number" | "Item name" | "Batch number/" | "Available physical" | "Pcs/case" | ...
+        //   Row 1:  <empty>      |   <empty>   | "Expiry Date"   | "in CASES !!"        |   <empty>  | ...
+        // We merge consecutive candidate rows to handle this pattern.
+        const matchRow = (row: any[]): { mapping: Record<number, string>; matches: number } => {
             const tempMapping: Record<number, string> = {};
             let matches = 0;
-
             row.forEach((cell, idx) => {
                 if (cell === undefined || cell === null || cell === '') return;
                 const normalizedCell = normalize(String(cell));
@@ -79,7 +119,6 @@ export class ExcelService {
                     tempMapping[idx] = headerAliases[normalizedCell];
                     matches++;
                 } else {
-                    // Partial match
                     for (const [alias, target] of Object.entries(headerAliases)) {
                         if (normalizedCell.length > 2 && (normalizedCell.includes(alias) || alias.includes(normalizedCell))) {
                             tempMapping[idx] = target;
@@ -89,11 +128,53 @@ export class ExcelService {
                     }
                 }
             });
+            return { mapping: tempMapping, matches };
+        };
 
-            if (matches >= 2) {
+        let headerRowIndex = -1;
+        let mapping: Record<number, string> = {};
+
+        for (let i = 0; i < Math.min(rows.length, 30); i++) {
+            const row = rows[i];
+            if (!row || row.length === 0) continue;
+
+            const { mapping: m1, matches: c1 } = matchRow(row);
+
+            // If next row exists and is a sub-header continuation, merge it
+            let mergedMapping = { ...m1 };
+            let totalMatches = c1;
+
+            if (i + 1 < rows.length) {
+                const nextRow = rows[i + 1] || [];
+                const { mapping: m2, matches: c2 } = matchRow(nextRow);
+                // Accept the merge if the next row has at least 1 match AND
+                // most of its non-empty cells are header-like (not data)
+                const nextNonEmpty = nextRow.filter(c => c !== undefined && c !== null && String(c).trim() !== '').length;
+                const nextIsSubHeader = c2 >= 1 && (c2 / Math.max(nextNonEmpty, 1)) > 0.3;
+                if (nextIsSubHeader) {
+                    // Merge: second row fills gaps where first row had no match
+                    for (const [col, target] of Object.entries(m2)) {
+                        if (!mergedMapping[col]) {
+                            mergedMapping[col] = target;
+                            totalMatches++;
+                        }
+                    }
+                }
+            }
+
+            if (totalMatches >= 2) {
                 headerRowIndex = i;
-                mapping = tempMapping;
-                console.log(`[ExcelService] Header found at row ${i} with ${matches} matches. Mapping:`, mapping);
+                mapping = mergedMapping;
+                // Skip the sub-header row in data processing
+                if (i + 1 < rows.length) {
+                    const nextRow = rows[i + 1] || [];
+                    const { matches: c2 } = matchRow(nextRow);
+                    const nextNonEmpty = nextRow.filter(c => c !== undefined && c !== null && String(c).trim() !== '').length;
+                    if (c2 >= 1 && (c2 / Math.max(nextNonEmpty, 1)) > 0.3) {
+                        headerRowIndex = i + 1; // data starts after sub-header
+                    }
+                }
+                console.log(`[ExcelService] Header found at row ${i} with ${totalMatches} matches. Mapping:`, mapping);
                 break;
             }
         }
@@ -171,6 +252,18 @@ export class ExcelService {
             return s.replace(/[٠-٩]/g, m => map[m]);
         };
 
+        // ── Helper: strip "C24" / "P12" prefix formats to get the number ──────
+        const parseQtyField = (raw: any): number => {
+            if (raw === undefined || raw === null) return 0;
+            // Handle "C24", "P12", "c 24", Arabic numerals, commas as decimals, etc.
+            const s = arabicToEnglish(String(raw))
+                .replace(/^[a-zA-Z\s]+/, '') // strip leading letters (C, P, BOX …)
+                .replace(/,/g, '.')           // European decimal comma → dot
+                .replace(/[^0-9.]/g, '');
+            const v = parseFloat(s);
+            return isNaN(v) ? 0 : Math.round(v); // logistics fields are always integers
+        };
+
         // Force strings
         if (row.name !== undefined && row.name !== null) row.name = String(row.name).trim();
         if (row.description !== undefined && row.description !== null) row.description = String(row.description).trim();
@@ -178,31 +271,45 @@ export class ExcelService {
         if (row.ean !== undefined && row.ean !== null) row.ean = String(row.ean).trim();
         if (row.brand !== undefined && row.brand !== null) row.brand = String(row.brand).trim();
         if (row.unit !== undefined && row.unit !== null) row.unit = String(row.unit).trim().toLowerCase();
+        if (row.shelfLife !== undefined && row.shelfLife !== null) row.shelfLife = String(row.shelfLife).trim();
 
-        // Force price to number
+        // Force price to number (handle European decimals like "1.58", "0.38")
         if (row.price !== undefined && row.price !== null) {
-            const cleanStr = arabicToEnglish(String(row.price)).replace(/[^0-9.-]/g, '');
+            const cleanStr = arabicToEnglish(String(row.price))
+                .replace(/,/g, '.')
+                .replace(/[^0-9.-]/g, '');
             const p = parseFloat(cleanStr);
             row.price = isNaN(p) ? 0 : p;
         }
 
-        // Force stock to number
+        // Force stock to number — strip "in CASES" suffix if present
         if (row.stock !== undefined && row.stock !== null) {
             const cleanStr = arabicToEnglish(String(row.stock)).replace(/[^0-9-]/g, '');
             const s = parseInt(cleanStr, 10);
             row.stock = isNaN(s) ? 10 : Math.min(Math.max(s, 0), 2147483647);
         }
 
+        // Logistics fields — all handle "C24" / "P403" style values
+        if (row.unitsPerCase !== undefined && row.unitsPerCase !== null) {
+            row.unitsPerCase = parseQtyField(row.unitsPerCase);
+        }
+        if (row.casesPerPallet !== undefined && row.casesPerPallet !== null) {
+            row.casesPerPallet = parseQtyField(row.casesPerPallet);
+        }
         if (row.unitsPerPallet !== undefined && row.unitsPerPallet !== null) {
-            const cleanStr = arabicToEnglish(String(row.unitsPerPallet)).replace(/[^0-9]/g, '');
-            const val = parseInt(cleanStr, 10);
-            row.unitsPerPallet = isNaN(val) ? 0 : val;
+            // If both unitsPerCase and casesPerPallet are set, derive unitsPerPallet
+            if (row.unitsPerCase && row.casesPerPallet) {
+                row.unitsPerPallet = row.unitsPerCase * row.casesPerPallet;
+            } else {
+                row.unitsPerPallet = parseQtyField(row.unitsPerPallet);
+            }
+        } else if (row.unitsPerCase && row.casesPerPallet) {
+            // Auto-derive unitsPerPallet even if column wasn't in the file
+            row.unitsPerPallet = row.unitsPerCase * row.casesPerPallet;
         }
 
         if (row.palletsPerShipment !== undefined && row.palletsPerShipment !== null) {
-            const cleanStr = arabicToEnglish(String(row.palletsPerShipment)).replace(/[^0-9]/g, '');
-            const val = parseInt(cleanStr, 10);
-            row.palletsPerShipment = isNaN(val) ? 0 : val;
+            row.palletsPerShipment = parseQtyField(row.palletsPerShipment);
         }
 
         // Defaults for missing required fields

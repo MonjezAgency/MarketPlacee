@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getActiveCurrency } from '@/lib/currency';
 import ProductEditorModal from '@/app/dashboard/supplier/ProductEditorModal';
+import AddProductDrawer from '@/components/product/AddProductDrawer';
 
 export default function SupplierProductsPage() {
     const { t, locale } = useLanguage();
@@ -41,6 +42,7 @@ export default function SupplierProductsPage() {
     const [selectedCategory, setSelectedCategory] = React.useState('All');
     const [currentPage, setCurrentPage] = React.useState(1);
     const [isEditorOpen, setIsEditorOpen] = React.useState(false);
+    const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
     const [editingProduct, setEditingProduct] = React.useState<Product | null>(null);
 
     const [isBulkModalOpen, setIsBulkModalOpen] = React.useState(false);
@@ -313,7 +315,7 @@ export default function SupplierProductsPage() {
                     </button>
                     <button
                         disabled={kycBlocked}
-                        onClick={() => { setEditingProduct(null); setIsEditorOpen(true); }}
+                        onClick={() => setIsAddDrawerOpen(true)}
                         className="h-12 px-8 bg-primary text-primary-foreground rounded-xl font-black flex items-center gap-2 hover:bg-primary/90 transition-all shadow-xl shadow-primary/20 disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
                     >
                         <Plus size={20} /> {locale === 'ar' ? 'إضافة جديد' : 'Add New'}
@@ -593,7 +595,7 @@ export default function SupplierProductsPage() {
                     <h3 className="text-2xl font-black text-foreground">No products found</h3>
                     <p className="text-muted-foreground font-medium mt-2">Try adjusting your filters or add a new product.</p>
                     <button
-                        onClick={() => { setEditingProduct(null); setIsEditorOpen(true); }}
+                        onClick={() => setIsAddDrawerOpen(true)}
                         className="mt-8 h-12 px-8 bg-primary text-primary-foreground rounded-full font-black flex items-center gap-2 hover:bg-primary/90 transition-all shadow-xl shadow-primary/20"
                     >
                         <Plus size={20} /> List First Product
@@ -601,12 +603,20 @@ export default function SupplierProductsPage() {
                 </div>
             )}
 
-            {/* Product Editor Modal */}
+            {/* Product Editor Modal — for EDITING existing products */}
             <ProductEditorModal
                 isOpen={isEditorOpen}
                 onClose={() => setIsEditorOpen(false)}
                 onSave={handleSaveProduct}
                 product={editingProduct as any}
+            />
+
+            {/* Add Product Side Drawer — for creating NEW products */}
+            <AddProductDrawer
+                isOpen={isAddDrawerOpen}
+                onClose={() => setIsAddDrawerOpen(false)}
+                onCreated={loadProducts}
+                role="supplier"
             />
 
             {/* Bulk Upload Modal */}

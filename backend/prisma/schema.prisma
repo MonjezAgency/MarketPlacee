@@ -162,8 +162,11 @@ model Product {
   status      ProductStatus @default(PENDING)
   adminNotes  String?
   moq         Int?          // Minimum Order Quantity
-  unitsPerPallet Int?
+  unitsPerCase       Int?   // Pieces per case/carton (e.g., 24 from "C24")
+  casesPerPallet     Int?   // Cases per pallet
+  unitsPerPallet     Int?   // Total pieces per pallet (derived: unitsPerCase × casesPerPallet)
   palletsPerShipment Int?
+  shelfLife          String? // Expiry date or shelf-life string from supplier file
   readyForDispatch Boolean @default(true)
   leadTime       Int?     @default(0) // Preparation time in days if not ready for dispatch
 

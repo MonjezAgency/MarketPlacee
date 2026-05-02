@@ -58,12 +58,26 @@ export class CreateProductDto {
     @IsOptional()
     @IsInt()
     @Min(0)
+    unitsPerCase?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    casesPerPallet?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(0)
     unitsPerPallet?: number;
 
     @IsOptional()
     @IsInt()
     @Min(0)
     palletsPerShipment?: number;
+
+    @IsOptional()
+    @IsString()
+    shelfLife?: string;
 
     @IsOptional()
     @IsString()
