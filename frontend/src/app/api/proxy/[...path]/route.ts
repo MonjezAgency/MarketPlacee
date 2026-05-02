@@ -29,6 +29,7 @@ const PUBLIC_PATHS = [
   'auth/google-login',
   'auth/refresh',
   'newsletter/subscribe',
+  'products/price-ticker',
 ];
 
 async function handler(

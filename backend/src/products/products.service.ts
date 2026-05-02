@@ -308,6 +308,47 @@ export class ProductsService {
         });
     }
 
+    /**
+     * Returns products with a recent price change for the live ticker.
+     * Each item includes: name, ean, brand, image, current price (EGP base),
+     * previous price (EGP base), and the delta. The frontend converts to the
+     * user's display currency.
+     */
+    async findRecentPriceChanges(limit: number = 30) {
+        const products = await this.prisma.product.findMany({
+            where: {
+                status: 'APPROVED',
+                previousPrice: { not: null },
+                priceChangedAt: { not: null },
+            },
+            select: {
+                id: true,
+                name: true,
+                ean: true,
+                brand: true,
+                images: true,
+                price: true,
+                previousPrice: true,
+                priceChangedAt: true,
+                supplier: { select: { name: true, companyName: true } },
+            },
+            orderBy: { priceChangedAt: 'desc' },
+            take: limit,
+        });
+
+        return products.map(p => ({
+            id: p.id,
+            name: p.name,
+            ean: p.ean,
+            brand: p.brand || p.supplier?.companyName || p.supplier?.name || null,
+            image: p.images?.[0] || null,
+            price: p.price,
+            previousPrice: p.previousPrice,
+            delta: p.price - (p.previousPrice ?? p.price),
+            changedAt: p.priceChangedAt,
+        }));
+    }
+
     async updateStatus(id: string, status: ProductStatus, adminNotes?: string) {
         if (status === ProductStatus.APPROVED) {
             const product = await this.findOne(id);
@@ -505,10 +546,20 @@ export class ProductsService {
             else if (unitLower.includes('container') || unitLower.includes('truck')) defaultMarkup = 1.02;
 
             const markup = config?.value ? parseFloat(config.value) : defaultMarkup;
-            const priceToUse = data.price !== undefined ? data.price : (await this.findOne(id)).basePrice;
+            const existing = await this.findOne(id);
+            const priceToUse = data.price !== undefined ? data.price : existing.basePrice;
 
             if (data.price !== undefined) updateData.basePrice = data.price;
-            updateData.price = priceToUse * (isNaN(markup) ? defaultMarkup : markup);
+            const newPrice = priceToUse * (isNaN(markup) ? defaultMarkup : markup);
+
+            // Track price change for the ticker — only when the customer-facing
+            // price actually moved by more than 1% (avoid noise from markup
+            // recomputation rounding)
+            if (existing && existing.price && Math.abs(newPrice - existing.price) / existing.price > 0.01) {
+                updateData.previousPrice = existing.price;
+                updateData.priceChangedAt = new Date();
+            }
+            updateData.price = newPrice;
         }
 
         const updated = await this.prisma.product.update({ where: { id }, data: updateData });

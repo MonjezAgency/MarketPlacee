@@ -39,6 +39,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import Navbar from '@/components/layout/Navbar';
+import PriceTicker from '@/components/ui/PriceTicker';
 import Footer from '@/components/layout/Footer';
 import { Marquee } from '@/components/ui/Marquee';
 import { apiFetch } from '@/lib/api';
@@ -372,6 +373,7 @@ export default function HomePage() {
     return (
         <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans text-[#111827]">
             <Navbar />
+            <PriceTicker />
 
             {/* 1. TOP FEATURE BAR (Above Hero) */}
             <div className="bg-white border-b border-[#E5E7EB] py-3 hidden md:block">

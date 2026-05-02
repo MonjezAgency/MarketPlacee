@@ -167,6 +167,8 @@ model Product {
   unitsPerPallet     Int?   // Total pieces per pallet (derived: unitsPerCase × casesPerPallet)
   palletsPerShipment Int?
   shelfLife          String? // Expiry date or shelf-life string from supplier file
+  previousPrice      Float?  // Last price before the most recent change (in EGP base) — used for price-change ticker
+  priceChangedAt     DateTime? // Timestamp of the most recent price change
   readyForDispatch Boolean @default(true)
   leadTime       Int?     @default(0) // Preparation time in days if not ready for dispatch
 

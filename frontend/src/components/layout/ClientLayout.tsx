@@ -1,6 +1,7 @@
 'use client';
 
 import Navbar from "./Navbar";
+import PriceTicker from "@/components/ui/PriceTicker";
 import Footer from "./Footer";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
@@ -62,6 +63,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     return (
         <div className="flex flex-col min-h-screen">
             {(!isDashboard && !isHome && !isAuthPage) && <Navbar />}
+            {/* Live price-change ticker — shown on non-home public pages
+                (home renders it inline beneath its own Navbar) */}
+            {(!isDashboard && !isHome && !isAuthPage) && <PriceTicker />}
             <main className={`flex-grow ${(!isDashboard && !isHome && !isAuthPage) ? 'pt-20' : ''}`}>
                 {children}
             </main>

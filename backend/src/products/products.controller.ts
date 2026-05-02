@@ -96,6 +96,12 @@ export class ProductsController {
         return { imageUrls: images };
     }
 
+    /** Public endpoint — products that recently changed price, for the live header ticker */
+    @Get('price-ticker')
+    async getPriceTicker(@Query('limit') limit?: string) {
+        return this.productsService.findRecentPriceChanges(limit ? parseInt(limit) : 30);
+    }
+
     // ─── Parameterized :id routes ──────────────────────────────────────────
 
     @Get(':id')

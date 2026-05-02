@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "previousPrice" DOUBLE PRECISION;
+ALTER TABLE "Product" ADD COLUMN IF NOT EXISTS "priceChangedAt" TIMESTAMP(3);
