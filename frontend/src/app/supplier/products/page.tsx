@@ -29,6 +29,7 @@ import { Zap, Rocket } from 'lucide-react';
 import { Product, ProductStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { getActiveCurrency } from '@/lib/currency';
 import ProductEditorModal from '@/app/dashboard/supplier/ProductEditorModal';
 
 export default function SupplierProductsPage() {
@@ -44,7 +45,7 @@ export default function SupplierProductsPage() {
 
     const [isBulkModalOpen, setIsBulkModalOpen] = React.useState(false);
     const [bulkFiles, setBulkFiles] = React.useState<File[]>([]);
-    const [bulkCurrency, setBulkCurrency] = React.useState('EGP');
+    const [bulkCurrency, setBulkCurrency] = React.useState(() => getActiveCurrency());
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [bulkResults, setBulkResults] = React.useState<any>(null);
 

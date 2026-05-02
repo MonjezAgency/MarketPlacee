@@ -12,7 +12,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
-import { formatPrice } from '@/lib/currency';
+import { formatPrice, getActiveCurrency } from '@/lib/currency';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -318,7 +318,7 @@ export default function ProductsModerationPage() {
 
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = React.useState(false);
-    const [uploadCurrency, setUploadCurrency] = React.useState('EGP');
+    const [uploadCurrency, setUploadCurrency] = React.useState(() => getActiveCurrency());
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
