@@ -17,6 +17,7 @@ import { useSearchParams, useRouter } from 'next/navigation';
 import { useEffect, Suspense } from 'react';
 
 import { useLanguage } from '@/contexts/LanguageContext';
+import { convertToBase, getActiveCurrency } from '@/lib/currency';
 
 function CategoriesContent() {
     const { t } = useLanguage();
@@ -58,8 +59,14 @@ function CategoriesContent() {
                     q: localQuery || undefined,
                     category: selectedCategories.length === 1 ? selectedCategories[0] : undefined,
                     brand: selectedBrands.length === 1 ? selectedBrands[0] : undefined,
-                    minPrice: appliedPrice.min || undefined,
-                    maxPrice: appliedPrice.max || undefined,
+                    // Convert from user's display currency → EGP base so the backend
+                    // comparison (which stores prices in EGP) is correct
+                    minPrice: appliedPrice.min
+                        ? String(Math.round(convertToBase(Number(appliedPrice.min), getActiveCurrency())))
+                        : undefined,
+                    maxPrice: appliedPrice.max
+                        ? String(Math.round(convertToBase(Number(appliedPrice.max), getActiveCurrency())))
+                        : undefined,
                     sort: sortMap[sortBy] || 'newest',
                 }),
                 apiFetch(`/ads?placement=SPONSORED_BRAND`).then(res => res.json()),

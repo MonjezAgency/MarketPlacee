@@ -136,9 +136,16 @@ export default function ProductsModerationPage() {
         const tid = toast.loading('Saving changes...');
         setIsSavingEdit(true);
         try {
+            // Backend PATCH treats `price` field as the new basePrice and recalculates
+            // the customer-facing price with markup. So we must send basePrice here,
+            // NOT the already-marked-up `price` — otherwise price keeps compounding.
+            const patchPayload = {
+                ...editData,
+                price: editData.basePrice ?? editData.price,
+            };
             const res = await apiFetch(`/products/${editData.id}`, {
                 method: 'PATCH',
-                body: JSON.stringify(editData)
+                body: JSON.stringify(patchPayload)
             });
 
             if (res.ok) {
