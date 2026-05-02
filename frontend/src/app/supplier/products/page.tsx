@@ -44,6 +44,7 @@ export default function SupplierProductsPage() {
 
     const [isBulkModalOpen, setIsBulkModalOpen] = React.useState(false);
     const [bulkFiles, setBulkFiles] = React.useState<File[]>([]);
+    const [bulkCurrency, setBulkCurrency] = React.useState('EGP');
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [bulkResults, setBulkResults] = React.useState<any>(null);
 
@@ -89,6 +90,7 @@ export default function SupplierProductsPage() {
             for (const file of bulkFiles) {
                 const formData = new FormData();
                 formData.append('file', file);
+                formData.append('currency', bulkCurrency);
 
                 const res = await apiFetch('/products/bulk-upload', {
                     method: 'POST',
@@ -668,6 +670,28 @@ export default function SupplierProductsPage() {
                                                     <li>{t('supplier', 'eanFetch')}</li>
                                                     <li>No default or placeholder images (e.g., Coca-Cola) will be used.</li>
                                                 </ul>
+                                            </div>
+
+                                            <div className="mt-4 flex items-center gap-3 relative z-20 pointer-events-auto">
+                                                <label className="text-xs font-black uppercase tracking-widest text-foreground whitespace-nowrap">
+                                                    {locale === 'ar' ? 'عملة الأسعار في الملف' : 'Prices in file are in'}
+                                                </label>
+                                                <select
+                                                    value={bulkCurrency}
+                                                    onChange={(e) => setBulkCurrency(e.target.value)}
+                                                    className="flex-1 h-10 px-3 rounded-xl border border-border/50 bg-background text-foreground font-bold text-sm outline-none focus:border-primary"
+                                                >
+                                                    <option value="EGP">EGP — Egyptian Pound</option>
+                                                    <option value="USD">USD — US Dollar</option>
+                                                    <option value="EUR">EUR — Euro</option>
+                                                    <option value="GBP">GBP — British Pound</option>
+                                                    <option value="AED">AED — UAE Dirham</option>
+                                                    <option value="SAR">SAR — Saudi Riyal</option>
+                                                    <option value="KWD">KWD — Kuwaiti Dinar</option>
+                                                    <option value="QAR">QAR — Qatari Riyal</option>
+                                                    <option value="TRY">TRY — Turkish Lira</option>
+                                                    <option value="INR">INR — Indian Rupee</option>
+                                                </select>
                                             </div>
 
                                             <input

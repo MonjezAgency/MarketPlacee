@@ -311,6 +311,7 @@ export default function ProductsModerationPage() {
 
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = React.useState(false);
+    const [uploadCurrency, setUploadCurrency] = React.useState('EGP');
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -322,6 +323,7 @@ export default function ProductsModerationPage() {
         try {
             const formData = new FormData();
             formData.append('file', file);
+            formData.append('currency', uploadCurrency);
 
             const res = await apiFetch('/products/bulk-upload', {
                 method: 'POST',
@@ -384,14 +386,31 @@ export default function ProductsModerationPage() {
                             className="h-10 w-[320px] pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/5 transition-all"
                         />
                     </div>
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleFileUpload} 
-                        className="hidden" 
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileUpload}
+                        className="hidden"
                         accept=".csv,.xlsx,.xls"
                     />
-                    <button 
+                    <select
+                        value={uploadCurrency}
+                        onChange={(e) => setUploadCurrency(e.target.value)}
+                        title="Currency of prices in the uploaded file"
+                        className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 outline-none focus:border-teal-500"
+                    >
+                        <option value="EGP">EGP</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                        <option value="GBP">GBP</option>
+                        <option value="AED">AED</option>
+                        <option value="SAR">SAR</option>
+                        <option value="KWD">KWD</option>
+                        <option value="QAR">QAR</option>
+                        <option value="TRY">TRY</option>
+                        <option value="INR">INR</option>
+                    </select>
+                    <button
                         onClick={() => setShowUploadGuide(true)}
                         disabled={isUploading}
                         className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all disabled:opacity-50"
