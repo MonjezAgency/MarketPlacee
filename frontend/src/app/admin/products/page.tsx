@@ -1070,7 +1070,17 @@ export default function ProductsModerationPage() {
                                                     <span className="text-sm font-bold text-green-600">98%</span>
                                                 </div>
                                             </div>
-                                            <button className="w-full h-12 bg-slate-100 text-slate-900 rounded-2xl text-[11px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-2">
+                                            <button
+                                                onClick={() => {
+                                                    if (selectedProduct?.supplier?.id) {
+                                                        router.push(`/admin/suppliers?id=${selectedProduct.supplier.id}`);
+                                                    } else {
+                                                        toast.error('Supplier info not available for this product');
+                                                    }
+                                                }}
+                                                disabled={!selectedProduct?.supplier?.id}
+                                                className="w-full h-12 bg-slate-100 text-slate-900 rounded-2xl text-[11px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                            >
                                                 <ExternalLink size={14} /> View Supplier Profile
                                             </button>
                                         </div>

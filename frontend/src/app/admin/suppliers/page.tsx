@@ -12,6 +12,7 @@ import {
     ArrowUpRight, BarChart3, Briefcase,
     Zap, DollarSign, Target, Award, Star
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
@@ -71,6 +72,26 @@ export default function AdminSuppliersPage() {
     React.useEffect(() => {
         loadSuppliers();
     }, []);
+
+    // If we landed here with ?id=<supplierId> (e.g. from "View Supplier
+    // Profile" on the products page), auto-select that supplier once the
+    // list has loaded so the panel opens immediately.
+    const searchParams = useSearchParams();
+    React.useEffect(() => {
+        const requestedId = searchParams?.get('id');
+        if (!requestedId || suppliers.length === 0) return;
+        const match = suppliers.find(s => s.id === requestedId);
+        if (match) {
+            setSelectedSupplier(match);
+            // Scroll the row into view if it's far down the list
+            setTimeout(() => {
+                const row = document.querySelector(`[data-supplier-id="${requestedId}"]`);
+                row?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+        } else {
+            toast.error('Supplier not found in current list');
+        }
+    }, [searchParams, suppliers]);
 
     const handleBulkAction = async (action: 'approve' | 'block' | 'delete') => {
         if (selectedIds.length === 0) return;
@@ -218,8 +239,9 @@ export default function AdminSuppliersPage() {
                                             </tr>
                                         ))
                                     ) : filteredSuppliers.map((supplier) => (
-                                        <tr 
-                                            key={supplier.id} 
+                                        <tr
+                                            key={supplier.id}
+                                            data-supplier-id={supplier.id}
                                             onClick={() => setSelectedSupplier(supplier)}
                                             className={cn(
                                                 "group cursor-pointer hover:bg-slate-50 transition-all h-[64px]",
