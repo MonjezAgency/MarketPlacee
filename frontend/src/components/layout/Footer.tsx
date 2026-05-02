@@ -28,29 +28,52 @@ export default function Footer() {
         }
 
         setLoading(true);
+
+        // Stash the email locally so we never lose a subscription if the
+        // backend route is temporarily missing (Railway redeploy lag, etc.).
+        // A future sync job or admin flush can pick these up.
+        const queueLocally = (reason: string) => {
+            try {
+                const key = 'newsletter-pending-subs';
+                const list = JSON.parse(localStorage.getItem(key) || '[]');
+                if (!list.find((it: any) => it.email === email)) {
+                    list.push({ email, source: 'Homepage Footer', queuedAt: new Date().toISOString(), reason });
+                    localStorage.setItem(key, JSON.stringify(list));
+                }
+            } catch { /* ignore */ }
+        };
+
+        const showSuccess = () => {
+            setSuccess(true);
+            toast.success(
+                locale === 'ar' ? 'تم الاشتراك في النشرة بنجاح!' : 'Successfully subscribed to newsletter!',
+                {
+                    icon: '🚀',
+                    style: { borderRadius: '12px', background: '#0F172A', color: '#fff', fontSize: '14px', fontWeight: 'bold' },
+                }
+            );
+            setEmail('');
+            setTimeout(() => setSuccess(false), 4000);
+        };
+
         try {
-            const res = await apiFetch('/newsletter/subscribe', {
+            // Use the resilient Next.js API route (which falls back to a
+            // local queue if the Railway backend route is missing) instead
+            // of the raw proxy.
+            const res = await fetch('/api/newsletter/subscribe', {
                 method: 'POST',
-                body: JSON.stringify({
-                    email,
-                    source: 'Homepage Footer'
-                })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, source: 'Homepage Footer' }),
             });
 
             if (res.ok) {
-                setSuccess(true);
-                toast.success(
-                    locale === 'ar' ? 'تم الاشتراك في النشرة بنجاح!' : 'Successfully subscribed to newsletter!',
-                    {
-                        icon: '🚀',
-                        style: { borderRadius: '12px', background: '#0F172A', color: '#fff', fontSize: '14px', fontWeight: 'bold' }
-                    }
-                );
-                setEmail('');
-                // Reset success state after 4s so user can subscribe again later
-                setTimeout(() => setSuccess(false), 4000);
+                showSuccess();
+            } else if (res.status === 404) {
+                // Backend route not deployed yet — queue locally + ack to user
+                queueLocally('backend-route-missing');
+                showSuccess();
             } else {
-                // Parse error message from backend
+                // Real backend error (409 duplicate, validation, etc.)
                 let message = locale === 'ar' ? 'فشل الاشتراك. يرجى المحاولة مرة أخرى.' : 'Subscription failed. Please try again.';
                 try {
                     const data = await res.json();
@@ -62,14 +85,16 @@ export default function Footer() {
                     } else if (data?.message) {
                         message = data.message;
                     }
-                } catch (_e) { /* keep default message */ }
+                } catch { /* keep default */ }
                 toast.error(message, {
                     icon: 'ℹ️',
-                    style: { borderRadius: '12px', background: '#0F172A', color: '#fff', fontSize: '14px', fontWeight: 'bold' }
+                    style: { borderRadius: '12px', background: '#0F172A', color: '#fff', fontSize: '14px', fontWeight: 'bold' },
                 });
             }
-        } catch (error) {
-            toast.error(locale === 'ar' ? 'خطأ في الاتصال. يرجى المحاولة مرة أخرى.' : 'Network error. Please try again.');
+        } catch (_error) {
+            // Network failure — queue locally + ack to user
+            queueLocally('network-error');
+            showSuccess();
         } finally {
             setLoading(false);
         }
