@@ -166,12 +166,7 @@ export class ProductsService {
                     adminNotes,
                     status: finalStatus,
                     basePrice: createProductDto.price,
-                    // In bulk uploads (skipAi=true) the supplier IS providing
-                    // the final price they want listed — do NOT apply the
-                    // platform markup on top, otherwise prices show inflated
-                    // by 50% (e.g. €4.75 → €7.13). For manual single-product
-                    // creation we still apply markup as before.
-                    price: skipAi ? createProductDto.price : createProductDto.price * finalMarkup,
+                    price: createProductDto.price * finalMarkup,
                     images: productImages,
                     supplierId: createProductDto.supplierId,
                     unit: createProductDto.unit || 'piece',

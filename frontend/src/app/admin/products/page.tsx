@@ -573,7 +573,7 @@ export default function ProductsModerationPage() {
                                             <td className="px-6 py-4 text-sm text-slate-600">{p.supplier?.name || 'Admin Upload'}</td>
                                             <td className="px-6 py-4"><StatusBadge status={p.status} /></td>
                                             <td className="px-6 py-4"><CompletenessBar value={p.completeness || 0} /></td>
-                                            <td className="px-6 py-4 text-sm font-bold text-slate-900">{formatPrice(p.price)}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-slate-900" title={`Buyer price (with markup): ${formatPrice(p.price)}`}>{formatPrice(p.basePrice ?? p.price)}</td>
                                             <td className="px-6 py-4 text-sm text-slate-600">{p.stock.toLocaleString()}</td>
                                             <td className="px-6 py-4 text-xs text-slate-400 font-medium">{new Date(p.createdAt).toLocaleDateString()}</td>
                                             <td className="px-6 py-4 text-end">
@@ -599,7 +599,7 @@ export default function ProductsModerationPage() {
                                         <p className="text-xs text-slate-500 mt-0.5">{p.supplier?.name || 'Admin Upload'}</p>
                                         <div className="flex items-center gap-2 mt-2">
                                             <StatusBadge status={p.status} />
-                                            <span className="text-[10px] font-bold text-slate-900">{formatPrice(p.price)}</span>
+                                            <span className="text-[10px] font-bold text-slate-900" title={`Buyer price: ${formatPrice(p.price)}`}>{formatPrice(p.basePrice ?? p.price)}</span>
                                         </div>
                                     </div>
                                     <ChevronRight size={18} className="text-slate-300" />
