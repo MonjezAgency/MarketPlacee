@@ -453,6 +453,58 @@ export class ProductsService {
         };
     }
 
+    /**
+     * Multiplies basePrice and price of every (or per-supplier) product
+     * by the given EGP-per-source-unit rate. Used to repair data uploaded
+     * without selecting the correct source currency. Returns counts only;
+     * pass dryRun:true to preview without writing.
+     */
+    async fixProductCurrency(multiplier: number, supplierId?: string, dryRun = false) {
+        const where: any = {};
+        if (supplierId) where.supplierId = supplierId;
+
+        const affected = await this.prisma.product.findMany({
+            where,
+            select: { id: true, name: true, basePrice: true, price: true, supplierId: true }
+        });
+
+        if (dryRun) {
+            return {
+                dryRun: true,
+                count: affected.length,
+                multiplier,
+                sample: affected.slice(0, 5).map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    currentBasePrice: p.basePrice,
+                    newBasePrice: (p.basePrice ?? 0) * multiplier,
+                    currentPrice: p.price,
+                    newPrice: (p.price ?? 0) * multiplier,
+                })),
+            };
+        }
+
+        // Update in batches to avoid massive single transactions
+        let updated = 0;
+        for (const p of affected) {
+            await this.prisma.product.update({
+                where: { id: p.id },
+                data: {
+                    basePrice: (p.basePrice ?? 0) * multiplier,
+                    price: (p.price ?? 0) * multiplier,
+                },
+            });
+            updated++;
+        }
+
+        return {
+            dryRun: false,
+            count: updated,
+            multiplier,
+            supplierId: supplierId || 'all',
+        };
+    }
+
     async bulkApprove(ids: string[]) {
         const products = await this.prisma.product.findMany({
             where: { id: { in: ids } },

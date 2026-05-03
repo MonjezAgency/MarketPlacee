@@ -320,6 +320,46 @@ export default function ProductsModerationPage() {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const [isUploading, setIsUploading] = React.useState(false);
     const [uploadCurrency, setUploadCurrency] = React.useState(() => getActiveCurrency());
+
+    // Currency repair tool state
+    const [showFixCurrency, setShowFixCurrency] = React.useState(false);
+    const [fixFromCurrency, setFixFromCurrency] = React.useState('EUR');
+    const [fixSupplierId, setFixSupplierId] = React.useState('');
+    const [fixPreview, setFixPreview] = React.useState<any>(null);
+    const [isFixing, setIsFixing] = React.useState(false);
+
+    const runFixCurrency = async (dryRun: boolean) => {
+        setIsFixing(true);
+        const tid = toast.loading(dryRun ? 'Calculating preview...' : 'Converting prices...');
+        try {
+            const res = await apiFetch('/products/admin/fix-currency', {
+                method: 'POST',
+                body: JSON.stringify({
+                    fromCurrency: fixFromCurrency,
+                    supplierId: fixSupplierId || undefined,
+                    dryRun,
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok || data.error) {
+                toast.error(data.error || data.message || 'Failed', { id: tid });
+                return;
+            }
+            if (dryRun) {
+                setFixPreview(data);
+                toast.success(`Preview ready: ${data.count} products would be updated`, { id: tid });
+            } else {
+                toast.success(`Updated ${data.count} products successfully`, { id: tid });
+                setShowFixCurrency(false);
+                setFixPreview(null);
+                fetchData();
+            }
+        } catch (e) {
+            toast.error('Connection error', { id: tid });
+        } finally {
+            setIsFixing(false);
+        }
+    };
     const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -402,29 +442,38 @@ export default function ProductsModerationPage() {
                         className="hidden"
                         accept=".csv,.xlsx,.xls"
                     />
-                    <select
-                        value={uploadCurrency}
-                        onChange={(e) => setUploadCurrency(e.target.value)}
-                        title="Currency of prices in the uploaded file"
-                        className="h-10 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 outline-none focus:border-teal-500"
-                    >
-                        <option value="EGP">EGP</option>
-                        <option value="USD">USD</option>
-                        <option value="EUR">EUR</option>
-                        <option value="GBP">GBP</option>
-                        <option value="AED">AED</option>
-                        <option value="SAR">SAR</option>
-                        <option value="KWD">KWD</option>
-                        <option value="QAR">QAR</option>
-                        <option value="TRY">TRY</option>
-                        <option value="INR">INR</option>
-                    </select>
+                    <div className="h-10 px-3 bg-amber-50 border-2 border-amber-300 rounded-xl flex items-center gap-2" title="Currency of prices INSIDE the uploaded file — pick the wrong one and prices will be stored incorrectly">
+                        <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest whitespace-nowrap">File ₠</span>
+                        <select
+                            value={uploadCurrency}
+                            onChange={(e) => setUploadCurrency(e.target.value)}
+                            className="bg-transparent text-xs font-black text-amber-900 outline-none cursor-pointer"
+                        >
+                            <option value="EGP">EGP</option>
+                            <option value="USD">USD</option>
+                            <option value="EUR">EUR</option>
+                            <option value="GBP">GBP</option>
+                            <option value="AED">AED</option>
+                            <option value="SAR">SAR</option>
+                            <option value="KWD">KWD</option>
+                            <option value="QAR">QAR</option>
+                            <option value="TRY">TRY</option>
+                            <option value="INR">INR</option>
+                        </select>
+                    </div>
                     <button
                         onClick={() => setShowUploadGuide(true)}
                         disabled={isUploading}
                         className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all disabled:opacity-50"
                     >
                         <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload File'}
+                    </button>
+                    <button
+                        onClick={() => setShowFixCurrency(true)}
+                        title="Convert existing product prices from a wrong source currency to EGP"
+                        className="h-10 px-4 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-700 flex items-center gap-2 hover:bg-amber-100 transition-all"
+                    >
+                        <DollarSign size={16} /> Fix Prices
                     </button>
                     <button
                         onClick={() => setIsAddDrawerOpen(true)}
@@ -1364,6 +1413,121 @@ export default function ProductsModerationPage() {
                 onCreated={fetchData}
                 role="admin"
             />
+
+            {/* Fix Currency Modal — repair wrongly-stored prices */}
+            <AnimatePresence>
+                {showFixCurrency && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
+                        >
+                            <div className="p-6 border-b border-slate-100 flex items-start justify-between">
+                                <div>
+                                    <h2 className="text-xl font-black text-slate-900">Fix Product Prices</h2>
+                                    <p className="text-xs text-slate-500 mt-1 max-w-xs">
+                                        Convert existing prices from a wrong source currency to EGP base. Use Preview first to verify.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => { setShowFixCurrency(false); setFixPreview(null); }}
+                                    className="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400"
+                                >
+                                    <XCircle size={20} />
+                                </button>
+                            </div>
+
+                            <div className="p-6 space-y-4">
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
+                                        Prices were actually in
+                                    </label>
+                                    <select
+                                        value={fixFromCurrency}
+                                        onChange={(e) => { setFixFromCurrency(e.target.value); setFixPreview(null); }}
+                                        className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-teal-500"
+                                    >
+                                        <option value="USD">USD — US Dollar (×48.5)</option>
+                                        <option value="EUR">EUR — Euro (×52.8)</option>
+                                        <option value="GBP">GBP — British Pound (×61.4)</option>
+                                        <option value="AED">AED — UAE Dirham (×13.2)</option>
+                                        <option value="SAR">SAR — Saudi Riyal (×12.9)</option>
+                                        <option value="KWD">KWD — Kuwaiti Dinar (×158.0)</option>
+                                        <option value="QAR">QAR — Qatari Riyal (×13.3)</option>
+                                        <option value="TRY">TRY — Turkish Lira (×1.49)</option>
+                                        <option value="INR">INR — Indian Rupee (×0.583)</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
+                                        Limit to supplier (optional)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={fixSupplierId}
+                                        onChange={(e) => { setFixSupplierId(e.target.value); setFixPreview(null); }}
+                                        placeholder="Leave empty to apply to ALL products"
+                                        className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-teal-500"
+                                    />
+                                </div>
+
+                                {fixPreview && (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
+                                        <p className="text-xs font-black text-amber-900">
+                                            Preview: {fixPreview.count} products will be multiplied by ×{fixPreview.multiplier}
+                                        </p>
+                                        <div className="space-y-1.5">
+                                            {fixPreview.sample?.map((p: any) => (
+                                                <div key={p.id} className="text-[11px] flex justify-between gap-2 bg-white/50 rounded-lg px-2 py-1">
+                                                    <span className="truncate font-medium text-slate-700">{p.name}</span>
+                                                    <span className="font-bold text-slate-900 shrink-0">
+                                                        {p.currentBasePrice?.toFixed(2)} → {p.newBasePrice?.toFixed(2)} EGP
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-[11px] text-red-700">
+                                    <strong>⚠ Warning:</strong> This is a one-way operation. If you run it twice with EUR, prices will be multiplied by 52.8² = 2787× — too much. Always preview first and only run once per source currency.
+                                </div>
+                            </div>
+
+                            <div className="p-4 border-t border-slate-100 flex gap-3">
+                                <button
+                                    onClick={() => runFixCurrency(true)}
+                                    disabled={isFixing}
+                                    className="flex-1 h-12 bg-slate-100 text-slate-900 rounded-2xl text-sm font-bold hover:bg-slate-200 transition-all disabled:opacity-50"
+                                >
+                                    {isFixing ? '...' : 'Preview'}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        if (!fixPreview) {
+                                            toast.error('Run Preview first to verify');
+                                            return;
+                                        }
+                                        if (!confirm(`Multiply prices of ${fixPreview.count} products by ×${fixPreview.multiplier}? This cannot be undone.`)) return;
+                                        runFixCurrency(false);
+                                    }}
+                                    disabled={isFixing || !fixPreview}
+                                    className="flex-1 h-12 bg-teal-600 text-white rounded-2xl text-sm font-black hover:bg-teal-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    <CheckCircle2 size={16} /> {isFixing ? 'Converting...' : 'Apply Fix'}
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

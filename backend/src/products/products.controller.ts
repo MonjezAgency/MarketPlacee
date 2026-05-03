@@ -319,6 +319,36 @@ export class ProductsController {
         return { message: 'Products rejected', count: body.ids.length };
     }
 
+    /**
+     * Admin tool: re-convert existing products from a wrongly-assumed
+     * source currency to the EGP base. Use when products were bulk-uploaded
+     * without selecting the correct currency (so values were stored as EGP
+     * but were really EUR/USD/etc.). Multiplies basePrice and price by the
+     * EGP-per-source-unit rate.
+     *
+     * Body: { fromCurrency: 'EUR', supplierId?: string, dryRun?: boolean }
+     */
+    @Post('admin/fix-currency')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    async fixCurrency(@Body() body: { fromCurrency: string; supplierId?: string; dryRun?: boolean }) {
+        const fromCurrency = (body?.fromCurrency || '').toUpperCase();
+        const RATES: Record<string, number> = {
+            EGP: 1, USD: 48.5, EUR: 52.8, GBP: 61.4,
+            AED: 13.2, SAR: 12.9, KWD: 158.0, QAR: 13.3,
+            TRY: 1.49, INR: 0.583,
+        };
+        const multiplier = RATES[fromCurrency];
+        if (!multiplier) {
+            return { error: `Unsupported source currency: ${fromCurrency}` };
+        }
+        if (multiplier === 1) {
+            return { error: 'Source currency is already EGP — nothing to convert' };
+        }
+
+        return this.productsService.fixProductCurrency(multiplier, body.supplierId, !!body.dryRun);
+    }
+
     @Post(':id/rate')
     @UseGuards(JwtAuthGuard)
     async rateProduct(@Param('id') id: string, @Body() body: { rating: number }) {
