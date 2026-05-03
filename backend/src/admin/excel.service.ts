@@ -25,12 +25,86 @@ export class ExcelService {
 
     constructor(private readonly aiAgent: AiAgentService) {}
 
+    /**
+     * BULLETPROOF PRICE DETECTOR — overrides AI/heuristic when wrong.
+     *
+     * Scans the first ~15 data rows. For each column, counts cells whose
+     * value contains a currency symbol (€, $, £, ¥) or currency code
+     * (EUR, USD, GBP). The column with the HIGHEST currency-symbol count
+     * (and at least 30% of its cells matching) becomes the price column.
+     *
+     * This single check fixes the most common bulk-upload failure: the
+     * AI/heuristic picks "Available in PALLETS" (values like 0.06, 2.62)
+     * instead of " € 1.99 " because both are decimals.
+     *
+     * Returns the column index that should be price, or -1 if none found.
+     */
+    private detectPriceColumnByCurrency(rows: any[][], headerRowIndex: number): number {
+        const currencyRegex = /[€$£¥]|\bEUR\b|\bUSD\b|\bGBP\b|\bAED\b|\bSAR\b|\bEGP\b/i;
+        const dataRows = rows.slice(headerRowIndex + 1, headerRowIndex + 16);
+        if (dataRows.length === 0) return -1;
+
+        const maxCols = Math.max(...dataRows.map(r => (r || []).length), 0);
+        const scores: { col: number; matches: number; nonEmpty: number }[] = [];
+
+        for (let col = 0; col < maxCols; col++) {
+            let matches = 0;
+            let nonEmpty = 0;
+            for (const row of dataRows) {
+                const cell = row?.[col];
+                if (cell === undefined || cell === null || String(cell).trim() === '') continue;
+                nonEmpty++;
+                if (currencyRegex.test(String(cell))) matches++;
+            }
+            if (matches > 0) scores.push({ col, matches, nonEmpty });
+        }
+
+        if (scores.length === 0) return -1;
+        // Best column = highest match count, tie-broken by highest match ratio
+        scores.sort((a, b) => {
+            if (b.matches !== a.matches) return b.matches - a.matches;
+            return (b.matches / b.nonEmpty) - (a.matches / a.nonEmpty);
+        });
+        const best = scores[0];
+        const ratio = best.matches / Math.max(best.nonEmpty, 1);
+        if (ratio < 0.3) return -1;
+        this.logger.log(`[ExcelService] Currency-detector: col ${best.col} has ${best.matches}/${best.nonEmpty} cells with currency symbols → price.`);
+        return best.col;
+    }
+
+    /**
+     * Apply the currency-detector result to a mapping. If a price column
+     * is found by currency symbols, it OVERRIDES whatever the AI/heuristic
+     * picked. Any other column previously labeled "price" is demoted to null.
+     */
+    private overridePriceMapping(
+        mapping: Record<number, string | null>,
+        priceCol: number,
+    ): Record<number, string | null> {
+        if (priceCol < 0) return mapping;
+        const out: Record<number, string | null> = { ...mapping };
+        // Demote any existing 'price' assignment that's NOT the detected column
+        for (const [k, v] of Object.entries(out)) {
+            if (v === 'price' && Number(k) !== priceCol) {
+                this.logger.log(`[ExcelService] Demoting wrongly-detected price column ${k} → null (currency-detector picked col ${priceCol}).`);
+                out[Number(k)] = null;
+            }
+        }
+        // If the detected price column was previously assigned to something
+        // else, force it to be price (price wins over other guesses for this column)
+        if (out[priceCol] !== 'price') {
+            this.logger.log(`[ExcelService] Forcing col ${priceCol} → 'price' (was: ${out[priceCol]}).`);
+            out[priceCol] = 'price';
+        }
+        return out;
+    }
+
     async processProductsExcel(buffer: Buffer, dtoClass: any): Promise<ExcelReport> {
         const workbook = XLSX.read(buffer, { type: 'buffer' });
         if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
             throw new Error('Excel file has no sheets');
         }
-        
+
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         if (!sheet) throw new Error(`Sheet "${sheetName}" not found`);
@@ -41,6 +115,12 @@ export class ExcelService {
 
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }) as any[][];
         if (rows.length === 0) throw new Error('Sheet is empty');
+
+        // FORMATTED rows — same shape as `rows` but cells use the display
+        // string (`.w`) so currency symbols, percentages, etc. are visible.
+        // Excel stores " € 0.38 " as raw number 0.38 with format "€ #.##",
+        // so we need this to detect currency columns.
+        const rowsFormatted = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false }) as any[][];
 
         console.log(`[ExcelService] Processing ${rows.length} raw rows from sheet: ${sheetName}`);
 
@@ -53,9 +133,14 @@ export class ExcelService {
             const aiResult = await this.aiAgent.detectColumnMapping(rows.slice(0, 12));
             if (aiResult && aiResult.confidence !== 'low') {
                 this.logger.log(`[ExcelService] Using AI mapping (confidence: ${aiResult.confidence}). ${aiResult.reasoning || ''}`);
+                // BULLETPROOF OVERRIDE: scan data for currency symbols and
+                // force the price column. Catches AI mistakes where it picks
+                // "Available in PALLETS" (decimals like 0.06, 2.62) as price.
+                const priceCol = this.detectPriceColumnByCurrency(rowsFormatted, aiResult.headerRowIndex);
+                const finalMapping = this.overridePriceMapping(aiResult.mapping, priceCol);
                 return this.processWithMapping(
                     rows,
-                    aiResult.mapping,
+                    finalMapping,
                     aiResult.headerRowIndex,
                     dtoClass,
                     await this.extractImagesFromZip(buffer, sheetName),
@@ -232,6 +317,21 @@ export class ExcelService {
                 }
                 console.log(`[ExcelService] Header found at row ${i} with ${totalMatches} matches. Final mapping:`, mapping);
                 break;
+            }
+        }
+
+        // BULLETPROOF PRICE OVERRIDE for heuristic path too — currency
+        // symbols in cell data always win over header-name guesses.
+        if (headerRowIndex !== -1) {
+            const priceCol = this.detectPriceColumnByCurrency(rowsFormatted, headerRowIndex);
+            if (priceCol >= 0) {
+                const overridden = this.overridePriceMapping(mapping as any, priceCol);
+                // Convert back to non-nullable form (filter out null entries)
+                const cleaned: Record<number, string> = {};
+                for (const [k, v] of Object.entries(overridden)) {
+                    if (v) cleaned[Number(k)] = v;
+                }
+                mapping = cleaned;
             }
         }
 

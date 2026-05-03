@@ -485,15 +485,31 @@ Categories List: ${categories.join(', ')}`;
 Allowed field names (use ONLY these, anything else is invalid):
 ${allowedFields.join(', ')}
 
-Important rules:
+⚠️ CRITICAL — PRICE DETECTION (most common mistake — read carefully):
+The "price" column is the column whose data CELLS contain a CURRENCY SYMBOL
+(€, $, £, ¥, EUR, USD, GBP) — e.g. " € 1.99 ", "€0.38", "$5.45", "1,58 €",
+"EUR 2.50". This is the ONLY reliable signal. Do NOT pick a column just
+because its header says "price" or because its values are decimals — many
+columns have decimal values (e.g. "Available physical in PALLETS" might
+contain values like 0.06, 2.62 — these are NOT prices, they are pallet
+counts). If MORE than one column looks like price, pick the one with
+currency symbols. If NO column has currency symbols, fall back to the
+column whose header literally contains the word "price" / "cost" / "سعر".
+
+Other rules:
 - "ean" is the SKU / Item number / barcode (long numeric or alphanumeric ID).
-- "stock" is the available quantity (integer).
+- "stock" is the available quantity in CASES or pieces (integer, usually
+  2-4 digits like 48, 1054, 96). NOT the pallet float (0.06, 2.62).
 - "unitsPerCase" is pieces per case/carton (e.g. value "C24" = 24).
-- "casesPerPallet" is how many cases stack on a pallet.
-- "unitsPerPallet" should be left null if the column is "available physical in pallets" (that's the stock expressed in pallet units, not the conversion factor — we'll auto-compute it).
+- "casesPerPallet" is how many cases stack on a pallet (integer like 48, 256, 403).
+- For columns headed "Available physical in PALLETS" or "Available in pallets"
+  (values like 0.06, 2.62, 1.00) — set to null. These are stock-in-pallets,
+  NOT price and NOT a conversion factor.
+- "unitsPerPallet" should be left null if the column is "available physical in pallets".
 - "shelfLife" is for batch number / expiry date columns.
-- "name" is the human-readable product name (text with letters).
-- "price" is the per-unit selling price (decimal, usually small like 0.38, 1.99, 5.45).
+- "name" is the human-readable product name (text WITH letters — e.g. "KitKat Mini 200g").
+  ⚠️ Must NEVER pick a column whose header is "Item NUMBER" or "Item NO" — that's the EAN/SKU.
+  The name column header is "Item NAME" / "Product NAME" / "Description" / "اسم المنتج".
 - A long 8-13 digit number that's not a date is likely an EAN.
 - A YYYYMMDD-style number (e.g. 20260731) is a date → shelfLife.
 

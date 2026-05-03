@@ -7,7 +7,7 @@ import {
     ArrowUpRight, Info, User, Sparkles, MessageSquare,
     Trash2, Eye, ExternalLink, Filter, Download,
     CheckCircle, ShieldAlert, Activity, Pencil,
-    Image as ImageIcon, ListFilter, FileSpreadsheet, ShieldCheck, DollarSign
+    Image as ImageIcon, ListFilter, FileSpreadsheet, ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -469,13 +469,6 @@ export default function ProductsModerationPage() {
                         className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all disabled:opacity-50"
                     >
                         <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload File'}
-                    </button>
-                    <button
-                        onClick={() => setShowFixCurrency(true)}
-                        title="Convert existing product prices from a wrong source currency to EGP"
-                        className="h-10 px-4 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-700 flex items-center gap-2 hover:bg-amber-100 transition-all"
-                    >
-                        <DollarSign size={16} /> Fix Prices
                     </button>
                     <button
                         onClick={() => setIsAddDrawerOpen(true)}
