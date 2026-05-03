@@ -107,6 +107,7 @@ export default function ProductsModerationPage() {
     const isAr = locale === 'ar';
     
     const [products, setProducts] = React.useState<Product[]>([]);
+    const router = useRouter();
     const [isLoading, setIsLoading] = React.useState(true);
     const [searchTerm, setSearchTerm] = React.useState('');
     const [activeTab, setActiveTab] = React.useState('All Products');
