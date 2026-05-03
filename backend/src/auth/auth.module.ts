@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { ViesService } from './vies.service';
 import { TwoFaService } from './twofa.service';
@@ -7,6 +7,7 @@ import { PassportModule } from '@nestjs/passport';
 import { JwtStrategy } from './jwt.strategy';
 import { AuthController } from './auth.controller';
 import { EmailModule } from '../email/email.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 import { PrismaModule } from '../common/prisma.module';
 
@@ -15,6 +16,7 @@ import { PrismaModule } from '../common/prisma.module';
         PassportModule,
         EmailModule,
         PrismaModule,
+        forwardRef(() => NotificationsModule),
         JwtModule.register({
             secret: process.env.JWT_SECRET || 'secretKey',
             signOptions: { expiresIn: '1d' },
