@@ -445,4 +445,123 @@ Categories List: ${categories.join(', ')}`;
     getLatestReport(): AgentReport | null {
         return this.reports[0] ?? null;
     }
+
+    /**
+     * Use an LLM to figure out which Excel column maps to which product
+     * field. Works regardless of column order, header position, language,
+     * or extra/unexpected columns. Falls back gracefully if the LLM is
+     * unavailable — caller should fall back to its own header heuristics.
+     *
+     * Inputs: a small sample of the sheet (first ~12 rows is enough).
+     * Output: { 0: 'name', 1: 'price', 2: null, ... } where null = ignore.
+     */
+    async detectColumnMapping(sampleRows: any[][]): Promise<{
+        mapping: Record<number, string | null>;
+        headerRowIndex: number;
+        confidence: 'high' | 'medium' | 'low';
+        reasoning?: string;
+    } | null> {
+        if (!process.env.OPENROUTER_API_KEY) return null;
+        if (!sampleRows || sampleRows.length === 0) return null;
+
+        // Trim to at most 12 rows × 20 cols so we don't blow the prompt budget
+        const trimmed = sampleRows.slice(0, 12).map(r => (r || []).slice(0, 20));
+        const sheetText = trimmed
+            .map((r, i) => `Row ${i}: ${JSON.stringify(r)}`)
+            .join('\n');
+
+        const allowedFields = [
+            'name', 'description', 'brand', 'category', 'ean',
+            'price', 'stock', 'unit',
+            'unitsPerCase', 'casesPerPallet', 'unitsPerPallet', 'palletsPerShipment',
+            'shelfLife', 'origin', 'weight', 'moq',
+        ];
+
+        const prompt = `You are a smart spreadsheet analyst for a B2B wholesale marketplace. Given a sample of an Excel sheet (first 12 rows), figure out:
+1. Which row is the header (might not be row 0 — could be row 1, 2, etc., depending on title rows / merged cells / sub-headers).
+2. Which product field each column corresponds to. Use BOTH the header text AND the actual data values to decide.
+3. If a column has no clear meaning, set it to null.
+
+Allowed field names (use ONLY these, anything else is invalid):
+${allowedFields.join(', ')}
+
+Important rules:
+- "ean" is the SKU / Item number / barcode (long numeric or alphanumeric ID).
+- "stock" is the available quantity (integer).
+- "unitsPerCase" is pieces per case/carton (e.g. value "C24" = 24).
+- "casesPerPallet" is how many cases stack on a pallet.
+- "unitsPerPallet" should be left null if the column is "available physical in pallets" (that's the stock expressed in pallet units, not the conversion factor — we'll auto-compute it).
+- "shelfLife" is for batch number / expiry date columns.
+- "name" is the human-readable product name (text with letters).
+- "price" is the per-unit selling price (decimal, usually small like 0.38, 1.99, 5.45).
+- A long 8-13 digit number that's not a date is likely an EAN.
+- A YYYYMMDD-style number (e.g. 20260731) is a date → shelfLife.
+
+Respond ONLY with valid JSON of this exact shape:
+{
+  "headerRowIndex": <integer>,
+  "mapping": { "0": "name" | null, "1": "price" | null, ... },
+  "confidence": "high" | "medium" | "low",
+  "reasoning": "<one sentence>"
+}
+
+Sheet sample:
+${sheetText}`;
+
+        try {
+            const response = await axios.post(
+                this.openRouterUrl,
+                {
+                    model: 'anthropic/claude-3.5-haiku',
+                    messages: [{ role: 'user', content: prompt }],
+                    max_tokens: 800,
+                    temperature: 0.1,
+                    response_format: { type: 'json_object' },
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 25000,
+                },
+            );
+
+            const raw = response.data?.choices?.[0]?.message?.content;
+            if (!raw) return null;
+
+            // The model sometimes wraps JSON in ```json ... ``` — strip it
+            const cleaned = String(raw).replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+            const parsed = JSON.parse(cleaned);
+
+            if (typeof parsed.headerRowIndex !== 'number') return null;
+            if (!parsed.mapping || typeof parsed.mapping !== 'object') return null;
+
+            // Convert string keys → number, validate field names against allowlist
+            const mapping: Record<number, string | null> = {};
+            for (const [k, v] of Object.entries(parsed.mapping)) {
+                const colIdx = Number(k);
+                if (Number.isNaN(colIdx)) continue;
+                if (v === null || v === undefined || v === '') {
+                    mapping[colIdx] = null;
+                } else if (allowedFields.includes(String(v))) {
+                    mapping[colIdx] = String(v);
+                } else {
+                    mapping[colIdx] = null;
+                }
+            }
+
+            this.logger.log(`[AI ColumnMapper] header=${parsed.headerRowIndex} confidence=${parsed.confidence} mapping=${JSON.stringify(mapping)}`);
+
+            return {
+                mapping,
+                headerRowIndex: parsed.headerRowIndex,
+                confidence: ['high', 'medium', 'low'].includes(parsed.confidence) ? parsed.confidence : 'medium',
+                reasoning: parsed.reasoning,
+            };
+        } catch (e: any) {
+            this.logger.warn(`[AI ColumnMapper] failed: ${e?.message}`);
+            return null;
+        }
+    }
 }

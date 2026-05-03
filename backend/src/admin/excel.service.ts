@@ -1,8 +1,9 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import * as XLSX from 'xlsx';
 import * as JSZip from 'jszip';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
+import { AiAgentService } from '../ai-agent/ai-agent.service';
 
 export interface ValidationRow {
     rowNumber: number;
@@ -20,6 +21,10 @@ export interface ExcelReport {
 
 @Injectable()
 export class ExcelService {
+    private readonly logger = new Logger(ExcelService.name);
+
+    constructor(private readonly aiAgent: AiAgentService) {}
+
     async processProductsExcel(buffer: Buffer, dtoClass: any): Promise<ExcelReport> {
         const workbook = XLSX.read(buffer, { type: 'buffer' });
         if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
@@ -38,6 +43,28 @@ export class ExcelService {
         if (rows.length === 0) throw new Error('Sheet is empty');
 
         console.log(`[ExcelService] Processing ${rows.length} raw rows from sheet: ${sheetName}`);
+
+        // \u2500\u2500 AI-FIRST COLUMN DETECTION \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+        // Send the first ~12 rows to an LLM to figure out which column is
+        // which \u2014 works regardless of column order, header position, or
+        // unusual layouts. Falls back to header-name heuristics if the LLM
+        // is unavailable, returns low confidence, or fails.
+        try {
+            const aiResult = await this.aiAgent.detectColumnMapping(rows.slice(0, 12));
+            if (aiResult && aiResult.confidence !== 'low') {
+                this.logger.log(`[ExcelService] Using AI mapping (confidence: ${aiResult.confidence}). ${aiResult.reasoning || ''}`);
+                return this.processWithMapping(
+                    rows,
+                    aiResult.mapping,
+                    aiResult.headerRowIndex,
+                    dtoClass,
+                    await this.extractImagesFromZip(buffer, sheetName),
+                );
+            }
+            this.logger.log(`[ExcelService] AI unavailable or low-confidence \u2014 falling back to header heuristics.`);
+        } catch (e: any) {
+            this.logger.warn(`[ExcelService] AI mapping threw: ${e?.message} \u2014 using heuristics.`);
+        }
 
         const normalize = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9\u0600-\u06FF]/g, '').trim();
 
@@ -290,6 +317,76 @@ export class ExcelService {
                     `${err.property}: ${Object.values(err.constraints || {}).join(', ')}`
                 );
                 results.push({ rowNumber: i + 1, success: false, errors: errorMessages });
+            } else {
+                successCount++;
+                results.push({ rowNumber: i + 1, success: true, data: instance });
+            }
+        }
+
+        return { totalRows: results.length, successCount, errorCount, results };
+    }
+
+    /**
+     * Shared row processor — used by both AI-mapped and heuristic-mapped
+     * paths. Takes a column-index → field-name mapping and turns each data
+     * row into a validated DTO instance.
+     */
+    private async processWithMapping(
+        rows: any[][],
+        mapping: Record<number, string | null>,
+        headerRowIndex: number,
+        dtoClass: any,
+        imageMapping: Record<number, string>,
+    ): Promise<ExcelReport> {
+        const results: ValidationRow[] = [];
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (let i = headerRowIndex + 1; i < rows.length; i++) {
+            const row = rows[i];
+            if (!row) continue;
+            const hasData = row.some(c => c !== undefined && c !== null && String(c).trim() !== '');
+            if (!hasData) continue;
+
+            const normalizedRow: Record<string, any> = {};
+            row.forEach((cell, idx) => {
+                const targetKey = mapping[idx];
+                if (!targetKey) return;
+                if (cell === undefined || cell === null || String(cell).trim() === '') return;
+                if (normalizedRow[targetKey] !== undefined) return;
+                normalizedRow[targetKey] = cell;
+            });
+
+            this.coerceTypes(normalizedRow);
+
+            if (imageMapping[i]) {
+                normalizedRow.images = [imageMapping[i]];
+            }
+
+            // Log first 3 extracted rows for verification
+            if (i - headerRowIndex <= 3) {
+                this.logger.log(`[ExcelService] Row ${i + 1}: ${JSON.stringify({
+                    name: normalizedRow.name,
+                    ean: normalizedRow.ean,
+                    price: normalizedRow.price,
+                    stock: normalizedRow.stock,
+                    unitsPerCase: normalizedRow.unitsPerCase,
+                    casesPerPallet: normalizedRow.casesPerPallet,
+                    unitsPerPallet: normalizedRow.unitsPerPallet,
+                    shelfLife: normalizedRow.shelfLife,
+                })}`);
+            }
+
+            const instance = plainToInstance(dtoClass, normalizedRow, { enableImplicitConversion: true });
+            const errors = await validate(instance as any);
+
+            if (errors.length > 0) {
+                errorCount++;
+                results.push({
+                    rowNumber: i + 1,
+                    success: false,
+                    errors: errors.map(err => `${err.property}: ${Object.values(err.constraints || {}).join(', ')}`),
+                });
             } else {
                 successCount++;
                 results.push({ rowNumber: i + 1, success: true, data: instance });
