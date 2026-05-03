@@ -7,7 +7,7 @@ import {
     ArrowUpRight, Info, User, Sparkles, MessageSquare,
     Trash2, Eye, ExternalLink, Filter, Download,
     CheckCircle, ShieldAlert, Activity, Pencil,
-    Image as ImageIcon, ListFilter, FileSpreadsheet, ShieldCheck
+    Image as ImageIcon, ListFilter, FileSpreadsheet, ShieldCheck, DollarSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
