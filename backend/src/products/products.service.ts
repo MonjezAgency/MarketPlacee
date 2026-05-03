@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
@@ -10,6 +10,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ProductsService {
+    private readonly logger = new Logger(ProductsService.name);
     constructor(
         private prisma: PrismaService, 
         private eanService: EanService,

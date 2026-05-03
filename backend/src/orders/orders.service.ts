@@ -5,6 +5,7 @@ import { EmailService } from '../email/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { InvoiceService } from '../invoices/invoice.service';
 import { EscrowService } from '../payments/escrow.service';
+import { AppConfigService } from '../admin/app-config.service';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
     PENDING: 'Pending',
@@ -118,6 +119,10 @@ export class OrdersService {
             },
         });
 
+        // Hoist platform fee fetch outside the loop (was awaiting inside .map)
+        const markupData = await this.appConfigService.getMarkupPercentage();
+        const feePercent = markupData.platformFee;
+
         // Map to format suitable for Admin Dashboard
         return orders.map(order => {
             const customerId = order.customer?.id;
@@ -149,8 +154,6 @@ export class OrdersService {
             for (const item of order.items) {
                 supplierProfit += item.price * item.quantity;
             }
-            const markupData = await this.appConfigService.getMarkupPercentage();
-            const feePercent = markupData.platformFee;
             const adminProfit = order.totalAmount * (feePercent / 100);
 
             return {

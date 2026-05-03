@@ -1,5 +1,6 @@
 import { Controller, Get, UseGuards, Post, Param, Body, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Request, Res, StreamableFile } from '@nestjs/common';
 import { UsersService } from './users.service';
+import { PrismaService } from '../common/prisma.service';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
@@ -13,7 +14,10 @@ import * as bcrypt from 'bcrypt';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @UseInterceptors(ClassSerializerInterceptor)
 export class UsersController {
-    constructor(private readonly usersService: UsersService) { }
+    constructor(
+        private readonly usersService: UsersService,
+        private readonly prisma: PrismaService,
+    ) { }
 
     @Get()
     @Roles(Role.ADMIN)

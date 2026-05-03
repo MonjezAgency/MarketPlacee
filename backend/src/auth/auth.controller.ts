@@ -33,7 +33,7 @@ export class AuthController {
         if (result && 'access_token' in result) {
             // Persistent sessions: 2h for access token, 30d for refresh token
             res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
-            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
@@ -43,7 +43,7 @@ export class AuthController {
         const result = await this.authService.register(registerDto);
         if (result && 'access_token' in result) {
             res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
-            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
@@ -73,7 +73,7 @@ export class AuthController {
         const result = await this.authService.refreshTokens(refreshToken);
         if (result && 'access_token' in result) {
             res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
-            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
@@ -106,7 +106,7 @@ export class AuthController {
         const result = await this.authService.googleLogin({ email, name, avatar, googleId });
         if (result && 'access_token' in result) {
             res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
-            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
@@ -139,7 +139,7 @@ export class AuthController {
                 status: 'ACTIVE',
                 emailVerified: true
             });
-            return { message: 'Admin seeded successfully', userId: user.id };
+            return { message: 'Admin seeded successfully', userId: (user as any).id };
         } catch (err) {
             throw new Error(`Seed admin failed: ${(err as any).message}`);
         }

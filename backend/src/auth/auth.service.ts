@@ -116,7 +116,7 @@ export class AuthService {
                 this.logger.warn(`[AUTH] Login blocked: User ${email} pending approval`);
                 throw new UnauthorizedException('حسابك قيد المراجعة في انتظار موافقة الإدارة');
             }
-            if (user.status === 'REJECTED' || user.status === 'BLOCKED' || user.status === 'DELETED') {
+            if ((user.status as any) === 'REJECTED' || (user.status as any) === 'BLOCKED' || (user.status as any) === 'DELETED') {
                 this.logger.warn(`[AUTH] Login blocked: User ${email} status is ${user.status}`);
                 throw new UnauthorizedException(`حسابك موقوف أو مرفوض أو محذوف: ${user.status}`);
             }
@@ -196,7 +196,7 @@ export class AuthService {
                     await this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, data.locale);
                     
                     // 2. Send Welcome Email (only if active, which currently is never for new signups)
-                    if (status === 'ACTIVE') {
+                    if ((status as any) === 'ACTIVE') {
                         await this.emailService.sendWelcomeEmail(user.email, user.name, user.role);
                     }
 
@@ -300,7 +300,7 @@ export class AuthService {
             select: { id: true, email: true, role: true, status: true, name: true, onboardingCompleted: true,
                       avatar: true, companyName: true, phone: true, country: true, emailVerified: true },
         });
-        if (!user || user.status === 'BLOCKED' || user.status === 'REJECTED' || user.status === 'DELETED') {
+        if (!user || (user.status as any) === 'BLOCKED' || (user.status as any) === 'REJECTED' || (user.status as any) === 'DELETED') {
             throw new UnauthorizedException('Account is not active');
         }
 
@@ -408,7 +408,7 @@ export class AuthService {
             return this.login(safeUser);
         }
 
-        if (user.status === 'BLOCKED' || user.status === 'REJECTED' || user.status === 'DELETED') {
+        if ((user.status as any) === 'BLOCKED' || (user.status as any) === 'REJECTED' || (user.status as any) === 'DELETED') {
             throw new UnauthorizedException(`Your account has been ${user.status.toLowerCase()}`);
         }
 
