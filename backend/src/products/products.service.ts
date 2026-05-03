@@ -179,11 +179,15 @@ export class ProductsService {
                 },
             });
 
-            // Automatic Translation
-            try {
-                const translations = await translateProduct({ 
-                    name: product.name, 
-                    description: product.description || '' 
+            // Automatic Translation — SKIPPED in bulk uploads (skipAi=true)
+            // because translateProduct makes 6 sequential HTTP calls to Google
+            // Translate per product (3 langs × 2 fields), turning a 50-row
+            // Excel into 300 sequential HTTP calls → request times out.
+            // Translation can be backfilled later by a cron/admin action.
+            if (!skipAi) try {
+                const translations = await translateProduct({
+                    name: product.name,
+                    description: product.description || ''
                 });
                 const variants = (product.variants as any[]) || [];
                 // Check if already exists to avoid duplicates

@@ -5,7 +5,9 @@ export async function translateText(text: string, targetLang: string): Promise<s
     
     try {
         const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
-        const response = await axios.get(url);
+        // Hard timeout — Google rate-limit/network slowness must not hang
+        // the calling request (this is called per-product in bulk uploads).
+        const response = await axios.get(url, { timeout: 4000 });
         
         if (response.data && response.data[0]) {
             return response.data[0].map((item: any) => item[0]).join('');

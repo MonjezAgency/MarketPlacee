@@ -196,30 +196,34 @@ export class ProductsController {
                 isAdmin ? null : this.productsService.getUserKycStatus(req.user.sub)
             ]);
 
-            const createdProducts = [];
-            for (const result of report.results) {
-                if (result.success && result.data) {
+            const createdProducts: any[] = [];
+            const EGP_RATES: Record<string, number> = {
+                EGP: 1, USD: 1 / 48.5, EUR: 1 / 52.8, GBP: 1 / 61.4,
+                AED: 1 / 13.2, SAR: 1 / 12.9, KWD: 1 / 158.0, QAR: 1 / 13.3,
+                TRY: 1 / 1.49, INR: 1 / 0.583,
+            };
+            const rate = EGP_RATES[currency] ?? 1;
+
+            // Parallel batches — sequential awaits on N rows used to take
+            // forever for big files. We run rows in batches of 10 in parallel.
+            const successResults = report.results.filter(r => r.success && r.data);
+            const BATCH_SIZE = 10;
+            for (let batchStart = 0; batchStart < successResults.length; batchStart += BATCH_SIZE) {
+                const batch = successResults.slice(batchStart, batchStart + BATCH_SIZE);
+                await Promise.all(batch.map(async (result) => {
                     const dto = result.data as CreateProductDto;
                     const supplierId = isAdmin ? (dto.supplierId || req.user.sub) : req.user.sub;
-
+                    const priceInBase = dto.price ? (dto.price / rate) : 0;
                     try {
-                        const EGP_RATES: Record<string, number> = {
-                            EGP: 1, USD: 1 / 48.5, EUR: 1 / 52.8, GBP: 1 / 61.4,
-                            AED: 1 / 13.2, SAR: 1 / 12.9, KWD: 1 / 158.0, QAR: 1 / 13.3,
-                            TRY: 1 / 1.49, INR: 1 / 0.583,
-                        };
-                        const rate = EGP_RATES[currency] ?? 1;
-                        const priceInBase = dto.price ? (dto.price / rate) : 0;
-
                         const product = await this.productsService.create({
                             ...dto,
                             price: priceInBase,
                             supplierId,
-                        }, isAdmin, true, { 
-                            preFetchedConfigs: configs, 
+                        }, isAdmin, true, {
+                            preFetchedConfigs: configs,
                             preFetchedCategories: categories,
                             supplierKycStatus: isAdmin ? undefined : user?.kycStatus
-                        }); // skipAi = true for bulk performance
+                        }); // skipAi=true → no per-row Google Translate calls
                         createdProducts.push(product);
                         (result as any).message = 'Created successfully';
                     } catch (e) {
@@ -230,7 +234,7 @@ export class ProductsController {
                         report.successCount--;
                         report.errorCount++;
                     }
-                }
+                }));
             }
 
             // Notify Admins ONCE after bulk upload if products were created by a supplier
