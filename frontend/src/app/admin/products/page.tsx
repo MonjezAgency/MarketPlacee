@@ -321,6 +321,18 @@ export default function ProductsModerationPage() {
     const [isUploading, setIsUploading] = React.useState(false);
     const [uploadCurrency, setUploadCurrency] = React.useState(() => getActiveCurrency());
 
+    // Keep uploadCurrency in sync with the user's settings — they no longer
+    // pick it manually, so we re-read whenever the settings change.
+    React.useEffect(() => {
+        const sync = () => setUploadCurrency(getActiveCurrency());
+        window.addEventListener('currency-changed', sync);
+        window.addEventListener('storage', sync);
+        return () => {
+            window.removeEventListener('currency-changed', sync);
+            window.removeEventListener('storage', sync);
+        };
+    }, []);
+
     // Currency repair tool state
     const [showFixCurrency, setShowFixCurrency] = React.useState(false);
     const [fixFromCurrency, setFixFromCurrency] = React.useState('EUR');
@@ -442,24 +454,13 @@ export default function ProductsModerationPage() {
                         className="hidden"
                         accept=".csv,.xlsx,.xls"
                     />
-                    <div className="h-10 px-3 bg-amber-50 border-2 border-amber-300 rounded-xl flex items-center gap-2" title="Currency of prices INSIDE the uploaded file — pick the wrong one and prices will be stored incorrectly">
-                        <span className="text-[9px] font-black text-amber-700 uppercase tracking-widest whitespace-nowrap">File ₠</span>
-                        <select
-                            value={uploadCurrency}
-                            onChange={(e) => setUploadCurrency(e.target.value)}
-                            className="bg-transparent text-xs font-black text-amber-900 outline-none cursor-pointer"
-                        >
-                            <option value="EGP">EGP</option>
-                            <option value="USD">USD</option>
-                            <option value="EUR">EUR</option>
-                            <option value="GBP">GBP</option>
-                            <option value="AED">AED</option>
-                            <option value="SAR">SAR</option>
-                            <option value="KWD">KWD</option>
-                            <option value="QAR">QAR</option>
-                            <option value="TRY">TRY</option>
-                            <option value="INR">INR</option>
-                        </select>
+                    {/* Currency comes from the user's settings (platform-currency
+                        in localStorage) — no manual dropdown shown. The active
+                        currency is displayed beside the Upload File button so
+                        the admin can confirm before uploading. */}
+                    <div className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2" title="Currency the file's prices will be interpreted in. Change in Settings.">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">File in</span>
+                        <span className="text-xs font-black text-slate-900">{uploadCurrency}</span>
                     </div>
                     <button
                         onClick={() => setShowUploadGuide(true)}

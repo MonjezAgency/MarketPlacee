@@ -83,9 +83,13 @@ export class ExcelService {
             'cartonsperpallets': 'casesPerPallet', 'caseperpallet': 'casesPerPallet',
             'كراتينالبالتة': 'casesPerPallet', 'عددالكراتينفيالبالتة': 'casesPerPallet',
             // ── unitsPerPallet ────────────────────────────────────────────────
+            // NOTE: do NOT map "Available physical in pallets" here — that
+            // is the total stock expressed in pallet units (e.g. 2.62 pallets
+            // available), NOT the pieces-per-pallet conversion factor.
+            // We auto-compute unitsPerPallet = casesPerPallet × unitsPerCase.
             'unitsperpallet': 'unitsPerPallet', 'itemsperpallet': 'unitsPerPallet',
             'palletunits': 'unitsPerPallet', 'palletqty': 'unitsPerPallet',
-            'availablephysicalinpallets': 'unitsPerPallet',
+            'piecesperpallet': 'unitsPerPallet', 'pcsperpallet': 'unitsPerPallet',
             'عددالوحداتفيالبالتة': 'unitsPerPallet', 'وحداتالبالتة': 'unitsPerPallet',
             'البالتةفيهاكام': 'unitsPerPallet',
             // ── palletsPerShipment ────────────────────────────────────────────
@@ -110,26 +114,54 @@ export class ExcelService {
         //   Row 0: "Item number" | "Item name" | "Batch number/" | "Available physical" | "Pcs/case" | ...
         //   Row 1:  <empty>      |   <empty>   | "Expiry Date"   | "in CASES !!"        |   <empty>  | ...
         // We merge consecutive candidate rows to handle this pattern.
-        const matchRow = (row: any[]): { mapping: Record<number, string>; matches: number } => {
-            const tempMapping: Record<number, string> = {};
+        // Each column gets a target field AND a confidence score:
+        //   exact match → 2 (e.g. "Item number" → exact 'itemnumber' alias → 'ean')
+        //   partial match → 1 (e.g. "Item label" → partial via "label" → 'name')
+        // When two columns end up mapped to the same target field, the one
+        // with the higher confidence wins. This fixes the case where
+        // "Item number" partial-matched 'item' → 'name' and stole the slot
+        // from "Item name" (which was an exact match).
+        const matchRow = (row: any[]): { mapping: Record<number, { target: string; confidence: number }>; matches: number } => {
+            const tempMapping: Record<number, { target: string; confidence: number }> = {};
             let matches = 0;
             row.forEach((cell, idx) => {
                 if (cell === undefined || cell === null || cell === '') return;
                 const normalizedCell = normalize(String(cell));
                 if (headerAliases[normalizedCell]) {
-                    tempMapping[idx] = headerAliases[normalizedCell];
+                    tempMapping[idx] = { target: headerAliases[normalizedCell], confidence: 2 };
                     matches++;
-                } else {
-                    for (const [alias, target] of Object.entries(headerAliases)) {
-                        if (normalizedCell.length > 2 && (normalizedCell.includes(alias) || alias.includes(normalizedCell))) {
-                            tempMapping[idx] = target;
-                            matches++;
-                            break;
-                        }
+                    return;
+                }
+                // Partial fallback — only if alias is at least 4 chars to avoid
+                // wildly broad matches like "item" snagging "Item number".
+                for (const [alias, target] of Object.entries(headerAliases)) {
+                    if (alias.length < 4) continue;
+                    if (normalizedCell.length > 2 && (normalizedCell.includes(alias) || alias.includes(normalizedCell))) {
+                        tempMapping[idx] = { target, confidence: 1 };
+                        matches++;
+                        break;
                     }
                 }
             });
             return { mapping: tempMapping, matches };
+        };
+
+        // After matching, resolve same-target conflicts by keeping the
+        // highest-confidence column per target field.
+        const resolveConflicts = (raw: Record<number, { target: string; confidence: number }>): Record<number, string> => {
+            const bestPerTarget: Record<string, { col: number; confidence: number }> = {};
+            for (const [colStr, info] of Object.entries(raw)) {
+                const col = Number(colStr);
+                const existing = bestPerTarget[info.target];
+                if (!existing || info.confidence > existing.confidence) {
+                    bestPerTarget[info.target] = { col, confidence: info.confidence };
+                }
+            }
+            const flat: Record<number, string> = {};
+            for (const [target, { col }] of Object.entries(bestPerTarget)) {
+                flat[col] = target;
+            }
+            return flat;
         };
 
         let headerRowIndex = -1;
@@ -142,21 +174,18 @@ export class ExcelService {
             const { mapping: m1, matches: c1 } = matchRow(row);
 
             // If next row exists and is a sub-header continuation, merge it
-            let mergedMapping = { ...m1 };
+            const mergedRaw: Record<number, { target: string; confidence: number }> = { ...m1 };
             let totalMatches = c1;
 
             if (i + 1 < rows.length) {
                 const nextRow = rows[i + 1] || [];
                 const { mapping: m2, matches: c2 } = matchRow(nextRow);
-                // Accept the merge if the next row has at least 1 match AND
-                // most of its non-empty cells are header-like (not data)
                 const nextNonEmpty = nextRow.filter(c => c !== undefined && c !== null && String(c).trim() !== '').length;
                 const nextIsSubHeader = c2 >= 1 && (c2 / Math.max(nextNonEmpty, 1)) > 0.3;
                 if (nextIsSubHeader) {
-                    // Merge: second row fills gaps where first row had no match
-                    for (const [col, target] of Object.entries(m2)) {
-                        if (!mergedMapping[col]) {
-                            mergedMapping[col] = target;
+                    for (const [col, info] of Object.entries(m2)) {
+                        if (!mergedRaw[Number(col)]) {
+                            mergedRaw[Number(col)] = info;
                             totalMatches++;
                         }
                     }
@@ -165,17 +194,16 @@ export class ExcelService {
 
             if (totalMatches >= 2) {
                 headerRowIndex = i;
-                mapping = mergedMapping;
-                // Skip the sub-header row in data processing
+                mapping = resolveConflicts(mergedRaw);
                 if (i + 1 < rows.length) {
                     const nextRow = rows[i + 1] || [];
                     const { matches: c2 } = matchRow(nextRow);
                     const nextNonEmpty = nextRow.filter(c => c !== undefined && c !== null && String(c).trim() !== '').length;
                     if (c2 >= 1 && (c2 / Math.max(nextNonEmpty, 1)) > 0.3) {
-                        headerRowIndex = i + 1; // data starts after sub-header
+                        headerRowIndex = i + 1;
                     }
                 }
-                console.log(`[ExcelService] Header found at row ${i} with ${totalMatches} matches. Mapping:`, mapping);
+                console.log(`[ExcelService] Header found at row ${i} with ${totalMatches} matches. Final mapping:`, mapping);
                 break;
             }
         }
@@ -193,6 +221,8 @@ export class ExcelService {
                         autoMapping[key] = headerAliases[nk];
                     } else {
                         for (const [alias, target] of Object.entries(headerAliases)) {
+                            // Skip too-short aliases that cause wide false positives
+                            if (alias.length < 4) continue;
                             if (nk.length > 2 && (nk.includes(alias) || alias.includes(nk))) {
                                 autoMapping[key] = target;
                                 break;

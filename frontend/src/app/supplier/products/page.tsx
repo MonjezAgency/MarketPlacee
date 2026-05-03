@@ -48,6 +48,18 @@ export default function SupplierProductsPage() {
     const [isBulkModalOpen, setIsBulkModalOpen] = React.useState(false);
     const [bulkFiles, setBulkFiles] = React.useState<File[]>([]);
     const [bulkCurrency, setBulkCurrency] = React.useState(() => getActiveCurrency());
+
+    // Stay in sync with the supplier's settings — they don't pick the
+    // currency manually anymore.
+    React.useEffect(() => {
+        const sync = () => setBulkCurrency(getActiveCurrency());
+        window.addEventListener('currency-changed', sync);
+        window.addEventListener('storage', sync);
+        return () => {
+            window.removeEventListener('currency-changed', sync);
+            window.removeEventListener('storage', sync);
+        };
+    }, []);
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [bulkResults, setBulkResults] = React.useState<any>(null);
 
@@ -683,26 +695,17 @@ export default function SupplierProductsPage() {
                                                 </ul>
                                             </div>
 
-                                            <div className="mt-4 flex items-center gap-3 relative z-20 pointer-events-auto">
-                                                <label className="text-xs font-black uppercase tracking-widest text-foreground whitespace-nowrap">
+                                            {/* Currency is taken from the supplier's profile/settings —
+                                                shown here so they can confirm before uploading. To change
+                                                it, they update their settings. */}
+                                            <div className="mt-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-muted/30 border border-border/50 relative z-20 pointer-events-auto">
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground whitespace-nowrap">
                                                     {locale === 'ar' ? 'عملة الأسعار في الملف' : 'Prices in file are in'}
-                                                </label>
-                                                <select
-                                                    value={bulkCurrency}
-                                                    onChange={(e) => setBulkCurrency(e.target.value)}
-                                                    className="flex-1 h-10 px-3 rounded-xl border border-border/50 bg-background text-foreground font-bold text-sm outline-none focus:border-primary"
-                                                >
-                                                    <option value="EGP">EGP — Egyptian Pound</option>
-                                                    <option value="USD">USD — US Dollar</option>
-                                                    <option value="EUR">EUR — Euro</option>
-                                                    <option value="GBP">GBP — British Pound</option>
-                                                    <option value="AED">AED — UAE Dirham</option>
-                                                    <option value="SAR">SAR — Saudi Riyal</option>
-                                                    <option value="KWD">KWD — Kuwaiti Dinar</option>
-                                                    <option value="QAR">QAR — Qatari Riyal</option>
-                                                    <option value="TRY">TRY — Turkish Lira</option>
-                                                    <option value="INR">INR — Indian Rupee</option>
-                                                </select>
+                                                </span>
+                                                <span className="text-base font-black text-foreground">{bulkCurrency}</span>
+                                                <span className="text-[10px] text-muted-foreground ms-auto">
+                                                    {locale === 'ar' ? 'غيّرها من الإعدادات' : 'Change in Settings'}
+                                                </span>
                                             </div>
 
                                             <input
