@@ -278,7 +278,7 @@ export class AiAgentService {
             const response = await axios.post(
                 this.openRouterUrl,
                 {
-                    model: 'google/gemini-2.0-flash-001',
+                    model: 'google/gemini-2.0-flash-exp:free',
                     messages: [{ role: 'user', content: prompt }],
                     max_tokens: 150,
                 },
@@ -319,7 +319,7 @@ export class AiAgentService {
             const response = await axios.post(
                 this.openRouterUrl,
                 {
-                    model: 'google/gemini-2.0-flash-001',
+                    model: 'google/gemini-2.0-flash-exp:free',
                     messages: [
                         {
                             role: 'system',
@@ -366,7 +366,7 @@ Categories List: ${categories.join(', ')}`;
             const response = await axios.post(
                 this.openRouterUrl,
                 {
-                    model: 'google/gemini-2.0-flash-001',
+                    model: 'google/gemini-2.0-flash-exp:free',
                     messages: [{ role: 'user', content: prompt }],
                     max_tokens: 50,
                 },
@@ -406,7 +406,7 @@ Categories List: ${categories.join(', ')}`;
             const response = await axios.post(
                 this.openRouterUrl,
                 {
-                    model: 'google/gemini-2.0-flash-001',
+                    model: 'google/gemini-2.0-flash-exp:free',
                     messages: [
                         {
                             role: 'user',
@@ -512,7 +512,7 @@ ${sheetText}`;
             const response = await axios.post(
                 this.openRouterUrl,
                 {
-                    model: 'anthropic/claude-3.5-haiku',
+                    model: 'google/gemini-2.0-flash-exp:free',
                     messages: [{ role: 'user', content: prompt }],
                     max_tokens: 800,
                     temperature: 0.1,
