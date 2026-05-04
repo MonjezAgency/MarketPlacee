@@ -287,7 +287,7 @@ export default function AdminDiscountsPage() {
                                                     </div>
                                                     <div>
                                                         <p className="font-bold text-[#0F1111] dark:text-white text-sm">
-                                                            {tier.minQty} — {tier.maxQty !== null ? tier.maxQty : '∞'} units
+                                                            {tier.minQty} — {tier.maxQty !== null ? tier.maxQty : '∞'} pcs
                                                         </p>
                                                         <p className="text-[10px] text-[#888] font-bold uppercase tracking-widest">
                                                             {tier.discountPercent}% discount
@@ -395,7 +395,7 @@ export default function AdminDiscountsPage() {
                                                         <p className="text-2xl font-black text-[#0F1111] dark:text-white">{formatPrice(calcResult.unitPrice)}</p>
                                                     </div>
                                                     <div className="text-end">
-                                                        <p className="text-[10px] font-black text-[#888] uppercase tracking-widest">Total ({calcResult.quantity} units)</p>
+                                                        <p className="text-[10px] font-black text-[#888] uppercase tracking-widest">Total ({calcResult.quantity} pcs)</p>
                                                         <p className="text-2xl font-black text-[#FF9900]">{formatPrice(calcResult.totalPrice)}</p>
                                                     </div>
                                                 </div>

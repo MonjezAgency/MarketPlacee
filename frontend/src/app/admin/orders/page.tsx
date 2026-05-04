@@ -181,7 +181,7 @@ export default function AdminOrdersPage() {
     };
 
     const handleSaveShipment = async (orderId: string) => {
-        const tid = toast.loading('Saving shipment details...');
+        const tid = toast.loading('Saving delivery details...');
         try {
             const res = await apiFetch('/shipments', {
                 method: 'POST',
@@ -192,10 +192,10 @@ export default function AdminOrdersPage() {
                 })
             });
             if (res.ok) {
-                toast.success('Shipment information updated', { id: tid });
+                toast.success('Delivery information updated', { id: tid });
                 await loadOrders();
             } else {
-                toast.error('Failed to update shipment', { id: tid });
+                toast.error('Failed to update delivery', { id: tid });
             }
         } catch (err) {
             toast.error('Network error', { id: tid });
@@ -681,7 +681,7 @@ export default function AdminOrdersPage() {
                                                     onClick={() => handleSaveShipment(selectedOrder.id)}
                                                     className="w-full h-8 bg-slate-900 text-white text-[10px] font-bold uppercase rounded-lg hover:bg-slate-800 transition-all"
                                                 >
-                                                    Update Shipment
+                                                    Update Delivery
                                                 </button>
                                             </div>
                                         </div>

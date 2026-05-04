@@ -28,7 +28,7 @@ export default function SponsoredProductCard({ product, index }: SponsoredProduc
         addItem({
             id: product.id,
             name: product.name,
-            brand: product.brand || product.supplier?.name || '',
+            brand: product.brand || 'Atlantis',
             price: product.price || 0,
             image: product.images?.[0] || '',
             unit: 'unit',
@@ -57,7 +57,7 @@ export default function SponsoredProductCard({ product, index }: SponsoredProduc
                 </Link>
 
                 <p className="text-[#007185] text-xs mb-2 truncate">
-                    {product.brand || product.supplier?.name}
+                    {product.brand || 'Atlantis'}
                 </p>
 
                 <div className="flex items-baseline gap-1 mb-2">

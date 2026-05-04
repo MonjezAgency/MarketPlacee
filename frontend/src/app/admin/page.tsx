@@ -169,7 +169,7 @@ export default function AdminOverviewPage() {
                 [''],
                 ['--- SECTION 2: TOP PERFORMANCE LEADERS ---'],
                 ['Category', 'Entity Name', 'Performance Metric'],
-                ...topProducts.slice(0, 5).map(p => ['Top Product', p.name, `${p.sales || 0} units sold`]),
+                ...topProducts.slice(0, 5).map(p => ['Top Product', p.name, `${p.sales || 0} pcs sold`]),
                 ...topSuppliers.slice(0, 5).map(s => ['Top Supplier', s.name, 'High Volume']),
             ];
 
@@ -300,7 +300,7 @@ export default function AdminOverviewPage() {
                 />
                 <DashboardKPICard 
                     icon={Package} label="Top Product" value={topProducts[0]?.name?.slice(0, 8) + '...' || 'N/A'} 
-                    subtext={`${topProducts[0]?.sales || 0} units sold`} trend="up" trendValue={6.1} 
+                    subtext={`${topProducts[0]?.sales || 0} pcs sold`} trend="up" trendValue={6.1} 
                     color="bg-slate-50" iconColor="text-slate-600" sparklineColor="#475569"
                 />
                 <DashboardKPICard 

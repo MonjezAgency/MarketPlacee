@@ -30,7 +30,7 @@ export default function AddProductWorkspace() {
         price: '',
         quantity: '',
         minOrder: '',
-        unitType: 'Case (24 units)',
+        unitType: 'Case (24 pcs)',
         description: '',
         isAdvancedOpen: false,
         images: [] as string[]

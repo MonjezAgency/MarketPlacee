@@ -221,10 +221,10 @@ export default function AdminAddProductWorkspace() {
                 shelfLife: formData.shelfLife || undefined,
                 origin: formData.origin || undefined,
             };
-            if (formData.unitType === 'Pallet' || formData.unitType === 'Shipment') {
+            if (formData.unitType === 'Pallet' || formData.unitType === 'Truck') {
                 payload.unitsPerPallet = parseInt(formData.unitsPerPallet) || undefined;
             }
-            if (formData.unitType === 'Shipment') {
+            if (formData.unitType === 'Truck') {
                 payload.palletsPerShipment = parseInt(formData.palletsPerShipment) || undefined;
             }
 
@@ -412,7 +412,7 @@ export default function AdminAddProductWorkspace() {
                                     >
                                         <option value="Piece">📦 Piece</option>
                                         <option value="Pallet">🏗️ Pallet</option>
-                                        <option value="Shipment">🚢 Shipment</option>
+                                        <option value="Truck">🚛 Truck</option>
                                     </select>
                                 </div>
                             </div>
@@ -516,7 +516,7 @@ export default function AdminAddProductWorkspace() {
                             </div>
 
                             {/* Conditional Unit Hierarchy Fields */}
-                            {(formData.unitType === 'Pallet' || formData.unitType === 'Shipment') && (
+                            {(formData.unitType === 'Pallet' || formData.unitType === 'Truck') && (
                                 <>
                                     <div className="h-px bg-[#F3F4F6]" />
                                     <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-3">
@@ -535,9 +535,9 @@ export default function AdminAddProductWorkspace() {
                                                 />
                                                 <p className="text-[10px] text-blue-500">How many pieces fit on one pallet</p>
                                             </div>
-                                            {formData.unitType === 'Shipment' && (
+                                            {formData.unitType === 'Truck' && (
                                                 <div className="space-y-1.5">
-                                                    <label className="text-[12px] font-medium text-blue-600">Pallets per Shipment</label>
+                                                    <label className="text-[12px] font-medium text-blue-600">Pallet per Truck</label>
                                                     <input 
                                                         type="number" 
                                                         placeholder="e.g. 20"
@@ -545,13 +545,13 @@ export default function AdminAddProductWorkspace() {
                                                         onChange={e => setFormData({ ...formData, palletsPerShipment: e.target.value })}
                                                         className="w-full h-[44px] bg-white border border-blue-200 rounded-[10px] px-4 text-[14px] outline-none focus:border-blue-400 transition-all font-bold"
                                                     />
-                                                    <p className="text-[10px] text-blue-500">How many pallets per shipment container</p>
+                                                    <p className="text-[10px] text-blue-500">How many pallet per truck container</p>
                                                 </div>
                                             )}
                                         </div>
-                                        {formData.unitType === 'Shipment' && formData.unitsPerPallet && formData.palletsPerShipment && (
+                                        {formData.unitType === 'Truck' && formData.unitsPerPallet && formData.palletsPerShipment && (
                                             <div className="p-3 bg-white border border-blue-100 rounded-lg text-[12px] text-blue-700 font-medium">
-                                                📊 Total units per shipment: <span className="font-black">{parseInt(formData.unitsPerPallet) * parseInt(formData.palletsPerShipment) || '—'}</span> pieces
+                                                📊 Total pcs per shipment: <span className="font-black">{parseInt(formData.unitsPerPallet) * parseInt(formData.palletsPerShipment) || '—'}</span> pieces
                                             </div>
                                         )}
                                     </div>
@@ -572,7 +572,7 @@ export default function AdminAddProductWorkspace() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[12px] font-medium text-[#6B7280]">Shelf Life</label>
+                                    <label className="text-[12px] font-medium text-[#6B7280]">BBD</label>
                                     <input 
                                         type="text" 
                                         placeholder="12M"
@@ -740,12 +740,12 @@ export default function AdminAddProductWorkspace() {
                                     { label: 'Price (Base)', desc: 'Numeric', required: true },
                                     { label: 'Description', desc: 'Marketing', required: false },
                                     { label: 'Weight (kg)', desc: 'Logistics', required: false },
-                                    { label: 'Shelf Life', desc: 'e.g. 12M', required: false },
-                                    { label: 'Stock', desc: 'Total units', required: true },
+                                    { label: 'BBD', desc: 'e.g. 12M', required: false },
+                                    { label: 'Stock', desc: 'Total pcs', required: true },
                                     { label: 'MOQ', desc: 'Min order', required: false },
-                                    { label: 'Unit Type', desc: 'Piece/Pallet/Shipment', required: false },
+                                    { label: 'Unit Type', desc: 'Piece/Pallet/Truck', required: false },
                                     { label: 'Units/Pallet', desc: 'Numeric', required: false },
-                                    { label: 'Pallets/Shipment', desc: 'Numeric', required: false },
+                                    { label: 'Pallets/Truck', desc: 'Numeric', required: false },
                                     { label: 'EAN', desc: 'Barcode', required: false },
                                     { label: 'Origin', desc: 'Country', required: false },
                                 ].map((col) => (

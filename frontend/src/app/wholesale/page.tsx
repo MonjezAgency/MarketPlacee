@@ -105,10 +105,10 @@ export default function WholesalePage() {
                                 </thead>
                                 <tbody>
                                     {[
-                                        { qty: '10 – 49 units (MOQ)', price: '€12.50 / unit', save: 'Standard price' },
-                                        { qty: '50 – 199 units', price: '€10.80 / unit', save: '14% off' },
-                                        { qty: '200 – 499 units', price: '€9.20 / unit', save: '26% off' },
-                                        { qty: '500+ units', price: '€7.50 / unit', save: '40% off' },
+                                        { qty: '10 – 49 pcs (MOQ)', price: '€12.50 / unit', save: 'Standard price' },
+                                        { qty: '50 – 199 pcs', price: '€10.80 / unit', save: '14% off' },
+                                        { qty: '200 – 499 pcs', price: '€9.20 / unit', save: '26% off' },
+                                        { qty: '500+ pcs', price: '€7.50 / unit', save: '40% off' },
                                     ].map((row) => (
                                         <tr key={row.qty} className="border-b border-border/30 last:border-0">
                                             <td className="py-3 pr-6 font-bold">{row.qty}</td>

@@ -461,7 +461,7 @@ export default function SupplierDashboard() {
                                 if (!product.images || product.images.length === 0) missingFields.push('Image');
                                 if (!product.ean) missingFields.push('EAN');
                                 if (!product.weight) missingFields.push('Weight');
-                                if (!product.shelfLife) missingFields.push('Shelf Life');
+                                if (!product.shelfLife) missingFields.push('BBD');
                                 if (!product.origin) missingFields.push('Origin');
                                 if (!product.unitsPerPallet) missingFields.push('Pallet Units');
 

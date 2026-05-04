@@ -71,7 +71,7 @@ function mapProduct(item: any): Product {
     return {
         id: item.id,
         name: item.name,
-        brand: item.supplier?.companyName || item.supplier?.name || 'Parallel Broker',
+        brand: item.brand || 'Atlantis',
         price: item.price,
         basePrice: item.basePrice || undefined,
         supplierId: item.supplierId || undefined,

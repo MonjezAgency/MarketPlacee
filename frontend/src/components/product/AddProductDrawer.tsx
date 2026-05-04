@@ -22,7 +22,7 @@ interface AddProductDrawerProps {
     role: 'admin' | 'supplier';
 }
 
-const UNIT_TYPES = ['Piece', 'Case', 'Pallet', 'Shipment', 'Carton', 'Box', 'Kg', 'Litre'];
+const UNIT_TYPES = ['Piece', 'Case', 'Pallet', 'Truck', 'Carton', 'Box', 'Kg', 'Litre'];
 
 export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: AddProductDrawerProps) {
     const [isSaving, setIsSaving] = React.useState(false);
@@ -409,7 +409,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-slate-600 mb-1 block">Pallets / Shipment</label>
+                                        <label className="text-xs font-bold text-slate-600 mb-1 block">Pallets / Truck</label>
                                         <input
                                             type="number" min="0"
                                             value={form.palletsPerShipment}
@@ -428,7 +428,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-slate-600 mb-1 block">Shelf Life / Expiry</label>
+                                        <label className="text-xs font-bold text-slate-600 mb-1 block">BBD (Best Before Date)</label>
                                         <input
                                             value={form.shelfLife}
                                             onChange={e => set('shelfLife', e.target.value)}

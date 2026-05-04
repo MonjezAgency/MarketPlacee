@@ -150,12 +150,12 @@ function Target(props: any) {
 }
 
 const FEATURED_PRODUCTS = [
-    { name: 'Bluetooth Earbuds Pro', model: 'EB-2024', moq: '50 units', price: '$12.45', image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&q=80&w=300' },
-    { name: 'Cordless Drill 20V', model: 'CD-201', moq: '20 units', price: '$68.90', image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=300' },
-    { name: 'Corrugated Shipping Boxes', model: 'BOX-500', moq: '1000 units', price: '$0.45', image: 'https://images.unsplash.com/photo-1589939705384-5185138a047a?auto=format&fit=crop&q=80&w=300' },
-    { name: 'Ergonomic Office Chair', model: 'OC-500', moq: '10 units', price: '$45.75', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=300' },
-    { name: 'Laundry Detergent 5L', model: 'LD-200', moq: '100 units', price: '$6.25', image: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&q=80&w=300' },
-    { name: 'LED Bulb 12W', model: 'LB-100', moq: '500 units', price: '$1.20', image: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Bluetooth Earbuds Pro', model: 'EB-2024', moq: '50 pcs', price: '$12.45', image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Cordless Drill 20V', model: 'CD-201', moq: '20 pcs', price: '$68.90', image: 'https://images.unsplash.com/photo-1504148455328-c376907d081c?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Corrugated Shipping Boxes', model: 'BOX-500', moq: '1000 pcs', price: '$0.45', image: 'https://images.unsplash.com/photo-1589939705384-5185138a047a?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Ergonomic Office Chair', model: 'OC-500', moq: '10 pcs', price: '$45.75', image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&q=80&w=300' },
+    { name: 'Laundry Detergent 5L', model: 'LD-200', moq: '100 pcs', price: '$6.25', image: 'https://images.unsplash.com/photo-1563453392212-326f5e854473?auto=format&fit=crop&q=80&w=300' },
+    { name: 'LED Bulb 12W', model: 'LB-100', moq: '500 pcs', price: '$1.20', image: 'https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&q=80&w=300' },
 ];
 
 function HeroCarousel() {

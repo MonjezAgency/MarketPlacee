@@ -75,7 +75,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             brand: product.brand || 'Premium',
             price: product.price,
             image: product.image || '',
-            unit: product.unit || 'units',
+            unit: product.unit || 'pcs',
         });
 
         setIsAdded(true);
@@ -168,7 +168,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex flex-col">
                             <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Min Order</span>
-                            <span className="text-xs font-bold">{product.minOrder} units</span>
+                            <span className="text-xs font-bold">{product.minOrder} pcs</span>
                         </div>
 
                         <button

@@ -486,7 +486,7 @@ export default function SupplierProductsPage() {
                                                         <p className={cn("text-sm font-black", (product.stock ?? 0) < 10 ? "text-destructive" : "text-foreground")}>
                                                             {product.stock ?? 0}
                                                         </p>
-                                                        <p className="text-[9px] font-bold text-muted-foreground uppercase">{product.unit || 'units'}</p>
+                                                        <p className="text-[9px] font-bold text-muted-foreground uppercase">{product.unit || 'pcs'}</p>
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-5 text-end">

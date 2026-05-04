@@ -260,7 +260,7 @@ export default function SupplierAnalyticsPage() {
                                             </div>
                                             <div className="text-end shrink-0">
                                                 <p className="text-sm font-black text-primary">{formatPrice(p.revenue)}</p>
-                                                <p className="text-[10px] text-muted-foreground">{p.orders} units</p>
+                                                <p className="text-[10px] text-muted-foreground">{p.orders} pcs</p>
                                             </div>
                                         </div>
                                     ))}

@@ -24,7 +24,7 @@ export default function TrackOrderPage() {
             const res = await axios.get(`/api/shipments/track?number=${searchNum}`);
             setShipment(res.data);
         } catch (err) {
-            setError('Shipment not found. Please check your tracking number.');
+            setError('Delivery not found. Please check your tracking number.');
             setShipment(null);
         } finally {
             setLoading(false);
@@ -35,7 +35,7 @@ export default function TrackOrderPage() {
         <div className="container mx-auto px-6 py-24">
             <div className="max-w-4xl mx-auto">
                 <div className="text-center mb-12">
-                    <h1 className="text-4xl font-black mb-4 uppercase tracking-tighter font-heading">Track Your Shipment</h1>
+                    <h1 className="text-4xl font-black mb-4 uppercase tracking-tighter font-heading">Track Your Delivery</h1>
                     <p className="text-muted-foreground max-w-xl mx-auto">
                         Enter your tracking number below to see real-time updates on your B2B order delivery status.
                     </p>

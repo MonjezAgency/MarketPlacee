@@ -147,7 +147,7 @@ export default function CustomerDashboard() {
                     ))}
                 </div>
 
-                {/* Active Shipment Card */}
+                {/* Active Delivery Card */}
                 <section className="bg-white rounded-[16px] border border-[#E6EAF0] shadow-sm overflow-hidden">
                     <div className="p-6">
                         <div className="flex items-center justify-between mb-8">
@@ -156,7 +156,7 @@ export default function CustomerDashboard() {
                                     <Truck size={20} />
                                 </div>
                                <div>
-                                    <h3 className="text-base font-bold text-[#1A1F36]">Active Shipment</h3>
+                                    <h3 className="text-base font-bold text-[#1A1F36]">Active Delivery</h3>
                                     <p className="text-xs text-[#6B7280] font-medium">Track your current orders in real-time</p>
                                 </div>
                             </div>

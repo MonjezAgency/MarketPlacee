@@ -359,14 +359,14 @@ function ModalPortalContent({
                                                         >
                                                             <option value="Piece">📦 Piece</option>
                                                             <option value="Pallet">🏗️ Pallet</option>
-                                                            <option value="Shipment">🚢 Shipment</option>
+                                                            <option value="Truck">🚛 Truck</option>
                                                         </select>
                                                     </div>
                                                     <div className="space-y-2">
                                                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Minimum Order ({formData.unit || 'Units'})</label>
                                                         <input
                                                             type="number"
-                                                            placeholder={`min ${formData.unit?.toLowerCase() || 'units'}`}
+                                                            placeholder={`min ${formData.unit?.toLowerCase() || 'pcs'}`}
                                                             value={formData.minOrder || ''}
                                                             onChange={e => setFormData({ ...formData, minOrder: parseInt(e.target.value) || 1 })}
                                                             className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
@@ -396,7 +396,7 @@ function ModalPortalContent({
                                                     </div>
                                                     <div className="space-y-2">
                                                         <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
-                                                            Shelf Life / Expiry <span className="text-primary">(Required)</span>
+                                                            BBD (Best Before Date) <span className="text-primary">(Required)</span>
                                                             <div className="group/tip relative cursor-help">
                                                                 <Info size={10} className="text-muted-foreground" />
                                                                 <div className="absolute bottom-full mb-2 hidden group-hover/tip:block w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg shadow-xl z-50 normal-case font-medium">
@@ -459,7 +459,7 @@ function ModalPortalContent({
                                                 {formData.unit === 'Shipment' && (
                                                     <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/10">
                                                         <div className="space-y-2">
-                                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Pallets per Shipment</label>
+                                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Pallet per Truck</label>
                                                             <input
                                                                 type="number"
                                                                 placeholder="e.g. 26"
@@ -642,7 +642,7 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
     const defaultData: Product = {
         id: '',
         name: '', brand: '', price: 0, stock: 0, image: '', images: [],
-        category: 'Beverages', description: '', unit: 'Case (24 units)',
+        category: 'Beverages', description: '', unit: 'Case (24 pcs)',
         minOrder: 1, ean: '', variants: [], inStock: true,
         unitsPerPallet: 0, palletsPerShipment: 0,
         weight: 0, shelfLife: '', origin: '',

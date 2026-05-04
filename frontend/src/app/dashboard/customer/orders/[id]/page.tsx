@@ -343,7 +343,7 @@ export default function OrderTrackingPage() {
             {/* Progress Stepper */}
             {!isCancelled ? (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border/50 rounded-3xl p-8">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-8">Shipment Progress</p>
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-8">Delivery Progress</p>
                     <div className="relative">
                         <div className="absolute top-6 start-6 end-6 h-0.5 bg-border/50" />
                         <div className="absolute top-6 start-6 h-0.5 bg-primary transition-all duration-700"
@@ -411,9 +411,7 @@ export default function OrderTrackingPage() {
                                     )}
                                     <div className="flex-1 min-w-0 space-y-1">
                                         <p className="font-bold text-sm">{p.name}</p>
-                                        {p.supplier?.name && (
-                                            <p className="text-[11px] text-muted-foreground">Supplier: <span className="font-bold text-foreground">{p.supplier.name}</span></p>
-                                        )}
+                                        <p className="text-[11px] text-muted-foreground">Sold by: <span className="font-bold text-foreground">Atlantis</span></p>
                                         {logistics ? (
                                             <p className="text-[11px] font-black text-primary">Logistic {logistics}</p>
                                         ) : (

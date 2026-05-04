@@ -125,7 +125,7 @@ export default function OrderSummary({ order }: Props) {
                 <div className="shrink-0 w-8 h-8 rounded-full bg-[#30363D] flex items-center justify-center text-muted-foreground font-bold text-sm">2</div>
                 <div>
                     <p className="text-sm font-bold text-white">Supplier Ships</p>
-                    <p className="text-xs text-muted-foreground mt-1 text-balance">The supplier is notified to ship your goods. You can track the shipment details.</p>
+                    <p className="text-xs text-muted-foreground mt-1 text-balance">The supplier is notified to ship your goods. You can track the delivery details.</p>
                 </div>
             </div>
             <div className="flex gap-4">

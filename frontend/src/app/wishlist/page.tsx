@@ -174,7 +174,7 @@ export default function WishlistPage() {
                                         <Link href={`/products/${item.id}`} className="font-black text-sm hover:text-primary transition-colors line-clamp-2 mt-0.5">
                                             {item.name}
                                         </Link>
-                                        <p className="text-[11px] text-muted-foreground mt-0.5">{item.supplier?.name}</p>
+                                        <p className="text-[11px] text-muted-foreground mt-0.5">Atlantis</p>
                                     </div>
 
                                     <p className="text-xl font-black text-primary">{formatPrice(item.price, currency)}</p>

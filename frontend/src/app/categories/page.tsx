@@ -78,7 +78,7 @@ function CategoriesContent() {
             if (brandAdsP.status === 'fulfilled' && brandAdsP.value && brandAdsP.value.length > 0) {
                 const data = brandAdsP.value;
                 const brandItem = data[0].product;
-                setSponsoredBrand({ brandName: brandItem.brand || brandItem.supplier?.name || 'Premium Selection', products: data.map((d: any) => d.product) });
+                setSponsoredBrand({ brandName: brandItem.brand || 'Atlantis', products: data.map((d: any) => d.product) });
             }
             if (productAdsP.status === 'fulfilled' && productAdsP.value && productAdsP.value.length > 0) {
                 setSponsoredProducts(productAdsP.value.map((d: any) => d.product));

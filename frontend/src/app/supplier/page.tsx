@@ -317,7 +317,7 @@ export default function SupplierOverviewPage() {
                                         </div>
                                     </td>
                                     <td className="px-8 py-4 text-sm font-semibold text-[#0F172A]">€{product.price || '0.00'}</td>
-                                    <td className="px-8 py-4 text-sm font-bold text-[#0F172A]">{product.totalQuantitySold} units</td>
+                                    <td className="px-8 py-4 text-sm font-bold text-[#0F172A]">{product.totalQuantitySold} pcs</td>
                                     <td className="px-8 py-4 text-sm font-bold text-[#10B981]">{formatPrice(product.totalRevenue)}</td>
                                     <td className="px-8 py-4">
                                         <div className="w-16 h-6">

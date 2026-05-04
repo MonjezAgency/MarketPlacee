@@ -168,7 +168,7 @@ export default function ProductDetailClient() {
             brand: product.brand || 'Atlantis Premium',
             price: product.price,
             image: product.image || '',
-            unit: product.unit || 'units',
+            unit: product.unit || 'pcs',
             category: product.category || 'Uncategorized',
         }, quantity);
         setIsAdded(true);
@@ -531,8 +531,8 @@ export default function ProductDetailClient() {
                                     <div className="space-y-4">
                                         {[
                                             { label: 'Weight per Unit', value: `${product.weight || 'N/A'} kg` },
-                                            { label: 'Units per Pallet', value: `${product.unitsPerPallet || 'N/A'} units` },
-                                            { label: 'Pallets per Shipment', value: product.palletsPerShipment || 'N/A' },
+                                            { label: 'Units per Pallet', value: `${product.unitsPerPallet || 'N/A'} pcs` },
+                                            { label: 'Pallet per Truck', value: product.palletsPerShipment || 'N/A' },
                                             { label: 'Unit Type', value: product.unit || 'Standard' }
                                         ].map((item, i) => (
                                             <div key={i} className="flex justify-between py-3 border-b border-slate-200 last:border-0">
@@ -547,7 +547,7 @@ export default function ProductDetailClient() {
                                     <div className="space-y-4">
                                         {[
                                             { label: 'Country of Origin', value: product.origin || 'N/A' },
-                                            { label: 'Shelf Life', value: product.shelfLife || 'N/A' },
+                                            { label: 'BBD', value: product.shelfLife || 'N/A' },
                                             { label: 'Barcode (EAN)', value: product.ean || 'N/A' },
                                             { label: 'Brand Status', value: 'Verified by Atlantis' }
                                         ].map((item, i) => (

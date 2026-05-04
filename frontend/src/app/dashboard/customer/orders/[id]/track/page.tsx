@@ -27,7 +27,7 @@ export default function OrderTrackingPage() {
     const timeline = [
         {
             title: 'Arrived at Cairo Distribution Hub',
-            desc: 'The shipment has reached the regional sorting facility.',
+            desc: 'The delivery has reached the regional sorting facility.',
             time: 'Today, 10:45 AM',
             icon: Building2,
             type: 'current'
@@ -92,7 +92,7 @@ export default function OrderTrackingPage() {
                             <div className="flex items-center justify-between mb-10">
                                 <div>
                                     <h2 className="text-xl font-bold text-[#0F172A]">Current Status</h2>
-                                    <p className="text-sm text-slate-500">Your shipment is on its way to the delivery hub.</p>
+                                    <p className="text-sm text-slate-500">Your delivery is on its way to the delivery hub.</p>
                                 </div>
                                 <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center text-[#00BFA6]">
                                     <Truck size={24} />
@@ -134,7 +134,7 @@ export default function OrderTrackingPage() {
                         <div className="bg-white border border-[#E6EAF0] rounded-[24px] p-8 shadow-sm space-y-8">
                             <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
                                 <Clock size={20} className="text-slate-400" />
-                                Shipment Timeline
+                                Delivery Timeline
                             </h2>
                             <div className="space-y-0 relative">
                                 {/* Vertical line */}

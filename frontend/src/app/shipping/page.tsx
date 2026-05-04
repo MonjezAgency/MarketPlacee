@@ -64,7 +64,7 @@ export default function ShippingPage() {
                                     </tbody>
                                 </table>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-4">All times are estimates from the date of shipment, not order placement. Customs delays are outside the supplier's or Atlantis's control.</p>
+                            <p className="text-xs text-muted-foreground mt-4">All times are estimates from the date of dispatch, not order placement. Customs delays are outside the supplier's or Atlantis's control.</p>
                         </section>
 
                         <section className="border-b border-border/50 pb-10">
@@ -97,7 +97,7 @@ export default function ShippingPage() {
                         <section className="border-b border-border/50 pb-10">
                             <div className="flex items-center gap-3 mb-5">
                                 <CheckCircle2 size={18} className="text-emerald-500" />
-                                <h2 className="text-lg font-black">Tracking Your Shipment</h2>
+                                <h2 className="text-lg font-black">Tracking Your Delivery</h2>
                             </div>
                             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                                 When the supplier marks an order as shipped, the order status updates to "Shipped" in your dashboard. Where a tracking number is provided, it will appear in your Order Details page. You can also check your email for shipping notifications.

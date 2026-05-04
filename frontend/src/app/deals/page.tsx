@@ -154,9 +154,7 @@ export default function DealsPage() {
                                                 <Link href={`/products/${product.id}`}>
                                                     <p className="font-black text-sm mt-0.5 line-clamp-2 group-hover:text-primary transition-colors">{product.name}</p>
                                                 </Link>
-                                                {product.supplier?.companyName && (
-                                                    <p className="text-[10px] text-muted-foreground mt-1">{product.supplier.companyName}</p>
-                                                )}
+                                                <p className="text-[10px] text-muted-foreground mt-1">Atlantis</p>
                                             </div>
                                             <div className="flex items-center justify-between">
                                                 <div>

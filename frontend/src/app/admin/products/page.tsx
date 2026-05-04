@@ -788,7 +788,7 @@ export default function ProductsModerationPage() {
                                                         )}
                                                     </div>
                                                     <div className="space-y-1.5">
-                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shelf Life</label>
+                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">BBD</label>
                                                         {isEditing ? (
                                                             <input 
                                                                 className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
@@ -840,7 +840,7 @@ export default function ProductsModerationPage() {
                                                             onChange={(e) => setEditData({...editData, stock: parseInt(e.target.value)})}
                                                         />
                                                     ) : (
-                                                        <p className="text-lg font-bold text-slate-900">{selectedProduct.stock.toLocaleString()} units</p>
+                                                        <p className="text-lg font-bold text-slate-900">{selectedProduct.stock.toLocaleString()} pcs</p>
                                                     )}
                                                 </div>
                                             </div>
@@ -930,7 +930,7 @@ export default function ProductsModerationPage() {
                                                                 <option value="piece">Base Piece / Item</option>
                                                                 <option value="case">Case / Carton</option>
                                                                 <option value="pallet">Pallet (Wholesale)</option>
-                                                                <option value="shipment">Full Shipment / Container</option>
+                                                                <option value="truck">Full Truck / Container</option>
                                                             </select>
                                                         ) : (
                                                             <p className="text-sm font-bold text-slate-900 capitalize">{selectedProduct.unit || 'Piece'}</p>
@@ -996,10 +996,10 @@ export default function ProductsModerationPage() {
                                                         </div>
                                                     )}
 
-                                                    {(isEditing ? editData.unit : selectedProduct.unit) === 'shipment' && (
+                                                    {(isEditing ? editData.unit : selectedProduct.unit) === 'truck' && (
                                                         <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
                                                             <div className="space-y-1">
-                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Pallets / Shipment</label>
+                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Pallets / Truck</label>
                                                                 {isEditing ? (
                                                                     <input 
                                                                         type="number"
@@ -1075,8 +1075,8 @@ export default function ProductsModerationPage() {
                                                                 return `Min ${moq} case(s) = ${moq * pcs} pieces. Each case has ${pcs} pieces; ${cases} cases per pallet.`;
                                                             } else if (unit === 'pallet') {
                                                                 return `Min ${moq} pallet(s) = ${moq * ((isEditing ? editData.unitsPerPallet : selectedProduct.unitsPerPallet) || 0)} pieces total.`;
-                                                            } else if (unit === 'shipment') {
-                                                                return `Min ${moq} shipment(s).`;
+                                                            } else if (unit === 'truck') {
+                                                                return `Min ${moq} truck(s).`;
                                                             }
                                                             return `Min ${moq} piece(s).`;
                                                         })()}
@@ -1372,7 +1372,7 @@ export default function ProductsModerationPage() {
                                         <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                                             {[
                                                 'Product Name', 'Description', 'Product image',
-                                                'UnitBarcode', 'BBD (Shelf Life)', 'Units / Carton',
+                                                'UnitBarcode', 'BBD (BBD)', 'Units / Carton',
                                                 'Cartons / Pallet', 'UnitPriceEUR', 'MOQ'
                                             ].map(col => (
                                                 <div key={col} className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2">

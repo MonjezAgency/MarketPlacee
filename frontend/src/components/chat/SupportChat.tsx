@@ -29,7 +29,7 @@ interface Message {
 
 const ISSUE_CATEGORIES = [
     { id: 'marketplace', label: 'مشكلة في الماركت بليس', labelEn: 'Marketplace Issue' },
-    { id: 'shipment', label: 'مشكلة في الشحنة', labelEn: 'Shipment Issue' },
+    { id: 'shipment', label: 'مشكلة في الشحنة', labelEn: 'Delivery Issue' },
     { id: 'inquiry', label: 'استفسار', labelEn: 'General Inquiry' },
     { id: 'payment', label: 'مشكلة في الـ Payment', labelEn: 'Payment Issue' },
     { id: 'other', label: 'أخرى', labelEn: 'Other' },
