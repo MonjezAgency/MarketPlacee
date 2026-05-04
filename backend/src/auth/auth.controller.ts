@@ -151,6 +151,9 @@ export class AuthController {
                 status: 'ACTIVE',
                 emailVerified: true
             });
+            // register() always creates as PENDING_APPROVAL — re-run updateAdmin
+            // so a fresh seed call also produces a usable ACTIVE admin in one shot.
+            await this.authService.updateAdmin((user as any).id, password);
             return { message: 'Admin seeded successfully', userId: (user as any).id };
         } catch (err) {
             throw new Error(`Seed admin failed: ${(err as any).message}`);
