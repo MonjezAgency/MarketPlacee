@@ -138,9 +138,8 @@ export class AuthController {
         try {
             const existing = await this.authService.findByEmail(email);
             if (existing) {
-                if (existing.role === 'ADMIN' && existing.status === 'ACTIVE' && existing.emailVerified) {
-                    return { message: 'Admin already exists', userId: existing.id };
-                }
+                // Always reset the password to the supplied one so admins
+                // can recover access via this endpoint.
                 await this.authService.updateAdmin(existing.id, password);
                 return { message: 'Admin updated', userId: existing.id };
             }
