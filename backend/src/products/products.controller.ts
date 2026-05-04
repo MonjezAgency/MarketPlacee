@@ -204,6 +204,11 @@ export class ProductsController {
             };
             const rate = EGP_RATES[currency] ?? 1;
 
+            // Default image-count when fetching by EAN. Configurable via
+            // BULK_UPLOAD_EAN_IMAGE_COUNT in admin settings (defaults to 3).
+            const eanImageCountConfig = configs.find((c: any) => c.key === 'BULK_UPLOAD_EAN_IMAGE_COUNT');
+            const eanImageCount = eanImageCountConfig?.value ? Math.max(1, Math.min(parseInt(eanImageCountConfig.value, 10) || 3, 10)) : 3;
+
             // Parallel batches — sequential awaits on N rows used to take
             // forever for big files. We run rows in batches of 10 in parallel.
             const successResults = report.results.filter(r => r.success && r.data);
@@ -214,6 +219,21 @@ export class ProductsController {
                     const dto = result.data as CreateProductDto;
                     const supplierId = isAdmin ? (dto.supplierId || req.user.sub) : req.user.sub;
                     const priceInBase = dto.price ? (dto.price / rate) : 0;
+
+                    // ── EAN-based image fetch ────────────────────────────
+                    // If no images provided in the row AND we have an EAN,
+                    // fetch product photos from Open Food Facts → UPCItemDB
+                    // → BarcodeSpider chain. White background is best-effort.
+                    if ((!dto.images || dto.images.length === 0) && (dto as any).ean) {
+                        try {
+                            const fetched = await this.eanService.fetchImagesByEan(
+                                String((dto as any).ean),
+                                eanImageCount,
+                            );
+                            if (fetched.length > 0) (dto as any).images = fetched;
+                        } catch (_e) { /* non-fatal */ }
+                    }
+
                     try {
                         const product = await this.productsService.create({
                             ...dto,
