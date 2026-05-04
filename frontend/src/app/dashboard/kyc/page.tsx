@@ -13,11 +13,36 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/Button';
 import { useRouter } from 'next/navigation';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '@/lib/auth';
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
 export default function KYCPage() {
     const router = useRouter();
+    const { user, isAuthReady } = useAuth();
+
+    // If platform staff or supplier accidentally land here, send them home.
+    // Admins/owners shouldn't see KYC at all (they're the platform itself).
+    React.useEffect(() => {
+        if (!isAuthReady || !user) return;
+        const role = (user.role || '').toUpperCase();
+        const teamRoles = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
+        if (teamRoles.includes(role)) {
+            router.replace('/admin');
+        } else if (role === 'SUPPLIER') {
+            router.replace('/supplier');
+        }
+    }, [isAuthReady, user, router]);
+
+    // Helper used by all "Back to Dashboard" buttons so each role lands in
+    // its own dashboard rather than always /dashboard/customer.
+    const dashboardHref = (() => {
+        const role = (user?.role || '').toUpperCase();
+        if (['ADMIN','OWNER','MODERATOR','SUPPORT','EDITOR','DEVELOPER','LOGISTICS'].includes(role)) return '/admin';
+        if (role === 'SUPPLIER') return '/supplier';
+        return '/dashboard/customer';
+    })();
+
     const [step, setStep] = React.useState<Step>(1);
     const [isLoading, setIsLoading] = React.useState(false);
     const [status, setStatus] = React.useState<'IDLE' | 'VERIFYING' | 'SUCCESS' | 'FAILURE' | 'UNDER_REVIEW'>('IDLE');
@@ -210,7 +235,7 @@ export default function KYCPage() {
                     <p className="text-slate-500 max-w-sm mx-auto">Your account is fully authorized for B2B transactions. You can now access global pricing.</p>
                 </div>
                 <button 
-                    onClick={() => router.push('/dashboard/customer')}
+                    onClick={() => router.push(dashboardHref)}
                     className="h-14 px-12 rounded-2xl bg-[#00BFA6] text-white font-bold shadow-lg shadow-[#00BFA6]/20 transition-all active:scale-95"
                 >
                     Back to Dashboard
@@ -267,7 +292,7 @@ export default function KYCPage() {
                     <p className="text-slate-500 max-w-sm mx-auto">Your verification has been flagged for manual review. An agent will contact you within 24 hours.</p>
                 </div>
                 <button 
-                    onClick={() => router.push('/dashboard/customer')}
+                    onClick={() => router.push(dashboardHref)}
                     className="h-14 px-12 rounded-2xl bg-[#0F172A] text-white font-bold transition-all active:scale-95"
                 >
                     Back to Dashboard

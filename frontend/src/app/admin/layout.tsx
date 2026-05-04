@@ -328,22 +328,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     };
     const filteredSidebarGroups = getFilteredSidebarGroups();
 
-    // ... (keep KYC logic)
+    // KYC enforcement is for SUPPLIERS and BUYERS — never for platform staff.
+    // Everyone in /admin (OWNER + ADMIN + MODERATOR + EDITOR + SUPPORT +
+    // DEVELOPER + LOGISTICS) is platform staff and bypasses KYC entirely.
     React.useEffect(() => {
         if (!user) return;
-        if (isOwner) { setKycBlocked(false); return; }
-        if (!isTeamMember) return;
-        
-        apiFetch('/kyc/status', {
-            headers: {  },
-        })
-            .then(r => r.ok ? r.json() : null)
-            .then(data => {
-                if (!data) return;
-                setKycBlocked(data?.kycStatus !== 'VERIFIED');
-            })
-            .catch(() => {});
-    }, [user]);
+        if (isTeamMember) { setKycBlocked(false); return; }
+    }, [user, isTeamMember]);
 
     const badgeCounts: Record<string, number> = {
         '/admin/users': notifications.pendingUsers,
