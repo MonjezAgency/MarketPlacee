@@ -227,3 +227,12 @@ input:-webkit-autofill:active {
 .animate-marquee {
     animation: marquee 40s linear infinite;
 }
+
+/* Hide scrollbar utility */
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
