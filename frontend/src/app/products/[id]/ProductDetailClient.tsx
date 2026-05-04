@@ -43,6 +43,7 @@ export default function ProductDetailClient() {
     const [isLoading, setIsLoading] = useState(true);
     const [selectedImage, setSelectedImage] = useState<string>('');
     const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
+    const [selectedUnit, setSelectedUnit] = useState<'truck' | 'pallet' | 'carton' | undefined>(undefined);
     const [activeTab, setActiveTab] = useState('Description');
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -276,20 +277,79 @@ export default function ProductDetailClient() {
                                 </span>
                             </div>
 
-                            <div className="flex flex-col gap-2 py-6 border-y border-[#E5E7EB]">
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-[44px] font-bold text-[#111827] tracking-tighter">
-                                        {formatPrice(product.price)}
-                                    </span>
-                                    <span className="text-[18px] font-medium text-[#6B7280]">
-                                        / {product.unit || 'pallet'}
-                                    </span>
-                                </div>
-                                <div className="flex items-center gap-2 text-emerald-600">
-                                    <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                    <span className="text-[13px] font-bold uppercase tracking-widest">In Active Distribution</span>
-                                </div>
-                            </div>
+                            {/* Pricing block with unit toggle (Truck / Pallet / Carton)
+                                The base product.price is for whatever unit was configured at creation
+                                time. Other unit prices are derived using conversion factors. Different
+                                markups per unit are applied server-side at order-time; here we surface
+                                the indicative buy-tier price so buyers can compare. */}
+                            {(() => {
+                                const piecesPerCase = product.unitsPerCase || 0;
+                                const casesPerPallet = product.casesPerPallet || 0;
+                                const piecesPerPallet = product.unitsPerPallet || (piecesPerCase * casesPerPallet) || 0;
+                                const palletsPerTruck = product.palletsPerShipment || 0;
+                                const baseUnit = String(product.unit || 'piece').toLowerCase();
+
+                                // Convert product.price to a per-piece base.
+                                let perPiece = product.price;
+                                if (baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) {
+                                    if (piecesPerCase > 0) perPiece = product.price / piecesPerCase;
+                                } else if (baseUnit.includes('pallet')) {
+                                    if (piecesPerPallet > 0) perPiece = product.price / piecesPerPallet;
+                                } else if (baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment') || baseUnit.includes('delivery')) {
+                                    if (piecesPerPallet > 0 && palletsPerTruck > 0) perPiece = product.price / (piecesPerPallet * palletsPerTruck);
+                                }
+
+                                const cartonPrice = piecesPerCase > 0 ? perPiece * piecesPerCase : null;
+                                const palletPrice = piecesPerPallet > 0 ? perPiece * piecesPerPallet : null;
+                                const truckPrice = (piecesPerPallet > 0 && palletsPerTruck > 0) ? perPiece * piecesPerPallet * palletsPerTruck : null;
+
+                                const options: Array<{ key: 'truck'|'pallet'|'carton'; label: string; price: number | null }> = [];
+                                if (truckPrice !== null) options.push({ key: 'truck', label: 'Truck',  price: truckPrice });
+                                if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet', price: palletPrice });
+                                if (cartonPrice !== null) options.push({ key: 'carton', label: 'Carton', price: cartonPrice });
+                                if (options.length === 0) options.push({ key: 'carton', label: product.unit || 'Unit', price: product.price });
+
+                                // Default selection: largest available (Truck → Pallet → Carton)
+                                const initialSelected = options[0].key;
+                                if (selectedUnit === undefined) {
+                                    setTimeout(() => setSelectedUnit(initialSelected), 0);
+                                }
+                                const active = options.find(o => o.key === (selectedUnit ?? initialSelected)) || options[0];
+
+                                return (
+                                    <div className="flex flex-col gap-3 py-6 border-y border-[#E5E7EB]">
+                                        <div className="flex items-baseline gap-2">
+                                            <span className="text-[44px] font-bold text-[#111827] tracking-tighter">
+                                                {formatPrice(active.price ?? product.price)}
+                                            </span>
+                                            <span className="text-[18px] font-medium text-[#6B7280]">
+                                                / {active.label.toLowerCase()}
+                                            </span>
+                                        </div>
+                                        {/* Unit toggle */}
+                                        <div className="flex items-center gap-2 mt-1">
+                                            {options.map((opt) => (
+                                                <button
+                                                    key={opt.key}
+                                                    onClick={() => setSelectedUnit(opt.key)}
+                                                    className={cn(
+                                                        'h-9 px-4 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all border',
+                                                        active.key === opt.key
+                                                            ? 'bg-[#0F172A] text-white border-[#0F172A]'
+                                                            : 'bg-white text-[#475569] border-[#E5E7EB] hover:border-[#0F172A] hover:text-[#0F172A]'
+                                                    )}
+                                                >
+                                                    {opt.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <div className="flex items-center gap-2 text-emerald-600 mt-1">
+                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                            <span className="text-[13px] font-bold uppercase tracking-widest">In Active Distribution</span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
 
                             <div className="grid grid-cols-2 gap-x-10 gap-y-8 py-2">
                                 <div className="space-y-1.5">
@@ -298,7 +358,18 @@ export default function ProductDetailClient() {
                                 </div>
                                 <div className="space-y-1.5">
                                     <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Unit Type</p>
-                                    <p className="text-[18px] font-bold text-[#111827] capitalize">{product.unit || 'Pallet'}</p>
+                                    <p className="text-[18px] font-bold text-[#111827] capitalize">
+                                        {(() => {
+                                            const u = String(product.unit || '').trim().toLowerCase();
+                                            if (u === 'piece' || u === 'pcs' || u === 'item' || u === 'unit' || u === 'units') return 'Piece';
+                                            if (u === 'case' || u === 'carton' || u === 'box') return 'Carton';
+                                            if (u === 'pallet') return 'Pallet';
+                                            if (u === 'truck' || u === 'container' || u === 'shipment' || u === 'delivery') return 'Truck';
+                                            // If a numeric value leaked into `unit` (e.g. 24), default the label and surface it as "Carton (×24)"
+                                            if (/^\d+$/.test(u)) return `Carton (×${u})`;
+                                            return product.unit || 'Carton';
+                                        })()}
+                                    </p>
                                 </div>
                                 <div className="space-y-1.5">
                                     <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Inventory Status</p>
@@ -456,29 +527,42 @@ export default function ProductDetailClient() {
                                 Logistics & Delivery
                             </h3>
                             <div className="space-y-6">
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
-                                        <Package size={18} className="text-slate-400" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[13px] font-bold text-[#111827]">
-                                            Delivery: {product.readyForDispatch ? '2–5 days' : `${(product.leadTime || 7) + 3}–${(product.leadTime || 7) + 7} days`}
-                                        </p>
-                                        <p className="text-[11px] text-[#6B7280]">
-                                            {product.readyForDispatch ? 'Ready to ship' : `Made to order (${product.leadTime || 7}d lead time)`} 
-                                            {user?.country && ` • Shipping to ${user.country}`}
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
-                                        <RotateCcw size={18} className="text-slate-400" />
-                                    </div>
-                                    <div>
-                                        <p className="text-[13px] font-bold text-[#111827]">Returns: 30 Days</p>
-                                        <p className="text-[11px] text-[#6B7280]">Hassle-free corporate returns</p>
-                                    </div>
-                                </div>
+                                {(() => {
+                                    // EU country list — used to gate the 30-day returns + standard transit time
+                                    const EU_COUNTRIES = new Set([
+                                        'AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','GB','UK','UNITED KINGDOM','EU','EUROPE'
+                                    ]);
+                                    const country = (user?.country || '').toUpperCase().trim();
+                                    const isEU = country && EU_COUNTRIES.has(country);
+                                    const returnsLabel = isEU ? 'Returns: 30 Days' : 'Returns: 5–10 Days';
+                                    const returnsSub = isEU ? 'Hassle-free corporate returns (EU)' : 'Standard returns window for non-EU shipments';
+                                    return (
+                                        <>
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
+                                                    <Package size={18} className="text-slate-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[13px] font-bold text-[#111827]">Delivery: calculated at checkout</p>
+                                                    <p className="text-[11px] text-[#6B7280]">
+                                                        {product.readyForDispatch ? 'Ready to ship' : `Made to order (${product.leadTime || 7}d lead time)`}
+                                                        {user?.country ? ` • Shipping to ${user.country}` : ''}
+                                                        {' • Transit depends on carrier, weight, route'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
+                                                    <RotateCcw size={18} className="text-slate-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[13px] font-bold text-[#111827]">{returnsLabel}</p>
+                                                    <p className="text-[11px] text-[#6B7280]">{returnsSub}</p>
+                                                </div>
+                                            </div>
+                                        </>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>

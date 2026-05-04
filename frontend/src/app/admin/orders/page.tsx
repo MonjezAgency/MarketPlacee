@@ -487,7 +487,7 @@ export default function AdminOrdersPage() {
                                 {filteredOrders.map((order) => (
                                         <tr
                                             key={order.id}
-                                            onClick={() => setSelectedOrder(order)}
+                                            onClick={() => router.push(`/admin/orders/${order.id}`)}
                                             className={cn(
                                                 "group cursor-pointer transition-all",
                                                 selectedOrder?.id === order.id ? "bg-teal-50/30" : "hover:bg-slate-50",
