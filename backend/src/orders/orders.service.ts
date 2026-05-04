@@ -211,16 +211,45 @@ export class OrdersService {
         const order = await this.prisma.order.findFirst({
             where: { id: orderId, customerId },
             include: {
+                customer: {
+                    select: {
+                        id: true, name: true, email: true, phone: true,
+                        companyName: true, country: true, vatNumber: true,
+                    },
+                },
                 items: {
                     include: {
-                        product: { select: { id: true, name: true, images: true, supplier: { select: { name: true } } } },
+                        product: {
+                            select: {
+                                id: true, name: true, images: true, brand: true,
+                                category: true, unit: true, ean: true,
+                                unitsPerCase: true, casesPerPallet: true,
+                                unitsPerPallet: true, palletsPerShipment: true,
+                                shelfLife: true,
+                                supplier: { select: { name: true } },
+                            },
+                        },
                     },
                 },
                 history: { orderBy: { createdAt: 'asc' } },
+                shipment: {
+                    select: {
+                        trackingNumber: true, carrier: true, status: true,
+                        expectedDelivery: true,
+                    },
+                },
             },
         });
         if (!order) throw new NotFoundException('Order not found');
-        return order;
+
+        // Flatten shipment fields into the response so the existing
+        // `order.trackingNumber` / `order.carrier` UI keeps working.
+        return {
+            ...order,
+            trackingNumber: order.shipment?.trackingNumber ?? null,
+            carrier: order.shipment?.carrier ?? null,
+            expectedDelivery: order.shipment?.expectedDelivery ?? null,
+        };
     }
 
     async findBySupplier(supplierId: string) {

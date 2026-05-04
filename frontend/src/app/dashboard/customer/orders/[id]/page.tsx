@@ -23,15 +23,29 @@ interface OrderDetail {
     shippingCost: number | null;
     trackingNumber?: string | null;
     carrier?: string | null;
+    expectedDelivery?: string | null;
     invoiceNumber?: string | null;
     createdAt: string;
     deliveredAt?: string | null;
     shippedAt?: string | null;
+    customer?: {
+        id: string; name: string; email: string;
+        phone?: string | null; companyName?: string | null;
+        country?: string | null; vatNumber?: string | null;
+    };
     items: {
         id: string;
         quantity: number;
         price: number;
-        product: { id: string; name: string; images: string[]; supplier: { name: string }; unit?: string; unitsPerCase?: number; casesPerPallet?: number; unitsPerPallet?: number; palletsPerShipment?: number };
+        product: {
+            id: string; name: string; images: string[];
+            brand?: string | null; category?: string | null;
+            ean?: string | null; shelfLife?: string | null;
+            supplier: { name: string };
+            unit?: string;
+            unitsPerCase?: number; casesPerPallet?: number;
+            unitsPerPallet?: number; palletsPerShipment?: number;
+        };
     }[];
     history: { id: string; previousStatus: string | null; newStatus: string; createdAt: string; reason: string | null }[];
 }
@@ -236,7 +250,7 @@ export default function OrderTrackingPage() {
     const canDispute = (['SHIPPED', 'DELIVERED'] as OrderStatus[]).includes(order.status) && !existingDispute;
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-8 pt-24 pb-20 space-y-8">
+        <div className="max-w-7xl mx-auto px-4 py-8 pt-24 pb-20 space-y-8">
             {/* Header */}
             <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center gap-4">
@@ -380,11 +394,11 @@ export default function OrderTrackingPage() {
                 </motion.div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Order Items */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Order Items — spans 2 cols on desktop */}
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="lg:col-span-2 bg-card border border-border/50 rounded-3xl p-6 space-y-4">
                     <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Items ({order.items.length})</p>
-                    <div className="space-y-3">
+                    <div className="space-y-4">
                         {order.items.map(item => {
                             const p = item.product;
                             const u = (p.unit || 'piece').toLowerCase();
@@ -393,34 +407,92 @@ export default function OrderTrackingPage() {
                             const ppp = p.unitsPerPallet || (ppc * cpp) || 0;
                             const pps = p.palletsPerShipment || 0;
                             let logistics = '';
-                            if (u === 'case' && ppc > 0) logistics = `${item.quantity}×${ppc} = ${(item.quantity * ppc).toLocaleString()} pcs`;
-                            else if (u === 'pallet' && ppp > 0) {
-                                if (ppc > 0 && cpp > 0) logistics = `${item.quantity}×${cpp}×${ppc} = ${(item.quantity * cpp * ppc).toLocaleString()} pcs`;
-                                else logistics = `${item.quantity} × ${ppp} = ${(item.quantity * ppp).toLocaleString()} pcs`;
-                            } else if (u === 'shipment' && pps > 0 && ppp > 0) {
-                                logistics = `${item.quantity}×${pps}×${ppp} = ${(item.quantity * pps * ppp).toLocaleString()} pcs`;
+                            let totalPcs = 0;
+                            if (u === 'case' && ppc > 0) {
+                                totalPcs = item.quantity * ppc;
+                                logistics = `${item.quantity}×${ppc} = ${totalPcs.toLocaleString()} pcs`;
+                            } else if (u === 'pallet' && ppp > 0) {
+                                if (ppc > 0 && cpp > 0) {
+                                    totalPcs = item.quantity * cpp * ppc;
+                                    logistics = `${item.quantity}×${cpp}×${ppc} = ${totalPcs.toLocaleString()} pcs`;
+                                } else {
+                                    totalPcs = item.quantity * ppp;
+                                    logistics = `${item.quantity} × ${ppp} = ${totalPcs.toLocaleString()} pcs`;
+                                }
+                            } else if (u === 'truck' && pps > 0 && ppp > 0) {
+                                totalPcs = item.quantity * pps * ppp;
+                                logistics = `${item.quantity}×${pps}×${ppp} = ${totalPcs.toLocaleString()} pcs`;
                             }
                             return (
-                                <div key={item.id} className="flex items-start gap-3 p-3 bg-muted/30 rounded-2xl border border-border/30">
-                                    {p.images?.[0] ? (
-                                        <img src={p.images[0]} alt={p.name} className="w-14 h-14 rounded-xl object-cover border border-border/50 shrink-0" />
-                                    ) : (
-                                        <div className="w-14 h-14 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                                            <Package size={18} className="text-muted-foreground" />
-                                        </div>
-                                    )}
-                                    <div className="flex-1 min-w-0 space-y-1">
-                                        <p className="font-bold text-sm">{p.name}</p>
-                                        <p className="text-[11px] text-muted-foreground">Sold by: <span className="font-bold text-foreground">Atlantis</span></p>
-                                        {logistics ? (
-                                            <p className="text-[11px] font-black text-primary">Logistic {logistics}</p>
+                                <div key={item.id} className="p-4 bg-muted/30 rounded-2xl border border-border/30">
+                                    <div className="flex items-start gap-4">
+                                        {p.images?.[0] ? (
+                                            <img src={p.images[0]} alt={p.name} className="w-20 h-20 rounded-xl object-cover border border-border/50 shrink-0" />
                                         ) : (
-                                            <p className="text-[10px] text-muted-foreground">Qty: {item.quantity} {u}{item.quantity > 1 ? 's' : ''}</p>
+                                            <div className="w-20 h-20 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                                                <Package size={24} className="text-muted-foreground" />
+                                            </div>
                                         )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="font-black text-base leading-tight">{p.name}</p>
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] text-muted-foreground">
+                                                {p.brand && <span className="font-bold text-foreground/70">{p.brand}</span>}
+                                                {p.category && <span>· {p.category}</span>}
+                                                <span>· Sold by <span className="font-bold text-foreground">Atlantis</span></span>
+                                            </div>
+                                        </div>
+                                        <div className="text-end shrink-0">
+                                            <p className="text-base font-black text-primary">{formatPrice(item.price * item.quantity)}</p>
+                                            <p className="text-[10px] text-muted-foreground">{formatPrice(item.price)}/{u}</p>
+                                        </div>
                                     </div>
-                                    <div className="text-end shrink-0">
-                                        <p className="text-sm font-black text-primary">{formatPrice(item.price * item.quantity)}</p>
-                                        <p className="text-[10px] text-muted-foreground">{formatPrice(item.price)}/{u}</p>
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-border/30">
+                                        <div>
+                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Qty</p>
+                                            <p className="text-sm font-black mt-0.5">{item.quantity} {u}{item.quantity > 1 ? 's' : ''}</p>
+                                        </div>
+                                        {logistics && (
+                                            <div>
+                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Total Pcs</p>
+                                                <p className="text-sm font-black text-primary mt-0.5">{totalPcs.toLocaleString()}</p>
+                                            </div>
+                                        )}
+                                        {ppc > 0 && (
+                                            <div>
+                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Pcs / Case</p>
+                                                <p className="text-sm font-black mt-0.5">{ppc}</p>
+                                            </div>
+                                        )}
+                                        {cpp > 0 && (
+                                            <div>
+                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Cases / Pallet</p>
+                                                <p className="text-sm font-black mt-0.5">{cpp}</p>
+                                            </div>
+                                        )}
+                                        {ppp > 0 && (
+                                            <div>
+                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Pcs / Pallet</p>
+                                                <p className="text-sm font-black mt-0.5">{ppp}</p>
+                                            </div>
+                                        )}
+                                        {pps > 0 && (
+                                            <div>
+                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Pallets / Truck</p>
+                                                <p className="text-sm font-black mt-0.5">{pps}</p>
+                                            </div>
+                                        )}
+                                        {p.ean && (
+                                            <div>
+                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">EAN</p>
+                                                <p className="text-sm font-black mt-0.5 font-mono">{p.ean}</p>
+                                            </div>
+                                        )}
+                                        {p.shelfLife && (
+                                            <div>
+                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">BBD</p>
+                                                <p className="text-sm font-black mt-0.5">{p.shelfLife}</p>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -428,34 +500,66 @@ export default function OrderTrackingPage() {
                     </div>
                 </motion.div>
 
-                {/* Financial Summary */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-4">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Summary</p>
-                    <div className="space-y-3 text-sm">
-                        <div className="flex justify-between">
-                            <span className="text-muted-foreground">Subtotal</span>
-                            <span className="font-bold">{formatPrice(order.totalAmount)}</span>
-                        </div>
-                        {order.shippingCost != null && (
+                {/* Right rail: Buyer + Summary */}
+                <div className="space-y-6">
+                    {/* Buyer Info */}
+                    {order.customer && (
+                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-3">
+                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Buyer</p>
+                            <div className="space-y-2 text-sm">
+                                <p className="font-black">{order.customer.name}</p>
+                                {order.customer.companyName && (
+                                    <p className="text-xs text-muted-foreground">{order.customer.companyName}</p>
+                                )}
+                                {order.customer.email && (
+                                    <p className="text-xs text-muted-foreground">{order.customer.email}</p>
+                                )}
+                                {order.customer.phone && (
+                                    <p className="text-xs text-muted-foreground">{order.customer.phone}</p>
+                                )}
+                                {order.customer.country && (
+                                    <p className="text-xs text-muted-foreground">{order.customer.country}</p>
+                                )}
+                                {order.customer.vatNumber && (
+                                    <p className="text-[11px] text-muted-foreground font-mono">VAT: {order.customer.vatNumber}</p>
+                                )}
+                            </div>
+                            <div className="pt-3 border-t border-border/30 text-[11px] text-muted-foreground">
+                                <span className="font-bold">Handled by:</span>{' '}
+                                <span className="font-black text-primary">Atlantis Marketplace</span>
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* Financial Summary */}
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-4">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Summary</p>
+                        <div className="space-y-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-muted-foreground flex items-center gap-1.5">
-                                    <Truck size={12} /> {order.shippingCompany || 'Shipping'}
-                                </span>
-                                <span className="font-bold">{formatPrice(order.shippingCost)}</span>
+                                <span className="text-muted-foreground">Subtotal</span>
+                                <span className="font-bold">{formatPrice(order.totalAmount)}</span>
+                            </div>
+                            {order.shippingCost != null && (
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground flex items-center gap-1.5">
+                                        <Truck size={12} /> {order.shippingCompany || 'Shipping'}
+                                    </span>
+                                    <span className="font-bold">{formatPrice(order.shippingCost)}</span>
+                                </div>
+                            )}
+                            <div className="flex justify-between pt-3 border-t border-border/50">
+                                <span className="font-black text-primary">Total</span>
+                                <span className="font-black text-primary text-lg">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</span>
+                            </div>
+                        </div>
+                        {order.shippingCompany && (
+                            <div className="pt-4 border-t border-border/50 flex items-center gap-2 text-sm text-muted-foreground">
+                                <MapPin size={14} className="text-primary shrink-0" />
+                                <span className="font-bold">{order.shippingCompany}</span>
                             </div>
                         )}
-                        <div className="flex justify-between pt-3 border-t border-border/50">
-                            <span className="font-black text-primary">Total</span>
-                            <span className="font-black text-primary text-lg">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</span>
-                        </div>
-                    </div>
-                    {order.shippingCompany && (
-                        <div className="pt-4 border-t border-border/50 flex items-center gap-2 text-sm text-muted-foreground">
-                            <MapPin size={14} className="text-primary shrink-0" />
-                            <span className="font-bold">{order.shippingCompany}</span>
-                        </div>
-                    )}
-                </motion.div>
+                    </motion.div>
+                </div>
             </div>
 
             {/* History Timeline */}
