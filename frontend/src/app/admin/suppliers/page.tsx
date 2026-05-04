@@ -206,10 +206,7 @@ export default function AdminSuppliersPage() {
 
             <div className="grid grid-cols-12 gap-6 items-start">
                 {/* TABLE (LEFT - 65%) */}
-                <div className={cn(
-                    "transition-all duration-500",
-                    selectedSupplier ? "col-span-12 lg:col-span-7" : "col-span-12"
-                )}>
+                <div className="col-span-12">
                     <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left">
@@ -301,16 +298,29 @@ export default function AdminSuppliersPage() {
                     </div>
                 </div>
 
-                {/* RIGHT PANEL (35% / 420px) */}
-                <AnimatePresence>
-                    {selectedSupplier && (
-                        <motion.div 
-                            initial={{ x: 20, opacity: 0 }}
-                            animate={{ x: 0, opacity: 1 }}
-                            exit={{ x: 20, opacity: 0 }}
-                            className="col-span-12 lg:col-span-5"
+            </div>
+
+            {/* Supplier Details — centered modal */}
+            <AnimatePresence>
+                {selectedSupplier && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-8 bg-slate-900/60 backdrop-blur-sm"
+                        onClick={() => setSelectedSupplier(null)}
+                    >
+                        <motion.div
+                            key={selectedSupplier.id}
+                            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 24, scale: 0.97 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative w-full max-w-[860px] max-h-[90vh] flex flex-col"
                         >
-                            <div className="bg-white border border-slate-200 rounded-3xl shadow-xl overflow-hidden sticky top-8 flex flex-col max-h-[calc(100vh-140px)]">
+                            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                                 {/* Panel Header */}
                                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                                     <div className="flex items-center gap-4">
@@ -534,9 +544,9 @@ export default function AdminSuppliersPage() {
                                 </div>
                             </div>
                         </motion.div>
-                    )}
-                </AnimatePresence>
-            </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Bulk Actions Floating Bar */}
             <AnimatePresence>

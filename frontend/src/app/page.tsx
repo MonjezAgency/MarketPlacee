@@ -31,7 +31,6 @@ import {
 } from 'lucide-react';
 import Navbar from '@/components/layout/Navbar';
 import PriceTicker from '@/components/ui/PriceTicker';
-import Footer from '@/components/layout/Footer';
 import { apiFetch } from '@/lib/api';
 import ProductCard from '@/components/product/ProductCard';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -188,7 +187,7 @@ export default function HomePage() {
                  1. TOP FEATURE STRIP
             ============================================================ */}
             <div className="bg-white border-b border-[#E5E7EB] hidden md:block">
-                <div className="max-w-[1280px] mx-auto px-6 lg:px-8 py-3 flex items-center justify-between gap-4 overflow-x-auto">
+                <div className="max-w-[1440px] mx-auto px-4 lg:px-6 py-3 flex items-center justify-between gap-4 overflow-x-auto">
                     {TOP_FEATURES.map((f) => (
                         <div key={f} className="flex items-center gap-2 whitespace-nowrap">
                             <CheckCircle2 size={14} className="text-[#14B8A6] shrink-0" />
@@ -199,7 +198,7 @@ export default function HomePage() {
             </div>
 
             {/* MAIN CONTAINER */}
-            <main className="flex-1 max-w-[1280px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-8 sm:space-y-10">
+            <main className="flex-1 max-w-[1440px] mx-auto w-full px-3 sm:px-4 lg:px-6 py-5 sm:py-7 space-y-7 sm:space-y-9">
 
                 {/* ============================================================
                      2. HERO
@@ -500,46 +499,37 @@ export default function HomePage() {
                 ============================================================ */}
                 <section className="bg-[#0B1F3A] rounded-2xl px-6 sm:px-8 lg:px-10 py-7 sm:py-8 relative overflow-hidden">
                     <div className="absolute -right-20 -top-20 w-80 h-80 bg-[#14B8A6]/10 rounded-full blur-3xl pointer-events-none" />
-                    <div className="relative z-10 flex flex-col lg:flex-row items-center lg:justify-between gap-6 lg:gap-8">
-                        <div className="flex items-center gap-4 text-center lg:text-left">
+                    <div className="relative z-10 flex flex-col md:flex-row items-center md:justify-between gap-6">
+                        <div className="flex items-center gap-4 text-center md:text-left">
                             <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center text-[#14B8A6] shrink-0 hidden sm:flex">
                                 <Package size={26} />
                             </div>
                             <div>
                                 <h3 className="text-white text-[18px] sm:text-[20px] font-bold">Order in Bulk. Save More.</h3>
-                                <p className="text-[#CBD5F5] text-[12px] sm:text-[13px] mt-1">
-                                    Get exclusive discounts on bulk orders and long-term partnerships.
+                                <p className="text-[#CBD5F5] text-[12px] sm:text-[13px] mt-1 max-w-[520px]">
+                                    Unlock volume-tier pricing, dedicated account support and fast global shipping.
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-6 sm:gap-10">
-                            <div className="text-center">
-                                <div className="text-[#14B8A6] font-bold text-[20px] sm:text-[22px]">10K+</div>
-                                <div className="text-[10px] sm:text-[11px] text-[#CBD5F5] uppercase tracking-wider">Active Business Buyers</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-[#14B8A6] font-bold text-[20px] sm:text-[22px]">50M+</div>
-                                <div className="text-[10px] sm:text-[11px] text-[#CBD5F5] uppercase tracking-wider">Products Sourced</div>
-                            </div>
-                            <div className="text-center">
-                                <div className="text-[#14B8A6] font-bold text-[20px] sm:text-[22px]">120+</div>
-                                <div className="text-[10px] sm:text-[11px] text-[#CBD5F5] uppercase tracking-wider">Countries Served</div>
-                            </div>
+                        <div className="flex items-center gap-3">
+                            <Link
+                                href="/auth/register?role=customer"
+                                className="shrink-0 inline-flex items-center justify-center h-[44px] px-6 bg-[#14B8A6] hover:bg-[#0EA89A] text-white rounded-xl text-[13px] font-semibold transition-all shadow-lg shadow-[#14B8A6]/20 active:scale-95 no-underline"
+                            >
+                                Become a Buyer
+                            </Link>
+                            <Link
+                                href="/contact"
+                                className="shrink-0 inline-flex items-center justify-center h-[44px] px-6 border border-white/20 text-white hover:bg-white/5 rounded-xl text-[13px] font-semibold transition-all no-underline"
+                            >
+                                Contact Sales
+                            </Link>
                         </div>
-
-                        <Link
-                            href="/auth/register?role=customer"
-                            className="shrink-0 inline-flex items-center justify-center h-[44px] px-7 bg-[#14B8A6] hover:bg-[#0EA89A] text-white rounded-xl text-[13px] font-semibold transition-all shadow-lg shadow-[#14B8A6]/20 active:scale-95 no-underline"
-                        >
-                            Become a Buyer
-                        </Link>
                     </div>
                 </section>
 
             </main>
-
-            <Footer />
         </div>
     );
 }

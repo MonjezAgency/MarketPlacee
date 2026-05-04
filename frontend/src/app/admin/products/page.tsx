@@ -492,10 +492,7 @@ export default function ProductsModerationPage() {
             <div className="grid grid-cols-12 gap-8 px-6 h-full min-h-[600px]">
                 
                 {/* LEFT: 65% Table Area */}
-                <div className={cn(
-                    "space-y-6 transition-all duration-500",
-                    selectedProduct ? "col-span-12 lg:col-span-7" : "col-span-12"
-                )}>
+                <div className="col-span-12 space-y-6">
                     {/* Tabs */}
                     <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-xl w-fit">
                         {tabs.map((tab) => (
@@ -609,25 +606,29 @@ export default function ProductsModerationPage() {
                     </div>
                 </div>
 
-                {/* RIGHT: 35% Panel Area */}
-                <AnimatePresence>
-                    {selectedProduct && (
-                        <motion.div 
-                            initial={isMobile ? { opacity: 0, y: 100 } : { opacity: 0, x: 20 }}
-                            animate={isMobile ? { opacity: 1, y: 0 } : { opacity: 1, x: 0 }}
-                            exit={isMobile ? { opacity: 0, y: 100 } : { opacity: 0, x: 20 }}
-                            className={cn(
-                                "col-span-12 lg:col-span-5",
-                                isMobile && "fixed inset-x-0 bottom-0 z-50 p-4"
-                            )}
+            </div>
+
+            {/* Product Details — centered modal */}
+            <AnimatePresence>
+                {selectedProduct && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-8 bg-slate-900/60 backdrop-blur-sm"
+                        onClick={() => setSelectedProduct(null)}
+                    >
+                        <motion.div
+                            key={selectedProduct.id}
+                            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 24, scale: 0.97 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative w-full max-w-[920px] max-h-[90vh] flex flex-col"
                         >
-                            <div className={cn(
-                                "bg-white border border-slate-200 shadow-xl overflow-hidden flex flex-col transition-all",
-                                isMobile ? "rounded-t-3xl max-h-[80vh] h-[80vh]" : "rounded-3xl sticky top-8 h-[calc(100vh-140px)]"
-                            )}>
-                                {isMobile && (
-                                    <div className="h-1.5 w-12 bg-slate-200 rounded-full mx-auto mt-3 mb-1 shrink-0" />
-                                )}
+                            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
                                 {/* Panel Header */}
                                 <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
                                     <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -1251,10 +1252,9 @@ export default function ProductsModerationPage() {
                                 </div>
                             </div>
                         </motion.div>
-                    )}
-                </AnimatePresence>
-
-            </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Bulk Actions Floating Bar */}
             <AnimatePresence>

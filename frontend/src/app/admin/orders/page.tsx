@@ -123,7 +123,7 @@ export default function AdminOrdersPage() {
             if (res.ok) {
                 const data = await res.json();
                 setOrders(data);
-                if (data.length > 0 && !selectedOrder) setSelectedOrder(data[0]);
+                // Note: do not auto-select; details now open as a modal on row click
             }
         } catch (err) {
             console.error('Failed to load orders:', err);
@@ -461,11 +461,11 @@ export default function AdminOrdersPage() {
                 )}
             </AnimatePresence>
 
-            {/* Main Content Grid (65/35) */}
+            {/* Main Content — full width table; details open in modal */}
             <div className="grid grid-cols-12 gap-8 items-start">
-                
-                {/* Orders Table (Left 65%) */}
-                <div className="col-span-12 lg:col-span-8 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+
+                {/* Orders Table (full width) */}
+                <div className="col-span-12 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-start">
                             <thead className="bg-slate-50/50 border-b border-slate-100">
@@ -523,17 +523,28 @@ export default function AdminOrdersPage() {
                     </div>
                 </div>
 
-                {/* Order Details Panel (Right 35%) */}
-                <div className="col-span-12 lg:col-span-4 sticky top-24">
-                    <AnimatePresence mode="wait">
-                        {selectedOrder ? (
-                            <motion.div 
-                                key={selectedOrder.id}
-                                initial={{ opacity: 0, x: 20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: 20 }}
-                                className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col"
-                            >
+            </div>
+
+            {/* Order Details — centered modal */}
+            <AnimatePresence>
+                {selectedOrder && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-8 bg-slate-900/60 backdrop-blur-sm"
+                        onClick={() => setSelectedOrder(null)}
+                    >
+                        <motion.div
+                            key={selectedOrder.id}
+                            initial={{ opacity: 0, y: 24, scale: 0.97 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 24, scale: 0.97 }}
+                            transition={{ duration: 0.25, ease: 'easeOut' }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="relative w-full max-w-[920px] max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                        ><div className="flex flex-col h-full overflow-hidden">
                                 {/* Panel Header */}
                                 <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
                                     <div className="flex items-center gap-3">
@@ -567,7 +578,7 @@ export default function AdminOrdersPage() {
                                 </div>
 
                                 {/* Panel Content */}
-                                <div className="p-6 space-y-6 max-h-[500px] overflow-y-auto no-scrollbar">
+                                <div className="p-6 space-y-6 flex-1 overflow-y-auto no-scrollbar">
                                     {detailTab === 'info' && (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
                                             {/* Supplier banner */}
@@ -811,22 +822,11 @@ export default function AdminOrdersPage() {
                                         Delete
                                     </button>
                                 </div>
-                            </motion.div>
-                        ) : (
-                            <div className="bg-white border border-slate-200 border-dashed rounded-2xl p-12 flex flex-col items-center justify-center text-center space-y-4">
-                                <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center text-slate-200">
-                                    <Package size={32} />
-                                </div>
-                                <div>
-                                    <h4 className="text-sm font-bold text-slate-900">No order selected</h4>
-                                    <p className="text-[11px] text-slate-400 font-medium mt-1">Select an order from the list to view full details and manage settlement.</p>
-                                </div>
-                            </div>
-                        )}
-                    </AnimatePresence>
-                </div>
-
-            </div>
+                        </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Bulk Action Bar */}
             <AnimatePresence>
