@@ -318,9 +318,9 @@ export default function AdminSuppliersPage() {
                             exit={{ opacity: 0, y: 24, scale: 0.97 }}
                             transition={{ duration: 0.25, ease: 'easeOut' }}
                             onClick={(e) => e.stopPropagation()}
-                            className="relative w-full max-w-[860px] max-h-[90vh] flex flex-col"
+                            className="relative w-full max-w-[860px] flex flex-col"
                         >
-                            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
                                 {/* Panel Header */}
                                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                                     <div className="flex items-center gap-4">
@@ -364,7 +364,7 @@ export default function AdminSuppliersPage() {
                                 </div>
 
                                 {/* Panel Content */}
-                                <div className="flex-1 overflow-y-auto p-6 space-y-8 no-scrollbar">
+                                <div className="overflow-y-auto p-6 space-y-8 no-scrollbar" style={{ maxHeight: 'calc(88vh - 200px)' }}>
                                     {panelTab === 'profile' && (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                                             <div className="space-y-4">

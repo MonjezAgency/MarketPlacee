@@ -485,8 +485,9 @@ export default function AdminOrdersPage() {
                             </thead>
                             <tbody className="divide-y divide-slate-50">
                                 {filteredOrders.map((order) => (
-                                        <tr 
+                                        <tr
                                             key={order.id}
+                                            onClick={() => setSelectedOrder(order)}
                                             className={cn(
                                                 "group cursor-pointer transition-all",
                                                 selectedOrder?.id === order.id ? "bg-teal-50/30" : "hover:bg-slate-50",
@@ -498,25 +499,25 @@ export default function AdminOrdersPage() {
                                                     {selectedIds.has(order.id) ? <CheckSquare size={18} /> : <Square size={18} />}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-5" onClick={() => setSelectedOrder(order)}>
-                                            <div className="flex flex-col">
-                                                <span className="text-sm font-semibold text-slate-900">{order.customer}</span>
-                                                <span className="text-[10px] text-slate-400 font-medium">via {order.supplier}</span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <span className="text-sm font-bold text-slate-900">{formatPrice(order.total)}</span>
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <StatusBadge status={order.status} />
-                                        </td>
-                                        <td className="px-6 py-5">
-                                            <span className="text-xs text-slate-500 font-medium">{new Date(order.date).toLocaleDateString()}</span>
-                                        </td>
-                                        <td className="px-6 py-5 text-end">
-                                            <ChevronRight size={18} className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-1 transition-all" />
-                                        </td>
-                                    </tr>
+                                            <td className="px-6 py-5">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-semibold text-slate-900">{order.customer}</span>
+                                                    <span className="text-[10px] text-slate-400 font-medium">via {order.supplier}</span>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <span className="text-sm font-bold text-slate-900">{formatPrice(order.total)}</span>
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <StatusBadge status={order.status} />
+                                            </td>
+                                            <td className="px-6 py-5">
+                                                <span className="text-xs text-slate-500 font-medium">{new Date(order.date).toLocaleDateString()}</span>
+                                            </td>
+                                            <td className="px-6 py-5 text-end">
+                                                <ChevronRight size={18} className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-1 transition-all" />
+                                            </td>
+                                        </tr>
                                 ))}
                             </tbody>
                         </table>
@@ -543,7 +544,7 @@ export default function AdminOrdersPage() {
                             exit={{ opacity: 0, y: 24, scale: 0.97 }}
                             transition={{ duration: 0.25, ease: 'easeOut' }}
                             onClick={(e) => e.stopPropagation()}
-                            className="relative w-full max-w-[920px] max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
+                            className="relative w-full max-w-[920px] max-h-[88vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
                         ><div className="flex flex-col h-full overflow-hidden">
                                 {/* Panel Header */}
                                 <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
@@ -578,7 +579,7 @@ export default function AdminOrdersPage() {
                                 </div>
 
                                 {/* Panel Content */}
-                                <div className="p-6 space-y-6 flex-1 overflow-y-auto no-scrollbar">
+                                <div className="p-6 space-y-6 overflow-y-auto no-scrollbar" style={{ maxHeight: 'calc(88vh - 200px)' }}>
                                     {detailTab === 'info' && (
                                         <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
                                             {/* Supplier banner */}

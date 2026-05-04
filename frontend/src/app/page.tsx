@@ -63,53 +63,59 @@ const QUOTE_STEPS = [
 ];
 
 const BUSINESS_CATEGORIES = [
-    { name: 'Electronics & Accessories', icon: Monitor, count: '12,450+ products', slug: 'electronics-accessories' },
-    { name: 'Industrial & Machinery', icon: Factory, count: '8,750+ products', slug: 'industrial-machinery' },
-    { name: 'Packaging & Materials', icon: Box, count: '6,320+ products', slug: 'packaging-materials' },
-    { name: 'Office & Stationery', icon: FileText, count: '4,890+ products', slug: 'office-stationery' },
-    { name: 'Home & Kitchen Supplies', icon: HomeIcon, count: '7,230+ products', slug: 'home-kitchen' },
-    { name: 'Health & Personal Care', icon: Stethoscope, count: '5,410+ products', slug: 'health-personal-care' },
-    { name: 'Fashion & Textiles', icon: Shirt, count: '9,870+ products', slug: 'fashion-textiles' },
-    { name: 'Automotive & Parts', icon: Car, count: '6,150+ products', slug: 'automotive-parts' },
+    { name: 'Electronics & Accessories', icon: Monitor, slug: 'electronics-accessories' },
+    { name: 'Industrial & Machinery', icon: Factory, slug: 'industrial-machinery' },
+    { name: 'Packaging & Materials', icon: Box, slug: 'packaging-materials' },
+    { name: 'Office & Stationery', icon: FileText, slug: 'office-stationery' },
+    { name: 'Home & Kitchen Supplies', icon: HomeIcon, slug: 'home-kitchen' },
+    { name: 'Health & Personal Care', icon: Stethoscope, slug: 'health-personal-care' },
+    { name: 'Fashion & Textiles', icon: Shirt, slug: 'fashion-textiles' },
+    { name: 'Automotive & Parts', icon: Car, slug: 'automotive-parts' },
 ];
 
 const BRANDS = [
-    { name: 'Siemens', logo: 'https://logo.clearbit.com/siemens.com' },
-    { name: 'Bosch', logo: 'https://logo.clearbit.com/bosch.com' },
-    { name: 'Philips', logo: 'https://logo.clearbit.com/philips.com' },
-    { name: 'DHL', logo: 'https://logo.clearbit.com/dhl.com' },
-    { name: 'Unilever', logo: 'https://logo.clearbit.com/unilever.com' },
-    { name: 'P&G', logo: 'https://logo.clearbit.com/pg.com' },
-    { name: 'Nestle', logo: 'https://logo.clearbit.com/nestle.com' },
-    { name: 'Caterpillar', logo: 'https://logo.clearbit.com/cat.com' },
-    { name: 'Schneider', logo: 'https://logo.clearbit.com/se.com' },
-    { name: '3M', logo: 'https://logo.clearbit.com/3m.com' },
+    { name: 'Siemens', logo: 'https://cdn.worldvectorlogo.com/logos/siemens-2.svg' },
+    { name: 'Bosch', logo: 'https://cdn.worldvectorlogo.com/logos/bosch.svg' },
+    { name: 'Philips', logo: 'https://cdn.worldvectorlogo.com/logos/philips.svg' },
+    { name: 'DHL', logo: 'https://cdn.worldvectorlogo.com/logos/dhl-1.svg' },
+    { name: 'Unilever', logo: 'https://cdn.worldvectorlogo.com/logos/unilever-2.svg' },
+    { name: 'P&G', logo: 'https://cdn.worldvectorlogo.com/logos/p-g.svg' },
+    { name: 'Nestle', logo: 'https://cdn.worldvectorlogo.com/logos/nestle-2.svg' },
+    { name: 'Caterpillar', logo: 'https://cdn.worldvectorlogo.com/logos/caterpillar.svg' },
+    { name: 'Schneider', logo: 'https://cdn.worldvectorlogo.com/logos/schneider-electric-2.svg' },
+    { name: '3M', logo: 'https://cdn.worldvectorlogo.com/logos/3m.svg' },
+    { name: 'Coca-Cola', logo: 'https://cdn.worldvectorlogo.com/logos/coca-cola-2021.svg' },
+    { name: 'PepsiCo', logo: 'https://cdn.worldvectorlogo.com/logos/pepsico-2.svg' },
+    { name: 'Heinz', logo: 'https://cdn.worldvectorlogo.com/logos/heinz-1.svg' },
+    { name: 'Kellogg\'s', logo: 'https://cdn.worldvectorlogo.com/logos/kelloggs-2.svg' },
+    { name: 'Mondelez', logo: 'https://cdn.worldvectorlogo.com/logos/mondelez-international-1.svg' },
+    { name: 'Danone', logo: 'https://cdn.worldvectorlogo.com/logos/danone.svg' },
 ];
 
 const TOP_BUSINESS_CATEGORIES = [
     {
         title: 'Electronics & Accessories',
-        count: '12,450+ products',
+        sub: 'Devices, audio, peripherals',
         image: 'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?auto=format&fit=crop&q=80&w=900',
     },
     {
         title: 'Industrial & Machinery',
-        count: '8,750+ products',
+        sub: 'Equipment, tools, automation',
         image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=900',
     },
     {
         title: 'Packaging & Materials',
-        count: '6,320+ products',
+        sub: 'Boxes, films, raw inputs',
         image: 'https://images.unsplash.com/photo-1589939705384-5185138a047a?auto=format&fit=crop&q=80&w=900',
     },
     {
-        title: 'Office & Janitorial Supplies',
-        count: '4,890+ products',
+        title: 'Office & Janitorial',
+        sub: 'Stationery, cleaning, supplies',
         image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=900',
     },
     {
         title: 'Home & Kitchen Supplies',
-        count: '7,230+ products',
+        sub: 'Cookware, appliances, decor',
         image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&q=80&w=900',
     },
 ];
@@ -327,7 +333,6 @@ export default function HomePage() {
                                 </div>
                                 <div className="space-y-0.5">
                                     <div className="text-[11px] sm:text-[12px] font-semibold text-[#0F172A] leading-tight line-clamp-2">{c.name}</div>
-                                    <div className="text-[10px] text-[#94A3B8]">{c.count}</div>
                                 </div>
                             </Link>
                         ))}
@@ -335,7 +340,7 @@ export default function HomePage() {
                 </section>
 
                 {/* ============================================================
-                     5. TRUSTED BY LEADING GLOBAL BRANDS
+                     5. TRUSTED BY LEADING GLOBAL BRANDS (animated marquee)
                 ============================================================ */}
                 <section className="space-y-4">
                     <div className="flex items-center justify-between">
@@ -344,22 +349,26 @@ export default function HomePage() {
                             View all brands <ArrowRight size={13} />
                         </Link>
                     </div>
-                    <div className="bg-white border border-[#E5E7EB] rounded-xl px-3 sm:px-4 py-4">
-                        <div className="grid grid-cols-3 sm:grid-cols-5 lg:grid-cols-10 gap-3 sm:gap-4">
-                            {BRANDS.map((b) => (
+                    <div className="bg-white border border-[#E5E7EB] rounded-xl py-5 relative overflow-hidden">
+                        {/* edge fades */}
+                        <div className="absolute inset-y-0 left-0 w-12 sm:w-20 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
+                        <div className="absolute inset-y-0 right-0 w-12 sm:w-20 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
+                        {/* row 1 — moves right→left */}
+                        <div className="flex w-max animate-marquee-ltr items-center">
+                            {[...BRANDS, ...BRANDS].map((b, i) => (
                                 <div
-                                    key={b.name}
-                                    className="h-[56px] sm:h-[60px] flex items-center justify-center px-2 rounded-lg hover:bg-[#F8FAFC] transition-colors"
+                                    key={`r1-${i}`}
+                                    className="h-[56px] sm:h-[64px] mx-4 sm:mx-8 flex items-center justify-center shrink-0"
                                 >
                                     <img
                                         src={b.logo}
                                         alt={b.name}
-                                        className="max-h-[28px] sm:max-h-[32px] w-auto object-contain grayscale opacity-70 hover:opacity-100 hover:grayscale-0 transition-all"
+                                        className="max-h-[34px] sm:max-h-[40px] w-auto object-contain grayscale opacity-70 hover:opacity-100 hover:grayscale-0 transition-all"
                                         onError={(e) => {
                                             const el = e.currentTarget;
                                             el.style.display = 'none';
                                             const span = document.createElement('span');
-                                            span.className = 'text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider';
+                                            span.className = 'text-[12px] font-bold text-[#94A3B8] uppercase tracking-wider whitespace-nowrap';
                                             span.textContent = b.name;
                                             el.parentElement?.appendChild(span);
                                         }}
@@ -397,7 +406,7 @@ export default function HomePage() {
                                 </div>
                                 <div className="p-3 sm:p-4">
                                     <div className="text-[12px] sm:text-[13px] font-bold text-[#0F172A] line-clamp-1">{c.title}</div>
-                                    <div className="text-[10px] sm:text-[11px] text-[#64748B] mt-1">{c.count}</div>
+                                    <div className="text-[10px] sm:text-[11px] text-[#64748B] mt-1 line-clamp-1">{c.sub}</div>
                                     <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-[#14B8A6]">
                                         Explore <ChevronRight size={12} />
                                     </div>

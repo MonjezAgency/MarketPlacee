@@ -626,9 +626,9 @@ export default function ProductsModerationPage() {
                             exit={{ opacity: 0, y: 24, scale: 0.97 }}
                             transition={{ duration: 0.25, ease: 'easeOut' }}
                             onClick={(e) => e.stopPropagation()}
-                            className="relative w-full max-w-[920px] max-h-[90vh] flex flex-col"
+                            className="relative w-full max-w-[920px] flex flex-col"
                         >
-                            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+                            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
                                 {/* Panel Header */}
                                 <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
                                     <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -686,7 +686,7 @@ export default function ProductsModerationPage() {
                                 </div>
 
                                 {/* Scrollable Content */}
-                                <div className="flex-1 overflow-y-auto p-6 space-y-8 scrollbar-hide">
+                                <div className="overflow-y-auto p-6 space-y-8 scrollbar-hide" style={{ maxHeight: 'calc(88vh - 200px)' }}>
                                     {activePanelTab === 'Product Info' && (
                                         <>
                                             <div className="space-y-4">

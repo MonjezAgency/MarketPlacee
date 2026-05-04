@@ -301,3 +301,15 @@ html.dark .bg-slate-900\/60 { background-color: rgba(0,0,0,0.7) !important; }
 html.dark .shadow-sm { box-shadow: 0 1px 2px rgba(0,0,0,0.4) !important; }
 html.dark .shadow-xl,
 html.dark .shadow-2xl { box-shadow: 0 25px 60px rgba(0,0,0,0.5) !important; }
+
+/* Brand marquee — single direction, smooth */
+@keyframes marquee-ltr {
+    from { transform: translateX(0); }
+    to   { transform: translateX(-50%); }
+}
+.animate-marquee-ltr {
+    animation: marquee-ltr 40s linear infinite;
+}
+.animate-marquee-ltr:hover {
+    animation-play-state: paused;
+}
