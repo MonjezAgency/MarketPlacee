@@ -688,231 +688,195 @@ export default function ProductsModerationPage() {
                                 {/* Scrollable Content */}
                                 <div className="overflow-y-auto p-6 space-y-8 scrollbar-hide" style={{ maxHeight: 'calc(88vh - 200px)' }}>
                                     {activePanelTab === 'Product Info' && (
-                                        <>
-                                            <div className="space-y-4">
-                                                <div className="aspect-video w-full rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 overflow-hidden relative group flex items-center justify-center">
-                                                    {(isEditing ? editData.images?.[0] : selectedProduct.images?.[0]) ? (
-                                                        <img src={isEditing ? editData.images?.[0] : selectedProduct.images?.[0]} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="w-full h-full object-cover" />
-                                                    ) : (
-                                                        <div className="flex flex-col items-center gap-2 text-slate-300">
-                                                            <ImageIcon size={48} strokeWidth={1.5} />
-                                                            <p className="text-xs font-bold uppercase tracking-widest">No image uploaded</p>
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+                                            {/* LEFT COLUMN — Overview + Basic Info */}
+                                            <div className="lg:col-span-2 space-y-5">
+                                                {/* Product Overview card */}
+                                                <div className="border border-slate-200 rounded-2xl p-5">
+                                                    <h4 className="text-[14px] font-bold text-slate-900 mb-4">Product Overview</h4>
+                                                    <div className="aspect-[5/3] w-full rounded-2xl bg-slate-50 border border-slate-200 border-dashed overflow-hidden relative flex items-center justify-center">
+                                                        {(isEditing ? editData.images?.[0] : selectedProduct.images?.[0]) ? (
+                                                            <img src={isEditing ? editData.images?.[0] : selectedProduct.images?.[0]} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="flex flex-col items-center gap-3 text-slate-300 text-center px-6">
+                                                                <ImageIcon size={44} strokeWidth={1.5} />
+                                                                <div>
+                                                                    <p className="text-[14px] font-semibold text-slate-500">No image uploaded</p>
+                                                                    <p className="text-[12px] text-slate-400 mt-1">Upload a clear product image to help buyers identify your product.</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {isEditing && (
+                                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+                                                                <p className="text-white text-[10px] font-bold uppercase tracking-widest">Editing Mode</p>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    {/* Image thumbnails strip (only when there are multiple) */}
+                                                    {(selectedProduct.images && selectedProduct.images.length > 1) && (
+                                                        <div className="flex gap-2 overflow-x-auto pt-3 scrollbar-hide">
+                                                            {(isEditing ? editData.images : selectedProduct.images).map((img: string, i: number) => (
+                                                                <div key={i} className="relative group shrink-0">
+                                                                    <img src={img} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/56?text=NA'; }} className="w-14 h-14 rounded-xl object-cover border border-slate-100" />
+                                                                    {isEditing && (
+                                                                        <button
+                                                                            onClick={() => setEditData({...editData, images: editData.images.filter((_:any, idx:number) => idx !== i)})}
+                                                                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg"
+                                                                        >
+                                                                            <Trash2 size={10} />
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            ))}
                                                         </div>
                                                     )}
                                                     {isEditing && (
-                                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                                            <p className="text-white text-[10px] font-bold uppercase tracking-widest">Editing Mode</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-                                                    {(isEditing ? editData.images : selectedProduct.images).map((img: string, i: number) => (
-                                                        <div key={i} className="relative group shrink-0">
-                                                            <img src={img} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=NA'; }} className="w-16 h-16 rounded-xl object-cover border border-slate-100" />
-                                                            {isEditing && (
-                                                                <button 
-                                                                    onClick={() => setEditData({...editData, images: editData.images.filter((_:any, idx:number) => idx !== i)})}
-                                                                    className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg"
-                                                                >
-                                                                    <Trash2 size={10} />
-                                                                </button>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    {isEditing && (
-                                                        <div className="flex gap-2">
-                                                            <input 
-                                                                type="file" 
-                                                                hidden 
-                                                                ref={imageInputRef} 
-                                                                onChange={handleImageUpload}
-                                                                accept="image/*"
-                                                            />
-                                                            <button 
-                                                                onClick={() => imageInputRef.current?.click()}
-                                                                className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 hover:border-teal-200 transition-all shrink-0"
-                                                            >
-                                                                <Upload size={16} />
-                                                                <span className="text-[8px] font-bold mt-1">DEVICE</span>
+                                                        <div className="flex gap-2 mt-3">
+                                                            <input type="file" hidden ref={imageInputRef} onChange={handleImageUpload} accept="image/*" />
+                                                            <button onClick={() => imageInputRef.current?.click()} className="h-10 px-4 rounded-xl border border-dashed border-slate-300 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-all flex items-center gap-2">
+                                                                <Upload size={14} /> Upload from device
                                                             </button>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    const url = window.prompt('Enter professional image URL:');
-                                                                    if (url && url.trim()) setEditData({...editData, images: [...(editData.images || []), url.trim()]});
-                                                                }}
-                                                                className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-400 hover:bg-slate-50 hover:border-teal-200 transition-all shrink-0"
-                                                            >
-                                                                <ImageIcon size={16} />
-                                                                <span className="text-[8px] font-bold mt-1">URL</span>
+                                                            <button onClick={() => {
+                                                                const url = window.prompt('Enter professional image URL:');
+                                                                if (url && url.trim()) setEditData({...editData, images: [...(editData.images || []), url.trim()]});
+                                                            }} className="h-10 px-4 rounded-xl border border-dashed border-slate-300 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-all flex items-center gap-2">
+                                                                <ImageIcon size={14} /> Paste URL
                                                             </button>
                                                         </div>
                                                     )}
                                                 </div>
-                                            </div>
 
-                                            <div className="grid grid-cols-1 gap-4">
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Product Name</label>
-                                                    {isEditing ? (
-                                                        <input 
-                                                            className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
-                                                            value={editData.name}
-                                                            onChange={(e) => setEditData({...editData, name: e.target.value})}
-                                                        />
-                                                    ) : (
-                                                        <p className="text-sm font-bold text-slate-900">{selectedProduct.name}</p>
-                                                    )}
-                                                </div>
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">EAN / UPC</label>
-                                                    {isEditing ? (
-                                                        <input 
-                                                            className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
-                                                            value={editData.ean || ''}
-                                                            onChange={(e) => setEditData({...editData, ean: e.target.value})}
-                                                        />
-                                                    ) : (
-                                                        <p className="text-sm font-bold text-slate-900">{selectedProduct.ean || 'N/A'}</p>
-                                                    )}
-                                                </div>
-                                                <div className="grid grid-cols-3 gap-4">
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Origin</label>
-                                                        {isEditing ? (
-                                                            <input 
-                                                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
-                                                                value={editData.origin || ''}
-                                                                onChange={(e) => setEditData({...editData, origin: e.target.value})}
-                                                            />
-                                                        ) : (
-                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.origin || 'N/A'}</p>
+                                                {/* Basic Information card */}
+                                                <div className="border border-slate-200 rounded-2xl p-5">
+                                                    <h4 className="text-[14px] font-bold text-slate-900 mb-4">Basic Information</h4>
+                                                    <dl className="divide-y divide-slate-100">
+                                                        <div className="flex items-center justify-between py-3">
+                                                            <dt className="text-[13px] text-slate-500">Product Name</dt>
+                                                            <dd className="text-[13px] font-bold text-slate-900 max-w-[60%] text-right truncate" title={selectedProduct.name}>
+                                                                {isEditing ? (
+                                                                    <input className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:border-teal-500" value={editData.name} onChange={(e) => setEditData({...editData, name: e.target.value})} />
+                                                                ) : selectedProduct.name}
+                                                            </dd>
+                                                        </div>
+                                                        <div className="flex items-center justify-between py-3">
+                                                            <dt className="text-[13px] text-slate-500">Product ID</dt>
+                                                            <dd className="text-[13px] font-bold text-slate-900 font-mono">{selectedProduct.id.slice(0, 8).toUpperCase()}</dd>
+                                                        </div>
+                                                        <div className="flex items-center justify-between py-3">
+                                                            <dt className="text-[13px] text-slate-500">Status</dt>
+                                                            <dd>
+                                                                <span className={cn(
+                                                                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                                                                    selectedProduct.status === 'APPROVED' && "bg-emerald-50 text-emerald-700 border border-emerald-200",
+                                                                    selectedProduct.status === 'PENDING' && "bg-amber-50 text-amber-700 border border-amber-200",
+                                                                    selectedProduct.status === 'REJECTED' && "bg-red-50 text-red-700 border border-red-200"
+                                                                )}>
+                                                                    {selectedProduct.status}
+                                                                </span>
+                                                            </dd>
+                                                        </div>
+                                                        {selectedProduct.ean && (
+                                                            <div className="flex items-center justify-between py-3">
+                                                                <dt className="text-[13px] text-slate-500">EAN / UPC</dt>
+                                                                <dd className="text-[13px] font-bold text-slate-900 font-mono">{selectedProduct.ean}</dd>
+                                                            </div>
                                                         )}
-                                                    </div>
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">BBD</label>
-                                                        {isEditing ? (
-                                                            <input 
-                                                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
-                                                                value={editData.shelfLife || ''}
-                                                                onChange={(e) => setEditData({...editData, shelfLife: e.target.value})}
-                                                            />
-                                                        ) : (
-                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.shelfLife || 'N/A'}</p>
+                                                        {selectedProduct.origin && (
+                                                            <div className="flex items-center justify-between py-3">
+                                                                <dt className="text-[13px] text-slate-500">Origin</dt>
+                                                                <dd className="text-[13px] font-bold text-slate-900">{selectedProduct.origin}</dd>
+                                                            </div>
                                                         )}
-                                                    </div>
-                                                    <div className="space-y-1.5">
-                                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Weight (kg)</label>
-                                                        {isEditing ? (
-                                                            <input 
-                                                                type="number"
-                                                                step="0.01"
-                                                                className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-teal-500"
-                                                                value={editData.weight || 0}
-                                                                onChange={(e) => setEditData({...editData, weight: parseFloat(e.target.value) || 0})}
-                                                            />
-                                                        ) : (
-                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.weight || 0}</p>
+                                                        {selectedProduct.shelfLife && (
+                                                            <div className="flex items-center justify-between py-3">
+                                                                <dt className="text-[13px] text-slate-500">BBD</dt>
+                                                                <dd className="text-[13px] font-bold text-slate-900">{selectedProduct.shelfLife}</dd>
+                                                            </div>
                                                         )}
-                                                    </div>
+                                                        {selectedProduct.weight ? (
+                                                            <div className="flex items-center justify-between py-3">
+                                                                <dt className="text-[13px] text-slate-500">Weight</dt>
+                                                                <dd className="text-[13px] font-bold text-slate-900">{selectedProduct.weight} kg</dd>
+                                                            </div>
+                                                        ) : null}
+                                                        {selectedProduct.description && (
+                                                            <div className="py-3">
+                                                                <dt className="text-[13px] text-slate-500 mb-2">Description</dt>
+                                                                <dd className="text-[12px] text-slate-700 leading-relaxed">{selectedProduct.description}</dd>
+                                                            </div>
+                                                        )}
+                                                    </dl>
                                                 </div>
                                             </div>
 
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Display Price</p>
-                                                    {isEditing ? (
-                                                        <input 
-                                                            type="number"
-                                                            className="w-full bg-transparent border-b border-teal-200 text-lg font-bold outline-none"
-                                                            value={editData.price}
-                                                            onChange={(e) => setEditData({...editData, price: parseFloat(e.target.value)})}
-                                                        />
-                                                    ) : (
-                                                        <p className="text-lg font-bold text-slate-900">{formatPrice(selectedProduct.price)}</p>
-                                                    )}
+                                            {/* RIGHT COLUMN — Summary + Submission Checklist */}
+                                            <div className="space-y-5">
+                                                {/* Product Summary */}
+                                                <div className="border border-slate-200 rounded-2xl p-5">
+                                                    <h4 className="text-[14px] font-bold text-slate-900 mb-4">Product Summary</h4>
+                                                    <dl className="space-y-3">
+                                                        {[
+                                                            { label: 'Category',  value: selectedProduct.category },
+                                                            { label: 'Brand',     value: (selectedProduct as any).brand },
+                                                            { label: 'Unit Type', value: (() => {
+                                                                const u = String(selectedProduct.unit || '').toLowerCase();
+                                                                if (u === 'piece' || u === 'pcs' || u === 'item') return 'Piece';
+                                                                if (u === 'case' || u === 'carton' || u === 'box') return 'Carton';
+                                                                if (u === 'pallet') return 'Pallet';
+                                                                if (u === 'truck' || u === 'container' || u === 'shipment') return 'Truck';
+                                                                return selectedProduct.unit || null;
+                                                            })() },
+                                                            { label: 'Created At',   value: (selectedProduct as any).createdAt ? new Date((selectedProduct as any).createdAt).toLocaleDateString() : null },
+                                                            { label: 'Last Updated', value: (selectedProduct as any).updatedAt ? new Date((selectedProduct as any).updatedAt).toLocaleDateString() : null },
+                                                        ].map((row) => (
+                                                            <div key={row.label} className="flex items-center justify-between">
+                                                                <dt className="text-[12px] text-slate-500">{row.label}</dt>
+                                                                <dd className="text-[12px] font-bold text-slate-700">{row.value || '—'}</dd>
+                                                            </div>
+                                                        ))}
+                                                    </dl>
                                                 </div>
-                                                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Stock</p>
-                                                    {isEditing ? (
-                                                        <input 
-                                                            type="number"
-                                                            className="w-full bg-transparent border-b border-teal-200 text-lg font-bold outline-none"
-                                                            value={editData.stock}
-                                                            onChange={(e) => setEditData({...editData, stock: parseInt(e.target.value)})}
-                                                        />
-                                                    ) : (
-                                                        <p className="text-lg font-bold text-slate-900">{selectedProduct.stock.toLocaleString()} pcs</p>
-                                                    )}
+
+                                                {/* Submission Checklist */}
+                                                <div className="border border-slate-200 rounded-2xl p-5">
+                                                    <h4 className="text-[14px] font-bold text-slate-900 mb-4">Submission Checklist</h4>
+                                                    {(() => {
+                                                        const checklist = [
+                                                            { label: 'Product image',       done: (selectedProduct.images || []).length > 0,        missingLabel: 'Missing' },
+                                                            { label: 'Pricing & units',     done: !!selectedProduct.price && !!selectedProduct.unit,  missingLabel: 'Pending' },
+                                                            { label: 'Supplier information', done: !!selectedProduct.supplier?.id,                    missingLabel: 'Pending' },
+                                                            { label: 'AI data',             done: !!selectedProduct.description && selectedProduct.description.length > 30, missingLabel: 'Pending' },
+                                                            { label: 'Notes',               done: !!(selectedProduct as any).notes,                   missingLabel: 'Pending' },
+                                                        ];
+                                                        return (
+                                                            <ul className="space-y-3">
+                                                                {checklist.map(item => (
+                                                                    <li key={item.label} className="flex items-center justify-between">
+                                                                        <span className="flex items-center gap-2.5">
+                                                                            <span className={cn(
+                                                                                'w-2 h-2 rounded-full',
+                                                                                item.done ? 'bg-emerald-500' : 'bg-slate-300'
+                                                                            )} />
+                                                                            <span className="text-[12px] font-semibold text-slate-700">{item.label}</span>
+                                                                        </span>
+                                                                        <span className={cn(
+                                                                            'px-2 py-0.5 rounded-full text-[10px] font-bold',
+                                                                            item.done
+                                                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                                                : item.missingLabel === 'Missing'
+                                                                                    ? 'bg-slate-50 text-slate-500 border border-slate-200'
+                                                                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                        )}>
+                                                                            {item.done ? 'Complete' : item.missingLabel}
+                                                                        </span>
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
-
-                                            <div className="space-y-2">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description</p>
-                                                {isEditing ? (
-                                                    <textarea 
-                                                        className="w-full h-32 p-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-teal-500 resize-none"
-                                                        value={editData.description}
-                                                        onChange={(e) => setEditData({...editData, description: e.target.value})}
-                                                    />
-                                                ) : (
-                                                    <p className="text-sm text-slate-600 leading-relaxed bg-slate-50/50 p-4 rounded-2xl border border-slate-100 italic">
-                                                        "{selectedProduct.description || 'No description provided'}"
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Category</p>
-                                                {isEditing ? (
-                                                    <select 
-                                                        className="w-full h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold outline-none"
-                                                        value={editData.category}
-                                                        onChange={(e) => setEditData({...editData, category: e.target.value})}
-                                                    >
-                                                        <option value="Beverages">Beverages</option>
-                                                        <option value="Soft Drinks">Soft Drinks</option>
-                                                        <option value="Energy Drinks">Energy Drinks</option>
-                                                        <option value="Water">Water</option>
-                                                        <option value="Juices">Juices</option>
-                                                        <option value="Snacks">Snacks</option>
-                                                        <option value="Chips">Chips</option>
-                                                        <option value="Chocolate">Chocolate</option>
-                                                        <option value="Candy">Candy</option>
-                                                        <option value="Biscuits">Biscuits</option>
-                                                        <option value="Dairy">Dairy</option>
-                                                        <option value="Milk">Milk</option>
-                                                        <option value="Cheese">Cheese</option>
-                                                        <option value="Yogurt">Yogurt</option>
-                                                        <option value="Personal Care">Personal Care</option>
-                                                        <option value="Skincare">Skincare</option>
-                                                        <option value="Haircare">Haircare</option>
-                                                        <option value="Oral Care">Oral Care</option>
-                                                        <option value="Cleaning">Cleaning</option>
-                                                        <option value="Household">Household</option>
-                                                        <option value="Detergent">Detergent</option>
-                                                        <option value="Frozen Food">Frozen Food</option>
-                                                        <option value="Ice Cream">Ice Cream</option>
-                                                        <option value="Meat">Meat</option>
-                                                        <option value="Seafood">Seafood</option>
-                                                        <option value="Bakery">Bakery</option>
-                                                        <option value="Bread">Bread</option>
-                                                        <option value="Pastries">Pastries</option>
-                                                        <option value="Tobacco">Tobacco</option>
-                                                        <option value="Coffee">Coffee</option>
-                                                        <option value="Tea">Tea</option>
-                                                        <option value="Baby Products">Baby Products</option>
-                                                        <option value="Pet Food">Pet Food</option>
-                                                        <option value="Other">Other</option>
-                                                    </select>
-                                                ) : (
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-3 py-1 bg-teal-50 text-teal-600 text-[11px] font-bold rounded-lg border border-teal-100">
-                                                            {selectedProduct.category}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </>
+                                        </div>
                                     )}
 
                                     {activePanelTab === 'Pricing & Units' && (
@@ -1226,26 +1190,24 @@ export default function ProductsModerationPage() {
                                             </div>
                                         </motion.div>
                                     ) : (
-                                        <div className="space-y-2.5">
-                                            <div className="grid grid-cols-2 gap-2.5">
-                                                <button
-                                                    onClick={() => setShowRejectInput(true)}
-                                                    className="h-12 bg-white border-2 border-red-200 text-red-600 rounded-2xl text-sm font-black hover:bg-red-50 hover:border-red-300 transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <XCircle size={16} /> Reject
-                                                </button>
-                                                <button
-                                                    onClick={() => handleApprove(selectedProduct.id)}
-                                                    className="h-12 bg-teal-600 text-white rounded-2xl text-sm font-black shadow-lg shadow-teal-600/30 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <CheckCircle2 size={16} /> Approve
-                                                </button>
-                                            </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                             <button
                                                 onClick={() => startEditing(selectedProduct)}
-                                                className="w-full h-11 bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl text-xs font-bold hover:bg-slate-100 transition-all flex items-center justify-center gap-2"
+                                                className="h-12 bg-white border border-slate-200 text-slate-700 rounded-xl text-[13px] font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                                             >
                                                 <Pencil size={14} /> Edit Product Details
+                                            </button>
+                                            <button
+                                                onClick={() => setShowRejectInput(true)}
+                                                className="h-12 bg-white border border-red-200 text-red-600 rounded-xl text-[13px] font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <XCircle size={14} /> Reject
+                                            </button>
+                                            <button
+                                                onClick={() => handleApprove(selectedProduct.id)}
+                                                className="h-12 bg-teal-600 text-white rounded-xl text-[13px] font-semibold shadow-lg shadow-teal-600/25 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <CheckCircle2 size={14} /> Approve
                                             </button>
                                         </div>
                                     )}
