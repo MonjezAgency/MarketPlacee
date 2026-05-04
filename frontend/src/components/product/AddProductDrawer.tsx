@@ -54,7 +54,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
 
     const defaultForm = {
         name: '', brand: '', category: 'Beverages', ean: '',
-        price: '', stock: '', moq: '1', unit: 'Case',
+        price: '', stock: '', moq: '1', unit: 'Piece',
         unitsPerCase: '', casesPerPallet: '', unitsPerPallet: '', palletsPerShipment: '',
         description: '', supplierId: '', images: [] as string[],
         weight: '', shelfLife: '', origin: '',
@@ -140,7 +140,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                 price: priceEGP,
                 stock: parseInt(form.stock) || 0,
                 moq: parseInt(form.moq) || 1,
-                unit: form.unit,
+                unit: 'piece', // pricing base is always per-piece; buyer toggles derive carton/pallet/truck
                 description: form.description,
                 images: form.images,
                 supplierId: form.supplierId || undefined,
@@ -303,7 +303,9 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                 </div>
                             </section>
 
-                            {/* Pricing & Stock */}
+                            {/* Pricing & Stock — base = price PER PIECE.
+                                Carton / Pallet / Truck prices auto-derive from
+                                logistics multipliers below. */}
                             <section>
                                 <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
                                     <DollarSign size={12} /> Pricing & Stock
@@ -312,7 +314,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="text-xs font-bold text-slate-600 mb-1 block">
-                                                Price <span className="text-red-400">*</span>
+                                                Price per Piece <span className="text-red-400">*</span>
                                                 <span className="text-slate-400 font-normal ml-1">({activeCurrency})</span>
                                             </label>
                                             <div className="relative">
@@ -327,41 +329,65 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                                     className="w-full h-10 pl-7 pr-3 rounded-xl border border-slate-200 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 outline-none transition-all"
                                                 />
                                             </div>
+                                            <p className="text-[10px] text-slate-400 mt-1">Carton, pallet & truck prices auto-calculate</p>
                                         </div>
                                         <div>
-                                            <label className="text-xs font-bold text-slate-600 mb-1 block">Available Stock (cases)</label>
+                                            <label className="text-xs font-bold text-slate-600 mb-1 block">Available Stock (pieces)</label>
                                             <input
                                                 type="number"
                                                 min="0"
                                                 value={form.stock}
                                                 onChange={e => set('stock', e.target.value)}
-                                                placeholder="e.g. 1054"
+                                                placeholder="e.g. 12000"
                                                 className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 outline-none transition-all"
                                             />
                                         </div>
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-600 mb-1 block">Min Order (MOQ)</label>
-                                            <input
-                                                type="number"
-                                                min="1"
-                                                value={form.moq}
-                                                onChange={e => set('moq', e.target.value)}
-                                                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:border-teal-500 outline-none"
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="text-xs font-bold text-slate-600 mb-1 block">Unit Type</label>
-                                            <select
-                                                value={form.unit}
-                                                onChange={e => set('unit', e.target.value)}
-                                                className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:border-teal-500 outline-none bg-white"
-                                            >
-                                                {UNIT_TYPES.map(u => <option key={u}>{u}</option>)}
-                                            </select>
-                                        </div>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-600 mb-1 block">Min Order (MOQ, pieces)</label>
+                                        <input
+                                            type="number"
+                                            min="1"
+                                            value={form.moq}
+                                            onChange={e => set('moq', e.target.value)}
+                                            className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:border-teal-500 outline-none"
+                                        />
                                     </div>
+
+                                    {/* Live computed price preview */}
+                                    {(() => {
+                                        const pp = parseFloat(form.price) || 0;
+                                        const pc = parseInt(form.unitsPerCase) || 0;
+                                        const cp = parseInt(form.casesPerPallet) || 0;
+                                        const pt = parseInt(form.palletsPerShipment) || 0;
+                                        if (pp <= 0) return null;
+                                        const cartonPrice  = pc > 0 ? pp * pc : null;
+                                        const palletPrice  = pc > 0 && cp > 0 ? pp * pc * cp : null;
+                                        const truckPrice   = pc > 0 && cp > 0 && pt > 0 ? pp * pc * cp * pt : null;
+                                        const fmt = (n: number) => `${currencyInfo.symbol}${n.toFixed(2)}`;
+                                        return (
+                                            <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl space-y-1.5">
+                                                <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest">Auto-calculated tiers</p>
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    <div>
+                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">Carton</p>
+                                                        <p className="text-[12px] font-bold text-slate-900">{cartonPrice !== null ? fmt(cartonPrice) : '—'}</p>
+                                                        <p className="text-[9px] text-slate-400">{pc > 0 ? `${pc} pcs` : 'set pcs/case'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">Pallet</p>
+                                                        <p className="text-[12px] font-bold text-slate-900">{palletPrice !== null ? fmt(palletPrice) : '—'}</p>
+                                                        <p className="text-[9px] text-slate-400">{pc > 0 && cp > 0 ? `${pc * cp} pcs` : 'set cases/pallet'}</p>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">Truck</p>
+                                                        <p className="text-[12px] font-bold text-slate-900">{truckPrice !== null ? fmt(truckPrice) : '—'}</p>
+                                                        <p className="text-[9px] text-slate-400">{pc > 0 && cp > 0 && pt > 0 ? `${pc * cp * pt} pcs` : 'set pallets/truck'}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </section>
 

@@ -57,6 +57,8 @@ export default function AdminAddProductWorkspace() {
         quantity: '',
         minOrder: '1',
         unitType: 'Piece',
+        unitsPerCase: '',
+        casesPerPallet: '',
         unitsPerPallet: '',
         palletsPerShipment: '',
         description: '',
@@ -191,14 +193,18 @@ export default function AdminAddProductWorkspace() {
         try {
             const priceInBase = convertToBase(Number(formData.price), activeCurrency);
             
+            const piecesPerCase  = parseInt(formData.unitsPerCase) || 0;
+            const casesPerPallet = parseInt(formData.casesPerPallet) || 0;
+            const palletsPerTruck = parseInt(formData.palletsPerShipment) || 0;
+
             const payload: any = {
                 name: formData.name,
                 brand: formData.brand,
                 category: formData.category,
-                price: priceInBase,
+                price: priceInBase, // always per-piece
                 stock: parseInt(formData.quantity) || 0,
                 moq: parseInt(formData.minOrder) || 1,
-                unit: formData.unitType,
+                unit: 'piece', // pricing base is always per piece — buyer-side toggles derive larger tiers
                 description: formData.description,
                 ean: formData.barcode,
                 images: formData.images,
@@ -207,12 +213,12 @@ export default function AdminAddProductWorkspace() {
                 shelfLife: formData.shelfLife || undefined,
                 origin: formData.origin || undefined,
             };
-            if (formData.unitType === 'Pallet' || formData.unitType === 'Truck') {
-                payload.unitsPerPallet = parseInt(formData.unitsPerPallet) || undefined;
+            if (piecesPerCase  > 0) payload.unitsPerCase  = piecesPerCase;
+            if (casesPerPallet > 0) payload.casesPerPallet = casesPerPallet;
+            if (piecesPerCase > 0 && casesPerPallet > 0) {
+                payload.unitsPerPallet = piecesPerCase * casesPerPallet;
             }
-            if (formData.unitType === 'Truck') {
-                payload.palletsPerShipment = parseInt(formData.palletsPerShipment) || undefined;
-            }
+            if (palletsPerTruck > 0) payload.palletsPerShipment = palletsPerTruck;
 
             const res = await apiFetch('/products', {
                 method: 'POST',
@@ -390,16 +396,11 @@ export default function AdminAddProductWorkspace() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[12px] font-medium text-[#6B7280]">Unit Type <span className="text-red-400">*</span></label>
-                                    <select 
-                                        value={formData.unitType}
-                                        onChange={e => setFormData({ ...formData, unitType: e.target.value, unitsPerPallet: '', palletsPerShipment: '' })}
-                                        className="w-full h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#14B8A6] appearance-none font-medium"
-                                    >
-                                        <option value="Piece">📦 Piece</option>
-                                        <option value="Pallet">🏗️ Pallet</option>
-                                        <option value="Truck">🚛 Truck</option>
-                                    </select>
+                                    <label className="text-[12px] font-medium text-[#6B7280]">Pricing Base</label>
+                                    <div className="h-[44px] bg-teal-50 border border-teal-100 rounded-[10px] px-4 flex items-center text-[13px] font-bold text-teal-700">
+                                        📦 Per Piece (auto)
+                                    </div>
+                                    <p className="text-[10px] text-[#9CA3AF]">Carton / pallet / truck prices auto-calculate below</p>
                                 </div>
                             </div>
                         </div>
@@ -463,48 +464,80 @@ export default function AdminAddProductWorkspace() {
                                 </div>
                             </div>
 
-                            {/* Conditional Unit Hierarchy Fields */}
-                            {(formData.unitType === 'Pallet' || formData.unitType === 'Truck') && (
-                                <>
-                                    <div className="h-px bg-[#F3F4F6]" />
-                                    <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-3">
-                                        <p className="text-[11px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
-                                            <Info size={12} /> Unit Hierarchy Configuration
-                                        </p>
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[12px] font-medium text-blue-600">Units per Pallet</label>
-                                                <input 
-                                                    type="number" 
-                                                    placeholder="e.g. 48"
-                                                    value={formData.unitsPerPallet}
-                                                    onChange={e => setFormData({ ...formData, unitsPerPallet: e.target.value })}
-                                                    className="w-full h-[44px] bg-white border border-blue-200 rounded-[10px] px-4 text-[14px] outline-none focus:border-blue-400 transition-all font-bold"
-                                                />
-                                                <p className="text-[10px] text-blue-500">How many pieces fit on one pallet</p>
-                                            </div>
-                                            {formData.unitType === 'Truck' && (
-                                                <div className="space-y-1.5">
-                                                    <label className="text-[12px] font-medium text-blue-600">Pallet per Truck</label>
-                                                    <input 
-                                                        type="number" 
-                                                        placeholder="e.g. 20"
-                                                        value={formData.palletsPerShipment}
-                                                        onChange={e => setFormData({ ...formData, palletsPerShipment: e.target.value })}
-                                                        className="w-full h-[44px] bg-white border border-blue-200 rounded-[10px] px-4 text-[14px] outline-none focus:border-blue-400 transition-all font-bold"
-                                                    />
-                                                    <p className="text-[10px] text-blue-500">How many pallet per truck container</p>
-                                                </div>
-                                            )}
-                                        </div>
-                                        {formData.unitType === 'Truck' && formData.unitsPerPallet && formData.palletsPerShipment && (
-                                            <div className="p-3 bg-white border border-blue-100 rounded-lg text-[12px] text-blue-700 font-medium">
-                                                📊 Total pcs per shipment: <span className="font-black">{parseInt(formData.unitsPerPallet) * parseInt(formData.palletsPerShipment) || '—'}</span> pieces
-                                            </div>
-                                        )}
+                            {/* Unit Hierarchy — always required so we can derive carton/pallet/truck pricing */}
+                            <div className="h-px bg-[#F3F4F6]" />
+                            <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl space-y-3">
+                                <p className="text-[11px] font-black text-blue-700 uppercase tracking-widest flex items-center gap-1.5">
+                                    <Info size={12} /> Logistics Multipliers
+                                </p>
+                                <div className="grid grid-cols-3 gap-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[12px] font-medium text-blue-600">Pieces / Carton</label>
+                                        <input
+                                            type="number"
+                                            placeholder="e.g. 24"
+                                            value={formData.unitsPerCase}
+                                            onChange={e => setFormData({ ...formData, unitsPerCase: e.target.value })}
+                                            className="w-full h-[44px] bg-white border border-blue-200 rounded-[10px] px-4 text-[14px] outline-none focus:border-blue-400 transition-all font-bold"
+                                        />
+                                        <p className="text-[10px] text-blue-500">e.g. 24 pieces in a carton</p>
                                     </div>
-                                </>
-                            )}
+                                    <div className="space-y-1.5">
+                                        <label className="text-[12px] font-medium text-blue-600">Cartons / Pallet</label>
+                                        <input
+                                            type="number"
+                                            placeholder="e.g. 108"
+                                            value={formData.casesPerPallet}
+                                            onChange={e => setFormData({ ...formData, casesPerPallet: e.target.value })}
+                                            className="w-full h-[44px] bg-white border border-blue-200 rounded-[10px] px-4 text-[14px] outline-none focus:border-blue-400 transition-all font-bold"
+                                        />
+                                        <p className="text-[10px] text-blue-500">e.g. 108 cartons per pallet</p>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[12px] font-medium text-blue-600">Pallets / Truck</label>
+                                        <input
+                                            type="number"
+                                            placeholder="e.g. 20"
+                                            value={formData.palletsPerShipment}
+                                            onChange={e => setFormData({ ...formData, palletsPerShipment: e.target.value })}
+                                            className="w-full h-[44px] bg-white border border-blue-200 rounded-[10px] px-4 text-[14px] outline-none focus:border-blue-400 transition-all font-bold"
+                                        />
+                                        <p className="text-[10px] text-blue-500">how many pallets fit per truck</p>
+                                    </div>
+                                </div>
+
+                                {/* Live computed buyer-facing prices (per Carton / Pallet / Truck) */}
+                                {(() => {
+                                    const pp = parseFloat(formData.price) || 0;
+                                    const pc = parseInt(formData.unitsPerCase) || 0;
+                                    const cp = parseInt(formData.casesPerPallet) || 0;
+                                    const pt = parseInt(formData.palletsPerShipment) || 0;
+                                    if (pp <= 0) return null;
+                                    const carton = pc > 0 ? pp * pc : null;
+                                    const pallet = pc > 0 && cp > 0 ? pp * pc * cp : null;
+                                    const truck  = pc > 0 && cp > 0 && pt > 0 ? pp * pc * cp * pt : null;
+                                    const fmt = (n: number) => `${selectedCurrencyInfo.symbol}${n.toFixed(2)}`;
+                                    return (
+                                        <div className="p-3 bg-white border border-blue-200 rounded-xl">
+                                            <p className="text-[11px] font-black text-blue-700 uppercase tracking-widest mb-2">Auto-calculated buyer-side tiers</p>
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div>
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase">Carton</p>
+                                                    <p className="text-[14px] font-bold text-slate-900">{carton !== null ? fmt(carton) : '—'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase">Pallet</p>
+                                                    <p className="text-[14px] font-bold text-slate-900">{pallet !== null ? fmt(pallet) : '—'}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[10px] text-slate-500 font-bold uppercase">Truck</p>
+                                                    <p className="text-[14px] font-bold text-slate-900">{truck !== null ? fmt(truck) : '—'}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
+                            </div>
 
                             <div className="h-px bg-[#F3F4F6]" />
 
@@ -676,21 +709,30 @@ export default function AdminAddProductWorkspace() {
                                 </div>
                             </div>
 
+                            <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl mb-4">
+                                <p className="text-[12px] font-bold text-teal-900">
+                                    💡 Submit <strong>price per piece only</strong>. AI will derive carton, pallet & truck prices using the multipliers below.
+                                </p>
+                                <p className="text-[11px] text-teal-700 mt-1">
+                                    Example: piece €0.50 · 24 pcs/carton · 108 cartons/pallet · 33 pallets/truck →
+                                    Carton €12.00 · Pallet €1,296 · Truck €42,768
+                                </p>
+                            </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 {[
                                     { label: 'Product Name', desc: 'Required', required: true },
                                     { label: 'Brand', desc: 'Required', required: true },
                                     { label: 'Category', desc: 'System Match', required: false },
-                                    { label: 'Price (Base)', desc: 'Numeric', required: true },
+                                    { label: 'Price per Piece', desc: 'Base; numeric', required: true },
+                                    { label: 'Pcs / Carton', desc: 'e.g. 24', required: true },
+                                    { label: 'Cartons / Pallet', desc: 'e.g. 108', required: true },
+                                    { label: 'Pallets / Truck', desc: 'e.g. 20–33', required: false },
+                                    { label: 'Stock', desc: 'Total pieces', required: true },
+                                    { label: 'MOQ', desc: 'Min order pcs', required: false },
+                                    { label: 'EAN', desc: 'Barcode', required: false },
                                     { label: 'Description', desc: 'Marketing', required: false },
                                     { label: 'Weight (kg)', desc: 'Logistics', required: false },
                                     { label: 'BBD', desc: 'e.g. 12M', required: false },
-                                    { label: 'Stock', desc: 'Total pcs', required: true },
-                                    { label: 'MOQ', desc: 'Min order', required: false },
-                                    { label: 'Unit Type', desc: 'Piece/Pallet/Truck', required: false },
-                                    { label: 'Units/Pallet', desc: 'Numeric', required: false },
-                                    { label: 'Pallets/Truck', desc: 'Numeric', required: false },
-                                    { label: 'EAN', desc: 'Barcode', required: false },
                                     { label: 'Origin', desc: 'Country', required: false },
                                 ].map((col) => (
                                     <div key={col.label} className={`p-3 border rounded-2xl ${col.required ? 'bg-teal-50/50 border-teal-200' : 'bg-[#F8FAFC] border-[#E5E7EB]'}`}>
