@@ -76,10 +76,11 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
         if (!targetUserId) return;
         const tid = toast.loading(active ? 'Activating AI Agent...' : 'Switching to Human...');
         try {
-            const res = await apiFetch(`/chat/admin/conversations/${targetUserId}/agent`, {
-                method: 'PATCH',
-                body: JSON.stringify({ active })
-            });
+            // Backend exposes two distinct endpoints — switch-ai vs switch
+            const path = active
+                ? `/chat/admin/switch-ai/${targetUserId}`
+                : `/chat/admin/switch/${targetUserId}`;
+            const res = await apiFetch(path, { method: 'PATCH' });
             if (res.ok) {
                 setIsBotActive(active);
                 toast.success(active ? 'AI Agent is now active' : 'Switched to Human mode', { id: tid });
@@ -98,11 +99,30 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
         let socket: Socket | null = null;
 
         const initSocket = async () => {
-            let token = getToken();
-            const socketUrl = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app';
-            socket = io(`${socketUrl}/chat`, {
+            // Try to obtain a JWT for socket auth — the proxy holds the
+            // httpOnly cookie, so we ask it to mint a short-lived token.
+            let token: string | undefined;
+            try {
+                const r = await fetch('/api/proxy/auth/socket-token', {
+                    credentials: 'same-origin',
+                });
+                if (r.ok) {
+                    const data = await r.json().catch(() => ({}));
+                    token = data?.token;
+                }
+            } catch (_e) { /* socket auth optional; HTTP fallback still works */ }
+
+            // Socket must connect to the actual backend WS endpoint, not the
+            // Next.js proxy. NEXT_PUBLIC_API_URL of "/api" → use the public
+            // Railway URL fallback.
+            let socketBase = process.env.NEXT_PUBLIC_API_URL || '';
+            if (!socketBase || socketBase.startsWith('/')) {
+                socketBase = 'https://marketplace-backend-production-539c.up.railway.app';
+            }
+            socket = io(`${socketBase}/chat`, {
                 auth: { token },
                 transports: ['websocket', 'polling'],
+                withCredentials: true,
             });
 
             socketRef.current = socket;

@@ -84,6 +84,19 @@ export class AuthController {
         return this.authService.getUserProfile(req.user.sub);
     }
 
+    /**
+     * Returns the current JWT for the authenticated user, mined from the
+     * httpOnly cookie. Used by the chat WebSocket gateway, which can't read
+     * the cookie itself but can accept a token in the auth handshake.
+     */
+    @UseGuards(JwtAuthGuard)
+    @Get('socket-token')
+    async getSocketToken(@Req() req: any) {
+        const cookieToken = req?.cookies?.token;
+        if (!cookieToken) throw new UnauthorizedException('No token cookie');
+        return { token: cookieToken };
+    }
+
     @Post('logout')
     async logout(@Res({ passthrough: true }) res: any) {
         res.clearCookie('token', {
