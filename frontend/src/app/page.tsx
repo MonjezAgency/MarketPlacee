@@ -106,7 +106,7 @@ const TOP_BUSINESS_CATEGORIES = [
     {
         title: 'Packaging & Materials',
         sub: 'Boxes, films, raw inputs',
-        image: 'https://images.unsplash.com/photo-1589939705384-5185138a047a?auto=format&fit=crop&q=80&w=900',
+        image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&q=80&w=900',
     },
     {
         title: 'Office & Janitorial',
@@ -209,7 +209,7 @@ export default function HomePage() {
                 {/* ============================================================
                      2. HERO
                 ============================================================ */}
-                <section className="relative h-[360px] sm:h-[400px] md:h-[440px] lg:h-[460px] rounded-2xl overflow-hidden bg-[#0B1F3A]">
+                <section className="relative h-[420px] sm:h-[460px] md:h-[480px] lg:h-[500px] rounded-2xl overflow-hidden bg-[#0B1F3A]">
                     {/* Background image */}
                     <img
                         src={HERO_SLIDES[slide].image}
@@ -220,36 +220,35 @@ export default function HomePage() {
                     <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F3A] via-[#0B1F3A]/85 to-[#0B1F3A]/30" />
 
                     {/* Content */}
-                    <div className="relative z-10 h-full flex flex-col justify-center px-5 sm:px-8 md:px-10 lg:px-12">
-                        <div className="max-w-full sm:max-w-[480px] lg:max-w-[520px] space-y-4 sm:space-y-5">
-                            <h1 className="text-white font-bold leading-[1.15] tracking-tight text-[26px] sm:text-[32px] md:text-[38px] lg:text-[42px]">
-                                {HERO_SLIDES[slide].title}
-                                <br />
+                    <div className="relative z-10 h-full flex flex-col justify-center px-6 sm:px-10 md:px-12 lg:px-14 pb-10">
+                        <div className="max-w-full sm:max-w-[500px] lg:max-w-[540px] space-y-5">
+                            <h1 className="text-white font-bold leading-[1.12] tracking-tight text-[28px] sm:text-[34px] md:text-[40px] lg:text-[44px]">
+                                {HERO_SLIDES[slide].title}{' '}
                                 <span className="text-[#14B8A6]">{HERO_SLIDES[slide].accent}</span>
                             </h1>
                             <p className="text-[#CBD5F5] text-[13px] sm:text-[14px] md:text-[15px] leading-relaxed max-w-[460px]">
                                 {HERO_SLIDES[slide].desc}
                             </p>
 
-                            {/* Inline highlights */}
-                            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-x-5 sm:gap-x-6 gap-y-3 pt-1">
+                            {/* Inline highlights — always 2 columns, fixed grid */}
+                            <div className="grid grid-cols-2 gap-x-5 gap-y-3 max-w-[460px]">
                                 {HERO_HIGHLIGHTS.map((h) => (
                                     <div key={h.title} className="flex items-center gap-2">
                                         <div className="w-7 h-7 rounded-full bg-[#14B8A6]/15 flex items-center justify-center text-[#14B8A6] shrink-0">
                                             <CheckCircle2 size={14} />
                                         </div>
-                                        <div className="leading-tight">
-                                            <div className="text-[11px] sm:text-[12px] font-semibold text-white">{h.title}</div>
-                                            <div className="text-[10px] sm:text-[11px] text-[#94A3B8]">{h.sub}</div>
+                                        <div className="leading-tight min-w-0">
+                                            <div className="text-[11px] sm:text-[12px] font-semibold text-white truncate">{h.title}</div>
+                                            <div className="text-[10px] sm:text-[11px] text-[#94A3B8] truncate">{h.sub}</div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            <div className="pt-2">
+                            <div className="pt-1">
                                 <Link
                                     href="/categories"
-                                    className="inline-flex items-center gap-2 h-[46px] sm:h-[48px] px-6 sm:px-7 bg-[#14B8A6] hover:bg-[#0EA89A] text-white rounded-xl text-[14px] sm:text-[15px] font-semibold shadow-lg shadow-[#14B8A6]/25 transition-all active:scale-95 no-underline"
+                                    className="inline-flex items-center gap-2 h-[48px] sm:h-[50px] px-7 sm:px-8 bg-[#14B8A6] hover:bg-[#0EA89A] text-white rounded-xl text-[14px] sm:text-[15px] font-semibold shadow-lg shadow-[#14B8A6]/25 transition-all active:scale-95 no-underline"
                                 >
                                     Start Sourcing Now <ArrowRight size={16} />
                                 </Link>
@@ -257,14 +256,14 @@ export default function HomePage() {
                         </div>
                     </div>
 
-                    {/* dots */}
-                    <div className="absolute bottom-4 sm:bottom-5 left-5 sm:left-8 md:left-10 lg:left-12 z-20 flex gap-2">
+                    {/* dots — bottom-right so they don't crowd the CTA */}
+                    <div className="absolute bottom-5 right-6 sm:right-10 md:right-12 lg:right-14 z-20 flex gap-2">
                         {HERO_SLIDES.map((_, i) => (
                             <button
                                 key={i}
                                 onClick={() => setSlide(i)}
                                 aria-label={`Slide ${i + 1}`}
-                                className={`h-1.5 rounded-full transition-all ${slide === i ? 'w-8 bg-[#14B8A6]' : 'w-1.5 bg-white/30 hover:bg-white/60'}`}
+                                className={`h-1.5 rounded-full transition-all ${slide === i ? 'w-8 bg-[#14B8A6]' : 'w-1.5 bg-white/40 hover:bg-white/70'}`}
                             />
                         ))}
                     </div>
@@ -358,12 +357,12 @@ export default function HomePage() {
                             {[...BRANDS, ...BRANDS].map((b, i) => (
                                 <div
                                     key={`r1-${i}`}
-                                    className="h-[56px] sm:h-[64px] mx-4 sm:mx-8 flex items-center justify-center shrink-0"
+                                    className="w-[140px] sm:w-[160px] h-[64px] sm:h-[72px] mx-1 sm:mx-2 flex items-center justify-center shrink-0"
                                 >
                                     <img
                                         src={b.logo}
                                         alt={b.name}
-                                        className="max-h-[34px] sm:max-h-[40px] w-auto object-contain grayscale opacity-70 hover:opacity-100 hover:grayscale-0 transition-all"
+                                        className="max-h-[36px] sm:max-h-[40px] max-w-[110px] sm:max-w-[130px] w-auto h-auto object-contain grayscale opacity-70 hover:opacity-100 hover:grayscale-0 transition-all"
                                         onError={(e) => {
                                             const el = e.currentTarget;
                                             el.style.display = 'none';
@@ -396,12 +395,16 @@ export default function HomePage() {
                                 href="/categories"
                                 className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden group hover:shadow-md hover:border-[#14B8A6]/40 transition-all no-underline"
                             >
-                                <div className="aspect-[4/3] overflow-hidden bg-[#F1F5F9]">
+                                <div className="aspect-[4/3] overflow-hidden bg-gradient-to-br from-[#F1F5F9] to-[#E2E8F0] relative">
                                     <img
                                         src={c.image}
                                         alt={c.title}
                                         loading="lazy"
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                        onError={(e) => {
+                                            const el = e.currentTarget;
+                                            el.style.display = 'none';
+                                        }}
                                     />
                                 </div>
                                 <div className="p-3 sm:p-4">

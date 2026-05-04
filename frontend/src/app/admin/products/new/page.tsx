@@ -13,6 +13,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
+import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertToBase } from '@/lib/currency';
 import { Loader2 } from 'lucide-react';
@@ -20,10 +21,9 @@ import { CATEGORIES_LIST } from '@/lib/products';
 
 export default function AdminAddProductWorkspace() {
     const router = useRouter();
+    const { user } = useAuth();
     const [isSaving, setIsSaving] = useState(false);
     const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-    const [suppliers, setSuppliers] = useState<any[]>([]);
-    const [searchTerm, setSearchTerm] = useState('');
     const [activeCurrency, setActiveCurrencyState] = useState(() => {
         // Read from localStorage first (admin settings), then fallback to detection
         if (typeof window !== 'undefined') {
@@ -81,27 +81,13 @@ export default function AdminAddProductWorkspace() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const bulkInputRef = useRef<HTMLInputElement>(null);
 
-    // Fetch suppliers for the admin to choose from
+    // Auto-assign Atlantis (the logged-in admin) as the supplier — no picker.
+    // The admin IS the platform: every product they add belongs to Atlantis.
     useEffect(() => {
-        const fetchSuppliers = async () => {
-            try {
-                const res = await apiFetch('/users?role=SUPPLIER');
-                if (res.ok) {
-                    const data = await res.json();
-                    const suppliersList = Array.isArray(data) ? data : (data.users || []);
-                    setSuppliers(suppliersList);
-                    
-                    // Auto-select if only one supplier exists (e.g. the admin's own team)
-                    if (suppliersList.length === 1) {
-                        setFormData(prev => ({ ...prev, supplierId: suppliersList[0].id }));
-                    }
-                }
-            } catch (err) {
-                console.error('Failed to fetch suppliers', err);
-            }
-        };
-        fetchSuppliers();
-    }, []);
+        if (user?.id) {
+            setFormData(prev => ({ ...prev, supplierId: user.id }));
+        }
+    }, [user?.id]);
 
     const handleAIDescription = async () => {
         if (!formData.name) return;
@@ -131,7 +117,7 @@ export default function AdminAddProductWorkspace() {
 
     const completionItems = [
         { label: 'Basic Info', done: !!formData.name && !!formData.brand },
-        { label: 'Pricing & Supply', done: !!formData.price && !!formData.supplierId },
+        { label: 'Pricing & Supply', done: !!formData.price },
         { label: 'Media', done: formData.images.length > 0 },
         { label: 'Description', done: formData.description.length > 20 }
     ];
@@ -196,8 +182,8 @@ export default function AdminAddProductWorkspace() {
     };
 
     const handleLaunch = async () => {
-        if (!formData.name || !formData.price || !formData.supplierId) {
-            alert('Please fill in required fields (Name, Price, and Supplier)');
+        if (!formData.name || !formData.price) {
+            alert('Please fill in required fields (Name and Price)');
             return;
         }
 
@@ -418,45 +404,7 @@ export default function AdminAddProductWorkspace() {
                             </div>
                         </div>
 
-                        {/* CARD: SUPPLIER SELECTION (SHOW ONLY IF MULTIPLE SUPPLIERS EXIST) */}
-                        {suppliers.length > 1 && (
-                            <div className="bg-white border border-[#E5E7EB] rounded-[14px] p-4 shadow-sm">
-                                <h3 className="text-[16px] font-semibold mb-4 flex items-center gap-2">
-                                    <Store size={18} className="text-teal-600" /> Source Supplier
-                                </h3>
-                                <div className="space-y-4">
-                                    <div className="relative">
-                                        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7280]" />
-                                        <input 
-                                            type="text" 
-                                            placeholder="Search suppliers..."
-                                            value={searchTerm}
-                                            onChange={e => setSearchTerm(e.target.value)}
-                                            className="w-full h-[44px] bg-[#F8FAFC] border border-[#E5E7EB] rounded-[10px] ps-10 pe-4 text-[14px] outline-none focus:border-[#14B8A6] transition-all"
-                                        />
-                                    </div>
-                                    <div className="max-h-[160px] overflow-y-auto border border-[#E5E7EB] rounded-xl divide-y divide-[#E5E7EB]">
-                                        {suppliers.filter(s => s.name?.toLowerCase().includes(searchTerm.toLowerCase()) || s.email?.toLowerCase().includes(searchTerm.toLowerCase())).map((s) => (
-                                            <button 
-                                                key={s.id}
-                                                type="button"
-                                                onClick={() => setFormData({ ...formData, supplierId: s.id })}
-                                                className={cn(
-                                                    "w-full px-4 py-3 flex items-center justify-between hover:bg-[#F1F5F9] transition-all text-left",
-                                                    formData.supplierId === s.id && "bg-teal-50"
-                                                )}
-                                            >
-                                                <div>
-                                                    <p className="text-[13px] font-bold">{s.name}</p>
-                                                    <p className="text-[11px] text-[#6B7280]">{s.email}</p>
-                                                </div>
-                                                {formData.supplierId === s.id && <CheckCircle2 size={16} className="text-teal-600" />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
+                        {/* Supplier picker removed — admin IS the supplier (Atlantis). */}
 
                         {/* CARD 3: LOGISTICS & COMPLIANCE */}
                         <div className="bg-white border border-[#E5E7EB] rounded-[14px] p-5 shadow-sm space-y-5">
@@ -665,14 +613,12 @@ export default function AdminAddProductWorkspace() {
                                     <p className="text-[14px] font-black text-[#14B8A6] mt-1">{formData.price ? `${activeCurrency} ${formData.price}` : 'Price Pending'}</p>
                                 </div>
                             </div>
-                            {formData.supplierId && (
-                                <div className="mt-3 p-3 bg-teal-50 border border-teal-100 rounded-xl flex items-center gap-2">
-                                    <Store size={14} className="text-teal-600" />
-                                    <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider">
-                                        Assigned to: {suppliers.find(s => s.id === formData.supplierId)?.name || 'Unknown'}
-                                    </span>
-                                </div>
-                            )}
+                            <div className="mt-3 p-3 bg-teal-50 border border-teal-100 rounded-xl flex items-center gap-2">
+                                <Store size={14} className="text-teal-600" />
+                                <span className="text-[11px] font-bold text-teal-800 uppercase tracking-wider">
+                                    Atlantis Platform Inventory
+                                </span>
+                            </div>
                         </div>
 
                         {/* CARD 2: COMPLETION PROGRESS */}
@@ -703,12 +649,10 @@ export default function AdminAddProductWorkspace() {
 
                         {/* CARD 4: ALERTS */}
                         <div className="space-y-2">
-                            {!formData.supplierId && (
-                                <div className="h-[40px] px-3 bg-red-50 border border-red-100 rounded-[10px] flex items-center gap-2 text-red-600">
-                                    <AlertCircle size={16} />
-                                    <span className="text-[13px] font-medium">Please assign a supplier to this product</span>
-                                </div>
-                            )}
+                            <div className="h-[40px] px-3 bg-teal-50 border border-teal-100 rounded-[10px] flex items-center gap-2 text-teal-700">
+                                <Store size={16} />
+                                <span className="text-[13px] font-medium">Source: Atlantis (platform inventory)</span>
+                            </div>
                             <div className="h-[40px] px-3 bg-[#F59E0B]/5 border border-[#F59E0B]/10 rounded-[10px] flex items-center gap-2 text-[#F59E0B]">
                                 <Info size={16} />
                                 <span className="text-[13px] font-medium">Product will be visible to all enterprise buyers</span>

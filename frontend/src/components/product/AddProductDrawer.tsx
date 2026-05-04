@@ -123,15 +123,11 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
         { label: 'Image', done: form.images.length > 0 },
         { label: 'Description', done: form.description.length > 20 },
     ];
-    if (role === 'admin') {
-        completionItems.push({ label: 'Supplier', done: !!form.supplierId });
-    }
     const progress = (completionItems.filter(i => i.done).length / completionItems.length) * 100;
 
     const handleSave = async () => {
         if (!form.name.trim()) { toast.error('Product name is required'); return; }
         if (!form.price) { toast.error('Price is required'); return; }
-        if (role === 'admin' && !form.supplierId) { toast.error('Please select a supplier'); return; }
 
         setIsSaving(true);
         try {
@@ -500,52 +496,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                 />
                             </section>
 
-                            {/* Supplier picker (admin only) */}
-                            {role === 'admin' && (
-                                <section>
-                                    <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
-                                        <Store size={12} /> Assign Supplier <span className="text-red-400">*</span>
-                                    </h3>
-                                    <input
-                                        value={supplierSearch}
-                                        onChange={e => setSupplierSearch(e.target.value)}
-                                        placeholder="Search suppliers…"
-                                        className="w-full h-9 px-3 rounded-xl border border-slate-200 text-sm focus:border-teal-500 outline-none mb-2"
-                                    />
-                                    <div className="max-h-40 overflow-y-auto space-y-1 rounded-xl border border-slate-100 bg-slate-50/50 p-2">
-                                        {filteredSuppliers.length === 0 ? (
-                                            <p className="text-xs text-slate-400 text-center py-3">No suppliers found</p>
-                                        ) : filteredSuppliers.map(s => (
-                                            <button
-                                                key={s.id}
-                                                onClick={() => set('supplierId', s.id)}
-                                                className={cn(
-                                                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors",
-                                                    form.supplierId === s.id
-                                                        ? "bg-teal-500 text-white"
-                                                        : "hover:bg-slate-100 text-slate-700"
-                                                )}
-                                            >
-                                                <div className={cn(
-                                                    "w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black shrink-0",
-                                                    form.supplierId === s.id ? "bg-white/20 text-white" : "bg-slate-200 text-slate-600"
-                                                )}>
-                                                    {(s.name || s.email || '?')[0].toUpperCase()}
-                                                </div>
-                                                <div className="flex-1 min-w-0">
-                                                    <p className={cn("text-xs font-bold truncate", form.supplierId === s.id ? "text-white" : "text-slate-800")}>
-                                                        {s.name || 'Unnamed'}
-                                                    </p>
-                                                    <p className={cn("text-[10px] truncate", form.supplierId === s.id ? "text-white/70" : "text-slate-400")}>
-                                                        {s.email}
-                                                    </p>
-                                                </div>
-                                                {form.supplierId === s.id && <CheckCircle2 size={14} />}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </section>
-                            )}
+                            {/* Admin: supplier is always Atlantis (the platform itself) — no picker */}
 
                             {/* Admin-only: publish toggle */}
                             {role === 'admin' && (
