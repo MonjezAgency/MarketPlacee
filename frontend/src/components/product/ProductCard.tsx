@@ -154,12 +154,17 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const palletPrice = piecesPerPallet > 0 ? basePerPiece * piecesPerPallet * mPallet : null;
     const truckPrice  = (piecesPerPallet > 0 && palletsPerTruck > 0) ? basePerPiece * piecesPerPallet * palletsPerTruck * mContainer : null;
 
-    // Pick price + label based on admin setting, fall back when data is missing
+    // Show per-carton equivalent price regardless of tier, so customers can compare apples-to-apples
     let cardPrice = displayPrice;
-    let cardUnit  = product.unit || 'piece';
-    if (defaultUnit === 'truck' && truckPrice !== null)        { cardPrice = truckPrice;  cardUnit = 'truck'; }
-    else if (defaultUnit === 'pallet' && palletPrice !== null) { cardPrice = palletPrice; cardUnit = 'pallet'; }
-    else if (defaultUnit === 'carton' && cartonPrice !== null) { cardPrice = cartonPrice; cardUnit = 'carton'; }
+    let cardUnit  = 'ctn';
+    if (defaultUnit === 'truck' && truckPrice !== null) {
+        const cartonsInTruck = casesPerPallet * palletsPerTruck;
+        cardPrice = cartonsInTruck > 0 ? truckPrice / cartonsInTruck : truckPrice;
+    } else if (defaultUnit === 'pallet' && palletPrice !== null) {
+        cardPrice = casesPerPallet > 0 ? palletPrice / casesPerPallet : palletPrice;
+    } else if (defaultUnit === 'carton' && cartonPrice !== null) {
+        cardPrice = cartonPrice;
+    }
 
     const rating = product.rating || 0;
     const reviews = product.reviewsCount || 0;

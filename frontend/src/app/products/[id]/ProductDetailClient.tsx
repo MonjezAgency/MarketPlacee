@@ -342,10 +342,11 @@ export default function ProductDetailClient() {
                                 // Fallback per-piece customer price (with piece markup applied)
                                 const perPiece = basePerPiece * markups.piece;
 
+                                // qty = number of cartons inside the tier (so price/qty = per-carton price)
                                 const options: Array<{ key: 'truck'|'pallet'|'carton'; label: string; emoji: string; price: number | null; qty: number }> = [];
-                                if (truckPrice !== null)  options.push({ key: 'truck',  label: 'Truck',  emoji: '🚛', price: truckPrice,  qty: palletsPerTruck });
-                                if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet', emoji: '📦', price: palletPrice, qty: casesPerPallet });
-                                if (cartonPrice !== null) options.push({ key: 'carton', label: 'Carton', emoji: '🗃️', price: cartonPrice, qty: piecesPerCase });
+                                if (truckPrice !== null)  options.push({ key: 'truck',  label: 'Truck',  emoji: '🚛', price: truckPrice,  qty: (casesPerPallet * palletsPerTruck) || 1 });
+                                if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet', emoji: '📦', price: palletPrice, qty: casesPerPallet || 1 });
+                                if (cartonPrice !== null) options.push({ key: 'carton', label: 'Carton', emoji: '🗃️', price: cartonPrice, qty: 1 });
                                 if (options.length === 0) options.push({ key: 'carton', label: product.unit || 'Unit', emoji: '📦', price: product.price, qty: 1 });
 
                                 // Default: use admin-configured unit, fall back to the largest available
@@ -355,8 +356,9 @@ export default function ProductDetailClient() {
                                 }
                                 const active = options.find(o => o.key === (selectedUnit ?? initialSelected)) || options[0];
 
-                                // Custom quantity total price
+                                // unitPrice = per-carton equivalent (tier total ÷ cartons in tier)
                                 const unitPrice = active.price != null ? active.price / (active.qty || 1) : perPiece;
+                                // customTotal = grand total for quantity tiers ordered (tierTotal × qty)
                                 const customTotal = active.price != null
                                     ? active.price * quantity
                                     : perPiece * quantity;
@@ -381,7 +383,7 @@ export default function ProductDetailClient() {
                                                     <span className="text-[11px] font-black uppercase tracking-widest">{opt.label}</span>
                                                     {opt.price != null && (
                                                         <span className={cn('text-[11px] font-semibold mt-0.5', active.key === opt.key ? 'text-white/70' : 'text-[#9CA3AF]')}>
-                                                            {formatPrice(opt.price)}
+                                                            {formatPrice(opt.price / (opt.qty || 1))} / ctn
                                                         </span>
                                                     )}
                                                 </button>
@@ -396,12 +398,17 @@ export default function ProductDetailClient() {
                                                 </p>
                                                 <div className="flex items-baseline gap-2">
                                                     <span className="text-[40px] font-black text-[#111827] tracking-tighter leading-none">
-                                                        {formatPrice(quantity > 1 ? customTotal : (active.price ?? product.price))}
+                                                        {formatPrice(unitPrice)}
                                                     </span>
-                                                    {quantity === 1 && (
-                                                        <span className="text-[15px] font-medium text-[#6B7280]">/ {active.label.toLowerCase()}</span>
-                                                    )}
+                                                    <span className="text-[15px] font-medium text-[#6B7280]">/ ctn</span>
                                                 </div>
+                                                {/* Show tier total as secondary reference price */}
+                                                {active.qty > 1 && (
+                                                    <p className="text-[12px] text-[#9CA3AF] mt-0.5">
+                                                        {active.qty} ctns × {formatPrice(unitPrice)} = <span className="text-[#6B7280] font-semibold">{formatPrice(active.price ?? product.price)}</span> / {active.label.toLowerCase()}
+                                                        {quantity > 1 && <span className="ml-1">· <strong className="text-[#111827]">{formatPrice(customTotal)}</strong> total</span>}
+                                                    </p>
+                                                )}
                                             </div>
 
                                             {/* Quantity selector */}
@@ -418,12 +425,12 @@ export default function ProductDetailClient() {
                                             </div>
                                         </div>
 
-                                        {/* Breakdown hint */}
-                                        {quantity > 1 && active.qty > 0 && (
+                                        {/* Breakdown hint (multi-unit orders) */}
+                                        {quantity > 1 && (
                                             <p className="text-[12px] text-[#6B7280] bg-[#F8FAFC] rounded-xl px-3 py-2 leading-relaxed">
                                                 {quantity} {active.label.toLowerCase()}s × {formatPrice(active.price ?? product.price)} = <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
-                                                {active.key === 'truck' && palletPrice != null && <span className="ml-2 text-[#9CA3AF]">({quantity * palletsPerTruck} pallets)</span>}
-                                                {active.key === 'pallet' && cartonPrice != null && <span className="ml-2 text-[#9CA3AF]">({quantity * casesPerPallet} cartons)</span>}
+                                                {active.key === 'truck' && palletsPerTruck > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * (casesPerPallet * palletsPerTruck)} cartons total)</span>}
+                                                {active.key === 'pallet' && casesPerPallet > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * casesPerPallet} cartons total)</span>}
                                                 {active.key === 'carton' && piecesPerCase > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * piecesPerCase} pcs)</span>}
                                             </p>
                                         )}
