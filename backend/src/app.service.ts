@@ -31,6 +31,11 @@ export class AppService {
         return { currency: config?.value || null };
     }
 
+    async getDefaultDisplayUnit(): Promise<string> {
+        const config = await this.prisma.appConfig.findUnique({ where: { key: 'DEFAULT_DISPLAY_UNIT' } });
+        return config?.value || 'truck';
+    }
+
     async resetAdmin() {
         const email = 'Info@atlantisfmcg.com';
         const password = 'Admin@123';

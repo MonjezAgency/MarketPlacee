@@ -157,6 +157,21 @@ export class AppConfigService {
             update: { value: currency }
         });
     }
+    async getDefaultDisplayUnit(): Promise<string> {
+        const config = await this.prisma.appConfig.findUnique({ where: { key: 'DEFAULT_DISPLAY_UNIT' } });
+        return config?.value || 'truck';
+    }
+
+    async setDefaultDisplayUnit(unit: string): Promise<any> {
+        const allowed = ['truck', 'pallet', 'carton'];
+        const value = allowed.includes(unit) ? unit : 'truck';
+        return this.prisma.appConfig.upsert({
+            where: { key: 'DEFAULT_DISPLAY_UNIT' },
+            create: { key: 'DEFAULT_DISPLAY_UNIT', value },
+            update: { value }
+        });
+    }
+
     async getAdPlacements() {
         const config = await this.prisma.appConfig.findUnique({
             where: { key: 'AD_PLACEMENTS' }

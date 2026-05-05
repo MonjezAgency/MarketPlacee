@@ -75,6 +75,17 @@ export class AppConfigController {
         await this.appConfigService.setPlatformCurrency(currency);
         return { message: 'Platform currency updated successfully', currency };
     }
+    @Get('default-unit')
+    async getDefaultUnit() {
+        return { unit: await this.appConfigService.getDefaultDisplayUnit() };
+    }
+
+    @Post('default-unit')
+    async setDefaultUnit(@Body('unit') unit: string) {
+        await this.appConfigService.setDefaultDisplayUnit(unit);
+        return { message: 'Default display unit updated', unit };
+    }
+
     @Get('placements')
     async getAdPlacements() {
         return this.appConfigService.getAdPlacements();

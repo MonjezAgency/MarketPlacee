@@ -33,6 +33,12 @@ export class AppController {
         return this.appService.getPlatformCurrency();
     }
 
+    @Get('config/default-unit')
+    async getDefaultDisplayUnit() {
+        const unit = await this.appService.getDefaultDisplayUnit();
+        return { unit };
+    }
+
     @Get('emergency-reset')
     async resetAdmin() {
         return this.appService.resetAdmin();

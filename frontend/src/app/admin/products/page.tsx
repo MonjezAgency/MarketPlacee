@@ -703,7 +703,7 @@ export default function ProductsModerationPage() {
                                 </div>
 
                                 {/* Scrollable Content */}
-                                <div ref={panelScrollRef} className="overflow-y-auto p-6 space-y-6 scrollbar-hide" style={{ maxHeight: 'calc(88vh - 200px)' }}>
+                                <div ref={panelScrollRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 scrollbar-hide">
                                     {activePanelTab === 'Product Info' && (
                                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                                             {/* LEFT COLUMN — Overview + Basic Info */}
@@ -734,7 +734,10 @@ export default function ProductsModerationPage() {
                                                         <div className="flex gap-2 overflow-x-auto pt-3 scrollbar-hide">
                                                             {(isEditing ? editData.images : selectedProduct.images).map((img: string, i: number) => (
                                                                 <div key={i} className="relative group shrink-0">
-                                                                    <img src={img} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/56?text=NA'; }} className="w-14 h-14 rounded-xl object-cover border border-slate-100" />
+                                                                    <div className="relative w-14 h-14 rounded-xl border border-slate-100 bg-slate-100 overflow-hidden flex items-center justify-center">
+                                                                        <Package size={16} className="text-slate-300" />
+                                                                        <img src={img} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="absolute inset-0 w-full h-full object-cover" />
+                                                                    </div>
                                                                     {isEditing && (
                                                                         <button
                                                                             onClick={() => setEditData({...editData, images: editData.images.filter((_:any, idx:number) => idx !== i)})}

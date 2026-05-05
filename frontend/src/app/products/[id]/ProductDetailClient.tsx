@@ -44,6 +44,7 @@ export default function ProductDetailClient() {
     const [selectedImage, setSelectedImage] = useState<string>('');
     const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
     const [selectedUnit, setSelectedUnit] = useState<'truck' | 'pallet' | 'carton' | undefined>(undefined);
+    const [adminDefaultUnit, setAdminDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
     const [activeTab, setActiveTab] = useState('Description');
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -55,6 +56,19 @@ export default function ProductDetailClient() {
             scrollContainerRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
         }
     };
+
+    // Fetch admin-configured default display unit once on mount
+    useEffect(() => {
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+        fetch(`${apiBase}/config/default-unit`)
+            .then(r => r.json())
+            .then(data => {
+                if (data?.unit && ['truck', 'pallet', 'carton'].includes(data.unit)) {
+                    setAdminDefaultUnit(data.unit as 'truck' | 'pallet' | 'carton');
+                }
+            })
+            .catch(() => { /* keep default 'truck' */ });
+    }, []);
 
     useEffect(() => {
         if (!id) return;
@@ -309,8 +323,8 @@ export default function ProductDetailClient() {
                                 if (cartonPrice !== null) options.push({ key: 'carton', label: 'Carton', emoji: '🗃️', price: cartonPrice, qty: piecesPerCase });
                                 if (options.length === 0) options.push({ key: 'carton', label: product.unit || 'Unit', emoji: '📦', price: product.price, qty: 1 });
 
-                                // Default: Truck (largest) → Pallet → Carton
-                                const initialSelected = options[0].key;
+                                // Default: use admin-configured unit, fall back to the largest available
+                                const initialSelected = options.find(o => o.key === adminDefaultUnit)?.key ?? options[0].key;
                                 if (selectedUnit === undefined) {
                                     setTimeout(() => setSelectedUnit(initialSelected), 0);
                                 }

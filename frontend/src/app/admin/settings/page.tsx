@@ -127,6 +127,8 @@ export default function SettingsDashboard() {
     const [platformFee, setPlatformFee] = React.useState(5);
     const [shippingMarkup, setShippingMarkup] = React.useState(1.10);
 
+    const [defaultUnit, setDefaultUnit] = React.useState<'truck' | 'pallet' | 'carton'>('truck');
+
     const [avatarPreview, setAvatarPreview] = React.useState<string | null>(null);
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -161,6 +163,16 @@ export default function SettingsDashboard() {
                 }
             })
             .catch(err => console.error('Failed to fetch markup settings:', err));
+
+        // Fetch default display unit
+        apiFetch('/admin/config/default-unit')
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.unit) {
+                    setDefaultUnit(data.unit as 'truck' | 'pallet' | 'carton');
+                }
+            })
+            .catch(err => console.error('Failed to fetch default unit:', err));
     }, [user]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -238,6 +250,12 @@ export default function SettingsDashboard() {
                     platformFee,
                     shippingMarkup
                 })
+            });
+
+            // Update default display unit
+            await apiFetch('/admin/config/default-unit', {
+                method: 'POST',
+                body: JSON.stringify({ unit: defaultUnit })
             });
 
             if (res.ok && markupRes.ok) {
@@ -597,6 +615,33 @@ export default function SettingsDashboard() {
                                             </div>
                                             <p className="text-[10px] text-slate-400 mt-1 italic">Additional percentage added to base shipping costs.</p>
                                         </div>
+                                    </div>
+                                </SettingCard>
+
+                                <SettingCard title="Default Product View Unit">
+                                    <p className="text-xs text-slate-500 -mt-2">Controls which unit tier buyers see first when opening a product page.</p>
+                                    <div className="grid grid-cols-3 gap-3">
+                                        {([
+                                            { key: 'truck',  emoji: '🚛', label: 'Truck',  desc: 'Full truckload' },
+                                            { key: 'pallet', emoji: '📦', label: 'Pallet', desc: 'Per pallet' },
+                                            { key: 'carton', emoji: '🗃️', label: 'Carton', desc: 'Per carton' },
+                                        ] as const).map((opt) => (
+                                            <button
+                                                key={opt.key}
+                                                type="button"
+                                                onClick={() => setDefaultUnit(opt.key)}
+                                                className={cn(
+                                                    'flex flex-col items-center py-4 px-2 rounded-2xl border-2 text-center transition-all',
+                                                    defaultUnit === opt.key
+                                                        ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-sm'
+                                                        : 'border-slate-200 bg-white text-slate-500 hover:border-teal-300'
+                                                )}
+                                            >
+                                                <span className="text-2xl mb-1">{opt.emoji}</span>
+                                                <span className="text-[12px] font-black uppercase tracking-widest">{opt.label}</span>
+                                                <span className="text-[10px] text-slate-400 mt-0.5">{opt.desc}</span>
+                                            </button>
+                                        ))}
                                     </div>
                                 </SettingCard>
 
