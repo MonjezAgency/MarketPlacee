@@ -22,6 +22,10 @@ import {
     HelpCircle,
     X,
     Settings,
+    Navigation,
+    Pencil,
+    ExternalLink,
+    Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -30,6 +34,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useCart } from '@/lib/cart';
 import NotificationBell from '@/components/ui/NotificationBell';
+import { useRouter } from 'next/navigation';
 
 const LANGUAGES = [
     { code: 'en', name: 'English', flag: '🇺🇸' },
@@ -95,6 +100,7 @@ export default function Navbar() {
     const { items } = useCart();
     const { locale, setLocale, t } = useLanguage();
     const { currency, setCurrency } = useCurrency();
+    const router = useRouter();
     const [searchQuery, setSearchQuery] = React.useState('');
     const [isLangOpen, setIsLangOpen] = React.useState(false);
     const [isCurrOpen, setIsCurrOpen] = React.useState(false);
@@ -102,12 +108,12 @@ export default function Navbar() {
     const [isLocationOpen, setIsLocationOpen] = React.useState(false);
     const [savedAddress, setSavedAddress] = React.useState<string>('');
     const [savedCount, setSavedCount] = React.useState<number>(0);
-    const [showAddressPrompt, setShowAddressPrompt] = React.useState(false);
+    const [showQuickEdit, setShowQuickEdit] = React.useState(false);
     const [addressInput, setAddressInput] = React.useState('');
+    const [isGpsLoading, setIsGpsLoading] = React.useState(false);
     const locationRef = React.useRef<HTMLDivElement>(null);
 
     React.useEffect(() => {
-        // Hydrate saved-address from localStorage
         try {
             const stored = localStorage.getItem('atl_delivery_address') || '';
             setSavedAddress(stored);
@@ -115,26 +121,34 @@ export default function Navbar() {
             setSavedCount(Array.isArray(saved) ? saved.length : 0);
         } catch { /* noop */ }
 
-        // Listen for saved-items changes from other components
         const handleSavedChange = () => {
             try {
                 const saved = JSON.parse(localStorage.getItem('atl_saved_items') || '[]');
                 setSavedCount(Array.isArray(saved) ? saved.length : 0);
             } catch { /* noop */ }
         };
+        // Also re-read address when it changes (e.g. from address page)
+        const handleAddressChange = () => {
+            try {
+                const stored = localStorage.getItem('atl_delivery_address') || '';
+                setSavedAddress(stored);
+            } catch { /* noop */ }
+        };
         window.addEventListener('atl:saved-changed', handleSavedChange);
+        window.addEventListener('atl:address-changed', handleAddressChange);
         window.addEventListener('storage', handleSavedChange);
         return () => {
             window.removeEventListener('atl:saved-changed', handleSavedChange);
+            window.removeEventListener('atl:address-changed', handleAddressChange);
             window.removeEventListener('storage', handleSavedChange);
         };
     }, []);
 
     React.useEffect(() => {
-        // Close location dropdown on outside click
         const handler = (e: MouseEvent) => {
             if (locationRef.current && !locationRef.current.contains(e.target as Node)) {
                 setIsLocationOpen(false);
+                setShowQuickEdit(false);
             }
         };
         document.addEventListener('mousedown', handler);
@@ -148,13 +162,59 @@ export default function Navbar() {
         }
     };
 
-    const handleSaveAddress = () => {
+    /** GPS auto-detect using browser geolocation + Nominatim reverse geocoding */
+    const handleGps = async (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!navigator.geolocation) return;
+        setIsGpsLoading(true);
+        navigator.geolocation.getCurrentPosition(
+            async (pos) => {
+                try {
+                    const { latitude: lat, longitude: lon } = pos.coords;
+                    const res = await fetch(
+                        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&addressdetails=1`,
+                        { headers: { 'Accept-Language': 'en' } }
+                    );
+                    const data = await res.json();
+                    const a = data.address || {};
+                    const city = a.city || a.town || a.village || a.county || '';
+                    const state = a.state || a.region || '';
+                    const country = a.country || '';
+                    const formatted = [city, state, country].filter(Boolean).join(', ');
+                    if (formatted) {
+                        localStorage.setItem('atl_delivery_address', formatted);
+                        setSavedAddress(formatted);
+                        window.dispatchEvent(new Event('atl:address-changed'));
+                        setIsLocationOpen(false);
+                        setShowQuickEdit(false);
+                    }
+                } catch { /* noop */ }
+                setIsGpsLoading(false);
+            },
+            () => setIsGpsLoading(false),
+            { timeout: 8000 }
+        );
+    };
+
+    /** Click the delivery pill — navigate to address page (or login) */
+    const handleDeliverClick = () => {
+        setIsLocationOpen(false);
+        if (!user) {
+            router.push('/auth/login?redirect=/account/address');
+        } else {
+            router.push('/account/address');
+        }
+    };
+
+    /** Save inline quick-edit address */
+    const handleQuickSave = () => {
         const value = addressInput.trim();
         if (!value) return;
         try {
             localStorage.setItem('atl_delivery_address', value);
             setSavedAddress(value);
-            setShowAddressPrompt(false);
+            window.dispatchEvent(new Event('atl:address-changed'));
+            setShowQuickEdit(false);
             setIsLocationOpen(false);
             setAddressInput('');
         } catch { /* noop */ }
@@ -163,7 +223,7 @@ export default function Navbar() {
     const country = getCountryDisplay(user?.country);
     const displayCity = savedAddress
         ? savedAddress.split(',')[0].trim().slice(0, 18)
-        : (user ? 'Set address' : 'Sign in for address');
+        : (user ? 'Set address' : 'Set address');
 
     return (
         <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-[100] w-full shadow-sm">
@@ -200,98 +260,130 @@ export default function Navbar() {
                         </span>
                     </Link>
 
-                    {/* DELIVER TO — Amazon-style location pill */}
-                    <div ref={locationRef} className="hidden md:flex relative shrink-0">
+                    {/* DELIVER TO — GPS-enabled location pill */}
+                    <div ref={locationRef} className="hidden md:flex relative shrink-0 items-center gap-1">
+
+                        {/* Main pill — click goes to full address page */}
                         <button
-                            onClick={() => setIsLocationOpen(!isLocationOpen)}
-                            className="flex items-start gap-1.5 h-[44px] px-3 hover:bg-[#F1F5F9] rounded-lg transition-colors group"
+                            onClick={handleDeliverClick}
+                            className="flex items-start gap-1.5 h-[44px] px-2.5 hover:bg-[#F1F5F9] rounded-lg transition-colors group"
                         >
-                            <MapPin size={16} className="text-[#64748B] mt-0.5 group-hover:text-[#2EC4B6] transition-colors" />
+                            <MapPin size={16} className="text-[#64748B] mt-0.5 group-hover:text-[#2EC4B6] transition-colors shrink-0" />
                             <div className="flex flex-col leading-tight items-start min-w-0">
-                                <span className="text-[10px] text-[#64748B] font-medium">
+                                <span className="text-[10px] text-[#64748B] font-medium whitespace-nowrap">
                                     Deliver to {country.label && <span className="font-bold text-[#0F172A]">{country.flag} {country.label}</span>}
                                 </span>
-                                <span className="text-[12px] font-bold text-[#0F172A] truncate max-w-[140px]">
+                                <span className="text-[12px] font-bold text-[#0F172A] truncate max-w-[120px]">
                                     {displayCity}
                                 </span>
                             </div>
-                            <ChevronDown size={12} className="text-[#94A3B8] mt-1.5" />
                         </button>
 
+                        {/* GPS auto-detect button */}
+                        <button
+                            onClick={handleGps}
+                            title="Auto-detect my location"
+                            disabled={isGpsLoading}
+                            className="w-[30px] h-[30px] flex items-center justify-center rounded-full border border-[#E5E7EB] hover:border-[#2EC4B6] hover:bg-[#F0FDFA] text-[#64748B] hover:text-[#2EC4B6] transition-all disabled:opacity-50"
+                        >
+                            {isGpsLoading
+                                ? <Loader2 size={13} className="animate-spin" />
+                                : <Navigation size={13} />
+                            }
+                        </button>
+
+                        {/* Chevron — opens dropdown for saved-address quick options */}
+                        {savedAddress && (
+                            <button
+                                onClick={() => { setIsLocationOpen(!isLocationOpen); setShowQuickEdit(false); }}
+                                className="w-[24px] h-[30px] flex items-center justify-center text-[#94A3B8] hover:text-[#2EC4B6] transition-colors"
+                            >
+                                <ChevronDown size={12} className={cn('transition-transform', isLocationOpen && 'rotate-180')} />
+                            </button>
+                        )}
+
+                        {/* Dropdown — only for users who already have a saved address */}
                         <AnimatePresence>
-                            {isLocationOpen && (
+                            {isLocationOpen && savedAddress && (
                                 <motion.div
                                     initial={{ opacity: 0, y: 4 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: 4 }}
-                                    className="absolute top-full left-0 mt-2 w-[320px] bg-white border border-[#E5E7EB] rounded-2xl shadow-2xl z-[110] overflow-hidden"
+                                    className="absolute top-full left-0 mt-2 w-[300px] bg-white border border-[#E5E7EB] rounded-2xl shadow-2xl z-[110] overflow-hidden"
                                 >
-                                    <div className="px-5 py-4 border-b border-[#E5E7EB] bg-gradient-to-br from-[#F8FAFC] to-white">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <MapPin size={14} className="text-[#2EC4B6]" />
+                                    {/* Header */}
+                                    <div className="px-4 py-3 border-b border-[#E5E7EB] bg-[#F8FAFC]">
+                                        <div className="flex items-center gap-2">
+                                            <MapPin size={13} className="text-[#2EC4B6]" />
                                             <span className="text-[11px] font-bold uppercase tracking-wider text-[#64748B]">Delivery Location</span>
                                         </div>
-                                        <h4 className="text-[14px] font-bold text-[#0F172A]">
-                                            {country.label ? (
-                                                <>Shipping to {country.flag} {country.label}</>
-                                            ) : (
-                                                <>Set your delivery address</>
-                                            )}
-                                        </h4>
+                                        <p className="mt-1 text-[12px] text-[#0F172A] font-semibold truncate">{savedAddress}</p>
                                     </div>
 
-                                    <div className="p-5 space-y-3">
-                                        {savedAddress && !showAddressPrompt ? (
-                                            <div className="space-y-2">
-                                                <p className="text-[12px] text-[#64748B] font-medium">Default shipping address:</p>
-                                                <div className="px-3 py-2.5 bg-[#F1F5F9] border border-[#E5E7EB] rounded-lg text-[12px] text-[#0F172A] leading-relaxed">
-                                                    {savedAddress}
+                                    {!showQuickEdit ? (
+                                        <div className="p-3 space-y-1.5">
+                                            {/* GPS re-detect */}
+                                            <button
+                                                onClick={handleGps}
+                                                disabled={isGpsLoading}
+                                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F0FDFA] text-left transition-colors group disabled:opacity-50"
+                                            >
+                                                <span className="w-7 h-7 rounded-full bg-[#CCFBF1] flex items-center justify-center shrink-0">
+                                                    {isGpsLoading ? <Loader2 size={13} className="text-[#2EC4B6] animate-spin" /> : <Navigation size={13} className="text-[#2EC4B6]" />}
+                                                </span>
+                                                <div>
+                                                    <p className="text-[12px] font-bold text-[#0F172A]">Use my current location</p>
+                                                    <p className="text-[11px] text-[#64748B]">Auto-detect via GPS</p>
                                                 </div>
-                                                <div className="flex items-center gap-2 pt-1">
-                                                    <button
-                                                        onClick={() => { setShowAddressPrompt(true); setAddressInput(savedAddress); }}
-                                                        className="flex-1 h-9 text-[12px] font-bold border border-[#E5E7EB] hover:border-[#2EC4B6] hover:text-[#2EC4B6] text-[#64748B] rounded-lg transition-colors"
-                                                    >
-                                                        Edit address
-                                                    </button>
-                                                    <Link
-                                                        href={user ? '/dashboard/customer/settings' : '/auth/login'}
-                                                        onClick={() => setIsLocationOpen(false)}
-                                                        className="flex-1 h-9 text-[12px] font-bold bg-[#0B1F3A] hover:bg-[#2EC4B6] text-white rounded-lg transition-colors flex items-center justify-center no-underline"
-                                                    >
-                                                        Manage in account
-                                                    </Link>
+                                            </button>
+
+                                            {/* Quick Edit */}
+                                            <button
+                                                onClick={() => { setShowQuickEdit(true); setAddressInput(savedAddress); }}
+                                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F1F5F9] text-left transition-colors"
+                                            >
+                                                <span className="w-7 h-7 rounded-full bg-[#F1F5F9] flex items-center justify-center shrink-0">
+                                                    <Pencil size={13} className="text-[#64748B]" />
+                                                </span>
+                                                <div>
+                                                    <p className="text-[12px] font-bold text-[#0F172A]">Quick edit</p>
+                                                    <p className="text-[11px] text-[#64748B]">Edit address inline</p>
                                                 </div>
+                                            </button>
+
+                                            {/* Full Edit */}
+                                            <button
+                                                onClick={() => { setIsLocationOpen(false); router.push('/account/address'); }}
+                                                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#F1F5F9] text-left transition-colors"
+                                            >
+                                                <span className="w-7 h-7 rounded-full bg-[#F1F5F9] flex items-center justify-center shrink-0">
+                                                    <ExternalLink size={13} className="text-[#64748B]" />
+                                                </span>
+                                                <div>
+                                                    <p className="text-[12px] font-bold text-[#0F172A]">Full edit</p>
+                                                    <p className="text-[11px] text-[#64748B]">Street, city, zip & more</p>
+                                                </div>
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        /* Quick-edit inline form */
+                                        <div className="p-4 space-y-3">
+                                            <p className="text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Quick Edit</p>
+                                            <input
+                                                type="text"
+                                                value={addressInput}
+                                                onChange={(e) => setAddressInput(e.target.value)}
+                                                placeholder="City, Country"
+                                                className="w-full h-10 px-3 text-[13px] border border-[#E5E7EB] rounded-lg outline-none focus:border-[#2EC4B6] focus:ring-2 focus:ring-[#2EC4B6]/20 transition-all"
+                                                onKeyDown={(e) => { if (e.key === 'Enter') handleQuickSave(); if (e.key === 'Escape') setShowQuickEdit(false); }}
+                                                autoFocus
+                                            />
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setShowQuickEdit(false)} className="flex-1 h-9 text-[12px] font-bold border border-[#E5E7EB] text-[#64748B] rounded-lg hover:border-[#94A3B8] transition-colors">Cancel</button>
+                                                <button onClick={handleQuickSave} disabled={!addressInput.trim()} className="flex-1 h-9 text-[12px] font-black bg-[#2EC4B6] hover:bg-[#0B1F3A] disabled:bg-[#94A3B8] text-white rounded-lg transition-colors disabled:cursor-not-allowed">Save</button>
                                             </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                <p className="text-[12px] text-[#64748B] leading-relaxed">
-                                                    Save your shipping address so we can show you accurate delivery time and freight pricing.
-                                                </p>
-                                                <input
-                                                    type="text"
-                                                    value={addressInput}
-                                                    onChange={(e) => setAddressInput(e.target.value)}
-                                                    placeholder="e.g. Cairo, Egypt — 6th of October City"
-                                                    className="w-full h-10 px-3 text-[13px] border border-[#E5E7EB] rounded-lg outline-none focus:border-[#2EC4B6] focus:ring-2 focus:ring-[#2EC4B6]/20 transition-all"
-                                                    onKeyDown={(e) => { if (e.key === 'Enter') handleSaveAddress(); }}
-                                                    autoFocus
-                                                />
-                                                <button
-                                                    onClick={handleSaveAddress}
-                                                    disabled={!addressInput.trim()}
-                                                    className="w-full h-10 bg-[#2EC4B6] hover:bg-[#0B1F3A] disabled:bg-[#94A3B8] text-white rounded-lg text-[12px] font-black uppercase tracking-wider transition-colors disabled:cursor-not-allowed"
-                                                >
-                                                    Save Address
-                                                </button>
-                                                {!user && (
-                                                    <p className="text-[11px] text-center text-[#94A3B8]">
-                                                        <Link href="/auth/login" className="text-[#2EC4B6] font-bold hover:underline">Sign in</Link> to sync across devices
-                                                    </p>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
+                                        </div>
+                                    )}
                                 </motion.div>
                             )}
                         </AnimatePresence>

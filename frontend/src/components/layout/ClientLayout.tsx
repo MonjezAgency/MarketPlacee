@@ -15,7 +15,6 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const isAuthPage = pathname?.startsWith('/auth');
     const isPendingPage = pathname === '/auth/pending';
     const isDashboard = pathname?.startsWith('/dashboard') || pathname?.startsWith('/admin') || pathname?.startsWith('/supplier');
-    const isHome = pathname === '/';
 
     // Enforcement logic: Make the entire marketplace private
     useEffect(() => {
@@ -60,13 +59,14 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
     }, [user, isLoggedIn, isAuthReady, pathname, isAuthPage, isPendingPage, router]);
 
+    const showNav = !isDashboard && !isAuthPage;
+
     return (
         <div className="flex flex-col min-h-screen">
-            {(!isDashboard && !isHome && !isAuthPage) && <Navbar />}
-            {/* Live price-change ticker — shown on non-home public pages
-                (home renders it inline beneath its own Navbar) */}
-            {(!isDashboard && !isHome && !isAuthPage) && <PriceTicker />}
-            <main className={`flex-grow ${(!isDashboard && !isHome && !isAuthPage) ? 'pt-20' : ''}`}>
+            {/* Single source of truth: Navbar + PriceTicker on all public pages */}
+            {showNav && <Navbar />}
+            {showNav && <PriceTicker />}
+            <main className="flex-grow">
                 {children}
             </main>
             {(!isDashboard) && <Footer />}

@@ -29,8 +29,6 @@ import {
     Wrench,
     Sparkles,
 } from 'lucide-react';
-import Navbar from '@/components/layout/Navbar';
-import PriceTicker from '@/components/ui/PriceTicker';
 import { apiFetch } from '@/lib/api';
 import ProductCard from '@/components/product/ProductCard';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -185,10 +183,7 @@ export default function HomePage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] flex flex-col font-sans text-[#111827]">
-            <Navbar />
-            <PriceTicker />
-
+        <div className="bg-[#F8FAFC] font-sans text-[#111827]">
             {/* ============================================================
                  1. TOP FEATURE STRIP
             ============================================================ */}
