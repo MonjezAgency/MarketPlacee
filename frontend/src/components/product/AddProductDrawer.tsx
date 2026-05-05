@@ -53,6 +53,15 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
 
     const currencyInfo = SUPPORTED_CURRENCIES.find(c => c.code === activeCurrency) || SUPPORTED_CURRENCIES[0];
 
+    // Markup config from backend
+    const [markups, setMarkups] = React.useState({ piece: 1.5, pallet: 1.1, container: 1.05 });
+    React.useEffect(() => {
+        apiFetch('/config/markup')
+            .then(r => r.json())
+            .then(d => { if (d?.piece) setMarkups({ piece: d.piece, pallet: d.pallet, container: d.container }); })
+            .catch(() => {});
+    }, []);
+
     const defaultForm = {
         name: '', brand: '', category: 'Beverages', ean: '',
         price: '', stock: '', moq: '1', unit: 'Piece',
@@ -366,35 +375,36 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                         />
                                     </div>
 
-                                    {/* Live computed price preview */}
+                                    {/* Live computed price preview — with markup */}
                                     {(() => {
                                         const pp = parseFloat(form.price) || 0;
                                         const pc = parseInt(form.unitsPerCase) || 0;
                                         const cp = parseInt(form.casesPerPallet) || 0;
                                         const pt = parseInt(form.palletsPerShipment) || 0;
                                         if (pp <= 0) return null;
-                                        const cartonPrice  = pc > 0 ? pp * pc : null;
-                                        const palletPrice  = pc > 0 && cp > 0 ? pp * pc * cp : null;
-                                        const truckPrice   = pc > 0 && cp > 0 && pt > 0 ? pp * pc * cp * pt : null;
+                                        // Apply tier-specific markups
+                                        const cartonTotal = pc > 0 ? pp * pc * markups.piece : null;
+                                        const palletTotal = pc > 0 && cp > 0 ? pp * pc * cp * markups.pallet : null;
+                                        const truckTotal  = pc > 0 && cp > 0 && pt > 0 ? pp * pc * cp * pt * markups.container : null;
                                         const fmt = (n: number) => `${currencyInfo.symbol}${n.toFixed(2)}`;
                                         return (
                                             <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl space-y-1.5">
-                                                <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest">Auto-calculated tiers</p>
+                                                <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest">Customer prices (markup applied)</p>
                                                 <div className="grid grid-cols-3 gap-2">
                                                     <div>
                                                         <p className="text-[9px] text-slate-500 font-bold uppercase">Carton</p>
-                                                        <p className="text-[12px] font-bold text-slate-900">{cartonPrice !== null ? fmt(cartonPrice) : '—'}</p>
-                                                        <p className="text-[9px] text-slate-400">{pc > 0 ? `${pc} pcs` : 'set pcs/case'}</p>
+                                                        <p className="text-[12px] font-bold text-slate-900">{cartonTotal !== null ? fmt(cartonTotal) : '—'}</p>
+                                                        <p className="text-[9px] text-slate-400">{pc > 0 ? `${pc}pcs ×${markups.piece}` : 'set pcs/case'}</p>
                                                     </div>
                                                     <div>
                                                         <p className="text-[9px] text-slate-500 font-bold uppercase">Pallet</p>
-                                                        <p className="text-[12px] font-bold text-slate-900">{palletPrice !== null ? fmt(palletPrice) : '—'}</p>
-                                                        <p className="text-[9px] text-slate-400">{pc > 0 && cp > 0 ? `${pc * cp} pcs` : 'set cases/pallet'}</p>
+                                                        <p className="text-[12px] font-bold text-slate-900">{palletTotal !== null ? fmt(palletTotal) : '—'}</p>
+                                                        <p className="text-[9px] text-slate-400">{palletTotal !== null && cp > 0 ? `${fmt(palletTotal / cp)}/ctn` : 'set cases/pallet'}</p>
                                                     </div>
                                                     <div>
                                                         <p className="text-[9px] text-slate-500 font-bold uppercase">Truck</p>
-                                                        <p className="text-[12px] font-bold text-slate-900">{truckPrice !== null ? fmt(truckPrice) : '—'}</p>
-                                                        <p className="text-[9px] text-slate-400">{pc > 0 && cp > 0 && pt > 0 ? `${pc * cp * pt} pcs` : 'set pallets/truck'}</p>
+                                                        <p className="text-[12px] font-bold text-slate-900">{truckTotal !== null ? fmt(truckTotal) : '—'}</p>
+                                                        <p className="text-[9px] text-slate-400">{truckTotal !== null && cp > 0 && pt > 0 ? `${fmt(truckTotal / (cp * pt))}/ctn` : 'set pallets/truck'}</p>
                                                     </div>
                                                 </div>
                                             </div>

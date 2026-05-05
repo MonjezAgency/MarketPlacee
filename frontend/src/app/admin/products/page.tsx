@@ -121,6 +121,16 @@ export default function ProductsModerationPage() {
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
     const [isBulkLoading, setIsBulkLoading] = React.useState(false);
 
+    // Markup config (fetched from /config/markup)
+    const [markups, setMarkups] = React.useState({ piece: 1.5, pallet: 1.1, container: 1.05 });
+
+    React.useEffect(() => {
+        apiFetch('/config/markup')
+            .then(r => r.json())
+            .then(d => { if (d?.piece) setMarkups({ piece: d.piece, pallet: d.pallet, container: d.container }); })
+            .catch(() => {});
+    }, []);
+
     // Edit Mode State
     const [isEditing, setIsEditing] = React.useState(false);
     const [editData, setEditData] = React.useState<any>(null);
@@ -1028,30 +1038,40 @@ export default function ProductsModerationPage() {
                                                         </p>
                                                     </div>
                                                 </div>
-                                                {/* Tier price preview */}
+                                                {/* Tier price preview — with markup applied */}
                                                 {(() => {
                                                     const pp = parseFloat((isEditing ? editData.basePrice : selectedProduct.basePrice) || 0);
                                                     const pc = (isEditing ? editData.unitsPerCase : selectedProduct.unitsPerCase) || 0;
                                                     const cp = (isEditing ? editData.casesPerPallet : selectedProduct.casesPerPallet) || 0;
                                                     const pt = (isEditing ? editData.palletsPerShipment : selectedProduct.palletsPerShipment) || 0;
                                                     if (!pp || !pc) return null;
-                                                    const cartonP = pp * pc;
-                                                    const palletP = pc && cp ? pp * pc * cp : null;
-                                                    const truckP  = pc && cp && pt ? pp * pc * cp * pt : null;
+                                                    // Apply tier-specific markups
+                                                    const cartonTotal = pp * pc * markups.piece;
+                                                    const palletTotal = cp ? pp * pc * cp * markups.pallet : null;
+                                                    const truckTotal  = cp && pt ? pp * pc * cp * pt * markups.container : null;
+                                                    // Per-carton equivalents
+                                                    const palletPerCtn = palletTotal !== null && cp ? palletTotal / cp : null;
+                                                    const truckPerCtn  = truckTotal !== null && cp && pt ? truckTotal / (cp * pt) : null;
                                                     return (
-                                                        <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl grid grid-cols-3 gap-2">
-                                                            <div className="text-center">
-                                                                <p className="text-[9px] text-teal-500 font-bold uppercase">Carton</p>
-                                                                <p className="text-[12px] font-bold text-teal-700">{formatPrice(cartonP)}</p>
+                                                        <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl space-y-2">
+                                                            <p className="text-[9px] text-teal-600 font-bold uppercase tracking-widest">Customer prices (markup applied)</p>
+                                                            <div className="grid grid-cols-3 gap-2">
+                                                                <div className="text-center">
+                                                                    <p className="text-[9px] text-teal-500 font-bold uppercase">Carton</p>
+                                                                    <p className="text-[13px] font-bold text-teal-700">{formatPrice(cartonTotal)}</p>
+                                                                    <p className="text-[9px] text-slate-400">×{markups.piece} / {pc}pcs</p>
+                                                                </div>
+                                                                {palletTotal !== null && <div className="text-center">
+                                                                    <p className="text-[9px] text-teal-500 font-bold uppercase">Pallet</p>
+                                                                    <p className="text-[13px] font-bold text-teal-700">{formatPrice(palletTotal)}</p>
+                                                                    <p className="text-[9px] text-slate-400">{formatPrice(palletPerCtn!)}/ctn</p>
+                                                                </div>}
+                                                                {truckTotal !== null && <div className="text-center">
+                                                                    <p className="text-[9px] text-teal-500 font-bold uppercase">Truck</p>
+                                                                    <p className="text-[13px] font-bold text-teal-700">{formatPrice(truckTotal)}</p>
+                                                                    <p className="text-[9px] text-slate-400">{formatPrice(truckPerCtn!)}/ctn</p>
+                                                                </div>}
                                                             </div>
-                                                            {palletP !== null && <div className="text-center">
-                                                                <p className="text-[9px] text-teal-500 font-bold uppercase">Pallet</p>
-                                                                <p className="text-[12px] font-bold text-teal-700">{formatPrice(palletP)}</p>
-                                                            </div>}
-                                                            {truckP !== null && <div className="text-center">
-                                                                <p className="text-[9px] text-teal-500 font-bold uppercase">Truck</p>
-                                                                <p className="text-[12px] font-bold text-teal-700">{formatPrice(truckP)}</p>
-                                                            </div>}
                                                         </div>
                                                     );
                                                 })()}
