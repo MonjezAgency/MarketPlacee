@@ -438,6 +438,172 @@ Categories List: ${categories.join(', ')}`;
         }
     }
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // PRICING ASSISTANT — answers customer questions about any product's pricing
+    // ──────────────────────────────────────────────────────────────────────────
+    async pricingAssistant(
+        productId: string,
+        message: string,
+        history: Array<{ role: 'user' | 'assistant'; content: string }> = [],
+    ): Promise<{ reply: string; suggestedQuestions: string[] }> {
+        // 1. Fetch product
+        const product = await this.prisma.product.findUnique({
+            where: { id: productId },
+            select: {
+                name: true, brand: true, basePrice: true, price: true,
+                unit: true, unitsPerCase: true, casesPerPallet: true,
+                unitsPerPallet: true, palletsPerShipment: true,
+            },
+        });
+
+        if (!product) {
+            return { reply: 'Product not found.', suggestedQuestions: [] };
+        }
+
+        // 2. Fetch markups from AppConfig
+        const [pieceConf, palletConf, containerConf, legacyConf] = await Promise.all([
+            this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PIECE' } }),
+            this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PALLET' } }),
+            this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_CONTAINER' } }),
+            this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE' } }),
+        ]);
+
+        const mPiece     = pieceConf     ? parseFloat(pieceConf.value)     : (legacyConf ? parseFloat(legacyConf.value) : 1.10);
+        const mPallet    = palletConf    ? parseFloat(palletConf.value)    : 1.05;
+        const mContainer = containerConf ? parseFloat(containerConf.value) : 1.02;
+
+        // 3. Compute per-piece base (before markup)
+        const piecesPerCase   = product.unitsPerCase || 0;
+        const casesPerPallet  = product.casesPerPallet || 0;
+        const piecesPerPallet = product.unitsPerPallet || (piecesPerCase * casesPerPallet) || 0;
+        const palletsPerTruck = product.palletsPerShipment || 0;
+        const baseUnit        = String(product.unit || 'piece').toLowerCase();
+
+        const rawBase = product.basePrice != null ? product.basePrice : product.price / mPiece;
+        let basePerPiece = rawBase;
+        if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
+            basePerPiece = rawBase / piecesPerCase;
+        else if (baseUnit.includes('pallet') && piecesPerPallet > 0)
+            basePerPiece = rawBase / piecesPerPallet;
+        else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment')) && piecesPerPallet > 0 && palletsPerTruck > 0)
+            basePerPiece = rawBase / (piecesPerPallet * palletsPerTruck);
+
+        // 4. Compute tier prices
+        const fmt = (n: number) => `€${n.toFixed(3)}`;
+        const cartonTotal  = piecesPerCase > 0 ? basePerPiece * piecesPerCase * mPiece : null;
+        const palletTotal  = piecesPerPallet > 0 ? basePerPiece * piecesPerPallet * mPallet : null;
+        const truckTotal   = (piecesPerPallet > 0 && palletsPerTruck > 0) ? basePerPiece * piecesPerPallet * palletsPerTruck * mContainer : null;
+        const cartonsInPallet = casesPerPallet;
+        const cartonsInTruck  = casesPerPallet * palletsPerTruck;
+        const cartonPerCtn    = cartonTotal;
+        const palletPerCtn    = palletTotal && cartonsInPallet > 0 ? palletTotal / cartonsInPallet : null;
+        const truckPerCtn     = truckTotal  && cartonsInTruck  > 0 ? truckTotal  / cartonsInTruck  : null;
+
+        // 5. Build system prompt
+        const systemPrompt = `You are Atlantis FMCG's smart pricing assistant. You help B2B buyers understand product pricing and choose the right buying tier.
+
+PRODUCT: ${product.name}${product.brand ? ` by ${product.brand}` : ''}
+
+PACKAGING STRUCTURE:
+- Pieces per carton: ${piecesPerCase}
+- Cartons per pallet: ${casesPerPallet}
+- Pallets per truck: ${palletsPerTruck}
+- Cartons per pallet: ${cartonsInPallet}
+- Total cartons per truck: ${cartonsInTruck}
+
+CURRENT PRICING (markup already applied):
+${cartonTotal  != null ? `• Carton tier:  ${fmt(cartonTotal)} per carton  =  ${fmt(cartonPerCtn!)} / ctn  (markup +${Math.round((mPiece-1)*100)}%)` : ''}
+${palletTotal  != null ? `• Pallet tier:  ${fmt(palletTotal)} per pallet  =  ${fmt(palletPerCtn!)} / ctn  (${cartonsInPallet} cartons, markup +${Math.round((mPallet-1)*100)}%)` : ''}
+${truckTotal   != null ? `• Truck tier:   ${fmt(truckTotal)} per truck  =  ${fmt(truckPerCtn!)} / ctn  (${cartonsInTruck} cartons, markup +${Math.round((mContainer-1)*100)}%)` : ''}
+
+SAVINGS vs CARTON (per-carton comparison):
+${palletPerCtn && cartonPerCtn ? `• Buying pallet saves ${fmt(cartonPerCtn - palletPerCtn)} / ctn (${((1 - palletPerCtn/cartonPerCtn)*100).toFixed(1)}% cheaper per carton)` : ''}
+${truckPerCtn  && cartonPerCtn ? `• Buying truck saves  ${fmt(cartonPerCtn - truckPerCtn)} / ctn (${((1 - truckPerCtn/cartonPerCtn)*100).toFixed(1)}% cheaper per carton)` : ''}
+
+RULES:
+- Always show the per-carton (ctn) equivalent price so buyers can compare apples-to-apples.
+- When a buyer asks "how much for X pallets/trucks/cartons?", calculate the exact total.
+- Be concise but precise — show the math when it helps.
+- Respond in the same language the buyer writes in (Arabic or English).
+- Never mention base price or internal margins.
+- If you cannot calculate something, say so clearly.`;
+
+        if (!process.env.OPENROUTER_API_KEY) {
+            // Fallback: deterministic rule-based responses
+            const reply = this.buildFallbackPricingReply(message, { cartonTotal, palletTotal, truckTotal, cartonPerCtn, palletPerCtn, truckPerCtn, cartonsInPallet, cartonsInTruck, piecesPerCase });
+            return { reply, suggestedQuestions: this.getPricingSuggestions(cartonTotal, palletTotal, truckTotal) };
+        }
+
+        try {
+            const messages = [
+                { role: 'system' as const, content: systemPrompt },
+                ...history.slice(-6), // keep last 3 exchanges for context
+                { role: 'user' as const, content: message },
+            ];
+
+            const response = await axios.post(
+                this.openRouterUrl,
+                {
+                    model: 'google/gemini-2.0-flash-exp:free',
+                    messages,
+                    max_tokens: 400,
+                    temperature: 0.3,
+                },
+                {
+                    headers: {
+                        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                        'Content-Type': 'application/json',
+                    },
+                    timeout: 15000,
+                },
+            );
+
+            const reply = response.data.choices[0].message.content.trim();
+            return {
+                reply,
+                suggestedQuestions: this.getPricingSuggestions(cartonTotal, palletTotal, truckTotal),
+            };
+        } catch (err) {
+            this.logger.warn(`Pricing assistant AI call failed: ${err?.message}`);
+            const reply = this.buildFallbackPricingReply(message, { cartonTotal, palletTotal, truckTotal, cartonPerCtn, palletPerCtn, truckPerCtn, cartonsInPallet, cartonsInTruck, piecesPerCase });
+            return { reply, suggestedQuestions: this.getPricingSuggestions(cartonTotal, palletTotal, truckTotal) };
+        }
+    }
+
+    private buildFallbackPricingReply(
+        message: string,
+        p: { cartonTotal: number|null; palletTotal: number|null; truckTotal: number|null; cartonPerCtn: number|null; palletPerCtn: number|null; truckPerCtn: number|null; cartonsInPallet: number; cartonsInTruck: number; piecesPerCase: number },
+    ): string {
+        const fmt = (n: number) => `€${n.toFixed(2)}`;
+        const msg = message.toLowerCase();
+        if ((msg.includes('truck') || msg.includes('شاحنة') || msg.includes('container')) && p.truckTotal) {
+            return `🚛 Truck price: ${fmt(p.truckTotal!)} total\n📦 Per carton: ${fmt(p.truckPerCtn!)} / ctn\n(${p.cartonsInTruck} cartons per truck)`;
+        }
+        if ((msg.includes('pallet') || msg.includes('باليت')) && p.palletTotal) {
+            return `📦 Pallet price: ${fmt(p.palletTotal!)} total\n📦 Per carton: ${fmt(p.palletPerCtn!)} / ctn\n(${p.cartonsInPallet} cartons per pallet)`;
+        }
+        if ((msg.includes('carton') || msg.includes('كرتون') || msg.includes('box')) && p.cartonTotal) {
+            return `🗃️ Carton price: ${fmt(p.cartonTotal!)} / carton\n(${p.piecesPerCase} pieces per carton)`;
+        }
+        // Default: show all tiers
+        const lines = ['Here is the full pricing summary:'];
+        if (p.cartonTotal)  lines.push(`🗃️ Carton: ${fmt(p.cartonTotal)} = ${fmt(p.cartonPerCtn!)} / ctn`);
+        if (p.palletTotal)  lines.push(`📦 Pallet: ${fmt(p.palletTotal)} = ${fmt(p.palletPerCtn!)} / ctn (${p.cartonsInPallet} ctns)`);
+        if (p.truckTotal)   lines.push(`🚛 Truck:  ${fmt(p.truckTotal)} = ${fmt(p.truckPerCtn!)} / ctn (${p.cartonsInTruck} ctns)`);
+        return lines.join('\n');
+    }
+
+    private getPricingSuggestions(cartonTotal: number|null, palletTotal: number|null, truckTotal: number|null): string[] {
+        const q: string[] = [];
+        if (cartonTotal)  q.push('What is the carton price?');
+        if (palletTotal)  q.push('What is the pallet price?');
+        if (truckTotal)   q.push('What is the truck price?');
+        if (palletTotal && cartonTotal) q.push('How much do I save buying a pallet?');
+        if (truckTotal  && cartonTotal) q.push('How much cheaper per carton on a truck?');
+        q.push('How many pieces per carton?');
+        return q.slice(0, 4);
+    }
+
     getReports(): AgentReport[] {
         return this.reports;
     }

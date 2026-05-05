@@ -18,6 +18,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { translateText } from '@/lib/translator';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReviewSection from '@/components/product/ReviewSection';
+import PricingAssistant from '@/components/product/PricingAssistant';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { useWishlist } from '@/hooks/useWishlist';
@@ -486,6 +487,12 @@ export default function ProductDetailClient() {
                                         {isAdded ? <><Check size={20} /> Added to Order</> : <><ShoppingCart size={20} /> {isLoggedIn ? 'Add to Procurement List' : 'Login to Order'}</>}
                                     </Button>
                                 </div>
+
+                                {/* AI Pricing Assistant */}
+                                <PricingAssistant
+                                    productId={product.id}
+                                    productName={product.name}
+                                />
                             </div>
 
                             <div className="pt-8 border-t border-[#E5E7EB] space-y-4">
