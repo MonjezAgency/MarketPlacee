@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Star, Check, ShieldCheck, ShoppingCart, ArrowUpRight, Image as ImageIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
-// ── Module-level singleton: fetch admin default display unit once ────────────
+// ── Module-level singletons: fetch admin config once across all card instances ─
 let _defaultUnit: 'truck' | 'pallet' | 'carton' | null = null;
 let _defaultUnitPromise: Promise<'truck' | 'pallet' | 'carton'> | null = null;
 
@@ -22,6 +22,28 @@ function getAdminDefaultUnit(): Promise<'truck' | 'pallet' | 'carton'> {
             .catch(() => { _defaultUnit = 'truck'; return _defaultUnit!; });
     }
     return _defaultUnitPromise;
+}
+
+let _markups: { piece: number; pallet: number; container: number } | null = null;
+let _markupsPromise: Promise<{ piece: number; pallet: number; container: number }> | null = null;
+
+function getAdminMarkups(): Promise<{ piece: number; pallet: number; container: number }> {
+    if (_markups) return Promise.resolve(_markups);
+    if (!_markupsPromise) {
+        const base = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+        _markupsPromise = fetch(`${base}/config/markup`)
+            .then(r => r.json())
+            .then(d => {
+                _markups = {
+                    piece: Number(d?.piece) || 1.10,
+                    pallet: Number(d?.pallet) || 1.05,
+                    container: Number(d?.container) || 1.02,
+                };
+                return _markups!;
+            })
+            .catch(() => { _markups = { piece: 1.10, pallet: 1.05, container: 1.02 }; return _markups!; });
+    }
+    return _markupsPromise;
 }
 import { useCart } from '@/lib/cart';
 import { cn } from '@/lib/utils';
@@ -96,7 +118,9 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
     // Admin-configured default display unit (truck / pallet / carton)
     const [defaultUnit, setDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
+    const [markups, setMarkups] = useState<{ piece: number; pallet: number; container: number }>({ piece: 1.10, pallet: 1.05, container: 1.02 });
     useEffect(() => { getAdminDefaultUnit().then(setDefaultUnit); }, []);
+    useEffect(() => { getAdminMarkups().then(setMarkups); }, []);
 
     // Compute unit-tier price for the card
     const piecesPerCase = product.unitsPerCase || 0;
@@ -104,19 +128,31 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const piecesPerPallet = product.unitsPerPallet || (piecesPerCase * casesPerPallet) || 0;
     const palletsPerTruck = product.palletsPerShipment || 0;
 
-    // Normalise to per-piece (handle products whose base unit is already case/pallet/truck)
-    let perPiece = displayPrice;
+    // ── Resolve per-piece BASE price (supplier raw, before markup) ────────────
+    // Suppliers viewing their own product see raw base prices (no markup).
+    // Everyone else: derive base from product.basePrice or reverse from product.price ÷ piece markup.
     const baseUnit = String(product.unit || 'piece').toLowerCase();
-    if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
-        perPiece = displayPrice / piecesPerCase;
-    else if (baseUnit.includes('pallet') && piecesPerPallet > 0)
-        perPiece = displayPrice / piecesPerPallet;
-    else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment')) && piecesPerPallet > 0 && palletsPerTruck > 0)
-        perPiece = displayPrice / (piecesPerPallet * palletsPerTruck);
 
-    const cartonPrice = piecesPerCase > 0 ? perPiece * piecesPerCase : null;
-    const palletPrice = piecesPerPallet > 0 ? perPiece * piecesPerPallet : null;
-    const truckPrice  = (piecesPerPallet > 0 && palletsPerTruck > 0) ? perPiece * piecesPerPallet * palletsPerTruck : null;
+    const rawBase = isOwnProduct
+        ? displayPrice
+        : (product.basePrice != null ? product.basePrice : displayPrice / markups.piece);
+
+    let basePerPiece = rawBase;
+    if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
+        basePerPiece = rawBase / piecesPerCase;
+    else if (baseUnit.includes('pallet') && piecesPerPallet > 0)
+        basePerPiece = rawBase / piecesPerPallet;
+    else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment')) && piecesPerPallet > 0 && palletsPerTruck > 0)
+        basePerPiece = rawBase / (piecesPerPallet * palletsPerTruck);
+
+    // Tier-specific markup multipliers (suppliers see base prices, no markup)
+    const mPiece     = isOwnProduct ? 1 : markups.piece;
+    const mPallet    = isOwnProduct ? 1 : markups.pallet;
+    const mContainer = isOwnProduct ? 1 : markups.container;
+
+    const cartonPrice = piecesPerCase > 0 ? basePerPiece * piecesPerCase * mPiece : null;
+    const palletPrice = piecesPerPallet > 0 ? basePerPiece * piecesPerPallet * mPallet : null;
+    const truckPrice  = (piecesPerPallet > 0 && palletsPerTruck > 0) ? basePerPiece * piecesPerPallet * palletsPerTruck * mContainer : null;
 
     // Pick price + label based on admin setting, fall back when data is missing
     let cardPrice = displayPrice;

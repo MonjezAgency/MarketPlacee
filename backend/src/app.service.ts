@@ -31,6 +31,23 @@ export class AppService {
         return { currency: config?.value || null };
     }
 
+    async getPublicMarkup(): Promise<{ piece: number; pallet: number; container: number }> {
+        const pieceConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PIECE' } });
+        const legacyConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE' } });
+        const palletConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PALLET' } });
+        const containerConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_CONTAINER' } });
+
+        const piece = pieceConfig ? parseFloat(pieceConfig.value) : (legacyConfig ? parseFloat(legacyConfig.value) : 1.10);
+        const pallet = palletConfig ? parseFloat(palletConfig.value) : 1.05;
+        const container = containerConfig ? parseFloat(containerConfig.value) : 1.02;
+
+        return {
+            piece: isNaN(piece) ? 1.10 : piece,
+            pallet: isNaN(pallet) ? 1.05 : pallet,
+            container: isNaN(container) ? 1.02 : container,
+        };
+    }
+
     async getDefaultDisplayUnit(): Promise<string> {
         const config = await this.prisma.appConfig.findUnique({ where: { key: 'DEFAULT_DISPLAY_UNIT' } });
         return config?.value || 'truck';

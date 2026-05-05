@@ -39,6 +39,11 @@ export class AppController {
         return { unit };
     }
 
+    @Get('config/markup')
+    async getPublicMarkup() {
+        return this.appService.getPublicMarkup();
+    }
+
     @Get('emergency-reset')
     async resetAdmin() {
         return this.appService.resetAdmin();

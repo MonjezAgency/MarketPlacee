@@ -45,6 +45,7 @@ export default function ProductDetailClient() {
     const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
     const [selectedUnit, setSelectedUnit] = useState<'truck' | 'pallet' | 'carton' | undefined>(undefined);
     const [adminDefaultUnit, setAdminDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
+    const [markups, setMarkups] = useState<{ piece: number; pallet: number; container: number }>({ piece: 1.10, pallet: 1.05, container: 1.02 });
     const [activeTab, setActiveTab] = useState('Description');
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -57,17 +58,24 @@ export default function ProductDetailClient() {
         }
     };
 
-    // Fetch admin-configured default display unit once on mount
+    // Fetch admin-configured default display unit + tier markups once on mount
     useEffect(() => {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
-        fetch(`${apiBase}/config/default-unit`)
-            .then(r => r.json())
-            .then(data => {
-                if (data?.unit && ['truck', 'pallet', 'carton'].includes(data.unit)) {
-                    setAdminDefaultUnit(data.unit as 'truck' | 'pallet' | 'carton');
-                }
-            })
-            .catch(() => { /* keep default 'truck' */ });
+        Promise.all([
+            fetch(`${apiBase}/config/default-unit`).then(r => r.json()).catch(() => ({})),
+            fetch(`${apiBase}/config/markup`).then(r => r.json()).catch(() => ({})),
+        ]).then(([unitData, markupData]) => {
+            if (unitData?.unit && ['truck', 'pallet', 'carton'].includes(unitData.unit)) {
+                setAdminDefaultUnit(unitData.unit as 'truck' | 'pallet' | 'carton');
+            }
+            if (markupData?.piece) {
+                setMarkups({
+                    piece: Number(markupData.piece) || 1.10,
+                    pallet: Number(markupData.pallet) || 1.05,
+                    container: Number(markupData.container) || 1.02,
+                });
+            }
+        });
     }, []);
 
     useEffect(() => {
@@ -303,19 +311,36 @@ export default function ProductDetailClient() {
                                 const palletsPerTruck = product.palletsPerShipment || 0;
                                 const baseUnit = String(product.unit || 'piece').toLowerCase();
 
-                                // Convert product.price to a per-piece base.
-                                let perPiece = product.price;
-                                if (baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) {
-                                    if (piecesPerCase > 0) perPiece = product.price / piecesPerCase;
-                                } else if (baseUnit.includes('pallet')) {
-                                    if (piecesPerPallet > 0) perPiece = product.price / piecesPerPallet;
-                                } else if (baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment') || baseUnit.includes('delivery')) {
-                                    if (piecesPerPallet > 0 && palletsPerTruck > 0) perPiece = product.price / (piecesPerPallet * palletsPerTruck);
-                                }
+                                // ── Step 1: resolve per-piece BASE price (supplier raw, before markup) ──
+                                // product.basePrice is the supplier raw price.
+                                // If absent, reverse from product.price ÷ piece markup multiplier.
+                                const rawBase = product.basePrice != null
+                                    ? product.basePrice
+                                    : product.price / markups.piece;
 
-                                const cartonPrice = piecesPerCase > 0 ? perPiece * piecesPerCase : null;
-                                const palletPrice = piecesPerPallet > 0 ? perPiece * piecesPerPallet : null;
-                                const truckPrice = (piecesPerPallet > 0 && palletsPerTruck > 0) ? perPiece * piecesPerPallet * palletsPerTruck : null;
+                                let basePerPiece = rawBase;
+                                if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
+                                    basePerPiece = rawBase / piecesPerCase;
+                                else if (baseUnit.includes('pallet') && piecesPerPallet > 0)
+                                    basePerPiece = rawBase / piecesPerPallet;
+                                else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment') || baseUnit.includes('delivery')) && piecesPerPallet > 0 && palletsPerTruck > 0)
+                                    basePerPiece = rawBase / (piecesPerPallet * palletsPerTruck);
+
+                                // ── Step 2: customer-visible tier prices (base × qty × tier markup) ──
+                                // Each tier uses its own markup: piece/carton → piece markup,
+                                // pallet → pallet markup, truck → container markup.
+                                const cartonPrice = piecesPerCase > 0
+                                    ? basePerPiece * piecesPerCase * markups.piece
+                                    : null;
+                                const palletPrice = piecesPerPallet > 0
+                                    ? basePerPiece * piecesPerPallet * markups.pallet
+                                    : null;
+                                const truckPrice = (piecesPerPallet > 0 && palletsPerTruck > 0)
+                                    ? basePerPiece * piecesPerPallet * palletsPerTruck * markups.container
+                                    : null;
+
+                                // Fallback per-piece customer price (with piece markup applied)
+                                const perPiece = basePerPiece * markups.piece;
 
                                 const options: Array<{ key: 'truck'|'pallet'|'carton'; label: string; emoji: string; price: number | null; qty: number }> = [];
                                 if (truckPrice !== null)  options.push({ key: 'truck',  label: 'Truck',  emoji: '🚛', price: truckPrice,  qty: palletsPerTruck });
@@ -419,16 +444,8 @@ export default function ProductDetailClient() {
                                 <div className="space-y-1.5">
                                     <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Unit Type</p>
                                     <p className="text-[18px] font-bold text-[#111827] capitalize">
-                                        {(() => {
-                                            const u = String(product.unit || '').trim().toLowerCase();
-                                            if (u === 'piece' || u === 'pcs' || u === 'item' || u === 'unit' || u === 'units') return 'Piece';
-                                            if (u === 'case' || u === 'carton' || u === 'box') return 'Carton';
-                                            if (u === 'pallet') return 'Pallet';
-                                            if (u === 'truck' || u === 'container' || u === 'shipment' || u === 'delivery') return 'Truck';
-                                            // If a numeric value leaked into `unit` (e.g. 24), default the label and surface it as "Carton (×24)"
-                                            if (/^\d+$/.test(u)) return `Carton (×${u})`;
-                                            return product.unit || 'Carton';
-                                        })()}
+                                        {(selectedUnit ?? adminDefaultUnit) === 'truck' ? 'Truck' :
+                                         (selectedUnit ?? adminDefaultUnit) === 'pallet' ? 'Pallet' : 'Carton'}
                                     </p>
                                 </div>
                                 <div className="space-y-1.5">
