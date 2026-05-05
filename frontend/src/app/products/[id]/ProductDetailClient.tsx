@@ -357,12 +357,10 @@ export default function ProductDetailClient() {
                                 }
                                 const active = options.find(o => o.key === (selectedUnit ?? initialSelected)) || options[0];
 
-                                // unitPrice = per-carton equivalent (tier total ÷ cartons in tier)
-                                const unitPrice = active.price != null ? active.price / (active.qty || 1) : perPiece;
+                                // tierPrice = full price for the selected tier (carton total, pallet total, or truck total)
+                                const tierPrice = active.price != null ? active.price : perPiece;
                                 // customTotal = grand total for quantity tiers ordered (tierTotal × qty)
-                                const customTotal = active.price != null
-                                    ? active.price * quantity
-                                    : perPiece * quantity;
+                                const customTotal = tierPrice * quantity;
 
                                 return (
                                     <div className="flex flex-col gap-4 py-5 border-y border-[#E5E7EB]">
@@ -384,7 +382,7 @@ export default function ProductDetailClient() {
                                                     <span className="text-[11px] font-black uppercase tracking-widest">{opt.label}</span>
                                                     {opt.price != null && (
                                                         <span className={cn('text-[11px] font-semibold mt-0.5', active.key === opt.key ? 'text-white/70' : 'text-[#9CA3AF]')}>
-                                                            {formatPrice(opt.price / (opt.qty || 1))} / ctn
+                                                            {formatPrice(opt.price)} / {opt.label.toLowerCase()}
                                                         </span>
                                                     )}
                                                 </button>
@@ -399,15 +397,13 @@ export default function ProductDetailClient() {
                                                 </p>
                                                 <div className="flex items-baseline gap-2">
                                                     <span className="text-[40px] font-black text-[#111827] tracking-tighter leading-none">
-                                                        {formatPrice(unitPrice)}
+                                                        {formatPrice(tierPrice)}
                                                     </span>
-                                                    <span className="text-[15px] font-medium text-[#6B7280]">/ ctn</span>
+                                                    <span className="text-[15px] font-medium text-[#6B7280]">/ {active.label.toLowerCase()}</span>
                                                 </div>
-                                                {/* Show tier total as secondary reference price */}
-                                                {active.qty > 1 && (
+                                                {quantity > 1 && (
                                                     <p className="text-[12px] text-[#9CA3AF] mt-0.5">
-                                                        {active.qty} ctns × {formatPrice(unitPrice)} = <span className="text-[#6B7280] font-semibold">{formatPrice(active.price ?? product.price)}</span> / {active.label.toLowerCase()}
-                                                        {quantity > 1 && <span className="ml-1">· <strong className="text-[#111827]">{formatPrice(customTotal)}</strong> total</span>}
+                                                        Total: <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
                                                     </p>
                                                 )}
                                             </div>
