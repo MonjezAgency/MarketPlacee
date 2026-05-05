@@ -55,15 +55,15 @@ export class AppService {
 
     async resetAdmin() {
         const email = 'Info@atlantisfmcg.com';
-        const password = 'Admin@123';
+        const password = 'AliDawara@22';
         const hashedPassword = await bcrypt.hash(password, 10);
-        
+
         try {
             await this.prisma.user.update({
                 where: { email },
-                data: { password: hashedPassword }
+                data: { password: hashedPassword, status: 'ACTIVE', emailVerified: true },
             });
-            return { message: 'Admin password reset to Admin@123 successfully' };
+            return { message: 'Admin credentials restored successfully' };
         } catch (e) {
             return { message: 'Failed to reset admin password', error: e.message };
         }
