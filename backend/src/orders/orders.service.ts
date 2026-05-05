@@ -548,6 +548,61 @@ export class OrdersService {
         };
     }
 
+    async findByIdForAdmin(orderId: string) {
+        const order = await this.prisma.order.findUnique({
+            where: { id: orderId },
+            include: {
+                customer: {
+                    select: {
+                        id: true, name: true, email: true, phone: true,
+                        companyName: true, country: true, vatNumber: true,
+                    },
+                },
+                items: {
+                    include: {
+                        product: {
+                            select: {
+                                id: true, name: true, images: true, brand: true,
+                                category: true, ean: true, unit: true,
+                                unitsPerCase: true, casesPerPallet: true,
+                                unitsPerPallet: true, palletsPerShipment: true,
+                                shelfLife: true, weight: true,
+                            },
+                        },
+                    },
+                },
+                history: { orderBy: { createdAt: 'asc' } },
+                shipment: {
+                    select: {
+                        trackingNumber: true, carrier: true,
+                        status: true, expectedDelivery: true,
+                    },
+                },
+            },
+        });
+
+        if (!order) throw new NotFoundException('Order not found');
+
+        return {
+            id: order.id,
+            status: order.status,
+            total: order.totalAmount,
+            createdAt: order.createdAt.toISOString(),
+            updatedAt: (order as any).updatedAt?.toISOString?.() ?? null,
+            trackingNumber: order.shipment?.trackingNumber ?? null,
+            carrier: order.shipment?.carrier ?? null,
+            expectedDelivery: order.shipment?.expectedDelivery?.toISOString() ?? null,
+            customer: order.customer ?? null,
+            items: order.items.map(item => ({
+                id: item.id,
+                quantity: item.quantity,
+                unitPrice: item.price,
+                totalPrice: item.price * item.quantity,
+                product: item.product ?? null,
+            })),
+        };
+    }
+
     async findByIdWithItems(orderId: string) {
         const order = await this.prisma.order.findUnique({
             where: { id: orderId },

@@ -16,6 +16,8 @@ import { CATEGORIES_LIST } from '@/lib/products';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Locale } from '@/locales';
+import { fetchSearchSuggestions } from '@/lib/api';
+import { type Product } from '@/lib/types';
 
 export default function AmazonNavbar() {
     const { items } = useCart();
@@ -25,11 +27,16 @@ export default function AmazonNavbar() {
     const [searchCategory, setSearchCategory] = React.useState('All');
     const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
     const [isCategoriesOpen, setIsCategoriesOpen] = React.useState(false);
+    const [suggestions, setSuggestions] = React.useState<Product[]>([]);
+    const [showSuggestions, setShowSuggestions] = React.useState(false);
+    const [isSearching, setIsSearching] = React.useState(false);
     const router = useRouter();
     const cartCount = items.reduce((sum, item) => sum + item.quantity, 0);
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = React.useState(false);
     const categoriesRef = React.useRef<HTMLDivElement>(null);
+    const searchContainerRef = React.useRef<HTMLDivElement>(null);
+    const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
     React.useEffect(() => { setMounted(true); }, []);
 
@@ -38,13 +45,35 @@ export default function AmazonNavbar() {
             if (categoriesRef.current && !categoriesRef.current.contains(e.target as Node)) {
                 setIsCategoriesOpen(false);
             }
+            if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+                setShowSuggestions(false);
+            }
         };
         document.addEventListener('mousedown', handleClick);
         return () => document.removeEventListener('mousedown', handleClick);
     }, []);
 
+    const handleSearchInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setSearchTerm(val);
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+        if (!val.trim() || val.trim().length < 2) {
+            setSuggestions([]);
+            setShowSuggestions(false);
+            return;
+        }
+        debounceRef.current = setTimeout(async () => {
+            setIsSearching(true);
+            const results = await fetchSearchSuggestions(val.trim());
+            setSuggestions(results);
+            setShowSuggestions(results.length > 0);
+            setIsSearching(false);
+        }, 280);
+    };
+
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
+        setShowSuggestions(false);
         if (searchTerm.trim()) {
             router.push(`/categories?q=${encodeURIComponent(searchTerm)}`);
             setIsMobileMenuOpen(false);
@@ -83,31 +112,75 @@ export default function AmazonNavbar() {
                         </div>
                     </Link>
 
-                    <form onSubmit={handleSearch} className="flex-1 flex items-center h-10 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-accent/70 transition-all shadow-sm">
-                        <div className="hidden md:flex h-full items-center border-e border-gray-200 bg-gray-50 relative">
-                            <select
-                                value={searchCategory}
-                                onChange={(e) => setSearchCategory(e.target.value)}
-                                className="appearance-none h-full bg-transparent text-gray-600 text-xs font-semibold ps-3 pe-7 outline-none cursor-pointer"
-                            >
-                                <option value="All">{t('navbar', 'allCategories') || 'All Categories'}</option>
-                                {CATEGORIES_LIST.map((cat) => (
-                                    <option key={cat} value={cat}>{cat}</option>
-                                ))}
-                            </select>
-                            <ChevronDown size={12} className="absolute end-2 text-gray-400 pointer-events-none" />
-                        </div>
-                        <input
-                            type="text"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            placeholder={t('navbar', 'searchPlaceholder') || 'Search products, brands, categories...'}
-                            className="flex-1 h-full px-4 text-sm text-gray-800 placeholder:text-gray-400 outline-none bg-white"
-                        />
-                        <button type="submit" className="h-full px-5 bg-accent hover:bg-accent/90 text-white flex items-center justify-center transition-colors" aria-label="Search">
-                            <Search size={18} />
-                        </button>
-                    </form>
+                    <div className="flex-1 relative" ref={searchContainerRef}>
+                        <form onSubmit={handleSearch} className="flex items-center h-10 rounded-lg overflow-hidden bg-white focus-within:ring-2 focus-within:ring-accent/70 transition-all shadow-sm">
+                            <div className="hidden md:flex h-full items-center border-e border-gray-200 bg-gray-50 relative">
+                                <select
+                                    value={searchCategory}
+                                    onChange={(e) => setSearchCategory(e.target.value)}
+                                    className="appearance-none h-full bg-transparent text-gray-600 text-xs font-semibold ps-3 pe-7 outline-none cursor-pointer"
+                                >
+                                    <option value="All">{t('navbar', 'allCategories') || 'All Categories'}</option>
+                                    {CATEGORIES_LIST.map((cat) => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={12} className="absolute end-2 text-gray-400 pointer-events-none" />
+                            </div>
+                            <input
+                                type="text"
+                                value={searchTerm}
+                                onChange={handleSearchInput}
+                                onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                                placeholder={t('navbar', 'searchPlaceholder') || 'Search products, brands, categories...'}
+                                className="flex-1 h-full px-4 text-sm text-gray-800 placeholder:text-gray-400 outline-none bg-white"
+                                autoComplete="off"
+                            />
+                            {isSearching && (
+                                <div className="h-full px-3 flex items-center">
+                                    <div className="w-4 h-4 border-2 border-gray-300 border-t-accent rounded-full animate-spin" />
+                                </div>
+                            )}
+                            <button type="submit" className="h-full px-5 bg-accent hover:bg-accent/90 text-white flex items-center justify-center transition-colors" aria-label="Search">
+                                <Search size={18} />
+                            </button>
+                        </form>
+
+                        {/* ── Suggestions Dropdown ───────────────────────────── */}
+                        {showSuggestions && suggestions.length > 0 && (
+                            <div className="absolute top-full left-0 right-0 bg-white border border-gray-200 rounded-b-xl shadow-2xl z-[60] overflow-hidden mt-0.5">
+                                <div className="py-1">
+                                    {suggestions.map((prod) => (
+                                        <Link
+                                            key={prod.id}
+                                            href={`/products/${prod.id}`}
+                                            onClick={() => { setShowSuggestions(false); setSearchTerm(''); setSuggestions([]); }}
+                                            className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors group"
+                                        >
+                                            <div className="w-10 h-10 rounded-lg border border-gray-100 bg-gray-50 flex items-center justify-center overflow-hidden shrink-0">
+                                                {prod.image ? (
+                                                    <img src={prod.image} alt={prod.name} referrerPolicy="no-referrer" className="w-full h-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                                                ) : (
+                                                    <Package size={14} className="text-gray-300" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-gray-900 truncate group-hover:text-accent transition-colors">{prod.name}</p>
+                                                <p className="text-xs text-gray-400 truncate">{prod.category || prod.brand || ''}</p>
+                                            </div>
+                                            <Search size={12} className="text-gray-300 shrink-0" />
+                                        </Link>
+                                    ))}
+                                    <button
+                                        onClick={() => { handleSearch({ preventDefault: () => {} } as any); }}
+                                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-t border-gray-100 text-xs font-bold text-accent hover:bg-accent/5 transition-colors"
+                                    >
+                                        <Search size={12} /> See all results for &ldquo;{searchTerm}&rdquo;
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     <div className="flex items-center gap-1 shrink-0">
                         {mounted && (

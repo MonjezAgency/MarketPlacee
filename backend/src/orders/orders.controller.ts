@@ -112,9 +112,9 @@ export class OrdersController {
         if (req.user.role === Role.CUSTOMER) {
             return this.ordersService.findByIdForBuyer(id, req.user.sub);
         }
-        if (req.user.role === Role.ADMIN) {
-            const orders = await this.ordersService.findAll();
-            return orders.find(o => o.id === id);
+        // Admin / Owner / Support / Logistics all get the full admin view
+        if ([Role.ADMIN, Role.OWNER, Role.SUPPORT, Role.MODERATOR, Role.LOGISTICS].includes(req.user.role)) {
+            return this.ordersService.findByIdForAdmin(id);
         }
         throw new ForbiddenException();
     }

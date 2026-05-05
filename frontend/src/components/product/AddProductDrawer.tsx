@@ -30,6 +30,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
     const [suppliers, setSuppliers] = React.useState<any[]>([]);
     const [supplierSearch, setSupplierSearch] = React.useState('');
     const [isUploadingImage, setIsUploadingImage] = React.useState(false);
+    const [imageUrlInput, setImageUrlInput] = React.useState('');
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
     const [activeCurrency, setActiveCurrency] = React.useState(() => {
@@ -69,8 +70,19 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
         if (isOpen) {
             setForm({ ...defaultForm, autoApprove: role === 'admin' });
             setSupplierSearch('');
+            setImageUrlInput('');
         }
     }, [isOpen, role]);
+
+    const handleAddImageUrl = () => {
+        const url = imageUrlInput.trim();
+        if (!url) return;
+        // basic URL validation
+        try { new URL(url); } catch { toast.error('Please enter a valid image URL'); return; }
+        if (form.images.includes(url)) { toast.error('Image already added'); return; }
+        setForm(prev => ({ ...prev, images: [...prev.images, url] }));
+        setImageUrlInput('');
+    };
 
     // Fetch suppliers (admin only)
     React.useEffect(() => {
@@ -467,8 +479,20 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                     <ImageIcon size={12} /> Product Images
                                 </h3>
                                 <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleImageUpload} className="hidden" />
+                                {/* Upload drop zone */}
                                 <div
                                     onClick={() => fileInputRef.current?.click()}
+                                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('border-teal-400', 'bg-teal-50/40'); }}
+                                    onDragLeave={(e) => { e.currentTarget.classList.remove('border-teal-400', 'bg-teal-50/40'); }}
+                                    onDrop={(e) => {
+                                        e.preventDefault();
+                                        e.currentTarget.classList.remove('border-teal-400', 'bg-teal-50/40');
+                                        const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+                                        if (files.length) {
+                                            const fakeEvent = { target: { files } } as any;
+                                            handleImageUpload(fakeEvent);
+                                        }
+                                    }}
                                     className="border-2 border-dashed border-slate-200 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:border-teal-400 hover:bg-teal-50/30 transition-all group"
                                 >
                                     {isUploadingImage ? (
@@ -477,15 +501,41 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                         <Upload size={24} className="text-slate-300 group-hover:text-teal-500 mb-2 transition-colors" />
                                     )}
                                     <p className="text-sm font-bold text-slate-500 group-hover:text-teal-600">
-                                        {isUploadingImage ? 'Uploading...' : 'Click to upload images'}
+                                        {isUploadingImage ? 'Uploading...' : 'Click or drag to upload images'}
                                     </p>
                                     <p className="text-xs text-slate-400 mt-1">PNG, JPG, WebP — multiple allowed</p>
                                 </div>
+
+                                {/* Add by URL */}
+                                <div className="flex items-center gap-2 mt-3">
+                                    <input
+                                        type="url"
+                                        value={imageUrlInput}
+                                        onChange={e => setImageUrlInput(e.target.value)}
+                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddImageUrl(); } }}
+                                        placeholder="Or paste an image URL and press Add…"
+                                        className="flex-1 px-3 py-2 rounded-xl border border-slate-200 text-sm focus:border-teal-500 focus:ring-2 focus:ring-teal-500/10 outline-none transition-all"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={handleAddImageUrl}
+                                        className="px-3 py-2 rounded-xl bg-teal-600 text-white text-xs font-bold hover:bg-teal-700 transition-colors whitespace-nowrap"
+                                    >
+                                        Add
+                                    </button>
+                                </div>
+
                                 {form.images.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-3">
                                         {form.images.map((url, i) => (
                                             <div key={i} className="relative group">
-                                                <img src={url} alt="" className="w-16 h-16 rounded-xl object-cover border border-slate-200" />
+                                                <img
+                                                    src={url}
+                                                    alt=""
+                                                    referrerPolicy="no-referrer"
+                                                    className="w-16 h-16 rounded-xl object-cover border border-slate-200 bg-slate-50"
+                                                    onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.3'; }}
+                                                />
                                                 <button
                                                     onClick={() => setForm(prev => ({ ...prev, images: prev.images.filter((_, idx) => idx !== i) }))}
                                                     className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
