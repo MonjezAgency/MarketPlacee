@@ -100,6 +100,36 @@ export class ProductsController {
         return { imageUrls: images };
     }
 
+    /**
+     * Structured EAN lookup with AI validation + caching.
+     * Matches the user-facing spec exactly:
+     *   POST /products/ean-lookup  { ean, title?, image_count?, brand? }
+     *   →  { ean, title, images, cached, confidence_score, matched, source, reason? }
+     *
+     * The endpoint is public (no auth) to support the AddProductDrawer / bulk
+     * upload preview flows where the user is creating a product before it's
+     * persisted. Throttling is handled at the OpenRouter layer.
+     */
+    @Post('ean-lookup')
+    async lookupEan(@Body() body: { ean: string; title?: string; image_count?: number; brand?: string; refresh?: boolean }) {
+        const result = await this.eanService.fetchProductByEan(
+            String(body.ean || '').trim(),
+            body.title,
+            body.image_count || 3,
+            { brand: body.brand, skipCache: !!body.refresh },
+        );
+        return {
+            ean: result.ean,
+            title: result.title,
+            images: result.images,
+            cached: result.cached === true,
+            confidence_score: result.confidence_score ?? 0,
+            matched: result.matched,
+            source: result.source,
+            ...(result.reason ? { reason: result.reason } : {}),
+        };
+    }
+
     /** Public endpoint — products that recently changed price, for the live header ticker */
     @Get('price-ticker')
     async getPriceTicker(@Query('limit') limit?: string) {

@@ -6,6 +6,8 @@ import { PlacementController } from './placement.controller';
 import { PricingModule } from '../pricing/pricing.module';
 import { AiAgentModule } from '../ai-agent/ai-agent.module';
 import { EanService } from './ean.service';
+import { EanCacheService } from './ean-cache.service';
+import { EanValidatorService } from './ean-validator.service';
 import { ExcelService } from '../admin/excel.service';
 import { ReviewsService } from './reviews.service';
 import { ReviewsController, AdminReviewsController } from './reviews.controller';
@@ -15,7 +17,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
     imports: [PricingModule, AiAgentModule, StorageModule, NotificationsModule],
-    providers: [ProductsService, PlacementService, EanService, ExcelService, ReviewsService],
+    providers: [ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService],
     controllers: [ProductsController, PlacementController, ReviewsController, AdminReviewsController],
     exports: [ProductsService, PlacementService],
 })
