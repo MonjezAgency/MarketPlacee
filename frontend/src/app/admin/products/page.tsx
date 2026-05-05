@@ -12,7 +12,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
-import { formatPrice, getActiveCurrency } from '@/lib/currency';
+import { formatPrice, getActiveCurrency, getCurrencyInfo } from '@/lib/currency';
 import { toast } from 'react-hot-toast';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -1038,7 +1038,7 @@ export default function ProductsModerationPage() {
                                                         </p>
                                                     </div>
                                                 </div>
-                                                {/* Tier price preview — with markup applied */}
+                                                {/* Tier price preview — with markup, NO currency conversion (math stays in input currency) */}
                                                 {(() => {
                                                     const pp = parseFloat((isEditing ? editData.basePrice : selectedProduct.basePrice) || 0);
                                                     const pc = (isEditing ? editData.unitsPerCase : selectedProduct.unitsPerCase) || 0;
@@ -1052,25 +1052,43 @@ export default function ProductsModerationPage() {
                                                     // Per-carton equivalents
                                                     const palletPerCtn = palletTotal !== null && cp ? palletTotal / cp : null;
                                                     const truckPerCtn  = truckTotal !== null && cp && pt ? truckTotal / (cp * pt) : null;
+                                                    // Local formatter — no currency conversion (input value is already in user's display currency)
+                                                    const sym = getCurrencyInfo().symbol;
+                                                    const fmt = (n: number) => `${sym}${n.toFixed(2)}`;
                                                     return (
-                                                        <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl space-y-2">
-                                                            <p className="text-[9px] text-teal-600 font-bold uppercase tracking-widest">Customer prices (markup applied)</p>
+                                                        <div className="p-4 bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-200 rounded-2xl space-y-3">
+                                                            <div className="flex items-center justify-between">
+                                                                <p className="text-[10px] text-teal-700 font-black uppercase tracking-widest">Customer prices (markup applied)</p>
+                                                                <p className="text-[9px] text-slate-500 font-mono">base {fmt(pp)} / pc</p>
+                                                            </div>
                                                             <div className="grid grid-cols-3 gap-2">
-                                                                <div className="text-center">
-                                                                    <p className="text-[9px] text-teal-500 font-bold uppercase">Carton</p>
-                                                                    <p className="text-[13px] font-bold text-teal-700">{formatPrice(cartonTotal)}</p>
-                                                                    <p className="text-[9px] text-slate-400">×{markups.piece} / {pc}pcs</p>
+                                                                <div className="bg-white/60 rounded-xl p-2.5 text-center border border-white">
+                                                                    <p className="text-[9px] text-teal-600 font-black uppercase">Carton</p>
+                                                                    <p className="text-[15px] font-black text-teal-800">{fmt(cartonTotal)}</p>
+                                                                    <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
+                                                                        {fmt(pp)} × {pc} × {markups.piece}
+                                                                    </p>
                                                                 </div>
-                                                                {palletTotal !== null && <div className="text-center">
-                                                                    <p className="text-[9px] text-teal-500 font-bold uppercase">Pallet</p>
-                                                                    <p className="text-[13px] font-bold text-teal-700">{formatPrice(palletTotal)}</p>
-                                                                    <p className="text-[9px] text-slate-400">{formatPrice(palletPerCtn!)}/ctn</p>
-                                                                </div>}
-                                                                {truckTotal !== null && <div className="text-center">
-                                                                    <p className="text-[9px] text-teal-500 font-bold uppercase">Truck</p>
-                                                                    <p className="text-[13px] font-bold text-teal-700">{formatPrice(truckTotal)}</p>
-                                                                    <p className="text-[9px] text-slate-400">{formatPrice(truckPerCtn!)}/ctn</p>
-                                                                </div>}
+                                                                {palletTotal !== null && (
+                                                                    <div className="bg-white/60 rounded-xl p-2.5 text-center border border-white">
+                                                                        <p className="text-[9px] text-teal-600 font-black uppercase">Pallet</p>
+                                                                        <p className="text-[15px] font-black text-teal-800">{fmt(palletTotal)}</p>
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
+                                                                            {fmt(pp)} × {pc} × {cp} × {markups.pallet}
+                                                                        </p>
+                                                                        <p className="text-[9px] text-emerald-700 font-bold mt-0.5">{fmt(palletPerCtn!)}/ctn</p>
+                                                                    </div>
+                                                                )}
+                                                                {truckTotal !== null && (
+                                                                    <div className="bg-white/60 rounded-xl p-2.5 text-center border border-white">
+                                                                        <p className="text-[9px] text-teal-600 font-black uppercase">Truck</p>
+                                                                        <p className="text-[15px] font-black text-teal-800">{fmt(truckTotal)}</p>
+                                                                        <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
+                                                                            {fmt(pp)} × {pc} × {cp} × {pt} × {markups.container}
+                                                                        </p>
+                                                                        <p className="text-[9px] text-emerald-700 font-bold mt-0.5">{fmt(truckPerCtn!)}/ctn</p>
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     );

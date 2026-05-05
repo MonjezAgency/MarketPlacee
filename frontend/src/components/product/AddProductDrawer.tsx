@@ -375,36 +375,50 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                         />
                                     </div>
 
-                                    {/* Live computed price preview — with markup */}
+                                    {/* Live computed price preview — with markup, formula shown */}
                                     {(() => {
                                         const pp = parseFloat(form.price) || 0;
                                         const pc = parseInt(form.unitsPerCase) || 0;
                                         const cp = parseInt(form.casesPerPallet) || 0;
                                         const pt = parseInt(form.palletsPerShipment) || 0;
                                         if (pp <= 0) return null;
-                                        // Apply tier-specific markups
                                         const cartonTotal = pc > 0 ? pp * pc * markups.piece : null;
                                         const palletTotal = pc > 0 && cp > 0 ? pp * pc * cp * markups.pallet : null;
                                         const truckTotal  = pc > 0 && cp > 0 && pt > 0 ? pp * pc * cp * pt * markups.container : null;
                                         const fmt = (n: number) => `${currencyInfo.symbol}${n.toFixed(2)}`;
                                         return (
-                                            <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl space-y-1.5">
-                                                <p className="text-[10px] font-bold text-teal-700 uppercase tracking-widest">Customer prices (markup applied)</p>
+                                            <div className="p-4 bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-200 rounded-2xl space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-[10px] text-teal-700 font-black uppercase tracking-widest">Customer prices (markup applied)</p>
+                                                    <p className="text-[9px] text-slate-500 font-mono">base {fmt(pp)} / pc</p>
+                                                </div>
                                                 <div className="grid grid-cols-3 gap-2">
-                                                    <div>
-                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">Carton</p>
-                                                        <p className="text-[12px] font-bold text-slate-900">{cartonTotal !== null ? fmt(cartonTotal) : '—'}</p>
-                                                        <p className="text-[9px] text-slate-400">{pc > 0 ? `${pc}pcs ×${markups.piece}` : 'set pcs/case'}</p>
+                                                    <div className="bg-white/60 rounded-xl p-2.5 text-center border border-white">
+                                                        <p className="text-[9px] text-teal-600 font-black uppercase">Carton</p>
+                                                        <p className="text-[15px] font-black text-teal-800">{cartonTotal !== null ? fmt(cartonTotal) : '—'}</p>
+                                                        <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
+                                                            {pc > 0 ? `${fmt(pp)} × ${pc} × ${markups.piece}` : 'set pcs/case'}
+                                                        </p>
                                                     </div>
-                                                    <div>
-                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">Pallet</p>
-                                                        <p className="text-[12px] font-bold text-slate-900">{palletTotal !== null ? fmt(palletTotal) : '—'}</p>
-                                                        <p className="text-[9px] text-slate-400">{palletTotal !== null && cp > 0 ? `${fmt(palletTotal / cp)}/ctn` : 'set cases/pallet'}</p>
+                                                    <div className="bg-white/60 rounded-xl p-2.5 text-center border border-white">
+                                                        <p className="text-[9px] text-teal-600 font-black uppercase">Pallet</p>
+                                                        <p className="text-[15px] font-black text-teal-800">{palletTotal !== null ? fmt(palletTotal) : '—'}</p>
+                                                        <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
+                                                            {palletTotal !== null ? `${fmt(pp)} × ${pc} × ${cp} × ${markups.pallet}` : 'set cases/pallet'}
+                                                        </p>
+                                                        {palletTotal !== null && cp > 0 && (
+                                                            <p className="text-[9px] text-emerald-700 font-bold mt-0.5">{fmt(palletTotal / cp)}/ctn</p>
+                                                        )}
                                                     </div>
-                                                    <div>
-                                                        <p className="text-[9px] text-slate-500 font-bold uppercase">Truck</p>
-                                                        <p className="text-[12px] font-bold text-slate-900">{truckTotal !== null ? fmt(truckTotal) : '—'}</p>
-                                                        <p className="text-[9px] text-slate-400">{truckTotal !== null && cp > 0 && pt > 0 ? `${fmt(truckTotal / (cp * pt))}/ctn` : 'set pallets/truck'}</p>
+                                                    <div className="bg-white/60 rounded-xl p-2.5 text-center border border-white">
+                                                        <p className="text-[9px] text-teal-600 font-black uppercase">Truck</p>
+                                                        <p className="text-[15px] font-black text-teal-800">{truckTotal !== null ? fmt(truckTotal) : '—'}</p>
+                                                        <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
+                                                            {truckTotal !== null ? `${fmt(pp)} × ${pc} × ${cp} × ${pt} × ${markups.container}` : 'set pallets/truck'}
+                                                        </p>
+                                                        {truckTotal !== null && cp > 0 && pt > 0 && (
+                                                            <p className="text-[9px] text-emerald-700 font-bold mt-0.5">{fmt(truckTotal / (cp * pt))}/ctn</p>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </div>
