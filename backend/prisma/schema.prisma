@@ -260,6 +260,7 @@ model Order {
   invoices Invoice[]
   shipment Shipment?
   disputes Dispute[]
+  chatMessages SupportMessage[] @relation("OrderChat")
 
   deletedByCustomer Boolean @default(false)
   createdAt DateTime @default(now())
@@ -495,10 +496,16 @@ model SupportMessage {
   assignedTeam String?  // e.g., 'DEVELOPER', 'LOGISTICS'
   isHandedOver Boolean  @default(false) // true = human took over from bot
   handedOverBy String?  // userId of the support agent who took over
+
+  // Order-linked chat — set when this message belongs to a specific order conversation
+  orderId      String?
+  orderContext Order?   @relation("OrderChat", fields: [orderId], references: [id], onDelete: SetNull)
+
   createdAt    DateTime @default(now())
 
   @@index([senderId])
   @@index([receiverId])
+  @@index([orderId])
   @@index([createdAt])
 }
 

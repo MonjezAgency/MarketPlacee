@@ -499,34 +499,50 @@ Categories List: ${categories.join(', ')}`;
         const palletPerCtn    = palletTotal && cartonsInPallet > 0 ? palletTotal / cartonsInPallet : null;
         const truckPerCtn     = truckTotal  && cartonsInTruck  > 0 ? truckTotal  / cartonsInTruck  : null;
 
+        // Pre-compute the step-by-step calculation strings so the AI can quote them exactly
+        const bpp = basePerPiece.toFixed(4);
+        const cartonCalc  = cartonTotal  != null ? `${bpp} × ${piecesPerCase} pcs = ${(basePerPiece*piecesPerCase).toFixed(3)} × ${mPiece} markup = ${cartonTotal.toFixed(3)}€` : '';
+        const palletCalc  = palletTotal  != null ? `${bpp} × ${piecesPerCase} × ${casesPerPallet} ctns = ${(basePerPiece*piecesPerCase*casesPerPallet).toFixed(3)} × ${mPallet} markup = ${palletTotal.toFixed(3)}€` : '';
+        const truckCalc   = truckTotal   != null ? `${bpp} × ${piecesPerCase} × ${casesPerPallet} × ${palletsPerTruck} = ${(basePerPiece*piecesPerCase*casesPerPallet*palletsPerTruck).toFixed(3)} × ${mContainer} markup = ${truckTotal.toFixed(3)}€` : '';
+
         // 5. Build system prompt
-        const systemPrompt = `You are Atlantis FMCG's smart pricing assistant. You help B2B buyers understand product pricing and choose the right buying tier.
+        const systemPrompt = `You are Atlantis FMCG's smart B2B pricing assistant. Your job is to help buyers understand exact pricing using clear step-by-step calculations.
 
 PRODUCT: ${product.name}${product.brand ? ` by ${product.brand}` : ''}
 
 PACKAGING STRUCTURE:
 - Pieces per carton: ${piecesPerCase}
 - Cartons per pallet: ${casesPerPallet}
-- Pallets per truck: ${palletsPerTruck}
-- Cartons per pallet: ${cartonsInPallet}
+- Pallets per truck/container: ${palletsPerTruck}
+- Total cartons per pallet: ${cartonsInPallet}
 - Total cartons per truck: ${cartonsInTruck}
 
-CURRENT PRICING (markup already applied):
-${cartonTotal  != null ? `• Carton tier:  ${fmt(cartonTotal)} per carton  =  ${fmt(cartonPerCtn!)} / ctn  (markup +${Math.round((mPiece-1)*100)}%)` : ''}
-${palletTotal  != null ? `• Pallet tier:  ${fmt(palletTotal)} per pallet  =  ${fmt(palletPerCtn!)} / ctn  (${cartonsInPallet} cartons, markup +${Math.round((mPallet-1)*100)}%)` : ''}
-${truckTotal   != null ? `• Truck tier:   ${fmt(truckTotal)} per truck  =  ${fmt(truckPerCtn!)} / ctn  (${cartonsInTruck} cartons, markup +${Math.round((mContainer-1)*100)}%)` : ''}
+MARKUP RATES (from admin settings):
+- Carton markup: +${Math.round((mPiece-1)*100)}%  (multiplier: ×${mPiece})
+- Pallet markup: +${Math.round((mPallet-1)*100)}%  (multiplier: ×${mPallet})
+- Truck markup:  +${Math.round((mContainer-1)*100)}%  (multiplier: ×${mContainer})
 
-SAVINGS vs CARTON (per-carton comparison):
-${palletPerCtn && cartonPerCtn ? `• Buying pallet saves ${fmt(cartonPerCtn - palletPerCtn)} / ctn (${((1 - palletPerCtn/cartonPerCtn)*100).toFixed(1)}% cheaper per carton)` : ''}
-${truckPerCtn  && cartonPerCtn ? `• Buying truck saves  ${fmt(cartonPerCtn - truckPerCtn)} / ctn (${((1 - truckPerCtn/cartonPerCtn)*100).toFixed(1)}% cheaper per carton)` : ''}
+CALCULATED TIER PRICES (always quote these exact numbers):
+${cartonTotal  != null ? `🗃️ CARTON:  ${cartonCalc}
+   → Customer pays: €${cartonTotal.toFixed(2)} per carton  (= €${cartonPerCtn!.toFixed(3)} / ctn)` : ''}
+${palletTotal  != null ? `📦 PALLET:  ${palletCalc}
+   → Customer pays: €${palletTotal.toFixed(2)} per pallet  (= €${palletPerCtn!.toFixed(3)} / ctn | ${cartonsInPallet} cartons)` : ''}
+${truckTotal   != null ? `🚛 TRUCK:   ${truckCalc}
+   → Customer pays: €${truckTotal.toFixed(2)} per truck   (= €${truckPerCtn!.toFixed(3)} / ctn | ${cartonsInTruck} cartons)` : ''}
 
-RULES:
-- Always show the per-carton (ctn) equivalent price so buyers can compare apples-to-apples.
-- When a buyer asks "how much for X pallets/trucks/cartons?", calculate the exact total.
-- Be concise but precise — show the math when it helps.
-- Respond in the same language the buyer writes in (Arabic or English).
-- Never mention base price or internal margins.
-- If you cannot calculate something, say so clearly.`;
+SAVINGS (per carton):
+${palletPerCtn && cartonPerCtn ? `• Pallet vs Carton: saves €${(cartonPerCtn - palletPerCtn).toFixed(3)}/ctn = ${((1 - palletPerCtn/cartonPerCtn)*100).toFixed(1)}% cheaper` : ''}
+${truckPerCtn  && cartonPerCtn ? `• Truck vs Carton:  saves €${(cartonPerCtn - truckPerCtn).toFixed(3)}/ctn = ${((1 - truckPerCtn/cartonPerCtn)*100).toFixed(1)}% cheaper` : ''}
+
+CRITICAL RULES — follow these strictly:
+1. ALWAYS show the step-by-step calculation so the buyer can verify the math.
+   Format: "base × pieces × cartons × markup = total"
+2. When asked "how much for N pallets?", compute: N × €${palletTotal?.toFixed(2) ?? '?'} = total, then add "(= N×${cartonsInPallet} = X cartons total)"
+3. When asked "how much for N trucks?", compute: N × €${truckTotal?.toFixed(2) ?? '?'} = total
+4. Always show the per-carton equivalent (€/ctn) alongside the tier total.
+5. Respond in the SAME LANGUAGE as the buyer (Arabic → Arabic, English → English).
+6. Never mention internal base prices or margin details — only the customer-facing price.
+7. Be precise with decimal places — pricing matters in B2B.`;
 
         if (!process.env.OPENROUTER_API_KEY) {
             // Fallback: deterministic rule-based responses

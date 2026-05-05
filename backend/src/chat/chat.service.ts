@@ -184,6 +184,154 @@ export class ChatService {
     });
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // ORDER-LINKED CHAT — dedicated per-order conversation between admin & buyer
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /** Admin initiates or continues a conversation tied to a specific order */
+  async sendOrderMessage(senderId: string, orderId: string, content: string) {
+    // Resolve the order so we can notify the other party
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, customerId: true, supplierId: true, totalAmount: true, status: true },
+    });
+    if (!order) throw new Error('Order not found');
+
+    const sender = await this.prisma.user.findUnique({
+      where: { id: senderId },
+      select: { id: true, name: true, role: true },
+    });
+
+    const message = await this.prisma.supportMessage.create({
+      data: {
+        senderId,
+        orderId,
+        content,
+        receiverId: null,   // null = "general"; orderId carries the thread context
+      },
+      include: { sender: { select: { id: true, name: true, role: true } } },
+    });
+
+    // Determine who to notify
+    const isStaff = ['ADMIN', 'OWNER', 'SUPPORT', 'LOGISTICS'].includes(sender?.role || '');
+    const notifyUserId = isStaff ? order.customerId : null;
+
+    if (notifyUserId) {
+      await this.prisma.notification.create({
+        data: {
+          userId: notifyUserId,
+          title: 'New message about your order',
+          message: `You have a new message about order #${orderId.slice(-8).toUpperCase()}: "${content.substring(0, 60)}${content.length > 60 ? '…' : ''}"`,
+          type: 'INFO',
+        },
+      }).catch(() => {});
+    } else if (!isStaff) {
+      // Customer sent — notify admins
+      const admins = await this.prisma.user.findMany({
+        where: { role: { in: ['ADMIN', 'SUPPORT', 'OWNER'] } },
+        select: { id: true },
+        take: 5,
+      });
+      await Promise.all(admins.map(a =>
+        this.prisma.notification.create({
+          data: {
+            userId: a.id,
+            title: 'Customer replied on order',
+            message: `${sender?.name} replied on order #${orderId.slice(-8).toUpperCase()}: "${content.substring(0, 60)}"`,
+            type: 'INFO',
+          },
+        }).catch(() => {}),
+      ));
+    }
+
+    return message;
+  }
+
+  /** Get all messages for a specific order's chat thread */
+  async getOrderMessages(orderId: string) {
+    return this.prisma.supportMessage.findMany({
+      where: { orderId },
+      include: { sender: { select: { id: true, name: true, role: true, avatar: true } } },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
+
+  /** Customer: get a list of orders that have chat messages (for "Order Conversations" tab) */
+  async getCustomerOrderChats(customerId: string) {
+    // Find all orders belonging to this customer that have any chat message
+    const orders = await this.prisma.order.findMany({
+      where: {
+        customerId,
+        chatMessages: { some: {} },
+      },
+      select: {
+        id: true,
+        status: true,
+        totalAmount: true,
+        createdAt: true,
+        chatMessages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { content: true, createdAt: true, sender: { select: { name: true, role: true } } },
+        },
+        items: {
+          take: 1,
+          select: { product: { select: { name: true, images: true } } },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return orders.map(o => ({
+      orderId: o.id,
+      status: o.status,
+      total: o.totalAmount,
+      createdAt: o.createdAt,
+      firstProduct: o.items[0]?.product?.name ?? null,
+      firstImage: o.items[0]?.product?.images?.[0] ?? null,
+      lastMessage: o.chatMessages[0]?.content ?? null,
+      lastMessageAt: o.chatMessages[0]?.createdAt ?? null,
+      lastMessageSender: o.chatMessages[0]?.sender?.name ?? null,
+    }));
+  }
+
+  /** Admin: get all orders that have chat messages */
+  async getAdminOrderChats() {
+    const orders = await this.prisma.order.findMany({
+      where: { chatMessages: { some: {} } },
+      select: {
+        id: true,
+        status: true,
+        totalAmount: true,
+        createdAt: true,
+        customer: { select: { id: true, name: true, email: true } },
+        chatMessages: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: {
+            content: true,
+            createdAt: true,
+            isRead: true,
+            sender: { select: { name: true, role: true } },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    return orders.map(o => ({
+      orderId: o.id,
+      status: o.status,
+      total: o.totalAmount,
+      createdAt: o.createdAt,
+      customer: o.customer,
+      lastMessage: o.chatMessages[0]?.content ?? null,
+      lastMessageAt: o.chatMessages[0]?.createdAt ?? null,
+      lastMessageSender: o.chatMessages[0]?.sender?.name ?? null,
+      unread: o.chatMessages[0]?.isRead === false ? 1 : 0,
+    }));
+  }
+
   /**
    * Switch conversation from bot to human agent.
    * Marks all bot messages in this thread as handed over.

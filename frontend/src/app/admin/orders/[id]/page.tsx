@@ -19,11 +19,13 @@ import {
     Download,
     ExternalLink,
     Building2,
+    MessageSquare,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import OrderChatModal from '@/components/chat/OrderChatModal';
 
 type AdminOrderItem = {
     id: string;
@@ -110,6 +112,7 @@ export default function AdminOrderDetailPage() {
     const [order, setOrder] = React.useState<AdminOrder | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [updating, setUpdating] = React.useState(false);
+    const [chatOpen, setChatOpen] = React.useState(false);
 
     React.useEffect(() => {
         if (!params?.id) return;
@@ -530,7 +533,29 @@ export default function AdminOrderDetailPage() {
                             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Handled by</p>
                             <p className="text-[13px] font-bold text-teal-600">Atlantis Marketplace</p>
                         </div>
+
+                        {/* Contact Customer button */}
+                        <button
+                            onClick={() => setChatOpen(true)}
+                            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#0B1F3A] hover:bg-[#1a3a6b] text-white font-bold text-[13px] rounded-2xl transition-all shadow-sm"
+                        >
+                            <MessageSquare size={16} />
+                            Contact Customer
+                        </button>
                     </section>
+
+                    {/* Order Chat Modal */}
+                    <AnimatePresence>
+                        {chatOpen && order && (
+                            <OrderChatModal
+                                orderId={order.id}
+                                orderTotal={order.total}
+                                customerName={order.customer?.name}
+                                isAdmin={true}
+                                onClose={() => setChatOpen(false)}
+                            />
+                        )}
+                    </AnimatePresence>
 
                     <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
                         <h3 className="text-[14px] font-bold text-slate-900 mb-4 flex items-center gap-2">

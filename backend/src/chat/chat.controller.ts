@@ -48,4 +48,35 @@ export class ChatController {
   async markRead(@Body() data: { ids: string[] }) {
     return this.chatService.markAsRead(data.ids);
   }
+
+  // ─── Order-linked chat ────────────────────────────────────────────────────
+
+  /** Send (or start) a message in an order's dedicated chat thread */
+  @Post('order/:orderId/send')
+  async sendOrderMessage(
+    @Param('orderId') orderId: string,
+    @Body('content') content: string,
+    @Request() req,
+  ) {
+    return this.chatService.sendOrderMessage(req.user.sub, orderId, content);
+  }
+
+  /** Get all messages for an order's chat thread */
+  @Get('order/:orderId/messages')
+  async getOrderMessages(@Param('orderId') orderId: string) {
+    return this.chatService.getOrderMessages(orderId);
+  }
+
+  /** Customer: list all their orders that have active chat conversations */
+  @Get('my-order-chats')
+  async getMyOrderChats(@Request() req) {
+    return this.chatService.getCustomerOrderChats(req.user.sub);
+  }
+
+  /** Admin/Support: list all orders with active chat conversations */
+  @Get('admin/order-chats')
+  @Roles(Role.ADMIN, Role.SUPPORT, Role.OWNER, Role.LOGISTICS)
+  async getAdminOrderChats() {
+    return this.chatService.getAdminOrderChats();
+  }
 }
