@@ -91,8 +91,12 @@ export class ProductsController {
     }
 
     @Get('ean/:ean')
-    async findImagesByEan(@Param('ean') ean: string, @Query('limit') limit?: string) {
-        const images = await this.eanService.fetchImagesByEan(ean, limit ? parseInt(limit) : 3);
+    async findImagesByEan(
+        @Param('ean') ean: string,
+        @Query('limit') limit?: string,
+        @Query('name') name?: string,
+    ) {
+        const images = await this.eanService.fetchImagesByEan(ean, limit ? parseInt(limit) : 3, name);
         return { imageUrls: images };
     }
 
@@ -229,6 +233,7 @@ export class ProductsController {
                             const fetched = await this.eanService.fetchImagesByEan(
                                 String((dto as any).ean),
                                 eanImageCount,
+                                (dto as any).name,
                             );
                             if (fetched.length > 0) (dto as any).images = fetched;
                         } catch (_e) { /* non-fatal */ }

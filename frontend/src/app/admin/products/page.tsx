@@ -296,6 +296,31 @@ export default function ProductsModerationPage() {
         }
     };
 
+    // Delete a single product (admin) — only allowed for PENDING / REJECTED.
+    const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
+    const [isDeleting, setIsDeleting] = React.useState(false);
+
+    const handleDelete = async (id: string) => {
+        const tid = toast.loading('Deleting product...');
+        setIsDeleting(true);
+        try {
+            const res = await apiFetch(`/products/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                toast.success('Product deleted', { id: tid });
+                setShowDeleteConfirm(false);
+                setSelectedProduct(null);
+                fetchData();
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast.error(err.message || 'Delete failed', { id: tid });
+            }
+        } catch (err) {
+            toast.error('Error during delete', { id: tid });
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
     const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
         if (selectedIds.length === 0) return;
         
@@ -1251,25 +1276,25 @@ export default function ProductsModerationPage() {
                                             </button>
                                         </div>
                                     ) : showRejectInput ? (
-                                        <motion.div 
+                                        <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             className="space-y-4"
                                         >
-                                            <textarea 
+                                            <textarea
                                                 value={rejectReason}
                                                 onChange={(e) => setRejectReason(e.target.value)}
                                                 placeholder="Explain why this product is being rejected..."
                                                 className="w-full h-24 bg-white border border-red-100 rounded-2xl p-4 text-xs outline-none focus:border-red-500 transition-all resize-none shadow-sm"
                                             />
                                             <div className="grid grid-cols-2 gap-3">
-                                                <button 
+                                                <button
                                                     onClick={() => setShowRejectInput(false)}
                                                     className="h-11 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50"
                                                 >
                                                     Cancel
                                                 </button>
-                                                <button 
+                                                <button
                                                     onClick={() => handleReject(selectedProduct.id)}
                                                     className="h-11 bg-red-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-600/20"
                                                 >
@@ -1277,38 +1302,83 @@ export default function ProductsModerationPage() {
                                                 </button>
                                             </div>
                                         </motion.div>
-                                    ) : (
-                                        <div className={`grid gap-3 ${selectedProduct.status === 'PENDING' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
-                                            {/* Edit — always visible */}
-                                            <button
-                                                onClick={() => startEditing(selectedProduct)}
-                                                className="h-12 bg-white border border-slate-200 text-slate-700 rounded-xl text-[13px] font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
-                                            >
-                                                <Pencil size={14} /> Edit Product Details
-                                            </button>
-                                            {/* Reject — hide if already rejected */}
-                                            {selectedProduct.status !== 'REJECTED' && (
-                                                <button
-                                                    onClick={() => setShowRejectInput(true)}
-                                                    className="h-12 bg-white border border-red-200 text-red-600 rounded-xl text-[13px] font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <XCircle size={14} /> Reject
-                                                </button>
-                                            )}
-                                            {/* Approve — hide if already approved */}
-                                            {selectedProduct.status !== 'APPROVED' && (
-                                                <button
-                                                    onClick={() => handleApprove(selectedProduct.id)}
-                                                    className="h-12 bg-teal-600 text-white rounded-xl text-[13px] font-semibold shadow-lg shadow-teal-600/25 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <CheckCircle2 size={14} /> Approve
-                                                </button>
-                                            )}
-                                            {/* Already approved label */}
-                                            {selectedProduct.status === 'APPROVED' && (
-                                                <div className="h-12 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2">
-                                                    <CheckCircle2 size={14} /> Product Approved
+                                    ) : showDeleteConfirm ? (
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 10 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            className="space-y-4 p-4 bg-red-50 border border-red-200 rounded-2xl"
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                                                    <Trash2 size={18} className="text-red-600" />
                                                 </div>
+                                                <div className="flex-1">
+                                                    <p className="text-[14px] font-bold text-red-900 mb-1">Delete this product permanently?</p>
+                                                    <p className="text-[12px] text-red-700 leading-relaxed">
+                                                        "<strong>{selectedProduct.name}</strong>" ({selectedProduct.status}) will be removed from the system. This action cannot be undone.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <button
+                                                    onClick={() => setShowDeleteConfirm(false)}
+                                                    disabled={isDeleting}
+                                                    className="h-11 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                                                >
+                                                    Cancel
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(selectedProduct.id)}
+                                                    disabled={isDeleting}
+                                                    className="h-11 bg-red-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-600/20 hover:bg-red-700 disabled:opacity-60 flex items-center justify-center gap-2"
+                                                >
+                                                    {isDeleting ? 'Deleting…' : <><Trash2 size={13} /> Yes, Delete</>}
+                                                </button>
+                                            </div>
+                                        </motion.div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className={`grid gap-3 ${selectedProduct.status === 'PENDING' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                                                {/* Edit — always visible */}
+                                                <button
+                                                    onClick={() => startEditing(selectedProduct)}
+                                                    className="h-12 bg-white border border-slate-200 text-slate-700 rounded-xl text-[13px] font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Pencil size={14} /> Edit Product Details
+                                                </button>
+                                                {/* Reject — hide if already rejected */}
+                                                {selectedProduct.status !== 'REJECTED' && (
+                                                    <button
+                                                        onClick={() => setShowRejectInput(true)}
+                                                        className="h-12 bg-white border border-red-200 text-red-600 rounded-xl text-[13px] font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <XCircle size={14} /> Reject
+                                                    </button>
+                                                )}
+                                                {/* Approve — hide if already approved */}
+                                                {selectedProduct.status !== 'APPROVED' && (
+                                                    <button
+                                                        onClick={() => handleApprove(selectedProduct.id)}
+                                                        className="h-12 bg-teal-600 text-white rounded-xl text-[13px] font-semibold shadow-lg shadow-teal-600/25 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        <CheckCircle2 size={14} /> Approve
+                                                    </button>
+                                                )}
+                                                {/* Already approved label */}
+                                                {selectedProduct.status === 'APPROVED' && (
+                                                    <div className="h-12 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2">
+                                                        <CheckCircle2 size={14} /> Product Approved
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {/* Delete — only for PENDING / REJECTED. Approved products may have orders. */}
+                                            {(selectedProduct.status === 'PENDING' || selectedProduct.status === 'REJECTED') && (
+                                                <button
+                                                    onClick={() => setShowDeleteConfirm(true)}
+                                                    className="w-full h-10 bg-white border border-red-100 text-red-500 rounded-xl text-[12px] font-semibold hover:bg-red-50 hover:border-red-300 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <Trash2 size={13} /> Delete this product
+                                                </button>
                                             )}
                                         </div>
                                     )}

@@ -117,10 +117,15 @@ export class ProductsService {
         const markupPercentage = config && config.value ? parseFloat(config.value) : defaultMarkup;
         const finalMarkup = isNaN(markupPercentage) ? defaultMarkup : markupPercentage;
 
-        // Fetch EAN images if ean is provided and no images are uploaded
+        // Fetch EAN images if ean is provided and no images are uploaded.
+        // Pass product name so the Google/Bing fallback can use it as a smarter query.
         let productImages = createProductDto.images || [];
         if (!skipAi && createProductDto.ean && productImages.length === 0) {
-            const fetchedImages = await this.eanService.fetchImagesByEan(createProductDto.ean, 3);
+            const fetchedImages = await this.eanService.fetchImagesByEan(
+                createProductDto.ean,
+                3,
+                createProductDto.name,
+            );
             if (fetchedImages && fetchedImages.length > 0) {
                 productImages = fetchedImages;
             }
