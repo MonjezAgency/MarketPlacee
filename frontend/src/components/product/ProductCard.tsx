@@ -3,6 +3,26 @@
 import Link from 'next/link';
 import { Star, Check, ShieldCheck, ShoppingCart, ArrowUpRight, Image as ImageIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
+
+// ── Module-level singleton: fetch admin default display unit once ────────────
+let _defaultUnit: 'truck' | 'pallet' | 'carton' | null = null;
+let _defaultUnitPromise: Promise<'truck' | 'pallet' | 'carton'> | null = null;
+
+function getAdminDefaultUnit(): Promise<'truck' | 'pallet' | 'carton'> {
+    if (_defaultUnit) return Promise.resolve(_defaultUnit);
+    if (!_defaultUnitPromise) {
+        const base = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+        _defaultUnitPromise = fetch(`${base}/config/default-unit`)
+            .then(r => r.json())
+            .then(d => {
+                const u = d?.unit;
+                _defaultUnit = (['truck', 'pallet', 'carton'].includes(u) ? u : 'truck') as typeof _defaultUnit;
+                return _defaultUnit!;
+            })
+            .catch(() => { _defaultUnit = 'truck'; return _defaultUnit!; });
+    }
+    return _defaultUnitPromise;
+}
 import { useCart } from '@/lib/cart';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -73,6 +93,37 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     // Suppliers see their own base price (no markup)
     const isOwnProduct = user?.role?.toUpperCase() === 'SUPPLIER' && product.supplierId && user?.id === product.supplierId;
     const displayPrice = isOwnProduct && product.basePrice ? product.basePrice : product.price;
+
+    // Admin-configured default display unit (truck / pallet / carton)
+    const [defaultUnit, setDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
+    useEffect(() => { getAdminDefaultUnit().then(setDefaultUnit); }, []);
+
+    // Compute unit-tier price for the card
+    const piecesPerCase = product.unitsPerCase || 0;
+    const casesPerPallet = product.casesPerPallet || 0;
+    const piecesPerPallet = product.unitsPerPallet || (piecesPerCase * casesPerPallet) || 0;
+    const palletsPerTruck = product.palletsPerShipment || 0;
+
+    // Normalise to per-piece (handle products whose base unit is already case/pallet/truck)
+    let perPiece = displayPrice;
+    const baseUnit = String(product.unit || 'piece').toLowerCase();
+    if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
+        perPiece = displayPrice / piecesPerCase;
+    else if (baseUnit.includes('pallet') && piecesPerPallet > 0)
+        perPiece = displayPrice / piecesPerPallet;
+    else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment')) && piecesPerPallet > 0 && palletsPerTruck > 0)
+        perPiece = displayPrice / (piecesPerPallet * palletsPerTruck);
+
+    const cartonPrice = piecesPerCase > 0 ? perPiece * piecesPerCase : null;
+    const palletPrice = piecesPerPallet > 0 ? perPiece * piecesPerPallet : null;
+    const truckPrice  = (piecesPerPallet > 0 && palletsPerTruck > 0) ? perPiece * piecesPerPallet * palletsPerTruck : null;
+
+    // Pick price + label based on admin setting, fall back when data is missing
+    let cardPrice = displayPrice;
+    let cardUnit  = product.unit || 'piece';
+    if (defaultUnit === 'truck' && truckPrice !== null)        { cardPrice = truckPrice;  cardUnit = 'truck'; }
+    else if (defaultUnit === 'pallet' && palletPrice !== null) { cardPrice = palletPrice; cardUnit = 'pallet'; }
+    else if (defaultUnit === 'carton' && cartonPrice !== null) { cardPrice = cartonPrice; cardUnit = 'carton'; }
 
     const rating = product.rating || 0;
     const reviews = product.reviewsCount || 0;
@@ -187,9 +238,9 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
                 {/* Price & Min Order */}
                 <div className="mt-auto space-y-3">
-                    <div className="flex items-baseline gap-1">
-                        <span className="text-xl font-bold text-foreground">{formatPrice(displayPrice, currency)}</span>
-                        <span className="text-muted-foreground text-xs font-medium">/ {product.unit}</span>
+                    <div className="flex items-baseline gap-1 flex-wrap">
+                        <span className="text-xl font-bold text-foreground">{formatPrice(cardPrice, currency)}</span>
+                        <span className="text-muted-foreground text-xs font-medium">/ {cardUnit}</span>
                         {isOwnProduct && (
                             <span className="ms-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Your Price</span>
                         )}
