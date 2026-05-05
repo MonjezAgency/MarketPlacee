@@ -203,71 +203,78 @@ export default function HomePage() {
                 </div>
             </div>
 
+            {/* ============================================================
+                 2. HERO — FULL WIDTH (edge-to-edge), generous height
+            ============================================================ */}
+            <section className="relative w-full h-[440px] sm:h-[500px] md:h-[540px] lg:h-[580px] xl:h-[620px] overflow-hidden bg-[#0B1F3A]">
+                {/* Background image */}
+                <img
+                    src={HERO_SLIDES[slide].image}
+                    alt=""
+                    className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
+                />
+                {/* Gradient over image */}
+                <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F3A] via-[#0B1F3A]/80 to-[#0B1F3A]/20" />
+
+                {/* Content — content stays centered to layout but section spans full width */}
+                <div className="relative z-10 h-full max-w-[1600px] mx-auto px-6 sm:px-10 md:px-14 lg:px-20 flex flex-col justify-center pb-10">
+                    <div className="max-w-full sm:max-w-[560px] lg:max-w-[640px] space-y-6">
+                        <h1 className="text-white font-bold leading-[1.08] tracking-tight text-[32px] sm:text-[40px] md:text-[48px] lg:text-[56px] xl:text-[60px]">
+                            {HERO_SLIDES[slide].title}{' '}
+                            <span className="text-[#14B8A6]">{HERO_SLIDES[slide].accent}</span>
+                        </h1>
+                        <p className="text-[#CBD5F5] text-[14px] sm:text-[15px] md:text-[16px] lg:text-[17px] leading-relaxed max-w-[540px]">
+                            {HERO_SLIDES[slide].desc}
+                        </p>
+
+                        {/* Inline highlights — always 2 columns, fixed grid */}
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 max-w-[520px]">
+                            {HERO_HIGHLIGHTS.map((h) => (
+                                <div key={h.title} className="flex items-center gap-2.5">
+                                    <div className="w-8 h-8 rounded-full bg-[#14B8A6]/15 flex items-center justify-center text-[#14B8A6] shrink-0">
+                                        <CheckCircle2 size={15} />
+                                    </div>
+                                    <div className="leading-tight min-w-0">
+                                        <div className="text-[12px] sm:text-[13px] font-semibold text-white truncate">{h.title}</div>
+                                        <div className="text-[11px] sm:text-[12px] text-[#94A3B8] truncate">{h.sub}</div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="pt-1 flex items-center gap-3">
+                            <Link
+                                href="/categories"
+                                className="inline-flex items-center gap-2 h-[50px] sm:h-[52px] px-7 sm:px-8 bg-[#14B8A6] hover:bg-[#0EA89A] text-white rounded-xl text-[14px] sm:text-[15px] font-semibold shadow-lg shadow-[#14B8A6]/25 transition-all active:scale-95 no-underline"
+                            >
+                                Start Sourcing Now <ArrowRight size={16} />
+                            </Link>
+                            <Link
+                                href="/about"
+                                className="inline-flex items-center gap-2 h-[50px] sm:h-[52px] px-6 sm:px-7 bg-white/10 hover:bg-white/15 backdrop-blur-sm text-white border border-white/20 rounded-xl text-[14px] sm:text-[15px] font-semibold transition-all no-underline"
+                            >
+                                Learn More
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+
+                {/* dots — bottom center for full-width hero */}
+                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                    {HERO_SLIDES.map((_, i) => (
+                        <button
+                            key={i}
+                            onClick={() => setSlide(i)}
+                            aria-label={`Slide ${i + 1}`}
+                            className={`h-1.5 rounded-full transition-all ${slide === i ? 'w-10 bg-[#14B8A6]' : 'w-2 bg-white/40 hover:bg-white/70'}`}
+                        />
+                    ))}
+                </div>
+            </section>
+
             {/* MAIN CONTAINER */}
             <main className="flex-1 max-w-[1440px] mx-auto w-full px-3 sm:px-4 lg:px-6 py-5 sm:py-7 space-y-7 sm:space-y-9">
 
-                {/* ============================================================
-                     2. HERO
-                ============================================================ */}
-                <section className="relative h-[420px] sm:h-[460px] md:h-[480px] lg:h-[500px] rounded-2xl overflow-hidden bg-[#0B1F3A]">
-                    {/* Background image */}
-                    <img
-                        src={HERO_SLIDES[slide].image}
-                        alt=""
-                        className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
-                    />
-                    {/* Gradient over image */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F3A] via-[#0B1F3A]/85 to-[#0B1F3A]/30" />
-
-                    {/* Content */}
-                    <div className="relative z-10 h-full flex flex-col justify-center px-6 sm:px-10 md:px-12 lg:px-14 pb-10">
-                        <div className="max-w-full sm:max-w-[500px] lg:max-w-[540px] space-y-5">
-                            <h1 className="text-white font-bold leading-[1.12] tracking-tight text-[28px] sm:text-[34px] md:text-[40px] lg:text-[44px]">
-                                {HERO_SLIDES[slide].title}{' '}
-                                <span className="text-[#14B8A6]">{HERO_SLIDES[slide].accent}</span>
-                            </h1>
-                            <p className="text-[#CBD5F5] text-[13px] sm:text-[14px] md:text-[15px] leading-relaxed max-w-[460px]">
-                                {HERO_SLIDES[slide].desc}
-                            </p>
-
-                            {/* Inline highlights — always 2 columns, fixed grid */}
-                            <div className="grid grid-cols-2 gap-x-5 gap-y-3 max-w-[460px]">
-                                {HERO_HIGHLIGHTS.map((h) => (
-                                    <div key={h.title} className="flex items-center gap-2">
-                                        <div className="w-7 h-7 rounded-full bg-[#14B8A6]/15 flex items-center justify-center text-[#14B8A6] shrink-0">
-                                            <CheckCircle2 size={14} />
-                                        </div>
-                                        <div className="leading-tight min-w-0">
-                                            <div className="text-[11px] sm:text-[12px] font-semibold text-white truncate">{h.title}</div>
-                                            <div className="text-[10px] sm:text-[11px] text-[#94A3B8] truncate">{h.sub}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="pt-1">
-                                <Link
-                                    href="/categories"
-                                    className="inline-flex items-center gap-2 h-[48px] sm:h-[50px] px-7 sm:px-8 bg-[#14B8A6] hover:bg-[#0EA89A] text-white rounded-xl text-[14px] sm:text-[15px] font-semibold shadow-lg shadow-[#14B8A6]/25 transition-all active:scale-95 no-underline"
-                                >
-                                    Start Sourcing Now <ArrowRight size={16} />
-                                </Link>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* dots — bottom-right so they don't crowd the CTA */}
-                    <div className="absolute bottom-5 right-6 sm:right-10 md:right-12 lg:right-14 z-20 flex gap-2">
-                        {HERO_SLIDES.map((_, i) => (
-                            <button
-                                key={i}
-                                onClick={() => setSlide(i)}
-                                aria-label={`Slide ${i + 1}`}
-                                className={`h-1.5 rounded-full transition-all ${slide === i ? 'w-8 bg-[#14B8A6]' : 'w-1.5 bg-white/40 hover:bg-white/70'}`}
-                            />
-                        ))}
-                    </div>
-                </section>
 
                 {/* ============================================================
                      3. CUSTOM QUOTE BAR
