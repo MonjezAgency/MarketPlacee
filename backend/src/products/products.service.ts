@@ -158,25 +158,37 @@ export class ProductsService {
         }
 
         try {
-            const { id, ...productData } = createProductDto as any;
-            const product = await this.prisma.product.create({
-                data: {
-                    ...productData,
-                    category: finalCategory || 'General',
-                    adminNotes,
-                    status: finalStatus,
-                    basePrice: createProductDto.price,
-                    price: createProductDto.price * finalMarkup,
-                    images: productImages,
-                    supplierId: createProductDto.supplierId,
-                    unit: createProductDto.unit || 'piece',
-                    moq: createProductDto.moq ?? null,
-                    unitsPerPallet: createProductDto.unitsPerPallet ?? null,
-                    palletsPerShipment: createProductDto.palletsPerShipment ?? null,
-                    readyForDispatch: createProductDto.readyForDispatch ?? true,
-                    leadTime: createProductDto.leadTime ?? 0,
-                    warehouseId: createProductDto.warehouseId || null,
-                },
+            const dto = createProductDto as any;
+            const productData: any = {
+                // Explicit whitelist of all valid Product model fields
+                // (prevents unknown-field Prisma errors when the DTO has extra properties)
+                name: dto.name,
+                description: dto.description || '',
+                brand: dto.brand || null,
+                ean: dto.ean || null,
+                stock: dto.stock ?? 0,
+                category: finalCategory || 'General',
+                adminNotes,
+                status: finalStatus,
+                basePrice: dto.price,
+                price: dto.price * finalMarkup,
+                images: productImages,
+                supplierId: dto.supplierId,
+                unit: dto.unit || 'piece',
+                moq: dto.moq ?? null,
+                unitsPerCase: dto.unitsPerCase ?? null,
+                casesPerPallet: dto.casesPerPallet ?? null,
+                unitsPerPallet: dto.unitsPerPallet ?? null,
+                palletsPerShipment: dto.palletsPerShipment ?? null,
+                shelfLife: dto.shelfLife || null,
+                weight: dto.weight || null,         // stored as String? in schema
+                origin: dto.origin || null,         // stored as String? in schema
+                readyForDispatch: dto.readyForDispatch ?? true,
+                leadTime: dto.leadTime ?? 0,
+                warehouseId: dto.warehouseId || null,
+            };
+            const product = await (this.prisma.product.create as any)({
+                data: productData,
             });
 
             // Automatic Translation — SKIPPED in bulk uploads (skipAi=true)

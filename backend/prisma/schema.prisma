@@ -167,6 +167,8 @@ model Product {
   unitsPerPallet     Int?   // Total pieces per pallet (derived: unitsPerCase × casesPerPallet)
   palletsPerShipment Int?
   shelfLife          String? // Expiry date or shelf-life string from supplier file
+  weight             String? // Weight per unit (e.g., "250g", "1.5kg")
+  origin             String? // Country of origin (e.g., "Germany", "China")
   previousPrice      Float?  // Last price before the most recent change (in EGP base) — used for price-change ticker
   priceChangedAt     DateTime? // Timestamp of the most recent price change
   readyForDispatch Boolean @default(true)

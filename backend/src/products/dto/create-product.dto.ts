@@ -81,6 +81,14 @@ export class CreateProductDto {
 
     @IsOptional()
     @IsString()
+    weight?: string;
+
+    @IsOptional()
+    @IsString()
+    origin?: string;
+
+    @IsOptional()
+    @IsString()
     warehouseId?: string;
 
     @IsOptional()

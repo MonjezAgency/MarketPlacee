@@ -58,13 +58,13 @@ const CURRENCIES = [
 ];
 
 const NAV_CATEGORIES = [
-    { name: 'Electronics', slug: 'electronics' },
-    { name: 'Industrial & Machining', slug: 'industrial' },
-    { name: 'Packaging & Print', slug: 'packaging' },
-    { name: 'Automotive Parts', slug: 'automotive' },
-    { name: 'Fashion & Textiles', slug: 'fashion' },
-    { name: 'Health & Medical', slug: 'health' },
-    { name: 'Home & Garden', slug: 'home' }
+    { name: 'Electronics', q: 'Electronics' },
+    { name: 'Industrial & Machining', q: 'Industrial' },
+    { name: 'Packaging & Print', q: 'Packaging' },
+    { name: 'Automotive Parts', q: 'Automotive' },
+    { name: 'Fashion & Textiles', q: 'Fashion' },
+    { name: 'Health & Medical', q: 'Health' },
+    { name: 'Home & Garden', q: 'Home' }
 ];
 
 // Country code → flag emoji + label
@@ -181,7 +181,7 @@ export default function Navbar() {
                     </span>
                 </div>
                 <div className="flex items-center gap-5 text-white/70">
-                    <Link href="/sell" className="hover:text-white transition-colors">Sell on Atlantis</Link>
+                    <Link href="/auth/register?role=supplier" className="hover:text-white transition-colors">Sell on Atlantis</Link>
                     <span className="text-white/20">·</span>
                     <Link href="/help" className="hover:text-white transition-colors">Help Center</Link>
                     <span className="text-white/20">·</span>
@@ -325,8 +325,8 @@ export default function Navbar() {
                                             <div className="space-y-0.5">
                                                 {NAV_CATEGORIES.map((cat) => (
                                                     <Link
-                                                        key={cat.slug}
-                                                        href={`/categories/${cat.slug}`}
+                                                        key={cat.q}
+                                                        href={`/categories?category=${encodeURIComponent(cat.q)}`}
                                                         className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-[#F8FAFC] group transition-colors no-underline"
                                                     >
                                                         <span className="text-[13px] font-semibold text-[#475569] group-hover:text-[#2EC4B6]">{cat.name}</span>
@@ -578,15 +578,15 @@ export default function Navbar() {
                         <span className="w-px h-4 bg-[#E5E7EB]" />
                         {NAV_CATEGORIES.map((cat) => (
                             <Link
-                                key={cat.slug}
-                                href={`/categories/${cat.slug}`}
+                                key={cat.q}
+                                href={`/categories?category=${encodeURIComponent(cat.q)}`}
                                 className="px-3 h-full flex items-center text-[12px] font-semibold text-[#475569] hover:text-[#2EC4B6] whitespace-nowrap transition-colors"
                             >
                                 {cat.name}
                             </Link>
                         ))}
                         <span className="w-px h-4 bg-[#E5E7EB]" />
-                        <Link href="/deals" className="px-3 h-full flex items-center text-[12px] font-bold text-[#EF4444] hover:text-[#0B1F3A] whitespace-nowrap transition-colors">
+                        <Link href="/categories?sort=deals" className="px-3 h-full flex items-center text-[12px] font-bold text-[#EF4444] hover:text-[#0B1F3A] whitespace-nowrap transition-colors">
                             🔥 Today's Deals
                         </Link>
                         <Link href="/sponsored-highlights" className="px-3 h-full flex items-center text-[12px] font-semibold text-[#475569] hover:text-[#2EC4B6] whitespace-nowrap transition-colors">
