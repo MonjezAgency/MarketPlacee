@@ -56,10 +56,20 @@ export default function ContactPage() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // Simulate submission — in production, wire to email API or backend
-        await new Promise((r) => setTimeout(r, 1200));
-        setLoading(false);
-        setSubmitted(true);
+        try {
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+            const res = await fetch(`${apiBase}/contact`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(form),
+            });
+            if (!res.ok) throw new Error('Failed');
+            setSubmitted(true);
+        } catch {
+            alert('Failed to send message. Please email us directly at Info@atlantisfmcg.com');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

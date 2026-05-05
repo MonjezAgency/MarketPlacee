@@ -303,49 +303,95 @@ export default function ProductDetailClient() {
                                 const palletPrice = piecesPerPallet > 0 ? perPiece * piecesPerPallet : null;
                                 const truckPrice = (piecesPerPallet > 0 && palletsPerTruck > 0) ? perPiece * piecesPerPallet * palletsPerTruck : null;
 
-                                const options: Array<{ key: 'truck'|'pallet'|'carton'; label: string; price: number | null }> = [];
-                                if (truckPrice !== null) options.push({ key: 'truck', label: 'Truck',  price: truckPrice });
-                                if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet', price: palletPrice });
-                                if (cartonPrice !== null) options.push({ key: 'carton', label: 'Carton', price: cartonPrice });
-                                if (options.length === 0) options.push({ key: 'carton', label: product.unit || 'Unit', price: product.price });
+                                const options: Array<{ key: 'truck'|'pallet'|'carton'; label: string; emoji: string; price: number | null; qty: number }> = [];
+                                if (truckPrice !== null)  options.push({ key: 'truck',  label: 'Truck',  emoji: '🚛', price: truckPrice,  qty: palletsPerTruck });
+                                if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet', emoji: '📦', price: palletPrice, qty: casesPerPallet });
+                                if (cartonPrice !== null) options.push({ key: 'carton', label: 'Carton', emoji: '🗃️', price: cartonPrice, qty: piecesPerCase });
+                                if (options.length === 0) options.push({ key: 'carton', label: product.unit || 'Unit', emoji: '📦', price: product.price, qty: 1 });
 
-                                // Default selection: largest available (Truck → Pallet → Carton)
+                                // Default: Truck (largest) → Pallet → Carton
                                 const initialSelected = options[0].key;
                                 if (selectedUnit === undefined) {
                                     setTimeout(() => setSelectedUnit(initialSelected), 0);
                                 }
                                 const active = options.find(o => o.key === (selectedUnit ?? initialSelected)) || options[0];
 
+                                // Custom quantity total price
+                                const unitPrice = active.price != null ? active.price / (active.qty || 1) : perPiece;
+                                const customTotal = active.price != null
+                                    ? active.price * quantity
+                                    : perPiece * quantity;
+
                                 return (
-                                    <div className="flex flex-col gap-3 py-6 border-y border-[#E5E7EB]">
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="text-[44px] font-bold text-[#111827] tracking-tighter">
-                                                {formatPrice(active.price ?? product.price)}
-                                            </span>
-                                            <span className="text-[18px] font-medium text-[#6B7280]">
-                                                / {active.label.toLowerCase()}
-                                            </span>
-                                        </div>
-                                        {/* Unit toggle */}
-                                        <div className="flex items-center gap-2 mt-1">
+                                    <div className="flex flex-col gap-4 py-5 border-y border-[#E5E7EB]">
+
+                                        {/* Unit tabs — Truck / Pallet / Carton */}
+                                        <div className="grid grid-cols-3 gap-2">
                                             {options.map((opt) => (
                                                 <button
                                                     key={opt.key}
-                                                    onClick={() => setSelectedUnit(opt.key)}
+                                                    onClick={() => { setSelectedUnit(opt.key); setQuantity(1); }}
                                                     className={cn(
-                                                        'h-9 px-4 rounded-full text-[12px] font-bold uppercase tracking-wider transition-all border',
+                                                        'flex flex-col items-center py-3 px-2 rounded-2xl border-2 text-center transition-all',
                                                         active.key === opt.key
-                                                            ? 'bg-[#0F172A] text-white border-[#0F172A]'
-                                                            : 'bg-white text-[#475569] border-[#E5E7EB] hover:border-[#0F172A] hover:text-[#0F172A]'
+                                                            ? 'border-[#0F172A] bg-[#0F172A] text-white shadow-lg'
+                                                            : 'border-[#E5E7EB] bg-white text-[#475569] hover:border-[#0F172A]/40'
                                                     )}
                                                 >
-                                                    {opt.label}
+                                                    <span className="text-[20px] mb-0.5">{opt.emoji}</span>
+                                                    <span className="text-[11px] font-black uppercase tracking-widest">{opt.label}</span>
+                                                    {opt.price != null && (
+                                                        <span className={cn('text-[11px] font-semibold mt-0.5', active.key === opt.key ? 'text-white/70' : 'text-[#9CA3AF]')}>
+                                                            {formatPrice(opt.price)}
+                                                        </span>
+                                                    )}
                                                 </button>
                                             ))}
                                         </div>
-                                        <div className="flex items-center gap-2 text-emerald-600 mt-1">
+
+                                        {/* Selected unit price + quantity multiplier */}
+                                        <div className="flex items-end justify-between gap-4">
+                                            <div>
+                                                <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1">
+                                                    {quantity > 1 ? `${quantity} × ${active.label}` : `Per ${active.label}`}
+                                                </p>
+                                                <div className="flex items-baseline gap-2">
+                                                    <span className="text-[40px] font-black text-[#111827] tracking-tighter leading-none">
+                                                        {formatPrice(quantity > 1 ? customTotal : (active.price ?? product.price))}
+                                                    </span>
+                                                    {quantity === 1 && (
+                                                        <span className="text-[15px] font-medium text-[#6B7280]">/ {active.label.toLowerCase()}</span>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Quantity selector */}
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <button
+                                                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                                                    className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center text-[#475569] hover:border-[#0F172A] hover:text-[#0F172A] font-bold text-lg transition-all"
+                                                >−</button>
+                                                <span className="w-10 text-center text-[15px] font-black text-[#111827]">{quantity}</span>
+                                                <button
+                                                    onClick={() => setQuantity(q => q + 1)}
+                                                    className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center text-[#475569] hover:border-[#0F172A] hover:text-[#0F172A] font-bold text-lg transition-all"
+                                                >+</button>
+                                            </div>
+                                        </div>
+
+                                        {/* Breakdown hint */}
+                                        {quantity > 1 && active.qty > 0 && (
+                                            <p className="text-[12px] text-[#6B7280] bg-[#F8FAFC] rounded-xl px-3 py-2 leading-relaxed">
+                                                {quantity} {active.label.toLowerCase()}s × {formatPrice(active.price ?? product.price)} = <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
+                                                {active.key === 'truck' && palletPrice != null && <span className="ml-2 text-[#9CA3AF]">({quantity * palletsPerTruck} pallets)</span>}
+                                                {active.key === 'pallet' && cartonPrice != null && <span className="ml-2 text-[#9CA3AF]">({quantity * casesPerPallet} cartons)</span>}
+                                                {active.key === 'carton' && piecesPerCase > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * piecesPerCase} pcs)</span>}
+                                            </p>
+                                        )}
+
+                                        <div className="flex items-center gap-2 text-emerald-600">
                                             <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                            <span className="text-[13px] font-bold uppercase tracking-widest">In Active Distribution</span>
+                                            <span className="text-[12px] font-bold uppercase tracking-widest">In Active Distribution</span>
                                         </div>
                                     </div>
                                 );

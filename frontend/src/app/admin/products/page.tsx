@@ -115,6 +115,7 @@ export default function ProductsModerationPage() {
     const [activePanelTab, setActivePanelTab] = React.useState('Product Info');
     const [rejectReason, setRejectReason] = React.useState('');
     const [showRejectInput, setShowRejectInput] = React.useState(false);
+    const panelScrollRef = React.useRef<HTMLDivElement>(null);
     
     // Bulk Selection
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
@@ -688,9 +689,9 @@ export default function ProductsModerationPage() {
                                 {/* Panel Content Tabs */}
                                 <div className="flex items-center gap-4 px-6 border-b border-slate-100 overflow-x-auto scrollbar-hide">
                                     {['Product Info', 'Pricing & Units', 'Supplier Info', 'AI Data', 'Notes'].map((t) => (
-                                        <button 
+                                        <button
                                             key={t}
-                                            onClick={() => setActivePanelTab(t)}
+                                            onClick={() => { setActivePanelTab(t); panelScrollRef.current?.scrollTo({ top: 0 }); }}
                                             className={cn(
                                                 "py-4 text-[11px] font-bold uppercase tracking-widest border-b-2 transition-all whitespace-nowrap",
                                                 activePanelTab === t ? "border-teal-500 text-teal-600" : "border-transparent text-slate-400 hover:text-slate-600"
@@ -702,7 +703,7 @@ export default function ProductsModerationPage() {
                                 </div>
 
                                 {/* Scrollable Content */}
-                                <div className="overflow-y-auto p-6 space-y-8 scrollbar-hide" style={{ maxHeight: 'calc(88vh - 200px)' }}>
+                                <div ref={panelScrollRef} className="overflow-y-auto p-6 space-y-6 scrollbar-hide" style={{ maxHeight: 'calc(88vh - 200px)' }}>
                                     {activePanelTab === 'Product Info' && (
                                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
                                             {/* LEFT COLUMN — Overview + Basic Info */}
@@ -1236,25 +1237,38 @@ export default function ProductsModerationPage() {
                                             </div>
                                         </motion.div>
                                     ) : (
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div className={`grid gap-3 ${selectedProduct.status === 'PENDING' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
+                                            {/* Edit — always visible */}
                                             <button
                                                 onClick={() => startEditing(selectedProduct)}
                                                 className="h-12 bg-white border border-slate-200 text-slate-700 rounded-xl text-[13px] font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
                                             >
                                                 <Pencil size={14} /> Edit Product Details
                                             </button>
-                                            <button
-                                                onClick={() => setShowRejectInput(true)}
-                                                className="h-12 bg-white border border-red-200 text-red-600 rounded-xl text-[13px] font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-2"
-                                            >
-                                                <XCircle size={14} /> Reject
-                                            </button>
-                                            <button
-                                                onClick={() => handleApprove(selectedProduct.id)}
-                                                className="h-12 bg-teal-600 text-white rounded-xl text-[13px] font-semibold shadow-lg shadow-teal-600/25 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
-                                            >
-                                                <CheckCircle2 size={14} /> Approve
-                                            </button>
+                                            {/* Reject — hide if already rejected */}
+                                            {selectedProduct.status !== 'REJECTED' && (
+                                                <button
+                                                    onClick={() => setShowRejectInput(true)}
+                                                    className="h-12 bg-white border border-red-200 text-red-600 rounded-xl text-[13px] font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <XCircle size={14} /> Reject
+                                                </button>
+                                            )}
+                                            {/* Approve — hide if already approved */}
+                                            {selectedProduct.status !== 'APPROVED' && (
+                                                <button
+                                                    onClick={() => handleApprove(selectedProduct.id)}
+                                                    className="h-12 bg-teal-600 text-white rounded-xl text-[13px] font-semibold shadow-lg shadow-teal-600/25 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
+                                                >
+                                                    <CheckCircle2 size={14} /> Approve
+                                                </button>
+                                            )}
+                                            {/* Already approved label */}
+                                            {selectedProduct.status === 'APPROVED' && (
+                                                <div className="h-12 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2">
+                                                    <CheckCircle2 size={14} /> Product Approved
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
