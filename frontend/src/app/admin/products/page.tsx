@@ -127,6 +127,8 @@ export default function ProductsModerationPage() {
     const [isUploadingImage, setIsUploadingImage] = React.useState(false);
     const imageInputRef = React.useRef<HTMLInputElement>(null);
     const [showUploadGuide, setShowUploadGuide] = React.useState(false);
+    const [showUrlInput, setShowUrlInput] = React.useState(false);
+    const [urlInputValue, setUrlInputValue] = React.useState('');
 
     const startEditing = (product: any) => {
         setEditData({ ...product });
@@ -199,33 +201,47 @@ export default function ProductsModerationPage() {
     }, []);
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file || !editData) return;
+        const files = Array.from(e.target.files || []);
+        if (!files.length || !editData) return;
 
         setIsUploadingImage(true);
-        const tid = toast.loading(`Uploading ${file.name}...`);
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-
-            const res = await apiFetch('/products/upload-image', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (res.ok) {
-                const { url } = await res.json();
-                setEditData({ ...editData, images: [...(editData.images || []), url] });
-                toast.success('Image uploaded', { id: tid });
-            } else {
-                toast.error('Upload failed', { id: tid });
+        const newUrls: string[] = [];
+        for (const file of files) {
+            const tid = toast.loading(`Uploading ${file.name}...`);
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                const res = await apiFetch('/products/upload-image', { method: 'POST', body: formData });
+                if (res.ok) {
+                    const { url } = await res.json();
+                    newUrls.push(url);
+                    toast.success(`Uploaded: ${file.name}`, { id: tid });
+                } else {
+                    toast.error(`Failed: ${file.name}`, { id: tid });
+                }
+            } catch {
+                toast.error(`Error: ${file.name}`);
             }
-        } catch (err) {
-            toast.error('Connection error', { id: tid });
-        } finally {
-            setIsUploadingImage(false);
-            if (imageInputRef.current) imageInputRef.current.value = '';
         }
+        if (newUrls.length) {
+            setEditData((prev: any) => ({ ...prev, images: [...(prev.images || []), ...newUrls] }));
+        }
+        setIsUploadingImage(false);
+        if (imageInputRef.current) imageInputRef.current.value = '';
+    };
+
+    const handleAddImageUrls = () => {
+        if (!urlInputValue.trim() || !editData) return;
+        // Accept newline-separated, comma-separated, or space-separated URLs
+        const urls = urlInputValue
+            .split(/[\n,\s]+/)
+            .map(u => u.trim())
+            .filter(u => u.startsWith('http'));
+        if (!urls.length) { toast.error('No valid URLs found'); return; }
+        setEditData((prev: any) => ({ ...prev, images: [...(prev.images || []), ...urls] }));
+        setUrlInputValue('');
+        setShowUrlInput(false);
+        toast.success(`Added ${urls.length} image${urls.length > 1 ? 's' : ''}`);
     };
 
     const handleApprove = async (id: string) => {
@@ -731,17 +747,42 @@ export default function ProductsModerationPage() {
                                                         </div>
                                                     )}
                                                     {isEditing && (
-                                                        <div className="flex gap-2 mt-3">
-                                                            <input type="file" hidden ref={imageInputRef} onChange={handleImageUpload} accept="image/*" />
-                                                            <button onClick={() => imageInputRef.current?.click()} className="h-10 px-4 rounded-xl border border-dashed border-slate-300 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-all flex items-center gap-2">
-                                                                <Upload size={14} /> Upload from device
-                                                            </button>
-                                                            <button onClick={() => {
-                                                                const url = window.prompt('Enter professional image URL:');
-                                                                if (url && url.trim()) setEditData({...editData, images: [...(editData.images || []), url.trim()]});
-                                                            }} className="h-10 px-4 rounded-xl border border-dashed border-slate-300 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-all flex items-center gap-2">
-                                                                <ImageIcon size={14} /> Paste URL
-                                                            </button>
+                                                        <div className="mt-3 space-y-2">
+                                                            {/* Row 1 — upload + paste buttons */}
+                                                            <div className="flex gap-2">
+                                                                <input type="file" hidden multiple ref={imageInputRef} onChange={handleImageUpload} accept="image/*" />
+                                                                <button
+                                                                    onClick={() => imageInputRef.current?.click()}
+                                                                    disabled={isUploadingImage}
+                                                                    className="flex-1 h-10 rounded-xl border border-dashed border-slate-300 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                                                                >
+                                                                    <Upload size={14} /> {isUploadingImage ? 'Uploading…' : 'Upload images'}
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => { setShowUrlInput(!showUrlInput); setUrlInputValue(''); }}
+                                                                    className="flex-1 h-10 rounded-xl border border-dashed border-slate-300 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                                                                >
+                                                                    <ImageIcon size={14} /> Paste URLs
+                                                                </button>
+                                                            </div>
+                                                            {/* Row 2 — inline URL textarea (toggle) */}
+                                                            {showUrlInput && (
+                                                                <div className="space-y-1.5">
+                                                                    <textarea
+                                                                        rows={3}
+                                                                        value={urlInputValue}
+                                                                        onChange={(e) => setUrlInputValue(e.target.value)}
+                                                                        placeholder={"Paste image URLs (one per line or comma-separated):\nhttps://example.com/img1.jpg\nhttps://example.com/img2.jpg"}
+                                                                        className="w-full px-3 py-2 text-[12px] border border-slate-200 rounded-xl outline-none focus:border-teal-500 resize-none placeholder:text-slate-300"
+                                                                    />
+                                                                    <button
+                                                                        onClick={handleAddImageUrls}
+                                                                        className="w-full h-9 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-[12px] font-bold transition-colors"
+                                                                    >
+                                                                        Add URLs
+                                                                    </button>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
                                                 </div>
@@ -881,131 +922,19 @@ export default function ProductsModerationPage() {
 
                                     {activePanelTab === 'Pricing & Units' && (
                                         <div className="space-y-6">
-                                            <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl">
-                                                <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest mb-3">Unit Configuration</p>
-                                                <div className="grid grid-cols-1 gap-4">
-                                                    <div className="space-y-1">
-                                                        <label className="text-[10px] text-slate-500 font-bold uppercase">Pricing Unit</label>
-                                                        {isEditing ? (
-                                                            <select 
-                                                                className="w-full h-11 px-4 bg-white border border-teal-200 rounded-xl text-sm font-bold outline-none"
-                                                                value={editData.unit || 'piece'}
-                                                                onChange={(e) => setEditData({...editData, unit: e.target.value})}
-                                                            >
-                                                                <option value="piece">Base Piece / Item</option>
-                                                                <option value="case">Case / Carton</option>
-                                                                <option value="pallet">Pallet (Wholesale)</option>
-                                                                <option value="truck">Full Truck / Container</option>
-                                                            </select>
-                                                        ) : (
-                                                            <p className="text-sm font-bold text-slate-900 capitalize">{selectedProduct.unit || 'Piece'}</p>
-                                                        )}
-                                                    </div>
-
-                                                    {(isEditing ? editData.unit : selectedProduct.unit) === 'case' && (
-                                                        <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                                                            <div className="space-y-1">
-                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Pieces / Case</label>
-                                                                {isEditing ? (
-                                                                    <input
-                                                                        type="number"
-                                                                        className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
-                                                                        value={editData.unitsPerCase || 0}
-                                                                        onChange={(e) => setEditData({...editData, unitsPerCase: parseInt(e.target.value)})}
-                                                                    />
-                                                                ) : (
-                                                                    <p className="text-sm font-bold text-slate-900">{selectedProduct.unitsPerCase || 0} pcs</p>
-                                                                )}
-                                                            </div>
-                                                            <div className="space-y-1">
-                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Cases / Pallet</label>
-                                                                {isEditing ? (
-                                                                    <input
-                                                                        type="number"
-                                                                        className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
-                                                                        value={editData.casesPerPallet || 0}
-                                                                        onChange={(e) => setEditData({...editData, casesPerPallet: parseInt(e.target.value)})}
-                                                                    />
-                                                                ) : (
-                                                                    <p className="text-sm font-bold text-slate-900">{selectedProduct.casesPerPallet || 0}</p>
-                                                                )}
-                                                            </div>
-                                                            {(() => {
-                                                                const pcs = (isEditing ? editData.unitsPerCase : selectedProduct.unitsPerCase) || 0;
-                                                                const cases = (isEditing ? editData.casesPerPallet : selectedProduct.casesPerPallet) || 0;
-                                                                if (!pcs || !cases) return null;
-                                                                return (
-                                                                    <div className="col-span-2 p-2 bg-teal-50 border border-teal-100 rounded-xl">
-                                                                        <p className="text-[10px] font-bold text-teal-700">
-                                                                            {pcs} pcs/case × {cases} cases/pallet = {pcs * cases} pieces per pallet
-                                                                        </p>
-                                                                    </div>
-                                                                );
-                                                            })()}
-                                                        </div>
-                                                    )}
-
-                                                    {(isEditing ? editData.unit : selectedProduct.unit) === 'pallet' && (
-                                                        <div className="space-y-1 animate-in slide-in-from-top-2">
-                                                            <label className="text-[10px] text-slate-500 font-bold uppercase">Pieces Per Pallet</label>
-                                                            {isEditing ? (
-                                                                <input
-                                                                    type="number"
-                                                                    className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
-                                                                    value={editData.unitsPerPallet || 0}
-                                                                    onChange={(e) => setEditData({...editData, unitsPerPallet: parseInt(e.target.value)})}
-                                                                />
-                                                            ) : (
-                                                                <p className="text-sm font-bold text-slate-900">{selectedProduct.unitsPerPallet || 0} pieces</p>
-                                                            )}
-                                                        </div>
-                                                    )}
-
-                                                    {(isEditing ? editData.unit : selectedProduct.unit) === 'truck' && (
-                                                        <div className="grid grid-cols-2 gap-4 animate-in slide-in-from-top-2">
-                                                            <div className="space-y-1">
-                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Pallets / Truck</label>
-                                                                {isEditing ? (
-                                                                    <input 
-                                                                        type="number"
-                                                                        className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
-                                                                        value={editData.palletsPerShipment || 0}
-                                                                        onChange={(e) => setEditData({...editData, palletsPerShipment: parseInt(e.target.value)})}
-                                                                    />
-                                                                ) : (
-                                                                    <p className="text-sm font-bold text-slate-900">{selectedProduct.palletsPerShipment || 0}</p>
-                                                                )}
-                                                            </div>
-                                                            <div className="space-y-1">
-                                                                <label className="text-[10px] text-slate-500 font-bold uppercase">Pieces / Pallet</label>
-                                                                {isEditing ? (
-                                                                    <input 
-                                                                        type="number"
-                                                                        className="w-full h-10 px-3 bg-white border border-teal-100 rounded-xl text-sm font-bold"
-                                                                        value={editData.unitsPerPallet || 0}
-                                                                        onChange={(e) => setEditData({...editData, unitsPerPallet: parseInt(e.target.value)})}
-                                                                    />
-                                                                ) : (
-                                                                    <p className="text-sm font-bold text-slate-900">{selectedProduct.unitsPerPallet || 0}</p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-
+                                            {/* ── Order Requirements ──────────────────── */}
                                             <div className="space-y-3">
                                                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                                     Order Requirements <Info size={12} className="text-teal-500"/>
                                                 </p>
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Unit Price</p>
+                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Price per Piece</p>
                                                         {isEditing ? (
-                                                            <input 
+                                                            <input
                                                                 type="number"
                                                                 className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                value={editData.basePrice || 0}
+                                                                value={editData.basePrice ?? editData.price ?? 0}
                                                                 onChange={(e) => setEditData({...editData, basePrice: parseFloat(e.target.value)})}
                                                             />
                                                         ) : (
@@ -1016,36 +945,153 @@ export default function ProductsModerationPage() {
                                                         <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Min Order (MOQ)</p>
                                                         <div className="flex items-center gap-1.5">
                                                             {isEditing ? (
-                                                                <input 
+                                                                <input
                                                                     type="number"
-                                                                    className="w-12 h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                    value={editData.moq || 1}
+                                                                    className="w-16 h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
+                                                                    value={editData.moq ?? 1}
                                                                     onChange={(e) => setEditData({...editData, moq: parseInt(e.target.value)})}
                                                                 />
                                                             ) : (
                                                                 <span className="text-sm font-bold text-slate-900">{selectedProduct.moq || 1}</span>
                                                             )}
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase">{(isEditing ? editData.unit : selectedProduct.unit) || 'Piece'}(s)</span>
+                                                            <span className="text-[10px] font-bold text-slate-500 uppercase">piece(s)</span>
                                                         </div>
                                                     </div>
+                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
+                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Available Stock (pcs)</p>
+                                                        {isEditing ? (
+                                                            <input
+                                                                type="number"
+                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
+                                                                value={editData.stock ?? 0}
+                                                                onChange={(e) => setEditData({...editData, stock: parseInt(e.target.value)})}
+                                                            />
+                                                        ) : (
+                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.stock ?? 0}</p>
+                                                        )}
+                                                    </div>
+                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
+                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">EAN / Barcode</p>
+                                                        {isEditing ? (
+                                                            <input
+                                                                type="text"
+                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
+                                                                value={editData.ean || ''}
+                                                                onChange={(e) => setEditData({...editData, ean: e.target.value})}
+                                                                placeholder="e.g. 7613035..."
+                                                            />
+                                                        ) : (
+                                                            <p className="text-sm font-bold text-slate-900 font-mono">{selectedProduct.ean || '—'}</p>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                                <div className="p-3 bg-amber-50 border border-amber-100 rounded-xl">
-                                                    <p className="text-[9px] text-amber-700 font-medium leading-tight">
-                                                        {(() => {
-                                                            const unit = (isEditing ? editData.unit : selectedProduct.unit) || 'piece';
-                                                            const moq = (isEditing ? editData.moq : selectedProduct.moq) || 1;
-                                                            if (unit === 'case') {
+                                            </div>
+
+                                            {/* ── Logistics / Pack Configuration ───── */}
+                                            <div className="space-y-3">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Logistics & Pack Configuration</p>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {[
+                                                        { label: 'Pcs / Case',      key: 'unitsPerCase',       placeholder: 'e.g. 24' },
+                                                        { label: 'Cases / Pallet',  key: 'casesPerPallet',     placeholder: 'e.g. 40' },
+                                                        { label: 'Pallets / Truck', key: 'palletsPerShipment', placeholder: 'e.g. 20' },
+                                                    ].map(({ label, key, placeholder }) => (
+                                                        <div key={key} className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
+                                                            <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">{label}</p>
+                                                            {isEditing ? (
+                                                                <input
+                                                                    type="number"
+                                                                    min="0"
+                                                                    className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
+                                                                    value={(editData as any)[key] ?? ''}
+                                                                    onChange={(e) => setEditData({...editData, [key]: e.target.value ? parseInt(e.target.value) : null})}
+                                                                    placeholder={placeholder}
+                                                                />
+                                                            ) : (
+                                                                <p className="text-sm font-bold text-slate-900">{(selectedProduct as any)[key] ?? '—'}</p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                    {/* Units / Pallet — auto-calculated */}
+                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-teal-50/40">
+                                                        <p className="text-[9px] text-teal-500 font-bold uppercase mb-1">Units / Pallet (auto)</p>
+                                                        <p className="text-sm font-bold text-teal-700">
+                                                            {(() => {
                                                                 const pcs = (isEditing ? editData.unitsPerCase : selectedProduct.unitsPerCase) || 0;
                                                                 const cases = (isEditing ? editData.casesPerPallet : selectedProduct.casesPerPallet) || 0;
-                                                                return `Min ${moq} case(s) = ${moq * pcs} pieces. Each case has ${pcs} pieces; ${cases} cases per pallet.`;
-                                                            } else if (unit === 'pallet') {
-                                                                return `Min ${moq} pallet(s) = ${moq * ((isEditing ? editData.unitsPerPallet : selectedProduct.unitsPerPallet) || 0)} pieces total.`;
-                                                            } else if (unit === 'truck') {
-                                                                return `Min ${moq} truck(s).`;
-                                                            }
-                                                            return `Min ${moq} piece(s).`;
-                                                        })()}
-                                                    </p>
+                                                                return pcs && cases ? `${pcs * cases} pcs` : '—';
+                                                            })()}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                {/* Tier price preview */}
+                                                {(() => {
+                                                    const pp = parseFloat((isEditing ? editData.basePrice : selectedProduct.basePrice) || 0);
+                                                    const pc = (isEditing ? editData.unitsPerCase : selectedProduct.unitsPerCase) || 0;
+                                                    const cp = (isEditing ? editData.casesPerPallet : selectedProduct.casesPerPallet) || 0;
+                                                    const pt = (isEditing ? editData.palletsPerShipment : selectedProduct.palletsPerShipment) || 0;
+                                                    if (!pp || !pc) return null;
+                                                    const cartonP = pp * pc;
+                                                    const palletP = pc && cp ? pp * pc * cp : null;
+                                                    const truckP  = pc && cp && pt ? pp * pc * cp * pt : null;
+                                                    return (
+                                                        <div className="p-3 bg-teal-50 border border-teal-100 rounded-xl grid grid-cols-3 gap-2">
+                                                            <div className="text-center">
+                                                                <p className="text-[9px] text-teal-500 font-bold uppercase">Carton</p>
+                                                                <p className="text-[12px] font-bold text-teal-700">{formatPrice(cartonP)}</p>
+                                                            </div>
+                                                            {palletP !== null && <div className="text-center">
+                                                                <p className="text-[9px] text-teal-500 font-bold uppercase">Pallet</p>
+                                                                <p className="text-[12px] font-bold text-teal-700">{formatPrice(palletP)}</p>
+                                                            </div>}
+                                                            {truckP !== null && <div className="text-center">
+                                                                <p className="text-[9px] text-teal-500 font-bold uppercase">Truck</p>
+                                                                <p className="text-[12px] font-bold text-teal-700">{formatPrice(truckP)}</p>
+                                                            </div>}
+                                                        </div>
+                                                    );
+                                                })()}
+                                            </div>
+
+                                            {/* ── Product Details ─────────────────── */}
+                                            <div className="space-y-3">
+                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Product Details</p>
+                                                <div className="grid grid-cols-2 gap-3">
+                                                    {[
+                                                        { label: 'Origin (Country)',  key: 'origin',     placeholder: 'e.g. Germany' },
+                                                        { label: 'BBD (Best Before)', key: 'shelfLife',  placeholder: 'e.g. 20260731' },
+                                                        { label: 'Weight',            key: 'weight',     placeholder: 'e.g. 700g' },
+                                                        { label: 'Brand',             key: 'brand',      placeholder: 'e.g. Nestlé' },
+                                                    ].map(({ label, key, placeholder }) => (
+                                                        <div key={key} className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
+                                                            <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">{label}</p>
+                                                            {isEditing ? (
+                                                                <input
+                                                                    type="text"
+                                                                    className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
+                                                                    value={(editData as any)[key] || ''}
+                                                                    onChange={(e) => setEditData({...editData, [key]: e.target.value})}
+                                                                    placeholder={placeholder}
+                                                                />
+                                                            ) : (
+                                                                <p className="text-sm font-bold text-slate-900">{(selectedProduct as any)[key] || '—'}</p>
+                                                            )}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {/* Description */}
+                                                <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">Product Description</p>
+                                                    {isEditing ? (
+                                                        <textarea
+                                                            rows={4}
+                                                            className="w-full px-0 text-[13px] font-medium outline-none border-b border-teal-100 bg-transparent resize-none"
+                                                            value={editData.description || ''}
+                                                            onChange={(e) => setEditData({...editData, description: e.target.value})}
+                                                        />
+                                                    ) : (
+                                                        <p className="text-[12px] text-slate-700 leading-relaxed">{selectedProduct.description || '—'}</p>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>

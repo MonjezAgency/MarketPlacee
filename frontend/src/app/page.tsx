@@ -369,7 +369,7 @@ export default function HomePage() {
                                     <img
                                         src={b.logo}
                                         alt={b.name}
-                                        className="max-h-[36px] sm:max-h-[40px] max-w-[110px] sm:max-w-[130px] w-auto h-auto object-contain grayscale opacity-70 hover:opacity-100 hover:grayscale-0 transition-all"
+                                        className="h-[32px] max-w-[120px] w-auto object-contain grayscale opacity-70 hover:opacity-100 hover:grayscale-0 transition-all"
                                         onError={(e) => {
                                             const el = e.currentTarget;
                                             el.style.display = 'none';
