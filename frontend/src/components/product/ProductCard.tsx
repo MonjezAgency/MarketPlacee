@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Star, Check, ShieldCheck, ShoppingCart, ArrowUpRight, Image as ImageIcon } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useCart } from '@/lib/cart';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
@@ -23,6 +23,24 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
     const [translatedName, setTranslatedName] = useState(product.name);
     const isOutOfStock = product.inStock === false || (product.stock !== undefined && product.stock <= 0);
+
+    // Image auto-rotate on hover
+    const allImages = product.images && product.images.length > 1 ? product.images : null;
+    const [imgIndex, setImgIndex] = useState(0);
+    const [isHoveringImg, setIsHoveringImg] = useState(false);
+    const rotateTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+    useEffect(() => {
+        if (isHoveringImg && allImages) {
+            rotateTimer.current = setInterval(() => {
+                setImgIndex(i => (i + 1) % allImages.length);
+            }, 1500);
+        } else {
+            if (rotateTimer.current) clearInterval(rotateTimer.current);
+            setImgIndex(0);
+        }
+        return () => { if (rotateTimer.current) clearInterval(rotateTimer.current); };
+    }, [isHoveringImg, allImages]);
 
     useEffect(() => {
         const rawName = product.name?.trim() || '';
@@ -90,20 +108,32 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             transition={{ delay: index * 0.05 }}
             className="group bg-card text-card-foreground rounded-lg border border-border/60 hover:shadow-lg transition-shadow duration-300 flex flex-col h-full overflow-hidden"
         >
-            <div className="relative p-4 flex justify-center items-center h-[200px] border-b border-border/30 bg-white">
+            <div
+                className="relative p-4 flex justify-center items-center h-[200px] border-b border-border/30 bg-white"
+                onMouseEnter={() => setIsHoveringImg(true)}
+                onMouseLeave={() => setIsHoveringImg(false)}
+            >
                 { (product.image || (product.images && product.images.length > 0)) ? (
                     <img
-                        src={product.image || (product.images && product.images[0]) || ''}
+                        src={allImages ? allImages[imgIndex] : (product.image || (product.images && product.images[0]) || '')}
                         alt={product.name}
                         referrerPolicy="no-referrer"
-                        onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/160?text=Invalid+Image'; }}
-                        className="max-h-[160px] max-w-full object-contain mix-blend-multiply"
+                        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        className="max-h-[160px] max-w-full object-contain mix-blend-multiply transition-opacity duration-300"
                         loading="lazy"
                         decoding="async"
                     />
                 ) : (
                     <div className="w-full h-[160px] flex items-center justify-center text-muted-foreground/30">
                         {/* Empty layout as requested */}
+                    </div>
+                )}
+                {/* Image index dots (when multiple images and hovering) */}
+                {allImages && isHoveringImg && (
+                    <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 z-10">
+                        {allImages.map((_, i) => (
+                            <div key={i} className={cn('w-1.5 h-1.5 rounded-full transition-all duration-300', i === imgIndex ? 'bg-primary scale-125' : 'bg-border')} />
+                        ))}
                     </div>
                 )}
 
