@@ -598,8 +598,17 @@ export class ProductsService {
         if (data.variants !== undefined) updateData.variants = data.variants;
         if (data.unit !== undefined) updateData.unit = data.unit;
         if (data.moq !== undefined) updateData.moq = data.moq;
+        if (data.unitsPerCase !== undefined) updateData.unitsPerCase = data.unitsPerCase;
+        if (data.casesPerPallet !== undefined) updateData.casesPerPallet = data.casesPerPallet;
         if (data.unitsPerPallet !== undefined) updateData.unitsPerPallet = data.unitsPerPallet;
         if (data.palletsPerShipment !== undefined) updateData.palletsPerShipment = data.palletsPerShipment;
+        // Product details (these were silently dropped before — admin edits to
+        // brand/origin/shelfLife/weight didn't persist)
+        if (data.brand !== undefined) updateData.brand = data.brand;
+        if (data.origin !== undefined) updateData.origin = data.origin;
+        if (data.shelfLife !== undefined) updateData.shelfLife = data.shelfLife;
+        if (data.weight !== undefined) updateData.weight = data.weight;
+        if (data.adminNotes !== undefined) updateData.adminNotes = data.adminNotes;
         if (data.readyForDispatch !== undefined) updateData.readyForDispatch = data.readyForDispatch;
         if (data.leadTime !== undefined) updateData.leadTime = data.leadTime;
         if (data.warehouseId !== undefined) updateData.warehouseId = data.warehouseId;
