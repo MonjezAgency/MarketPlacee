@@ -1,22 +1,34 @@
 import type { MetadataRoute } from 'next';
 
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://atlantisfmcg.com';
+/**
+ * Normalize SITE_URL to never have a trailing slash so route paths can be
+ * concatenated as `${SITE_URL}/page` without producing the `//page` bug
+ * the SEO audit caught (every URL in the previous sitemap was malformed).
+ */
+const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '');
 
 export default function sitemap(): MetadataRoute.Sitemap {
     const lastModified = new Date();
 
-    const routes: MetadataRoute.Sitemap = [
-        { url: `${SITE_URL}/`, lastModified, changeFrequency: 'daily', priority: 1.0 },
-        { url: `${SITE_URL}/categories`, lastModified, changeFrequency: 'daily', priority: 0.9 },
-        { url: `${SITE_URL}/brands`, lastModified, changeFrequency: 'weekly', priority: 0.8 },
-        { url: `${SITE_URL}/products`, lastModified, changeFrequency: 'daily', priority: 0.9 },
-        { url: `${SITE_URL}/about`, lastModified, changeFrequency: 'monthly', priority: 0.6 },
-        { url: `${SITE_URL}/contact`, lastModified, changeFrequency: 'monthly', priority: 0.6 },
-        { url: `${SITE_URL}/login`, lastModified, changeFrequency: 'yearly', priority: 0.4 },
-        { url: `${SITE_URL}/register`, lastModified, changeFrequency: 'yearly', priority: 0.5 },
-        { url: `${SITE_URL}/privacy`, lastModified, changeFrequency: 'yearly', priority: 0.3 },
-        { url: `${SITE_URL}/terms`, lastModified, changeFrequency: 'yearly', priority: 0.3 },
+    // Notes from the SEO audit (May 2026):
+    // - /products and /brands were 404 → removed from sitemap.
+    // - /login and /register are gated user pages → must NOT be indexed.
+    // - changeFrequency and priority hints were dropped: Google has ignored
+    //   them since 2023 and they only add noise.
+    // - Shipping/returns/how-it-works/wholesale are real public pages we
+    //   want crawled.
+    return [
+        { url: `${SITE_URL}/`, lastModified },
+        { url: `${SITE_URL}/categories`, lastModified },
+        { url: `${SITE_URL}/about`, lastModified },
+        { url: `${SITE_URL}/contact`, lastModified },
+        { url: `${SITE_URL}/how-it-works`, lastModified },
+        { url: `${SITE_URL}/wholesale`, lastModified },
+        { url: `${SITE_URL}/shipping`, lastModified },
+        { url: `${SITE_URL}/returns`, lastModified },
+        { url: `${SITE_URL}/help`, lastModified },
+        { url: `${SITE_URL}/privacy-policy`, lastModified },
+        { url: `${SITE_URL}/terms`, lastModified },
+        { url: `${SITE_URL}/cookie-policy`, lastModified },
     ];
-
-    return routes;
 }

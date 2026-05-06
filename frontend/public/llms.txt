@@ -1,0 +1,40 @@
+# Atlantis Marketplace
+
+> Atlantis is a B2B wholesale marketplace connecting verified suppliers with business buyers across Europe and the Gulf region. Every supplier is KYC-verified before they can list a single product, and every payment is held in escrow until the buyer confirms delivery. EUR-native pricing, GDPR-compliant, developed by Monjez Company.
+
+## Key Pages
+
+- [Homepage](https://www.atlantisfmcg.com/): Browse verified wholesale suppliers across FMCG, beverages, electronics, industrial, packaging, automotive, fashion, health, and home categories.
+- [About](https://www.atlantisfmcg.com/about): Our mission, KYC verification process, escrow protection, and the Monjez Company team behind Atlantis.
+- [Categories](https://www.atlantisfmcg.com/categories): Full product catalog organized by category — FMCG, beverages, snacks, personal care, electronics, industrial goods, and more.
+- [How It Works](https://www.atlantisfmcg.com/how-it-works): Step-by-step explanation of how buyers source products and how payments are protected by escrow.
+- [Wholesale](https://www.atlantisfmcg.com/wholesale): Bulk pricing tiers, MOQ details, pallet and truck-level orders.
+- [Shipping](https://www.atlantisfmcg.com/shipping): Logistics partners, lead times, and delivery zones across Europe and the Gulf.
+- [Returns](https://www.atlantisfmcg.com/returns): Return policy and dispute-resolution process protected by escrow.
+- [Contact](https://www.atlantisfmcg.com/contact): Reach the Atlantis team — Info@atlantisfmcg.com. Romania · Europe · Gulf.
+
+## Key Facts
+
+- **Business model**: B2B-exclusive wholesale marketplace. No consumer or retail sales.
+- **Supplier verification**: Every supplier passes a KYC (Know Your Customer) identity-verification process with liveness detection before listing products.
+- **Payment protection**: All payments are held in escrow and released to the supplier only after the buyer confirms delivery.
+- **Currency**: EUR-native pricing for the European market. Multi-currency display supported.
+- **Tier-based pricing**: Buyers can purchase by carton, pallet, or truck. Each tier has its own markup configurable by the marketplace operator.
+- **Primary markets**: Romania, European Union, Gulf Cooperation Council (GCC).
+- **Compliance**: GDPR-compliant, AES-256 encryption, 2FA, PCI DSS for card payments.
+- **Categories carried**: Beverages, FMCG, snacks, personal care, household goods, electronics, industrial, packaging, automotive, fashion, health, home.
+- **Developed by**: Monjez Company.
+
+## What is B2B wholesale sourcing?
+
+B2B wholesale sourcing is the process by which businesses (retailers, distributors, importers) purchase goods in bulk directly from verified suppliers or manufacturers, typically at significantly lower per-unit prices than retail. On Atlantis, buyers select products by carton, pallet, or full truckload; each pricing tier reflects the volume markup. Payments are held in escrow until the buyer confirms delivery, eliminating the trust-gap that has historically slowed cross-border B2B transactions.
+
+## What makes Atlantis different from Alibaba or Faire?
+
+Atlantis is purpose-built for the European and Gulf markets with EUR-native pricing, GDPR compliance from day one, and KYC verification on every supplier — not just self-declared. Unlike global marketplaces that treat the EU as a sub-region, Atlantis is operated under European data-protection law and supports the regulatory and currency expectations of EU buyers as the default.
+
+## Contact
+
+- Email: Info@atlantisfmcg.com
+- Website: https://www.atlantisfmcg.com
+- Operator: Monjez Company
