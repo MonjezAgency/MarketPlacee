@@ -1,40 +1,16 @@
-'use client';
+import type { Metadata } from 'next';
+import NotFoundClient from './NotFoundClient';
 
-import Link from 'next/link';
-import { AlertCircle, ArrowLeft, Home } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+// Server-component wrapper so the 404 page can carry its own unique title
+// (audit issue #11 — soft-404 risk because every page including 404 shipped
+// with the homepage title). Next.js automatically returns a 404 HTTP status
+// for app/not-found.tsx; this override only changes the metadata.
+export const metadata: Metadata = {
+    title: 'Page Not Found | Atlantis B2B Wholesale Marketplace',
+    description: 'The page you were looking for could not be found. Browse our verified wholesale catalogue or contact the Atlantis team.',
+    robots: { index: false, follow: false },
+};
 
 export default function NotFound() {
-    return (
-        <div className="min-h-[80vh] flex items-center justify-center p-4">
-            <div className="max-w-xl w-full text-center space-y-8 animate-fade-in-up">
-                <div className="relative inline-block">
-                    <h1 className="text-[12rem] font-black leading-none text-primary/5 select-none">404</h1>
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <AlertCircle className="w-24 h-24 text-primary animate-bounce-in" />
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                    <h2 className="text-5xl font-poppins font-black tracking-tight">Lost in the sauce?</h2>
-                    <p className="text-xl text-foreground/60 leading-relaxed mx-auto max-w-md">
-                        The page you're looking for was either drunk and wandered off, or never existed in this wholesale catalog.
-                    </p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
-                    <Button variant="outline" size="lg" className="rounded-full w-full sm:w-auto h-14 px-10 font-black gap-2" onClick={() => window.history.back()}>
-                        <ArrowLeft className="w-5 h-5" />
-                        Go Back
-                    </Button>
-                    <Link href="/">
-                        <Button size="lg" className="rounded-full w-full sm:w-auto h-14 px-10 font-black gap-2 shadow-xl shadow-primary/20">
-                            <Home className="w-5 h-5" />
-                            Return Home
-                        </Button>
-                    </Link>
-                </div>
-            </div>
-        </div>
-    );
+    return <NotFoundClient />;
 }
