@@ -154,9 +154,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const palletPrice = piecesPerPallet > 0 ? basePerPiece * piecesPerPallet * mPallet : null;
     const truckPrice  = (piecesPerPallet > 0 && palletsPerTruck > 0) ? basePerPiece * piecesPerPallet * palletsPerTruck * mContainer : null;
 
-    // Build the cycling tier list — only include tiers we can compute.
-    // Order: largest first (truck) so the headline price is the best
-    // bulk value when the admin default is "truck".
+    // Tier list — only include tiers we can compute.
     type Tier = { key: 'truck' | 'pallet' | 'carton'; label: string; price: number };
     const tiers: Tier[] = [];
     if (truckPrice !== null)  tiers.push({ key: 'truck',  label: 'truck',  price: truckPrice });
@@ -164,31 +162,32 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     if (cartonPrice !== null) tiers.push({ key: 'carton', label: 'ctn',    price: cartonPrice });
     if (tiers.length === 0)   tiers.push({ key: 'carton', label: String(product.unit || 'unit'), price: displayPrice });
 
-    // Start the cycle on the admin-configured default unit (typically truck).
-    const startIndex = Math.max(0, tiers.findIndex(t => t.key === defaultUnit));
-    const [tierIndex, setTierIndex] = useState(startIndex >= 0 ? startIndex : 0);
+    // Headline price is FIXED on the admin-configured default unit (truck by
+    // default). The user explicitly didn't want the price cycling on the
+    // card — they want a stable headline so buyers see one canonical bulk
+    // price, and tier switching belongs on the product detail page where
+    // we get a real engagement signal (PDP click). The animated dots below
+    // are purely decorative — they hint that more tiers exist.
+    const headlineTier = tiers.find(t => t.key === defaultUnit) || tiers[0];
+    const cardPrice = headlineTier.price;
+    const cardUnit  = headlineTier.label;
+    const headlineIndex = Math.max(0, tiers.findIndex(t => t.key === headlineTier.key));
 
-    // Reset the index when defaultUnit arrives from the async config fetch.
+    // Decorative dots — animate which dot is highlighted but don't change
+    // the displayed price. Pauses on hover so the indicator is steady when
+    // the buyer is looking at the card.
+    const [dotIndex, setDotIndex] = useState(headlineIndex);
     useEffect(() => {
-        const i = tiers.findIndex(t => t.key === defaultUnit);
-        if (i >= 0) setTierIndex(i);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [defaultUnit, tiers.length]);
-
-    // Auto-cycle through tiers every 3.5s, pausing while the user is
-    // hovering the card (so they can read the price they care about).
+        setDotIndex(headlineIndex);
+    }, [headlineIndex]);
     useEffect(() => {
         if (tiers.length <= 1) return;
         if (isHoveringImg) return;
         const id = setInterval(() => {
-            setTierIndex(i => (i + 1) % tiers.length);
+            setDotIndex(i => (i + 1) % tiers.length);
         }, 3500);
         return () => clearInterval(id);
     }, [tiers.length, isHoveringImg]);
-
-    const activeTier = tiers[tierIndex] || tiers[0];
-    const cardPrice  = activeTier.price;
-    const cardUnit   = activeTier.label;
 
     const rating = product.rating || 0;
     const reviews = product.reviewsCount || 0;
@@ -304,37 +303,25 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                 {/* Price & Min Order */}
                 <div className="mt-auto space-y-3">
                     <div className="flex items-baseline gap-1 flex-wrap">
-                        {/* Animate the price + unit together when the tier
-                            changes — gives a clear visual cue that the card
-                            is showing different bulk tiers.  key={tierIndex}
-                            forces a remount on every cycle. */}
-                        <motion.span
-                            key={`price-${tierIndex}`}
-                            initial={{ opacity: 0, y: 4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ duration: 0.25 }}
-                            className="text-xl font-bold text-foreground"
-                        >
+                        {/* Stable headline price — always the admin default
+                            tier (truck unless changed). No animation on the
+                            number itself: B2B buyers want a steady canonical
+                            price they can read at a glance. */}
+                        <span className="text-xl font-bold text-foreground">
                             {formatPrice(cardPrice, currency)}
-                        </motion.span>
-                        <motion.span
-                            key={`unit-${tierIndex}`}
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ duration: 0.25, delay: 0.05 }}
-                            className="text-muted-foreground text-xs font-medium"
-                        >
+                        </span>
+                        <span className="text-muted-foreground text-xs font-medium">
                             / {cardUnit}
-                        </motion.span>
+                        </span>
                         {isOwnProduct && (
                             <span className="ms-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Your Price</span>
                         )}
                     </div>
-                    {/* Tier indicator — read-only progress dots so the buyer
-                        sees the cycle is happening but can't switch tiers
-                        from the card. The tier picker lives on the product
-                        detail page so we get a real engagement signal
-                        (clicks into the PDP) instead of card-level toggling. */}
+                    {/* Decorative tier-availability indicator. Animates
+                        through dots as a hint that there are more bulk
+                        tiers, but the price above stays stable. Tier
+                        switching happens only on the product detail page
+                        (= a real PDP click for analytics). */}
                     {tiers.length > 1 && (
                         <div className="flex items-center gap-1" aria-hidden="true">
                             {tiers.map((t, i) => (
@@ -342,7 +329,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                                     key={t.key}
                                     className={cn(
                                         'h-[3px] rounded-full transition-all duration-500',
-                                        i === tierIndex
+                                        i === dotIndex
                                             ? 'bg-[#0B1F3A] w-5'
                                             : 'bg-slate-200 w-2',
                                     )}
