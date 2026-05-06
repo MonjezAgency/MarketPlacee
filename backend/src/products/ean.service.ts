@@ -228,9 +228,15 @@ export class EanService {
     // ─── Helpers ────────────────────────────────────────────────────────────
 
     /**
-     * Pick up to `count` image URLs from an Open Food Facts product object,
-     * ordered: front → packaging → ingredients → nutrition → any other.
-     * The "selected" set in `selected_images` carries the curated full-size URLs.
+     * Pick up to `count` image URLs from an Open Food Facts product object.
+     * STRICT: only catalog-style product shots (front + packaging) — never
+     * ingredients lists or nutrition labels (those are tiny crops of text on
+     * the back of the pack, not what a buyer wants to see). The user
+     * specifically called this out: "أنا قلت لك لازم يجيب الصورة لازم
+     * تكون خلفية بيضاء وظهر الصورة بشكل كويس".
+     *
+     * The AI validator downstream is a final gate that filters out any
+     * remaining photos with messy backgrounds (kitchen counters, grass, etc).
      */
     private orderOpenFoodFactsImages(product: any, count: number): string[] {
         const out: string[] = [];
@@ -244,10 +250,13 @@ export class EanService {
             out.push(url);
         };
 
-        // Priority 1 — curated selected images (highest quality, semantic)
+        // Priority 1 — curated selected images. Only `front` and `packaging`
+        // — these are the angles a B2B buyer needs. Ingredients/nutrition
+        // labels are macro-shots of fine print and never make sense as a
+        // catalog image.
         const selected = product.selected_images || {};
         const lang = product.lang || 'en';
-        const angleOrder = ['front', 'packaging', 'ingredients', 'nutrition', 'other'];
+        const angleOrder = ['front', 'packaging'];
         for (const angle of angleOrder) {
             const angleData = selected[angle];
             if (!angleData) continue;
@@ -257,12 +266,19 @@ export class EanService {
             if (out.length >= count) return out;
         }
 
-        // Priority 2 — top-level *_url fields
+        // Priority 2 — top-level front/packaging URLs.
         push(product.image_front_url);
         push(product.image_url);
         push(product.image_packaging_url);
-        push(product.image_ingredients_url);
-        push(product.image_nutrition_url);
+
+        // Priority 3 — `front_*` localized variants if still need more
+        if (out.length < count) {
+            for (const key of Object.keys(product)) {
+                if (key.startsWith('image_front_url_') && out.length < count) {
+                    push((product as any)[key]);
+                }
+            }
+        }
 
         return out.slice(0, count);
     }

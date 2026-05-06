@@ -26,7 +26,11 @@ export interface ImageValidationResult {
 @Injectable()
 export class EanValidatorService {
     private readonly logger = new Logger(EanValidatorService.name);
-    private readonly MIN_CONFIDENCE = 0.5;
+    // Threshold raised to 0.7 — at 0.5 we were letting through textured-
+    // background shots (Kit Kat on grass, ingredient labels). White-bg
+    // catalog requirement means we'd rather return zero images than ship
+    // a non-catalog photo to the supplier UI.
+    private readonly MIN_CONFIDENCE = 0.7;
     private readonly MODEL = 'google/gemini-2.0-flash-exp:free';
     private readonly TIMEOUT_MS = 12000;
 
@@ -81,12 +85,22 @@ export class EanValidatorService {
             {
                 type: 'text',
                 text:
-                    `You are a product image verifier for a B2B FMCG marketplace.\n\n${productContext}\n\n` +
-                    `Below are ${urls.length} candidate image URL(s). For each image, judge whether it shows the EXACT product described above.\n` +
-                    `Consider: brand logo visible & matches, product name on packaging matches, packaging shape/format consistent. ` +
-                    `Reject images that show a similar but different product (different size, different flavor, different brand variant).\n\n` +
+                    `You are a STRICT product image verifier for a B2B wholesale catalog. Buyers expect every image to look like a clean catalog photo — the kind you'd see on Amazon's product page.\n\n${productContext}\n\n` +
+                    `Below are ${urls.length} candidate image URL(s). For each image, score from 0.0 (reject) to 1.0 (perfect catalog shot) based on ALL of these requirements:\n\n` +
+                    `REJECT (confidence < 0.5) if ANY of these are true:\n` +
+                    `  • Background is NOT white or near-white (grass, table textures, kitchen counters, photographer's backdrop with shadows, gradient backgrounds → all REJECT)\n` +
+                    `  • Image is primarily text/labels (ingredient lists, nutrition tables, barcode close-ups, regulatory text)\n` +
+                    `  • Image shows hands, people, or in-context lifestyle scenes (factory, store shelf, etc.)\n` +
+                    `  • Brand logo or product name not clearly readable\n` +
+                    `  • Different product variant (different size, flavor, package format than specified)\n` +
+                    `  • Heavily blurred, low-resolution, or off-center\n\n` +
+                    `ACCEPT (confidence ≥ 0.7) only if:\n` +
+                    `  • Clean white or very light grey background\n` +
+                    `  • Full product packaging visible and centered\n` +
+                    `  • Brand logo + product name match the title above\n` +
+                    `  • Looks like a professional catalog/e-commerce photo\n\n` +
                     `Respond with a JSON array, one object per image in the same order, each shaped like:\n` +
-                    `  { "confidence": <0.0–1.0>, "reason": "<short justification>" }\n\n` +
+                    `  { "confidence": <0.0–1.0>, "reason": "<short justification mentioning background + content>" }\n\n` +
                     `Output ONLY the JSON array, no markdown fences, no preamble.`,
             },
             ...urls.map(url => ({ type: 'image_url', image_url: { url } })),

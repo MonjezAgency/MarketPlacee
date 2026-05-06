@@ -154,17 +154,41 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const palletPrice = piecesPerPallet > 0 ? basePerPiece * piecesPerPallet * mPallet : null;
     const truckPrice  = (piecesPerPallet > 0 && palletsPerTruck > 0) ? basePerPiece * piecesPerPallet * palletsPerTruck * mContainer : null;
 
-    // Show per-carton equivalent price regardless of tier, so customers can compare apples-to-apples
-    let cardPrice = displayPrice;
-    let cardUnit  = 'ctn';
-    if (defaultUnit === 'truck' && truckPrice !== null) {
-        const cartonsInTruck = casesPerPallet * palletsPerTruck;
-        cardPrice = cartonsInTruck > 0 ? truckPrice / cartonsInTruck : truckPrice;
-    } else if (defaultUnit === 'pallet' && palletPrice !== null) {
-        cardPrice = casesPerPallet > 0 ? palletPrice / casesPerPallet : palletPrice;
-    } else if (defaultUnit === 'carton' && cartonPrice !== null) {
-        cardPrice = cartonPrice;
-    }
+    // Build the cycling tier list — only include tiers we can compute.
+    // Order: largest first (truck) so the headline price is the best
+    // bulk value when the admin default is "truck".
+    type Tier = { key: 'truck' | 'pallet' | 'carton'; label: string; price: number };
+    const tiers: Tier[] = [];
+    if (truckPrice !== null)  tiers.push({ key: 'truck',  label: 'truck',  price: truckPrice });
+    if (palletPrice !== null) tiers.push({ key: 'pallet', label: 'pallet', price: palletPrice });
+    if (cartonPrice !== null) tiers.push({ key: 'carton', label: 'ctn',    price: cartonPrice });
+    if (tiers.length === 0)   tiers.push({ key: 'carton', label: String(product.unit || 'unit'), price: displayPrice });
+
+    // Start the cycle on the admin-configured default unit (typically truck).
+    const startIndex = Math.max(0, tiers.findIndex(t => t.key === defaultUnit));
+    const [tierIndex, setTierIndex] = useState(startIndex >= 0 ? startIndex : 0);
+
+    // Reset the index when defaultUnit arrives from the async config fetch.
+    useEffect(() => {
+        const i = tiers.findIndex(t => t.key === defaultUnit);
+        if (i >= 0) setTierIndex(i);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [defaultUnit, tiers.length]);
+
+    // Auto-cycle through tiers every 3.5s, pausing while the user is
+    // hovering the card (so they can read the price they care about).
+    useEffect(() => {
+        if (tiers.length <= 1) return;
+        if (isHoveringImg) return;
+        const id = setInterval(() => {
+            setTierIndex(i => (i + 1) % tiers.length);
+        }, 3500);
+        return () => clearInterval(id);
+    }, [tiers.length, isHoveringImg]);
+
+    const activeTier = tiers[tierIndex] || tiers[0];
+    const cardPrice  = activeTier.price;
+    const cardUnit   = activeTier.label;
 
     const rating = product.rating || 0;
     const reviews = product.reviewsCount || 0;
@@ -280,12 +304,52 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                 {/* Price & Min Order */}
                 <div className="mt-auto space-y-3">
                     <div className="flex items-baseline gap-1 flex-wrap">
-                        <span className="text-xl font-bold text-foreground">{formatPrice(cardPrice, currency)}</span>
-                        <span className="text-muted-foreground text-xs font-medium">/ {cardUnit}</span>
+                        {/* Animate the price + unit together when the tier
+                            changes — gives a clear visual cue that the card
+                            is showing different bulk tiers.  key={tierIndex}
+                            forces a remount on every cycle. */}
+                        <motion.span
+                            key={`price-${tierIndex}`}
+                            initial={{ opacity: 0, y: 4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ duration: 0.25 }}
+                            className="text-xl font-bold text-foreground"
+                        >
+                            {formatPrice(cardPrice, currency)}
+                        </motion.span>
+                        <motion.span
+                            key={`unit-${tierIndex}`}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ duration: 0.25, delay: 0.05 }}
+                            className="text-muted-foreground text-xs font-medium"
+                        >
+                            / {cardUnit}
+                        </motion.span>
                         {isOwnProduct && (
                             <span className="ms-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Your Price</span>
                         )}
                     </div>
+                    {/* Tier dots — clickable, also let the user pin a tier */}
+                    {tiers.length > 1 && (
+                        <div className="flex items-center gap-1.5">
+                            {tiers.map((t, i) => (
+                                <button
+                                    key={t.key}
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTierIndex(i); }}
+                                    className={cn(
+                                        'text-[9px] font-bold uppercase tracking-wider transition-all px-1.5 py-0.5 rounded',
+                                        i === tierIndex
+                                            ? 'bg-[#0B1F3A] text-white'
+                                            : 'text-muted-foreground/60 hover:text-foreground',
+                                    )}
+                                    aria-label={`Show ${t.label} price`}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex flex-col">
