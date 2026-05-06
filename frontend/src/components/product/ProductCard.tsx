@@ -330,23 +330,23 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                             <span className="ms-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Your Price</span>
                         )}
                     </div>
-                    {/* Tier dots — clickable, also let the user pin a tier */}
+                    {/* Tier indicator — read-only progress dots so the buyer
+                        sees the cycle is happening but can't switch tiers
+                        from the card. The tier picker lives on the product
+                        detail page so we get a real engagement signal
+                        (clicks into the PDP) instead of card-level toggling. */}
                     {tiers.length > 1 && (
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1" aria-hidden="true">
                             {tiers.map((t, i) => (
-                                <button
+                                <span
                                     key={t.key}
-                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setTierIndex(i); }}
                                     className={cn(
-                                        'text-[9px] font-bold uppercase tracking-wider transition-all px-1.5 py-0.5 rounded',
+                                        'h-[3px] rounded-full transition-all duration-500',
                                         i === tierIndex
-                                            ? 'bg-[#0B1F3A] text-white'
-                                            : 'text-muted-foreground/60 hover:text-foreground',
+                                            ? 'bg-[#0B1F3A] w-5'
+                                            : 'bg-slate-200 w-2',
                                     )}
-                                    aria-label={`Show ${t.label} price`}
-                                >
-                                    {t.label}
-                                </button>
+                                />
                             ))}
                         </div>
                     )}
