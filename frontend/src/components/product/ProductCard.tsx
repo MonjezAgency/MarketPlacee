@@ -163,31 +163,12 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     if (tiers.length === 0)   tiers.push({ key: 'carton', label: String(product.unit || 'unit'), price: displayPrice });
 
     // Headline price is FIXED on the admin-configured default unit (truck by
-    // default). The user explicitly didn't want the price cycling on the
-    // card — they want a stable headline so buyers see one canonical bulk
-    // price, and tier switching belongs on the product detail page where
-    // we get a real engagement signal (PDP click). The animated dots below
-    // are purely decorative — they hint that more tiers exist.
+    // default). One stable canonical price per card. Tier switching lives
+    // exclusively on the product detail page so each switch is a real
+    // engagement signal (a click into the PDP).
     const headlineTier = tiers.find(t => t.key === defaultUnit) || tiers[0];
     const cardPrice = headlineTier.price;
     const cardUnit  = headlineTier.label;
-    const headlineIndex = Math.max(0, tiers.findIndex(t => t.key === headlineTier.key));
-
-    // Decorative dots — animate which dot is highlighted but don't change
-    // the displayed price. Pauses on hover so the indicator is steady when
-    // the buyer is looking at the card.
-    const [dotIndex, setDotIndex] = useState(headlineIndex);
-    useEffect(() => {
-        setDotIndex(headlineIndex);
-    }, [headlineIndex]);
-    useEffect(() => {
-        if (tiers.length <= 1) return;
-        if (isHoveringImg) return;
-        const id = setInterval(() => {
-            setDotIndex(i => (i + 1) % tiers.length);
-        }, 3500);
-        return () => clearInterval(id);
-    }, [tiers.length, isHoveringImg]);
 
     const rating = product.rating || 0;
     const reviews = product.reviewsCount || 0;
@@ -317,26 +298,6 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                             <span className="ms-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Your Price</span>
                         )}
                     </div>
-                    {/* Decorative tier-availability indicator. Animates
-                        through dots as a hint that there are more bulk
-                        tiers, but the price above stays stable. Tier
-                        switching happens only on the product detail page
-                        (= a real PDP click for analytics). */}
-                    {tiers.length > 1 && (
-                        <div className="flex items-center gap-1" aria-hidden="true">
-                            {tiers.map((t, i) => (
-                                <span
-                                    key={t.key}
-                                    className={cn(
-                                        'h-[3px] rounded-full transition-all duration-500',
-                                        i === dotIndex
-                                            ? 'bg-[#0B1F3A] w-5'
-                                            : 'bg-slate-200 w-2',
-                                    )}
-                                />
-                            ))}
-                        </div>
-                    )}
 
                     <div className="flex items-center justify-between gap-3">
                         <div className="flex flex-col">
