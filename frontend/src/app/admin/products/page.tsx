@@ -296,6 +296,61 @@ export default function ProductsModerationPage() {
         }
     };
 
+    // EAN-based image search (single product)
+    const [eanSearchResult, setEanSearchResult] = React.useState<{
+        images: string[];
+        confidence_score: number;
+        matched: boolean;
+        cached: boolean;
+        source: string;
+        reason?: string;
+    } | null>(null);
+    const [isSearchingEan, setIsSearchingEan] = React.useState(false);
+
+    const handleEanSearch = async (refresh: boolean = false) => {
+        if (!editData?.ean) {
+            toast.error('Set EAN/Barcode first');
+            return;
+        }
+        setIsSearchingEan(true);
+        setEanSearchResult(null);
+        const tid = toast.loading('Searching by EAN…');
+        try {
+            const res = await apiFetch('/products/ean-lookup', {
+                method: 'POST',
+                body: JSON.stringify({
+                    ean: String(editData.ean).trim(),
+                    title: editData.name,
+                    brand: editData.brand,
+                    image_count: 5,
+                    refresh,
+                }),
+            });
+            const data = await res.json();
+            setEanSearchResult(data);
+            if (data.matched && data.images.length > 0) {
+                toast.success(`Found ${data.images.length} image${data.images.length > 1 ? 's' : ''} (conf ${(data.confidence_score * 100).toFixed(0)}%)`, { id: tid });
+            } else {
+                toast.error(data.reason || 'No matching images found', { id: tid });
+            }
+        } catch (err: any) {
+            toast.error(`EAN search failed: ${err.message}`, { id: tid });
+        } finally {
+            setIsSearchingEan(false);
+        }
+    };
+
+    const addCandidateImage = (url: string) => {
+        if (!editData) return;
+        const existing = editData.images || [];
+        if (existing.includes(url)) {
+            toast.error('Already added');
+            return;
+        }
+        setEditData({ ...editData, images: [...existing, url] });
+        toast.success('Image added');
+    };
+
     // Delete a single product (admin) — only allowed for PENDING / REJECTED.
     const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
     const [isDeleting, setIsDeleting] = React.useState(false);
@@ -804,7 +859,16 @@ export default function ProductsModerationPage() {
                                                                     <ImageIcon size={14} /> Paste URLs
                                                                 </button>
                                                             </div>
-                                                            {/* Row 2 — inline URL textarea (toggle) */}
+                                                            {/* Row 2 — AI EAN search */}
+                                                            <button
+                                                                onClick={() => handleEanSearch(false)}
+                                                                disabled={isSearchingEan || !editData?.ean}
+                                                                className="w-full h-10 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 text-white text-[12px] font-bold hover:from-violet-600 hover:to-indigo-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                                                                title={editData?.ean ? `Search by EAN ${editData.ean}` : 'Set EAN first'}
+                                                            >
+                                                                <Sparkles size={14} /> {isSearchingEan ? 'Searching…' : 'Find images by EAN (AI verified)'}
+                                                            </button>
+                                                            {/* Row 3 — inline URL textarea (toggle) */}
                                                             {showUrlInput && (
                                                                 <div className="space-y-1.5">
                                                                     <textarea
@@ -820,6 +884,67 @@ export default function ProductsModerationPage() {
                                                                     >
                                                                         Add URLs
                                                                     </button>
+                                                                </div>
+                                                            )}
+                                                            {/* Row 4 — EAN search results */}
+                                                            {eanSearchResult && (
+                                                                <div className="rounded-2xl border border-violet-100 bg-violet-50/40 p-3 space-y-2">
+                                                                    <div className="flex items-center justify-between">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <Sparkles size={12} className="text-violet-600" />
+                                                                            <span className="text-[10px] font-black text-violet-700 uppercase tracking-widest">
+                                                                                {eanSearchResult.matched ? 'AI Verified' : 'No Match'}
+                                                                            </span>
+                                                                            {eanSearchResult.matched && (
+                                                                                <span className="text-[10px] font-bold text-violet-500">
+                                                                                    conf {(eanSearchResult.confidence_score * 100).toFixed(0)}%
+                                                                                </span>
+                                                                            )}
+                                                                            {eanSearchResult.cached && (
+                                                                                <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">cached</span>
+                                                                            )}
+                                                                        </div>
+                                                                        <button
+                                                                            onClick={() => setEanSearchResult(null)}
+                                                                            className="text-[10px] text-slate-400 hover:text-slate-600 font-bold"
+                                                                        >
+                                                                            ✕
+                                                                        </button>
+                                                                    </div>
+                                                                    {eanSearchResult.reason && !eanSearchResult.matched && (
+                                                                        <p className="text-[11px] text-red-600 leading-relaxed">{eanSearchResult.reason}</p>
+                                                                    )}
+                                                                    {eanSearchResult.images.length > 0 && (
+                                                                        <>
+                                                                            <p className="text-[10px] text-slate-500">Click an image to add it:</p>
+                                                                            <div className="grid grid-cols-3 gap-2">
+                                                                                {eanSearchResult.images.map((url, i) => (
+                                                                                    <button
+                                                                                        key={url}
+                                                                                        onClick={() => addCandidateImage(url)}
+                                                                                        className="group relative aspect-square rounded-xl border border-violet-200 bg-white overflow-hidden hover:border-violet-500 hover:shadow-lg transition-all"
+                                                                                        title={`Image ${i + 1} — click to add`}
+                                                                                    >
+                                                                                        <img src={url} alt="" referrerPolicy="no-referrer" className="absolute inset-0 w-full h-full object-contain p-1" />
+                                                                                        <div className="absolute inset-0 bg-violet-500/0 group-hover:bg-violet-500/20 transition-colors flex items-center justify-center">
+                                                                                            <Plus size={20} className="text-white opacity-0 group-hover:opacity-100 drop-shadow-lg transition-opacity" />
+                                                                                        </div>
+                                                                                    </button>
+                                                                                ))}
+                                                                            </div>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    const newOnes = eanSearchResult.images.filter(url => !(editData.images || []).includes(url));
+                                                                                    if (newOnes.length === 0) { toast.error('All already added'); return; }
+                                                                                    setEditData({ ...editData, images: [...(editData.images || []), ...newOnes] });
+                                                                                    toast.success(`Added ${newOnes.length} image${newOnes.length > 1 ? 's' : ''}`);
+                                                                                }}
+                                                                                className="w-full h-8 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-[11px] font-bold transition-colors"
+                                                                            >
+                                                                                Add all
+                                                                            </button>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             )}
                                                         </div>
