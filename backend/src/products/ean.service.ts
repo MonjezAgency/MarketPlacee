@@ -168,17 +168,53 @@ export class EanService {
                 images = validation.accepted.map(r => r.url);
                 confidence = validation.aggregateConfidence;
 
-                // If AI rejected everything → return empty with reason instead of bad images.
+                // If AI rejected everything from OFF, try the Bing fallback —
+                // OFF images are crowdsourced phone photos, often on real
+                // surfaces. Bing's catalog crawl gives us official product
+                // shots from retailer/manufacturer sites which are usually
+                // white-bg studio photos.
                 if (images.length === 0) {
+                    this.logger.log(`OFF candidates all rejected for EAN ${cleanEan}; trying Bing fallback`);
+                    const bingCandidates = await this.fetchBingCatalogImages(cleanEan, apiTitle || title, count * 2);
+
+                    if (bingCandidates.length > 0) {
+                        const bingValidation = await this.validator.validateImages(bingCandidates, {
+                            ean: cleanEan,
+                            title: apiTitle || title,
+                            brand: apiBrand || opts.brand,
+                        });
+                        if (bingValidation.accepted.length > 0) {
+                            const bingImages = bingValidation.accepted
+                                .sort((a, b) => b.confidence - a.confidence)
+                                .slice(0, count)
+                                .map(r => r.url);
+                            const result: EanProductResult = {
+                                ean: cleanEan,
+                                title: apiTitle || title || '',
+                                images: bingImages,
+                                matched: true,
+                                source: 'openfoodfacts', // primary source still wins on metadata
+                                cached: false,
+                                confidence_score: bingValidation.aggregateConfidence,
+                            };
+                            this.cache.set(cleanEan, title, count, result);
+                            return result;
+                        }
+                    }
+
+                    // Both sources rejected → empty with full diagnostic reason
+                    const offMaxConf = validation.rejected.length > 0
+                        ? Math.max(...validation.rejected.map(r => r.confidence))
+                        : 0;
                     const result: EanProductResult = {
                         ean: cleanEan,
                         title: apiTitle || title || '',
                         images: [],
                         matched: false,
                         source: 'none',
-                        reason: `AI validator rejected all ${candidates.length} candidate images (max conf ${validation.rejected.length > 0 ? Math.max(...validation.rejected.map(r => r.confidence)).toFixed(2) : '0.00'})`,
+                        reason: `No catalog-quality images found. OFF returned ${candidates.length} (max conf ${offMaxConf.toFixed(2)}); Bing fallback returned ${bingCandidates.length}. Try a different EAN or upload an image manually.`,
                         cached: false,
-                        confidence_score: validation.rejected.length > 0 ? Math.max(...validation.rejected.map(r => r.confidence)) : 0,
+                        confidence_score: offMaxConf,
                     };
                     this.cache.set(cleanEan, title, count, result);
                     return result;
@@ -226,6 +262,51 @@ export class EanService {
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * Bing image search fallback — runs when Open Food Facts has only
+     * crowdsourced phone photos and the AI validator rejected them all.
+     * Uses Bing's white-background filter (`color2-bw-white`) to bias
+     * toward studio catalog shots from retailer/manufacturer sites.
+     *
+     * No API key required — scrapes the public results HTML. Brittle but
+     * free and effective. Returns more candidates than `count` so the
+     * caller can re-run the AI validator and pick the highest-confidence.
+     */
+    private async fetchBingCatalogImages(ean: string, productName?: string, max: number = 6): Promise<string[]> {
+        const queryParts = [productName, ean, 'product packaging white background'].filter(Boolean);
+        const q = encodeURIComponent(queryParts.join(' '));
+        const url = `https://www.bing.com/images/search?q=${q}&qft=+filterui:photo-photo+filterui:color2-bw-white&form=IRFLTR`;
+
+        try {
+            const resp = await axios.get(url, {
+                timeout: 6000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                },
+            });
+            const html: string = resp.data;
+            const found = new Set<string>();
+
+            // Each Bing image card embeds a JSON 'm' attribute with `murl` = original URL.
+            const re = /"murl":"(https?:[^"]+?)"/g;
+            let m: RegExpExecArray | null;
+            while ((m = re.exec(html)) !== null && found.size < max) {
+                const candidate = m[1].replace(/\\\//g, '/').replace(/\\u002f/g, '/');
+                if (candidate.startsWith('http')) {
+                    // Skip data URIs and Bing's own thumbnail caches — those
+                    // are watermarked or low-resolution.
+                    if (candidate.includes('bing.com/th') || candidate.startsWith('data:')) continue;
+                    found.add(candidate);
+                }
+            }
+            return Array.from(found);
+        } catch (err: any) {
+            this.logger.debug(`Bing fallback failed for EAN ${ean}: ${err.message}`);
+            return [];
+        }
+    }
 
     /**
      * Pick up to `count` image URLs from an Open Food Facts product object.

@@ -26,11 +26,12 @@ export interface ImageValidationResult {
 @Injectable()
 export class EanValidatorService {
     private readonly logger = new Logger(EanValidatorService.name);
-    // Threshold raised to 0.7 — at 0.5 we were letting through textured-
-    // background shots (Kit Kat on grass, ingredient labels). White-bg
-    // catalog requirement means we'd rather return zero images than ship
-    // a non-catalog photo to the supplier UI.
-    private readonly MIN_CONFIDENCE = 0.7;
+    // Threshold tightened repeatedly — every step the user shipped us another
+    // counter-example (Kit Kat on grass at 0.7). Now at 0.85, which the new
+    // strict prompt aligns with: an image must be a clean studio/catalog shot
+    // to score above this. Better to return zero images than to leak a phone
+    // photo onto a B2B catalog.
+    private readonly MIN_CONFIDENCE = 0.85;
     private readonly MODEL = 'google/gemini-2.0-flash-exp:free';
     private readonly TIMEOUT_MS = 12000;
 
@@ -85,23 +86,31 @@ export class EanValidatorService {
             {
                 type: 'text',
                 text:
-                    `You are a STRICT product image verifier for a B2B wholesale catalog. Buyers expect every image to look like a clean catalog photo — the kind you'd see on Amazon's product page.\n\n${productContext}\n\n` +
-                    `Below are ${urls.length} candidate image URL(s). For each image, score from 0.0 (reject) to 1.0 (perfect catalog shot) based on ALL of these requirements:\n\n` +
-                    `REJECT (confidence < 0.5) if ANY of these are true:\n` +
-                    `  • Background is NOT white or near-white (grass, table textures, kitchen counters, photographer's backdrop with shadows, gradient backgrounds → all REJECT)\n` +
-                    `  • Image is primarily text/labels (ingredient lists, nutrition tables, barcode close-ups, regulatory text)\n` +
-                    `  • Image shows hands, people, or in-context lifestyle scenes (factory, store shelf, etc.)\n` +
-                    `  • Brand logo or product name not clearly readable\n` +
-                    `  • Different product variant (different size, flavor, package format than specified)\n` +
-                    `  • Heavily blurred, low-resolution, or off-center\n\n` +
-                    `ACCEPT (confidence ≥ 0.7) only if:\n` +
-                    `  • Clean white or very light grey background\n` +
-                    `  • Full product packaging visible and centered\n` +
-                    `  • Brand logo + product name match the title above\n` +
-                    `  • Looks like a professional catalog/e-commerce photo\n\n` +
-                    `Respond with a JSON array, one object per image in the same order, each shaped like:\n` +
-                    `  { "confidence": <0.0–1.0>, "reason": "<short justification mentioning background + content>" }\n\n` +
-                    `Output ONLY the JSON array, no markdown fences, no preamble.`,
+                    `You score images for a B2B WHOLESALE CATALOG. Only studio-quality catalog photos may pass. Phone snapshots are forbidden.\n\n${productContext}\n\n` +
+                    `Score each of the ${urls.length} image(s) from 0.0 to 1.0.\n\n` +
+                    `=== AUTOMATIC HARD-REJECT (score MUST be 0.0–0.3) ===\n` +
+                    `• Any visible ground, grass, asphalt, sand, dirt, wood floor, tile floor, carpet, fabric, or ANY textured surface under or around the product → 0.2\n` +
+                    `• Any visible table, desk, kitchen counter, sink, shelf, or surface with shadows → 0.2\n` +
+                    `• Outdoor setting (visible sky, trees, walls, sidewalks) → 0.1\n` +
+                    `• Background that is NOT a uniform white/light-grey studio backdrop → automatic 0.2 max\n` +
+                    `• Image is primarily a label, barcode close-up, ingredient list, or nutrition table → 0.0\n` +
+                    `• Person/hand visible, or product placed in a real-world scene → 0.1\n` +
+                    `• Wrong product (different brand, different size, different flavor) → 0.0\n` +
+                    `• Visible JPEG artifacts, blur, motion blur, low resolution → 0.3\n\n` +
+                    `=== ACCEPT (score 0.85–1.0) — ALL must be true ===\n` +
+                    `• Background is clean WHITE or very light grey (#FFFFFF–#F5F5F5), uniform, no shadows or textures\n` +
+                    `• Product is centered, sharp, well-lit, fully in frame\n` +
+                    `• Looks like an Amazon / Tesco / official manufacturer catalog photo\n` +
+                    `• Brand and product name clearly legible and match the requested product\n\n` +
+                    `=== EXAMPLES ===\n` +
+                    `• Kit Kat bar lying on grass → 0.2 (textured outdoor surface)\n` +
+                    `• Kit Kat case-pack on a clean white studio background → 0.95 (perfect catalog shot)\n` +
+                    `• Close-up of nutrition facts text → 0.0 (label, not a product photo)\n` +
+                    `• Bottle on a kitchen counter under warm lighting → 0.25 (real-world surface, shadows)\n` +
+                    `• Bottle on pure white background, centered, even lighting → 0.9 (catalog quality)\n\n` +
+                    `Respond with a JSON array, one object per image in input order:\n` +
+                    `  { "confidence": <0.0–1.0>, "reason": "<mention background + product condition in 10–20 words>" }\n\n` +
+                    `Output ONLY the JSON array. No markdown fences, no preamble, no trailing text.`,
             },
             ...urls.map(url => ({ type: 'image_url', image_url: { url } })),
         ];
