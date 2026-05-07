@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 
@@ -20,16 +20,39 @@ export class AppConfigService {
         const platformFee = feeConfig ? parseFloat(feeConfig.value) : (Number(process.env.PLATFORM_FEE_PERCENT) || 5);
         const shippingMarkup = shipConfig ? parseFloat(shipConfig.value) : 1.10; // Default 10% on shipping
 
+        // Sanity-clamp markup multipliers to >= 1.0. The DB occasionally
+        // ends up with bogus values (an exchange rate "0.019" written into
+        // MARKUP_PERCENTAGE_PIECE, or a percentage "5" instead of "1.05").
+        // Values below 1.0 would shrink prices, which is never what we want.
+        const safe = (v: number, fallback: number) =>
+            !isFinite(v) || isNaN(v) || v < 1.0 ? fallback : v;
+
         return {
-            piece: isNaN(piece) ? 1.10 : piece,
-            pallet: isNaN(pallet) ? 1.05 : pallet,
-            container: isNaN(container) ? 1.02 : container,
+            piece: safe(piece, 1.10),
+            pallet: safe(pallet, 1.05),
+            container: safe(container, 1.02),
             platformFee: isNaN(platformFee) ? 5 : platformFee,
-            shippingMarkup: isNaN(shippingMarkup) ? 1.10 : shippingMarkup,
+            shippingMarkup: safe(shippingMarkup, 1.10),
         };
     }
 
     async setMarkupPercentage(data: { piece: number; pallet: number; container: number; platformFee?: number; shippingMarkup?: number }): Promise<any> {
+        // Reject obviously-broken markup values at write time so the DB
+        // can't re-acquire the "0.019 markup" corruption that broke the
+        // catalog earlier. A markup multiplier MUST be >= 1.0.
+        const guard = (label: string, v: number) => {
+            if (!isFinite(v) || isNaN(v) || v < 1.0) {
+                throw new BadRequestException(
+                    `Invalid ${label} markup: ${v}. Markup must be a multiplier >= 1.0 ` +
+                    `(e.g. 1.05 = +5%). If you meant a percentage, divide by 100 and add 1 first.`
+                );
+            }
+        };
+        guard('piece', data.piece);
+        guard('pallet', data.pallet);
+        guard('container', data.container);
+        if (data.shippingMarkup !== undefined) guard('shipping', data.shippingMarkup);
+
         await this.prisma.appConfig.upsert({
             where: { key: 'MARKUP_PERCENTAGE_PIECE' },
             create: { key: 'MARKUP_PERCENTAGE_PIECE', value: data.piece.toString() },

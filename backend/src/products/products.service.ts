@@ -115,7 +115,26 @@ export class ProductsService {
         else if (unit.includes('container') || unit.includes('truck')) defaultMarkup = 1.02;
 
         const markupPercentage = config && config.value ? parseFloat(config.value) : defaultMarkup;
-        const finalMarkup = isNaN(markupPercentage) ? defaultMarkup : markupPercentage;
+        let finalMarkup = isNaN(markupPercentage) ? defaultMarkup : markupPercentage;
+
+        // Sanity-check the markup multiplier. A markup MUST be >= 1.0
+        // (1.0 = no markup, 1.05 = +5%, 1.50 = +50%). If we read a value
+        // below 1.0 from AppConfig, it's almost certainly a misconfiguration
+        // — common examples: someone wrote "0.019" (the EUR/EGP exchange
+        // rate) into MARKUP_PERCENTAGE_PIECE, or wrote "5" intending "5%".
+        // Without this guard a 16€ supplier price gets stored as 0.30€
+        // instead of 16.50€. Fall back to the unit-aware default so the
+        // catalog stays sane, and log loudly so the admin can fix the config.
+        if (!isFinite(finalMarkup) || finalMarkup < 1.0) {
+            this.logger.warn(
+                `Suspect markup value ${finalMarkup} read from AppConfig key ` +
+                `"${configKey}" — must be >= 1.0. Falling back to default ` +
+                `${defaultMarkup}. Check the OWNER → markup settings; the ` +
+                `field expects a multiplier like 1.05 (= +5%), not a ` +
+                `percentage or an exchange rate.`
+            );
+            finalMarkup = defaultMarkup;
+        }
 
         // Fetch EAN images if ean is provided and no images are uploaded.
         // Pass product name so the Google/Bing fallback can use it as a smarter query.
@@ -527,6 +546,77 @@ export class ProductsService {
         };
     }
 
+    /**
+     * Recompute every product's customer-facing `price` from its `basePrice`
+     * using the CURRENT (sanity-checked) markup config. Use this to recover
+     * a catalog where products were saved with a corrupt markup multiplier
+     * (e.g. 0.019 — the bug from the May 2026 incident). After this runs,
+     * every product's price === basePrice × correct-tier-markup.
+     *
+     * Returns counts; pass dryRun:true to preview.
+     */
+    async recomputePricesFromMarkup(opts: { dryRun?: boolean; supplierId?: string } = {}) {
+        const { dryRun = false, supplierId } = opts;
+
+        // Pull current markups (already sanity-clamped >= 1.0 by the
+        // AppConfig service guard).
+        const piece = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PIECE' } });
+        const pallet = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PALLET' } });
+        const container = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_CONTAINER' } });
+        const safe = (raw: string | undefined, fallback: number) => {
+            const v = raw ? parseFloat(raw) : NaN;
+            return !isFinite(v) || isNaN(v) || v < 1.0 ? fallback : v;
+        };
+        const markups = {
+            piece: safe(piece?.value, 1.10),
+            pallet: safe(pallet?.value, 1.05),
+            container: safe(container?.value, 1.02),
+        };
+
+        const where: any = { basePrice: { not: null, gt: 0 } };
+        if (supplierId) where.supplierId = supplierId;
+
+        const products = await this.prisma.product.findMany({
+            where,
+            select: { id: true, name: true, basePrice: true, price: true, unit: true },
+        });
+
+        const pickMarkup = (unit: string | null) => {
+            const u = (unit || 'piece').toLowerCase();
+            if (u.includes('pallet')) return markups.pallet;
+            if (u.includes('container') || u.includes('truck')) return markups.container;
+            return markups.piece;
+        };
+
+        if (dryRun) {
+            return {
+                dryRun: true,
+                count: products.length,
+                markups,
+                sample: products.slice(0, 5).map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    unit: p.unit,
+                    basePrice: p.basePrice,
+                    currentPrice: p.price,
+                    newPrice: (p.basePrice ?? 0) * pickMarkup(p.unit),
+                    markupApplied: pickMarkup(p.unit),
+                })),
+            };
+        }
+
+        let updated = 0;
+        for (const p of products) {
+            const newPrice = (p.basePrice ?? 0) * pickMarkup(p.unit);
+            await this.prisma.product.update({
+                where: { id: p.id },
+                data: { price: newPrice },
+            });
+            updated++;
+        }
+        return { dryRun: false, count: updated, markups };
+    }
+
     async bulkApprove(ids: string[]) {
         const products = await this.prisma.product.findMany({
             where: { id: { in: ids } },
@@ -628,12 +718,25 @@ export class ProductsService {
             if (unitLower.includes('pallet')) defaultMarkup = 1.05;
             else if (unitLower.includes('container') || unitLower.includes('truck')) defaultMarkup = 1.02;
 
-            const markup = config?.value ? parseFloat(config.value) : defaultMarkup;
+            const markupRaw = config?.value ? parseFloat(config.value) : defaultMarkup;
+            // Same guard as create(): a markup multiplier MUST be >= 1.0.
+            // Anything below 1.0 is a misconfigured AppConfig (exchange rate
+            // or percentage typed in by mistake) and would shrink prices
+            // instead of growing them.
+            let markup = !isFinite(markupRaw) || isNaN(markupRaw) || markupRaw < 1.0
+                ? defaultMarkup
+                : markupRaw;
+            if (markup !== markupRaw && isFinite(markupRaw)) {
+                this.logger.warn(
+                    `Update path: suspect markup ${markupRaw} for "${configKey}" — ` +
+                    `using default ${defaultMarkup} so price stays sane.`
+                );
+            }
             const existing = await this.findOne(id);
             const priceToUse = data.price !== undefined ? data.price : existing.basePrice;
 
             if (data.price !== undefined) updateData.basePrice = data.price;
-            const newPrice = priceToUse * (isNaN(markup) ? defaultMarkup : markup);
+            const newPrice = priceToUse * markup;
 
             // Track price change for the ticker — only when the customer-facing
             // price actually moved by more than 1% (avoid noise from markup

@@ -432,6 +432,23 @@ export class ProductsController {
         return this.productsService.fixProductCurrency(multiplier, body.supplierId, !!body.dryRun);
     }
 
+    /**
+     * Recompute customer-facing price for every product (or per-supplier)
+     * using the CURRENT markup config. Use after fixing a corrupt markup
+     * value to repair the catalog without re-uploading.
+     *
+     * Body: { dryRun?: boolean; supplierId?: string }
+     */
+    @Post('admin/recompute-prices')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN)
+    async recomputePrices(@Body() body: { dryRun?: boolean; supplierId?: string }) {
+        return this.productsService.recomputePricesFromMarkup({
+            dryRun: !!body?.dryRun,
+            supplierId: body?.supplierId,
+        });
+    }
+
     @Post(':id/rate')
     @UseGuards(JwtAuthGuard)
     async rateProduct(@Param('id') id: string, @Body() body: { rating: number }) {
