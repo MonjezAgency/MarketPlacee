@@ -62,8 +62,12 @@ let lastCacheTime = 0;
  * Priority: localStorage override → timezone heuristic → EGP fallback.
  */
 export function getActiveCurrency(): string {
-    if (typeof window === 'undefined') return 'EGP';
-    
+    // Default to EUR — this is a Romania-based, EU-focused B2B marketplace.
+    // The previous EGP default caused bulk uploads to send "EGP" to the
+    // backend, which then multiplied prices by the EGP→EUR rate (0.018),
+    // shrinking €16 supplier prices to €0.288 in the database.
+    if (typeof window === 'undefined') return 'EUR';
+
     // Cache for 100ms to avoid slamming localStorage in tight loops (like product lists)
     const now = Date.now();
     if (cachedCurrency && (now - lastCacheTime < 100)) {
@@ -77,10 +81,12 @@ export function getActiveCurrency(): string {
         return saved;
     }
 
-    // Timezone-based default
+    // Timezone-based default. Africa/Cairo keeps EGP because the original
+    // operator team is in Cairo, but every other unknown timezone now
+    // resolves to EUR (the platform base) rather than EGP.
     try {
         const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-        let detected = 'EGP';
+        let detected = 'EUR';
         if (tz.startsWith('Africa/Cairo'))   detected = 'EGP';
         else if (tz.startsWith('Asia/Dubai'))     detected = 'AED';
         else if (tz.startsWith('Asia/Riyadh'))    detected = 'SAR';
@@ -90,15 +96,15 @@ export function getActiveCurrency(): string {
         else if (tz.startsWith('Europe/'))        detected = 'EUR';
         else if (tz.startsWith('Asia/Kolkata'))   detected = 'INR';
         else if (tz.startsWith('Europe/Istanbul')) detected = 'TRY';
-        
+
         cachedCurrency = detected;
         lastCacheTime = now;
         return detected;
     } catch (_e) { /* ignore */ }
 
-    cachedCurrency = 'EGP';
+    cachedCurrency = 'EUR';
     lastCacheTime = now;
-    return 'EGP';
+    return 'EUR';
 }
 
 /**

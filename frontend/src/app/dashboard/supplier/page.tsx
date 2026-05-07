@@ -174,7 +174,11 @@ export default function SupplierDashboard() {
             for (const file of files) {
                 const formData = new FormData();
                 formData.append('file', file);
-                const currentCurrency = (typeof window !== 'undefined' ? localStorage.getItem('platform-currency') : null) || 'USD'; // Default fallback, backend EGP_RATES handles it
+                // Default to EUR (platform base currency for the EU market).
+                // The previous 'USD' default caused bulk uploads to be tagged
+                // as USD, which the backend then converted via TO_EUR['USD']
+                // (0.926) — shrinking supplier prices on every upload.
+                const currentCurrency = (typeof window !== 'undefined' ? localStorage.getItem('platform-currency') : null) || 'EUR';
                 formData.append('currency', currentCurrency);
                 
                 const res = await apiFetch(`/products/bulk-upload`, {

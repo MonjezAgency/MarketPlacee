@@ -13,7 +13,7 @@ export interface EanProductResult {
     title: string;
     images: string[];
     matched: boolean;                       // true = API + AI verification passed
-    source: 'openfoodfacts' | 'none';       // which API the data came from
+    source: 'openfoodfacts' | 'openbeautyfacts' | 'openproductsfacts' | 'bing' | 'none';       // which API the data came from
     reason?: string;                        // populated when matched === false
     cached?: boolean;                       // true when result came out of cache
     confidence_score?: number;              // 0.0 – 1.0, max AI score across accepted images
@@ -237,15 +237,119 @@ export class EanService {
             this.cache.set(cleanEan, title, count, result);
             return result;
         } catch (err: any) {
-            this.logger.warn(`Open Food Facts lookup failed for EAN ${cleanEan}: ${err.message}`);
-            // Don't cache transient API failures so we retry on next request.
+            // Open Food Facts is FOOD-only and returns 404 for hygiene /
+            // beauty / household products (TENA, soap, shampoo, etc).
+            // Before giving up, try the sibling Open* databases that share
+            // the exact same response schema (so orderOpenFoodFactsImages
+            // works on them unchanged), then fall back to Bing image search.
+            this.logger.warn(`OFF lookup failed for ${cleanEan}: ${err.message} — trying alternatives`);
+
+            // ── Helper: validate + return a cached success from a sibling-DB
+            //    response when it has at least one usable image.
+            const tryCandidates = async (
+                candidates: string[],
+                source: 'openbeautyfacts' | 'openproductsfacts',
+            ): Promise<EanProductResult | null> => {
+                if (candidates.length === 0) return null;
+                const validation = opts.skipAiValidation
+                    ? { accepted: candidates.map(url => ({ url, confidence: 0.7 })), rejected: [], aggregateConfidence: 0.7 }
+                    : await this.validator.validateImages(candidates, {
+                        ean: cleanEan,
+                        title,
+                        brand: opts.brand,
+                    });
+                if (validation.accepted.length === 0) return null;
+                const images = validation.accepted
+                    .sort((a, b) => b.confidence - a.confidence)
+                    .slice(0, count)
+                    .map(r => r.url);
+                const result: EanProductResult = {
+                    ean: cleanEan,
+                    title: title || '',
+                    images,
+                    matched: true,
+                    source,
+                    cached: false,
+                    confidence_score: validation.aggregateConfidence,
+                };
+                this.cache.set(cleanEan, title, count, result);
+                return result;
+            };
+
+            // 1) Open Beauty Facts — covers hygiene, cosmetics, shampoo, etc.
+            try {
+                const beautyResp = await axios.get(
+                    `https://world.openbeautyfacts.org/api/v2/product/${encodeURIComponent(cleanEan)}.json`,
+                    {
+                        timeout: 5000,
+                        headers: { 'User-Agent': 'AtlantisMarketplace/1.0 (atlantisfmcg.com)' },
+                    },
+                );
+                if (beautyResp.data?.status === 1 && beautyResp.data?.product) {
+                    const candidates = this.orderOpenFoodFactsImages(beautyResp.data.product, count);
+                    const ok = await tryCandidates(candidates, 'openbeautyfacts');
+                    if (ok) return ok;
+                }
+            } catch (_e) { /* fall through */ }
+
+            // 2) Open Products Facts — covers general consumer goods.
+            try {
+                const prodResp = await axios.get(
+                    `https://world.openproductsfacts.org/api/v2/product/${encodeURIComponent(cleanEan)}.json`,
+                    {
+                        timeout: 5000,
+                        headers: { 'User-Agent': 'AtlantisMarketplace/1.0 (atlantisfmcg.com)' },
+                    },
+                );
+                if (prodResp.data?.status === 1 && prodResp.data?.product) {
+                    const candidates = this.orderOpenFoodFactsImages(prodResp.data.product, count);
+                    const ok = await tryCandidates(candidates, 'openproductsfacts');
+                    if (ok) return ok;
+                }
+            } catch (_e) { /* fall through */ }
+
+            // 3) Bing image search — always-available last resort. Same
+            //    pattern as the OFF "all candidates rejected" branch.
+            const bingCandidates = await this.fetchBingCatalogImages(cleanEan, title, count * 2);
+            if (bingCandidates.length > 0) {
+                const bingValidation = opts.skipAiValidation
+                    ? { accepted: bingCandidates.map(url => ({ url, confidence: 0.7 })), rejected: [], aggregateConfidence: 0.7 }
+                    : await this.validator.validateImages(bingCandidates, {
+                        ean: cleanEan,
+                        title,
+                        brand: opts.brand,
+                    });
+                if (bingValidation.accepted.length > 0) {
+                    const bingImages = bingValidation.accepted
+                        .sort((a, b) => b.confidence - a.confidence)
+                        .slice(0, count)
+                        .map(r => r.url);
+                    const result: EanProductResult = {
+                        ean: cleanEan,
+                        title: title || '',
+                        images: bingImages,
+                        matched: true,
+                        source: 'bing',
+                        cached: false,
+                        confidence_score: bingValidation.aggregateConfidence,
+                    };
+                    this.cache.set(cleanEan, title, count, result);
+                    return result;
+                }
+            }
+
+            // 4) Everything failed. Don't cache transient API failures so we
+            //    retry on next request.
             return {
                 ean: cleanEan,
                 title: title || '',
                 images: [],
                 matched: false,
                 source: 'none',
-                reason: `API failure: ${err.message}`,
+                reason:
+                    `Not found in Open Food Facts, Open Beauty Facts, or Open Products Facts. ` +
+                    `Bing returned ${bingCandidates.length} candidate${bingCandidates.length === 1 ? '' : 's'} ` +
+                    `but none passed AI validation. Original error: ${err.message}`,
                 cached: false,
                 confidence_score: 0,
             };
