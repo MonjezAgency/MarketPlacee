@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AddProductDrawer from '@/components/product/AddProductDrawer';
+import ImageLightbox from '@/components/ImageLightbox';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -295,6 +296,9 @@ export default function ProductsModerationPage() {
             toast.error('Error during rejection', { id: tid });
         }
     };
+
+    // Image lightbox (zoom on click) — index null = closed.
+    const [lightboxIndex, setLightboxIndex] = React.useState<number | null>(null);
 
     // EAN-based image search (single product)
     const [eanSearchResult, setEanSearchResult] = React.useState<{
@@ -801,7 +805,16 @@ export default function ProductsModerationPage() {
                                                 {/* Product Overview card */}
                                                 <div className="border border-slate-200 rounded-2xl p-5">
                                                     <h4 className="text-[14px] font-bold text-slate-900 mb-4">Product Overview</h4>
-                                                    <div className="aspect-[5/3] w-full rounded-2xl bg-slate-50 border border-slate-200 border-dashed overflow-hidden relative flex items-center justify-center">
+                                                    <div
+                                                        onClick={() => {
+                                                            if (isEditing) return;
+                                                            const list = selectedProduct.images || [];
+                                                            if (list.length > 0) setLightboxIndex(0);
+                                                        }}
+                                                        className={`aspect-[5/3] w-full rounded-2xl bg-slate-50 border border-slate-200 border-dashed overflow-hidden relative flex items-center justify-center ${
+                                                            !isEditing && (selectedProduct.images?.length ?? 0) > 0 ? 'cursor-zoom-in' : ''
+                                                        }`}
+                                                    >
                                                         {(isEditing ? editData.images?.[0] : selectedProduct.images?.[0]) ? (
                                                             <img src={isEditing ? editData.images?.[0] : selectedProduct.images?.[0]} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="w-full h-full object-cover" />
                                                         ) : (
@@ -824,7 +837,10 @@ export default function ProductsModerationPage() {
                                                         <div className="flex gap-2 overflow-x-auto pt-3 scrollbar-hide">
                                                             {(isEditing ? editData.images : selectedProduct.images).map((img: string, i: number) => (
                                                                 <div key={i} className="relative group shrink-0">
-                                                                    <div className="relative w-14 h-14 rounded-xl border border-slate-100 bg-slate-100 overflow-hidden flex items-center justify-center">
+                                                                    <div
+                                                                        onClick={() => { if (!isEditing) setLightboxIndex(i); }}
+                                                                        className={`relative w-14 h-14 rounded-xl border border-slate-100 bg-slate-100 overflow-hidden flex items-center justify-center ${!isEditing ? 'cursor-zoom-in hover:border-slate-300' : ''}`}
+                                                                    >
                                                                         <Package size={16} className="text-slate-300" />
                                                                         <img src={img} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="absolute inset-0 w-full h-full object-cover" />
                                                                     </div>
@@ -1672,6 +1688,14 @@ export default function ProductsModerationPage() {
                 onClose={() => setIsAddDrawerOpen(false)}
                 onCreated={fetchData}
                 role="admin"
+            />
+
+            {/* Image lightbox — opened by clicking the product image / thumbs */}
+            <ImageLightbox
+                images={selectedProduct?.images || []}
+                startIndex={lightboxIndex}
+                onClose={() => setLightboxIndex(null)}
+                alt={selectedProduct?.name}
             />
 
             {/* Fix Currency Modal — repair wrongly-stored prices */}

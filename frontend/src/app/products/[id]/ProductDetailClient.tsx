@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { useWishlist } from '@/hooks/useWishlist';
 import { getDisplayCategory } from '@/lib/product-utils';
+import ImageLightbox from '@/components/ImageLightbox';
 
 
 export default function ProductDetailClient() {
@@ -43,6 +44,7 @@ export default function ProductDetailClient() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [selectedImage, setSelectedImage] = useState<string>('');
+    const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
     const [selectedUnit, setSelectedUnit] = useState<'truck' | 'pallet' | 'carton' | undefined>(undefined);
     const [adminDefaultUnit, setAdminDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
@@ -277,7 +279,14 @@ export default function ProductDetailClient() {
                     
                     {/* LEFT: Product Media */}
                     <div className="lg:col-span-4">
-                        <div className="w-full aspect-square bg-white border border-[#E5E7EB] rounded-[24px] flex items-center justify-center p-8 relative group overflow-hidden shadow-sm">
+                        <div
+                            onClick={() => {
+                                const i = allImages.findIndex(u => u === selectedImage);
+                                setLightboxIndex(i >= 0 ? i : 0);
+                            }}
+                            className="w-full aspect-square bg-white border border-[#E5E7EB] rounded-[24px] flex items-center justify-center p-8 relative group overflow-hidden shadow-sm cursor-zoom-in"
+                            title="Click to zoom"
+                        >
                             <AnimatePresence mode="wait">
                                 <motion.img
                                     key={selectedImage}
@@ -286,14 +295,14 @@ export default function ProductDetailClient() {
                                     exit={{ opacity: 0, scale: 1.05 }}
                                     src={selectedImage}
                                     alt={product.name}
-                                    className="w-full h-full object-contain drop-shadow-2xl select-none"
+                                    className="w-full h-full object-contain drop-shadow-2xl select-none transition-transform duration-300 group-hover:scale-105"
                                 />
                             </AnimatePresence>
                             
                             <button
-                                onClick={() => toggleWishlist(product.id)}
+                                onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
                                 className={cn(
-                                    "absolute top-6 right-6 w-12 h-12 rounded-full border flex items-center justify-center transition-all z-10 shadow-sm",
+                                    "absolute top-6 right-6 w-12 h-12 rounded-full border flex items-center justify-center transition-all z-10 shadow-sm cursor-pointer",
                                     isSaved(product.id) ? "bg-red-50 border-red-100 text-red-500" : "bg-white border-slate-100 text-slate-300 hover:text-red-500"
                                 )}
                             >
@@ -779,6 +788,14 @@ export default function ProductDetailClient() {
                     </div>
                 )}
             </main>
+
+            {/* Image lightbox — click any product image to open */}
+            <ImageLightbox
+                images={allImages}
+                startIndex={lightboxIndex}
+                onClose={() => setLightboxIndex(null)}
+                alt={product.name}
+            />
         </div>
     );
 }
