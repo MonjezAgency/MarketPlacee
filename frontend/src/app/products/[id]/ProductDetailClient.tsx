@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -50,6 +50,47 @@ export default function ProductDetailClient() {
     const [activeTab, setActiveTab] = useState('Description');
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
+
+    // ── Tier pricing memo ─────────────────────────────────────────────────────
+    // Computes the customer-visible price for the currently selected unit tier
+    // (truck / pallet / carton). Used both in handleAdd() and in the pricing UI.
+    // Duplicated from the JSX IIFE so that handleAdd() always has the right price.
+    const tierData = useMemo(() => {
+        if (!currentProduct) return { tierPrice: 0, activeLabel: 'Unit', activeKey: 'carton' as const };
+        const p = currentProduct;
+        const piecesPerCase   = p.unitsPerCase || 0;
+        const casesPerPallet  = p.casesPerPallet || 0;
+        const piecesPerPallet = p.unitsPerPallet || (piecesPerCase * casesPerPallet) || 0;
+        const palletsPerTruck = p.palletsPerShipment || 0;
+        const baseUnit        = String(p.unit || 'piece').toLowerCase();
+
+        const rawBase = p.basePrice != null ? p.basePrice : p.price / markups.piece;
+        let basePerPiece = rawBase;
+        if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
+            basePerPiece = rawBase / piecesPerCase;
+        else if (baseUnit.includes('pallet') && piecesPerPallet > 0)
+            basePerPiece = rawBase / piecesPerPallet;
+        else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment') || baseUnit.includes('delivery')) && piecesPerPallet > 0 && palletsPerTruck > 0)
+            basePerPiece = rawBase / (piecesPerPallet * palletsPerTruck);
+
+        const cartonPrice = piecesPerCase > 0   ? basePerPiece * piecesPerCase * markups.piece          : null;
+        const palletPrice = piecesPerPallet > 0  ? basePerPiece * piecesPerPallet * markups.pallet       : null;
+        const truckPrice  = (piecesPerPallet > 0 && palletsPerTruck > 0)
+            ? basePerPiece * piecesPerPallet * palletsPerTruck * markups.container : null;
+        const perPiece    = basePerPiece * markups.piece;
+
+        const options: Array<{ key: 'truck' | 'pallet' | 'carton'; label: string; price: number | null }> = [];
+        if (truckPrice  !== null) options.push({ key: 'truck',  label: 'Truck',         price: truckPrice  });
+        if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet',        price: palletPrice });
+        if (cartonPrice !== null) options.push({ key: 'carton', label: 'Carton',        price: cartonPrice });
+        if (options.length === 0) options.push({ key: 'carton', label: p.unit || 'Unit', price: p.price    });
+
+        const initialSelected = options.find(o => o.key === adminDefaultUnit)?.key ?? options[0].key;
+        const active          = options.find(o => o.key === (selectedUnit ?? initialSelected)) || options[0];
+        const tierPrice       = active.price != null ? active.price : perPiece;
+
+        return { tierPrice, activeLabel: active.label, activeKey: active.key };
+    }, [currentProduct, markups, selectedUnit, adminDefaultUnit]);
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollContainerRef.current) {
@@ -190,9 +231,11 @@ export default function ProductDetailClient() {
             id: product.id,
             name: product.name,
             brand: product.brand || 'Atlantis Premium',
-            price: product.price,
+            // Use the tier-selected price (truck / pallet / carton) instead of
+            // the raw product.price, which was always the per-piece DB price.
+            price: tierData.tierPrice,
             image: product.image || '',
-            unit: product.unit || 'pcs',
+            unit: tierData.activeLabel,
             category: product.category || 'Uncategorized',
         }, quantity);
         setIsAdded(true);

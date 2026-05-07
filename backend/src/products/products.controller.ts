@@ -231,12 +231,24 @@ export class ProductsController {
             ]);
 
             const createdProducts: any[] = [];
-            const EGP_RATES: Record<string, number> = {
-                EGP: 1, USD: 1 / 48.5, EUR: 1 / 52.8, GBP: 1 / 61.4,
-                AED: 1 / 13.2, SAR: 1 / 12.9, KWD: 1 / 158.0, QAR: 1 / 13.3,
-                TRY: 1 / 1.49, INR: 1 / 0.583,
+            // Convert supplier prices to EUR — the platform's base currency
+            // (DEFAULT_CURRENCY=eur, Romanian market).
+            // Each value = how many EUR you get for 1 unit of that currency.
+            // EUR stays as-is (rate = 1). Other currencies are approximate mid-market
+            // rates; they can be updated via env or admin settings later.
+            const TO_EUR: Record<string, number> = {
+                EUR: 1,       // stays as-is
+                USD: 0.926,   // 1 USD ≈ 0.926 EUR
+                GBP: 1.162,   // 1 GBP ≈ 1.162 EUR
+                EGP: 0.018,   // 1 EGP ≈ 0.018 EUR
+                AED: 0.252,   // 1 AED ≈ 0.252 EUR
+                SAR: 0.247,   // 1 SAR ≈ 0.247 EUR
+                KWD: 3.240,   // 1 KWD ≈ 3.240 EUR
+                QAR: 0.253,   // 1 QAR ≈ 0.253 EUR
+                TRY: 0.027,   // 1 TRY ≈ 0.027 EUR
+                INR: 0.011,   // 1 INR ≈ 0.011 EUR
             };
-            const rate = EGP_RATES[currency] ?? 1;
+            const rate = TO_EUR[currency] ?? 1;
 
             // Default image-count when fetching by EAN. Configurable via
             // BULK_UPLOAD_EAN_IMAGE_COUNT in admin settings (defaults to 3).
@@ -252,7 +264,7 @@ export class ProductsController {
                 await Promise.all(batch.map(async (result) => {
                     const dto = result.data as CreateProductDto;
                     const supplierId = isAdmin ? (dto.supplierId || req.user.sub) : req.user.sub;
-                    const priceInBase = dto.price ? (dto.price / rate) : 0;
+                    const priceInBase = dto.price ? (dto.price * rate) : 0;
 
                     // ── EAN-based image fetch ────────────────────────────
                     // If no images provided in the row AND we have an EAN,
@@ -380,30 +392,42 @@ export class ProductsController {
 
     /**
      * Admin tool: re-convert existing products from a wrongly-assumed
-     * source currency to the EGP base. Use when products were bulk-uploaded
-     * without selecting the correct currency (so values were stored as EGP
-     * but were really EUR/USD/etc.). Multiplies basePrice and price by the
-     * EGP-per-source-unit rate.
+     * source currency to the platform base. Two modes:
      *
-     * Body: { fromCurrency: 'EUR', supplierId?: string, dryRun?: boolean }
+     *   direction = 'multiply' (default — legacy)
+     *     Multiplies basePrice and price by the EGP-per-source-unit rate.
+     *     Use when prices were uploaded as EUR/USD but never converted at all.
+     *
+     *   direction = 'divide' (new — bulk-upload bug recovery)
+     *     Divides basePrice and price by the rate. Use to UNDO the pre-fix-2
+     *     bulk-upload bug where EUR prices were multiplied by 52.8 because
+     *     the controller did `price / (1/52.8)` instead of `price * 1`.
+     *     A €0.87 product stored as €45.94 → divide by 52.8 → back to €0.87.
+     *
+     * Body: { fromCurrency: 'EUR', supplierId?: string, dryRun?: boolean, direction?: 'multiply' | 'divide' }
      */
     @Post('admin/fix-currency')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.ADMIN)
-    async fixCurrency(@Body() body: { fromCurrency: string; supplierId?: string; dryRun?: boolean }) {
+    async fixCurrency(@Body() body: { fromCurrency: string; supplierId?: string; dryRun?: boolean; direction?: 'multiply' | 'divide' }) {
         const fromCurrency = (body?.fromCurrency || '').toUpperCase();
         const RATES: Record<string, number> = {
             EGP: 1, USD: 48.5, EUR: 52.8, GBP: 61.4,
             AED: 13.2, SAR: 12.9, KWD: 158.0, QAR: 13.3,
             TRY: 1.49, INR: 0.583,
         };
-        const multiplier = RATES[fromCurrency];
-        if (!multiplier) {
+        const rate = RATES[fromCurrency];
+        if (!rate) {
             return { error: `Unsupported source currency: ${fromCurrency}` };
         }
-        if (multiplier === 1) {
-            return { error: 'Source currency is already EGP — nothing to convert' };
+        if (rate === 1) {
+            return { error: 'Source currency is already at base rate — nothing to convert' };
         }
+
+        const direction = body.direction === 'divide' ? 'divide' : 'multiply';
+        // multiply: stored value × rate (legacy use case)
+        // divide:   stored value ÷ rate (bulk-upload bug recovery)
+        const multiplier = direction === 'divide' ? 1 / rate : rate;
 
         return this.productsService.fixProductCurrency(multiplier, body.supplierId, !!body.dryRun);
     }

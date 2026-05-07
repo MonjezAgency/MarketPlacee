@@ -689,6 +689,7 @@ Other rules:
   NOT price and NOT a conversion factor.
 - "unitsPerPallet" should be left null if the column is "available physical in pallets".
 - "shelfLife" is for batch number / expiry date columns.
+- "moq" is the minimum order quantity column. Its header may be labeled "MOQ", "MQQ", "Min Order", "Minimum Order Quantity", "Minimum Quantity", or similar.
 - "name" is the human-readable product name (text WITH letters — e.g. "KitKat Mini 200g").
   ⚠️ Must NEVER pick a column whose header is "Item NUMBER" or "Item NO" — that's the EAN/SKU.
   The name column header is "Item NAME" / "Product NAME" / "Description" / "اسم المنتج".

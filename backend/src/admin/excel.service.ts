@@ -209,6 +209,15 @@ export class ExcelService {
             'shipmentpallets': 'palletsPerShipment',
             'عددالبالتاتفيالشحنة': 'palletsPerShipment', 'البالتاتفيالشحنة': 'palletsPerShipment',
             'بالتاتالشحنة': 'palletsPerShipment',
+            // ── moq / minOrder ────────────────────────────────────────────────
+            // DTO field name is "moq". All common aliases point to it.
+            'moq': 'moq', 'mqq': 'moq', 'minorder': 'moq',
+            'minimumorder': 'moq', 'minimumorderquantity': 'moq',
+            'minqty': 'moq', 'minimumquantity': 'moq',
+            'mimimumquantity': 'moq',  // common typo
+            'orderlimit': 'moq',
+            'الحدالأدنى': 'moq', 'حدالطلب': 'moq', 'الحدالادنى': 'moq',
+            'أقلكمية': 'moq', 'اقلكمية': 'moq',
             // ── brand ─────────────────────────────────────────────────────────
             'brand': 'brand', 'make': 'brand', 'manufacturer': 'brand',
             'براند': 'brand', 'الماركة': 'brand', 'الشركةالمصنعة': 'brand',
@@ -568,6 +577,12 @@ export class ExcelService {
 
         if (row.palletsPerShipment !== undefined && row.palletsPerShipment !== null) {
             row.palletsPerShipment = parseQtyField(row.palletsPerShipment);
+        }
+
+        // MOQ / minOrder — minimum order quantity (integer ≥ 1)
+        if (row.moq !== undefined && row.moq !== null) {
+            const v = parseQtyField(row.moq);
+            row.moq = v >= 1 ? v : undefined; // ignore 0 / invalid
         }
 
         // ── Image URL parsing ──────────────────────────────────────────────

@@ -656,7 +656,7 @@ export default function SupplierProductsPage() {
                                         <button 
                                             type="button"
                                             onClick={() => {
-                                                const headers = 'name,brand,description,category,price,stock,ean,unit,minOrder,unitsPerPallet,palletsPerShipment';
+                                                const headers = 'name,brand,description,category,price,stock,ean,unit,minOrder,unitsPerCase,casesPerPallet,unitsPerPallet,palletsPerShipment';
                                                 const blob = new Blob([headers], { type: 'text/csv' });
                                                 const url = window.URL.createObjectURL(blob);
                                                 const a = document.createElement('a');
