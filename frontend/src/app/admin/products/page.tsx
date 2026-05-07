@@ -1094,11 +1094,18 @@ export default function ProductsModerationPage() {
                                                 <div className="grid grid-cols-2 gap-3">
                                                     <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
                                                         <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Price per Piece</p>
+                                                        <p className="text-[9px] text-slate-400 -mt-0.5 mb-1.5">Supplier raw price (before markup)</p>
                                                         {isEditing ? (
                                                             <input
                                                                 type="number"
+                                                                step="0.01"
                                                                 className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                value={editData.basePrice ?? editData.price ?? 0}
+                                                                // Show basePrice ONLY. Don't fall back to `price` because
+                                                                // `price` is the marked-up customer-facing value (e.g. 15.48
+                                                                // when the supplier's raw is 15.00). Falling back to price
+                                                                // would silently overwrite basePrice with the marked-up
+                                                                // number on save and double-apply the markup downstream.
+                                                                value={editData.basePrice ?? 0}
                                                                 onChange={(e) => setEditData({...editData, basePrice: parseFloat(e.target.value)})}
                                                             />
                                                         ) : (

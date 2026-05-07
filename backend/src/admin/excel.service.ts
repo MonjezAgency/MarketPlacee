@@ -193,6 +193,10 @@ export class ExcelService {
             // ── casesPerPallet ────────────────────────────────────────────────
             'casesperpallet': 'casesPerPallet', 'boxesperpallet': 'casesPerPallet',
             'cartonsperpallets': 'casesPerPallet', 'caseperpallet': 'casesPerPallet',
+            // After normalize() strips the slash, "case/pallet" → "casepallet"
+            // — without this alias the column was silently dropped.
+            'casepallet': 'casesPerPallet', 'cartonpallet': 'casesPerPallet',
+            'boxpallet': 'casesPerPallet',
             'كراتينالبالتة': 'casesPerPallet', 'عددالكراتينفيالبالتة': 'casesPerPallet',
             // ── unitsPerPallet ────────────────────────────────────────────────
             // NOTE: do NOT map "Available physical in pallets" here — that
@@ -202,6 +206,11 @@ export class ExcelService {
             'unitsperpallet': 'unitsPerPallet', 'itemsperpallet': 'unitsPerPallet',
             'palletunits': 'unitsPerPallet', 'palletqty': 'unitsPerPallet',
             'piecesperpallet': 'unitsPerPallet', 'pcsperpallet': 'unitsPerPallet',
+            // normalize() strips the slash, so "pcs/pallet" → "pcspallet" and
+            // "pieces/pallet" → "piecespallet". Without these aliases those
+            // columns were silently dropped.
+            'pcspallet': 'unitsPerPallet', 'piecespallet': 'unitsPerPallet',
+            'unitpallet': 'unitsPerPallet', 'itempallet': 'unitsPerPallet',
             'عددالوحداتفيالبالتة': 'unitsPerPallet', 'وحداتالبالتة': 'unitsPerPallet',
             'البالتةفيهاكام': 'unitsPerPallet',
             // ── palletsPerShipment ────────────────────────────────────────────
@@ -535,7 +544,15 @@ export class ExcelService {
         if (row.name !== undefined && row.name !== null) row.name = String(row.name).trim();
         if (row.description !== undefined && row.description !== null) row.description = String(row.description).trim();
         if (row.category !== undefined && row.category !== null) row.category = String(row.category).trim();
-        if (row.ean !== undefined && row.ean !== null) row.ean = String(row.ean).trim();
+        if (row.ean !== undefined && row.ean !== null) {
+            // Strip every non-digit character (and keep an X for ISBN-10
+            // checksums, just in case). Excel exports often append a trailing
+            // period or comma to long numeric strings — the previous trim()
+            // only stripped whitespace, leaving "7322541412405." which sent
+            // a malformed lookup to Open Food Facts and returned 404.
+            row.ean = String(row.ean).replace(/[^0-9X]/gi, '');
+            if (!row.ean) row.ean = undefined;
+        }
         if (row.brand !== undefined && row.brand !== null) row.brand = String(row.brand).trim();
         if (row.unit !== undefined && row.unit !== null) row.unit = String(row.unit).trim().toLowerCase();
         if (row.shelfLife !== undefined && row.shelfLife !== null) row.shelfLife = String(row.shelfLife).trim();

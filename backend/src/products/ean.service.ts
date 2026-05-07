@@ -48,7 +48,11 @@ export class EanService {
         imageCount: number = 3,
         opts: { brand?: string; skipCache?: boolean; skipAiValidation?: boolean } = {},
     ): Promise<EanProductResult> {
-        const cleanEan = String(ean || '').trim();
+        // Strip any non-digit chars (keep X for ISBN-10 checksums). Belt-
+        // and-suspenders defence: Excel sometimes leaves a trailing period
+        // on long numeric strings, and other callers might forget to clean.
+        // The previous trim() only handled whitespace.
+        const cleanEan = String(ean || '').replace(/[^0-9X]/gi, '').trim();
         if (!cleanEan) {
             return {
                 ean: cleanEan,
