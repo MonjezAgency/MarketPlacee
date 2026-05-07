@@ -1,9 +1,9 @@
 /**
  * currency.ts — Multi-currency support
  *
- * All prices in the DB are stored in EGP (Egyptian Pound) — the platform's
- * base currency for this deployment.
- * This file formats EGP amounts and optionally converts to the user's chosen
+ * All prices in the DB are stored in EUR (Euro) — the platform's base currency
+ * for this Romania/EU-focused B2B marketplace deployment.
+ * This file formats EUR amounts and optionally converts to the user's chosen
  * display currency.
  *
  * Exchange rates are approximate fixed rates (updated periodically).
@@ -23,34 +23,34 @@ export const SUPPORTED_CURRENCIES = [
     { code: 'INR', symbol: '₹',  name: 'Indian Rupee',      locale: 'en-IN' },
 ];
 
-// Exchange rates: 1 EGP = X foreign currency
-// Prices in the DB are in EGP so we convert FROM EGP, not from USD.
-const EGP_RATES: Record<string, number> = {
-    EGP: 1,
-    USD: 1 / 48.5,
-    EUR: 1 / 52.8,
-    GBP: 1 / 61.4,
-    AED: 1 / 13.2,
-    SAR: 1 / 12.9,
-    KWD: 1 / 158.0,
-    QAR: 1 / 13.3,
-    TRY: 1 / 1.49,
-    INR: 1 / 0.583,
+// Exchange rates: 1 EUR = X target currency
+// Prices in the DB are stored in EUR, so we convert FROM EUR to display currency.
+const EUR_RATES: Record<string, number> = {
+    EUR: 1,        // 1 EUR = 1 EUR  (identity — no conversion)
+    USD: 1.089,    // 1 EUR ≈ 1.09 USD
+    GBP: 0.860,    // 1 EUR ≈ 0.86 GBP
+    AED: 4.0,      // 1 EUR ≈ 4.0 AED
+    SAR: 4.09,     // 1 EUR ≈ 4.09 SAR
+    EGP: 52.8,     // 1 EUR ≈ 52.8 EGP
+    KWD: 0.334,    // 1 EUR ≈ 0.334 KWD
+    QAR: 3.97,     // 1 EUR ≈ 3.97 QAR
+    TRY: 35.4,     // 1 EUR ≈ 35.4 TRY
+    INR: 90.6,     // 1 EUR ≈ 90.6 INR
 };
 
 /**
- * Convert an EGP amount to the target currency.
+ * Convert a EUR amount to the target display currency.
  */
-export function convertFromBase(amountEGP: number, toCurrency: string): number {
-    const rate = EGP_RATES[toCurrency] ?? 1;
-    return amountEGP * rate;
+export function convertFromBase(amountEUR: number, toCurrency: string): number {
+    const rate = EUR_RATES[toCurrency] ?? 1;
+    return amountEUR * rate;
 }
 
 /**
- * Convert an amount from a target currency back to the base currency (EGP).
+ * Convert an amount from a display currency back to the base currency (EUR).
  */
 export function convertToBase(amount: number, fromCurrency: string): number {
-    const rate = EGP_RATES[fromCurrency] ?? 1;
+    const rate = EUR_RATES[fromCurrency] ?? 1;
     return amount / rate;
 }
 
@@ -75,7 +75,7 @@ export function getActiveCurrency(): string {
     }
 
     const saved = localStorage.getItem('platform-currency');
-    if (saved && EGP_RATES[saved]) {
+    if (saved && EUR_RATES[saved]) {
         cachedCurrency = saved;
         lastCacheTime = now;
         return saved;
@@ -121,12 +121,12 @@ export function setActiveCurrency(code: string): void {
 }
 
 /**
- * Format an EGP amount in the currently active display currency.
- * @param amountEGP  Price in EGP (as stored in the database)
+ * Format a EUR amount in the currently active display currency.
+ * @param amountEUR  Price in EUR (as stored in the database)
  * @param currencyCode Optional explicit currency code to use (e.g. from Context)
  */
-export function formatPrice(amountEGP: number, currencyCode?: string): string {
-    const safeAmount = amountEGP ?? 0;
+export function formatPrice(amountEUR: number, currencyCode?: string): string {
+    const safeAmount = amountEUR ?? 0;
 
     const activeCode = currencyCode || getActiveCurrency();
     const converted   = convertFromBase(safeAmount, activeCode);
