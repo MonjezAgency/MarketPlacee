@@ -278,7 +278,11 @@ export class EanService {
      * caller can re-run the AI validator and pick the highest-confidence.
      */
     private async fetchBingCatalogImages(ean: string, productName?: string, max: number = 6): Promise<string[]> {
-        const queryParts = [productName, ean, 'product packaging white background'].filter(Boolean);
+        // Bias the query toward multi-pack / display-case shots — B2B buyers
+        // buy the carton, not the individual piece. "carton" + "case pack"
+        // + "wholesale" pulls retailer + manufacturer catalog photos that
+        // typically show the shipper unit on white.
+        const queryParts = [productName, ean, 'carton case pack wholesale white background'].filter(Boolean);
         const q = encodeURIComponent(queryParts.join(' '));
         const url = `https://www.bing.com/images/search?q=${q}&qft=+filterui:photo-photo+filterui:color2-bw-white&form=IRFLTR`;
 
@@ -339,9 +343,17 @@ export class EanService {
         // — these are the angles a B2B buyer needs. Ingredients/nutrition
         // labels are macro-shots of fine print and never make sense as a
         // catalog image.
+        //
+        // Order: packaging FIRST, then front. B2B buyers buy the case /
+        // display box, not a single piece. On Open Food Facts the
+        // "packaging" angle is usually the multi-pack carton shot (when
+        // present); "front" is usually the single-piece front-of-pack.
+        // Pulling packaging first lines up the candidate list with what
+        // the AI validator's "packaging-level preference" rule wants to
+        // promote. Single-piece is still returned as a fallback.
         const selected = product.selected_images || {};
         const lang = product.lang || 'en';
-        const angleOrder = ['front', 'packaging'];
+        const angleOrder = ['packaging', 'front'];
         for (const angle of angleOrder) {
             const angleData = selected[angle];
             if (!angleData) continue;
@@ -351,10 +363,11 @@ export class EanService {
             if (out.length >= count) return out;
         }
 
-        // Priority 2 — top-level front/packaging URLs.
+        // Priority 2 — top-level front/packaging URLs. Packaging first for
+        // the same reason as the priority-1 ordering above.
+        push(product.image_packaging_url);
         push(product.image_front_url);
         push(product.image_url);
-        push(product.image_packaging_url);
 
         // Priority 3 — `front_*` localized variants if still need more
         if (out.length < count) {

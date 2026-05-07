@@ -102,12 +102,17 @@ export class EanValidatorService {
                     `• Product is centered, sharp, well-lit, fully in frame\n` +
                     `• Looks like an Amazon / Tesco / official manufacturer catalog photo\n` +
                     `• Brand and product name clearly legible and match the requested product\n\n` +
+                    `=== BRAND CHECK (zero tolerance) ===\n` +
+                    `If the product title above contains a brand name (e.g. TENA, Kit Kat, Nesquik, Red Bull) and the brand on the packaging in the image is DIFFERENT or unreadable → confidence MUST be 0.0–0.2 regardless of image quality. We will not ship a "Pampers" image for a "TENA" product just because both happen to be on white background.\n\n` +
+                    `=== PACKAGING-LEVEL PREFERENCE ===\n` +
+                    `B2B buyers purchase by the carton / case / display box. If you see TWO options of the same product — one is a single piece (a single bar, a single bottle, one wrapper) and the other is the multi-pack box / case / shipper — prefer the multi-pack: bump its confidence by ~0.05 and dock the single-piece by ~0.05. Bare-piece shots are still acceptable when no case shot exists.\n\n` +
                     `=== EXAMPLES ===\n` +
                     `• Kit Kat bar lying on grass → 0.2 (textured outdoor surface)\n` +
-                    `• Kit Kat case-pack on a clean white studio background → 0.95 (perfect catalog shot)\n` +
+                    `• Kit Kat case-pack on a clean white studio background → 0.95 (perfect catalog shot, multi-pack preferred)\n` +
                     `• Close-up of nutrition facts text → 0.0 (label, not a product photo)\n` +
                     `• Bottle on a kitchen counter under warm lighting → 0.25 (real-world surface, shadows)\n` +
-                    `• Bottle on pure white background, centered, even lighting → 0.9 (catalog quality)\n\n` +
+                    `• Single bottle on pure white background, centered, even lighting → 0.85 (catalog quality, single piece — would be 0.95 if it were a case-pack)\n` +
+                    `• "TENA Lady Pads" requested but image clearly shows "Always Ultra" packaging → 0.1 (brand mismatch)\n\n` +
                     `Respond with a JSON array, one object per image in input order:\n` +
                     `  { "confidence": <0.0–1.0>, "reason": "<mention background + product condition in 10–20 words>" }\n\n` +
                     `Output ONLY the JSON array. No markdown fences, no preamble, no trailing text.`,

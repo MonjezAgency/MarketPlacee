@@ -46,7 +46,7 @@ export default function ProductDetailClient() {
     const [selectedImage, setSelectedImage] = useState<string>('');
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
-    const [selectedUnit, setSelectedUnit] = useState<'truck' | 'pallet' | 'carton' | undefined>(undefined);
+    const [selectedUnit, setSelectedUnit] = useState<'truck' | 'pallet' | 'carton' | 'piece' | undefined>(undefined);
     const [adminDefaultUnit, setAdminDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
     const [markups, setMarkups] = useState<{ piece: number; pallet: number; container: number }>({ piece: 1.10, pallet: 1.05, container: 1.02 });
     const [activeTab, setActiveTab] = useState('Description');
@@ -81,11 +81,13 @@ export default function ProductDetailClient() {
             ? basePerPiece * piecesPerPallet * palletsPerTruck * markups.container : null;
         const perPiece    = basePerPiece * markups.piece;
 
-        const options: Array<{ key: 'truck' | 'pallet' | 'carton'; label: string; price: number | null }> = [];
+        const options: Array<{ key: 'truck' | 'pallet' | 'carton' | 'piece'; label: string; price: number | null }> = [];
         if (truckPrice  !== null) options.push({ key: 'truck',  label: 'Truck',         price: truckPrice  });
         if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet',        price: palletPrice });
-        if (cartonPrice !== null) options.push({ key: 'carton', label: 'Carton',        price: cartonPrice });
-        if (options.length === 0) options.push({ key: 'carton', label: p.unit || 'Unit', price: p.price    });
+        if (cartonPrice !== null) options.push({ key: 'carton', label: 'Case',          price: cartonPrice });
+        // Single-piece option always available — every product has a per-piece price.
+        options.push({ key: 'piece', label: 'Piece', price: perPiece });
+        if (options.length === 0) options.push({ key: 'piece', label: p.unit || 'Unit', price: p.price });
 
         const initialSelected = options.find(o => o.key === adminDefaultUnit)?.key ?? options[0].key;
         const active          = options.find(o => o.key === (selectedUnit ?? initialSelected)) || options[0];
@@ -396,11 +398,15 @@ export default function ProductDetailClient() {
                                 const perPiece = basePerPiece * markups.piece;
 
                                 // qty = number of cartons inside the tier (so price/qty = per-carton price)
-                                const options: Array<{ key: 'truck'|'pallet'|'carton'; label: string; emoji: string; price: number | null; qty: number }> = [];
+                                // For 'piece', qty is fractional (1 / piecesPerCase) so the per-carton math
+                                // and the per-piece view stay consistent.
+                                const options: Array<{ key: 'truck'|'pallet'|'carton'|'piece'; label: string; emoji: string; price: number | null; qty: number }> = [];
                                 if (truckPrice !== null)  options.push({ key: 'truck',  label: 'Truck',  emoji: '🚛', price: truckPrice,  qty: (casesPerPallet * palletsPerTruck) || 1 });
                                 if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet', emoji: '📦', price: palletPrice, qty: casesPerPallet || 1 });
-                                if (cartonPrice !== null) options.push({ key: 'carton', label: 'Carton', emoji: '🗃️', price: cartonPrice, qty: 1 });
-                                if (options.length === 0) options.push({ key: 'carton', label: product.unit || 'Unit', emoji: '📦', price: product.price, qty: 1 });
+                                if (cartonPrice !== null) options.push({ key: 'carton', label: 'Case',   emoji: '🗃️', price: cartonPrice, qty: 1 });
+                                // Single-piece tier — always available so the buyer can buy small.
+                                options.push({ key: 'piece', label: 'Piece', emoji: '🧩', price: perPiece, qty: piecesPerCase > 0 ? 1 / piecesPerCase : 1 });
+                                if (options.length === 0) options.push({ key: 'piece', label: product.unit || 'Unit', emoji: '📦', price: product.price, qty: 1 });
 
                                 // Default: use admin-configured unit, fall back to the largest available
                                 const initialSelected = options.find(o => o.key === adminDefaultUnit)?.key ?? options[0].key;
@@ -477,10 +483,11 @@ export default function ProductDetailClient() {
                                         {/* Breakdown hint (multi-unit orders) */}
                                         {quantity > 1 && (
                                             <p className="text-[12px] text-[#6B7280] bg-[#F8FAFC] rounded-xl px-3 py-2 leading-relaxed">
-                                                {quantity} {active.label.toLowerCase()}s × {formatPrice(active.price ?? product.price)} = <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
+                                                {quantity} {active.label.toLowerCase()}{quantity > 1 ? 's' : ''} × {formatPrice(active.price ?? product.price)} = <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
                                                 {active.key === 'truck' && palletsPerTruck > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * (casesPerPallet * palletsPerTruck)} cartons total)</span>}
                                                 {active.key === 'pallet' && casesPerPallet > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * casesPerPallet} cartons total)</span>}
                                                 {active.key === 'carton' && piecesPerCase > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * piecesPerCase} pcs)</span>}
+                                                {active.key === 'piece' && <span className="ml-2 text-[#9CA3AF]">({quantity} {quantity === 1 ? 'piece' : 'pieces'})</span>}
                                             </p>
                                         )}
 
@@ -500,8 +507,13 @@ export default function ProductDetailClient() {
                                 <div className="space-y-1.5">
                                     <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Unit Type</p>
                                     <p className="text-[18px] font-bold text-[#111827] capitalize">
-                                        {(selectedUnit ?? adminDefaultUnit) === 'truck' ? 'Truck' :
-                                         (selectedUnit ?? adminDefaultUnit) === 'pallet' ? 'Pallet' : 'Carton'}
+                                        {(() => {
+                                            const u = selectedUnit ?? adminDefaultUnit;
+                                            if (u === 'truck')  return 'Truck';
+                                            if (u === 'pallet') return 'Pallet';
+                                            if (u === 'piece')  return 'Piece';
+                                            return 'Case';
+                                        })()}
                                     </p>
                                 </div>
                                 <div className="space-y-1.5">
