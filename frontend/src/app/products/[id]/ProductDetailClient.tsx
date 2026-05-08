@@ -413,6 +413,15 @@ export default function ProductDetailClient() {
                                 }
                                 const active = options.find(o => o.key === (selectedUnit ?? initialSelected)) || options[0];
 
+                                // ── MOQ enforcement ──────────────────────────────────────────────────────
+                                // Convert MOQ (in pieces) to the selected unit. Minimum = 1 always.
+                                const moqPieces = product.moq || 1;
+                                const piecesPerActiveUnit =
+                                    active.key === 'carton' ? (piecesPerCase || 1)
+                                    : active.key === 'pallet' ? (piecesPerCase || 1) * (casesPerPallet || 1)
+                                    : (piecesPerCase || 1) * (casesPerPallet || 1) * (palletsPerTruck || 1);
+                                const minUnits = Math.max(1, Math.ceil(moqPieces / piecesPerActiveUnit));
+
                                 // tierPrice = full price for the selected tier (carton total, pallet total, or truck total)
                                 const tierPrice = active.price != null ? active.price : perPiece;
                                 // customTotal = grand total for quantity tiers ordered (tierTotal × qty)
@@ -426,7 +435,16 @@ export default function ProductDetailClient() {
                                             {options.map((opt) => (
                                                 <button
                                                     key={opt.key}
-                                                    onClick={() => { setSelectedUnit(opt.key); setQuantity(1); }}
+                                                    onClick={() => {
+                                                        // Compute minUnits for the NEW unit type before switching
+                                                        const ppuNew =
+                                                            opt.key === 'carton' ? (piecesPerCase || 1)
+                                                            : opt.key === 'pallet' ? (piecesPerCase || 1) * (casesPerPallet || 1)
+                                                            : (piecesPerCase || 1) * (casesPerPallet || 1) * (palletsPerTruck || 1);
+                                                        const minNew = Math.max(1, Math.ceil(moqPieces / ppuNew));
+                                                        setSelectedUnit(opt.key);
+                                                        setQuantity(minNew);
+                                                    }}
                                                     className={cn(
                                                         'flex flex-col items-center py-3 px-2 rounded-2xl border-2 text-center transition-all',
                                                         active.key === opt.key
@@ -465,16 +483,24 @@ export default function ProductDetailClient() {
                                             </div>
 
                                             {/* Quantity selector */}
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <button
-                                                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                                                    className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center text-[#475569] hover:border-[#0F172A] hover:text-[#0F172A] font-bold text-lg transition-all"
-                                                >−</button>
-                                                <span className="w-10 text-center text-[15px] font-black text-[#111827]">{quantity}</span>
-                                                <button
-                                                    onClick={() => setQuantity(q => q + 1)}
-                                                    className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center text-[#475569] hover:border-[#0F172A] hover:text-[#0F172A] font-bold text-lg transition-all"
-                                                >+</button>
+                                            <div className="flex flex-col items-end gap-1 shrink-0">
+                                                <div className="flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => setQuantity(q => Math.max(minUnits, q - 1))}
+                                                        disabled={quantity <= minUnits}
+                                                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center font-bold text-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[#475569] hover:border-[#0F172A] hover:text-[#0F172A]"
+                                                    >−</button>
+                                                    <span className="w-10 text-center text-[15px] font-black text-[#111827]">{quantity}</span>
+                                                    <button
+                                                        onClick={() => setQuantity(q => q + 1)}
+                                                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center text-[#475569] hover:border-[#0F172A] hover:text-[#0F172A] font-bold text-lg transition-all"
+                                                    >+</button>
+                                                </div>
+                                                {minUnits > 1 && (
+                                                    <p className="text-[10px] text-amber-600 font-semibold">
+                                                        Min. {minUnits} {active.label.toLowerCase()}{minUnits > 1 ? 's' : ''}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
 
@@ -499,7 +525,19 @@ export default function ProductDetailClient() {
                             <div className="grid grid-cols-2 gap-x-10 gap-y-8 py-2">
                                 <div className="space-y-1.5">
                                     <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Min. Sourcing</p>
-                                    <p className="text-[18px] font-bold text-[#111827]">{product.minOrder || 10} Units</p>
+                                    <p className="text-[18px] font-bold text-[#111827] capitalize">
+                                        {(() => {
+                                            const qty = product.moq ?? product.minOrder ?? 1;
+                                            const u = String(product.moqUnit || 'PIECE').toUpperCase();
+                                            const unitLabel: Record<string, string> = {
+                                                PIECE: qty === 1 ? 'piece' : 'pieces',
+                                                CASE: qty === 1 ? 'case' : 'cases',
+                                                PALLET: qty === 1 ? 'pallet' : 'pallets',
+                                                TRUCK: qty === 1 ? 'truck' : 'trucks',
+                                            };
+                                            return `${qty} ${unitLabel[u] || (qty === 1 ? 'unit' : 'units')}`;
+                                        })()}
+                                    </p>
                                 </div>
                                 <div className="space-y-1.5">
                                     <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Unit Type</p>

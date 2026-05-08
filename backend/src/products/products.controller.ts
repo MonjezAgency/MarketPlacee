@@ -127,6 +127,11 @@ export class ProductsController {
             matched: result.matched,
             source: result.source,
             ...(result.reason ? { reason: result.reason } : {}),
+            // Surface low-confidence candidates so the UI can offer a
+            // manual-pick fallback when nothing clears the strict bar.
+            ...(result.rejected_candidates && result.rejected_candidates.length > 0
+                ? { rejected_candidates: result.rejected_candidates }
+                : {}),
         };
     }
 
@@ -249,6 +254,20 @@ export class ProductsController {
                 INR: 0.011,   // 1 INR ≈ 0.011 EUR
             };
             const rate = TO_EUR[currency] ?? 1;
+
+            // Diagnostic: log the resolved currency + rate so we can debug
+            // any future "price stored as X% of sheet value" report by
+            // matching it to the upload that produced it. Sample a few
+            // rows so we don't blow up the log on big sheets.
+            this.logger.log(
+                `[BulkUpload] currency tag="${currency || '<empty>'}" → rate=${rate} ` +
+                `(EUR=${TO_EUR.EUR}, falls back to 1 when unknown). ` +
+                `${report.results.length} rows in file. ` +
+                `Sample: ${report.results.slice(0, 3).map(r => {
+                    const p = (r.data as any)?.price;
+                    return `${(r.data as any)?.name || '?'}: sheet=${p} → stored=${typeof p === 'number' ? (p * rate).toFixed(4) : '?'}`;
+                }).join(' | ')}`
+            );
 
             // Default image-count when fetching by EAN. Configurable via
             // BULK_UPLOAD_EAN_IMAGE_COUNT in admin settings (defaults to 3).

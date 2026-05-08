@@ -55,6 +55,11 @@ export class CreateProductDto {
     @Min(1)
     moq?: number;
 
+    /** Unit the MOQ is counted in. Defaults to PIECE on the backend. */
+    @IsOptional()
+    @IsString()
+    moqUnit?: 'PIECE' | 'CASE' | 'PALLET' | 'TRUCK' | string;
+
     @IsOptional()
     @IsInt()
     @Min(0)

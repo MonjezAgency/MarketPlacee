@@ -1130,18 +1130,37 @@ export default function ProductsModerationPage() {
                                                     </div>
                                                     <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
                                                         <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Min Order (MOQ)</p>
-                                                        <div className="flex items-center gap-1.5">
+                                                        <div className="flex items-center gap-2">
                                                             {isEditing ? (
-                                                                <input
-                                                                    type="number"
-                                                                    className="w-16 h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                    value={editData.moq ?? 1}
-                                                                    onChange={(e) => setEditData({...editData, moq: parseInt(e.target.value)})}
-                                                                />
+                                                                <>
+                                                                    <input
+                                                                        type="number"
+                                                                        min={1}
+                                                                        className="w-16 h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
+                                                                        value={editData.moq ?? 1}
+                                                                        onChange={(e) => setEditData({ ...editData, moq: parseInt(e.target.value) || 1 })}
+                                                                    />
+                                                                    <select
+                                                                        value={String(editData.moqUnit || 'PIECE')}
+                                                                        onChange={(e) => setEditData({ ...editData, moqUnit: e.target.value })}
+                                                                        className="h-8 text-[11px] font-bold uppercase outline-none border border-slate-200 rounded-md bg-white px-1.5"
+                                                                    >
+                                                                        <option value="PIECE">Piece(s)</option>
+                                                                        <option value="CASE">Case(s)</option>
+                                                                        <option value="PALLET">Pallet(s)</option>
+                                                                        <option value="TRUCK">Truck(s)</option>
+                                                                    </select>
+                                                                </>
                                                             ) : (
-                                                                <span className="text-sm font-bold text-slate-900">{selectedProduct.moq || 1}</span>
+                                                                <>
+                                                                    <span className="text-sm font-bold text-slate-900">{selectedProduct.moq || 1}</span>
+                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase">
+                                                                        {(selectedProduct as any).moqUnit
+                                                                            ? `${String((selectedProduct as any).moqUnit).toLowerCase()}${(selectedProduct.moq || 1) > 1 ? 's' : ''}`
+                                                                            : 'piece(s)'}
+                                                                    </span>
+                                                                </>
                                                             )}
-                                                            <span className="text-[10px] font-bold text-slate-500 uppercase">piece(s)</span>
                                                         </div>
                                                     </div>
                                                     <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">

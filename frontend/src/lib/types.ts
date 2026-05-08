@@ -41,6 +41,7 @@ export interface Product {
     stock?: number;
     inStock?: boolean;
     moq?: number;
+    moqUnit?: 'PIECE' | 'CASE' | 'PALLET' | 'TRUCK' | string;
     minOrder?: number; // UI Alias for moq
     unitsPerCase?: number;
     casesPerPallet?: number;

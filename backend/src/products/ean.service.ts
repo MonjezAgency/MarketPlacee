@@ -17,6 +17,11 @@ export interface EanProductResult {
     reason?: string;                        // populated when matched === false
     cached?: boolean;                       // true when result came out of cache
     confidence_score?: number;              // 0.0 – 1.0, max AI score across accepted images
+    /** Candidates that were found but didn't pass the AI threshold. The UI
+     *  shows these under a "Low confidence — review manually" toggle so an
+     *  admin always has something to choose from when no image clears the
+     *  strict 0.85 bar. Populated only on no-match paths. */
+    rejected_candidates?: Array<{ url: string; confidence: number; reason?: string }>;
 }
 
 @Injectable()
@@ -180,6 +185,7 @@ export class EanService {
                 if (images.length === 0) {
                     this.logger.log(`OFF candidates all rejected for EAN ${cleanEan}; trying Bing fallback`);
                     const bingCandidates = await this.fetchBingCatalogImages(cleanEan, apiTitle || title, count * 2);
+                    let bingRejected: typeof validation.rejected = [];
 
                     if (bingCandidates.length > 0) {
                         const bingValidation = await this.validator.validateImages(bingCandidates, {
@@ -204,12 +210,19 @@ export class EanService {
                             this.cache.set(cleanEan, title, count, result);
                             return result;
                         }
+                        bingRejected = bingValidation.rejected;
                     }
 
-                    // Both sources rejected → empty with full diagnostic reason
+                    // Both sources rejected → empty with full diagnostic
+                    // reason. Surface the top rejected candidates so the
+                    // admin always has a manual-pick fallback.
                     const offMaxConf = validation.rejected.length > 0
                         ? Math.max(...validation.rejected.map(r => r.confidence))
                         : 0;
+                    const topRejected = [...validation.rejected, ...bingRejected]
+                        .filter(r => r.confidence > 0)
+                        .sort((a, b) => b.confidence - a.confidence)
+                        .slice(0, count * 2);
                     const result: EanProductResult = {
                         ean: cleanEan,
                         title: apiTitle || title || '',
@@ -219,6 +232,7 @@ export class EanService {
                         reason: `No catalog-quality images found. OFF returned ${candidates.length} (max conf ${offMaxConf.toFixed(2)}); Bing fallback returned ${bingCandidates.length}. Try a different EAN or upload an image manually.`,
                         cached: false,
                         confidence_score: offMaxConf,
+                        rejected_candidates: topRejected.length > 0 ? topRejected : undefined,
                     };
                     this.cache.set(cleanEan, title, count, result);
                     return result;
@@ -244,6 +258,13 @@ export class EanService {
             // works on them unchanged), then fall back to Bing image search.
             this.logger.warn(`OFF lookup failed for ${cleanEan}: ${err.message} — trying alternatives`);
 
+            // Aggregate rejected candidates across every fallback source so
+            // the UI can surface them under a "Low confidence — review
+            // manually" toggle. Without this the admin saw "No match" and
+            // had nothing to fall back on for hygiene / niche products
+            // where Bing only returns mid-quality candidates.
+            const allRejected: Array<{ url: string; confidence: number; reason?: string }> = [];
+
             // ── Helper: validate + return a cached success from a sibling-DB
             //    response when it has at least one usable image.
             //
@@ -264,7 +285,10 @@ export class EanService {
                     title,
                     brand: opts.brand,
                 });
-                if (validation.accepted.length === 0) return null;
+                if (validation.accepted.length === 0) {
+                    allRejected.push(...validation.rejected);
+                    return null;
+                }
                 const images = validation.accepted
                     .sort((a, b) => b.confidence - a.confidence)
                     .slice(0, count)
@@ -346,10 +370,17 @@ export class EanService {
                     this.cache.set(cleanEan, title, count, result);
                     return result;
                 }
+                allRejected.push(...bingValidation.rejected);
             }
 
-            // 4) Everything failed. Don't cache transient API failures so we
-            //    retry on next request.
+            // 4) Everything failed. Surface the highest-scoring rejected
+            //    candidates so the admin can override the AI if it's being
+            //    too strict — better than "No match" with no recourse.
+            const topRejected = allRejected
+                .filter(r => r.confidence > 0)
+                .sort((a, b) => b.confidence - a.confidence)
+                .slice(0, count * 2);
+
             return {
                 ean: cleanEan,
                 title: title || '',
@@ -362,6 +393,7 @@ export class EanService {
                     `but none passed AI validation. Original error: ${err.message}`,
                 cached: false,
                 confidence_score: 0,
+                rejected_candidates: topRejected.length > 0 ? topRejected : undefined,
             };
         }
     }

@@ -227,6 +227,11 @@ export class ExcelService {
             'orderlimit': 'moq',
             'الحدالأدنى': 'moq', 'حدالطلب': 'moq', 'الحدالادنى': 'moq',
             'أقلكمية': 'moq', 'اقلكمية': 'moq',
+            // ── moqUnit ───────────────────────────────────────────────────────
+            // Optional unit that the MOQ is expressed in. Allowed values:
+            // PIECE / CASE / PALLET / TRUCK (case-insensitive on input).
+            'moqunit': 'moqUnit', 'minorderunit': 'moqUnit',
+            'orderunit': 'moqUnit', 'unitofmoq': 'moqUnit',
             // ── brand ─────────────────────────────────────────────────────────
             'brand': 'brand', 'make': 'brand', 'manufacturer': 'brand',
             'براند': 'brand', 'الماركة': 'brand', 'الشركةالمصنعة': 'brand',
@@ -600,6 +605,17 @@ export class ExcelService {
         if (row.moq !== undefined && row.moq !== null) {
             const v = parseQtyField(row.moq);
             row.moq = v >= 1 ? v : undefined; // ignore 0 / invalid
+        }
+        // moqUnit — accept common spellings; default to PIECE.
+        if (row.moqUnit !== undefined && row.moqUnit !== null) {
+            const raw = String(row.moqUnit).trim().toUpperCase();
+            const norm =
+                raw.includes('TRUCK') || raw.includes('CONTAINER') ? 'TRUCK' :
+                raw.includes('PALLET') ? 'PALLET' :
+                raw.includes('CASE') || raw.includes('CARTON') || raw.includes('BOX') ? 'CASE' :
+                raw.includes('PIECE') || raw.includes('PCS') || raw === 'PC' || raw === 'UNIT' ? 'PIECE' :
+                undefined;
+            row.moqUnit = norm; // undefined falls back to schema default 'PIECE'
         }
 
         // ── Image URL parsing ──────────────────────────────────────────────

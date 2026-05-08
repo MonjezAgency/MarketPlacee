@@ -64,7 +64,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
 
     const defaultForm = {
         name: '', brand: '', category: 'Beverages', ean: '',
-        price: '', stock: '', moq: '1', unit: 'Piece',
+        price: '', stock: '', moq: '1', moqUnit: 'PIECE', unit: 'Piece',
         unitsPerCase: '', casesPerPallet: '', unitsPerPallet: '', palletsPerShipment: '',
         description: '', supplierId: '', images: [] as string[],
         weight: '', shelfLife: '', origin: '',
@@ -101,7 +101,9 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
         cached: boolean;
         source: string;
         reason?: string;
+        rejected_candidates?: Array<{ url: string; confidence: number; reason?: string }>;
     } | null>(null);
+    const [showRejected, setShowRejected] = React.useState(false);
     const [isSearchingEan, setIsSearchingEan] = React.useState(false);
 
     const handleEanSearch = async () => {
@@ -214,6 +216,7 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                 price: priceEGP,
                 stock: parseInt(form.stock) || 0,
                 moq: parseInt(form.moq) || 1,
+                moqUnit: form.moqUnit || 'PIECE',
                 unit: 'piece', // pricing base is always per-piece; buyer toggles derive carton/pallet/truck
                 description: form.description,
                 images: form.images,
@@ -418,14 +421,28 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                         </div>
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-slate-600 mb-1 block">Min Order (MOQ, pieces)</label>
-                                        <input
-                                            type="number"
-                                            min="1"
-                                            value={form.moq}
-                                            onChange={e => set('moq', e.target.value)}
-                                            className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm focus:border-teal-500 outline-none"
-                                        />
+                                        <label className="text-xs font-bold text-slate-600 mb-1 block">Min Order (MOQ)</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={form.moq}
+                                                onChange={e => set('moq', e.target.value)}
+                                                className="w-24 h-10 px-3 rounded-xl border border-slate-200 text-sm focus:border-teal-500 outline-none"
+                                                placeholder="qty"
+                                            />
+                                            <select
+                                                value={form.moqUnit}
+                                                onChange={e => set('moqUnit', e.target.value)}
+                                                className="flex-1 h-10 px-3 rounded-xl border border-slate-200 text-sm focus:border-teal-500 outline-none bg-white font-bold uppercase"
+                                            >
+                                                <option value="PIECE">Piece(s)</option>
+                                                <option value="CASE">Case(s)</option>
+                                                <option value="PALLET">Pallet(s)</option>
+                                                <option value="TRUCK">Truck(s)</option>
+                                            </select>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 mt-1">e.g. "6 PALLET" = supplier requires at least 6 pallets per order</p>
                                     </div>
 
                                     {/* Live computed price preview — with markup, formula shown */}
@@ -642,6 +659,44 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                         </div>
                                         {eanSearchResult.reason && !eanSearchResult.matched && (
                                             <p className="text-[11px] text-red-600 leading-relaxed">{eanSearchResult.reason}</p>
+                                        )}
+                                        {/* Low-confidence fallback: when the AI rejected
+                                            everything, give the admin a chance to review
+                                            the highest-scoring rejects and add manually
+                                            if they actually look right. */}
+                                        {!eanSearchResult.matched && (eanSearchResult.rejected_candidates?.length ?? 0) > 0 && (
+                                            <div className="pt-2 border-t border-violet-200/60">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowRejected(s => !s)}
+                                                    className="text-[11px] font-bold text-violet-700 hover:text-violet-900 underline underline-offset-2"
+                                                >
+                                                    {showRejected ? 'Hide low-confidence candidates' : `Show ${eanSearchResult.rejected_candidates!.length} low-confidence candidate${eanSearchResult.rejected_candidates!.length === 1 ? '' : 's'}`}
+                                                </button>
+                                                {showRejected && (
+                                                    <div className="mt-2 space-y-1.5">
+                                                        <p className="text-[10px] text-slate-500 leading-relaxed">
+                                                            ⚠ AI rejected these. Review carefully — they may not match the product. Click only if it really is the right product.
+                                                        </p>
+                                                        <div className="grid grid-cols-3 gap-2">
+                                                            {eanSearchResult.rejected_candidates!.map((c, i) => (
+                                                                <button
+                                                                    type="button"
+                                                                    key={c.url + i}
+                                                                    onClick={() => addCandidateImage(c.url)}
+                                                                    className="group relative aspect-square rounded-xl border border-amber-200 bg-white overflow-hidden hover:border-amber-500 hover:shadow-lg transition-all"
+                                                                    title={c.reason || `Confidence ${(c.confidence * 100).toFixed(0)}%`}
+                                                                >
+                                                                    <img src={c.url} alt="" referrerPolicy="no-referrer" className="absolute inset-0 w-full h-full object-contain p-1" />
+                                                                    <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">
+                                                                        {(c.confidence * 100).toFixed(0)}%
+                                                                    </span>
+                                                                </button>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                         {eanSearchResult.images.length > 0 && (
                                             <>

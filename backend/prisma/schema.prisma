@@ -161,7 +161,8 @@ model Product {
   variants    Json?
   status      ProductStatus @default(PENDING)
   adminNotes  String?
-  moq         Int?          // Minimum Order Quantity
+  moq         Int?          // Minimum Order Quantity (number of moqUnit)
+  moqUnit     String?       @default("PIECE") // PIECE | CASE | PALLET | TRUCK — unit the MOQ is expressed in
   unitsPerCase       Int?   // Pieces per case/carton (e.g., 24 from "C24")
   casesPerPallet     Int?   // Cases per pallet
   unitsPerPallet     Int?   // Total pieces per pallet (derived: unitsPerCase × casesPerPallet)

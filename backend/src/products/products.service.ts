@@ -200,6 +200,7 @@ export class ProductsService {
                 supplierId: dto.supplierId,
                 unit: dto.unit || 'piece',
                 moq: dto.moq ?? null,
+                moqUnit: dto.moqUnit ? String(dto.moqUnit).toUpperCase() : 'PIECE',
                 unitsPerCase: dto.unitsPerCase ?? null,
                 casesPerPallet: dto.casesPerPallet ?? null,
                 unitsPerPallet: dto.unitsPerPallet ?? null,
@@ -688,6 +689,10 @@ export class ProductsService {
         if (data.variants !== undefined) updateData.variants = data.variants;
         if (data.unit !== undefined) updateData.unit = data.unit;
         if (data.moq !== undefined) updateData.moq = data.moq;
+        if (data.moqUnit !== undefined) {
+            const u = String(data.moqUnit).toUpperCase();
+            updateData.moqUnit = ['PIECE', 'CASE', 'PALLET', 'TRUCK'].includes(u) ? u : 'PIECE';
+        }
         if (data.unitsPerCase !== undefined) updateData.unitsPerCase = data.unitsPerCase;
         if (data.casesPerPallet !== undefined) updateData.casesPerPallet = data.casesPerPallet;
         if (data.unitsPerPallet !== undefined) updateData.unitsPerPallet = data.unitsPerPallet;
