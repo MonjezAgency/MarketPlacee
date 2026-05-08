@@ -216,6 +216,64 @@ export class ProductsController {
         return { url };
     }
 
+    /**
+     * Parse the uploaded Excel WITHOUT persisting. Returns an inspection
+     * payload the frontend can show to the admin BEFORE committing —
+     * helpful for catching gotchas like supplier files where prices look
+     * integer ("14") but the cell actually stores a decimal ("13.55"
+     * formatted to 0 decimals). The user reported wasted afternoons
+     * chasing "wrong stored prices" that turned out to be hidden cell
+     * formatting on the source sheet.
+     *
+     * Response shape (truncated):
+     *   { rowCount, currency, rate, samples: [{ name, ean, raw_cell,
+     *     parsed_price, after_rate, would_store_basePrice }, ...] }
+     */
+    @Post('bulk-upload-preview')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPPLIER, Role.ADMIN)
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 50 * 1024 * 1024 } }))
+    async bulkUploadPreview(
+        @UploadedFile() file: any,
+        @Body('currency') currency: string,
+    ) {
+        if (!file) throw new BadRequestException('File is required');
+        const TO_EUR: Record<string, number> = {
+            EUR: 1, USD: 0.926, GBP: 1.162, EGP: 0.018,
+            AED: 0.252, SAR: 0.247, KWD: 3.240, QAR: 0.253,
+            TRY: 0.027, INR: 0.011,
+        };
+        const rate = TO_EUR[currency] ?? 1;
+        const report = await this.excelService.processProductsExcel(file.buffer, CreateProductDto);
+        const samples = report.results.slice(0, 50).map(r => {
+            const d = r.data as any;
+            return {
+                row_index: report.results.indexOf(r),
+                name: d?.name?.slice(0, 60) || null,
+                ean: d?.ean ?? null,
+                raw_cell: d?.__rawPriceCell ?? null,
+                parsed_price: d?.price ?? null,
+                after_rate: typeof d?.price === 'number' ? +(d.price * rate).toFixed(4) : null,
+                would_store_basePrice: typeof d?.price === 'number' ? +(d.price * rate).toFixed(4) : null,
+                pcs_per_case: d?.unitsPerCase ?? null,
+                cases_per_pallet: d?.casesPerPallet ?? null,
+                pallets_per_truck: d?.palletsPerShipment ?? null,
+                moq: d?.moq ?? null,
+                moqUnit: d?.moqUnit ?? null,
+                row_errors: r.errors || [],
+                row_success: r.success,
+            };
+        });
+        return {
+            currency: currency || '<empty>',
+            rate,
+            rowCount: report.results.length,
+            successCount: report.successCount,
+            errorCount: report.errorCount,
+            samples,
+        };
+    }
+
     @Post('bulk-upload')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.SUPPLIER, Role.ADMIN)

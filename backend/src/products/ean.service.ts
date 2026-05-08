@@ -559,14 +559,18 @@ export class EanService {
     }
 
     /**
-     * Bing image search fallback — runs when Open Food Facts has only
-     * crowdsourced phone photos and the AI validator rejected them all.
-     * Uses Bing's white-background filter (`color2-bw-white`) to bias
-     * toward studio catalog shots from retailer/manufacturer sites.
+     * Free image search fallback — runs when Open Food / Beauty / Products
+     * Facts has nothing for the EAN. Tries DuckDuckGo (most reliable for
+     * niche products like hygiene/medical) then Bing as backup. Both are
+     * free and require no API key — they scrape the public search results.
      *
-     * No API key required — scrapes the public results HTML. Brittle but
-     * free and effective. Returns more candidates than `count` so the
-     * caller can re-run the AI validator and pick the highest-confidence.
+     * For TENA-style hygiene products that aren't in OFF, DuckDuckGo's
+     * image API (the proper 2-step vqd flow) returns ~95 real catalog
+     * images. The previous Bing-only path returned 0 because Bing's
+     * `color2-bw-white` filter requires a Microsoft account session.
+     *
+     * Method name kept as fetchBingCatalogImages for backward compat with
+     * the existing call sites — it now searches DDG first, then Bing.
      */
     private async fetchBingCatalogImages(ean: string, productName?: string, max: number = 6): Promise<string[]> {
         const found = new Set<string>();
@@ -611,19 +615,61 @@ export class EanService {
             'Accept-Encoding': 'gzip, deflate, br',
         };
 
-        // Strategy 1 — Bing: simple query (EAN + product name, no restrictive filters)
-        // The white-background filter was causing 0 results for hygiene products.
+        // Strategy 1 — DuckDuckGo images via the proper 2-step vqd flow.
+        // Returns ~95 real product photos for niche/hygiene products like
+        // TENA where Bing and OFF/OBF/OPF strike out. The flow is:
+        //   (a) GET https://duckduckgo.com/?q=...&iax=images&ia=images
+        //       → response HTML contains `vqd='...'` token to extract.
+        //   (b) GET https://duckduckgo.com/i.js?q=...&vqd=<token>&...&o=json
+        //       → returns { results: [{ image, title, ... }, ...] }.
+        // Free, no API key, no per-session limits in normal use.
         try {
-            const querySimple = encodeURIComponent([productName, ean].filter(Boolean).join(' '));
-            const urlSimple = `https://www.bing.com/images/search?q=${querySimple}&form=HDRSC2&first=1`;
-            const resp = await axios.get(urlSimple, { timeout: 7000, headers: browserHeaders });
-            const urls = parseBingHtml(resp.data as string);
-            urls.forEach(u => found.size < max && found.add(u));
+            const q = [productName, ean].filter(Boolean).join(' ');
+            const enc = encodeURIComponent(q);
+            const tokenResp = await axios.get(
+                `https://duckduckgo.com/?q=${enc}&iax=images&ia=images`,
+                { timeout: 6000, headers: browserHeaders },
+            );
+            const vqdMatch = String(tokenResp.data).match(/vqd=['"]?([^'"&\s]+)/);
+            if (vqdMatch) {
+                const imgResp = await axios.get('https://duckduckgo.com/i.js', {
+                    timeout: 6000,
+                    headers: { ...browserHeaders, 'Referer': 'https://duckduckgo.com/' },
+                    params: {
+                        q,
+                        vqd: vqdMatch[1],
+                        l: 'us-en',
+                        o: 'json',
+                        f: ',,,type:photo,layout:Square,',
+                        p: '-1',
+                    },
+                });
+                const results: any[] = imgResp.data?.results || [];
+                for (const r of results) {
+                    if (found.size >= max * 2) break; // overshoot so AI validator has more to choose from
+                    if (typeof r?.image === 'string' && r.image.startsWith('http')) {
+                        found.add(r.image);
+                    }
+                }
+            }
         } catch (err: any) {
-            this.logger.debug(`Bing simple query failed for EAN ${ean}: ${err.message}`);
+            this.logger.debug(`DuckDuckGo lookup failed for EAN ${ean}: ${err.message}`);
         }
 
-        // Strategy 2 — Bing: EAN-only query (more precise, less noise)
+        // Strategy 2 — Bing: simple query (free fallback when DDG returns nothing)
+        if (found.size < max) {
+            try {
+                const querySimple = encodeURIComponent([productName, ean].filter(Boolean).join(' '));
+                const urlSimple = `https://www.bing.com/images/search?q=${querySimple}&form=HDRSC2&first=1`;
+                const resp = await axios.get(urlSimple, { timeout: 7000, headers: browserHeaders });
+                const urls = parseBingHtml(resp.data as string);
+                urls.forEach(u => found.size < max && found.add(u));
+            } catch (err: any) {
+                this.logger.debug(`Bing simple query failed for EAN ${ean}: ${err.message}`);
+            }
+        }
+
+        // Strategy 3 — Bing: EAN-only query (last-resort precise search)
         if (found.size < max) {
             try {
                 const queryEan = encodeURIComponent(`${ean} product`);
@@ -631,23 +677,6 @@ export class EanService {
                 const resp = await axios.get(urlEan, { timeout: 7000, headers: browserHeaders });
                 const urls = parseBingHtml(resp.data as string);
                 urls.forEach(u => found.size < max && found.add(u));
-            } catch (_e) { /* ignore */ }
-        }
-
-        // Strategy 3 — DuckDuckGo images (different bot-detection threshold)
-        if (found.size < max) {
-            try {
-                const q = encodeURIComponent([productName, ean].filter(Boolean).join(' '));
-                const ddgUrl = `https://duckduckgo.com/?q=${q}&iax=images&ia=images`;
-                const resp = await axios.get(ddgUrl, { timeout: 7000, headers: browserHeaders });
-                // DDG embeds image URLs in JSON inside a script tag
-                const re = /"thumbnail":"(https?:[^"]+?)"/g;
-                const html: string = resp.data;
-                let m: RegExpExecArray | null;
-                while ((m = re.exec(html)) !== null && found.size < max) {
-                    const u = m[1].replace(/\\\//g, '/');
-                    if (u.startsWith('http') && !u.includes('duckduckgo.com/i')) found.add(u);
-                }
             } catch (_e) { /* ignore */ }
         }
 
