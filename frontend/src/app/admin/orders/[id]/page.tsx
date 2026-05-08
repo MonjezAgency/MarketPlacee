@@ -60,6 +60,8 @@ type AdminOrder = {
     trackingNumber?: string | null;
     carrier?: string | null;
     expectedDelivery?: string | null;
+    shippingCompany?: string | null;
+    shippingCost?: number | null;
     paymentMethod?: string | null;
     customer?: {
         id: string;
@@ -113,6 +115,41 @@ export default function AdminOrderDetailPage() {
     const [loading, setLoading] = React.useState(true);
     const [updating, setUpdating] = React.useState(false);
     const [chatOpen, setChatOpen] = React.useState(false);
+    // Transport editor — admin assigns a carrier + price after the buyer
+    // places the order. Stored on the Order row, surfaced on customer
+    // tracking, invoice, and supplier shipping confirmation email.
+    const [shippingCompanyDraft, setShippingCompanyDraft] = React.useState<string>('');
+    const [shippingCostDraft, setShippingCostDraft] = React.useState<string>('');
+    const [savingShipping, setSavingShipping] = React.useState(false);
+
+    React.useEffect(() => {
+        if (order) {
+            setShippingCompanyDraft(order.shippingCompany || '');
+            setShippingCostDraft(order.shippingCost != null ? String(order.shippingCost) : '');
+        }
+    }, [order?.id, order?.shippingCompany, order?.shippingCost]);
+
+    const saveShipping = async () => {
+        if (!order) return;
+        setSavingShipping(true);
+        try {
+            const res = await apiFetch(`/orders/${order.id}/shipping`, {
+                method: 'PATCH',
+                body: JSON.stringify({
+                    shippingCompany: shippingCompanyDraft || null,
+                    shippingCost: shippingCostDraft ? Number(shippingCostDraft) : null,
+                }),
+            });
+            if (!res.ok) throw new Error('Save failed');
+            const updated = await res.json();
+            setOrder(prev => prev ? { ...prev, shippingCompany: updated.shippingCompany, shippingCost: updated.shippingCost } : prev);
+            toast.success('Shipping details saved');
+        } catch (err: any) {
+            toast.error(err.message || 'Could not save');
+        } finally {
+            setSavingShipping(false);
+        }
+    };
 
     React.useEffect(() => {
         if (!params?.id) return;
@@ -425,6 +462,71 @@ export default function AdminOrderDetailPage() {
                                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Est. Delivery</p>
                                     <p className="text-[12px] font-bold text-slate-800">{order.expectedDelivery ? fmtDate(order.expectedDelivery) : '—'}</p>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* ── Transport assignment (admin) ────────────────────────
+                            Admin picks the carrier and enters the negotiated
+                            transport price. Stored on the order so the
+                            customer's tracking page, the invoice, and the
+                            supplier shipping email all see the same numbers. */}
+                        <div className="mt-5 p-4 rounded-2xl border border-slate-200 bg-slate-50/40 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Transport Assignment</p>
+                                {order.shippingCompany && order.shippingCost != null && (
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
+                                        Assigned
+                                    </span>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Shipping Company</label>
+                                    <select
+                                        value={shippingCompanyDraft}
+                                        onChange={e => setShippingCompanyDraft(e.target.value)}
+                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px] font-bold focus:border-teal-500 outline-none"
+                                    >
+                                        <option value="">— Select carrier —</option>
+                                        <option value="DB SCHENKER">DB Schenker</option>
+                                        <option value="LKW WALTER">LKW Walter</option>
+                                        <option value="Raben Group">Raben Group</option>
+                                        <option value="DHL Freight">DHL Freight</option>
+                                        <option value="DSV">DSV</option>
+                                        <option value="Kuehne+Nagel">Kuehne + Nagel</option>
+                                        <option value="GEFCO">GEFCO</option>
+                                        <option value="Maersk">Maersk</option>
+                                        <option value="UPS">UPS Freight</option>
+                                        <option value="FedEx">FedEx Freight</option>
+                                        <option value="Other">Other (custom)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Transport Cost (€)</label>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={shippingCostDraft}
+                                        onChange={e => setShippingCostDraft(e.target.value)}
+                                        placeholder="e.g. 350.00"
+                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px] font-bold focus:border-teal-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                            <div className="flex items-center justify-between gap-3 pt-1">
+                                <p className="text-[11px] text-slate-500">
+                                    {order.shippingCompany || order.shippingCost != null
+                                        ? <>Currently: <strong>{order.shippingCompany || '—'}</strong> · <strong>€{(order.shippingCost ?? 0).toFixed(2)}</strong></>
+                                        : 'No transport assigned yet — supplier won\'t ship until set.'}
+                                </p>
+                                <button
+                                    onClick={saveShipping}
+                                    disabled={savingShipping}
+                                    className="h-9 px-5 bg-[#0B1F3A] text-white rounded-xl text-[12px] font-bold hover:bg-[#1a3a6b] transition-colors disabled:opacity-50"
+                                >
+                                    {savingShipping ? 'Saving…' : 'Save Transport'}
+                                </button>
                             </div>
                         </div>
 

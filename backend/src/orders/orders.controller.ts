@@ -139,6 +139,23 @@ export class OrdersController {
         return plainToInstance(OrderDto, order);
     }
 
+    /**
+     * Admin assigns a shipping company + cost to the order. Used from the
+     * /admin/orders/[id] page after the buyer places the order — admin
+     * picks a carrier (DB Schenker / LKW Walter / Raben / DHL / etc) and
+     * enters the negotiated transport price. Stored on the Order row so
+     * the customer's order summary, the invoice, and the supplier's
+     * shipping confirmation email all see the same number.
+     */
+    @Patch(':id/shipping')
+    @Roles(Role.ADMIN, Role.LOGISTICS, Role.OWNER)
+    async setShipping(
+        @Param('id') id: string,
+        @Body() body: { shippingCompany?: string | null; shippingCost?: number | null },
+    ) {
+        return this.ordersService.setShipping(id, body.shippingCompany, body.shippingCost);
+    }
+
     @Patch('bulk-status')
     @Roles(Role.ADMIN)
     async bulkUpdateStatus(

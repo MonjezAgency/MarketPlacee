@@ -27,6 +27,26 @@ export class OrdersService {
         private appConfigService: AppConfigService,
     ) { }
 
+    /**
+     * Admin / logistics assigns a transport carrier + price to the order.
+     * Both fields nullable — admin can set just the carrier and fill price
+     * later, or clear both. The order's totalAmount is NOT auto-updated
+     * here; that recompute happens on the invoice/checkout path.
+     */
+    async setShipping(orderId: string, shippingCompany?: string | null, shippingCost?: number | null) {
+        const data: any = {};
+        if (shippingCompany !== undefined) data.shippingCompany = shippingCompany || null;
+        if (shippingCost !== undefined) {
+            data.shippingCost = shippingCost === null ? null
+                : Number(shippingCost) >= 0 ? Number(shippingCost) : null;
+        }
+        return this.prisma.order.update({
+            where: { id: orderId },
+            data,
+            select: { id: true, shippingCompany: true, shippingCost: true },
+        });
+    }
+
     async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number) {
         // Snapshot product names so the order keeps history if a product
         // is deleted later. We pass `name` from the cart payload when
