@@ -246,18 +246,24 @@ export class EanService {
 
             // ── Helper: validate + return a cached success from a sibling-DB
             //    response when it has at least one usable image.
+            //
+            // We ALWAYS run the AI validator on fallback-source candidates
+            // even if `skipAiValidation` was set. The flag exists for bulk
+            // uploads that pre-trust the data source; once we've fallen
+            // through to scraped/sibling sources we have no provenance and
+            // must validate. The validator itself hard-fails on missing
+            // OPENROUTER_API_KEY, returning zero images instead of
+            // pretending to validate at 0.7.
             const tryCandidates = async (
                 candidates: string[],
                 source: 'openbeautyfacts' | 'openproductsfacts',
             ): Promise<EanProductResult | null> => {
                 if (candidates.length === 0) return null;
-                const validation = opts.skipAiValidation
-                    ? { accepted: candidates.map(url => ({ url, confidence: 0.7 })), rejected: [], aggregateConfidence: 0.7 }
-                    : await this.validator.validateImages(candidates, {
-                        ean: cleanEan,
-                        title,
-                        brand: opts.brand,
-                    });
+                const validation = await this.validator.validateImages(candidates, {
+                    ean: cleanEan,
+                    title,
+                    brand: opts.brand,
+                });
                 if (validation.accepted.length === 0) return null;
                 const images = validation.accepted
                     .sort((a, b) => b.confidence - a.confidence)
@@ -312,13 +318,17 @@ export class EanService {
             //    pattern as the OFF "all candidates rejected" branch.
             const bingCandidates = await this.fetchBingCatalogImages(cleanEan, title, count * 2);
             if (bingCandidates.length > 0) {
-                const bingValidation = opts.skipAiValidation
-                    ? { accepted: bingCandidates.map(url => ({ url, confidence: 0.7 })), rejected: [], aggregateConfidence: 0.7 }
-                    : await this.validator.validateImages(bingCandidates, {
-                        ean: cleanEan,
-                        title,
-                        brand: opts.brand,
-                    });
+                // Always validate Bing results — Bing returns wildly off-topic
+                // images for short brand names that overlap with personal
+                // names (e.g. "TENA" → fashion-week portraits + basketball
+                // game shots). The previous skip-validator-at-0.7-confidence
+                // shortcut was the cause of those photos appearing as "AI
+                // VERIFIED 70%" in the catalog.
+                const bingValidation = await this.validator.validateImages(bingCandidates, {
+                    ean: cleanEan,
+                    title,
+                    brand: opts.brand,
+                });
                 if (bingValidation.accepted.length > 0) {
                     const bingImages = bingValidation.accepted
                         .sort((a, b) => b.confidence - a.confidence)

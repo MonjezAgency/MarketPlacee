@@ -50,9 +50,24 @@ export class EanValidatorService {
 
         const apiKey = process.env.OPENROUTER_API_KEY;
         if (!apiKey) {
-            // Soft-fallback: trust the source API. Confidence = 0.7 (uncertain).
-            const accepted = urls.map(url => ({ url, confidence: 0.7, reason: 'AI validator disabled (no key)' }));
-            return { accepted, rejected: [], aggregateConfidence: 0.7 };
+            // HARD-FAIL when the AI validator is disabled. The previous
+            // "soft-fallback at 0.7 confidence" path was the root cause of
+            // the catalog showing celebrity photos and basketball games as
+            // "AI VERIFIED 70%" for TENA hygiene products: with no key set,
+            // every Bing candidate auto-accepted and bypassed MIN_CONFIDENCE
+            // (0.85). Better to return zero images and tell the admin to
+            // upload manually than to ship a wrong photo onto the catalog.
+            this.logger.error(
+                `AI validator skipped for EAN ${ctx.ean} — OPENROUTER_API_KEY is not set. ` +
+                `Returning ZERO images (refusing to soft-trust unvalidated candidates). ` +
+                `Set OPENROUTER_API_KEY on the deploy to re-enable EAN image search.`
+            );
+            const rejected: ImageValidationResult[] = urls.map(url => ({
+                url,
+                confidence: 0,
+                reason: 'AI validator disabled — no OPENROUTER_API_KEY configured',
+            }));
+            return { accepted: [], rejected, aggregateConfidence: 0 };
         }
 
         try {
@@ -64,9 +79,23 @@ export class EanValidatorService {
                 : 0;
             return { accepted, rejected, aggregateConfidence };
         } catch (err: any) {
-            this.logger.warn(`AI validation failed for EAN ${ctx.ean}: ${err.message}. Falling back to trust-source.`);
-            const accepted = urls.map(url => ({ url, confidence: 0.7, reason: 'AI validator failed; trusted source API' }));
-            return { accepted, rejected: [], aggregateConfidence: 0.7 };
+            // HARD-FAIL on AI errors too. The previous "trust-source"
+            // fallback let through every candidate at 0.7 confidence,
+            // including completely unrelated Bing results, whenever
+            // OpenRouter timed out / rate-limited / returned malformed
+            // JSON. Now the error is logged loudly and zero images are
+            // returned — the UI shows "no catalog-quality images found"
+            // so the admin can upload manually.
+            this.logger.error(
+                `AI validation FAILED for EAN ${ctx.ean}: ${err?.message || err}. ` +
+                `Returning ZERO images (refusing to ship unvalidated candidates).`
+            );
+            const rejected: ImageValidationResult[] = urls.map(url => ({
+                url,
+                confidence: 0,
+                reason: `AI validator error: ${err?.message || 'unknown'}`,
+            }));
+            return { accepted: [], rejected, aggregateConfidence: 0 };
         }
     }
 
