@@ -152,13 +152,33 @@ export default function ProductsModerationPage() {
         const tid = toast.loading('Saving changes...');
         setIsSavingEdit(true);
         try {
-            // Backend PATCH treats `price` field as the new basePrice and recalculates
-            // the customer-facing price with markup. So we must send basePrice here,
-            // NOT the already-marked-up `price` — otherwise price keeps compounding.
-            const patchPayload = {
-                ...editData,
-                price: editData.basePrice ?? editData.price,
-            };
+            // Build a clean PATCH body. CRITICAL: don't send `price` unless the
+            // admin actually changed the supplier-raw price in the form.
+            //
+            // Why: the backend treats `data.price` as a new basePrice and
+            // recomputes price = basePrice × markup. If we always echo
+            // editData.basePrice back as `price`, every Save Changes click
+            // re-runs the markup pipeline. With a slightly different
+            // markup config (or any rounding), the price drifts on every
+            // save. The user reported "the price keeps changing" — this
+            // is the cause. Stable rule: only touch the price column when
+            // the basePrice input was actually modified.
+            const basePriceChanged =
+                selectedProduct &&
+                Number(editData.basePrice) !== Number(selectedProduct.basePrice);
+
+            const patchPayload: any = { ...editData };
+            // Strip the customer-facing `price` from the payload — backend
+            // recomputes it.
+            delete patchPayload.price;
+            if (basePriceChanged) {
+                // Send only when the admin really edited the field.
+                patchPayload.price = editData.basePrice;
+            } else {
+                // Don't even send basePrice — leave it untouched in the DB.
+                delete patchPayload.basePrice;
+            }
+
             const res = await apiFetch(`/products/${editData.id}`, {
                 method: 'PATCH',
                 body: JSON.stringify(patchPayload)

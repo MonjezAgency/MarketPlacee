@@ -18,7 +18,9 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { translateText } from '@/lib/translator';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReviewSection from '@/components/product/ReviewSection';
-import PricingAssistant from '@/components/product/PricingAssistant';
+// PricingAssistant removed from buyer-facing PDP — keep import commented
+// out so a future re-enable doesn't have to re-locate the path.
+// import PricingAssistant from '@/components/product/PricingAssistant';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
 import { useWishlist } from '@/hooks/useWishlist';
@@ -582,11 +584,11 @@ export default function ProductDetailClient() {
                                     </Button>
                                 </div>
 
-                                {/* AI Pricing Assistant */}
-                                <PricingAssistant
-                                    productId={product.id}
-                                    productName={product.name}
-                                />
+                                {/* AI Pricing Assistant — REMOVED from buyer-facing PDP.
+                                    Buyers shouldn't have a "why is this price?" tool —
+                                    that exposes markup math and invites haggling. The
+                                    component is still imported for the admin variants
+                                    if/when those are wired up. */}
                             </div>
 
                             <div className="pt-8 border-t border-[#E5E7EB] space-y-4">

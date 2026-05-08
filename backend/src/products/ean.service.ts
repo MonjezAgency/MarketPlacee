@@ -13,7 +13,7 @@ export interface EanProductResult {
     title: string;
     images: string[];
     matched: boolean;                       // true = API + AI verification passed
-    source: 'openfoodfacts' | 'openbeautyfacts' | 'openproductsfacts' | 'bing' | 'none';       // which API the data came from
+    source: 'openfoodfacts' | 'openbeautyfacts' | 'openproductsfacts' | 'eansearch' | 'bing' | 'none';       // which API the data came from
     reason?: string;                        // populated when matched === false
     cached?: boolean;                       // true when result came out of cache
     confidence_score?: number;              // 0.0 – 1.0, max AI score across accepted images
@@ -58,6 +58,26 @@ export class EanService {
         // on long numeric strings, and other callers might forget to clean.
         // The previous trim() only handled whitespace.
         const cleanEan = String(ean || '').replace(/[^0-9X]/gi, '').trim();
+
+        // Primary source: ean-search.org (paid API; gated on
+        // EAN_SEARCH_TOKEN env var). Covers ALL product categories — food,
+        // hygiene, electronics, tools — unlike Open Food Facts which is
+        // food-only. When the token is set, this runs FIRST and short-
+        // circuits the rest of the chain on success.
+        if (process.env.EAN_SEARCH_TOKEN && cleanEan) {
+            // Cache check up front so we don't hit the paid API repeatedly.
+            if (!opts.skipCache) {
+                const hit = this.cache.get(cleanEan, title, Math.max(1, Math.min(imageCount || 3, 10)));
+                if (hit) return hit;
+            }
+            try {
+                const count = Math.max(1, Math.min(imageCount || 3, 10));
+                const eanSearchResult = await this.fetchFromEanSearchOrg(cleanEan, title, count, opts);
+                if (eanSearchResult) return eanSearchResult;
+            } catch (err: any) {
+                this.logger.debug(`ean-search.org lookup failed for ${cleanEan}: ${err.message} — falling through to OFF`);
+            }
+        }
         if (!cleanEan) {
             return {
                 ean: cleanEan,
@@ -412,6 +432,131 @@ export class EanService {
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * ean-search.org primary lookup. Hits two endpoints:
+     *
+     *   1) op=barcode-lookup → product name + category + country (used for
+     *      title verification — confirms we found the right product).
+     *   2) op=product-image  → image URL (or sometimes a base64 PNG).
+     *
+     * Either or both can fail / 404; we treat any failure as "fall through
+     * to OFF" by returning null.
+     *
+     * Docs: https://www.ean-search.org/ean-search-api.html
+     * Postman collection: https://www.postman.com/relaxed/ean-search-org-api/
+     *
+     * Returns null on:
+     *   - HTTP error
+     *   - empty / "EAN not found" response
+     *   - title-mismatch (Jaccard < 0.4)
+     *   - no images available for the EAN
+     *   - all images rejected by AI validator
+     */
+    private async fetchFromEanSearchOrg(
+        cleanEan: string,
+        title: string | undefined,
+        count: number,
+        opts: { brand?: string },
+    ): Promise<EanProductResult | null> {
+        const token = process.env.EAN_SEARCH_TOKEN;
+        if (!token) return null;
+
+        // 1. Lookup product name + verify EAN exists.
+        let apiTitle = '';
+        try {
+            const lookupResp = await axios.get('https://api.ean-search.org/api', {
+                timeout: 5000,
+                params: {
+                    op: 'barcode-lookup',
+                    format: 'json',
+                    token,
+                    ean: cleanEan,
+                },
+            });
+            const items: any[] = Array.isArray(lookupResp.data) ? lookupResp.data : [];
+            if (items.length === 0 || !items[0]?.name) {
+                this.logger.debug(`ean-search.org: no product for EAN ${cleanEan}`);
+                return null;
+            }
+            // Some "EAN not found" responses come back as { error: "..." }
+            if ((items[0] as any).error) return null;
+            apiTitle = String(items[0].name || '');
+        } catch (err: any) {
+            this.logger.debug(`ean-search.org barcode-lookup error: ${err.message}`);
+            return null;
+        }
+
+        // 2. Title verification (Jaccard ≥ 0.4) when caller supplied a title.
+        if (title && apiTitle) {
+            const sim = this.titleSimilarity(apiTitle, title);
+            if (sim < this.TITLE_MATCH_THRESHOLD) {
+                this.logger.debug(
+                    `ean-search.org title mismatch (${sim.toFixed(2)} < ${this.TITLE_MATCH_THRESHOLD}): ` +
+                    `requested "${title}" vs API "${apiTitle}" — falling through.`
+                );
+                return null;
+            }
+        }
+
+        // 3. Image lookup. The product-image endpoint serves the image
+        // directly (image bytes via redirect to a CDN URL). We treat the
+        // canonical image URL as the URL of the redirect target. Some
+        // accounts also return a JSON metadata response with an `image`
+        // URL field — try that first to avoid blob-handling.
+        const candidates: string[] = [];
+        try {
+            // Get JSON metadata if available (for `imageUrl` field)
+            const imgResp = await axios.get('https://api.ean-search.org/api', {
+                timeout: 5000,
+                params: {
+                    op: 'product-image',
+                    format: 'json',
+                    token,
+                    ean: cleanEan,
+                },
+                validateStatus: s => s < 500,
+            });
+            const arr: any[] = Array.isArray(imgResp.data) ? imgResp.data : [imgResp.data];
+            for (const item of arr) {
+                if (item?.image && typeof item.image === 'string' && item.image.startsWith('http')) {
+                    candidates.push(item.image);
+                }
+            }
+        } catch (_e) { /* ignore — try the direct URL form below */ }
+
+        // Direct URL form (always works when the EAN has an image, even
+        // without JSON metadata):
+        const directUrl = `https://api.ean-search.org/api?op=barcode-image&token=${encodeURIComponent(token)}&ean=${encodeURIComponent(cleanEan)}`;
+        if (!candidates.includes(directUrl)) candidates.push(directUrl);
+
+        if (candidates.length === 0) return null;
+
+        // 4. AI validation — same threshold and prompt as every other source.
+        const validation = await this.validator.validateImages(candidates, {
+            ean: cleanEan,
+            title: apiTitle || title,
+            brand: opts.brand,
+        });
+        if (validation.accepted.length === 0) return null;
+
+        const images = validation.accepted
+            .sort((a, b) => b.confidence - a.confidence)
+            .slice(0, count)
+            .map(r => r.url);
+
+        const result: EanProductResult = {
+            ean: cleanEan,
+            title: apiTitle || title || '',
+            images,
+            matched: true,
+            source: 'eansearch',
+            cached: false,
+            confidence_score: validation.aggregateConfidence,
+        };
+        this.cache.set(cleanEan, title, count, result);
+        return result;
+    }
 
     /**
      * Bing image search fallback — runs when Open Food Facts has only

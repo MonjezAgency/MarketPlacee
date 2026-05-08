@@ -708,49 +708,63 @@ export class ProductsService {
         if (data.leadTime !== undefined) updateData.leadTime = data.leadTime;
         if (data.warehouseId !== undefined) updateData.warehouseId = data.warehouseId;
         if (data.price !== undefined || data.unit !== undefined) {
-            const currentUnit = data.unit || (await this.findOne(id))?.unit || 'piece';
-            const unitLower = currentUnit.toLowerCase();
-
-            let configKey = 'MARKUP_PERCENTAGE';
-            if (unitLower.includes('pallet')) configKey = 'MARKUP_PERCENTAGE_PALLET';
-            else if (unitLower.includes('container') || unitLower.includes('truck')) configKey = 'MARKUP_PERCENTAGE_CONTAINER';
-            else configKey = 'MARKUP_PERCENTAGE_PIECE';
-
-            let config = await this.prisma.appConfig.findUnique({ where: { key: configKey } });
-            if (!config) config = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE' } });
-
-            let defaultMarkup = 1.10;
-            if (unitLower.includes('pallet')) defaultMarkup = 1.05;
-            else if (unitLower.includes('container') || unitLower.includes('truck')) defaultMarkup = 1.02;
-
-            const markupRaw = config?.value ? parseFloat(config.value) : defaultMarkup;
-            // Same guard as create(): a markup multiplier MUST be >= 1.0.
-            // Anything below 1.0 is a misconfigured AppConfig (exchange rate
-            // or percentage typed in by mistake) and would shrink prices
-            // instead of growing them.
-            let markup = !isFinite(markupRaw) || isNaN(markupRaw) || markupRaw < 1.0
-                ? defaultMarkup
-                : markupRaw;
-            if (markup !== markupRaw && isFinite(markupRaw)) {
-                this.logger.warn(
-                    `Update path: suspect markup ${markupRaw} for "${configKey}" — ` +
-                    `using default ${defaultMarkup} so price stays sane.`
-                );
-            }
             const existing = await this.findOne(id);
-            const priceToUse = data.price !== undefined ? data.price : existing.basePrice;
 
-            if (data.price !== undefined) updateData.basePrice = data.price;
-            const newPrice = priceToUse * markup;
+            // STABILITY GUARD: if the caller sent `data.price` but it equals
+            // the existing basePrice (round-trip from a non-edit save in the
+            // admin form), don't recompute. The user's complaint was prices
+            // drifting after every Save Changes click — that happened
+            // because we re-ran basePrice × markup on every save, so
+            // floating-point or markup-config jitter accumulated. Now we
+            // only touch price when basePrice actually changed.
+            const noRealPriceChange =
+                data.price !== undefined &&
+                existing &&
+                existing.basePrice !== null && existing.basePrice !== undefined &&
+                Number(data.price) === Number(existing.basePrice);
+
+            if (noRealPriceChange && data.unit === undefined) {
+                // No work to do — skip the markup branch entirely.
+            } else {
+                const currentUnit = data.unit || existing?.unit || 'piece';
+                const unitLower = currentUnit.toLowerCase();
+
+                let configKey = 'MARKUP_PERCENTAGE';
+                if (unitLower.includes('pallet')) configKey = 'MARKUP_PERCENTAGE_PALLET';
+                else if (unitLower.includes('container') || unitLower.includes('truck')) configKey = 'MARKUP_PERCENTAGE_CONTAINER';
+                else configKey = 'MARKUP_PERCENTAGE_PIECE';
+
+                let config = await this.prisma.appConfig.findUnique({ where: { key: configKey } });
+                if (!config) config = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE' } });
+
+                let defaultMarkup = 1.10;
+                if (unitLower.includes('pallet')) defaultMarkup = 1.05;
+                else if (unitLower.includes('container') || unitLower.includes('truck')) defaultMarkup = 1.02;
+
+                const markupRaw = config?.value ? parseFloat(config.value) : defaultMarkup;
+                let markup = !isFinite(markupRaw) || isNaN(markupRaw) || markupRaw < 1.0
+                    ? defaultMarkup
+                    : markupRaw;
+                if (markup !== markupRaw && isFinite(markupRaw)) {
+                    this.logger.warn(
+                        `Update path: suspect markup ${markupRaw} for "${configKey}" — ` +
+                        `using default ${defaultMarkup} so price stays sane.`
+                    );
+                }
+                const priceToUse = data.price !== undefined ? data.price : existing.basePrice;
+
+                if (data.price !== undefined) updateData.basePrice = data.price;
+                const newPrice = priceToUse * markup;
 
             // Track price change for the ticker — only when the customer-facing
-            // price actually moved by more than 1% (avoid noise from markup
-            // recomputation rounding)
-            if (existing && existing.price && Math.abs(newPrice - existing.price) / existing.price > 0.01) {
-                updateData.previousPrice = existing.price;
-                updateData.priceChangedAt = new Date();
-            }
-            updateData.price = newPrice;
+                // price actually moved by more than 1% (avoid noise from markup
+                // recomputation rounding)
+                if (existing && existing.price && Math.abs(newPrice - existing.price) / existing.price > 0.01) {
+                    updateData.previousPrice = existing.price;
+                    updateData.priceChangedAt = new Date();
+                }
+                updateData.price = newPrice;
+            } // close else (real price/unit change)
         }
 
         const updated = await this.prisma.product.update({ where: { id }, data: updateData });
