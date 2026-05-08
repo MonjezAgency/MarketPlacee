@@ -1239,7 +1239,7 @@ export default function ProductsModerationPage() {
                                                                     <p className="text-[9px] text-teal-600 font-black uppercase">Carton</p>
                                                                     <p className="text-[15px] font-black text-teal-800">{fmt(cartonTotal)}</p>
                                                                     <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
-                                                                        {fmt(pp)} × {pc} × {markups.piece}
+                                                                        {fmt(pp)} × {pc} <span className="text-emerald-600 font-bold">+{Math.round((markups.piece - 1) * 100)}%</span>
                                                                     </p>
                                                                 </div>
                                                                 {palletTotal !== null && (
@@ -1247,7 +1247,7 @@ export default function ProductsModerationPage() {
                                                                         <p className="text-[9px] text-teal-600 font-black uppercase">Pallet</p>
                                                                         <p className="text-[15px] font-black text-teal-800">{fmt(palletTotal)}</p>
                                                                         <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
-                                                                            {fmt(pp)} × {pc} × {cp} × {markups.pallet}
+                                                                            {fmt(pp)} × {pc} × {cp} <span className="text-emerald-600 font-bold">+{Math.round((markups.pallet - 1) * 100)}%</span>
                                                                         </p>
                                                                         <p className="text-[9px] text-emerald-700 font-bold mt-0.5">{fmt(palletPerCtn!)}/ctn</p>
                                                                     </div>
@@ -1257,7 +1257,7 @@ export default function ProductsModerationPage() {
                                                                         <p className="text-[9px] text-teal-600 font-black uppercase">Truck</p>
                                                                         <p className="text-[15px] font-black text-teal-800">{fmt(truckTotal)}</p>
                                                                         <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
-                                                                            {fmt(pp)} × {pc} × {cp} × {pt} × {markups.container}
+                                                                            {fmt(pp)} × {pc} × {cp} × {pt} <span className="text-emerald-600 font-bold">+{Math.round((markups.container - 1) * 100)}%</span>
                                                                         </p>
                                                                         <p className="text-[9px] text-emerald-700 font-bold mt-0.5">{fmt(truckPerCtn!)}/ctn</p>
                                                                     </div>

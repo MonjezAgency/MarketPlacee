@@ -382,42 +382,95 @@ export class EanService {
      * caller can re-run the AI validator and pick the highest-confidence.
      */
     private async fetchBingCatalogImages(ean: string, productName?: string, max: number = 6): Promise<string[]> {
-        // Bias the query toward multi-pack / display-case shots — B2B buyers
-        // buy the carton, not the individual piece. "carton" + "case pack"
-        // + "wholesale" pulls retailer + manufacturer catalog photos that
-        // typically show the shipper unit on white.
-        const queryParts = [productName, ean, 'carton case pack wholesale white background'].filter(Boolean);
-        const q = encodeURIComponent(queryParts.join(' '));
-        const url = `https://www.bing.com/images/search?q=${q}&qft=+filterui:photo-photo+filterui:color2-bw-white&form=IRFLTR`;
+        const found = new Set<string>();
 
-        try {
-            const resp = await axios.get(url, {
-                timeout: 6000,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36',
-                    'Accept-Language': 'en-US,en;q=0.9',
-                },
-            });
-            const html: string = resp.data;
-            const found = new Set<string>();
-
-            // Each Bing image card embeds a JSON 'm' attribute with `murl` = original URL.
-            const re = /"murl":"(https?:[^"]+?)"/g;
-            let m: RegExpExecArray | null;
-            while ((m = re.exec(html)) !== null && found.size < max) {
-                const candidate = m[1].replace(/\\\//g, '/').replace(/\\u002f/g, '/');
-                if (candidate.startsWith('http')) {
-                    // Skip data URIs and Bing's own thumbnail caches — those
-                    // are watermarked or low-resolution.
-                    if (candidate.includes('bing.com/th') || candidate.startsWith('data:')) continue;
-                    found.add(candidate);
+        /**
+         * Parse image URLs from a Bing Images HTML response.
+         * Bing embeds original URLs in JSON blobs inside data-m attributes.
+         * We try multiple regex patterns because Bing's structure changes occasionally.
+         */
+        const parseBingHtml = (html: string): string[] => {
+            const urls: string[] = [];
+            const patterns = [
+                /"murl":"(https?:[^"]+?)"/g,          // current format
+                /data-src="(https?[^"]+\.(jpg|png|webp)[^"]*)"/gi, // img src fallback
+                /"imgurl":"(https?:[^"]+?)"/g,          // older format
+                /mediaurl=(https?[^&]+)/g,              // URL-encoded in query params
+            ];
+            for (const re of patterns) {
+                let m: RegExpExecArray | null;
+                re.lastIndex = 0;
+                while ((m = re.exec(html)) !== null && urls.length < max * 3) {
+                    let candidate = m[1].replace(/\\\//g, '/').replace(/\\u002f/g, '/');
+                    try { candidate = decodeURIComponent(candidate); } catch (_) { /* ignore decode errors */ }
+                    if (
+                        candidate.startsWith('http') &&
+                        !candidate.includes('bing.com/th') &&
+                        !candidate.startsWith('data:') &&
+                        (candidate.match(/\.(jpg|jpeg|png|webp)/i) || candidate.includes('image'))
+                    ) {
+                        urls.push(candidate);
+                    }
                 }
+                if (urls.length > 0) break; // stop at first pattern that yields results
             }
-            return Array.from(found);
+            return [...new Set(urls)]; // deduplicate
+        };
+
+        const browserHeaders = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+        };
+
+        // Strategy 1 — Bing: simple query (EAN + product name, no restrictive filters)
+        // The white-background filter was causing 0 results for hygiene products.
+        try {
+            const querySimple = encodeURIComponent([productName, ean].filter(Boolean).join(' '));
+            const urlSimple = `https://www.bing.com/images/search?q=${querySimple}&form=HDRSC2&first=1`;
+            const resp = await axios.get(urlSimple, { timeout: 7000, headers: browserHeaders });
+            const urls = parseBingHtml(resp.data as string);
+            urls.forEach(u => found.size < max && found.add(u));
         } catch (err: any) {
-            this.logger.debug(`Bing fallback failed for EAN ${ean}: ${err.message}`);
-            return [];
+            this.logger.debug(`Bing simple query failed for EAN ${ean}: ${err.message}`);
         }
+
+        // Strategy 2 — Bing: EAN-only query (more precise, less noise)
+        if (found.size < max) {
+            try {
+                const queryEan = encodeURIComponent(`${ean} product`);
+                const urlEan = `https://www.bing.com/images/search?q=${queryEan}&form=HDRSC2&first=1`;
+                const resp = await axios.get(urlEan, { timeout: 7000, headers: browserHeaders });
+                const urls = parseBingHtml(resp.data as string);
+                urls.forEach(u => found.size < max && found.add(u));
+            } catch (_e) { /* ignore */ }
+        }
+
+        // Strategy 3 — DuckDuckGo images (different bot-detection threshold)
+        if (found.size < max) {
+            try {
+                const q = encodeURIComponent([productName, ean].filter(Boolean).join(' '));
+                const ddgUrl = `https://duckduckgo.com/?q=${q}&iax=images&ia=images`;
+                const resp = await axios.get(ddgUrl, { timeout: 7000, headers: browserHeaders });
+                // DDG embeds image URLs in JSON inside a script tag
+                const re = /"thumbnail":"(https?:[^"]+?)"/g;
+                const html: string = resp.data;
+                let m: RegExpExecArray | null;
+                while ((m = re.exec(html)) !== null && found.size < max) {
+                    const u = m[1].replace(/\\\//g, '/');
+                    if (u.startsWith('http') && !u.includes('duckduckgo.com/i')) found.add(u);
+                }
+            } catch (_e) { /* ignore */ }
+        }
+
+        if (found.size === 0) {
+            this.logger.debug(`All image search strategies returned 0 results for EAN ${ean}`);
+        } else {
+            this.logger.log(`Found ${found.size} image candidates for EAN ${ean} via web search`);
+        }
+
+        return Array.from(found).slice(0, max);
     }
 
     /**
