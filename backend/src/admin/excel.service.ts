@@ -564,11 +564,21 @@ export class ExcelService {
 
         // Force price to number (handle European decimals like "1.58", "0.38")
         if (row.price !== undefined && row.price !== null) {
+            // Capture the RAW cell value before any cleanup, so the
+            // diagnostic log can tell us whether a 15.48 stored basePrice
+            // came from the supplier file (cell already had decimals,
+            // formatted to look integer) or from our pipeline. The Logger
+            // print happens at the controller after coerceTypes returns.
+            const rawCellPrice = row.price;
             const cleanStr = arabicToEnglish(String(row.price))
                 .replace(/,/g, '.')
                 .replace(/[^0-9.-]/g, '');
             const p = parseFloat(cleanStr);
             row.price = isNaN(p) ? 0 : p;
+            // Tag the row so the controller can include the raw value in
+            // its per-row trace log. Plain object property — not part of
+            // the DTO contract; controller deletes it before persisting.
+            (row as any).__rawPriceCell = rawCellPrice;
         }
 
         // Force stock to number — strip "in CASES" suffix if present

@@ -285,12 +285,17 @@ export class ProductsController {
                     // 13.55, 17 → 17.36 etc.). This log line captures the
                     // full chain so the next upload either confirms the
                     // fix or pinpoints the next bug:
-                    //   sheet → DTO → controller × rate → service.basePrice
+                    //   raw Excel cell → parsed dto.price → × rate → basePrice
+                    const rawCell = (dto as any).__rawPriceCell;
                     this.logger.log(
                         `[BulkUpload row] name="${(dto as any).name?.slice(0, 40) || '?'}" ` +
-                        `dto.price=${dto.price} (raw from Excel) × rate=${rate} (currency="${currency || '<empty>'}") ` +
+                        `raw_cell="${rawCell !== undefined ? String(rawCell) : '?'}" ` +
+                        `→ parsed=${dto.price} × rate=${rate} (currency="${currency || '<empty>'}") ` +
                         `→ priceInBase=${priceInBase} (this becomes basePrice in DB)`
                     );
+                    // Strip the diagnostic tag before it reaches Prisma — it
+                    // isn't a Product field and would error on persist.
+                    delete (dto as any).__rawPriceCell;
 
                     // ── EAN-based image fetch ────────────────────────────
                     // If no images provided in the row AND we have an EAN,
