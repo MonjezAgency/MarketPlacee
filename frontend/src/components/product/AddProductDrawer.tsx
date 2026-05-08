@@ -24,6 +24,45 @@ interface AddProductDrawerProps {
 
 const UNIT_TYPES = ['Piece', 'Case', 'Pallet', 'Truck', 'Carton', 'Box', 'Kg', 'Litre'];
 
+/**
+ * Image-preview tile with broken-URL detection. Shows a red warning
+ * triangle if the <img> fails to load, with a hover tooltip telling the
+ * user exactly how to grab a real image URL (right-click → Open image in
+ * new tab → copy URL). Replaces the silent opacity-0.3 fade that left the
+ * user wondering why their pasted URL "didn't work."
+ */
+function ImagePreviewTile({ url, onRemove }: { url: string; onRemove: () => void }) {
+    const [broken, setBroken] = React.useState(false);
+    return (
+        <div className="relative group">
+            <img
+                src={url}
+                alt=""
+                referrerPolicy="no-referrer"
+                onLoad={() => setBroken(false)}
+                onError={() => setBroken(true)}
+                className={cn(
+                    'w-16 h-16 rounded-xl object-cover border bg-slate-50 transition-all',
+                    broken ? 'border-red-300 opacity-30' : 'border-slate-200',
+                )}
+            />
+            {broken && (
+                <div className="absolute -top-1 -left-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center cursor-help"
+                     title={"Image failed to load. The URL might point to a search-results page instead of the image itself.\n\nHow to fix:\n1. Find the image (Google Images, supplier site, etc).\n2. Right-click the image → 'Open image in new tab'.\n3. Copy the URL from that new tab — it should end in .jpg/.png/.webp."}>
+                    <AlertCircle size={10} />
+                </div>
+            )}
+            <button
+                type="button"
+                onClick={onRemove}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+                <X size={10} />
+            </button>
+        </div>
+    );
+}
+
 export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: AddProductDrawerProps) {
     const [isSaving, setIsSaving] = React.useState(false);
     const [isGeneratingAI, setIsGeneratingAI] = React.useState(false);
@@ -84,10 +123,38 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
     }, [isOpen, role]);
 
     const handleAddImageUrl = () => {
-        const url = imageUrlInput.trim();
-        if (!url) return;
+        const raw = imageUrlInput.trim();
+        if (!raw) return;
         // basic URL validation
-        try { new URL(url); } catch { toast.error('Please enter a valid image URL'); return; }
+        let parsed: URL;
+        try { parsed = new URL(raw); } catch {
+            toast.error('That doesn\'t look like a URL. Right-click the image → Open image in new tab → copy that URL.');
+            return;
+        }
+
+        // Common gotcha: user pastes a Google/Bing image *search-results* URL
+        // instead of the image itself. Extract the actual image URL from the
+        // imgurl= / mediaurl= query parameter when present.
+        const params = parsed.searchParams;
+        const extracted = params.get('imgurl') || params.get('mediaurl') || params.get('media');
+        let url = extracted ? decodeURIComponent(extracted) : raw;
+
+        // Strip Google's "tbn:..." thumbnails — those are tiny preview crops
+        // that won't load when used as a real product image.
+        if (url.includes('encrypted-tbn') || url.includes('gstatic.com/images')) {
+            toast.error('That looks like a Google thumbnail. Click through to the actual image, right-click → Open image in new tab → copy that URL.', { duration: 6000 });
+            return;
+        }
+
+        // Final sanity-check: must look like an image URL
+        const looksLikeImage = /\.(jpe?g|png|webp|gif|avif|bmp|svg)(\?|$)/i.test(url) || /\/image\b/i.test(url);
+        if (!looksLikeImage) {
+            // Allow it but warn — some CDNs serve images via UUID paths with
+            // no extension (e.g. /uploads/abc123). The image preview tile
+            // will show a red broken-image marker if it actually fails.
+            toast('Saved — but this URL doesn\'t end in .jpg/.png/.webp. If the preview is broken, paste a direct image link instead.', { icon: '⚠️', duration: 6000 });
+        }
+
         if (form.images.includes(url)) { toast.error('Image already added'); return; }
         setForm(prev => ({ ...prev, images: [...prev.images, url] }));
         setImageUrlInput('');
@@ -737,24 +804,23 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                 {form.images.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-3">
                                         {form.images.map((url, i) => (
-                                            <div key={i} className="relative group">
-                                                <img
-                                                    src={url}
-                                                    alt=""
-                                                    referrerPolicy="no-referrer"
-                                                    className="w-16 h-16 rounded-xl object-cover border border-slate-200 bg-slate-50"
-                                                    onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.3'; }}
-                                                />
-                                                <button
-                                                    onClick={() => setForm(prev => ({ ...prev, images: prev.images.filter((_, idx) => idx !== i) }))}
-                                                    className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    <X size={10} />
-                                                </button>
-                                            </div>
+                                            <ImagePreviewTile
+                                                key={url + i}
+                                                url={url}
+                                                onRemove={() => setForm(prev => ({ ...prev, images: prev.images.filter((_, idx) => idx !== i) }))}
+                                            />
                                         ))}
                                     </div>
                                 )}
+                                {/* Inline help: how to grab a real image URL */}
+                                <div className="mt-3 px-3 py-2 rounded-xl bg-blue-50/60 border border-blue-100 text-[11px] text-blue-700 leading-relaxed">
+                                    <strong>How to paste an image URL correctly:</strong>
+                                    <ol className="list-decimal ml-4 mt-1 space-y-0.5">
+                                        <li>Find the image you want (Google Images, the supplier site, etc).</li>
+                                        <li><strong>Right-click</strong> the image → <strong>"Open image in new tab"</strong>.</li>
+                                        <li>Copy the URL from that new tab — it should end in <code className="bg-white px-1 rounded">.jpg</code>, <code className="bg-white px-1 rounded">.png</code>, or <code className="bg-white px-1 rounded">.webp</code>.</li>
+                                    </ol>
+                                </div>
                             </section>
 
                             {/* Description */}

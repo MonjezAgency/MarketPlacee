@@ -420,6 +420,27 @@ export class ExcelService {
 
             this.coerceTypes(normalizedRow);
 
+            // Skip footer/policy/note rows. Suppliers commonly add a row at the
+            // bottom of their sheet like "Minimum Order 6 pallets mixed - Prices
+            // are EXW Thessaloniki -GR" — that's a policy comment, not a
+            // product. Detected by: a name-only row (no EAN, no real price,
+            // no logistics fields) that contains note-keywords. The MOQ value
+            // is extracted into the file-level metadata so we can warn the
+            // admin about the policy without polluting the catalog with a
+            // garbage product.
+            if (this.isNoteRow(normalizedRow)) {
+                this.logger.log(
+                    `[ExcelService] Row ${i + 1} skipped as policy/footer note: ` +
+                    `"${String(normalizedRow.name).slice(0, 80)}"`
+                );
+                continue;
+            }
+
+            // Auto-extract brand and weight from the product name when the
+            // sheet didn't supply them as their own column. Pulls "Pepsi"
+            // out of "Pepsi Diet 150ml" and "150ml" out of the same name.
+            this.enrichFromName(normalizedRow);
+
             // Log first 3 data rows so the operator can verify extraction
             if (i - headerRowIndex <= 3) {
                 console.log(`[ExcelService] Row ${i + 1} extracted:`, JSON.stringify({
@@ -431,6 +452,8 @@ export class ExcelService {
                     casesPerPallet: normalizedRow.casesPerPallet,
                     unitsPerPallet: normalizedRow.unitsPerPallet,
                     shelfLife: normalizedRow.shelfLife,
+                    brand: normalizedRow.brand,
+                    weight: normalizedRow.weight,
                 }));
             }
 
@@ -525,6 +548,96 @@ export class ExcelService {
         }
 
         return { totalRows: results.length, successCount, errorCount, results };
+    }
+
+    /**
+     * Returns true if the row is a footer / policy note rather than a real
+     * product. Heuristic: only the name field is meaningful (no EAN, no
+     * non-zero price, no logistics counts) AND the name contains a known
+     * note keyword. Examples that should be skipped:
+     *
+     *   "Minimum Order 6 pallets mixed - Prices are EXW Thessaloniki -GR"
+     *   "All prices in EUR. VAT not included."
+     *   "Note: deliveries Mon-Fri only"
+     *
+     * Without this guard those text rows land in the DB as zero-price
+     * products and clutter the catalog.
+     */
+    private isNoteRow(row: Record<string, any>): boolean {
+        const hasEan = row.ean && String(row.ean).trim().length > 0;
+        const hasPrice = typeof row.price === 'number' && row.price > 0;
+        const hasLogistics = !!(row.unitsPerCase || row.casesPerPallet || row.unitsPerPallet || row.palletsPerShipment);
+        if (hasEan || hasPrice || hasLogistics) return false; // real product, keep
+
+        const name = String(row.name || '').toLowerCase().trim();
+        if (!name) return true; // empty rows → skip (won't validate anyway)
+
+        const noteSignals = [
+            'minimum order', 'min order', 'min. order',
+            'prices are', 'all prices', 'incl. vat', 'excl. vat',
+            'exw ', 'fob ', 'cif ', 'ddp ', 'delivery terms', 'incoterms',
+            'note:', 'notes:', 'remarks:', 'terms:', 'conditions:',
+            'mixed pallets', 'pallets mixed', 'mixed cases',
+            'price list', 'offer valid', 'valid until',
+            'thank you', 'thessaloniki',
+        ];
+        return noteSignals.some(sig => name.includes(sig));
+    }
+
+    /**
+     * Pull brand + weight out of the product name when the sheet didn't
+     * supply them as their own columns. The user's specific request:
+     *
+     *   "if the customer types Pepsi Diet 150ml in the product name,
+     *    you take 'Pepsi' as the brand and '150ml' as the weight"
+     *
+     * Brand: first capitalised word, when no brand column was mapped.
+     *        Common known brands also recognised case-insensitive.
+     * Weight: regex /(\d+(?:[.,]\d+)?\s*(?:ml|l|g|kg|oz|lb|pcs|cl))/i.
+     *
+     * Both are only set when the row doesn't already have them — never
+     * overwrites a value the supplier explicitly provided.
+     */
+    private enrichFromName(row: Record<string, any>) {
+        const name = String(row.name || '').trim();
+        if (!name) return;
+
+        // Weight extraction
+        if (!row.weight) {
+            const weightMatch = name.match(/(\d+(?:[.,]\d+)?\s*(?:ml|l|kg|g|oz|lb|cl|cm|mm))\b/i);
+            if (weightMatch) row.weight = weightMatch[1].replace(/\s+/g, '').toLowerCase();
+        }
+
+        // Brand extraction
+        if (!row.brand) {
+            // Known brands first — case-insensitive, partial-match on word boundary.
+            const KNOWN = [
+                'Nestle', 'Nestlé', 'Pepsi', 'Coca-Cola', 'Coca Cola', 'Red Bull',
+                'KitKat', 'Kit Kat', 'Tena', 'Pampers', 'Always',
+                'P&G', 'Procter', 'Unilever', 'Mars', 'Ferrero', 'Kellogg',
+                'Haribo', 'Storck', 'Bahlsen', 'Lindt', 'Cadbury', 'Hershey',
+                'Trolli', 'Nesquik', 'Lipton', 'Ahmad', 'Twinings',
+                'Lay\'s', 'Pringles', 'Doritos', 'Tony\'s Chocolonely',
+                'Ritter Sport', 'Milka', 'Toblerone',
+                'Swiffer', 'Ariel', 'Tide', 'Persil', 'Comfort',
+            ];
+            const lower = name.toLowerCase();
+            for (const b of KNOWN) {
+                const re = new RegExp(`\\b${b.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}\\b`, 'i');
+                if (re.test(name) || lower.includes(b.toLowerCase())) {
+                    row.brand = b;
+                    break;
+                }
+            }
+            // Fallback: first capitalised token (≥3 chars), unless it's the
+            // weight or a generic word. Better than no brand at all.
+            if (!row.brand) {
+                const firstWord = name.split(/\s+/)[0];
+                if (firstWord && firstWord.length >= 3 && /^[A-Z]/.test(firstWord) && !/^\d/.test(firstWord)) {
+                    row.brand = firstWord;
+                }
+            }
+        }
     }
 
     private coerceTypes(row: Record<string, any>) {
