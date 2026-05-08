@@ -1,4 +1,5 @@
-import { Controller, Get, UseGuards, Post, Param, Body, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Request, Res, StreamableFile } from '@nestjs/common';
+import { Controller, Get, UseGuards, Post, Patch, Param, Body, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Request, Res, StreamableFile, UploadedFile, BadRequestException } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { PrismaService } from '../common/prisma.service';
 import { RolesGuard } from '../auth/roles.guard';
@@ -7,8 +8,12 @@ import { Role } from '@prisma/client';
 import { UserDto } from '../common/dtos/base.dto';
 import { plainToInstance } from 'class-transformer';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import type { Response } from 'express';
 import * as bcrypt from 'bcrypt';
+
+// Phone validation: optional + prefix, 8-15 digits. Stripped of spaces/dashes.
+const PHONE_RE = /^\+?\d{8,15}$/;
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -17,7 +22,63 @@ export class UsersController {
     constructor(
         private readonly usersService: UsersService,
         private readonly prisma: PrismaService,
+        private readonly storageService: SupabaseStorageService,
     ) { }
+
+    // ─── Self-service profile endpoints ──────────────────────────────────
+
+    /**
+     * Update the authenticated user's profile fields. Validates phone format
+     * server-side so the customer-facing settings page can't ship garbage to
+     * the DB. Only fields the user is allowed to change land in the update.
+     */
+    @Patch('me')
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
+    async updateMe(
+        @Request() req,
+        @Body() body: { name?: string; phone?: string | null; companyDescription?: string | null },
+    ) {
+        const data: any = {};
+        if (typeof body.name === 'string') data.name = body.name.trim();
+        if (body.phone !== undefined) {
+            if (body.phone === null || body.phone === '') {
+                data.phone = null;
+            } else {
+                const stripped = String(body.phone).replace(/[\s()-]/g, '');
+                if (!PHONE_RE.test(stripped)) {
+                    throw new BadRequestException('Invalid phone — must be 8-15 digits with optional + prefix');
+                }
+                data.phone = stripped;
+            }
+        }
+        if (body.companyDescription !== undefined) {
+            data.companyDescription = body.companyDescription || null;
+        }
+        const updated = await this.prisma.user.update({
+            where: { id: req.user.sub },
+            data,
+        });
+        return plainToInstance(UserDto, updated);
+    }
+
+    /**
+     * Upload / replace the authenticated user's avatar. Routes through the
+     * existing StorageService used for product images so the same Cloudinary
+     * (or local fallback) configuration applies.
+     */
+    @Post('me/avatar')
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 4 * 1024 * 1024 } }))
+    async uploadAvatar(@Request() req, @UploadedFile() file: any) {
+        if (!file) throw new BadRequestException('No file uploaded');
+        if (!file.mimetype?.startsWith('image/')) throw new BadRequestException('File must be an image');
+        const url = await this.storageService.uploadProductImage(file.buffer, file.originalname, file.mimetype);
+        await this.prisma.user.update({
+            where: { id: req.user.sub },
+            data: { avatar: url },
+        });
+        return { url };
+    }
 
     @Get()
     @Roles(Role.ADMIN)

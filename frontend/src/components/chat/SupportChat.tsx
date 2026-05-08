@@ -42,6 +42,9 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
     
     const [isBotActive, setIsBotActive] = React.useState(true);
     const [newMessage, setNewMessage] = React.useState('');
+    // Send-debounce flag — prevents the user-reported "message duplicated 3
+    // times" bug from rapid Enter presses or button taps.
+    const [isSending, setIsSending] = React.useState(false);
     const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
     const [selectedCategory, setSelectedCategory] = React.useState<string | null>(null);
     const [hasLoadedMessages, setHasLoadedMessages] = React.useState(false);
@@ -222,8 +225,10 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
     };
 
     const handleSend = async () => {
+        if (isSending) return; // hard-debounce: ignore rapid clicks / Enter
         if (!newMessage.trim() && !selectedImage) return;
 
+        setIsSending(true);
         const content = newMessage;
         const image = selectedImage;
         setNewMessage('');
@@ -264,6 +269,9 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
                 removeMessage(optimisticMsg.id);
             }
         }
+        // Release the debounce flag after the request is conceptually done.
+        // The 400ms delay catches stragglers from optimistic UI / socket ack.
+        setTimeout(() => setIsSending(false), 400);
     };
 
     const showCategorySelector = !isSupport && hasLoadedMessages && messages.length === 0 && !selectedCategory;
@@ -450,17 +458,18 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
                         type="text"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+                        onKeyDown={(e) => { if (e.key === 'Enter' && !isSending) handleSend(); }}
                         placeholder="Type your message..."
+                        disabled={isSending}
                         className={cn(
-                            "flex-1 bg-transparent border-none py-3 text-sm outline-none",
+                            "flex-1 bg-transparent border-none py-3 text-sm outline-none disabled:opacity-60",
                             isLight ? "text-slate-900 placeholder:text-slate-400" : "text-white placeholder:text-white/20"
                         )}
                     />
                     <button
                         onClick={handleSend}
-                        disabled={!newMessage.trim() && !selectedImage}
-                        className="w-12 h-12 bg-teal-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/20"
+                        disabled={isSending || (!newMessage.trim() && !selectedImage)}
+                        className="w-12 h-12 bg-teal-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-teal-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <Send size={20} />
                     </button>
