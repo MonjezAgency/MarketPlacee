@@ -400,6 +400,24 @@ export default function ProductsModerationPage() {
         }
     };
 
+    // STALE-STATE GUARD. When selectedProduct changes (user clicks a
+    // different row, or closes the modal), reset every derived sub-state.
+    // Without this, opening Product B after editing Product A shows B's
+    // header with A's form fields populated — e.g. the user's screenshot
+    // of "Trolli All in One 1kg" carrying TENA XL's price + EAN through.
+    // Also clears the EAN search panel, lightbox, reject input, and
+    // delete-confirm UI so each product starts with a clean slate.
+    React.useEffect(() => {
+        setIsEditing(false);
+        setEditData(null);
+        setShowRejectInput(false);
+        setRejectReason('');
+        setShowDeleteConfirm(false);
+        setEanSearchResult(null);
+        setLightboxIndex(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedProduct?.id]);
+
     const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
         if (selectedIds.length === 0) return;
         

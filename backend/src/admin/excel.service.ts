@@ -556,7 +556,20 @@ export class ExcelService {
             // only stripped whitespace, leaving "7322541412405." which sent
             // a malformed lookup to Open Food Facts and returned 404.
             row.ean = String(row.ean).replace(/[^0-9X]/gi, '');
-            if (!row.ean) row.ean = undefined;
+
+            // Format-validate the EAN. Real product barcodes are EAN-13,
+            // EAN-8, UPC-A (12), or ITF-14 (14). Anything else — usually a
+            // supplier's internal SKU like "11042" — is NOT a barcode and
+            // should be dropped, otherwise we send malformed lookups to
+            // every external API and pollute the DB with phantom EANs.
+            //
+            // The Excel parser also maps "itemnumber" → ean (because some
+            // suppliers really do put barcodes in that column), so this
+            // length guard is the only thing keeping internal SKUs out.
+            const validLengths = [8, 12, 13, 14];
+            if (!row.ean || !validLengths.includes(row.ean.length)) {
+                row.ean = undefined;
+            }
         }
         if (row.brand !== undefined && row.brand !== null) row.brand = String(row.brand).trim();
         if (row.unit !== undefined && row.unit !== null) row.unit = String(row.unit).trim().toLowerCase();
