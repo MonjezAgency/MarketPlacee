@@ -42,69 +42,95 @@ export class EmailService {
   }
 
   /**
-   * Send email — tries SMTP first (fast 5s timeout), then Resend API.
+   * Send email — tries Resend (HTTPS, never blocked from cloud hosts) FIRST,
+   * falls back to SMTP only if Resend isn't configured.
+   *
+   * Returns { success: boolean, error?: string } so the controller can
+   * surface the real reason to the admin instead of a vague "REJECTED".
+   *
+   * The previous order (SMTP → Resend) didn't work on Railway because
+   * Hostinger SMTP rejects connections from cloud-IP ranges. Result: every
+   * SMTP attempt timed out at 5s, then fell through to Resend — which on
+   * an unverified domain returned 403, leaving the user with "REJECTED"
+   * and no idea what to do.
    */
-  async sendMail(to: string, subject: string, html: string): Promise<boolean> {
-    // ──── Strategy 1: SMTP (works locally / non-Railway) ────
+  async sendMailDetailed(to: string, subject: string, html: string): Promise<{ success: boolean; error?: string; provider?: string }> {
+    const resendKey = process.env.RESEND_API_KEY;
+
+    // ──── Strategy 1: Resend API (PRIMARY) ────
+    if (resendKey) {
+      const resendFrom = process.env.RESEND_FROM || 'onboarding@resend.dev';
+      try {
+        console.log(`[EMAIL] Resend → ${to} (from: ${resendFrom})`);
+        const res = await axios.post(
+          'https://api.resend.com/emails',
+          {
+            from: `Atlantis Marketplace <${resendFrom}>`,
+            to: [to],
+            subject,
+            html,
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${resendKey}`,
+              'Content-Type': 'application/json',
+            },
+            timeout: 10000,
+          },
+        );
+        console.log(`✅ [EMAIL] Resend success — ID ${res.data?.id}`);
+        return { success: true, provider: 'resend' };
+      } catch (resendErr: any) {
+        const status = resendErr.response?.status;
+        const data = resendErr.response?.data;
+        console.error(`❌ [EMAIL] Resend HTTP ${status}: ${JSON.stringify(data)}`);
+
+        // Translate the Resend error into a human reason for the admin UI
+        let reason = data?.message || resendErr.message || 'Resend API error';
+        if (status === 403 && /verify.*domain/i.test(reason)) {
+            reason = `Sending domain not verified in Resend. Go to https://resend.com/domains, add atlantisfmcg.com, copy the DNS records, then set RESEND_FROM=noreply@atlantisfmcg.com on Railway.`;
+        } else if (status === 403 && /testing emails/i.test(reason)) {
+            reason = `Resend is in testing mode — only the account owner's email can receive. Verify a sending domain to send to anyone.`;
+        } else if (status === 422) {
+            reason = `Resend rejected the message: ${reason}`;
+        } else if (status === 401) {
+            reason = `Resend API key invalid. Check RESEND_API_KEY on Railway.`;
+        }
+        // Fall through to SMTP attempt
+        console.warn(`[EMAIL] Falling back to SMTP — ${reason}`);
+        return this.smtpFallback(to, subject, html, reason);
+      }
+    } else {
+      console.warn(`[EMAIL] RESEND_API_KEY not set — SMTP-only mode (likely fails on Railway)`);
+      return this.smtpFallback(to, subject, html, 'RESEND_API_KEY not configured');
+    }
+  }
+
+  private async smtpFallback(to: string, subject: string, html: string, prevError: string): Promise<{ success: boolean; error?: string; provider?: string }> {
     try {
-      console.log(`[EMAIL] Trying SMTP to ${to}...`);
+      console.log(`[EMAIL] SMTP fallback → ${to}...`);
       const info = await this.transporter.sendMail({
         from: this.getFrom(),
         to,
         subject,
         html,
       });
-      console.log(`✅ [EMAIL] SMTP SUCCESS — ${info.messageId}`);
-      return true;
+      console.log(`✅ [EMAIL] SMTP success — ${info.messageId}`);
+      return { success: true, provider: 'smtp' };
     } catch (smtpErr: any) {
-      console.warn(`⚠️ [EMAIL] SMTP failed: ${smtpErr.code || smtpErr.message}`);
+      const reason = `${prevError}; SMTP fallback also failed: ${smtpErr.code || smtpErr.message}`;
+      console.error(`❌ [EMAIL] BOTH PROVIDERS FAILED for ${to} — ${reason}`);
+      return { success: false, error: reason, provider: 'none' };
     }
+  }
 
-    // ──── Strategy 2: Resend API (HTTPS, never blocked) ────
-    const resendKey = process.env.RESEND_API_KEY;
-    if (!resendKey) {
-      console.error(`❌ [EMAIL] No RESEND_API_KEY. Cannot send to ${to}.`);
-      return false;
-    }
-
-    const resendFrom = process.env.RESEND_FROM || 'onboarding@resend.dev';
-    console.log(`[EMAIL] Trying Resend API to ${to} (from: ${resendFrom})...`);
-
-    try {
-      const res = await axios.post(
-        'https://api.resend.com/emails',
-        {
-          from: `Atlantis Marketplace <${resendFrom}>`,
-          to: [to],
-          subject,
-          html,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${resendKey}`,
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-      console.log(`✅ [EMAIL] Resend SUCCESS — ID: ${res.data?.id}`);
-      return true;
-    } catch (resendErr: any) {
-      const status = resendErr.response?.status;
-      const data = resendErr.response?.data;
-      console.error(`❌ [EMAIL] Resend FAILED — HTTP ${status}`);
-      console.error(`   ${JSON.stringify(data)}`);
-
-      if (status === 403 && data?.message?.includes('verify a domain')) {
-        console.error(`\n╔══════════════════════════════════════════════════╗`);
-        console.error(`║  TO FIX EMAIL: Verify your domain in Resend!     ║`);
-        console.error(`║  1. Go to https://resend.com/domains             ║`);
-        console.error(`║  2. Add domain: atlantisfmcg.com                 ║`);
-        console.error(`║  3. Add the DNS records they give you            ║`);
-        console.error(`║  4. Set RESEND_FROM=noreply@atlantisfmcg.com     ║`);
-        console.error(`╚══════════════════════════════════════════════════╝\n`);
-      }
-      return false;
-    }
+  /**
+   * Backwards-compat boolean wrapper. New callers should use sendMailDetailed
+   * to get the actual error message.
+   */
+  async sendMail(to: string, subject: string, html: string): Promise<boolean> {
+    const result = await this.sendMailDetailed(to, subject, html);
+    return result.success;
   }
 
   async sendVerificationEmail(email: string, token: string) {
@@ -202,15 +228,21 @@ export class EmailService {
     role: string;
     inviteLink: string;
     senderName?: string;
-  }) {
+  }): Promise<{ success: boolean; error?: string; provider?: string }> {
     const html = getInvitationEmailHtml(params);
-
     try {
-      const result = await this.sendMail(params.recipientEmail, `🎉 Invitation: Join Atlantis as a ${params.role === 'supplier' ? 'Supplier' : 'Strategic Customer'}`, html);
-      return { success: result };
-    } catch (error) {
+      // sendMailDetailed returns the real error reason so the admin UI can
+      // surface "Domain not verified" / "API key invalid" instead of a
+      // vague REJECTED badge.
+      const result = await this.sendMailDetailed(
+        params.recipientEmail,
+        `🎉 Invitation: Join Atlantis as a ${params.role === 'supplier' ? 'Supplier' : 'Strategic Customer'}`,
+        html,
+      );
+      return result;
+    } catch (error: any) {
       console.error('ERROR [sendInviteEmail]:', error);
-      throw error;
+      return { success: false, error: error?.message || 'Unknown email error' };
     }
   }
 

@@ -55,7 +55,18 @@ export class TeamController {
                     inviteLink: body.inviteLink,
                     senderName,
                 });
-                return { email, success: result.success, message: result.success ? 'Accepted' : 'Failed' };
+                return {
+                    email,
+                    success: result.success,
+                    provider: result.provider || null,
+                    // Surface the real reason to the admin UI when delivery
+                    // failed — e.g. "Sending domain not verified in Resend"
+                    // instead of just REJECTED.
+                    message: result.success
+                        ? `Sent via ${result.provider || 'email'}`
+                        : (result.error || 'Delivery failed'),
+                    error: result.success ? undefined : (result.error || 'Delivery failed'),
+                };
             } catch (error: any) {
                 return { email, success: false, error: error.message || 'SMTP/Delivery failure' };
             }

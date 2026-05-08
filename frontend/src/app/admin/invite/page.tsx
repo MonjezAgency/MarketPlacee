@@ -281,17 +281,21 @@ export default function AdminInvitePage() {
                                                      <p className="text-[10px] font-black uppercase text-muted-foreground mb-2">Detailed Status:</p>
                                                      <div className="max-h-32 overflow-y-auto space-y-1 pr-2 custom-scrollbar">
                                                         {emailResult.details.map((res: any, idx: number) => (
-                                                            <div key={idx} className="flex items-center justify-between py-1 border-b border-white/5 last:border-0">
-                                                                <span className="text-[11px] truncate max-w-[180px] opacity-70 font-mono italic">{res.email}</span>
-                                                                <span className={cn(
-                                                                    "text-[9px] font-black uppercase px-2 py-0.5 rounded-md flex items-center gap-1",
-                                                                    res.success ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"
-                                                                )}>
-                                                                    {res.success ? 'ACCEPTED' : 'REJECTED'}
-                                                                    {!res.success && res.error && (
-                                                                        <span className="opacity-60 text-[8px] lowercase italic">({res.error.substring(0, 15)})</span>
-                                                                    )}
-                                                                </span>
+                                                            <div key={idx} className="py-1.5 border-b border-white/5 last:border-0">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-[11px] truncate max-w-[200px] opacity-70 font-mono italic">{res.email}</span>
+                                                                    <span className={cn(
+                                                                        "text-[9px] font-black uppercase px-2 py-0.5 rounded-md",
+                                                                        res.success ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400",
+                                                                    )}>
+                                                                        {res.success ? `Sent · ${res.provider || 'email'}` : 'Failed'}
+                                                                    </span>
+                                                                </div>
+                                                                {!res.success && res.error && (
+                                                                    <p className="mt-1 text-[10px] text-red-300/80 leading-snug pl-1">
+                                                                        {res.error}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         ))}
                                                      </div>
