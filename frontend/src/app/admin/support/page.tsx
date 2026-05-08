@@ -4,6 +4,7 @@ import { apiFetch, getToken } from "@/lib/api";
 import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { SupportChat } from '@/components/chat/SupportChat';
+import OrderChatModal from '@/components/chat/OrderChatModal';
 import { useAuth } from '@/lib/auth';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
@@ -109,6 +110,15 @@ function SupportHQContent() {
     const [kycList, setKycList] = React.useState<any[]>([]);
     const [conversations, setConversations] = React.useState<any[]>([]);
     const [selectedUser, setSelectedUser] = React.useState<any>(null);
+    // Order-linked chats sit in a separate backend collection from general
+    // support inquiries. They were invisible in the admin list because we
+    // only fetched /chat/admin/conversations. Now we fetch both and let the
+    // admin filter between them.
+    const [orderChats, setOrderChats] = React.useState<any[]>([]);
+    const [convFilter, setConvFilter] = React.useState<'all' | 'support' | 'orders'>('all');
+    const [openOrderChatId, setOpenOrderChatId] = React.useState<string | null>(null);
+    const [openOrderChatTotal, setOpenOrderChatTotal] = React.useState<number>(0);
+    const [openOrderChatCustomer, setOpenOrderChatCustomer] = React.useState<string>('');
     const searchParams = useSearchParams();
     const initialSearch = searchParams.get('search') || '';
     const [searchTerm, setSearchTerm] = React.useState(initialSearch);
@@ -125,19 +135,23 @@ function SupportHQContent() {
         else setIsRefreshing(true);
         
         try {
-            const [disputeStats, disputeData, orderData, kycData, chatData] = await Promise.allSettled([
+            const [disputeStats, disputeData, orderData, kycData, chatData, orderChatData] = await Promise.allSettled([
                 apiFetch(`/disputes/stats`).then(r => r.json()),
                 apiFetch(`/disputes?page=1&limit=50`).then(r => r.json()),
                 apiFetch(`/orders?page=1&limit=30`).then(r => r.json()),
                 apiFetch(`/kyc/pending`).then(r => r.json()),
                 apiFetch(`/chat/admin/conversations`).then(r => r.json()),
+                apiFetch(`/chat/admin/order-chats`).then(r => r.json()),
             ]);
 
             if (disputeStats.status === 'fulfilled') setStats(disputeStats.value);
             if (disputeData.status === 'fulfilled') setDisputes(disputeData.value?.data || []);
             if (orderData.status === 'fulfilled') setOrders(orderData.value?.data || orderData.value || []);
             if (kycData.status === 'fulfilled') setKycList(Array.isArray(kycData.value) ? kycData.value : []);
-            
+            if (orderChatData.status === 'fulfilled') {
+                setOrderChats(Array.isArray(orderChatData.value) ? orderChatData.value : []);
+            }
+
             if (chatData.status === 'fulfilled') {
                 const convs = Array.isArray(chatData.value) ? chatData.value : [];
                 setConversations(convs);
@@ -254,32 +268,34 @@ function SupportHQContent() {
                 <SectionTab label="Live Chat" icon={MessageCircle} active={tab === 'chat'} count={conversations.filter(c => c.unread).length} onClick={() => setTab('chat')} />
             </div>
 
-            {/* KPI Row - Responsive Grid */}
+            {/* KPI Row — values derived from real fetched data, no more
+                hardcoded mock numbers. The trend percentages were also
+                fabricated; left at 0 with no arrow until we wire up time-
+                bucketed historical counts. */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-                <KPICard 
-                    icon={AlertCircle} label="Open Disputes" value={stats?.OPEN ?? 8} 
-                    subtext="Require attention" trend="up" trendValue={23} 
-                    color="bg-red-50" iconColor="text-red-500" 
+                <KPICard
+                    icon={AlertCircle} label="Open Disputes" value={stats?.OPEN ?? disputes.length}
+                    subtext="Require attention"
+                    color="bg-red-50" iconColor="text-red-500"
                 />
-                <KPICard 
-                    icon={Clock} label="Under Review" value={stats?.UNDER_REVIEW ?? 12} 
-                    subtext="Awaiting review" trend="up" trendValue={15} 
-                    color="bg-orange-50" iconColor="text-orange-500" 
+                <KPICard
+                    icon={Clock} label="Under Review" value={stats?.UNDER_REVIEW ?? 0}
+                    subtext="Awaiting review"
+                    color="bg-orange-50" iconColor="text-orange-500"
                 />
-                <KPICard 
-                    icon={UserCheck} label="KYC Pending" value={kycList.length || 24} 
-                    subtext="Pending verification" trend="down" trendValue={8} 
-                    color="bg-blue-50" iconColor="text-blue-500" 
+                <KPICard
+                    icon={UserCheck} label="KYC Pending" value={kycList.length}
+                    subtext="Pending verification"
+                    color="bg-blue-50" iconColor="text-blue-500"
                 />
-                <KPICard 
-                    icon={MessageCircle} label="Active Conversations" value={conversations.length || 3} 
-                    subtext="Unresolved chats" trend="up" trendValue={12} 
-                    color="bg-emerald-50" iconColor="text-emerald-500" 
+                <KPICard
+                    icon={MessageCircle} label="Active Conversations" value={conversations.length + orderChats.length}
+                    subtext={`${conversations.length} support · ${orderChats.length} order`}
+                    color="bg-emerald-50" iconColor="text-emerald-500"
                 />
-                <KPICard 
-                    icon={Clock} label="Avg. Response Time" value="18m" 
-                    subtext="Within SLA" trend="down" trendValue={2.7} 
-                    color="bg-purple-50" iconColor="text-purple-500" 
+                <KPICard
+                    icon={Clock} label="Avg. Response Time" value="—"
+                    subtext="SLA tracking pending"
                 />
             </div>
 
@@ -294,59 +310,145 @@ function SupportHQContent() {
                                 <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
                                     Conversations
                                     <span className="px-2 py-0.5 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full font-bold">
-                                        {conversations.length}
+                                        {conversations.length + orderChats.length}
                                     </span>
                                 </h3>
                                 <p className="text-xs text-slate-400 mt-1">Active resolution threads</p>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <button className="p-2 bg-white border border-slate-200 rounded-lg text-slate-500 hover:text-slate-900 transition-colors">
-                                    <Filter size={14} />
-                                </button>
+                            <div className="flex items-center gap-1.5 bg-slate-100/60 rounded-lg p-1">
+                                {([
+                                    { id: 'all',     label: 'All',     count: conversations.length + orderChats.length },
+                                    { id: 'support', label: 'Support', count: conversations.length },
+                                    { id: 'orders',  label: 'Orders',  count: orderChats.length },
+                                ] as const).map(f => (
+                                    <button
+                                        key={f.id}
+                                        onClick={() => setConvFilter(f.id)}
+                                        className={cn(
+                                            'px-2.5 py-1 rounded-md text-[11px] font-bold transition-all',
+                                            convFilter === f.id
+                                                ? 'bg-white text-teal-700 shadow-sm'
+                                                : 'text-slate-500 hover:text-slate-700',
+                                        )}
+                                    >
+                                        {f.label} <span className="opacity-60">({f.count})</span>
+                                    </button>
+                                ))}
                             </div>
                         </div>
 
                         <div className="flex-1 overflow-y-auto no-scrollbar">
-                            {conversations
-                                .filter(c => 
-                                    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                                    c.lastMessage?.toLowerCase().includes(searchTerm.toLowerCase())
+                            {(() => {
+                                // Tag each conversation with `kind` so we can route clicks
+                                // to the right modal (general support → SupportChat panel,
+                                // order-linked → OrderChatModal).
+                                const taggedSupport = conversations.map(c => ({ ...c, kind: 'support' as const }));
+                                const taggedOrders = orderChats.map(o => ({
+                                    id: `order-${o.orderId}`,
+                                    userId: o.customer?.id || null,
+                                    name: o.customer?.name || 'Customer',
+                                    lastMessage: o.lastMessage,
+                                    lastMessageAt: o.lastMessageAt,
+                                    orderId: o.orderId,
+                                    orderTotal: o.total,
+                                    orderStatus: o.status,
+                                    unread: o.unread || 0,
+                                    kind: 'order' as const,
+                                }));
+                                const merged = (
+                                    convFilter === 'support' ? taggedSupport :
+                                    convFilter === 'orders' ? taggedOrders :
+                                    [...taggedSupport, ...taggedOrders]
                                 )
-                                .map((conv, idx) => {
-                                const priority = conv.lastMessage?.toLowerCase().includes('payment') || conv.lastMessage?.toLowerCase().includes('نزاع') ? 'HIGH' : 'MEDIUM';
-                                return (
-                                    <button 
-                                        key={conv.id}
-                                        onClick={() => setSelectedUser(conv)}
-                                        className={cn(
-                                            "w-full p-4 border-b border-slate-50 flex items-start gap-4 transition-all text-start",
-                                            selectedUser?.id === conv.id ? "bg-teal-50/30 border-l-4 border-l-teal-500" : "hover:bg-slate-50/50"
-                                        )}
-                                    >
-                                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 shrink-0">
-                                            {(conv.name || '?')[0]}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <div className="flex items-center justify-between mb-1">
-                                                <h4 className="text-sm font-semibold text-slate-900 truncate">{conv.name}</h4>
-                                                <span className="text-[10px] text-slate-400">5m ago</span>
-                                            </div>
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <span className={cn(
-                                                    "text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider",
-                                                    priority === 'HIGH' ? "bg-red-50 text-red-600 border border-red-100" : "bg-orange-50 text-orange-600 border border-orange-100"
-                                                )}>
-                                                    {priority}
-                                                </span>
-                                                <p className="text-[10px] text-slate-400 font-medium">Order #AT-78451</p>
-                                            </div>
-                                            <p className="text-xs text-slate-500 truncate leading-relaxed">
-                                                {conv.lastMessage || 'I haven\'t received my order yet and the tracking...'}
+                                .filter(c =>
+                                    c.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    c.lastMessage?.toLowerCase().includes(searchTerm.toLowerCase()),
+                                )
+                                .sort((a, b) => {
+                                    const ta = a.lastMessageAt ? new Date(a.lastMessageAt).getTime() : 0;
+                                    const tb = b.lastMessageAt ? new Date(b.lastMessageAt).getTime() : 0;
+                                    return tb - ta;
+                                });
+
+                                if (merged.length === 0) {
+                                    return (
+                                        <div className="flex flex-col items-center justify-center h-full text-center p-6 gap-2">
+                                            <MessageCircle size={32} className="text-slate-200" />
+                                            <p className="text-sm font-bold text-slate-500">No conversations</p>
+                                            <p className="text-[11px] text-slate-400">
+                                                {convFilter === 'orders'
+                                                    ? 'When you click "Contact Customer" on an order, the chat appears here.'
+                                                    : 'Customer support inquiries will appear here once they message.'}
                                             </p>
                                         </div>
-                                    </button>
-                                );
-                            })}
+                                    );
+                                }
+
+                                return merged.map((conv: any) => {
+                                    const isOrder = conv.kind === 'order';
+                                    return (
+                                        <button
+                                            key={conv.id}
+                                            onClick={() => {
+                                                if (isOrder) {
+                                                    setOpenOrderChatId(conv.orderId);
+                                                    setOpenOrderChatTotal(conv.orderTotal || 0);
+                                                    setOpenOrderChatCustomer(conv.name);
+                                                } else {
+                                                    setSelectedUser(conv);
+                                                }
+                                            }}
+                                            className={cn(
+                                                'w-full p-4 border-b border-slate-50 flex items-start gap-4 transition-all text-start',
+                                                !isOrder && selectedUser?.id === conv.id
+                                                    ? 'bg-teal-50/30 border-l-4 border-l-teal-500'
+                                                    : 'hover:bg-slate-50/50',
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                'w-10 h-10 rounded-full flex items-center justify-center font-bold shrink-0',
+                                                isOrder
+                                                    ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                                    : 'bg-slate-100 text-slate-400',
+                                            )}>
+                                                {(conv.name || '?')[0]}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <h4 className="text-sm font-semibold text-slate-900 truncate">{conv.name}</h4>
+                                                    <span className="text-[10px] text-slate-400">
+                                                        {conv.lastMessageAt
+                                                            ? new Date(conv.lastMessageAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                                            : '—'}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                    <span className={cn(
+                                                        'text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider',
+                                                        isOrder
+                                                            ? 'bg-amber-50 text-amber-600 border border-amber-100'
+                                                            : 'bg-blue-50 text-blue-600 border border-blue-100',
+                                                    )}>
+                                                        {isOrder ? `Order` : 'Support'}
+                                                    </span>
+                                                    {isOrder && conv.orderId && (
+                                                        <p className="text-[10px] text-slate-400 font-mono">#{String(conv.orderId).slice(-8).toUpperCase()}</p>
+                                                    )}
+                                                    {isOrder && conv.orderTotal && (
+                                                        <p className="text-[10px] text-slate-400 font-medium">€{Number(conv.orderTotal).toFixed(2)}</p>
+                                                    )}
+                                                    {conv.unread > 0 && (
+                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 bg-red-500 text-white rounded-full">{conv.unread}</span>
+                                                    )}
+                                                </div>
+                                                <p className="text-xs text-slate-500 truncate leading-relaxed">
+                                                    {conv.lastMessage || (isOrder ? 'New order conversation started' : 'No messages yet')}
+                                                </p>
+                                            </div>
+                                        </button>
+                                    );
+                                });
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -509,12 +611,28 @@ function SupportHQContent() {
             <div className="bg-amber-50 border border-amber-200 rounded-[1.5rem] p-4 flex items-center justify-between">
                 <div className="flex items-center gap-3 text-amber-800">
                     <AlertCircle size={18} />
-                    <p className="text-xs font-bold">You have <span className="font-black">8 open disputes</span> that need your attention.</p>
+                    <p className="text-xs font-bold">You have <span className="font-black">{stats?.openDisputes ?? disputes.length}</span> open disputes that need your attention.</p>
                 </div>
-                <button className="h-9 px-6 bg-white border border-amber-200 text-amber-800 text-[10px] font-black rounded-xl hover:bg-amber-100 transition-all">
+                <button onClick={() => setTab('disputes')} className="h-9 px-6 bg-white border border-amber-200 text-amber-800 text-[10px] font-black rounded-xl hover:bg-amber-100 transition-all">
                     Review Disputes
                 </button>
             </div>
+
+            {/* Order Chat Modal — opened from the Conversations list when an admin
+                clicks an order-linked thread. Same OrderChatModal that the
+                /admin/orders/[id] page uses, so messages persist to the same
+                Order.chatMessages relation and appear on both sides. */}
+            <AnimatePresence>
+                {openOrderChatId && (
+                    <OrderChatModal
+                        orderId={openOrderChatId}
+                        orderTotal={openOrderChatTotal}
+                        customerName={openOrderChatCustomer}
+                        isAdmin={true}
+                        onClose={() => { setOpenOrderChatId(null); fetchAll(true); }}
+                    />
+                )}
+            </AnimatePresence>
         </div>
     );
 }
