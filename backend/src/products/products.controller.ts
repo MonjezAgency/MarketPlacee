@@ -255,18 +255,13 @@ export class ProductsController {
             };
             const rate = TO_EUR[currency] ?? 1;
 
-            // Diagnostic: log the resolved currency + rate so we can debug
-            // any future "price stored as X% of sheet value" report by
-            // matching it to the upload that produced it. Sample a few
-            // rows so we don't blow up the log on big sheets.
+            // Header diagnostic. Per-row trace happens later in the batch
+            // loop so we can match each row's stored basePrice back to the
+            // sheet value if a price-drift bug surfaces.
             this.logger.log(
                 `[BulkUpload] currency tag="${currency || '<empty>'}" → rate=${rate} ` +
-                `(EUR=${TO_EUR.EUR}, falls back to 1 when unknown). ` +
-                `${report.results.length} rows in file. ` +
-                `Sample: ${report.results.slice(0, 3).map(r => {
-                    const p = (r.data as any)?.price;
-                    return `${(r.data as any)?.name || '?'}: sheet=${p} → stored=${typeof p === 'number' ? (p * rate).toFixed(4) : '?'}`;
-                }).join(' | ')}`
+                `(EUR=${TO_EUR.EUR}). ${report.results.length} rows in file. ` +
+                `Per-row price trace below.`
             );
 
             // Default image-count when fetching by EAN. Configurable via
@@ -284,6 +279,18 @@ export class ProductsController {
                     const dto = result.data as CreateProductDto;
                     const supplierId = isAdmin ? (dto.supplierId || req.user.sub) : req.user.sub;
                     const priceInBase = dto.price ? (dto.price * rate) : 0;
+
+                    // PER-ROW PRICE TRACE. The user reports prices being
+                    // stored as different ratios of the sheet value (14 →
+                    // 13.55, 17 → 17.36 etc.). This log line captures the
+                    // full chain so the next upload either confirms the
+                    // fix or pinpoints the next bug:
+                    //   sheet → DTO → controller × rate → service.basePrice
+                    this.logger.log(
+                        `[BulkUpload row] name="${(dto as any).name?.slice(0, 40) || '?'}" ` +
+                        `dto.price=${dto.price} (raw from Excel) × rate=${rate} (currency="${currency || '<empty>'}") ` +
+                        `→ priceInBase=${priceInBase} (this becomes basePrice in DB)`
+                    );
 
                     // ── EAN-based image fetch ────────────────────────────
                     // If no images provided in the row AND we have an EAN,
