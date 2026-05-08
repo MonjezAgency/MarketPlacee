@@ -723,7 +723,9 @@ export default function ProductDetailClient() {
                                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Logistics & Physical</h4>
                                     <div className="space-y-4">
                                         {[
-                                            { label: 'Weight per Unit', value: `${product.weight || 'N/A'} kg` },
+                                            // Don't append "kg" if the weight already contains a unit (g, kg, ml, etc).
+                                            // Suppliers commonly type "100g" or "1.5kg" directly.
+                                            { label: 'Weight per Unit', value: product.weight ? (/[a-z]/i.test(String(product.weight)) ? String(product.weight) : `${product.weight} kg`) : 'N/A' },
                                             { label: 'Units per Pallet', value: `${product.unitsPerPallet || 'N/A'} pcs` },
                                             { label: 'Pallet per Truck', value: product.palletsPerShipment || 'N/A' },
                                             { label: 'Unit Type', value: product.unit || 'Standard' }

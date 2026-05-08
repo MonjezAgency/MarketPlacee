@@ -154,6 +154,13 @@ export default function HomePage() {
     const [products, setProducts] = React.useState<any[]>([]);
     const [loading, setLoading] = React.useState(true);
     const productsRef = React.useRef<HTMLDivElement | null>(null);
+    // True pagination on the Popular Wholesale Products carousel —
+    // arrows now fetch the next/previous PAGE of products from the API
+    // instead of just scrolling the same set. User reported clicking
+    // "next" and seeing the same products as before — this fixes that.
+    const [productsPage, setProductsPage] = React.useState(1);
+    const [productsTotalPages, setProductsTotalPages] = React.useState(1);
+    const PRODUCTS_PER_PAGE = 12; // 2 rows × 6 columns on desktop
 
     React.useEffect(() => {
         const id = setInterval(() => setSlide((s) => (s + 1) % HERO_SLIDES.length), 6000);
@@ -163,10 +170,12 @@ export default function HomePage() {
     React.useEffect(() => {
         (async () => {
             try {
-                const res = await apiFetch('/products?limit=12&status=APPROVED&sort=popular');
+                setLoading(true);
+                const res = await apiFetch(`/products?limit=${PRODUCTS_PER_PAGE}&page=${productsPage}&status=APPROVED&sort=popular`);
                 if (res.ok) {
                     const data = await res.json();
                     setProducts(data.data || []);
+                    if (typeof data.totalPages === 'number') setProductsTotalPages(data.totalPages);
                 }
             } catch {
                 /* noop */
@@ -174,12 +183,17 @@ export default function HomePage() {
                 setLoading(false);
             }
         })();
-    }, []);
+    }, [productsPage]);
 
     const scrollProducts = (dir: 'left' | 'right') => {
-        if (!productsRef.current) return;
-        const amount = productsRef.current.clientWidth * 0.85;
-        productsRef.current.scrollBy({ left: dir === 'left' ? -amount : amount, behavior: 'smooth' });
+        // Page-based navigation: each arrow click advances a true page.
+        // Stays within bounds [1, totalPages].
+        setProductsPage(p => {
+            if (dir === 'right') return Math.min(p + 1, productsTotalPages);
+            return Math.max(p - 1, 1);
+        });
+        // Scroll back to the start so the new page renders from the left.
+        if (productsRef.current) productsRef.current.scrollLeft = 0;
     };
 
     return (
@@ -473,18 +487,28 @@ export default function HomePage() {
                     </div>
 
                     <div className="relative">
-                        {/* Side arrows (hidden on small) */}
+                        {/* Page indicator — bottom-right, only when there are
+                            multiple pages. Tells the user that the arrows
+                            actually advance through different products. */}
+                        {productsTotalPages > 1 && (
+                            <div className="hidden lg:flex absolute -top-7 right-0 items-center gap-2 text-[11px] font-bold text-[#64748B]">
+                                Page {productsPage} of {productsTotalPages}
+                            </div>
+                        )}
+                        {/* Side arrows (hidden on small) — disabled at boundaries */}
                         <button
                             onClick={() => scrollProducts('left')}
-                            aria-label="Previous"
-                            className="hidden lg:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 items-center justify-center bg-white border border-[#E5E7EB] rounded-full shadow-sm hover:bg-[#F1F5F9]"
+                            aria-label="Previous page"
+                            disabled={productsPage <= 1}
+                            className="hidden lg:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 items-center justify-center bg-white border border-[#E5E7EB] rounded-full shadow-sm hover:bg-[#F1F5F9] disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             <ChevronLeft size={18} className="text-[#0F172A]" />
                         </button>
                         <button
                             onClick={() => scrollProducts('right')}
-                            aria-label="Next"
-                            className="hidden lg:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 items-center justify-center bg-white border border-[#E5E7EB] rounded-full shadow-sm hover:bg-[#F1F5F9]"
+                            aria-label="Next page"
+                            disabled={productsPage >= productsTotalPages}
+                            className="hidden lg:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 items-center justify-center bg-white border border-[#E5E7EB] rounded-full shadow-sm hover:bg-[#F1F5F9] disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                             <ChevronRight size={18} className="text-[#0F172A]" />
                         </button>

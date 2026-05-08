@@ -1055,7 +1055,14 @@ export default function ProductsModerationPage() {
                                                         {selectedProduct.weight ? (
                                                             <div className="flex items-center justify-between py-3">
                                                                 <dt className="text-[13px] text-slate-500">Weight</dt>
-                                                                <dd className="text-[13px] font-bold text-slate-900">{selectedProduct.weight} kg</dd>
+                                                                <dd className="text-[13px] font-bold text-slate-900">{(() => {
+                                                                    // Display the weight as-is if the supplier already typed
+                                                                    // a unit suffix (g/kg/ml/L/oz/lb). Only append "kg" when
+                                                                    // the value is a bare number — otherwise we get bugs
+                                                                    // like "100g kg".
+                                                                    const w = String(selectedProduct.weight).trim();
+                                                                    return /[a-z]/i.test(w) ? w : `${w} kg`;
+                                                                })()}</dd>
                                                             </div>
                                                         ) : null}
                                                         {selectedProduct.description && (
