@@ -28,6 +28,18 @@ export class OrdersService {
     ) { }
 
     async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number) {
+        // Snapshot product names so the order keeps history if a product
+        // is deleted later. We pass `name` from the cart payload when
+        // available, otherwise look it up.
+        const productIds = items.map(i => i.productId).filter(Boolean);
+        const productNames = productIds.length > 0
+            ? await this.prisma.product.findMany({
+                where: { id: { in: productIds } },
+                select: { id: true, name: true },
+            })
+            : [];
+        const nameById = new Map(productNames.map(p => [p.id, p.name]));
+
         const order = await this.prisma.order.create({
             data: {
                 customerId,
@@ -40,6 +52,7 @@ export class OrdersService {
                         productId: item.productId,
                         quantity: item.quantity,
                         price: item.price,
+                        productNameSnapshot: item.name || nameById.get(item.productId) || null,
                     })),
                 },
                 history: {
@@ -280,8 +293,9 @@ export class OrdersService {
             items: order.items.map(item => ({
                 id: item.id,
                 productId: item.productId,
-                name: item.product.name,
-                image: item.product.images?.[0] ?? null,
+                // Fall back to the snapshot when product was deleted post-order.
+                name: (item as any).product?.name ?? (item as any).productNameSnapshot ?? 'Deleted product',
+                image: (item as any).product?.images?.[0] ?? null,
                 quantity: item.quantity,
                 price: item.price,
             })),

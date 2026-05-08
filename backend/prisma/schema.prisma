@@ -297,8 +297,15 @@ model OrderItem {
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
-  productId String
-  product   Product @relation(fields: [productId], references: [id])
+  // productId nullable so admins can delete a Product after orders exist —
+  // the OrderItem keeps its quantity + price snapshot for order history,
+  // but the live link to the Product row goes to NULL when the product is
+  // removed. Frontend renders "Deleted product" when product is null.
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  // Snapshot of the product name at order time, in case the product is later
+  // deleted. Optional — populated on order creation.
+  productNameSnapshot String?
 }
 
 model AdminActionLog {

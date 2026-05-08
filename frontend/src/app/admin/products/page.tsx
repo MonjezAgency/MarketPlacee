@@ -1576,15 +1576,17 @@ export default function ProductsModerationPage() {
                                                     </div>
                                                 )}
                                             </div>
-                                            {/* Delete — only for PENDING / REJECTED. Approved products may have orders. */}
-                                            {(selectedProduct.status === 'PENDING' || selectedProduct.status === 'REJECTED') && (
-                                                <button
-                                                    onClick={() => setShowDeleteConfirm(true)}
-                                                    className="w-full h-10 bg-white border border-red-100 text-red-500 rounded-xl text-[12px] font-semibold hover:bg-red-50 hover:border-red-300 transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <Trash2 size={13} /> Delete this product
-                                                </button>
-                                            )}
+                                            {/* Delete — available for ANY status. Order history is preserved
+                                                via OrderItem.productNameSnapshot + the SET NULL cascade on the
+                                                productId FK, so deleting an approved product with orders no
+                                                longer breaks anything. The confirm dialog warns the admin if
+                                                the product has orders. */}
+                                            <button
+                                                onClick={() => setShowDeleteConfirm(true)}
+                                                className="w-full h-10 bg-white border border-red-100 text-red-500 rounded-xl text-[12px] font-semibold hover:bg-red-50 hover:border-red-300 transition-all flex items-center justify-center gap-2"
+                                            >
+                                                <Trash2 size={13} /> Delete this product
+                                            </button>
                                         </div>
                                     )}
                                 </div>

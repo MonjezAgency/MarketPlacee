@@ -453,26 +453,55 @@ export class ProductsService {
         return updated;
     }
 
+    /**
+     * Hard-delete a single product. The OrderItem.product FK is now SET NULL
+     * on cascade (migration 20260509_orderitem_product_setnull), so existing
+     * orders preserve their quantity + price + productNameSnapshot — only
+     * the live link to the Product row drops. Admin can delete any product
+     * after confirmation regardless of order history.
+     */
     async deleteProduct(id: string) {
+        // Snapshot product names onto OrderItems first so order history
+        // shows "KitKat 40g (deleted)" rather than just a blank cell.
+        const product = await this.prisma.product.findUnique({
+            where: { id },
+            select: { name: true },
+        });
+        if (product?.name) {
+            await this.prisma.orderItem.updateMany({
+                where: { productId: id, productNameSnapshot: null },
+                data: { productNameSnapshot: product.name },
+            });
+        }
+        // Clean dependent rows that DON'T have cascade set in the schema.
+        await this.prisma.$transaction([
+            this.prisma.productPlacement.deleteMany({ where: { productId: id } }),
+            this.prisma.tieredPrice.deleteMany({ where: { productId: id } }),
+            this.prisma.review.deleteMany({ where: { productId: id } }),
+            this.prisma.wishlistItem.deleteMany({ where: { productId: id } }),
+        ]);
         return this.prisma.product.delete({ where: { id } });
     }
 
     async deleteProducts(ids: string[], supplierId?: string) {
-        // 1. First, check if any of these products have orders.
-        // If they have orders, we should probably not delete them to keep history.
-        const productsWithOrders = await this.prisma.orderItem.findMany({
-            where: { productId: { in: ids } },
-            select: { productId: true }
+        // Snapshot names for any OrderItems still linked to these products
+        // so order history doesn't lose context after deletion.
+        const products = await this.prisma.product.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, name: true },
         });
-        
-        const idsWithOrders = new Set(productsWithOrders.map(oi => oi.productId));
-        const idsToDelete = ids.filter(id => !idsWithOrders.has(id));
-
-        if (idsToDelete.length === 0 && ids.length > 0) {
-            throw new BadRequestException('Cannot delete products that are already part of existing orders.');
+        for (const p of products) {
+            if (p.name) {
+                await this.prisma.orderItem.updateMany({
+                    where: { productId: p.id, productNameSnapshot: null },
+                    data: { productNameSnapshot: p.name },
+                });
+            }
         }
 
-        // 2. Clear related records that might not have Cascade Delete set in DB yet
+        // Clean related rows — OrderItem.productId will SET NULL via the
+        // schema-level cascade rule, so we don't touch OrderItem here.
+        const idsToDelete = ids;
         await this.prisma.$transaction([
             this.prisma.productPlacement.deleteMany({ where: { productId: { in: idsToDelete } } }),
             this.prisma.tieredPrice.deleteMany({ where: { productId: { in: idsToDelete } } }),
