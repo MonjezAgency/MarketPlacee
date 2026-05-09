@@ -78,10 +78,30 @@ async function handler(
         signal: controller.signal,
       };
 
+      // Read the request body fully BEFORE handing it to upstream fetch.
+      //
+      // Why: Node 18+ undici fetch + req.body (a ReadableStream) needs
+      // duplex:'half' AND the stream must still be unread. In Next.js
+      // 14 the stream is sometimes consumed during routing, leaving
+      // `req.body` null even on POST requests — which surfaces as the
+      // generic "expected non-null body source" undici error and
+      // breaks every register / login / mutation request.
+      //
+      // Reading via req.arrayBuffer() materialises the body into a
+      // buffer we own, then we forward it as a plain Buffer body.
+      // No streaming → no duplex flag → no surprises.
       if (req.method !== 'GET' && req.method !== 'HEAD') {
-        fetchOptions.body = req.body;
-        // Node.js 18+ fetch requires duplex: 'half' when streaming a Request body
-        (fetchOptions as any).duplex = 'half';
+        const contentLength = req.headers.get('content-length');
+        if (contentLength && contentLength !== '0') {
+          try {
+            const buf = await req.arrayBuffer();
+            if (buf.byteLength > 0) {
+              fetchOptions.body = Buffer.from(buf) as any;
+            }
+          } catch (bodyErr) {
+            console.error('[PROXY] failed to read request body', bodyErr);
+          }
+        }
       }
 
       const res = await fetch(backendUrl, fetchOptions);
