@@ -111,7 +111,7 @@ export class KycController {
    */
   @Get('admin/signed-url')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN, Role.MODERATOR)
+  @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
   async getSignedUrl(@Query('path') path: string) {
     if (!path?.startsWith('supabase://')) {
       throw new BadRequestException('Invalid storage path');
@@ -123,7 +123,7 @@ export class KycController {
   /** Admin: get all pending submissions */
   @Get('admin/pending')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN, Role.MODERATOR)
+  @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
   async getPending() {
     return this.kycService.getAllPending();
   }
@@ -131,7 +131,7 @@ export class KycController {
   /** Admin: get all submissions with optional status filter */
   @Get('admin/all')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN, Role.MODERATOR)
+  @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
   async getAll(@Query('status') status?: KYCStatus) {
     return this.kycService.getAll(status);
   }
@@ -139,7 +139,7 @@ export class KycController {
   /** Admin: get KYC stats */
   @Get('admin/stats')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN, Role.MODERATOR)
+  @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
   async getStats() {
     return this.kycService.getStats();
   }
@@ -147,7 +147,7 @@ export class KycController {
   /** Admin: get single KYC document */
   @Get('admin/:id')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN, Role.MODERATOR)
+  @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
   async getById(@Param('id') id: string) {
     return this.kycService.getById(id);
   }
@@ -155,7 +155,7 @@ export class KycController {
   /** Admin: verify (approve) */
   @Patch('admin/:id/verify')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN, Role.MODERATOR)
+  @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
   async verify(@Param('id') id: string, @Body() body: { adminNotes?: string }) {
     return this.kycService.verifyKyc(id, body.adminNotes);
   }
@@ -163,7 +163,7 @@ export class KycController {
   /** Admin: reject */
   @Patch('admin/:id/reject')
   @UseGuards(RolesGuard)
-  @Roles(Role.ADMIN, Role.MODERATOR)
+  @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
   async reject(@Param('id') id: string, @Body() body: { adminNotes: string }) {
     return this.kycService.rejectKyc(id, body.adminNotes);
   }

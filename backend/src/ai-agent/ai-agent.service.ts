@@ -386,22 +386,95 @@ Categories List: ${categories.join(', ')}`;
         }
     }
 
-    async verifyKYCDocument(frontUrl: string, backUrl?: string): Promise<{ approved: boolean; reason: string }> {
+    /**
+     * Full KYC vision check.
+     *
+     * Inputs (any combination — at minimum frontUrl):
+     *   - frontUrl       front of the ID
+     *   - backUrl        back of the ID (optional)
+     *   - selfieUrl      live selfie / video frame for face match
+     *   - declaredCountry the country the user said they're from
+     *                    (we'll cross-check against the document)
+     *   - declaredName   the name the user registered with (we'll
+     *                    sanity-check against the name on the doc)
+     *
+     * Output: a signals object covering every criterion the operator
+     * asked about — document genuineness, country detected,
+     * face-match between selfie and ID, name-match, plus an overall
+     * confidence the calling KYC service uses for auto-approval.
+     */
+    async verifyKYCDocument(
+        frontUrl: string,
+        backUrl?: string,
+        selfieUrl?: string,
+        declaredCountry?: string,
+        declaredName?: string,
+    ): Promise<{
+        approved: boolean;
+        reason: string;
+        confidence: number;
+        documentValid: boolean;
+        countryDetected?: string;
+        countryMatch?: boolean;
+        faceMatch?: boolean;
+        faceMatchConfidence?: number;
+        nameOnDocument?: string;
+        nameMatch?: boolean;
+        documentType?: string;
+        recommendation: 'AUTO_APPROVE' | 'AUTO_REJECT' | 'MANUAL_REVIEW';
+    }> {
+        const fail = (reason: string) => ({
+            approved: false,
+            reason,
+            confidence: 0,
+            documentValid: false,
+            recommendation: 'MANUAL_REVIEW' as const,
+        });
+
         if (!process.env.OPENROUTER_API_KEY) {
-            return { approved: false, reason: 'AI Verification system offline' };
+            return fail('AI Verification system offline (OPENROUTER_API_KEY missing)');
         }
 
         try {
-            const prompt = `You are an Identity Document Verification Expert. Analyze the provided image(s) of an ID card or Passport. 
-            Check for:
-            1. Is it a real identity document (National ID, Passport, or License)?
-            2. Is the image clear and legible?
-            3. Are there any obvious signs of tampering or forgery?
-            
-            Respond only in JSON format: { "approved": boolean, "reason": "short explanation" }`;
+            const prompt = `You are an identity verification expert reviewing a KYC submission for a B2B wholesale marketplace.
 
-            const images = [{ type: 'image_url', image_url: { url: frontUrl } }];
-            if (backUrl) images.push({ type: 'image_url', image_url: { url: backUrl } });
+Inputs you have:
+- Image 1: FRONT of an identity document (national ID, passport, or driver's license).
+${backUrl ? '- Image 2: BACK of the same identity document.' : ''}
+${selfieUrl ? '- Image 3: A live SELFIE of the person submitting the document.' : ''}
+
+What the user told us at signup:
+- Declared name:    ${declaredName ? `"${declaredName}"` : '(not provided)'}
+- Declared country: ${declaredCountry ? `"${declaredCountry}"` : '(not provided)'}
+
+Carefully analyse and return a JSON object with EXACTLY these fields:
+
+{
+  "documentValid":        boolean,            // is this a real, untampered, legible ID document?
+  "documentType":         "PASSPORT" | "NATIONAL_ID" | "DRIVING_LICENSE" | "RESIDENCE_PERMIT" | "OTHER",
+  "countryDetected":      "<country name in English, e.g. Egypt, Romania>", // from the document itself
+  "countryMatch":         boolean,            // does countryDetected match the declared country?
+  "nameOnDocument":       "<full name as printed on document>",
+  "nameMatch":            boolean,            // does nameOnDocument match the declared name? Allow minor spelling diffs and ordering.
+  "faceMatch":            boolean,            // ${selfieUrl ? 'does the face in the selfie clearly match the face on the ID?' : 'false (no selfie provided)'}
+  "faceMatchConfidence":  number,             // 0.0–1.0; ${selfieUrl ? 'how confident are you the faces match?' : '0 if no selfie'}
+  "confidence":           number,             // 0.0–1.0 OVERALL confidence the submission is legitimate
+  "reason":               "<one-sentence summary of the strongest signals>",
+  "recommendation":       "AUTO_APPROVE" | "AUTO_REJECT" | "MANUAL_REVIEW"
+}
+
+Rules for "recommendation":
+- AUTO_APPROVE  only if documentValid AND faceMatch AND nameMatch AND countryMatch AND confidence >= 0.85.
+- AUTO_REJECT   if documentValid is false, OR faceMatch is clearly false (different person), OR document is obviously forged.
+- MANUAL_REVIEW for everything in between (poor lighting, partial obscuration, ambiguous match).
+
+Return ONLY the JSON. No markdown fences, no commentary.`;
+
+            const images: any[] = [
+                { type: 'image_url', image_url: { url: frontUrl } },
+            ];
+            if (backUrl)   images.push({ type: 'image_url', image_url: { url: backUrl } });
+            if (selfieUrl) images.push({ type: 'image_url', image_url: { url: selfieUrl } });
 
             const response = await axios.post(
                 this.openRouterUrl,
@@ -412,29 +485,52 @@ Categories List: ${categories.join(', ')}`;
                             role: 'user',
                             content: [
                                 { type: 'text', text: prompt },
-                                ...images
-                            ]
-                        }
+                                ...images,
+                            ],
+                        },
                     ],
-                    max_tokens: 300,
+                    max_tokens: 600,
+                    temperature: 0,
                 },
                 {
                     headers: {
                         Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
                         'Content-Type': 'application/json',
                     },
-                    timeout: 30000,
+                    timeout: 45000,
                 },
             );
 
-            const content = response.data.choices[0].message.content.trim();
-            const jsonMatch = content.match(/\{[\s\S]*\}/);
-            if (jsonMatch) return JSON.parse(jsonMatch[0]);
+            const content = String(response.data?.choices?.[0]?.message?.content ?? '').trim();
+            const cleaned = content.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+            const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                return fail('AI returned an unparseable response');
+            }
+            const parsed = JSON.parse(jsonMatch[0]);
 
-            return { approved: false, reason: 'AI analysis failed to produce a clear result' };
-        } catch (error) {
-            this.logger.error(`KYC AI Verification ERROR: ${error.message}`);
-            return { approved: false, reason: 'Error during AI processing' };
+            const recommendation: 'AUTO_APPROVE' | 'AUTO_REJECT' | 'MANUAL_REVIEW' =
+                parsed.recommendation === 'AUTO_APPROVE'  ? 'AUTO_APPROVE'  :
+                parsed.recommendation === 'AUTO_REJECT'   ? 'AUTO_REJECT'   :
+                'MANUAL_REVIEW';
+
+            return {
+                approved: recommendation === 'AUTO_APPROVE',
+                reason: parsed.reason || 'AI completed verification',
+                confidence: Number(parsed.confidence) || 0,
+                documentValid: !!parsed.documentValid,
+                countryDetected: parsed.countryDetected ?? undefined,
+                countryMatch: parsed.countryMatch ?? undefined,
+                faceMatch: parsed.faceMatch ?? undefined,
+                faceMatchConfidence: parsed.faceMatchConfidence != null ? Number(parsed.faceMatchConfidence) : undefined,
+                nameOnDocument: parsed.nameOnDocument ?? undefined,
+                nameMatch: parsed.nameMatch ?? undefined,
+                documentType: parsed.documentType ?? undefined,
+                recommendation,
+            };
+        } catch (error: any) {
+            this.logger.error(`KYC AI Verification ERROR: ${error?.message || error}`);
+            return fail(`Error during AI processing: ${error?.message || 'unknown'}`);
         }
     }
 

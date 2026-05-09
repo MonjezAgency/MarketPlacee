@@ -125,11 +125,28 @@ export class KycService {
   }
 
   /**
-   * AI Identity Analysis using Gemini Vision
+   * AI Identity Analysis using Gemini Vision.
+   *
+   * Decision flow based on the AI's recommendation:
+   *   AUTO_APPROVE   → high-confidence pass (faces match, country
+   *                    matches, name matches, doc looks real). KYC
+   *                    flips to VERIFIED automatically.
+   *   AUTO_REJECT    → AI is sure the doc is fake / faces clearly
+   *                    don't match / blocked country. Flips to
+   *                    REJECTED automatically.
+   *   MANUAL_REVIEW  → ambiguous (low light, partial obscure,
+   *                    different name spelling). Stays PENDING and
+   *                    a human admin reviews. The AI's full report
+   *                    is stored on adminNotes so the admin sees
+   *                    everything the AI saw.
+   *
+   * Stores a structured AI report on the doc so the admin UI can
+   * render face-match / country-match / name-match badges next to
+   * the human review controls.
    */
   private async runSmartVerification(docId: string) {
     this.logger.log(`[KYC_AI_PROCESSOR] Starting AI analysis for doc: ${docId}`);
-    
+
     const doc = await this.prisma.kYCDocument.findUnique({
       where: { id: docId },
       include: { user: true },
@@ -138,18 +155,60 @@ export class KycService {
     if (!doc || doc.status !== KYCStatus.PENDING) return;
 
     try {
-        const result = await this.aiAgent.verifyKYCDocument(doc.frontImageUrl, doc.backImageUrl || undefined);
-        
-        if (result.approved) {
-            this.logger.log(`[KYC_AI_PROCESSOR] PASS: AI Approved doc ${docId}. Reason: ${result.reason}`);
-            await this.verifyKyc(doc.id, `AI-Automated: ${result.reason}`);
-        } else {
-            this.logger.warn(`[KYC_AI_PROCESSOR] FAIL: AI Rejected doc ${docId}. Reason: ${result.reason}`);
-            // Automatically reject if AI is confident
-            await this.rejectKyc(doc.id, `AI-Automated Rejection: ${result.reason}`);
+        const result = await this.aiAgent.verifyKYCDocument(
+            doc.frontImageUrl,
+            doc.backImageUrl || undefined,
+            doc.selfieUrl || undefined,
+            (doc as any).user?.country || undefined,
+            (doc as any).user?.name || undefined,
+        );
+
+        // Build a human-readable summary that any admin can scan in
+        // 5 seconds — used as adminNotes when we approve/reject AND
+        // when the row stays PENDING for human review.
+        const lines: string[] = [];
+        lines.push(`AI confidence: ${(result.confidence * 100).toFixed(0)}%`);
+        lines.push(`Document: ${result.documentValid ? '✅ valid' : '❌ invalid'} (${result.documentType || 'unknown type'})`);
+        if (result.countryDetected) {
+            lines.push(`Country: ${result.countryDetected}${result.countryMatch === false ? ' ⚠ does NOT match declared' : result.countryMatch === true ? ' ✅' : ''}`);
         }
-    } catch (err) {
-        this.logger.error(`[KYC_AI_PROCESSOR] Critical failure: ${err.message}`);
+        if (doc.selfieUrl) {
+            lines.push(`Face match: ${result.faceMatch === true ? '✅ matches' : result.faceMatch === false ? '❌ different person' : '— inconclusive'}${result.faceMatchConfidence != null ? ` (${(result.faceMatchConfidence * 100).toFixed(0)}%)` : ''}`);
+        }
+        if (result.nameOnDocument) {
+            lines.push(`Name on doc: ${result.nameOnDocument}${result.nameMatch === false ? ' ⚠ does NOT match declared' : result.nameMatch === true ? ' ✅' : ''}`);
+        }
+        lines.push(`Recommendation: ${result.recommendation}`);
+        lines.push(`Summary: ${result.reason}`);
+        const aiReport = lines.join('\n');
+
+        // Persist liveness score for the existing dashboard widgets
+        // (uses faceMatchConfidence when present, else overall).
+        const liveness = result.faceMatchConfidence ?? result.confidence ?? null;
+        await this.prisma.kYCDocument.update({
+            where: { id: doc.id },
+            data: { livenessScore: liveness },
+        });
+
+        if (result.recommendation === 'AUTO_APPROVE') {
+            this.logger.log(`[KYC_AI_PROCESSOR] AUTO_APPROVE doc ${docId}: ${result.reason}`);
+            await this.verifyKyc(doc.id, `AI auto-approved\n\n${aiReport}`);
+            return;
+        }
+        if (result.recommendation === 'AUTO_REJECT') {
+            this.logger.warn(`[KYC_AI_PROCESSOR] AUTO_REJECT doc ${docId}: ${result.reason}`);
+            await this.rejectKyc(doc.id, `AI auto-rejected\n\n${aiReport}`);
+            return;
+        }
+        // MANUAL_REVIEW — leave PENDING but persist the AI's findings
+        // so the admin can decide quickly with full context.
+        this.logger.log(`[KYC_AI_PROCESSOR] MANUAL_REVIEW doc ${docId}: ${result.reason}`);
+        await this.prisma.kYCDocument.update({
+            where: { id: doc.id },
+            data: { adminNotes: `AI flagged for manual review\n\n${aiReport}` },
+        });
+    } catch (err: any) {
+        this.logger.error(`[KYC_AI_PROCESSOR] Critical failure: ${err?.message || err}`);
     }
   }
 
