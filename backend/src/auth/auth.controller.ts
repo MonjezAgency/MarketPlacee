@@ -25,7 +25,13 @@ export class AuthController {
             loginDto.password,
         );
         if (!user) {
-            throw new UnauthorizedException('Invalid email or password');
+            // Security best-practice: don't reveal which of the two
+            // failed (email-not-found vs password-mismatch). Add a
+            // concrete next step so the operator / customer isn't
+            // stuck if they actually forgot their password.
+            throw new UnauthorizedException(
+                'Invalid email or password. If you forgot your password, click "Recovery" below to reset it.',
+            );
         }
 
         // Step 2: Handle 2FA check + token generation

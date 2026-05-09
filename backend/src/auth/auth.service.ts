@@ -79,16 +79,24 @@ export class AuthService {
         // ── Run lockout check and user fetch in parallel to save ~500ms ────────
         const [locked, user] = await Promise.all([
             this.isAccountLocked(trimmedEmail),
-            this.prisma.user.findFirst({ 
-                where: { email: { equals: trimmedEmail, mode: 'insensitive' } } 
+            this.prisma.user.findFirst({
+                where: { email: { equals: trimmedEmail, mode: 'insensitive' } }
             }),
         ]);
         this.logger.debug(`[AUTH] Parallel lockout+fetch took: ${Date.now() - startTime}ms`);
 
-        if (locked) {
+        // Exempt platform staff from the brute-force lockout. They lose the
+        // platform when they're locked out (admins are the people who'd
+        // unlock other accounts) so the cost of a lockout-bypass attack
+        // is dwarfed by the cost of a locked-out OWNER. Customers and
+        // suppliers still get the standard lockout.
+        const isStaffRole = !!user && ['OWNER', 'ADMIN', 'MODERATOR', 'SUPPORT', 'DEVELOPER', 'LOGISTICS', 'EDITOR']
+            .includes(String(user.role).toUpperCase());
+
+        if (locked && !isStaffRole) {
             this.logger.warn(`[AUTH] Account locked for email: ${trimmedEmail}`);
             throw new UnauthorizedException(
-                'تم تجاوز الحد المسموح من المحاولات. حاول مرة أخرى بعد 15 دقيقة.',
+                'Too many failed attempts. Try again in 15 minutes — or use "Forgot password?". تم تجاوز الحد المسموح من المحاولات. حاول مرة أخرى بعد 15 دقيقة.',
             );
         }
 
@@ -105,11 +113,21 @@ export class AuthService {
         const isMatch = await bcrypt.compare(trimmedPass, user.password);
         this.logger.debug(`[AUTH_STEP] Password verification result: ${isMatch}`);
         this.logger.debug(`[AUTH] Bcrypt compare took: ${Date.now() - bcryptStart}ms`);
-        
+
         if (isMatch) {
-            // Clear recent failed attempts on successful login
-            this.logger.debug(`[AUTH_STEP] Recording successful login attempt for: ${email}`);
-            await this.recordLoginAttempt(email, true, ip);
+            // Successful login — wipe ALL prior failed attempts for this
+            // email so a single fat-finger session a week ago doesn't
+            // accumulate and trigger lockout the next time the user has
+            // a typo. Use the trimmed lowercased email for the delete
+            // (matches how isAccountLocked counts) so case-variant
+            // records are also cleared.
+            this.logger.debug(`[AUTH_STEP] Recording successful login attempt for: ${trimmedEmail}`);
+            await this.recordLoginAttempt(trimmedEmail, true, ip);
+            try {
+                await this.prisma.loginAttempt.deleteMany({
+                    where: { email: trimmedEmail, success: false },
+                });
+            } catch {}
 
             // Status checks. We surface a CLEAR, distinct message per state
             // (bilingual EN/AR) so the user sees "your account is awaiting
@@ -143,8 +161,11 @@ export class AuthService {
             return safeResult;
         }
 
-        // Wrong password — record failure (non-blocking)
-        this.recordLoginAttempt(email, false, ip).catch(err => 
+        // Wrong password — record failure (non-blocking). Use the
+        // trimmed lowercased email so isAccountLocked() counts case-
+        // variant attempts together; otherwise admin@x.com vs Admin@x.com
+        // would accumulate on different rows and never trigger lockout.
+        this.recordLoginAttempt(trimmedEmail, false, ip).catch(err =>
             this.logger.error(`[AUTH] Failed to record login attempt: ${err.message}`)
         );
         return null;
