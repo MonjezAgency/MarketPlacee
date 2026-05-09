@@ -38,6 +38,35 @@ export default function NewsletterPage() {
     const router = useRouter();
     const [isExporting, setIsExporting] = React.useState(false);
     const [isCampaignOpen, setIsCampaignOpen] = React.useState(false);
+    const [isTesting, setIsTesting] = React.useState(false);
+    /**
+     * One-click email pipeline diagnostic. Posts to /newsletter/test-email
+     * with the admin's own email so they can see the actual provider
+     * response (Resend / SMTP) when the campaign send reports 0 / N
+     * delivered. Surfaces the real reason — domain not verified,
+     * key missing, etc. — directly in a toast.
+     */
+    const handleSendTestEmail = async () => {
+        const to = window.prompt('Send a test email to which address?', 'info@atlantisfmcg.com');
+        if (!to) return;
+        setIsTesting(true);
+        try {
+            const res = await apiFetch('/newsletter/test-email', {
+                method: 'POST',
+                body: JSON.stringify({ to }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data?.success) {
+                toast.success(`Test email delivered via ${data.provider || 'email'} — check ${to}`, { duration: 6000 });
+            } else {
+                toast.error(`Test email failed: ${data?.error || data?.message || 'unknown error'}`, { duration: 12000 });
+            }
+        } catch (err: any) {
+            toast.error('Network error: ' + (err?.message || ''));
+        } finally {
+            setIsTesting(false);
+        }
+    };
     const [isAddOpen, setIsAddOpen] = React.useState(false);
     const [isSending, setIsSending] = React.useState(false);
     const [isUploading, setIsUploading] = React.useState(false);
@@ -271,6 +300,15 @@ export default function NewsletterPage() {
                     >
                         {isExporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
                         Export CSV
+                    </button>
+                    <button
+                        onClick={handleSendTestEmail}
+                        disabled={isTesting}
+                        title="Send a real email to a single address to verify the email pipeline"
+                        className="h-[52px] px-5 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/40 text-amber-200 rounded-2xl text-[12px] font-black uppercase tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                    >
+                        {isTesting ? <Loader2 size={16} className="animate-spin" /> : <Activity size={16} />}
+                        Test Email
                     </button>
                     <button
                         onClick={() => router.push('/admin/newsletter/campaign')}

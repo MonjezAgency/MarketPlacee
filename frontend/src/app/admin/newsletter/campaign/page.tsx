@@ -354,13 +354,22 @@ export default function CampaignBuilderPage() {
             });
             if (res.ok) {
                 const r = await res.json();
-                toast.success(
-                    `Campaign sent to ${r.successCount} of ${r.total} recipient(s) — saved to history`,
-                    { duration: 4000 },
-                );
-                // Exit the builder and land the admin on the History
-                // tab so they can see the campaign they just sent.
-                setTimeout(() => router.push('/admin/newsletter/history'), 600);
+                if (r.successCount === 0 && r.total > 0) {
+                    // Server returned 200 but every email failed. Show
+                    // the dominant provider error so the admin knows
+                    // exactly what to fix (Resend domain, SMTP key,
+                    // etc.) instead of just "0 / N delivered".
+                    toast.error(
+                        `0 / ${r.total} delivered. Reason: ${r.failureReason || 'unknown — check Vercel/Railway logs'}`,
+                        { duration: 9000 },
+                    );
+                } else {
+                    toast.success(
+                        `Campaign sent to ${r.successCount} of ${r.total} recipient(s) — saved to history`,
+                        { duration: 4000 },
+                    );
+                    setTimeout(() => router.push('/admin/newsletter/history'), 600);
+                }
             } else {
                 const err = await res.json().catch(() => ({}));
                 toast.error(err.message || 'Send failed');

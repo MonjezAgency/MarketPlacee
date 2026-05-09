@@ -1,10 +1,11 @@
-import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
 import * as XLSX from 'xlsx';
 
 @Injectable()
 export class NewsletterService {
+    private readonly logger = new Logger(NewsletterService.name);
     constructor(
         private prisma: PrismaService,
         private emailService: EmailService
@@ -267,17 +268,33 @@ export class NewsletterService {
         `;
         const finalHtml = (opts.html && opts.html.trim()) ? opts.html : fallbackShell(content || '');
 
+        // Track per-recipient outcomes so we can show the admin the
+        // ACTUAL reason emails failed instead of "successCount: 0" with
+        // no explanation. The most common failure is Resend in testing
+        // mode (only sends to the account owner) before the operator
+        // verifies their sending domain.
         let successCount = 0;
+        const errors: Record<string, number> = {};
         for (const r of recipients) {
             try {
-                const ok = await this.emailService.sendMail(r.email, subject, finalHtml);
-                if (ok) successCount++;
-            } catch {
-                // continue — we still persist the campaign with the partial count
+                const result = await this.emailService.sendMailDetailed(r.email, subject, finalHtml);
+                if (result.success) {
+                    successCount++;
+                } else if (result.error) {
+                    errors[result.error] = (errors[result.error] || 0) + 1;
+                }
+            } catch (err: any) {
+                const msg = err?.message || 'unknown send error';
+                errors[msg] = (errors[msg] || 0) + 1;
             }
         }
 
-        // Persist to history so the admin can re-open / re-send it later.
+        // Pick the dominant error to surface as the campaign-level
+        // reason. Stored on the Campaign row + returned in the API
+        // response so the admin toast can show it directly.
+        const sortedErrors = Object.entries(errors).sort((a, b) => b[1] - a[1]);
+        const dominantError = sortedErrors.length > 0 ? sortedErrors[0][0] : null;
+
         const campaign = await this.prisma.campaign.create({
             data: {
                 subject,
@@ -290,12 +307,46 @@ export class NewsletterService {
             },
         });
 
+        if (dominantError) {
+            this.logger.error(
+                `[CAMPAIGN ${campaign.id}] ${successCount}/${recipients.length} delivered. ` +
+                `Top failure (${sortedErrors[0][1]} recipients): ${dominantError}`,
+            );
+        }
+
         return {
             id: campaign.id,
             total: recipients.length,
             successCount,
             audience,
+            // When the entire send failed, hand the operator a
+            // ready-to-paste explanation in the toast.
+            failureReason: successCount === 0 ? dominantError : null,
         };
+    }
+
+    /**
+     * Diagnostic — sends a single test email to a target address using
+     * the same email pipeline campaigns use. Returns the provider's
+     * actual response so the admin can paste it into a support ticket
+     * or fix the configuration. No campaign record is written.
+     */
+    async sendTestEmail(to: string) {
+        if (!to || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+            throw new BadRequestException('A valid recipient email is required');
+        }
+        const html = `
+<div style="font-family:Arial,sans-serif;padding:24px;max-width:520px;margin:auto;">
+  <h2 style="color:#0F172A;">Atlantis test email</h2>
+  <p style="color:#475569;">If you can read this, the Atlantis email pipeline reached your inbox successfully.</p>
+  <p style="color:#94A3B8;font-size:12px;">Sent from /api/newsletter/test-email at ${new Date().toISOString()}</p>
+</div>`;
+        const result = await this.emailService.sendMailDetailed(
+            to,
+            'Atlantis · Email Pipeline Test',
+            html,
+        );
+        return result;
     }
 
     async listCampaigns() {

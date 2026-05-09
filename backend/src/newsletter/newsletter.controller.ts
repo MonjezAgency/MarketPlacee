@@ -89,6 +89,19 @@ export class NewsletterController {
         });
     }
 
+    /**
+     * Diagnostic — fires one email through the same pipeline campaigns
+     * use and returns the provider response. Useful when "Send" reports
+     * 0/N delivered — call this with the admin's own email to see the
+     * actual failure (Resend domain unverified, SMTP blocked, etc.).
+     */
+    @Post('test-email')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN', 'OWNER')
+    async testEmail(@Body() body: { to: string }) {
+        return this.newsletterService.sendTestEmail(body?.to);
+    }
+
     /** Past campaigns (history page). */
     @Get('campaigns')
     @UseGuards(JwtAuthGuard, RolesGuard)
