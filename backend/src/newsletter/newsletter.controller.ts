@@ -1,5 +1,5 @@
 import {
-    Controller, Post, Get, Delete, Body, Param, UseGuards, UseInterceptors,
+    Controller, Post, Get, Delete, Body, Param, Req, UseGuards, UseInterceptors,
     UploadedFile, Query, Logger, BadRequestException
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -79,13 +79,37 @@ export class NewsletterController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN', 'OWNER')
     async sendCampaign(
-        @Body() body: { subject: string; content?: string; html?: string; recipientIds?: string[] },
+        @Body() body: { subject: string; content?: string; html?: string; audience?: 'PLATFORM' | 'NEWSLETTER' },
+        @Req() req: any,
     ) {
-        return this.newsletterService.sendCampaign(
-            body.subject,
-            body.content,
-            body.recipientIds,
-            body.html,
-        );
+        return this.newsletterService.sendCampaign(body.subject, body.content, {
+            html: body.html,
+            audience: body.audience,
+            sentBy: req.user?.sub,
+        });
+    }
+
+    /** Past campaigns (history page). */
+    @Get('campaigns')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN', 'OWNER')
+    async listCampaigns() {
+        return this.newsletterService.listCampaigns();
+    }
+
+    /** Single campaign — used to re-open in the builder. */
+    @Get('campaigns/:id')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN', 'OWNER')
+    async getCampaign(@Param('id') id: string) {
+        return this.newsletterService.getCampaign(id);
+    }
+
+    /** Delete from history. */
+    @Delete('campaigns/:id')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN', 'OWNER')
+    async deleteCampaign(@Param('id') id: string) {
+        return this.newsletterService.deleteCampaign(id);
     }
 }

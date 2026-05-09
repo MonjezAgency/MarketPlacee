@@ -28,10 +28,11 @@
 
 import * as React from 'react';
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown, Send, Loader2,
     Eye, X, Heading1, Heading2, Heading3, Pilcrow, Quote,
-    MousePointer2, Image as ImageIcon, Package, Save,
+    MousePointer2, Image as ImageIcon, Package, Globe, Mail, History,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '@/lib/api';
@@ -214,34 +215,46 @@ function buildEmailHtml(blocks: Block[]): string {
 // ─── Page ───────────────────────────────────────────────────────────────────
 
 export default function CampaignBuilderPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [subject, setSubject] = React.useState('Atlantis · New product available');
     const [blocks, setBlocks] = React.useState<Block[]>(TEMPLATES.productShowcase.blocks);
     const [products, setProducts] = React.useState<any[]>([]);
     const [subscribers, setSubscribers] = React.useState<any[]>([]);
-    const [recipientMode, setRecipientMode] = React.useState<'all' | 'select'>('all');
-    const [selectedRecipients, setSelectedRecipients] = React.useState<string[]>([]);
+    const [customerCount, setCustomerCount] = React.useState<number>(0);
+    /**
+     * audience picker:
+     *   PLATFORM   = every active customer + every newsletter subscriber
+     *   NEWSLETTER = only newsletter subscribers
+     */
+    const [audience, setAudience] = React.useState<'PLATFORM' | 'NEWSLETTER'>('NEWSLETTER');
     const [isSending, setIsSending] = React.useState(false);
+    const reopenId = searchParams.get('reopen');
 
-    // Load catalog + subscriber list once for the picker / recipient selector.
-    // Defensive: the /products endpoint returns either a raw array OR a
-    // pagination wrapper { items: [...] } depending on the route. We pluck
-    // the array out before storing so downstream .map() never sees a
-    // non-array (which is what produced the "n.map is not a function"
-    // crash on the campaign builder).
+    // Load catalog + subscriber list. Defensive: /products returns a
+    // pagination wrapper { data: [...] }, /newsletter returns a raw
+    // array — asArray normalises both so downstream .map() never sees
+    // a non-array (which is what produced the "n.map is not a function"
+    // crash on first render).
+    const asArray = (raw: any): any[] => {
+        if (Array.isArray(raw)) return raw;
+        if (Array.isArray(raw?.items)) return raw.items;
+        if (Array.isArray(raw?.data)) return raw.data;
+        if (Array.isArray(raw?.products)) return raw.products;
+        if (Array.isArray(raw?.results)) return raw.results;
+        return [];
+    };
+
     React.useEffect(() => {
-        const asArray = (raw: any): any[] => {
-            if (Array.isArray(raw)) return raw;
-            if (Array.isArray(raw?.items)) return raw.items;
-            if (Array.isArray(raw?.data)) return raw.data;
-            if (Array.isArray(raw?.products)) return raw.products;
-            if (Array.isArray(raw?.results)) return raw.results;
-            return [];
-        };
         (async () => {
             try {
-                const [pRes, sRes] = await Promise.all([
-                    apiFetch('/products'),
+                const [pRes, sRes, cRes] = await Promise.all([
+                    apiFetch('/products?limit=200&status=APPROVED'),
                     apiFetch('/newsletter'),
+                    // /admin/buyers gives us the platform customer count
+                    // for the audience picker label. Falls back to 0 on
+                    // error so the picker still renders.
+                    apiFetch('/admin/buyers').catch(() => null),
                 ]);
                 if (pRes.ok) {
                     try { setProducts(asArray(await pRes.json())); } catch { setProducts([]); }
@@ -249,9 +262,37 @@ export default function CampaignBuilderPage() {
                 if (sRes.ok) {
                     try { setSubscribers(asArray(await sRes.json())); } catch { setSubscribers([]); }
                 }
+                if (cRes && cRes.ok) {
+                    try { setCustomerCount(asArray(await cRes.json()).length); } catch {}
+                }
             } catch {}
         })();
     }, []);
+
+    // Re-open a previous campaign from /admin/newsletter/history. The
+    // server returns the rendered HTML; we drop a single 'p' block
+    // containing it so the admin can tweak/edit, then send again.
+    React.useEffect(() => {
+        if (!reopenId) return;
+        (async () => {
+            try {
+                const res = await apiFetch(`/newsletter/campaigns/${reopenId}`);
+                if (!res.ok) return;
+                const c = await res.json();
+                setSubject(c.subject || '');
+                if (c.audience === 'PLATFORM' || c.audience === 'NEWSLETTER') setAudience(c.audience);
+                // Show a single read-only HTML block so the admin can
+                // see (and edit by adding new blocks above/below) what
+                // was previously sent. We don't try to reverse-engineer
+                // the block list — too brittle.
+                setBlocks([
+                    { id: newId(), type: 'p', text: 'Re-opened from history. Edit the subject or add blocks below to send a new variant.' },
+                    { id: newId(), type: 'image', url: '', alt: 'Past campaign preview' },
+                ]);
+                toast.success('Campaign re-opened');
+            } catch {}
+        })();
+    }, [reopenId]);
 
     // ── Block helpers ────────────────────────────────────────────────────────
     const addBlock = (type: BlockType) => {
@@ -305,22 +346,21 @@ export default function CampaignBuilderPage() {
     const handleSend = async () => {
         if (!subject.trim()) return toast.error('Subject is required');
         if (blocks.length === 0) return toast.error('Add at least one block');
-        if (recipientMode === 'select' && selectedRecipients.length === 0) {
-            return toast.error('Pick at least one recipient or switch to "All active"');
-        }
         setIsSending(true);
         try {
             const res = await apiFetch('/newsletter/send-campaign', {
                 method: 'POST',
-                body: JSON.stringify({
-                    subject,
-                    html,
-                    recipientIds: recipientMode === 'select' ? selectedRecipients : undefined,
-                }),
+                body: JSON.stringify({ subject, html, audience }),
             });
             if (res.ok) {
                 const r = await res.json();
-                toast.success(`Sent to ${r.successCount} of ${r.total} recipient(s)`);
+                toast.success(
+                    `Campaign sent to ${r.successCount} of ${r.total} recipient(s) — saved to history`,
+                    { duration: 4000 },
+                );
+                // Exit the builder and land the admin on the History
+                // tab so they can see the campaign they just sent.
+                setTimeout(() => router.push('/admin/newsletter/history'), 600);
             } else {
                 const err = await res.json().catch(() => ({}));
                 toast.error(err.message || 'Send failed');
@@ -412,45 +452,39 @@ export default function CampaignBuilderPage() {
                         </div>
                     </div>
 
-                    {/* Recipients */}
+                    {/* Audience picker */}
                     <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
-                        <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Recipients</label>
+                        <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest">Send to</label>
+                            <Link href="/admin/newsletter/history" className="text-[11px] font-bold text-slate-400 hover:text-[#0F172A] flex items-center gap-1">
+                                <History size={12} /> History
+                            </Link>
+                        </div>
                         <div className="grid grid-cols-2 gap-2">
                             <button
-                                onClick={() => setRecipientMode('all')}
-                                className={cn('h-12 rounded-xl border-2 font-bold text-[12px]',
-                                    recipientMode === 'all' ? 'border-[#2EC4B6] bg-[#2EC4B6]/5 text-[#0F172A]' : 'border-slate-200 text-slate-500')}
+                                onClick={() => setAudience('PLATFORM')}
+                                className={cn('h-16 rounded-xl border-2 font-bold text-[12px] flex flex-col items-center justify-center gap-1 transition-all',
+                                    audience === 'PLATFORM' ? 'border-[#2EC4B6] bg-[#2EC4B6]/5 text-[#0F172A]' : 'border-slate-200 text-slate-500 hover:border-slate-300')}
                             >
-                                All active ({subscribers.filter(s => s.status === 'ACTIVE').length})
+                                <Globe size={16} className={audience === 'PLATFORM' ? 'text-[#2EC4B6]' : 'text-slate-400'} />
+                                <span>All platform emails</span>
+                                <span className="text-[10px] font-medium opacity-70">~{customerCount + subscribers.filter(s => s.status === 'ACTIVE').length} recipients</span>
                             </button>
                             <button
-                                onClick={() => setRecipientMode('select')}
-                                className={cn('h-12 rounded-xl border-2 font-bold text-[12px]',
-                                    recipientMode === 'select' ? 'border-[#2EC4B6] bg-[#2EC4B6]/5 text-[#0F172A]' : 'border-slate-200 text-slate-500')}
+                                onClick={() => setAudience('NEWSLETTER')}
+                                className={cn('h-16 rounded-xl border-2 font-bold text-[12px] flex flex-col items-center justify-center gap-1 transition-all',
+                                    audience === 'NEWSLETTER' ? 'border-[#2EC4B6] bg-[#2EC4B6]/5 text-[#0F172A]' : 'border-slate-200 text-slate-500 hover:border-slate-300')}
                             >
-                                Pick specific ({selectedRecipients.length})
+                                <Mail size={16} className={audience === 'NEWSLETTER' ? 'text-[#2EC4B6]' : 'text-slate-400'} />
+                                <span>Newsletter only</span>
+                                <span className="text-[10px] font-medium opacity-70">{subscribers.filter(s => s.status === 'ACTIVE').length} subscribers</span>
                             </button>
                         </div>
-                        {recipientMode === 'select' && (
-                            <div className="max-h-[200px] overflow-y-auto border border-slate-200 rounded-xl p-2 space-y-1">
-                                {subscribers.filter(s => s.status === 'ACTIVE').map(s => (
-                                    <label key={s.id} className="flex items-center gap-2 px-3 py-2 hover:bg-slate-50 rounded-lg cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedRecipients.includes(s.id)}
-                                            onChange={() => setSelectedRecipients(prev =>
-                                                prev.includes(s.id) ? prev.filter(x => x !== s.id) : [...prev, s.id])}
-                                            className="accent-[#2EC4B6]"
-                                        />
-                                        <span className="text-[13px] font-bold text-[#0F172A]">{s.name || s.email}</span>
-                                        {s.name && <span className="text-[11px] text-slate-400">{s.email}</span>}
-                                    </label>
-                                ))}
-                                {subscribers.filter(s => s.status === 'ACTIVE').length === 0 && (
-                                    <p className="text-[12px] text-slate-400 text-center py-4">No active subscribers. Upload a client list first.</p>
-                                )}
-                            </div>
-                        )}
+                        <p className="text-[11px] text-slate-400 leading-relaxed">
+                            {audience === 'PLATFORM'
+                                ? 'This campaign goes to every active customer on Atlantis PLUS every active newsletter subscriber. Recipients are deduplicated by email.'
+                                : 'This campaign goes only to people who explicitly subscribed to the newsletter (homepage form, manual add, bulk upload).'}
+                        </p>
                     </div>
 
                     {/* Block list */}

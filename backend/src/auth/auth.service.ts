@@ -111,14 +111,24 @@ export class AuthService {
             this.logger.debug(`[AUTH_STEP] Recording successful login attempt for: ${email}`);
             await this.recordLoginAttempt(email, true, ip);
 
-            // Check status
+            // Status checks. We surface a CLEAR, distinct message per state
+            // (bilingual EN/AR) so the user sees "your account is awaiting
+            // approval" instead of the generic "invalid email or password"
+            // and knows the credentials were correct.
             if (user.status === 'PENDING_APPROVAL') {
                 this.logger.warn(`[AUTH] Login blocked: User ${email} pending approval`);
-                throw new UnauthorizedException('حسابك قيد المراجعة في انتظار موافقة الإدارة');
+                throw new UnauthorizedException(
+                    'Your account is awaiting approval from the Atlantis team — usually within 24 hours. You will receive an email with a link as soon as it goes through. حسابك قيد المراجعة من فريق Atlantis — عادةً خلال 24 ساعة. سيصلك إيميل بمجرد الموافقة.',
+                );
             }
-            if ((user.status as any) === 'REJECTED' || (user.status as any) === 'BLOCKED' || (user.status as any) === 'DELETED') {
-                this.logger.warn(`[AUTH] Login blocked: User ${email} status is ${user.status}`);
-                throw new UnauthorizedException(`حسابك موقوف أو مرفوض أو محذوف: ${user.status}`);
+            if ((user.status as any) === 'REJECTED') {
+                throw new UnauthorizedException('Your account application was rejected. Contact Info@atlantisfmcg.com if you believe this is a mistake. تم رفض طلب الحساب — تواصل معنا إذا كان ذلك بالخطأ.');
+            }
+            if ((user.status as any) === 'BLOCKED') {
+                throw new UnauthorizedException('Your account is currently blocked. Contact Info@atlantisfmcg.com to resolve. حسابك محجوب حالياً.');
+            }
+            if ((user.status as any) === 'DELETED') {
+                throw new UnauthorizedException('This account has been deleted. هذا الحساب تم حذفه.');
             }
 
             this.logger.log(`[AUTH] User ${email} validated successfully in ${Date.now() - startTime}ms`);

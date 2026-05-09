@@ -196,39 +196,61 @@ export class NewsletterService {
     }
 
     /**
-     * Send a campaign. Three input modes are supported:
+     * Send a campaign and persist it to the Campaign history table.
      *
-     *   1. `html` — fully rendered HTML. The campaign builder produces
-     *      this from its block list + Atlantis template shell. The
-     *      email is sent verbatim, no extra wrapping.
+     * Audience modes:
+     *   PLATFORM   — every ACTIVE customer on the platform PLUS every
+     *                ACTIVE newsletter subscriber, deduped by lowercase
+     *                email. This is the broad blast.
+     *   NEWSLETTER — only ACTIVE newsletter subscribers (the people
+     *                who explicitly signed up via the homepage etc).
      *
-     *   2. `content` — plain-text body. Wrapped in a minimal Atlantis
-     *      shell server-side (legacy path used by the simple modal).
+     * Body is the fully-rendered HTML produced by the campaign builder.
+     * The legacy plain-text `content` field is still supported as a
+     * fallback for the older simple modal.
      *
-     *   3. Neither — rejected.
-     *
-     * Recipient targeting:
-     *   - recipientIds[] — exact subset (multi-select in the UI).
-     *   - Otherwise → every ACTIVE subscriber.
+     * After sending, the campaign is written to the Campaign table so
+     * the admin can re-open / re-send it from /admin/newsletter/history.
      */
     async sendCampaign(
         subject: string,
         content: string | undefined,
-        recipientIds?: string[],
-        html?: string,
+        opts: {
+            html?: string;
+            audience?: 'PLATFORM' | 'NEWSLETTER';
+            sentBy?: string;
+        } = {},
     ) {
         if (!subject || !subject.trim()) {
             throw new BadRequestException('Subject is required');
         }
-        if ((!html || !html.trim()) && (!content || !content.trim())) {
+        if ((!opts.html || !opts.html.trim()) && (!content || !content.trim())) {
             throw new BadRequestException('Email body (html or content) is required');
         }
+        const audience: 'PLATFORM' | 'NEWSLETTER' =
+            opts.audience === 'PLATFORM' ? 'PLATFORM' : 'NEWSLETTER';
 
-        const where: any = { status: 'ACTIVE' };
-        if (Array.isArray(recipientIds) && recipientIds.length > 0) {
-            where.id = { in: recipientIds };
+        // Build the recipient list per audience mode, dedup by email.
+        const seen = new Set<string>();
+        const recipients: { email: string }[] = [];
+        const subs = await this.prisma.newsletterSubscriber.findMany({
+            where: { status: 'ACTIVE' },
+            select: { email: true },
+        });
+        for (const s of subs) {
+            const e = (s.email || '').toLowerCase().trim();
+            if (e && !seen.has(e)) { seen.add(e); recipients.push({ email: s.email }); }
         }
-        const subscribers = await this.prisma.newsletterSubscriber.findMany({ where });
+        if (audience === 'PLATFORM') {
+            const customers = await this.prisma.user.findMany({
+                where: { role: 'CUSTOMER', status: 'ACTIVE' },
+                select: { email: true },
+            });
+            for (const c of customers) {
+                const e = (c.email || '').toLowerCase().trim();
+                if (e && !seen.has(e)) { seen.add(e); recipients.push({ email: c.email }); }
+            }
+        }
 
         const fallbackShell = (body: string) => `
             <div style="font-family: sans-serif; padding: 40px; color: #333; max-width: 600px; margin: 0 auto; background: #fff; border-radius: 12px; border: 1px solid #eee;">
@@ -243,17 +265,58 @@ export class NewsletterService {
                 </p>
             </div>
         `;
-        const finalHtml = (html && html.trim()) ? html : fallbackShell(content || '');
+        const finalHtml = (opts.html && opts.html.trim()) ? opts.html : fallbackShell(content || '');
 
-        const results = await Promise.all(
-            subscribers.map(sub =>
-                this.emailService.sendMail(sub.email, subject, finalHtml)
-            )
-        );
+        let successCount = 0;
+        for (const r of recipients) {
+            try {
+                const ok = await this.emailService.sendMail(r.email, subject, finalHtml);
+                if (ok) successCount++;
+            } catch {
+                // continue — we still persist the campaign with the partial count
+            }
+        }
+
+        // Persist to history so the admin can re-open / re-send it later.
+        const campaign = await this.prisma.campaign.create({
+            data: {
+                subject,
+                html: finalHtml,
+                audience,
+                sentCount: successCount,
+                totalCount: recipients.length,
+                status: successCount === 0 ? 'FAILED' : 'SENT',
+                sentBy: opts.sentBy ?? null,
+            },
+        });
 
         return {
-            total: subscribers.length,
-            successCount: results.filter(r => r).length,
+            id: campaign.id,
+            total: recipients.length,
+            successCount,
+            audience,
         };
+    }
+
+    async listCampaigns() {
+        return this.prisma.campaign.findMany({
+            orderBy: { createdAt: 'desc' },
+            select: {
+                id: true, subject: true, audience: true,
+                sentCount: true, totalCount: true, status: true,
+                createdAt: true, sentBy: true,
+            },
+        });
+    }
+
+    async getCampaign(id: string) {
+        const c = await this.prisma.campaign.findUnique({ where: { id } });
+        if (!c) throw new BadRequestException('Campaign not found');
+        return c;
+    }
+
+    async deleteCampaign(id: string) {
+        await this.prisma.campaign.delete({ where: { id } });
+        return { ok: true };
     }
 }

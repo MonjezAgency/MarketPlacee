@@ -738,6 +738,28 @@ model Offer {
   @@index([status])
 }
 
+/**
+ * A sent (or saved) marketing campaign. The Newsletter Hub's campaign
+ * builder writes one of these every time admin clicks "Send" — the
+ * full HTML of the email is stored verbatim so the admin can re-open
+ * a past campaign in the builder and re-send it without rebuilding.
+ */
+model Campaign {
+  id            String   @id @default(uuid())
+  subject       String
+  html          String   @db.Text     // fully-rendered Atlantis email
+  audience      String   // 'PLATFORM' | 'NEWSLETTER'
+  sentCount     Int      @default(0)
+  totalCount    Int      @default(0)
+  status        String   @default("SENT") // SENT | DRAFT | FAILED
+  sentBy        String?  // admin user id
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([createdAt])
+  @@index([status])
+}
+
 model NewsletterSubscriber {
   id        String   @id @default(uuid())
   email     String   @unique

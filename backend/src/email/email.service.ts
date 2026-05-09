@@ -356,9 +356,13 @@ export class EmailService {
     const frontendUrl = this.getFrontendUrl();
     const isSupplier = role.toUpperCase() === 'SUPPLIER';
     
+    // Supplier CTA → /supplier (the supplier hub, layout lives at
+    //   frontend/src/app/supplier/layout.tsx — NOT /dashboard/supplier
+    //   which 404s).
+    // Buyer CTA → / (homepage / catalog).
     const ctaUrl = isSupplier
-      ? `${frontendUrl}/dashboard/supplier`
-      : `${frontendUrl}/`; // Land on marketplace directly for buyers
+      ? `${frontendUrl}/supplier`
+      : `${frontendUrl}/`;
 
     const ctaText = isSupplier
       ? 'Go to Your Dashboard →'
