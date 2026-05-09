@@ -191,7 +191,7 @@ export const en = {
         expandingNetwork: "Expanding Global Network",
         firstWave: "Be part of our first wave of wholesale buyers.",
         activeBuyers: "Active Buyers",
-        verifiedSuppliers: "Verified Suppliers",
+        verifiedSuppliers: "Sold by Atlantis",
         globalVision: "Global Vision",
         becomeBuyer: "Become a Buyer",
         customQuote: "Need a Custom Quote?",
@@ -201,7 +201,7 @@ export const en = {
         expertReview: "Expert Review",
         validateSpecs: "We validate your specs",
         receiveQuotes: "Receive Quotes",
-        compareOffers: "Compare offers from suppliers",
+        compareOffers: "Receive a tailored Atlantis quote",
         requestQuote: "Request a Quote",
     },
     footer: {
@@ -635,7 +635,7 @@ export const en = {
         supportAgent: "Support Agent",
         contentEditor: "Content Editor",
         logistics: "Logistics",
-        verifiedSupplier: "Verified Supplier",
+        verifiedSupplier: "Sold by Atlantis",
         partner: "Partner",
     },
     supplier: {

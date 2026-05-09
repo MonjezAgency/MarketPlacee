@@ -48,7 +48,7 @@ const TOP_FEATURES = [
 ];
 
 const HERO_HIGHLIGHTS = [
-    { icon: ShieldCheck, title: 'Verified Suppliers', sub: '100% vetted' },
+    { icon: ShieldCheck, title: 'Sold by Atlantis', sub: 'Direct, no middlemen' },
     { icon: CircleDollarSign, title: 'Bulk Pricing', sub: 'Lower costs' },
     { icon: Truck, title: 'Global Shipping', sub: 'Fast & reliable' },
     { icon: ShieldCheck, title: 'Secure Payments', sub: 'Safe transactions' },
@@ -131,7 +131,7 @@ const HERO_SLIDES = [
     {
         title: 'Your B2B Partner for',
         accent: 'Global Wholesale',
-        desc: 'Source quality products in bulk from verified suppliers worldwide. Better prices, reliable shipping, and business growth—together.',
+        desc: 'Source quality products in bulk directly from Atlantis. Better prices, reliable shipping, and business growth—together.',
         image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1400',
     },
     {
@@ -233,7 +233,7 @@ export default function HomePage() {
                         Delivery" wording as a misleading H1 for a wholesale
                         marketplace homepage. */}
                     <h1 className="sr-only">
-                        Atlantis — B2B Wholesale Marketplace for Verified Suppliers across Europe and the Gulf
+                        Atlantis — B2B Wholesale Marketplace selling FMCG, beverages and consumer goods across Europe and the Gulf
                     </h1>
                     <div className="max-w-full sm:max-w-[560px] lg:max-w-[640px] space-y-6">
                         {/* Rotating hero heading. role/aria-level keeps it a
@@ -310,7 +310,7 @@ export default function HomePage() {
                         <div className="lg:pr-6 lg:border-r lg:border-[#E5E7EB] lg:min-w-[230px]">
                             <h3 className="text-[15px] sm:text-[16px] font-bold text-[#0F172A]">Need a custom quote?</h3>
                             <p className="text-[12px] text-[#64748B] mt-1">
-                                Tell us what you need and we'll get competitive quotes from our suppliers.
+                                Tell us what you need and our team will send you a competitive Atlantis quote.
                             </p>
                         </div>
 

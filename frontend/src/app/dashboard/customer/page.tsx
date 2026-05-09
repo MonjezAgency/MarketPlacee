@@ -324,7 +324,7 @@ export default function CustomerDashboard() {
                                         </div>
                                     </div>
                                     <div className="p-4 space-y-2">
-                                        <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">Verified Supplier</p>
+                                        <p className="text-[10px] font-bold text-[#6B7280] uppercase tracking-widest">Sold by Atlantis</p>
                                         <h4 className="text-sm font-bold text-[#1A1F36] line-clamp-1 group-hover:text-[#1ABC9C] transition-colors">{product.name}</h4>
                                         <div className="pt-2 flex items-center justify-between">
                                             <span className="text-base font-bold text-[#1A1F36]">{formatPrice(product.price)}<span className="text-[10px] text-[#6B7280] font-medium ms-0.5">/unit</span></span>

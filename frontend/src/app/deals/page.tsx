@@ -65,7 +65,7 @@ export default function DealsPage() {
                         Today's <span className="text-primary">Deals</span>
                     </h1>
                     <p className="text-muted-foreground max-w-xl mx-auto text-lg">
-                        Bulk purchasing at competitive prices — direct from verified suppliers.
+                        Bulk purchasing at competitive prices — direct from Atlantis.
                     </p>
                 </motion.div>
 

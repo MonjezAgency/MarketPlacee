@@ -54,10 +54,10 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
     const brand = product.brand ? `${product.brand} ` : '';
     const titleBase = `${brand}${product.name}`.trim();
-    const title = `${titleBase} — Wholesale Bulk Supplier | Atlantis`;
+    const title = `${titleBase} — Wholesale Bulk | Atlantis`;
 
     const desc = product.description?.replace(/\s+/g, ' ').trim().slice(0, 155)
-        || `Source ${titleBase} wholesale on Atlantis. KYC-verified suppliers, escrow-protected payments, EUR pricing. Order by carton, pallet, or full truck.`;
+        || `Buy ${titleBase} wholesale direct from Atlantis. Escrow-protected payments, EUR pricing. Order by carton, pallet, or full truck.`;
 
     const ogImage = (product.images || []).find(u => u && u.startsWith('http')) || `${SITE_URL}/og-image.png`;
 

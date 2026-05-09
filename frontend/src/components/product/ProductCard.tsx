@@ -260,7 +260,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                     {(user?.role === 'ADMIN' || isOwnProduct) ? (
                         <span className="text-[11px] font-bold uppercase tracking-widest text-primary/80">{product.brand}</span>
                     ) : (
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Verified Supplier</span>
+                        <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Sold by Atlantis</span>
                     )}
                     <div className="flex items-center gap-1">
                         {rating > 0 ? (

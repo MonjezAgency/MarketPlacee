@@ -816,7 +816,7 @@ export default function ProductDetailClient() {
                                         {(user?.role === 'ADMIN' || (user?.role === 'SUPPLIER' && p.supplierId === user?.id)) ? (
                                             <p className="text-[10px] font-bold text-[#14B8A6] uppercase tracking-widest truncate">{p.brand}</p>
                                         ) : (
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Verified Supplier</p>
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Sold by Atlantis</p>
                                         )}
                                         <h3 className="text-[13px] font-bold text-[#111827] line-clamp-2 leading-snug group-hover:text-[#14B8A6] transition-colors">{p.name}</h3>
                                         <div className="flex items-center gap-1">

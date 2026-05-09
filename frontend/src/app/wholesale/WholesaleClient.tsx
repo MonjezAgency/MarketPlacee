@@ -5,12 +5,12 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Package, BarChart3, ShieldCheck, Zap, Globe, Tag, CheckCircle2 } from 'lucide-react';
 
 const BENEFITS = [
-    { icon: Package, title: 'Tiered Bulk Pricing', desc: 'Every product on Atlantis offers quantity-based pricing tiers. The more you order, the lower your unit cost — automatically applied at checkout.', color: 'text-primary bg-primary/10' },
-    { icon: ShieldCheck, title: 'Verified Suppliers Only', desc: 'Every supplier on our platform has completed full KYC identity and business verification. Buy in bulk with confidence.', color: 'text-emerald-500 bg-emerald-500/10' },
-    { icon: Globe, title: 'Europe & Gulf Sourcing', desc: 'Source FMCG, beverages, personal care, and more from suppliers across Europe and the Gulf — all in one platform.', color: 'text-blue-500 bg-blue-500/10' },
+    { icon: Package, title: 'Tiered Bulk Pricing', desc: 'Every product in the Atlantis catalog offers quantity-based pricing tiers. The more you order, the lower your unit cost — automatically applied at checkout.', color: 'text-primary bg-primary/10' },
+    { icon: ShieldCheck, title: 'Curated by Atlantis', desc: 'Every product is sourced and quality-checked by the Atlantis team before listing. Buy in bulk with confidence.', color: 'text-emerald-500 bg-emerald-500/10' },
+    { icon: Globe, title: 'Europe & Gulf Distribution', desc: 'FMCG, beverages, personal care and more — sold and shipped by Atlantis across Europe and the Gulf, all in one place.', color: 'text-blue-500 bg-blue-500/10' },
     { icon: ShieldCheck, title: 'Escrow Payment Protection', desc: 'Your wholesale payment is held in escrow until goods are confirmed delivered. No wire transfer risk, no trust required.', color: 'text-purple-500 bg-purple-500/10' },
     { icon: BarChart3, title: 'Financial Reporting', desc: 'Download invoices automatically for every order. Full purchase history with exportable records for your accounting team.', color: 'text-orange-500 bg-orange-500/10' },
-    { icon: Zap, title: 'Fast Reordering', desc: 'Repeat your most common orders with a single click from your order history. Build supplier relationships and negotiate directly.', color: 'text-amber-500 bg-amber-500/10' },
+    { icon: Zap, title: 'Fast Reordering', desc: 'Repeat your most common orders with a single click from your order history. Build a long-term wholesale relationship with Atlantis.', color: 'text-amber-500 bg-amber-500/10' },
 ];
 
 const CATEGORIES = [
@@ -44,7 +44,7 @@ export default function WholesalePage() {
                             <span className="text-primary">B2B Prices</span>
                         </h1>
                         <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-8">
-                            Atlantis is purpose-built for B2B wholesale sourcing. Browse thousands of FMCG and consumer goods products with quantity-based pricing, minimum order quantities, and secure escrow payment — all from KYC-verified suppliers.
+                            Atlantis is purpose-built for B2B wholesale sourcing. Browse thousands of FMCG and consumer goods products with quantity-based pricing, minimum order quantities, and secure escrow payment — all sold and shipped directly by Atlantis.
                         </p>
                         <div className="flex items-center gap-4 flex-wrap">
                             <Link href="/auth/register" className="h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm">

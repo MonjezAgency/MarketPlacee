@@ -168,7 +168,7 @@ export const ar = {
         expertReview: "مراجعة الخبراء",
         validateSpecs: "فريقنا يتحقق من المواصفات",
         receiveQuotes: "استلام عروض الأسعار",
-        compareOffers: "قارن أفضل عروض الجملة",
+        compareOffers: "احصل على عرض سعر مخصص من Atlantis",
         requestQuote: "طلب عرض سعر",
         browseByCategory: "تصفح حسب فئة العمل",
         viewAllCategories: "عرض كل الفئات",
@@ -197,7 +197,7 @@ export const ar = {
         expandingNetwork: "نحن نوسع شبكتنا.",
         firstWave: "كن جزءاً من الموجة الأولى من الشركات المتميزة في أتلانتس.",
         activeBuyers: "المشترون النشطون",
-        verifiedSuppliers: "الموردون الموثقون",
+        verifiedSuppliers: "بيع مباشر من Atlantis",
         globalVision: "رؤية عالمية",
         becomeBuyer: "كن مشترياً"
     },
@@ -632,7 +632,7 @@ export const ar = {
         supportAgent: "وكيل الدعم",
         contentEditor: "محرر المحتوى",
         logistics: "اللوجستيات",
-        verifiedSupplier: "مورد موثق",
+        verifiedSupplier: "بيع مباشر من Atlantis",
         partner: "شريك",
     },
     supplier: {

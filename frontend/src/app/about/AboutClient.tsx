@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowRight, Shield, Globe, Zap, Users, BarChart3, ShieldChec
 const STATS = [
     { value: 'EUR', label: 'Primary Currency', desc: 'Built for the European market' },
     { value: 'B2B', label: 'Exclusive Focus', desc: 'Business-to-business only' },
-    { value: 'KYC', label: 'Verified Suppliers', desc: 'Every supplier identity-checked' },
+    { value: 'Atlantis', label: 'Direct Seller', desc: 'Sourced & shipped by us' },
     { value: 'Escrow', label: 'Secure Payments', desc: 'Funds held until delivery confirmed' },
 ];
 
@@ -20,8 +20,8 @@ const VALUES = [
     },
     {
         icon: ShieldCheck,
-        title: 'Verified Trust',
-        desc: 'We verify every supplier before they list a single product. KYC with liveness detection ensures you always know who you are buying from.',
+        title: 'Sourced by Atlantis',
+        desc: 'Every product in our catalog is sourced and quality-checked by the Atlantis team before listing — so you always know what you are buying.',
         color: 'text-emerald-500 bg-emerald-500/10',
     },
     {
@@ -72,7 +72,7 @@ export default function AboutPage() {
                             <span className="text-primary">Built for Trust</span>
                         </h1>
                         <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl">
-                            Atlantis is a B2B wholesale platform connecting verified suppliers with business buyers across Europe and the Gulf. We were founded with a simple belief: business commerce should be as secure and transparent as enterprise banking, and as simple as consumer shopping.
+                            Atlantis is a B2B wholesale company that sells FMCG, beverages and consumer goods directly to business buyers across Europe and the Gulf. We were founded with a simple belief: business commerce should be as secure and transparent as enterprise banking, and as simple as consumer shopping.
                         </p>
                     </div>
 
@@ -95,10 +95,10 @@ export default function AboutPage() {
                                 <h2 className="text-3xl font-black mb-6">Why We Built Atlantis</h2>
                                 <div className="space-y-4 text-muted-foreground text-sm leading-relaxed">
                                     <p>
-                                        Traditional B2B sourcing involves endless email chains, PDF catalogs, wire transfers with no protection, and supplier relationships built on nothing more than hope.
+                                        Traditional B2B sourcing involves endless email chains, PDF catalogs, wire transfers with no protection, and vendor relationships built on nothing more than hope.
                                     </p>
                                     <p>
-                                        We built Atlantis to change that. Developed by Monjez Company, our platform brings together KYC-verified suppliers and buyers in a secure, escrow-protected marketplace where every transaction is tracked, every supplier is verified, and every payment is protected until delivery is confirmed.
+                                        We built Atlantis to change that. Developed by Monjez Company, our platform sells a curated wholesale catalog directly to business buyers in a secure, escrow-protected experience where every transaction is tracked and every payment is held until delivery is confirmed.
                                     </p>
                                     <p>
                                         Headquartered with a focus on Romania and the broader European market, we understand the regulatory requirements, currency considerations, and trust dynamics that make EU B2B commerce unique.

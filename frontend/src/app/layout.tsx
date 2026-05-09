@@ -33,23 +33,23 @@ export const metadata: Metadata = {
         // Homepage default — every other page should set its own `title`
         // (the audit flagged 100% duplicate titles). The template handles
         // pages that DO set their own title.
-        default: "Atlantis | B2B Wholesale Marketplace — Verified Suppliers, Europe & Gulf",
+        default: "Atlantis | B2B Wholesale Distributor — Europe & Gulf",
         template: "%s | Atlantis Marketplace",
     },
-    description: "Source bulk FMCG, beverages, electronics, and industrial products from KYC-verified suppliers. Escrow-protected payments. EUR pricing. Built for Romania, Europe, and the Gulf.",
+    description: "Buy bulk FMCG, beverages, electronics, and industrial products direct from Atlantis. Escrow-protected payments. EUR pricing. Built for Romania, Europe, and the Gulf.",
     keywords: [
         "B2B marketplace",
         "wholesale platform",
         "bulk sourcing",
-        "global suppliers",
+        "wholesale distributor",
         "wholesale distribution",
         "B2B procurement",
-        "verified suppliers",
+        "Atlantis wholesale",
         "trade assurance",
         "wholesale prices",
         "bulk orders",
         "FMCG wholesale",
-        "supplier network",
+        "Europe distribution",
         "Atlantis Marketplace",
         "B2B sourcing",
         "wholesale beverages",
@@ -75,8 +75,8 @@ export const metadata: Metadata = {
     openGraph: {
         type: 'website',
         siteName: 'Atlantis Marketplace',
-        title: 'Atlantis | B2B Wholesale Marketplace — Verified Suppliers, Europe & Gulf',
-        description: 'KYC-verified suppliers. Escrow-protected payments. EUR pricing. The B2B wholesale marketplace built for Europe and the Gulf.',
+        title: 'Atlantis | B2B Wholesale Distributor — Europe & Gulf',
+        description: 'Wholesale catalog sold and shipped by Atlantis. Escrow-protected payments. EUR pricing. The B2B wholesale distributor built for Europe and the Gulf.',
         url: `${SITE_URL}/`,
         locale: 'en_US',
         alternateLocale: ['ar_EG', 'fr_FR', 'ro_RO'],
@@ -91,14 +91,14 @@ export const metadata: Metadata = {
                 url: '/og-image.png',
                 width: 1200,
                 height: 630,
-                alt: 'Atlantis — B2B Wholesale Marketplace for verified suppliers across Europe and the Gulf',
+                alt: 'Atlantis — B2B Wholesale Distributor across Europe and the Gulf',
             },
         ],
     },
     twitter: {
         card: 'summary_large_image',
-        title: 'Atlantis | B2B Wholesale Marketplace — Verified Suppliers, Europe & Gulf',
-        description: 'KYC-verified suppliers. Escrow-protected payments. EUR pricing. Source FMCG, electronics, industrial goods at scale.',
+        title: 'Atlantis | B2B Wholesale Distributor — Europe & Gulf',
+        description: 'Sold and shipped by Atlantis. Escrow-protected payments. EUR pricing. Source FMCG, electronics, industrial goods at scale.',
         images: ['/og-image.png'],
     },
     robots: {
@@ -148,7 +148,7 @@ export default function RootLayout({
                             legalName: 'Atlantis Marketplace (operated by Monjez Company)',
                             url: `${SITE_URL}/`,
                             logo: `${SITE_URL}/icon.png`,
-                            description: 'B2B wholesale marketplace connecting KYC-verified suppliers with business buyers across Europe and the Gulf. EUR-native pricing, escrow-protected payments.',
+                            description: 'B2B wholesale distributor selling FMCG, beverages and consumer goods directly to business buyers across Europe and the Gulf. EUR-native pricing, escrow-protected payments.',
                             // sameAs populated so the entity is discoverable by AI
                             // search engines — the GEO audit flagged the empty
                             // array as one of the biggest brand-signal misses.

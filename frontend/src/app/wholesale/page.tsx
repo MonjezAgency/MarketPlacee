@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     openGraph: {
         type: 'website',
         title: 'Wholesale Pricing & Bulk Orders | Atlantis',
-        description: 'Carton, pallet, or truck — tier-based bulk pricing on verified-supplier inventory. EUR-native, escrow-protected.',
+        description: 'Carton, pallet, or truck — tier-based bulk pricing on the Atlantis catalog. EUR-native, escrow-protected.',
         url: `${SITE_URL}/wholesale`,
     },
 };

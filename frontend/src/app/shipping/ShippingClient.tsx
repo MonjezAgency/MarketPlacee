@@ -73,15 +73,15 @@ export default function ShippingPage() {
                                 <h2 className="text-lg font-black">Shipping Costs</h2>
                             </div>
                             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
-                                Shipping costs are set by each supplier and displayed during checkout before you confirm your order. Costs vary based on:
+                                Transport cost is calculated by the Atlantis logistics team after your order is placed and confirmed with you before payment capture. Costs vary based on:
                             </p>
                             <ul className="text-sm text-muted-foreground space-y-2 list-disc pl-5">
                                 <li>Order weight and volume</li>
                                 <li>Destination country and shipping zone</li>
                                 <li>Shipping speed selected</li>
-                                <li>Supplier's preferred carrier</li>
+                                <li>Carrier negotiated for your route</li>
                             </ul>
-                            <p className="text-sm text-muted-foreground mt-4">Some suppliers offer free shipping above a minimum order value — this is displayed on their product pages.</p>
+                            <p className="text-sm text-muted-foreground mt-4">Atlantis works with multiple European carriers (DB Schenker, LKW Walter, Raben, DHL and others) to negotiate the best transport rate for each order.</p>
                         </section>
 
                         <section className="border-b border-border/50 pb-10">
@@ -90,7 +90,7 @@ export default function ShippingPage() {
                                 <h2 className="text-lg font-black">Order Processing Time</h2>
                             </div>
                             <p className="text-sm text-muted-foreground leading-relaxed">
-                                After payment is confirmed, the supplier has up to 48 business hours to accept and begin processing your order. Processing time (picking, packing, dispatch) is separate from shipping transit time. Suppliers communicate their processing time on their product pages.
+                                After payment is confirmed, Atlantis has up to 48 business hours to begin processing your order. Processing time (picking, packing, dispatch) is separate from shipping transit time and is shown on each product page.
                             </p>
                         </section>
 

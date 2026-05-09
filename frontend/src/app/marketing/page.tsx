@@ -1,7 +1,10 @@
 'use client';
 
+import * as React from 'react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/lib/auth';
 import { ArrowLeft, ArrowRight, Zap, BarChart3, Star, TrendingUp, Target, Eye, CheckCircle2 } from 'lucide-react';
 
 const PLACEMENT_TYPES = [
@@ -45,6 +48,20 @@ const BENEFITS = [
 ];
 
 export default function MarketingPage() {
+    // Atlantis sells directly. Supplier marketing tools are invite-only and
+    // must NOT be visible to public visitors or to customers — otherwise we
+    // leak the existence of a supplier program. Redirect anyone who is not
+    // a SUPPLIER / ADMIN / OWNER to the homepage.
+    const router = useRouter();
+    const { user, isAuthReady } = useAuth();
+    React.useEffect(() => {
+        if (!isAuthReady) return;
+        const allowed = user?.role === 'SUPPLIER' || user?.role === 'ADMIN' || user?.role === 'OWNER';
+        if (!allowed) router.replace('/');
+    }, [user, isAuthReady, router]);
+    if (!isAuthReady || !(user?.role === 'SUPPLIER' || user?.role === 'ADMIN' || user?.role === 'OWNER')) {
+        return <main className="min-h-screen bg-background" />;
+    }
     return (
         <main className="min-h-screen bg-background">
             <div className="container mx-auto px-6 py-16 max-w-5xl">
@@ -71,9 +88,6 @@ export default function MarketingPage() {
                         <div className="flex items-center gap-4 flex-wrap">
                             <Link href="/supplier" className="h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm">
                                 Go to Supplier Dashboard <ArrowRight size={16} />
-                            </Link>
-                            <Link href="/auth/register" className="h-12 px-10 border border-border bg-card font-black rounded-2xl hover:bg-muted transition-colors text-sm">
-                                Register as Supplier
                             </Link>
                         </div>
                     </div>
@@ -139,11 +153,10 @@ export default function MarketingPage() {
                     {/* CTA */}
                     <div className="bg-primary/5 border border-primary/20 rounded-3xl p-12 text-center space-y-6">
                         <h2 className="text-3xl font-black">Ready to grow your reach?</h2>
-                        <p className="text-muted-foreground max-w-md mx-auto">Placements are available to all KYC-verified suppliers. Log in to your supplier dashboard to get started.</p>
+                        <p className="text-muted-foreground max-w-md mx-auto">Log in to your supplier dashboard to manage placements and grow your reach.</p>
                         <Link href="/supplier/placements" className="inline-flex items-center gap-2 h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors text-sm">
                             Manage Placements <ArrowRight size={16} />
                         </Link>
-                        <p className="text-xs text-muted-foreground">Not a supplier yet? <Link href="/auth/register" className="text-primary hover:underline font-bold">Register here →</Link></p>
                     </div>
                 </motion.div>
             </div>

@@ -15,14 +15,14 @@ These Terms were last updated in April 2026.`,
     },
     {
         title: '2. Platform Description',
-        content: `Atlantis is a B2B wholesale marketplace that connects verified suppliers with business buyers. The Platform facilitates:
+        content: `Atlantis is a B2B wholesale distributor that sells FMCG, beverages and consumer goods directly to business buyers. The Platform facilitates:
 
 • Product discovery and sourcing
 • Secure order placement and payment via Stripe escrow
-• Supplier payouts after confirmed delivery
-• KYC-verified business relationships
+• Order fulfilment and delivery by Atlantis
+• Verified business relationships
 
-Atlantis acts as a technology intermediary. We are not a party to transactions between buyers and suppliers except to the extent of facilitating payment processing and dispute resolution.`,
+Atlantis is the seller of record for products listed on the Platform unless otherwise noted on a specific product page.`,
     },
     {
         title: '3. Eligibility',

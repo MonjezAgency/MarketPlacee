@@ -19,6 +19,7 @@ import {
     Heart,
     Tag,
     Truck,
+    ShieldCheck,
     HelpCircle,
     X,
     Settings,
@@ -227,22 +228,25 @@ export default function Navbar() {
 
     return (
         <header className="bg-white border-b border-[#E5E7EB] sticky top-0 z-[100] w-full shadow-sm">
-            {/* 1. SLIM TOP UTILITY BAR — Noon style */}
+            {/* 1. SLIM TOP UTILITY BAR — Atlantis-direct messaging.
+                We deliberately do NOT mention "free shipping over 1 truck"
+                (transport cost is negotiated per order with the buyer)
+                and we do NOT mention "verified suppliers" — Atlantis sells
+                the products directly. Supplier signup is invite-only and
+                is intentionally absent from this public bar. */}
             <div className="hidden lg:flex h-9 items-center justify-between px-8 bg-[#0B1F3A] text-white text-[11px] font-semibold">
                 <div className="flex items-center gap-5">
                     <span className="flex items-center gap-1.5">
-                        <Truck size={13} className="text-[#2EC4B6]" />
-                        <span className="text-white/80">Free shipping on bulk orders over 1 truck</span>
+                        <ShieldCheck size={13} className="text-[#2EC4B6]" />
+                        <span className="text-white/80">Sold &amp; shipped by Atlantis · Escrow-protected payments</span>
                     </span>
                     <span className="text-white/20">·</span>
                     <span className="flex items-center gap-1.5 text-white/70">
                         <Tag size={12} className="text-[#2EC4B6]" />
-                        Verified suppliers worldwide
+                        EUR-native wholesale pricing
                     </span>
                 </div>
                 <div className="flex items-center gap-5 text-white/70">
-                    <Link href="/auth/register?role=supplier" className="hover:text-white transition-colors">Sell on Atlantis</Link>
-                    <span className="text-white/20">·</span>
                     <Link href="/help" className="hover:text-white transition-colors">Help Center</Link>
                     <span className="text-white/20">·</span>
                     <Link href="/contact" className="hover:text-white transition-colors">Contact</Link>

@@ -22,7 +22,7 @@ const DEMO_SLIDES: Slide[] = [
     {
         image: "https://images.unsplash.com/photo-1550345332-09e3ac987658?auto=format&fit=crop&q=80&w=2000",
         title: "Wholesale Beverages Direct",
-        subtitle: "Global brands delivered to your doorstep. Verified suppliers only.",
+        subtitle: "Global brands delivered to your doorstep. Sourced & shipped by Atlantis.",
         badge: "B2B Exclusive"
     },
     {
@@ -33,8 +33,8 @@ const DEMO_SLIDES: Slide[] = [
     },
     {
         image: "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&q=80&w=2000",
-        title: "Supplier Spotlight: Bloom Energy",
-        subtitle: "Check out the latest sparkling energy flavors from Bloom.",
+        title: "New Arrival: Bloom Energy",
+        subtitle: "Check out the latest sparkling energy flavors from Bloom — now stocked by Atlantis.",
         badge: "New Arrival"
     }
 ];

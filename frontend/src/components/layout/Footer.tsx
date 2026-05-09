@@ -166,8 +166,11 @@ export default function Footer() {
                         <ul className="space-y-4 text-[13px] opacity-70">
                             <li><Link href="/how-it-works" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'howItWorks')}</Link></li>
                             <li><Link href="/categories" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'browseCategories')}</Link></li>
-                            <li><Link href="/auth/register" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'registerSupplier')}</Link></li>
-                            <li><Link href="/deals" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'bulkWholesale')}</Link></li>
+                            {/* "Register as Supplier" link removed — supplier
+                                onboarding is invite-only and intentionally NOT
+                                exposed in the public footer. */}
+                            <li><Link href="/wholesale" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'bulkWholesale')}</Link></li>
+                            <li><Link href="/deals" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'dailyDeals')}</Link></li>
                         </ul>
                     </div>
 

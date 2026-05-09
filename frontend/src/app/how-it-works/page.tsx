@@ -5,12 +5,12 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.atlantisfmcg.
 
 export const metadata: Metadata = {
     title: 'How Atlantis Works | B2B Wholesale Sourcing & Escrow Payments Explained',
-    description: 'Step-by-step: how to source bulk goods on Atlantis. KYC-verified supplier discovery, secure escrow payments, dispute resolution, and EUR-native pricing across Europe and the Gulf.',
+    description: 'Step-by-step: how to buy bulk goods directly from Atlantis. Curated wholesale catalog, secure escrow payments, dispute resolution, and EUR-native pricing across Europe and the Gulf.',
     alternates: { canonical: `${SITE_URL}/how-it-works` },
     openGraph: {
         type: 'website',
-        title: 'How Atlantis Works | B2B Wholesale Sourcing Explained',
-        description: 'KYC-verified suppliers + escrow payments + EUR pricing — the B2B wholesale marketplace built for Europe and the Gulf.',
+        title: 'How Atlantis Works | B2B Wholesale Buying Explained',
+        description: 'Curated catalog + escrow payments + EUR pricing — the B2B wholesale distributor built for Europe and the Gulf.',
         url: `${SITE_URL}/how-it-works`,
     },
 };

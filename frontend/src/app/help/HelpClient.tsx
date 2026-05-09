@@ -3,11 +3,14 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { ArrowLeft, HelpCircle, ChevronDown, Search, Users, Building2, CreditCard, Package, ShieldCheck, MessageSquare } from 'lucide-react';
+import { ArrowLeft, HelpCircle, ChevronDown, Search, Users, CreditCard, Package, ShieldCheck, MessageSquare } from 'lucide-react';
 
+// Help Center is a public, customer-facing page. We intentionally do NOT
+// expose a "Supplier FAQ" category, "Become a supplier" CTAs, or any
+// language that implies third-party sellers — Atlantis is the seller of
+// record. Supplier onboarding is invite-only and handled privately.
 const CATEGORIES = [
     { icon: Users, label: 'Buyer FAQs', color: 'text-blue-500 bg-blue-500/10' },
-    { icon: Building2, label: 'Supplier FAQs', color: 'text-purple-500 bg-purple-500/10' },
     { icon: CreditCard, label: 'Payments & Escrow', color: 'text-emerald-500 bg-emerald-500/10' },
     { icon: Package, label: 'Orders & Shipping', color: 'text-orange-500 bg-orange-500/10' },
     { icon: ShieldCheck, label: 'Security & KYC', color: 'text-primary bg-primary/10' },
@@ -16,33 +19,24 @@ const CATEGORIES = [
 const FAQS: { category: string; q: string; a: string }[] = [
     // Buyer FAQs
     { category: 'Buyer FAQs', q: 'How do I register as a buyer?', a: 'Click "Register" on the homepage and select the Buyer/Customer account type. Fill in your company details, email, and password. Your account will be reviewed and activated by our team within 24 hours. You\'ll receive a confirmation email once approved.' },
-    { category: 'Buyer FAQs', q: 'What is the minimum order quantity (MOQ)?', a: 'Each product has its own MOQ set by the supplier. The MOQ is displayed on every product page. You must meet the minimum order quantity to add the product to your cart. This ensures suppliers can fulfill orders economically.' },
-    { category: 'Buyer FAQs', q: 'Can I request a custom quote?', a: 'For large volume orders or bulk inquiries outside standard pricing tiers, contact the supplier directly via the platform messaging system, or reach out to us at Info@atlantisfmcg.com and we will connect you with the right supplier.' },
-    { category: 'Buyer FAQs', q: 'How do I track my order?', a: 'Go to Dashboard → My Orders to see the real-time status of all your orders. Status updates from the supplier (Processing, Shipped, Delivered) appear there in real-time. You\'ll also receive email notifications at each stage.' },
-    { category: 'Buyer FAQs', q: 'What happens if goods arrive damaged?', a: 'Do not confirm delivery. Instead, open a dispute within 7 days from the expected delivery date. Go to your order and click "Open Dispute". Provide photos and a description. Our team will review within 48-72 hours and either issue a refund or resolve with the supplier.' },
-
-    // Supplier FAQs
-    { category: 'Supplier FAQs', q: 'How do I register as a supplier?', a: 'Click "Register as Supplier" and complete the registration form. You\'ll then be guided through KYC verification — upload your national ID/passport, business registration documents, and complete a selfie verification. After approval (typically 48 hours), you can start listing products.' },
-    { category: 'Supplier FAQs', q: 'Why is KYC required?', a: 'KYC (Know Your Customer) verification is required by EU financial regulations and is essential to maintaining a trusted marketplace. It protects buyers from fraudulent suppliers and protects suppliers from fraudulent buyers. All financial data is encrypted and stored securely.' },
-    { category: 'Supplier FAQs', q: 'How do I connect my Stripe account?', a: 'Go to Supplier Dashboard → Payment Methods → Connect Stripe. You\'ll be redirected to Stripe\'s secure onboarding where you\'ll provide your bank account and identity details. Once onboarded, you can receive payouts automatically after buyers confirm delivery.' },
-    { category: 'Supplier FAQs', q: 'How long does product approval take?', a: 'New product listings are reviewed by our moderation team within 48 business hours. You\'ll receive a notification once approved or if changes are needed. Make sure your product has accurate descriptions, correct EAN codes, and clear images for faster approval.' },
-    { category: 'Supplier FAQs', q: 'Can I offer bulk pricing tiers?', a: 'Yes! When creating a product listing, you can set multiple pricing tiers based on order quantity (e.g., 10-50 pcs at €X, 51-200 pcs at €Y). This is displayed to buyers and automatically applied at checkout.' },
+    { category: 'Buyer FAQs', q: 'What is the minimum order quantity (MOQ)?', a: 'Each product has its own MOQ shown on the product page. You must meet the minimum order quantity to add the product to your cart — this lets us ship efficiently at wholesale prices.' },
+    { category: 'Buyer FAQs', q: 'Can I request a custom quote?', a: 'For large volume orders or bulk inquiries outside standard pricing tiers, contact us at Info@atlantisfmcg.com and our sales team will send you a tailored Atlantis quote.' },
+    { category: 'Buyer FAQs', q: 'How do I track my order?', a: 'Go to Dashboard → My Orders to see the real-time status of all your orders. Status updates (Processing, Shipped, Delivered) appear there in real-time, along with the carrier tracking number once dispatched. You\'ll also receive email notifications at each stage.' },
+    { category: 'Buyer FAQs', q: 'What happens if goods arrive damaged?', a: 'Do not confirm delivery. Instead, open a dispute within 7 days from the expected delivery date. Go to your order and click "Open Dispute". Provide photos and a description. Our team will review within 48-72 hours and either issue a refund or arrange a replacement.' },
 
     // Payments & Escrow
-    { category: 'Payments & Escrow', q: 'What is escrow and why is it used?', a: 'Escrow means Atlantis holds the buyer\'s payment securely after checkout. The funds are not released to the supplier until the buyer confirms delivery. This protects buyers from non-delivery and gives suppliers confidence that payment is guaranteed upon fulfillment.' },
-    { category: 'Payments & Escrow', q: 'When do suppliers receive payment?', a: 'Payment is released to the supplier automatically after the buyer clicks "Confirm Delivery" in their dashboard. Atlantis deducts its platform commission (typically 5%) and transfers the remainder to the supplier\'s connected Stripe account. Stripe then pays out to the supplier\'s bank on their payout schedule (usually 2-7 business days).' },
+    { category: 'Payments & Escrow', q: 'What is escrow and why is it used?', a: 'Escrow means Atlantis holds your payment securely after checkout. The funds are not captured until the order is confirmed delivered. This protects you from non-delivery and gives you full transparency on every order.' },
     { category: 'Payments & Escrow', q: 'What payment methods are accepted?', a: 'We accept all major credit and debit cards (Visa, Mastercard, Amex), as well as Apple Pay and Google Pay — all processed securely by Stripe. We do not accept bank transfers, cash, or cryptocurrency at this time.' },
-    { category: 'Payments & Escrow', q: 'What is the platform commission?', a: 'Atlantis charges a commission on each completed order. The rate is deducted automatically from the supplier\'s payout. The current rate is displayed in your supplier dashboard settings. Commission only applies to delivered, confirmed orders — cancelled orders are fully refunded.' },
-    { category: 'Payments & Escrow', q: 'How do refunds work?', a: 'If a dispute is resolved in the buyer\'s favor, the escrowed funds are returned to the buyer\'s original payment method. Refunds typically appear within 5-10 business days depending on your bank. Stripe processing fees are non-refundable in some cases.' },
+    { category: 'Payments & Escrow', q: 'How do refunds work?', a: 'If a dispute is resolved in your favor, the escrowed funds are returned to your original payment method. Refunds typically appear within 5-10 business days depending on your bank. Stripe processing fees are non-refundable in some cases.' },
 
     // Orders & Shipping
-    { category: 'Orders & Shipping', q: 'Does Atlantis handle shipping?', a: 'Atlantis is a marketplace platform — shipping is arranged by the supplier. Suppliers are responsible for providing accurate shipping timelines at the product level and updating the order status when shipped. If a supplier fails to ship within the stated timeframe, you can open a dispute.' },
-    { category: 'Orders & Shipping', q: 'Can I cancel an order?', a: 'You can request a cancellation before the supplier accepts and starts processing your order. Once the order status moves to "Processing" or "Shipped", cancellation is handled through the dispute process. Contact us at Info@atlantisfmcg.com immediately for urgent cancellation requests.' },
+    { category: 'Orders & Shipping', q: 'Does Atlantis handle shipping?', a: 'Yes. Atlantis arranges shipping for every order through our negotiated network of European carriers (DB Schenker, LKW Walter, Raben, DHL and others). Transport cost is calculated per order and confirmed with you before payment is captured.' },
+    { category: 'Orders & Shipping', q: 'Can I cancel an order?', a: 'You can request a cancellation before the order moves to "Processing". Once the order is in "Processing" or "Shipped", cancellation is handled through the dispute process. Contact us at Info@atlantisfmcg.com immediately for urgent cancellation requests.' },
     { category: 'Orders & Shipping', q: 'Are invoices generated automatically?', a: 'Yes. An invoice is generated automatically once your order is confirmed as delivered. You can download it from your Order History in the dashboard.' },
 
     // Security & KYC
     { category: 'Security & KYC', q: 'How is my financial data protected?', a: 'All sensitive financial data (IBAN, SWIFT codes, 2FA secrets) is encrypted using AES-256 encryption before being stored in our database. We never store card numbers — all card data is handled exclusively by Stripe (PCI DSS Level 1 certified). Your account uses JWT authentication with short-lived tokens and optional two-factor authentication.' },
-    { category: 'Security & KYC', q: 'What is 2FA and should I enable it?', a: 'Two-Factor Authentication (2FA) adds an extra layer of security to your account. After entering your password, you\'ll also need to enter a code from an authenticator app (like Google Authenticator). We strongly recommend enabling 2FA, especially for supplier accounts that receive payments.' },
+    { category: 'Security & KYC', q: 'What is 2FA and should I enable it?', a: 'Two-Factor Authentication (2FA) adds an extra layer of security to your account. After entering your password, you\'ll also need to enter a code from an authenticator app (like Google Authenticator). We strongly recommend enabling 2FA on every business account.' },
     { category: 'Security & KYC', q: 'What should I do if I suspect my account is compromised?', a: 'Contact us immediately at Info@atlantisfmcg.com or change your password immediately from Account Security settings. We monitor all login attempts and will flag suspicious activity. Accounts are automatically locked after repeated failed login attempts.' },
 ];
 
