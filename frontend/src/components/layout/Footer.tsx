@@ -180,7 +180,10 @@ export default function Footer() {
                             <li><Link href="/help" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'helpCenter')}</Link></li>
                             <li><Link href="/shipping" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'shippingPolicy')}</Link></li>
                             <li><Link href="/returns" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'returnsRefunds')}</Link></li>
-                            <li><Link href="/trade-assurance" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">Trade Assurance</Link></li>
+                            {/* "Trade Assurance" link removed — page does not
+                                exist and was producing a 404. Add the route
+                                back here once /app/trade-assurance/page.tsx
+                                ships. */}
                         </ul>
                     </div>
 
@@ -188,7 +191,7 @@ export default function Footer() {
                         <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'aboutUs')}</h4>
                         <ul className="space-y-4 text-[13px] opacity-70">
                             <li><Link href="/about" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'aboutUs')}</Link></li>
-                            <li><Link href="/news" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'brandSpotlights')}</Link></li>
+                            {/* "/news" link removed — no News page exists. */}
                             <li><Link href="/contact" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'contactUs')}</Link></li>
                         </ul>
                     </div>
@@ -197,8 +200,11 @@ export default function Footer() {
                         <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'terms')}</h4>
                         <ul className="space-y-4 text-[13px] opacity-70">
                             <li><Link href="/terms" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'terms')}</Link></li>
-                            <li><Link href="/privacy" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'privacy')}</Link></li>
-                            <li><Link href="/cookies" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'cookies')}</Link></li>
+                            {/* The actual route folders are
+                                /privacy-policy and /cookie-policy — the
+                                old short-form links produced 404s. */}
+                            <li><Link href="/privacy-policy" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'privacy')}</Link></li>
+                            <li><Link href="/cookie-policy" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'cookies')}</Link></li>
                         </ul>
                     </div>
                 </div>

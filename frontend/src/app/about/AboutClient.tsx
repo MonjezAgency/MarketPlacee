@@ -33,7 +33,7 @@ const VALUES = [
     {
         icon: Zap,
         title: 'Simplicity at Scale',
-        desc: 'Managing thousands of SKUs, multiple suppliers, and cross-border shipping should not require a PhD. We make B2B commerce as simple as B2C.',
+        desc: 'Managing thousands of SKUs, multi-warehouse stock, and cross-border shipping should not require a PhD. We make B2B commerce as simple as B2C.',
         color: 'text-orange-500 bg-orange-500/10',
     },
     {
@@ -112,9 +112,9 @@ export default function AboutPage() {
                                 </div>
                                 {[
                                     'Customer pays → funds held in Stripe Escrow',
-                                    'Supplier ships → customer gets tracking',
+                                    'Atlantis ships → customer gets a carrier tracking number',
                                     'Customer confirms delivery → escrow releases',
-                                    'Atlantis takes 5% commission → supplier gets the rest',
+                                    'Funds settle to Atlantis → order closed',
                                     'Dispute? Our team reviews and resolves fairly',
                                 ].map((step, i) => (
                                     <div key={i} className="flex items-start gap-3">
