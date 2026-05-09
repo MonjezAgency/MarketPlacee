@@ -37,7 +37,10 @@ interface Product {
         id: string;
     };
     createdAt: string;
-    completeness?: number; // Calculated field
+    completeness?: number;       // Calculated field (0-100)
+    missingFields?: string[];     // Filled by computeCompleteness — used by the
+                                  // bar's hover tooltip to tell admins what
+                                  // exactly is still missing on this row.
     unit?: string;
     unitsPerCase?: number;
     casesPerPallet?: number;
@@ -49,6 +52,10 @@ interface Product {
     origin?: string;
     shelfLife?: string;
     weight?: number;
+    /** EXW (Ex Works) — required at upload, surfaced on PDP. */
+    exwLocation?: string;
+    /** Optional brand string — used by completeness scoring. */
+    brand?: string;
 }
 
 // ─── Components ─────────────────────────────────────────────────────────────
@@ -67,20 +74,81 @@ function KPICard({ label, value, icon: Icon, color, bg }: any) {
     );
 }
 
-function CompletenessBar({ value }: { value: number }) {
+/**
+ * Compute a realistic data-completeness score plus a list of which
+ * fields are still missing. Replaces the previous mock random value
+ * so admins see, at a glance, exactly what each product still needs
+ * before it can be approved. The fields are weighted: a few are
+ * REQUIRED (must exist for a sane B2B listing), the rest are
+ * RECOMMENDED (improve UX but not blocking).
+ *
+ * Returned shape:
+ *   { score: 0-100, missing: ["Description", "EXW location", ...] }
+ */
+function computeCompleteness(p: Product): { score: number; missing: string[] } {
+    const checks: Array<{ label: string; ok: boolean; weight: number }> = [
+        { label: 'Name',                ok: !!(p.name && p.name.trim().length >= 2),               weight: 2 },
+        { label: 'Description',         ok: !!((p as any).description && String((p as any).description).trim().length >= 10), weight: 2 },
+        { label: 'Brand',               ok: !!((p as any).brand && String((p as any).brand).trim()), weight: 1 },
+        { label: 'Price',               ok: !!(p.price && Number(p.price) > 0),                    weight: 2 },
+        { label: 'Stock',               ok: !!(p.stock != null && Number(p.stock) > 0),            weight: 2 },
+        { label: 'Category',            ok: !!(p.category && p.category.trim()),                    weight: 1 },
+        { label: 'EXW location',        ok: !!((p as any).exwLocation && String((p as any).exwLocation).trim()), weight: 2 },
+        { label: 'Country of origin',   ok: !!(p.origin && p.origin.trim()),                       weight: 1 },
+        { label: 'Image',               ok: !!((p as any).images && (p as any).images.length > 0 || (p as any).image), weight: 1 },
+        { label: 'EAN / Barcode',       ok: !!(p.ean && String(p.ean).trim()),                      weight: 1 },
+        { label: 'Weight',              ok: !!(p.weight && String(p.weight).trim()),                weight: 1 },
+        { label: 'Shelf life / BBD',    ok: !!(p.shelfLife && String(p.shelfLife).trim()),          weight: 1 },
+        { label: 'Units per case',      ok: !!(p.unitsPerCase && p.unitsPerCase > 0),               weight: 1 },
+        { label: 'Cases per pallet',    ok: !!(p.casesPerPallet && p.casesPerPallet > 0),           weight: 1 },
+        { label: 'Pallets per truck',   ok: !!(p.palletsPerShipment && p.palletsPerShipment > 0),   weight: 1 },
+        { label: 'MOQ',                 ok: !!(p.moq && p.moq > 0),                                 weight: 1 },
+    ];
+    const totalWeight = checks.reduce((s, c) => s + c.weight, 0);
+    const earned      = checks.filter(c => c.ok).reduce((s, c) => s + c.weight, 0);
+    const score = Math.round((earned / totalWeight) * 100);
+    const missing = checks.filter(c => !c.ok).map(c => c.label);
+    return { score, missing };
+}
+
+function CompletenessBar({ value, missing }: { value: number; missing?: string[] }) {
     const color = value < 50 ? 'bg-red-500' : value < 80 ? 'bg-orange-500' : 'bg-green-500';
+    const dotColor = value < 50 ? 'bg-red-500' : value < 80 ? 'bg-orange-500' : 'bg-green-500';
     return (
-        <div className="flex flex-col gap-1.5 w-full max-w-[100px]">
+        <div className="group/bar relative flex flex-col gap-1.5 w-full max-w-[100px]">
             <div className="flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-400">{value}%</span>
             </div>
             <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                <motion.div 
+                <motion.div
                     initial={{ width: 0 }}
                     animate={{ width: `${value}%` }}
                     className={cn("h-full rounded-full transition-all duration-1000", color)}
                 />
             </div>
+
+            {/* Hover popover — lists exactly which fields are missing.
+                Shown on hover/focus over the cell so admins know what to
+                ask the supplier for instead of guessing why a row is at
+                72% instead of 100%. */}
+            {missing && missing.length > 0 && (
+                <div className="absolute z-50 left-0 top-full mt-2 w-[240px] hidden group-hover/bar:block pointer-events-none">
+                    <div className="bg-slate-900 text-white text-[11px] rounded-xl shadow-xl border border-slate-800 p-3 leading-relaxed">
+                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/10">
+                            <span className={cn("w-2 h-2 rounded-full", dotColor)} />
+                            <span className="font-bold">Missing data ({missing.length})</span>
+                        </div>
+                        <ul className="space-y-1">
+                            {missing.map((m, i) => (
+                                <li key={i} className="flex items-start gap-1.5">
+                                    <span className="text-amber-400 mt-0.5">•</span>
+                                    <span className="text-white/80">{m}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -206,11 +274,14 @@ export default function ProductsModerationPage() {
             const res = await apiFetch('/products/admin/all');
             if (res.ok) {
                 const data = await res.json();
-                // Add mock completeness for visual demonstration if missing
-                const enriched = (data as Product[]).map(p => ({
-                    ...p,
-                    completeness: p.completeness ?? Math.floor(Math.random() * 40) + 60
-                }));
+                // Compute REAL completeness from each product's fields, plus
+                // the list of missing items the admin can hover to see. No
+                // more mock random values — admins now know exactly why a
+                // row is at 72% and can chase the supplier for the gap.
+                const enriched = (data as Product[]).map(p => {
+                    const { score, missing } = computeCompleteness(p);
+                    return { ...p, completeness: score, missingFields: missing };
+                });
                 setProducts(enriched);
             }
         } catch (err) {
@@ -718,7 +789,7 @@ export default function ProductsModerationPage() {
                                             </td>
                                             <td className="px-6 py-4 text-sm text-slate-600">{p.supplier?.name || 'Admin Upload'}</td>
                                             <td className="px-6 py-4"><StatusBadge status={p.status} /></td>
-                                            <td className="px-6 py-4"><CompletenessBar value={p.completeness || 0} /></td>
+                                            <td className="px-6 py-4"><CompletenessBar value={p.completeness || 0} missing={p.missingFields} /></td>
                                             <td className="px-6 py-4 text-sm font-bold text-slate-900" title={`Buyer price (with markup): ${formatPrice(p.price)}`}>{formatPrice(p.basePrice ?? p.price)}</td>
                                             <td className="px-6 py-4 text-sm text-slate-600">{p.stock.toLocaleString()}</td>
                                             <td className="px-6 py-4 text-xs text-slate-400 font-medium">{new Date(p.createdAt).toLocaleDateString()}</td>

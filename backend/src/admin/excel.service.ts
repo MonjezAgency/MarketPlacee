@@ -470,6 +470,21 @@ export class ExcelService {
             // out of "Pepsi Diet 150ml" and "150ml" out of the same name.
             this.enrichFromName(normalizedRow);
 
+            // Description is required by the DTO (MinLength 10). If the
+            // supplier left it blank we synthesise a minimal one from the
+            // brand + name + weight + shelf-life so the row doesn't fail
+            // validation just for that. Suppliers who care about SEO can
+            // still override with a real description on their next edit.
+            if (!normalizedRow.description || String(normalizedRow.description).trim().length < 10) {
+                const parts: string[] = [];
+                if (normalizedRow.brand) parts.push(String(normalizedRow.brand));
+                if (normalizedRow.name)  parts.push(String(normalizedRow.name));
+                if (normalizedRow.weight) parts.push(`(${normalizedRow.weight})`);
+                if (normalizedRow.shelfLife) parts.push(`— BBD ${normalizedRow.shelfLife}`);
+                const synth = parts.join(' ').trim();
+                if (synth.length >= 10) normalizedRow.description = synth;
+            }
+
             // ── EXW resolution ──────────────────────────────────────────────
             // Required field. Resolution order:
             //   1. The mapped exwLocation column (per-row).
@@ -543,11 +558,14 @@ export class ExcelService {
     }
 
     /**
-     * Walks every cell of every row to find an EXW value the supplier may
-     * have written somewhere other than a dedicated column — e.g. a footer
-     * note "Prices are EXW Thessaloniki -GR" or a description cell that
-     * starts "Ex Works: Hamburg, Germany". Returns the first match found,
-     * or null if the sheet contains no EXW signal at all.
+     * Walks every cell of every row — including header rows — to find an
+     * EXW value the supplier may have written somewhere other than a
+     * dedicated column. Suppliers commonly bake the EXW INTO a column
+     * header (e.g. "Price EXW IT" or "Price & EXW in GR") rather than
+     * using a separate EXW column, OR they write a footer note like
+     * "Prices are EXW Thessaloniki -GR". Both styles are handled here.
+     * Returns the first match found, or null if the sheet contains no
+     * EXW signal at all.
      */
     private detectSheetLevelExw(rows: any[][]): string | null {
         for (const row of rows) {
@@ -559,33 +577,87 @@ export class ExcelService {
     }
 
     /**
+     * 2-letter country code → full country name. Suppliers often shorthand
+     * the EXW location ("EXW IT", "Priced EXW GR") instead of writing the
+     * full country, especially in column headers. We expand to the full
+     * name so the buyer-facing PDP doesn't show cryptic "IT" or "GR".
+     */
+    private static readonly COUNTRY_ABBREV: Record<string, string> = {
+        IT: 'Italy', GR: 'Greece', DE: 'Germany', FR: 'France', ES: 'Spain',
+        PT: 'Portugal', RO: 'Romania', BG: 'Bulgaria', PL: 'Poland',
+        NL: 'Netherlands', BE: 'Belgium', AT: 'Austria', CZ: 'Czechia',
+        SK: 'Slovakia', HU: 'Hungary', SI: 'Slovenia', HR: 'Croatia',
+        DK: 'Denmark', SE: 'Sweden', FI: 'Finland', NO: 'Norway',
+        IE: 'Ireland', LU: 'Luxembourg', CH: 'Switzerland', LI: 'Liechtenstein',
+        EE: 'Estonia', LV: 'Latvia', LT: 'Lithuania', MT: 'Malta', CY: 'Cyprus',
+        GB: 'United Kingdom', UK: 'United Kingdom', IS: 'Iceland',
+        US: 'United States', CA: 'Canada', MX: 'Mexico',
+        TR: 'Turkey', RU: 'Russia', UA: 'Ukraine',
+        EG: 'Egypt', SA: 'Saudi Arabia', AE: 'UAE', QA: 'Qatar',
+        KW: 'Kuwait', BH: 'Bahrain', OM: 'Oman', JO: 'Jordan', LB: 'Lebanon',
+        MA: 'Morocco', TN: 'Tunisia', DZ: 'Algeria', LY: 'Libya',
+        CN: 'China', JP: 'Japan', KR: 'South Korea', IN: 'India',
+        TH: 'Thailand', VN: 'Vietnam', SG: 'Singapore', MY: 'Malaysia',
+        ID: 'Indonesia', PH: 'Philippines',
+        AU: 'Australia', NZ: 'New Zealand', BR: 'Brazil',
+    };
+
+    /**
+     * Expand 2-letter country codes inside an EXW string. "IT" alone
+     * becomes "Italy"; "Thessaloniki -GR" becomes "Thessaloniki, Greece";
+     * "Hamburg, DE" becomes "Hamburg, Germany". Leaves already-spelled-out
+     * names untouched.
+     */
+    private expandCountryAbbrev(value: string): string {
+        const v = value.trim();
+        // Pure 2-letter code → full country name.
+        if (/^[A-Za-z]{2}$/.test(v)) {
+            const full = ExcelService.COUNTRY_ABBREV[v.toUpperCase()];
+            if (full) return full;
+        }
+        // "City -GR" / "City, GR" / "City GR" → "City, <Country>"
+        const m = v.match(/^(.+?)[\s,\-]+([A-Za-z]{2})\s*$/);
+        if (m) {
+            const country = ExcelService.COUNTRY_ABBREV[m[2].toUpperCase()];
+            if (country) return `${m[1].trim()}, ${country}`;
+        }
+        return v;
+    }
+
+    /**
      * Pull an EXW value out of a single row's cells. Recognises:
      *   "EXW Thessaloniki"           → "Thessaloniki"
-     *   "EXW: Thessaloniki -GR"      → "Thessaloniki -GR"
+     *   "EXW: Thessaloniki -GR"      → "Thessaloniki, Greece"
      *   "Ex Works Hamburg, Germany"  → "Hamburg, Germany"
      *   "Prices are EXW Hamburg"     → "Hamburg"
      *   "Origin warehouse: Bucharest"→ "Bucharest"
+     *   "Price & EXW in IT"          → "Italy"
+     *   "EXW GR"                     → "Greece"
      * Stops at the first newline or pipe so multi-field cells don't bleed.
      */
     private extractExwFromCells(row: any[]): string | null {
         if (!row) return null;
         const patterns: RegExp[] = [
-            /\bexw\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
-            /\bex\s*works?\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
-            /\borigin\s*warehouse\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
-            /\bship\s*from\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
-            /\bstock\s*location\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
+            // "EXW in IT", "EXW at GR", "EXW from Hamburg" — common in headers
+            /\bexw\s+(?:in|at|from)\s+([^\n|]+?)(?:[.,;)]|$)/i,
+            /\bexw\s*[:\-]?\s*([^\n|]+?)(?:[.,;)]|$)/i,
+            /\bex\s*works?\s*[:\-]?\s*([^\n|]+?)(?:[.,;)]|$)/i,
+            /\borigin\s*warehouse\s*[:\-]?\s*([^\n|]+?)(?:[.,;)]|$)/i,
+            /\bship(?:ped)?\s*from\s*[:\-]?\s*([^\n|]+?)(?:[.,;)]|$)/i,
+            /\bstock\s*location\s*[:\-]?\s*([^\n|]+?)(?:[.,;)]|$)/i,
+            /\bpickup\s*location\s*[:\-]?\s*([^\n|]+?)(?:[.,;)]|$)/i,
         ];
         for (const cell of row) {
             const s = String(cell ?? '').trim();
-            if (!s || s.length < 3 || s.length > 200) continue;
+            if (!s || s.length < 3 || s.length > 300) continue;
             for (const re of patterns) {
                 const m = s.match(re);
                 if (m && m[1]) {
-                    const v = m[1].trim().replace(/^[\-:\s]+/, '').replace(/\s{2,}/g, ' ');
-                    // Reject obvious non-locations (numbers, single letters)
+                    let v = m[1].trim().replace(/^[\-:\s]+/, '').replace(/\s{2,}/g, ' ');
+                    // Strip trailing junk like "Price", "Cost", "EUR"
+                    v = v.replace(/\s+(price|cost|eur|usd|gbp|in|at|from)$/i, '').trim();
                     if (v.length >= 2 && /[a-zA-Z؀-ۿ]/.test(v)) {
-                        return v.slice(0, 80);
+                        return this.expandCountryAbbrev(v).slice(0, 80);
                     }
                 }
             }

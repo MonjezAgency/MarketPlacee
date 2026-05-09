@@ -1,11 +1,19 @@
-import { IsString, IsNumber, IsOptional, IsInt, Min, IsEnum } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsInt, Min, IsEnum, MinLength } from 'class-validator';
 import { ProductStatus } from '@prisma/client';
 
 export class CreateProductDto {
     @IsString()
+    @MinLength(2, { message: 'Product name is required (at least 2 characters).' })
     name!: string;
 
+    /**
+     * Description is REQUIRED — even a one-liner. The supplier should
+     * say something useful about the product (shelf life, packaging,
+     * variant, anything). Importer rejects rows with empty descriptions
+     * so the catalog never lists an empty product page.
+     */
     @IsString()
+    @MinLength(10, { message: 'Description is required — write at least one short sentence describing the product (shelf life, variant, packaging notes, etc.).' })
     description!: string;
 
     @IsOptional()
