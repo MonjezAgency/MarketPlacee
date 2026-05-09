@@ -149,12 +149,23 @@ function RegisterForm() {
                 locale,
             });
 
+            // BUG FIX (operator-reported "I registered but nothing
+            // landed in the DB"): the auth lib's register() returns
+            // EITHER a result object on success OR an error STRING on
+            // failure. The previous `if (!success)` check was wrong —
+            // a non-empty error string is truthy, so the block was
+            // SKIPPED and the user saw the success screen even when
+            // the backend rejected the request silently.
+            //
+            // Distinguish them explicitly: a string return value is
+            // ALWAYS an error, an object is ALWAYS success.
+            if (typeof success === 'string') {
+                setError(success || 'Registration failed.');
+                setLoading(false);
+                return;
+            }
             if (!success) {
-                if (typeof success === 'string') {
-                    setError(success);
-                } else {
-                    setError('Unable to reach the registration server.');
-                }
+                setError('Unable to reach the registration server.');
                 setLoading(false);
                 return;
             }
