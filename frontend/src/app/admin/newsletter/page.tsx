@@ -16,6 +16,7 @@
  */
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import {
     Mail, Search, Download, Upload, Trash2, Send, Users, Activity,
     CheckCircle2, EyeOff, Ban, X, Loader2, Plus, RotateCcw,
@@ -34,6 +35,7 @@ export default function NewsletterPage() {
     const [statusFilter, setStatusFilter] = React.useState<StatusFilter>('active');
     const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
 
+    const router = useRouter();
     const [isExporting, setIsExporting] = React.useState(false);
     const [isCampaignOpen, setIsCampaignOpen] = React.useState(false);
     const [isAddOpen, setIsAddOpen] = React.useState(false);
@@ -262,7 +264,7 @@ export default function NewsletterPage() {
                         Export CSV
                     </button>
                     <button
-                        onClick={() => setIsCampaignOpen(true)}
+                        onClick={() => router.push('/admin/newsletter/campaign')}
                         className="h-[52px] px-8 bg-[#2EC4B6] hover:brightness-110 text-[#0F172A] rounded-2xl text-sm font-black uppercase tracking-widest transition-all shadow-2xl shadow-[#2EC4B6]/30 flex items-center gap-3 active:scale-95"
                     >
                         <Send size={18} /> Create Campaign

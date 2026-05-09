@@ -195,36 +195,65 @@ export class NewsletterService {
         return { totalRows: rows.length, created, updated, skipped, errors };
     }
 
-    async sendCampaign(subject: string, content: string, recipientIds?: string[]) {
-        // Default to all ACTIVE subscribers; if recipientIds is provided,
-        // limit the send to that explicit list (multi-select from the UI).
+    /**
+     * Send a campaign. Three input modes are supported:
+     *
+     *   1. `html` — fully rendered HTML. The campaign builder produces
+     *      this from its block list + Atlantis template shell. The
+     *      email is sent verbatim, no extra wrapping.
+     *
+     *   2. `content` — plain-text body. Wrapped in a minimal Atlantis
+     *      shell server-side (legacy path used by the simple modal).
+     *
+     *   3. Neither — rejected.
+     *
+     * Recipient targeting:
+     *   - recipientIds[] — exact subset (multi-select in the UI).
+     *   - Otherwise → every ACTIVE subscriber.
+     */
+    async sendCampaign(
+        subject: string,
+        content: string | undefined,
+        recipientIds?: string[],
+        html?: string,
+    ) {
+        if (!subject || !subject.trim()) {
+            throw new BadRequestException('Subject is required');
+        }
+        if ((!html || !html.trim()) && (!content || !content.trim())) {
+            throw new BadRequestException('Email body (html or content) is required');
+        }
+
         const where: any = { status: 'ACTIVE' };
         if (Array.isArray(recipientIds) && recipientIds.length > 0) {
             where.id = { in: recipientIds };
         }
         const subscribers = await this.prisma.newsletterSubscriber.findMany({ where });
 
+        const fallbackShell = (body: string) => `
+            <div style="font-family: sans-serif; padding: 40px; color: #333; max-width: 600px; margin: 0 auto; background: #fff; border-radius: 12px; border: 1px solid #eee;">
+                <h1 style="color: #0F172A; font-size: 24px; font-weight: 900; margin-bottom: 24px;">Atlantis Marketplace</h1>
+                <div style="font-size: 16px; line-height: 1.6; color: #555;">
+                    ${body.replace(/\n/g, '<br/>')}
+                </div>
+                <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;" />
+                <p style="font-size: 12px; color: #999; text-align: center;">
+                    You received this because you subscribed to Atlantis Marketplace updates.<br/>
+                    © ${new Date().getFullYear()} Atlantis Marketplace. All rights reserved.
+                </p>
+            </div>
+        `;
+        const finalHtml = (html && html.trim()) ? html : fallbackShell(content || '');
+
         const results = await Promise.all(
             subscribers.map(sub =>
-                this.emailService.sendMail(sub.email, subject, `
-                    <div style="font-family: sans-serif; padding: 40px; color: #333; max-width: 600px; margin: 0 auto; background: #fff; border-radius: 12px; border: 1px solid #eee;">
-                        <h1 style="color: #0F172A; font-size: 24px; font-weight: 900; margin-bottom: 24px;">Atlantis Marketplace</h1>
-                        <div style="font-size: 16px; line-height: 1.6; color: #555;">
-                            ${content.replace(/\n/g, '<br/>')}
-                        </div>
-                        <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;" />
-                        <p style="font-size: 12px; color: #999; text-align: center;">
-                            You received this because you subscribed to Atlantis Marketplace updates.<br/>
-                            © 2026 Atlantis Marketplace. All rights reserved.
-                        </p>
-                    </div>
-                `)
+                this.emailService.sendMail(sub.email, subject, finalHtml)
             )
         );
 
         return {
             total: subscribers.length,
-            successCount: results.filter(r => r).length
+            successCount: results.filter(r => r).length,
         };
     }
 }
