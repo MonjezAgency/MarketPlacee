@@ -22,11 +22,13 @@ export class PaymentsService {
     async createConnectOnboardingUrl(userId: string) {
         const user = await this.prisma.user.findUnique({ where: { id: userId } });
         if (!user) throw new ForbiddenException('User not found');
-        
-        // Relaxed KYC check for testing: permit VERIFIED and PENDING
-        if (user.kycStatus === 'UNVERIFIED' || user.kycStatus === 'REJECTED') {
-            throw new ForbiddenException('Please submit your KYC documents and wait for review before connecting your bank account');
-        }
+
+        // KYC enforcement DISABLED platform-wide — operator decision.
+        // Suppliers can connect Stripe regardless of KYC status. To
+        // re-enable, restore:
+        //   if (user.kycStatus === 'UNVERIFIED' || user.kycStatus === 'REJECTED') {
+        //     throw new ForbiddenException('Please submit your KYC documents...');
+        //   }
 
         let accountId = user.stripeAccountId;
         try {

@@ -76,14 +76,9 @@ function PayoutSettingsContent() {
     }, []);
 
     const handleOnboardStripe = async () => {
-        if (user?.kycStatus !== 'VERIFIED') {
-            setStatus({ 
-                type: 'error', 
-                msg: 'Complete KYC verification before connecting your bank account.' 
-            });
-            return;
-        }
-
+        // KYC gate disabled platform-wide. Suppliers can onboard
+        // Stripe immediately. To re-enable, restore the
+        // user.kycStatus !== 'VERIFIED' guard here.
         setIsOnboarding(true);
         setStatus(null);
         try {
@@ -280,7 +275,7 @@ function PayoutSettingsContent() {
                             </p>
                             <button
                                 type="submit"
-                                disabled={isLoading || user?.kycStatus !== 'VERIFIED'}
+                                disabled={isLoading}
                                 className="h-12 px-8 bg-primary text-primary-foreground font-black text-[11px] uppercase tracking-widest rounded-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 {isLoading ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
@@ -290,43 +285,46 @@ function PayoutSettingsContent() {
                     </form>
                 </div>
 
-                {/* Sidebar Info */}
-                <div className="space-y-6">
-                    <div className="bg-card shadow-premium border border-border rounded-[32px] p-8 space-y-6">
-                        <h3 className="text-sm font-black text-card-foreground uppercase tracking-widest flex items-center gap-2">
-                            <ShieldCheck size={18} className="text-emerald-500" />
-                            KYC Status
-                        </h3>
-                        
-                        <div className={cn(
-                            "p-4 rounded-2xl border space-y-2",
-                            user?.kycStatus === 'VERIFIED' ? "bg-emerald-500/5 border-emerald-500/20" : "bg-amber-500/5 border-amber-500/20"
-                        )}>
-                            <div className="flex items-center justify-between">
-                                <p className="text-[10px] font-black uppercase tracking-widest text-foreground">Identity Check</p>
-                                {user?.kycStatus === 'VERIFIED' ? (
-                                    <CheckCircle2 size={14} className="text-emerald-500" />
-                                ) : (
-                                    <AlertCircle size={14} className="text-amber-500" />
-                                )}
-                            </div>
-                            <p className="text-[11px] font-bold text-foreground">
-                                {user?.kycStatus || 'UNVERIFIED'}
-                            </p>
-                        </div>
-
-                        {user?.kycStatus !== 'VERIFIED' && (
-                            <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
-                                <p className="text-[10px] text-amber-600 font-black uppercase leading-relaxed">
-                                    Financial laws require identity verification before we can process payouts. Please complete KYC first.
+                {/* Sidebar Info — KYC widget hidden while platform-wide
+                    KYC enforcement is disabled. The widget itself is left
+                    in source so we can flip it back on later by removing
+                    this `false &&` gate. */}
+                {false && (
+                    <div className="space-y-6">
+                        <div className="bg-card shadow-premium border border-border rounded-[32px] p-8 space-y-6">
+                            <h3 className="text-sm font-black text-card-foreground uppercase tracking-widest flex items-center gap-2">
+                                <ShieldCheck size={18} className="text-emerald-500" />
+                                KYC Status
+                            </h3>
+                            <div className={cn(
+                                "p-4 rounded-2xl border space-y-2",
+                                user?.kycStatus === 'VERIFIED' ? "bg-emerald-500/5 border-emerald-500/20" : "bg-amber-500/5 border-amber-500/20"
+                            )}>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-foreground">Identity Check</p>
+                                    {user?.kycStatus === 'VERIFIED' ? (
+                                        <CheckCircle2 size={14} className="text-emerald-500" />
+                                    ) : (
+                                        <AlertCircle size={14} className="text-amber-500" />
+                                    )}
+                                </div>
+                                <p className="text-[11px] font-bold text-foreground">
+                                    {user?.kycStatus || 'UNVERIFIED'}
                                 </p>
-                                <Link href="/dashboard/kyc" className="inline-block mt-3 text-[10px] font-black text-amber-700 underline underline-offset-4">
-                                    GO TO VERIFICATION
-                                </Link>
                             </div>
-                        )}
+                            {user?.kycStatus !== 'VERIFIED' && (
+                                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
+                                    <p className="text-[10px] text-amber-600 font-black uppercase leading-relaxed">
+                                        Financial laws require identity verification before we can process payouts. Please complete KYC first.
+                                    </p>
+                                    <Link href="/dashboard/kyc" className="inline-block mt-3 text-[10px] font-black text-amber-700 underline underline-offset-4">
+                                        GO TO VERIFICATION
+                                    </Link>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
         </div>
     );

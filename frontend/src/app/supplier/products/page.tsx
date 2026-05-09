@@ -68,7 +68,16 @@ export default function SupplierProductsPage() {
     const [isDeletingBulk, setIsDeletingBulk] = React.useState(false);
     const router = useRouter();
     const [kycStatus, setKycStatus] = React.useState<string>('UNVERIFIED');
-    const kycBlocked = kycStatus !== 'VERIFIED';
+    /**
+     * KYC enforcement is currently DISABLED on the platform — operator
+     * decision to let suppliers list products immediately without an
+     * identity-verification gate. To re-enable later, change this back
+     * to:  const kycBlocked = kycStatus !== 'VERIFIED';
+     * Everything else (KYC pages, AI verification, admin KYC review
+     * tab, revoke / resync endpoints) stays in place — only the
+     * BLOCKING is suppressed.
+     */
+    const kycBlocked = false;
 
     React.useEffect(() => {
         loadProducts();

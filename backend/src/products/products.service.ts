@@ -72,17 +72,21 @@ export class ProductsService {
     }
 
     async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false, options?: { preFetchedConfigs?: any[], preFetchedCategories?: string[], supplierKycStatus?: string }) {
-        // KYC enforcement: suppliers must be verified or pending approval before listing products
-        if (!isAdmin && createProductDto.supplierId) {
-            const kycStatus = options?.supplierKycStatus || (await this.prisma.user.findUnique({
-                where: { id: createProductDto.supplierId },
-                select: { kycStatus: true },
-            }))?.kycStatus;
-
-            if (kycStatus === 'UNVERIFIED') {
-                throw new ForbiddenException('Identity verification required. Please submit your documents before listing products.');
-            }
-        }
+        // KYC enforcement DISABLED — operator decision to let
+        // suppliers list products immediately without an identity-
+        // verification gate. The KYC module + AI checks + admin
+        // review tab all stay in place; only the listing-block is
+        // suppressed. To re-enable, restore the block below:
+        //
+        // if (!isAdmin && createProductDto.supplierId) {
+        //     const kycStatus = options?.supplierKycStatus || (await this.prisma.user.findUnique({
+        //         where: { id: createProductDto.supplierId },
+        //         select: { kycStatus: true },
+        //     }))?.kycStatus;
+        //     if (kycStatus === 'UNVERIFIED') {
+        //         throw new ForbiddenException('Identity verification required. Please submit your documents before listing products.');
+        //     }
+        // }
 
         // Fetch markup setting based on unit
         const unit = createProductDto.unit?.toLowerCase() || 'piece';
