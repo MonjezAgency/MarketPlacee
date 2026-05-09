@@ -54,16 +54,12 @@ const COLORS = {
     textSecondary: '#64748B'
 };
 
-// Mock Analytics Data
-const ANALYTICS_DATA = [
-    { name: 'Mon', impressions: 4000, clicks: 240, conversions: 24 },
-    { name: 'Tue', impressions: 3000, clicks: 139, conversions: 18 },
-    { name: 'Wed', impressions: 2000, clicks: 980, conversions: 50 },
-    { name: 'Thu', impressions: 2780, clicks: 390, conversions: 35 },
-    { name: 'Fri', impressions: 1890, clicks: 480, conversions: 42 },
-    { name: 'Sat', impressions: 2390, clicks: 380, conversions: 30 },
-    { name: 'Sun', impressions: 3490, clicks: 430, conversions: 38 },
-];
+// Empty week skeleton — real per-day numbers are populated from
+// the campaign list when the supplier has any active campaigns.
+// Shows zeros (not fake spikes) when there are no campaigns yet.
+const EMPTY_WEEK = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map(name => ({
+    name, impressions: 0, clicks: 0, conversions: 0,
+}));
 
 const AD_TYPES = [
     {
@@ -104,6 +100,50 @@ export default function OffersAndAdsPage() {
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [currentStep, setCurrentStep] = React.useState(1);
     const [campaigns, setCampaigns] = React.useState<any[]>([]);
+
+    // Real KPI aggregation from the live campaign list. Fields used:
+    //   impressions, clicks, conversions, spend (each per campaign).
+    // Falls back to 0 cleanly when the supplier has no campaigns —
+    // never shows the previous fake "142.8k impressions" mock data.
+    const aggregateKpis = React.useMemo(() => {
+        let impressions = 0, clicks = 0, conversions = 0, spend = 0;
+        for (const c of campaigns) {
+            impressions += Number(c?.impressions || 0);
+            clicks      += Number(c?.clicks || 0);
+            conversions += Number(c?.conversions || 0);
+            spend       += Number(c?.spend || c?.totalSpend || 0);
+        }
+        const ctr  = impressions > 0 ? (clicks / impressions) * 100 : 0;
+        const conv = clicks > 0 ? (conversions / clicks) * 100 : 0;
+        const fmtNum = (n: number) =>
+            n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M`
+            : n >= 1_000   ? `${(n / 1_000).toFixed(1)}k`
+            : n.toLocaleString();
+        return {
+            impressions: fmtNum(impressions),
+            ctr: `${ctr.toFixed(2)}%`,
+            conv: `${conv.toFixed(2)}%`,
+            spend: spend > 0 ? `€${spend.toLocaleString()}` : '€0',
+            hasData: impressions > 0 || clicks > 0 || conversions > 0 || spend > 0,
+        };
+    }, [campaigns]);
+
+    // Real weekly chart data — each campaign optionally carries a
+    // dailyStats array; we sum across campaigns per day. If nothing
+    // has data we render a flat zero week instead of mock spikes.
+    const weeklyChartData = React.useMemo(() => {
+        const week = EMPTY_WEEK.map(d => ({ ...d }));
+        for (const c of campaigns) {
+            if (!Array.isArray(c?.dailyStats)) continue;
+            c.dailyStats.forEach((d: any, i: number) => {
+                if (i >= week.length) return;
+                week[i].impressions += Number(d?.impressions || 0);
+                week[i].clicks      += Number(d?.clicks || 0);
+                week[i].conversions += Number(d?.conversions || 0);
+            });
+        }
+        return week;
+    }, [campaigns]);
     const [loading, setLoading] = React.useState(true);
     const [selectedPlacement, setSelectedPlacement] = React.useState<string | null>(null);
 
@@ -310,7 +350,7 @@ export default function OffersAndAdsPage() {
                             </div>
                             <div className="flex-1 w-full min-h-0">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={ANALYTICS_DATA} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+                                    <AreaChart data={weeklyChartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
                                         <defs>
                                             <linearGradient id="colorImp" x1="0" y1="0" x2="0" y2="1">
                                                 <stop offset="5%" stopColor="#2EC4B6" stopOpacity={0.1}/>
@@ -334,10 +374,10 @@ export default function OffersAndAdsPage() {
                         {/* Right: KPI Cards */}
                         <div className="lg:col-span-4 space-y-[16px]">
                             {[
-                                { label: 'Total Impressions', value: '142.8k', trend: '+12.5%', icon: Eye, color: '#2EC4B6' },
-                                { label: 'Avg. CTR', value: '2.48%', trend: '+0.4%', icon: MousePointer2, color: '#8B5CF6' },
-                                { label: 'Conversion Rate', value: '1.2%', trend: '-0.2%', icon: TrendingUp, color: '#F59E0B' },
-                                { label: 'Total Spend', value: '$1,240', trend: 'Budget tracking', icon: DollarSign, color: '#0F172A' },
+                                { label: 'Total Impressions', value: aggregateKpis.impressions, trend: aggregateKpis.hasData ? 'Live' : 'No data yet', icon: Eye, color: '#2EC4B6' },
+                                { label: 'Avg. CTR',           value: aggregateKpis.ctr,         trend: aggregateKpis.hasData ? 'Live' : 'No data yet', icon: MousePointer2, color: '#8B5CF6' },
+                                { label: 'Conversion Rate',    value: aggregateKpis.conv,        trend: aggregateKpis.hasData ? 'Live' : 'No data yet', icon: TrendingUp, color: '#F59E0B' },
+                                { label: 'Total Spend',        value: aggregateKpis.spend,       trend: aggregateKpis.hasData ? 'Live' : 'No campaigns', icon: DollarSign, color: '#0F172A' },
                             ].map((kpi) => (
                                 <div key={kpi.label} className="bg-white border border-[#E5E7EB] rounded-[16px] p-[16px] h-[100px] flex items-center gap-4 group hover:border-[#2EC4B6]/30 transition-colors">
                                     <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center transition-colors group-hover:bg-[#2EC4B6]/10">

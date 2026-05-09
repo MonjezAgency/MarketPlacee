@@ -168,6 +168,22 @@ export class KycController {
     return this.kycService.rejectKyc(id, body.adminNotes);
   }
 
+  /** Admin: revoke a previously-verified KYC (flips back to PENDING). */
+  @Patch('admin/:id/revoke')
+  @UseGuards(RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+  async revoke(@Param('id') id: string, @Body() body: { adminNotes?: string }) {
+    return this.kycService.revokeKyc(id, body?.adminNotes || '');
+  }
+
+  /** Admin: re-sync user.kycStatus from latest KYCDocument (heals stale state). */
+  @Patch('admin/users/:userId/resync')
+  @UseGuards(RolesGuard)
+  @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+  async resync(@Param('userId') userId: string) {
+    return this.kycService.resyncKycStatus(userId);
+  }
+
   /** Admin: quick verify users by email (dev utility) */
   @Post('admin/quick-verify')
   @UseGuards(RolesGuard)

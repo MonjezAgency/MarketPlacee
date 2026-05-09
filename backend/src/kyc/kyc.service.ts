@@ -302,6 +302,72 @@ export class KycService {
     return updated;
   }
 
+  /**
+   * Admin: revoke a previously-verified KYC. Flips the document
+   * status back to PENDING and the user's kycStatus to UNVERIFIED
+   * so they have to resubmit. Useful when fraud is detected after
+   * approval, when a KYC expires, or when the admin needs to
+   * re-validate after a country/legal-entity change.
+   */
+  async revokeKyc(docId: string, adminNotes: string) {
+    const reason = (adminNotes || '').trim() || 'Admin revoked verification.';
+    const doc = await this.prisma.kYCDocument.findUnique({
+      where: { id: docId },
+      include: { user: { select: { id: true, email: true, name: true } } },
+    });
+    if (!doc) throw new NotFoundException('KYC document not found');
+
+    const updated = await this.prisma.kYCDocument.update({
+      where: { id: docId },
+      data: {
+        status: KYCStatus.PENDING,
+        adminNotes: `Verification revoked — ${reason}`,
+      },
+    });
+
+    await this.prisma.user.update({
+      where: { id: doc.userId },
+      data: { kycStatus: KYCStatus.UNVERIFIED },
+    });
+
+    if (doc.user?.email) {
+      this.emailService.sendKycStatusEmail(
+        doc.user.email,
+        doc.user.name || 'Partner',
+        'REJECTED',
+        `Your previously-approved verification has been revoked. ${reason}`,
+      ).catch(() => {});
+    }
+
+    await this.notificationsService.notifyUser(
+      doc.userId,
+      'Identity Verification Revoked',
+      `Your KYC verification was revoked. Reason: ${reason}. Please resubmit.`,
+      'ERROR',
+    ).catch(() => {});
+
+    return updated;
+  }
+
+  /**
+   * Admin: re-sync the user's kycStatus from the latest KYCDocument
+   * row. Handles the rare case where the User.kycStatus column got
+   * out of sync with the document table (e.g. an old DB import or a
+   * partial migration). Cheap to run, safe to re-run.
+   */
+  async resyncKycStatus(userId: string) {
+    const latest = await this.prisma.kYCDocument.findFirst({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const target = latest?.status ?? KYCStatus.UNVERIFIED;
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { kycStatus: target },
+    });
+    return { userId, kycStatus: target };
+  }
+
   /** Admin: reject a KYC document */
   async rejectKyc(docId: string, adminNotes: string) {
     if (!adminNotes?.trim()) {
