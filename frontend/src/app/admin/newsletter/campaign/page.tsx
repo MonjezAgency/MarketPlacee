@@ -222,16 +222,33 @@ export default function CampaignBuilderPage() {
     const [selectedRecipients, setSelectedRecipients] = React.useState<string[]>([]);
     const [isSending, setIsSending] = React.useState(false);
 
-    // Load catalog + subscriber list once for the picker / recipient selector
+    // Load catalog + subscriber list once for the picker / recipient selector.
+    // Defensive: the /products endpoint returns either a raw array OR a
+    // pagination wrapper { items: [...] } depending on the route. We pluck
+    // the array out before storing so downstream .map() never sees a
+    // non-array (which is what produced the "n.map is not a function"
+    // crash on the campaign builder).
     React.useEffect(() => {
+        const asArray = (raw: any): any[] => {
+            if (Array.isArray(raw)) return raw;
+            if (Array.isArray(raw?.items)) return raw.items;
+            if (Array.isArray(raw?.data)) return raw.data;
+            if (Array.isArray(raw?.products)) return raw.products;
+            if (Array.isArray(raw?.results)) return raw.results;
+            return [];
+        };
         (async () => {
             try {
                 const [pRes, sRes] = await Promise.all([
                     apiFetch('/products'),
                     apiFetch('/newsletter'),
                 ]);
-                if (pRes.ok) setProducts(await pRes.json());
-                if (sRes.ok) setSubscribers(await sRes.json());
+                if (pRes.ok) {
+                    try { setProducts(asArray(await pRes.json())); } catch { setProducts([]); }
+                }
+                if (sRes.ok) {
+                    try { setSubscribers(asArray(await sRes.json())); } catch { setSubscribers([]); }
+                }
             } catch {}
         })();
     }, []);

@@ -50,7 +50,16 @@ export default function NewsletterPage() {
             const res = await apiFetch('/newsletter?includeHidden=true');
             if (res.ok) {
                 const data = await res.json();
-                setSubscribers(data);
+                // Defensive — backend should return an array but if a
+                // wrapper response slips through (e.g. Nest's transform
+                // interceptor wrapping it under `data`) we never let a
+                // non-array reach .map() below.
+                const arr = Array.isArray(data)
+                    ? data
+                    : Array.isArray((data as any)?.data) ? (data as any).data
+                    : Array.isArray((data as any)?.items) ? (data as any).items
+                    : [];
+                setSubscribers(arr);
             }
         } catch (error) {
             console.error('Failed to fetch subscribers:', error);
