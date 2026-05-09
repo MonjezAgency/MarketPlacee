@@ -28,8 +28,14 @@ const PUBLIC_PATHS = [
   'auth/verify-email',
   'auth/google-login',
   'auth/refresh',
+  'auth/emergency-reset',
   'newsletter/subscribe',
   'products/price-ticker',
+  // Health endpoints — no auth so the operator can hit them from
+  // the browser to verify Railway connectivity even when locked out.
+  'health',
+  'health/database',
+  'health/payments',
 ];
 
 async function handler(
@@ -90,9 +96,35 @@ async function handler(
       });
     } catch (err: any) {
       if (err.name === 'AbortError') {
-        return NextResponse.json({ message: 'Backend request timed out' }, { status: 504 });
+        return NextResponse.json(
+          { message: `Backend request to ${getBackendUrl()} timed out after 60s. The Railway service may be cold-starting or down.` },
+          { status: 504 },
+        );
       }
-      return NextResponse.json({ message: err.message || 'Proxy error' }, { status: 500 });
+      // "fetch failed" by itself is unhelpful — surface the actual
+      // upstream URL + error cause so the operator (and us) can
+      // tell at a glance whether it's a wrong env var, a Railway
+      // outage, a DNS issue, or a CORS/firewall block.
+      const causeMsg =
+        err?.cause?.message ||
+        err?.cause?.code ||
+        err?.code ||
+        err?.message ||
+        'unknown error';
+      console.error('[PROXY] upstream fetch failed', {
+        backend: getBackendUrl(),
+        path: `/${backendPath}`,
+        method: req.method,
+        err: causeMsg,
+      });
+      return NextResponse.json(
+        {
+          message: `Cannot reach the backend at ${getBackendUrl()} (${causeMsg}). Check that Railway is running and BACKEND_URL is set on Vercel.`,
+          backend: getBackendUrl(),
+          cause: causeMsg,
+        },
+        { status: 502 },
+      );
     }
 }
 
