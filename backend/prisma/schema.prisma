@@ -107,6 +107,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   products     Product[]
+  offers       Offer[]
   customerOrders    Order[] @relation("CustomerOrders")
   supplierOrders    Order[] @relation("SupplierOrders")
   adminActions AdminActionLog[] @relation("AdminActions")
@@ -192,6 +193,7 @@ model Product {
   warehouse   Warehouse? @relation(fields: [warehouseId], references: [id])
 
   placements   ProductPlacement[]
+  offers       Offer[]
   orderItems   OrderItem[]
   tieredPrices TieredPrice[]
   reviews      Review[]
@@ -693,6 +695,47 @@ model EscrowTransaction {
   releasedAt       DateTime?
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
+}
+
+/**
+ * Supplier offer on an existing platform product.
+ *
+ * Workflow:
+ *   1. Supplier creates an Offer (manual form OR bulk-upload sheet).
+ *      The offer references an existing Product (matched by name on
+ *      bulk import). One row = one offer = one (supplier, product)
+ *      pair at a chosen tier and price.
+ *   2. Status starts as PENDING.
+ *   3. Admin reviews on /admin/offers — approves or rejects.
+ *   4. On APPROVE, the backend blasts a campaign email to every
+ *      ACTIVE newsletter subscriber + every CUSTOMER on the
+ *      platform with the offer details (product, price, qty,
+ *      tier, supplier). On REJECT, the supplier is notified.
+ */
+model Offer {
+  id           String   @id @default(uuid())
+  supplierId   String
+  supplier     User     @relation(fields: [supplierId], references: [id])
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id])
+
+  pricePerUnit Float    // price in EUR for ONE unit at the chosen tier
+  unit         String   // 'truck' | 'pallet' | 'carton'
+  quantity     Int      // how many units the supplier can deliver
+  validUntil   DateTime?
+  notes        String?
+
+  status       String   @default("PENDING") // PENDING | APPROVED | REJECTED | EXPIRED
+  adminNotes   String?
+  approvedAt   DateTime?
+  approvedBy   String?  // admin user id
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([supplierId])
+  @@index([productId])
+  @@index([status])
 }
 
 model NewsletterSubscriber {

@@ -35,6 +35,7 @@ import NotificationBell from '@/components/ui/NotificationBell';
 const SUPPLIER_LINKS = [
     { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
     { label: 'Inventory Manager', href: '/supplier/products', icon: Box, key: 'products' },
+    { label: 'Wholesale Offers', href: '/supplier/wholesale-offers', icon: ListPlus, key: 'wholesale-offers' },
     { label: 'Offers & Ads', href: '/supplier/offers', icon: ListPlus },
     { label: 'My Sales', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
     { label: 'Analytics', href: '/supplier/analytics', icon: TrendingUp },

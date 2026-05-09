@@ -47,6 +47,7 @@ import {
     LifeBuoy,
     MessageCircle,
     Activity,
+    CheckCircle2,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -82,6 +83,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         links: [
             { label: 'Dashboard', translationKey: 'overview', href: '/admin', icon: Home },
             { label: 'Inventory Hub', translationKey: 'allProducts', href: '/admin/products', icon: Package },
+            { label: 'Approve Offers', translationKey: 'approveOffers', href: '/admin/wholesale-offers', icon: CheckCircle2 },
             { label: 'Global Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
             { label: 'Supply Chain', translationKey: 'suppliers', href: '/admin/suppliers', icon: Store },
             { label: 'B2B Customers', translationKey: 'buyers', href: '/admin/buyers', icon: Users },

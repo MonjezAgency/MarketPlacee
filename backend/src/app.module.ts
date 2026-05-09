@@ -36,6 +36,7 @@ import { AiAgentModule } from './ai-agent/ai-agent.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
 import { EmailModule } from './email/email.module';
 import { I18nModule } from './i18n/i18n.module';
+import { OffersModule } from './offers/offers.module';
 
 @Module({
     imports: [
@@ -71,6 +72,7 @@ import { I18nModule } from './i18n/i18n.module';
         NewsletterModule,
         EmailModule,
         I18nModule,
+        OffersModule,
     ],
     controllers: [AppController],
     providers: [
