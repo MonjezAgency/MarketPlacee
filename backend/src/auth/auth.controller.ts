@@ -53,6 +53,31 @@ export class AuthController {
         return this.authService.forgotPassword(email);
     }
 
+    /**
+     * Emergency admin password reset. Used when SMTP is down or the
+     * normal forgot-password flow isn't reaching the inbox. Caller
+     * must know the SEED_ADMIN_SECRET env var (same one used by the
+     * tech-team seed script) — without it the call is rejected.
+     *
+     * Body: { email, newPassword, secret, role? }
+     *
+     * If the user doesn't exist AND role is provided, we create a
+     * fresh ACTIVE user at that role (lets the operator bootstrap
+     * an admin account from scratch on a clean DB). When the user
+     * exists we just overwrite the password and force ACTIVE status
+     * so a forgotten / locked admin gets back in.
+     */
+    @Post('emergency-reset')
+    async emergencyReset(@Body() body: { email: string; newPassword: string; secret: string; role?: string; name?: string }) {
+        return this.authService.emergencyReset(
+            body?.email,
+            body?.newPassword,
+            body?.secret,
+            body?.role,
+            body?.name,
+        );
+    }
+
     @Post('reset-password')
     async resetPassword(@Body() body: { token: string; newPassword: any }) {
         return this.authService.resetPassword(body.token, body.newPassword);

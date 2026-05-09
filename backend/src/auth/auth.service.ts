@@ -444,6 +444,80 @@ export class AuthService {
         return this.generateTokens(user as AuthUser);
     }
 
+    /**
+     * Emergency password reset gated by SEED_ADMIN_SECRET. See controller
+     * docstring for the full rationale — short version: when SMTP can't
+     * reach the operator's inbox, this lets them set their own password
+     * server-side using the bootstrap secret already in the env.
+     *
+     * If the user exists → overwrite password + force status ACTIVE.
+     * If not → create a new user when a role is provided.
+     */
+    async emergencyReset(
+        email: string,
+        newPassword: string,
+        secret: string,
+        role?: string,
+        name?: string,
+    ) {
+        const expected = process.env.SEED_ADMIN_SECRET;
+        if (!expected) {
+            throw new UnauthorizedException('SEED_ADMIN_SECRET is not configured on the server.');
+        }
+        if (!secret || secret !== expected) {
+            throw new UnauthorizedException('Invalid emergency-reset secret.');
+        }
+        const trimmedEmail = (email || '').trim().toLowerCase();
+        if (!trimmedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+            throw new BadRequestException('Email is required and must be valid.');
+        }
+        if (!newPassword || newPassword.length < 8) {
+            throw new BadRequestException('New password must be at least 8 characters.');
+        }
+
+        const hashed = await bcrypt.hash(newPassword, 10);
+        const existing = await this.prisma.user.findUnique({ where: { email: trimmedEmail } });
+
+        if (existing) {
+            await this.prisma.user.update({
+                where: { id: existing.id },
+                data: {
+                    password: hashed,
+                    status: 'ACTIVE',
+                },
+            });
+            // Also clear any pending lockout from the LoginAttempt table
+            // so the user isn't blocked by the rate-limiter immediately
+            // after the reset.
+            try {
+                await this.prisma.loginAttempt.deleteMany({
+                    where: { email: trimmedEmail, success: false },
+                });
+            } catch {}
+            this.logger.warn(`[EMERGENCY_RESET] Password reset for existing user ${trimmedEmail} (role=${existing.role})`);
+            return { ok: true, action: 'reset', userId: existing.id, role: existing.role };
+        }
+
+        // Create from scratch — required for first-boot or wiped DBs.
+        if (!role) {
+            throw new BadRequestException(
+                `No user with email ${trimmedEmail} exists. Pass a role (ADMIN/OWNER/CUSTOMER/SUPPLIER) to create one.`,
+            );
+        }
+        const created = await this.prisma.user.create({
+            data: {
+                email: trimmedEmail,
+                password: hashed,
+                name: name || trimmedEmail.split('@')[0],
+                role: role.toUpperCase() as any,
+                status: 'ACTIVE',
+                emailVerified: true,
+            },
+        });
+        this.logger.warn(`[EMERGENCY_RESET] Created new user ${trimmedEmail} role=${role.toUpperCase()}`);
+        return { ok: true, action: 'created', userId: created.id, role: created.role };
+    }
+
     async forgotPassword(email: string) {
         const user = await this.prisma.user.findUnique({ where: { email } });
 
