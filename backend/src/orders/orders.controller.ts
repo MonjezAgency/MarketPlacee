@@ -151,9 +151,9 @@ export class OrdersController {
     @Roles(Role.ADMIN, Role.LOGISTICS, Role.OWNER)
     async setShipping(
         @Param('id') id: string,
-        @Body() body: { shippingCompany?: string | null; shippingCost?: number | null },
+        @Body() body: { shippingCompany?: string | null; shippingCost?: number | null; trackingNumber?: string | null },
     ) {
-        return this.ordersService.setShipping(id, body.shippingCompany, body.shippingCost);
+        return this.ordersService.setShipping(id, body.shippingCompany, body.shippingCost, body.trackingNumber);
     }
 
     @Patch('bulk-status')

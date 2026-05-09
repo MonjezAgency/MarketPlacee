@@ -28,23 +28,83 @@ export class OrdersService {
     ) { }
 
     /**
-     * Admin / logistics assigns a transport carrier + price to the order.
-     * Both fields nullable — admin can set just the carrier and fill price
-     * later, or clear both. The order's totalAmount is NOT auto-updated
-     * here; that recompute happens on the invoice/checkout path.
+     * Admin / logistics assigns a transport carrier, price, and (optionally)
+     * the carrier-issued tracking number to the order. Upsert pattern so the
+     * admin can update fields independently as info comes in: carrier first
+     * during the booking call, tracking number when the carrier returns it,
+     * price when negotiated.
+     *
+     * Order.shippingCompany + Order.shippingCost are stored on the Order
+     * row directly. trackingNumber + carrier live on a separate Shipment
+     * row (one-to-one with Order via unique orderId) so the Shipment record
+     * can carry status updates over time.
      */
-    async setShipping(orderId: string, shippingCompany?: string | null, shippingCost?: number | null) {
-        const data: any = {};
-        if (shippingCompany !== undefined) data.shippingCompany = shippingCompany || null;
+    async setShipping(
+        orderId: string,
+        shippingCompany?: string | null,
+        shippingCost?: number | null,
+        trackingNumber?: string | null,
+    ) {
+        // 1. Order-level fields
+        const orderData: any = {};
+        if (shippingCompany !== undefined) orderData.shippingCompany = shippingCompany || null;
         if (shippingCost !== undefined) {
-            data.shippingCost = shippingCost === null ? null
+            orderData.shippingCost = shippingCost === null ? null
                 : Number(shippingCost) >= 0 ? Number(shippingCost) : null;
         }
-        return this.prisma.order.update({
+        if (Object.keys(orderData).length > 0) {
+            await this.prisma.order.update({ where: { id: orderId }, data: orderData });
+        }
+
+        // 2. Shipment-level fields (tracking + carrier)
+        if (trackingNumber !== undefined || shippingCompany !== undefined) {
+            const trimmedTracking = trackingNumber?.trim();
+            if (trimmedTracking) {
+                // Upsert the Shipment row. trackingNumber is @unique in the
+                // schema; if a customer's old tracking number is being
+                // reassigned to a different order Prisma will throw — that
+                // shouldn't happen in normal use because each carrier-issued
+                // tracking is unique to the shipment.
+                await this.prisma.shipment.upsert({
+                    where: { orderId },
+                    create: {
+                        orderId,
+                        trackingNumber: trimmedTracking,
+                        carrier: shippingCompany || null,
+                    },
+                    update: {
+                        trackingNumber: trimmedTracking,
+                        ...(shippingCompany !== undefined ? { carrier: shippingCompany || null } : {}),
+                    },
+                });
+            } else if (trackingNumber === null) {
+                // Explicit clear — drop the Shipment row entirely.
+                await this.prisma.shipment.deleteMany({ where: { orderId } });
+            } else if (shippingCompany !== undefined) {
+                // Only the carrier was changed — update existing Shipment if any.
+                await this.prisma.shipment.updateMany({
+                    where: { orderId },
+                    data: { carrier: shippingCompany || null },
+                });
+            }
+        }
+
+        // Return the merged latest state
+        const fresh = await this.prisma.order.findUnique({
             where: { id: orderId },
-            data,
-            select: { id: true, shippingCompany: true, shippingCost: true },
+            select: {
+                id: true,
+                shippingCompany: true,
+                shippingCost: true,
+                shipment: { select: { trackingNumber: true, carrier: true } },
+            },
         });
+        return {
+            id: fresh?.id,
+            shippingCompany: fresh?.shippingCompany,
+            shippingCost: fresh?.shippingCost,
+            trackingNumber: (fresh as any)?.shipment?.trackingNumber ?? null,
+        };
     }
 
     async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number) {

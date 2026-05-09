@@ -115,19 +115,21 @@ export default function AdminOrderDetailPage() {
     const [loading, setLoading] = React.useState(true);
     const [updating, setUpdating] = React.useState(false);
     const [chatOpen, setChatOpen] = React.useState(false);
-    // Transport editor — admin assigns a carrier + price after the buyer
-    // places the order. Stored on the Order row, surfaced on customer
-    // tracking, invoice, and supplier shipping confirmation email.
+    // Transport editor — admin assigns carrier + price + tracking number
+    // after the buyer places the order and after the booking call with the
+    // carrier. Each field can be filled independently as info comes in.
     const [shippingCompanyDraft, setShippingCompanyDraft] = React.useState<string>('');
     const [shippingCostDraft, setShippingCostDraft] = React.useState<string>('');
+    const [trackingNumberDraft, setTrackingNumberDraft] = React.useState<string>('');
     const [savingShipping, setSavingShipping] = React.useState(false);
 
     React.useEffect(() => {
         if (order) {
             setShippingCompanyDraft(order.shippingCompany || '');
             setShippingCostDraft(order.shippingCost != null ? String(order.shippingCost) : '');
+            setTrackingNumberDraft(order.trackingNumber || '');
         }
-    }, [order?.id, order?.shippingCompany, order?.shippingCost]);
+    }, [order?.id, order?.shippingCompany, order?.shippingCost, order?.trackingNumber]);
 
     const saveShipping = async () => {
         if (!order) return;
@@ -138,12 +140,18 @@ export default function AdminOrderDetailPage() {
                 body: JSON.stringify({
                     shippingCompany: shippingCompanyDraft || null,
                     shippingCost: shippingCostDraft ? Number(shippingCostDraft) : null,
+                    trackingNumber: trackingNumberDraft.trim() || null,
                 }),
             });
             if (!res.ok) throw new Error('Save failed');
             const updated = await res.json();
-            setOrder(prev => prev ? { ...prev, shippingCompany: updated.shippingCompany, shippingCost: updated.shippingCost } : prev);
-            toast.success('Shipping details saved');
+            setOrder(prev => prev ? {
+                ...prev,
+                shippingCompany: updated.shippingCompany,
+                shippingCost: updated.shippingCost,
+                trackingNumber: updated.trackingNumber,
+            } : prev);
+            toast.success('Transport details saved');
         } catch (err: any) {
             toast.error(err.message || 'Could not save');
         } finally {
@@ -512,6 +520,19 @@ export default function AdminOrderDetailPage() {
                                         placeholder="e.g. 350.00"
                                         className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px] font-bold focus:border-teal-500 outline-none"
                                     />
+                                </div>
+                                <div className="sm:col-span-2">
+                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Tracking Number (from carrier)</label>
+                                    <input
+                                        type="text"
+                                        value={trackingNumberDraft}
+                                        onChange={e => setTrackingNumberDraft(e.target.value)}
+                                        placeholder="e.g. ABCD-1234567890"
+                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px] font-bold font-mono focus:border-teal-500 outline-none"
+                                    />
+                                    <p className="text-[10px] text-slate-400 mt-1">
+                                        Once added, the buyer sees this in their order tracking page and can follow the shipment with the carrier.
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex items-center justify-between gap-3 pt-1">
