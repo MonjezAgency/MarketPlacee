@@ -61,12 +61,19 @@ export default function SupplierOffersPage() {
     const fetchAll = React.useCallback(async () => {
         setIsLoading(true);
         try {
+            // /products/my-products returns ONLY this supplier's listings
+            // (any status). We filter client-side to APPROVED — a
+            // supplier can only post offers on products they uploaded
+            // AND that have already been approved by Atlantis.
             const [oRes, pRes] = await Promise.all([
                 apiFetch('/offers/mine'),
-                apiFetch('/products?limit=200&status=APPROVED'),
+                apiFetch('/products/my-products'),
             ]);
             if (oRes.ok) setOffers(asArray(await oRes.json()));
-            if (pRes.ok) setProducts(asArray(await pRes.json()));
+            if (pRes.ok) {
+                const all = asArray(await pRes.json());
+                setProducts(all.filter((p: any) => String(p.status).toUpperCase() === 'APPROVED'));
+            }
         } catch (err) {
             console.error('Failed to load offers', err);
         } finally {
@@ -289,7 +296,7 @@ export default function SupplierOffersPage() {
                             </div>
 
                             <ul className="space-y-3 text-[13px]">
-                                <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span><strong>The product must already be on Atlantis.</strong> We match each row to an existing approved product by name. Rows that don't resolve are skipped.</span></li>
+                                <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span><strong>You can only post offers on YOUR own approved products.</strong> Each row's product name is matched against your catalog (and only your catalog) — rows that don't resolve are skipped.</span></li>
                                 <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span><strong>Required columns:</strong> <code className="bg-slate-100 px-1.5 py-0.5 rounded">Product</code> · <code className="bg-slate-100 px-1.5 py-0.5 rounded">Price</code> · <code className="bg-slate-100 px-1.5 py-0.5 rounded">Quantity</code></span></li>
                                 <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span><strong>Optional columns:</strong> <code className="bg-slate-100 px-1.5 py-0.5 rounded">Unit</code> (truck / pallet / carton — defaults to carton) · <code className="bg-slate-100 px-1.5 py-0.5 rounded">ValidUntil</code> · <code className="bg-slate-100 px-1.5 py-0.5 rounded">Notes</code></span></li>
                                 <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span>One row = one offer. If you have 20 offers, send 20 rows.</span></li>
@@ -327,12 +334,16 @@ export default function SupplierOffersPage() {
                             <div className="space-y-1.5">
                                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Product *</label>
                                 <select required name="productId" className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]">
-                                    <option value="">— Pick a product from the Atlantis catalog —</option>
+                                    <option value="">— Pick from your approved products —</option>
                                     {products.map(p => (
                                         <option key={p.id} value={p.id}>{p.name}{p.brand ? ` · ${p.brand}` : ''}</option>
                                     ))}
                                 </select>
-                                <p className="text-[11px] text-slate-400">If your product is not in the list, ask an admin to publish it first — offers can only be posted on existing approved products.</p>
+                                <p className="text-[11px] text-slate-400">
+                                    {products.length === 0
+                                        ? 'You have no approved products yet. Upload a product from /supplier/products and wait for admin approval before posting offers.'
+                                        : 'You can only post offers on YOUR own products that Atlantis has already approved. Pending or rejected listings won\'t appear here.'}
+                                </p>
                             </div>
 
                             <div className="grid grid-cols-3 gap-3">

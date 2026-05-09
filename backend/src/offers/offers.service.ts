@@ -26,25 +26,44 @@ export class OffersService {
 
     /**
      * Match an incoming product reference to an existing platform Product.
+     *
+     * IMPORTANT — supplier scoping:
+     * When `restrictToSupplierId` is set (it always is when called via the
+     * supplier-facing create / bulk-upload endpoints), we ONLY match
+     * against products that supplier owns AND that are APPROVED. A
+     * supplier cannot post an offer on another supplier's product —
+     * that would let supplier A undercut supplier B's listing.
+     * Admins / Owners pass null to lift the restriction.
+     *
      * Order of resolution:
-     *   1. Direct productId hit (exact uuid).
-     *   2. Case-insensitive exact name match on APPROVED products only.
-     *   3. Case-insensitive `contains` match — first APPROVED hit wins.
-     * Returns null when nothing matches.
+     *   1. Direct productId hit (exact uuid) — must still satisfy the
+     *      supplier scope check.
+     *   2. Case-insensitive exact name match (APPROVED + scoped).
+     *   3. Case-insensitive `contains` match (APPROVED + scoped).
      */
-    async resolveProduct(productId?: string, productName?: string) {
+    async resolveProduct(
+        productId?: string,
+        productName?: string,
+        restrictToSupplierId?: string | null,
+    ) {
+        const baseScope: any = { status: 'APPROVED' };
+        if (restrictToSupplierId) baseScope.supplierId = restrictToSupplierId;
+
         if (productId) {
             const p = await this.prisma.product.findUnique({ where: { id: productId } });
-            if (p) return p;
+            if (!p) return null;
+            if (restrictToSupplierId && p.supplierId !== restrictToSupplierId) return null;
+            if (p.status !== 'APPROVED') return null;
+            return p;
         }
         if (!productName || !productName.trim()) return null;
         const trimmed = productName.trim();
         const exact = await this.prisma.product.findFirst({
-            where: { name: { equals: trimmed, mode: 'insensitive' }, status: 'APPROVED' },
+            where: { ...baseScope, name: { equals: trimmed, mode: 'insensitive' } },
         });
         if (exact) return exact;
         const fuzzy = await this.prisma.product.findFirst({
-            where: { name: { contains: trimmed, mode: 'insensitive' }, status: 'APPROVED' },
+            where: { ...baseScope, name: { contains: trimmed, mode: 'insensitive' } },
         });
         return fuzzy;
     }
@@ -57,11 +76,15 @@ export class OffersService {
         return 'carton';
     }
 
-    async create(supplierId: string, input: OfferInput) {
-        const product = await this.resolveProduct(input.productId, input.productName);
+    async create(supplierId: string, input: OfferInput, isAdmin = false) {
+        // Suppliers are scoped to their own approved products. Admin /
+        // Owner callers (e.g. backfilling on behalf of a supplier) can
+        // pass any approved product.
+        const restrict = isAdmin ? null : supplierId;
+        const product = await this.resolveProduct(input.productId, input.productName, restrict);
         if (!product) {
             throw new BadRequestException(
-                `No matching product found on Atlantis for "${input.productName || input.productId}". The product must already be published on the platform before you can post an offer for it.`,
+                `No matching product found in YOUR catalog for "${input.productName || input.productId}". You can only post offers on products you have already uploaded AND that have been approved by Atlantis. Check /supplier/products to see your approved listings.`,
             );
         }
         if (!input.pricePerUnit || input.pricePerUnit <= 0) {
@@ -94,7 +117,7 @@ export class OffersService {
      * Returns a per-row report (created / unmatched / errors) the supplier
      * UI shows so they can fix the missing rows and re-upload.
      */
-    async bulkUpload(supplierId: string, buffer: Buffer) {
+    async bulkUpload(supplierId: string, buffer: Buffer, isAdmin = false) {
         if (!buffer || buffer.length === 0) {
             throw new BadRequestException('Upload is empty');
         }
@@ -145,7 +168,7 @@ export class OffersService {
                     unit,
                     validUntil: valid || undefined,
                     notes: notes || undefined,
-                });
+                }, isAdmin);
                 created.push(offer);
             } catch (err: any) {
                 errors.push({ row: i + 2, reason: err?.message || 'create failed' });

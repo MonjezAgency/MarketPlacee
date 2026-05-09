@@ -14,14 +14,22 @@ import { Role } from '@prisma/client';
 export class OffersController {
     constructor(private readonly svc: OffersService) {}
 
-    /** Supplier creates a single offer manually. */
+    /** Supplier creates a single offer manually. Admin/Owner can also
+     *  post on behalf of a supplier (e.g. when fixing a sheet). */
     @Post()
     @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER)
     async create(@Req() req: any, @Body() body: any) {
-        return this.svc.create(req.user.sub, body);
+        const role = (req.user.role || '').toUpperCase();
+        const isAdmin = role === 'ADMIN' || role === 'OWNER';
+        // When an admin posts on behalf of someone, they must include
+        // an explicit body.supplierId; otherwise we credit the offer
+        // to themselves (rare path, only useful for testing).
+        const supplierId = isAdmin && body?.supplierId ? body.supplierId : req.user.sub;
+        return this.svc.create(supplierId, body, isAdmin);
     }
 
-    /** Supplier bulk-uploads offers from a CSV / XLS / XLSX. */
+    /** Supplier bulk-uploads offers from a CSV / XLS / XLSX. Each row
+     *  is matched ONLY against the supplier's own approved products. */
     @Post('bulk-upload')
     @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER)
     @UseInterceptors(FileInterceptor('file'))
@@ -29,7 +37,9 @@ export class OffersController {
         if (!file?.buffer) {
             throw new BadRequestException('Upload a CSV / Excel file under the "file" field.');
         }
-        return this.svc.bulkUpload(req.user.sub, file.buffer);
+        const role = (req.user.role || '').toUpperCase();
+        const isAdmin = role === 'ADMIN' || role === 'OWNER';
+        return this.svc.bulkUpload(req.user.sub, file.buffer, isAdmin);
     }
 
     /** Supplier sees their own offers (any status). */
