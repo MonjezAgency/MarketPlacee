@@ -17,33 +17,50 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const [locale, setLocaleState] = useState<Locale>('en');
 
     useEffect(() => {
-        // All side effects in this hook are wrapped in try/catch — a
-        // single failure (private-mode localStorage, missing document,
-        // bad cached locale) must NEVER break the entire app. If any
-        // step throws we just stay on the default English experience.
-        try {
-            let initial: Locale = 'en';
-            try {
-                const saved = localStorage.getItem('app-locale') as Locale;
-                if (saved && translations[saved]) initial = saved;
-            } catch {
-                // localStorage disabled — silently default to English.
-            }
+        const applyLocale = (initial: Locale) => {
             if (initial !== locale) setLocaleState(initial);
             try {
                 document.documentElement.dir = initial === 'ar' ? 'rtl' : 'ltr';
                 document.documentElement.lang = initial;
             } catch {}
-            // Defer to next tick so React has a chance to mount the
-            // page before the DOM-walking translator starts.
             setTimeout(() => {
                 try { setAutoTranslateLocale(initial); } catch (err) {
                     console.warn('[i18n] auto-translate boot failed:', err);
                 }
             }, 0);
+        };
+
+        try {
+            let initial: Locale = 'en';
+            try {
+                const saved = localStorage.getItem('app-locale') as Locale;
+                if (saved && translations[saved]) initial = saved;
+            } catch {}
+            applyLocale(initial);
         } catch (err) {
             console.warn('[i18n] init failed:', err);
         }
+
+        // Listen for the auth-change event the cart context already
+        // dispatches. When a different user logs in we reset locale
+        // to English so a previous browser session's choice doesn't
+        // bleed into the new user's experience. The new user can
+        // still pick their language from the navbar dropdown — and
+        // their choice persists to localStorage from that point.
+        const onAuthChanged = () => {
+            try {
+                const saved = localStorage.getItem('app-locale') as Locale;
+                // We only reset when there's NO explicit pref saved.
+                // Because the user picker writes to localStorage on
+                // every change, "no saved value" effectively means
+                // "fresh session / different user".
+                if (!saved || !translations[saved]) {
+                    applyLocale('en');
+                }
+            } catch {}
+        };
+        window.addEventListener('bev-auth-changed', onAuthChanged);
+        return () => window.removeEventListener('bev-auth-changed', onAuthChanged);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 

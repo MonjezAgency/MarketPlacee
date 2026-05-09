@@ -666,7 +666,13 @@ export default function SupplierProductsPage() {
                                 onSubmit={handleBulkUpload}
                                 initial={{ scale: 0.9, y: 20 }}
                                 animate={{ scale: 1, y: 0 }}
-                                className="bg-card w-full max-w-2xl rounded-[40px] border border-border/50 overflow-hidden shadow-2xl flex flex-col"
+                                /* max-h + flex-col + the inner content
+                                   gets the scroll, footer stays pinned —
+                                   fixes the "where's the upload button"
+                                   problem the operator reported when the
+                                   instruction list pushed the form
+                                   beyond the viewport. */
+                                className="bg-card w-full max-w-2xl max-h-[90vh] rounded-[40px] border border-border/50 overflow-hidden shadow-2xl flex flex-col"
                             >
                                 <div className="p-8 border-b border-border/50 flex items-center justify-between">
                                     <div>
@@ -677,8 +683,11 @@ export default function SupplierProductsPage() {
                                         <button 
                                             type="button"
                                             onClick={() => {
-                                                const headers = 'name,brand,description,category,price,stock,ean,unit,minOrder,unitsPerCase,casesPerPallet,unitsPerPallet,palletsPerShipment';
-                                                const blob = new Blob([headers], { type: 'text/csv' });
+                                                // Full column set the importer understands. The
+                                                // first row is the header so the supplier can fill
+                                                // their own values directly underneath.
+                                                const headers = 'name,brand,description,category,price,stock,EXW,ean,weight,origin,shelfLife,minOrder,unitsPerCase,casesPerPallet,unitsPerPallet,palletsPerShipment';
+                                                const blob = new Blob([headers + '\n'], { type: 'text/csv;charset=utf-8' });
                                                 const url = window.URL.createObjectURL(blob);
                                                 const a = document.createElement('a');
                                                 a.href = url;
@@ -695,7 +704,7 @@ export default function SupplierProductsPage() {
                                     </div>
                                 </div>
 
-                                <div className="p-8 space-y-6">
+                                <div className="p-8 space-y-6 overflow-y-auto flex-1">
                                     {!bulkResults ? (
                                         <div className="border-2 border-dashed border-border/50 rounded-3xl p-12 flex flex-col items-center justify-center text-center relative group hover:border-primary/50 hover:bg-primary/5 transition-all">
                                             <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
@@ -706,13 +715,15 @@ export default function SupplierProductsPage() {
 
                                             <div className="mt-6 text-start bg-muted/30 p-4 rounded-xl border border-border/50 max-w-md w-full relative z-20 pointer-events-auto">
                                                 <h4 className="text-xs font-black uppercase tracking-widest text-foreground mb-2 flex items-center gap-2">
-                                                    <CheckCircle2 size={14} className="text-primary" /> {t('supplier', 'importantRules')}
+                                                    <CheckCircle2 size={14} className="text-primary" /> What columns the sheet should have
                                                 </h4>
                                                 <ul className="text-[11px] text-muted-foreground space-y-1.5 list-disc ps-4 font-medium">
-                                                    <li><strong className="text-foreground">{t('supplier', 'requiredColumns')}:</strong> name, description, category, price, stock</li>
-                                                    <li>{t('supplier', 'pendingWarning')}</li>
-                                                    <li>{t('supplier', 'eanFetch')}</li>
-                                                    <li>No default or placeholder images (e.g., Coca-Cola) will be used.</li>
+                                                    <li><strong className="text-foreground">Required:</strong> Name · Description · Category · Price · Stock · <strong className="text-foreground">EXW</strong> (origin warehouse / country)</li>
+                                                    <li><strong className="text-foreground">Recommended:</strong> EAN · Brand · Weight · Country of Origin · BBD · Units per case · Cases per pallet · Pallets per truck · MOQ</li>
+                                                    <li>The EAN column auto-fetches the product image from EAN-DB if a barcode is provided.</li>
+                                                    <li>Brand and weight are auto-extracted from the product name when not provided as their own column.</li>
+                                                    <li>Rows missing EXW are rejected — Atlantis logistics needs the origin to quote transport.</li>
+                                                    <li>No default / placeholder images (e.g. generic Coca-Cola PNG) will be used — only real product photos.</li>
                                                 </ul>
                                             </div>
 
