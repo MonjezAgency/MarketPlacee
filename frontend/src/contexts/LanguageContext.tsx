@@ -17,29 +17,46 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const [locale, setLocaleState] = useState<Locale>('en');
 
     useEffect(() => {
-        const saved = localStorage.getItem('app-locale') as Locale;
-        const initial = saved && translations[saved] ? saved : 'en';
-        if (initial !== locale) setLocaleState(initial);
-        // Fire the runtime auto-translator on initial mount so any
-        // hardcoded English on the marketing pages is converted to
-        // the user's saved locale immediately, without waiting for
-        // them to re-pick the language.
-        document.documentElement.dir = initial === 'ar' ? 'rtl' : 'ltr';
-        document.documentElement.lang = initial;
-        // Defer to next tick so React has a chance to mount the page.
-        setTimeout(() => setAutoTranslateLocale(initial), 0);
+        // All side effects in this hook are wrapped in try/catch — a
+        // single failure (private-mode localStorage, missing document,
+        // bad cached locale) must NEVER break the entire app. If any
+        // step throws we just stay on the default English experience.
+        try {
+            let initial: Locale = 'en';
+            try {
+                const saved = localStorage.getItem('app-locale') as Locale;
+                if (saved && translations[saved]) initial = saved;
+            } catch {
+                // localStorage disabled — silently default to English.
+            }
+            if (initial !== locale) setLocaleState(initial);
+            try {
+                document.documentElement.dir = initial === 'ar' ? 'rtl' : 'ltr';
+                document.documentElement.lang = initial;
+            } catch {}
+            // Defer to next tick so React has a chance to mount the
+            // page before the DOM-walking translator starts.
+            setTimeout(() => {
+                try { setAutoTranslateLocale(initial); } catch (err) {
+                    console.warn('[i18n] auto-translate boot failed:', err);
+                }
+            }, 0);
+        } catch (err) {
+            console.warn('[i18n] init failed:', err);
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const setLocale = (newLocale: Locale) => {
         setLocaleState(newLocale);
-        localStorage.setItem('app-locale', newLocale);
-        document.documentElement.dir = newLocale === 'ar' ? 'rtl' : 'ltr';
-        document.documentElement.lang = newLocale;
-        // Trigger the DOM-walking translator. It will swap every
-        // visible English string into the new locale (or restore
-        // English if the user picked en).
-        setAutoTranslateLocale(newLocale);
+        try { localStorage.setItem('app-locale', newLocale); } catch {}
+        try {
+            document.documentElement.dir = newLocale === 'ar' ? 'rtl' : 'ltr';
+            document.documentElement.lang = newLocale;
+        } catch {}
+        try { setAutoTranslateLocale(newLocale); } catch (err) {
+            console.warn('[i18n] locale switch failed:', err);
+        }
     };
 
     const t = (section: keyof typeof translations['en'], key?: string) => {

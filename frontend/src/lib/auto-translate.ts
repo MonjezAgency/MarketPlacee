@@ -331,58 +331,95 @@ let observer: MutationObserver | null = null;
 function startObserver() {
     if (observer) return;
     if (typeof window === 'undefined') return;
+    if (typeof MutationObserver === 'undefined') return;
+    if (typeof document === 'undefined' || !document.body) return;
+
     observer = new MutationObserver((mutations) => {
-        if (currentLocale === SOURCE_LOCALE) return;
-        for (const m of mutations) {
-            if (m.type === 'childList') {
-                m.addedNodes.forEach((n) => walkAndCollect(n));
-            } else if (m.type === 'characterData') {
-                const n = m.target;
-                if (n.nodeType === Node.TEXT_NODE) {
-                    const tn = n as Text;
-                    if ((tn as any).__i18nApplying) continue;
-                    // Real React update — refresh our captured original
-                    // before re-translating so the new content is what
-                    // we send to the translator.
-                    (tn as any).__i18nOrig = tn.textContent ?? '';
-                    (tn as any).__i18nLoc = undefined;
-                    processTextNode(tn);
-                }
-            } else if (m.type === 'attributes' && m.attributeName) {
-                if (ATTR_NAMES.includes(m.attributeName)) {
-                    const el = m.target as Element;
-                    if ((el as any)[`__i18nAttrApplying_${m.attributeName}`]) continue;
-                    (el as any)[`__i18nAttrOrig_${m.attributeName}`] = el.getAttribute(m.attributeName) ?? '';
-                    (el as any)[`__i18nAttrLoc_${m.attributeName}`] = undefined;
-                    processAttributes(el);
+        try {
+            if (currentLocale === SOURCE_LOCALE) return;
+            for (const m of mutations) {
+                try {
+                    if (m.type === 'childList') {
+                        m.addedNodes.forEach((n) => {
+                            try { walkAndCollect(n); } catch {}
+                        });
+                    } else if (m.type === 'characterData') {
+                        const n = m.target;
+                        if (n.nodeType === Node.TEXT_NODE) {
+                            const tn = n as Text;
+                            if ((tn as any).__i18nApplying) continue;
+                            (tn as any).__i18nOrig = tn.textContent ?? '';
+                            (tn as any).__i18nLoc = undefined;
+                            processTextNode(tn);
+                        }
+                    } else if (m.type === 'attributes' && m.attributeName) {
+                        if (ATTR_NAMES.includes(m.attributeName)) {
+                            const el = m.target as Element;
+                            if ((el as any)[`__i18nAttrApplying_${m.attributeName}`]) continue;
+                            (el as any)[`__i18nAttrOrig_${m.attributeName}`] = el.getAttribute(m.attributeName) ?? '';
+                            (el as any)[`__i18nAttrLoc_${m.attributeName}`] = undefined;
+                            processAttributes(el);
+                        }
+                    }
+                } catch {
+                    // Per-mutation error swallowed so one bad node
+                    // can't kill the whole observer pass.
                 }
             }
+            queueFlush();
+        } catch {
+            // Observer-level failure — last-ditch swallow so the
+            // browser never sees an uncaught listener exception.
         }
-        queueFlush();
     });
-    observer.observe(document.body, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-        attributes: true,
-        attributeFilter: ATTR_NAMES,
-    });
+    try {
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+            attributes: true,
+            attributeFilter: ATTR_NAMES,
+        });
+    } catch (err) {
+        console.warn('[auto-translate] observer.observe failed:', err);
+    }
 }
 
 /**
  * Switch the page's display language. Called from LanguageContext
  * whenever the user picks a different locale.
+ *
+ * Hardened: every step is wrapped in try/catch so a translator
+ * failure (DOM not ready, localStorage quota, MutationObserver
+ * not supported, etc.) cannot take the entire app down with a
+ * client-side exception. Worst case we log and stay on English.
  */
 export function setAutoTranslateLocale(locale: string) {
     if (typeof window === 'undefined') return;
-    loadCache();
-    currentLocale = locale || SOURCE_LOCALE;
-    startObserver();
-
-    if (currentLocale === SOURCE_LOCALE) {
-        restoreOriginals(document.body);
-        return;
+    if (typeof document === 'undefined' || !document.body) return;
+    try {
+        loadCache();
+    } catch (err) {
+        // localStorage may be disabled (Safari private mode, quota)
+        // — keep going with an empty in-memory cache.
+        console.warn('[auto-translate] cache load failed:', err);
     }
-    walkAndCollect(document.body);
-    queueFlush();
+    currentLocale = locale || SOURCE_LOCALE;
+    try {
+        startObserver();
+    } catch (err) {
+        console.warn('[auto-translate] MutationObserver unavailable:', err);
+    }
+
+    try {
+        if (currentLocale === SOURCE_LOCALE) {
+            restoreOriginals(document.body);
+            return;
+        }
+        walkAndCollect(document.body);
+        queueFlush();
+    } catch (err) {
+        // Catch any DOM-walking failure so the page keeps rendering.
+        console.warn('[auto-translate] translate pass failed:', err);
+    }
 }
