@@ -21,16 +21,17 @@ export default function KYCPage() {
     const router = useRouter();
     const { user, isAuthReady } = useAuth();
 
-    // If platform staff or supplier accidentally land here, send them home.
-    // Admins/owners shouldn't see KYC at all (they're the platform itself).
+    // Only platform staff (ADMIN/OWNER/etc) get redirected away —
+    // they don't need KYC because they're the platform itself.
+    // SUPPLIERS DO need this page (the inventory page redirects them
+    // here to verify before listing products), so we let them in.
+    // CUSTOMERS use it for buyer KYC. The flow is identical for both.
     React.useEffect(() => {
         if (!isAuthReady || !user) return;
         const role = (user.role || '').toUpperCase();
         const teamRoles = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
         if (teamRoles.includes(role)) {
             router.replace('/admin');
-        } else if (role === 'SUPPLIER') {
-            router.replace('/supplier');
         }
     }, [isAuthReady, user, router]);
 

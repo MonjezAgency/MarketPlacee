@@ -23,6 +23,7 @@ import {
     ShieldAlert
 } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { CATEGORIES_LIST } from '@/lib/products';
 import { fetchMyProducts, apiFetch, apiUrl, requestAdPlacement } from '@/lib/api';
 import { Zap, Rocket } from 'lucide-react';
@@ -65,6 +66,7 @@ export default function SupplierProductsPage() {
 
     const [selectedProducts, setSelectedProducts] = React.useState<Set<string>>(new Set());
     const [isDeletingBulk, setIsDeletingBulk] = React.useState(false);
+    const router = useRouter();
     const [kycStatus, setKycStatus] = React.useState<string>('UNVERIFIED');
     const kycBlocked = kycStatus !== 'VERIFIED';
 
@@ -276,24 +278,34 @@ export default function SupplierProductsPage() {
 
     return (
         <div className="space-y-8 p-6 lg:p-10 max-w-7xl mx-auto">
-            {/* KYC Enforcement Banner */}
+            {/* KYC Enforcement Banner — high-contrast in BOTH themes.
+                Previously the light-only amber-50 background sat on top
+                of the dark-theme dashboard and produced a washed-out,
+                barely-readable strip. The dark variant now uses a
+                semi-transparent amber tile with a glowing border so it
+                pops on the navy background. */}
             {kycBlocked && (
-                <div className="flex items-start gap-4 p-5 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-700 rounded-2xl">
-                    <ShieldAlert className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
+                <div className="flex items-start gap-4 p-5 bg-amber-50 dark:bg-amber-500/10 border-2 border-amber-300 dark:border-amber-500/40 rounded-2xl shadow-sm dark:shadow-amber-500/5">
+                    <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center shrink-0">
+                        <ShieldAlert className="w-5 h-5 text-amber-600 dark:text-amber-300" />
+                    </div>
                     <div className="flex-1 min-w-0">
-                        <p className="font-black text-amber-800 dark:text-amber-300">
+                        <p className="font-black text-amber-900 dark:text-amber-200 text-[15px] leading-tight">
                             {kycStatus === 'PENDING' ? (locale === 'ar' ? 'KYC قيد المراجعة ⏳' : 'KYC Under Review ⏳') : (locale === 'ar' ? 'مطلوب التحقق من الهوية 🔐' : 'Identity Verification Required 🔐')}
                         </p>
-                        <p className="text-sm text-amber-700 dark:text-amber-400 mt-0.5">
+                        <p className="text-[13px] text-amber-800 dark:text-amber-300/90 mt-1 leading-relaxed">
                             {kycStatus === 'PENDING'
                                 ? (locale === 'ar' ? 'يتم مراجعة مستنداتك. ستتمكن من إضافة المنتجات بمجرد التحقق من هويتك.' : 'Your documents are being reviewed. You can add products once your identity is verified.')
                                 : (locale === 'ar' ? 'يجب إكمال KYC (التحقق من الهوية) قبل إدراج المنتجات على المنصة.' : 'You must complete KYC (identity verification) before listing products on the platform.')}
                         </p>
                     </div>
                     {kycStatus !== 'PENDING' && (
-                        <Link href="/dashboard/kyc" className="shrink-0 px-4 py-2 bg-amber-500 text-white text-sm font-bold rounded-xl hover:bg-amber-600 transition-colors">
+                        <button
+                            onClick={() => router.push('/dashboard/kyc')}
+                            className="shrink-0 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 dark:bg-amber-400 dark:hover:bg-amber-300 dark:text-amber-950 text-white text-[13px] font-black uppercase tracking-wider rounded-xl transition-colors shadow-lg shadow-amber-500/30"
+                        >
                             {locale === 'ar' ? 'تحقق الآن' : 'Verify Now'}
-                        </Link>
+                        </button>
                     )}
                 </div>
             )}

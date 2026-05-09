@@ -424,41 +424,170 @@ export class EmailService {
       ? 'Excellent news! Our team has verified your business profile. You can now access the full power of the Atlantis supplier hub.'
       : 'Excellent news! Your account is active and you can now start sourcing premium products directly from our global partners.';
 
-    await this.sendMail(email, 'Welcome to Atlantis — Your account is approved! 🎉', `
-      <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
-        <div style="background: #0A1A2F; padding: 50px 40px; text-align: center;">
-          <h1 style="color: white; font-size: 32px; margin: 0 0 10px; font-weight: 900;">Welcome, ${name}! 👋</h1>
-          <p style="color: #1BC7C9; font-size: 18px; margin: 0;">Your account is ready.</p>
+    await this.sendMail(email, 'Welcome to Atlantis — Your account is approved! 🎉', this.atlantisShell({
+      title: `Welcome, ${name}! 👋`,
+      subtitle: 'Your account is ready.',
+      iconType: 'success',
+      body: `<p style="font-size:16px;color:#475569;margin:0 0 28px;line-height:1.65;">${welcomeBody}</p>`,
+      ctaText,
+      ctaUrl,
+    }));
+  }
+
+  /**
+   * Reusable Atlantis email shell — gradient navy header with the
+   * ATLANTIS / FMCG wordmark, a floating icon (success / pending /
+   * warning / info), the body the caller passes in, an optional
+   * primary CTA button, and a clean footer. Mirrors the visual
+   * language of the campaign builder so every transactional + every
+   * marketing email looks like the same brand.
+   */
+  private atlantisShell(opts: {
+    title: string;
+    subtitle?: string;
+    iconType?: 'success' | 'pending' | 'warning' | 'info';
+    body: string;
+    ctaText?: string;
+    ctaUrl?: string;
+    footerNote?: string;
+  }): string {
+    const iconBg: Record<string, string> = {
+      success: '#2EC4B6',
+      pending: '#F59E0B',
+      warning: '#EF4444',
+      info:    '#3B82F6',
+    };
+    const iconSvg: Record<string, string> = {
+      success: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+      pending: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+      warning: '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+      info:    '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+    };
+    const iconColor = iconBg[opts.iconType || 'info'];
+    const icon = iconSvg[opts.iconType || 'info'];
+
+    return `
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/></head>
+<body style="margin:0;padding:0;background:#F8FAFC;font-family:Inter,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;padding:40px 16px;">
+  <tr><td align="center">
+    <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 12px 40px rgba(15,23,42,0.08);">
+
+      <!-- Header — Atlantis brand mark on gradient navy -->
+      <tr><td style="background:linear-gradient(135deg,#0B1F3A 0%,#0F172A 100%);padding:40px 40px 56px;text-align:center;">
+        <div style="display:inline-block;">
+          <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="vertical-align:middle;padding-right:14px;">
+              <div style="width:44px;height:44px;border-radius:12px;background:#2EC4B6;color:#0F172A;font-family:Inter,Arial,sans-serif;font-size:22px;font-weight:900;text-align:center;line-height:44px;">A</div>
+            </td>
+            <td style="vertical-align:middle;text-align:left;">
+              <div style="color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:900;font-size:22px;letter-spacing:0.02em;line-height:1;">ATLANTIS</div>
+              <div style="color:#2EC4B6;font-family:Inter,Arial,sans-serif;font-weight:700;font-size:11px;letter-spacing:0.4em;margin-top:4px;line-height:1;">FMCG</div>
+            </td>
+          </tr></table>
         </div>
-        <div style="padding: 40px 30px; background: #fff; text-align: center;">
-          <p style="font-size: 16px; color: #2E2E2E; margin-bottom: 25px;">${welcomeBody}</p>
-          <a href="${ctaUrl}" style="display: inline-block; background:#f97316; color:#fff; padding:16px 32px; border-radius:12px; text-decoration:none; font-weight: 900; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
-            ${ctaText}
-          </a>
+      </td></tr>
+
+      <!-- Floating status icon -->
+      <tr><td style="background:#ffffff;padding:0;text-align:center;height:0;">
+        <div style="margin-top:-32px;display:inline-block;width:64px;height:64px;border-radius:50%;background:${iconColor};box-shadow:0 8px 24px ${iconColor}40;line-height:64px;text-align:center;">
+          <span style="display:inline-block;vertical-align:middle;line-height:0;">${icon}</span>
         </div>
-        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
-        </div>
-      </div>
-    `);
+      </td></tr>
+
+      <!-- Title + subtitle -->
+      <tr><td style="padding:24px 40px 8px;text-align:center;">
+        <h1 style="color:#0F172A;font-family:Inter,Arial,sans-serif;font-size:28px;font-weight:900;margin:0 0 8px;line-height:1.2;letter-spacing:-0.02em;">${opts.title}</h1>
+        ${opts.subtitle ? `<p style="color:#2EC4B6;font-family:Inter,Arial,sans-serif;font-weight:700;font-size:15px;margin:0;letter-spacing:0.01em;">${opts.subtitle}</p>` : ''}
+      </td></tr>
+
+      <!-- Body content -->
+      <tr><td style="padding:24px 48px 16px;text-align:center;">
+        <div style="height:1px;background:#E2E8F0;margin:0 auto 28px;width:60px;"></div>
+        ${opts.body}
+        ${opts.ctaText && opts.ctaUrl ? `
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:24px auto 8px;"><tr>
+            <td style="background:#2EC4B6;border-radius:14px;box-shadow:0 6px 20px rgba(46,196,182,0.35);">
+              <a href="${opts.ctaUrl}" style="display:inline-block;padding:16px 36px;color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:800;font-size:14px;text-decoration:none;letter-spacing:0.04em;text-transform:uppercase;">${opts.ctaText}</a>
+            </td>
+          </tr></table>
+        ` : ''}
+        ${opts.footerNote ? `<p style="color:#94A3B8;font-family:Inter,Arial,sans-serif;font-size:12px;margin:24px 0 0;line-height:1.5;">${opts.footerNote}</p>` : ''}
+      </td></tr>
+
+      <!-- Footer -->
+      <tr><td style="background:#F8FAFC;padding:24px 40px;border-top:1px solid #E2E8F0;text-align:center;">
+        <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr>
+          <td style="vertical-align:middle;padding-right:10px;">
+            <div style="width:24px;height:24px;border-radius:6px;background:#2EC4B6;color:#0F172A;font-family:Inter,Arial,sans-serif;font-size:13px;font-weight:900;text-align:center;line-height:24px;">A</div>
+          </td>
+          <td style="vertical-align:middle;text-align:left;">
+            <span style="color:#0F172A;font-family:Inter,Arial,sans-serif;font-weight:900;font-size:13px;letter-spacing:0.01em;">ATLANTIS</span>
+            <span style="color:#2EC4B6;font-family:Inter,Arial,sans-serif;font-weight:700;font-size:10px;letter-spacing:0.3em;margin-left:6px;">FMCG</span>
+          </td>
+        </tr></table>
+        <p style="color:#94A3B8;font-family:Inter,Arial,sans-serif;font-size:11px;margin:14px 0 0;">© ${new Date().getFullYear()} Atlantis FMCG · All rights reserved</p>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</body></html>`;
   }
 
   async sendRejectionEmail(email: string, name: string, reason?: string) {
-    await this.sendMail(email, 'Update regarding your Atlantis application', `
-      <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
-        <div style="background: #0A1A2F; padding: 50px 40px; text-align: center; border-bottom: 4px solid #EF4444;">
-          <h1 style="color: white; font-size: 26px; margin: 0; font-weight: 900;">Application Update</h1>
+    await this.sendMail(email, 'Update regarding your Atlantis application', this.atlantisShell({
+      title: 'Application Update',
+      subtitle: `Hello ${name}`,
+      iconType: 'warning',
+      body: `
+        <p style="font-size:15px;color:#475569;margin:0 0 18px;line-height:1.65;">Thank you for your interest in Atlantis. After reviewing your application, we are unable to approve your account at this time.</p>
+        ${reason ? `<div style="background:#FEF2F2;padding:16px 20px;border-radius:14px;margin:20px 0;border-left:4px solid #EF4444;text-align:left;"><p style="margin:0;font-size:13px;color:#991B1B;line-height:1.6;"><strong style="color:#7F1D1D;">Reason:</strong> ${reason}</p></div>` : ''}
+        <p style="font-size:13px;color:#94A3B8;margin:18px 0 0;line-height:1.6;">If you believe this is a mistake or have updated documentation, please contact our compliance team at Info@atlantisfmcg.com.</p>
+      `,
+    }));
+  }
+
+  /**
+   * Pending-registration acknowledgement — sent immediately after a
+   * supplier (or buyer) finishes signup so they know their account
+   * is in the review queue and roughly when to expect a response.
+   * Mirrors the in-app "Registration Pending" screen design.
+   */
+  async sendRegistrationPendingEmail(email: string, name: string, role: string) {
+    const isSupplier = role.toUpperCase() === 'SUPPLIER';
+    const subject = isSupplier
+      ? 'Atlantis · Your supplier application is under review'
+      : 'Atlantis · Your account is under review';
+    await this.sendMail(email, subject, this.atlantisShell({
+      title: 'Registration Pending',
+      subtitle: `Hello ${name}`,
+      iconType: 'pending',
+      body: `
+        <p style="font-size:15px;color:#475569;margin:0 0 20px;line-height:1.65;">
+          Your account is currently being reviewed by our administration team.
+        </p>
+        <div style="background:#F0FDFA;border:1px solid #99F6E4;border-radius:14px;padding:18px 22px;margin:20px 0;text-align:left;">
+          <table role="presentation" cellpadding="0" cellspacing="0" width="100%"><tr>
+            <td style="vertical-align:top;width:36px;padding-top:2px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0F766E" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            </td>
+            <td style="vertical-align:top;">
+              <p style="margin:0 0 4px;color:#0F172A;font-family:Inter,Arial,sans-serif;font-size:13px;font-weight:800;">Notification Email</p>
+              <p style="margin:0;color:#475569;font-family:Inter,Arial,sans-serif;font-size:12px;line-height:1.6;">
+                We will email <strong style="color:#0F766E;">${email}</strong> as soon as your request is processed. This typically takes <strong>24-48 hours</strong>.
+              </p>
+            </td>
+          </tr></table>
         </div>
-        <div style="padding: 40px 30px; background: #fff; text-align: center;">
-          <p style="font-size: 16px; color: #2E2E2E; margin-bottom: 25px;">Hi ${name}, thank you for your interest in Atlantis. After reviewing your application, we are unable to approve your account at this time.</p>
-          ${reason ? `<div style="background:#FEF2F2; padding:16px; border-radius:12px; margin:20px 0; border-left:4px solid #EF4444; text-align:left;"><p style="margin:0; font-size:14px; color:#991B1B;"><strong>Reason:</strong> ${reason}</p></div>` : ''}
-          <p style="font-size: 14px; color: #667085;">If you believe this is a mistake or have updated documentation, please contact our compliance team.</p>
-        </div>
-        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
-        </div>
-      </div>
-    `);
+        <p style="font-size:12px;color:#94A3B8;margin:20px 0 0;line-height:1.6;">
+          ${isSupplier
+            ? 'You will receive a verification link once approved — until then, login is locked.'
+            : 'You can still browse the catalog while we verify your details.'}
+        </p>
+      `,
+      footerNote: 'Connecting buyers and suppliers worldwide.',
+    }));
   }
 
   async sendArrivingTodayEmail(email: string, name: string, orderId: string) {

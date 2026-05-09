@@ -247,6 +247,15 @@ export class AuthService {
                         companyName: user.companyName,
                         registeredAt: user.createdAt || new Date(),
                     });
+
+                    // Acknowledgement to the new user — matches the
+                    // "Registration Pending" in-app screen so they
+                    // know to expect a 24-48h review window.
+                    await this.emailService.sendRegistrationPendingEmail(
+                        user.email,
+                        user.name || 'there',
+                        data.role,
+                    ).catch(() => {});
                     
                     // 4. Notify Admins about the new registration
                     await this.notificationsService.notifyAdmins(
