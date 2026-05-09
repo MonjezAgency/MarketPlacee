@@ -54,8 +54,40 @@ export class EmailService {
    * an unverified domain returned 403, leaving the user with "REJECTED"
    * and no idea what to do.
    */
+  /**
+   * Strip HTML to a clean plain-text alternative. Gmail auto-generates
+   * one when missing but its version concatenates everything into a
+   * single paragraph (the "ugly spam" view the operator just saw).
+   * Providing our own plain-text part keeps the subject line + an
+   * inviting one-liner readable in clients that block HTML.
+   */
+  private htmlToPlainText(html: string): string {
+    return html
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<\/(p|div|h[1-6]|li|tr|br|table)>/gi, '\n')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+      .slice(0, 4000);
+  }
+
   async sendMailDetailed(to: string, subject: string, html: string): Promise<{ success: boolean; error?: string; provider?: string }> {
     const resendKey = process.env.RESEND_API_KEY;
+    const text = this.htmlToPlainText(html);
+    // Support / unsubscribe address that recipients can hit in their
+    // mail client. Resend honours List-Unsubscribe-Post for one-click
+    // unsubscribe, which is a major Gmail / Outlook deliverability win.
+    const unsubscribeUrl = `${process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com'}/unsubscribe?email=${encodeURIComponent(to)}`;
+    const replyTo = process.env.EMAIL_USER || 'Info@atlantisfmcg.com';
 
     // ──── Strategy 1: Resend API (PRIMARY) ────
     if (resendKey) {
@@ -65,10 +97,21 @@ export class EmailService {
         const res = await axios.post(
           'https://api.resend.com/emails',
           {
-            from: `Atlantis Marketplace <${resendFrom}>`,
+            from: `Atlantis FMCG <${resendFrom}>`,
             to: [to],
+            reply_to: replyTo,
             subject,
             html,
+            text,
+            // Headers that meaningfully reduce spam scoring on Gmail /
+            // Outlook. List-Unsubscribe + List-Unsubscribe-Post lets
+            // clients show a one-click unsubscribe button (Gmail's
+            // anti-spam treats sender domains that ignore this badly).
+            headers: {
+              'List-Unsubscribe': `<${unsubscribeUrl}>, <mailto:${replyTo}?subject=unsubscribe>`,
+              'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+              'X-Entity-Ref-ID': `atlantis-${Date.now()}`,
+            },
           },
           {
             headers: {
@@ -109,11 +152,20 @@ export class EmailService {
   private async smtpFallback(to: string, subject: string, html: string, prevError: string): Promise<{ success: boolean; error?: string; provider?: string }> {
     try {
       console.log(`[EMAIL] SMTP fallback → ${to}...`);
+      const text = this.htmlToPlainText(html);
+      const replyTo = process.env.EMAIL_USER || 'Info@atlantisfmcg.com';
+      const unsubscribeUrl = `${process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com'}/unsubscribe?email=${encodeURIComponent(to)}`;
       const info = await this.transporter.sendMail({
         from: this.getFrom(),
         to,
+        replyTo,
         subject,
         html,
+        text,
+        headers: {
+          'List-Unsubscribe': `<${unsubscribeUrl}>, <mailto:${replyTo}?subject=unsubscribe>`,
+          'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+        },
       });
       console.log(`✅ [EMAIL] SMTP success — ${info.messageId}`);
       return { success: true, provider: 'smtp' };
