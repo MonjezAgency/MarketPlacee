@@ -67,8 +67,12 @@ export default function AdminAddProductWorkspace() {
         images: [] as string[],
         // Logistics & Documentation Fields
         weight: '',
+        weightUnit: 'kg' as 'kg' | 'g' | 'mg' | 't' | 'lb' | 'oz' | 'l' | 'ml',
         shelfLife: '',
         origin: '',
+        // EXW (Ex Works) — required at upload, surfaced on PDP next to
+        // Country of Origin. Captures where the goods physically sit.
+        exwLocation: '',
         storageTemp: 'Ambient',
         docs: {
             coo: false, // Certificate of Origin
@@ -209,9 +213,19 @@ export default function AdminAddProductWorkspace() {
                 ean: formData.barcode,
                 images: formData.images,
                 supplierId: formData.supplierId,
-                weight: formData.weight || undefined,
+                // Compose the weight as "<value><unit>" so storage stays
+                // string-based and consistent with the importer's output
+                // (e.g. "150ml", "1.5kg", "12oz"). If the supplier already
+                // typed a unit suffix into the value field we leave it.
+                weight: (() => {
+                    const v = String(formData.weight || '').trim();
+                    if (!v) return undefined;
+                    if (/[a-zA-Z]/.test(v)) return v; // already has a unit suffix
+                    return `${v}${formData.weightUnit}`;
+                })(),
                 shelfLife: formData.shelfLife || undefined,
                 origin: formData.origin || undefined,
+                exwLocation: formData.exwLocation || undefined,
             };
             if (piecesPerCase  > 0) payload.unitsPerCase  = piecesPerCase;
             if (casesPerPallet > 0) payload.casesPerPallet = casesPerPallet;
@@ -543,19 +557,42 @@ export default function AdminAddProductWorkspace() {
 
                             <div className="grid grid-cols-3 gap-4">
                                 <div className="space-y-1.5">
-                                    <label className="text-[12px] font-medium text-[#6B7280]">Weight (kg)</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="0.5kg"
-                                        value={formData.weight}
-                                        onChange={e => setFormData({ ...formData, weight: e.target.value })}
-                                        className="w-full h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#14B8A6]"
-                                    />
+                                    <label className="text-[12px] font-medium text-[#6B7280]">Weight</label>
+                                    {/* Two-input combo: numeric value + unit dropdown.
+                                        We compose "<value><unit>" on submit so the
+                                        DB still stores a single string ("150ml",
+                                        "1.5kg") consistent with the importer's
+                                        regex-extracted format. Admin used to be
+                                        stuck on "kg" only — now they pick mg/g/kg/
+                                        t/oz/lb/ml/l explicitly. */}
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="text"
+                                            placeholder="0.5"
+                                            value={formData.weight}
+                                            onChange={e => setFormData({ ...formData, weight: e.target.value })}
+                                            className="flex-1 h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#14B8A6]"
+                                        />
+                                        <select
+                                            value={formData.weightUnit}
+                                            onChange={e => setFormData({ ...formData, weightUnit: e.target.value as any })}
+                                            className="h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-3 text-[13px] font-bold outline-none focus:border-[#14B8A6] cursor-pointer"
+                                        >
+                                            <option value="mg">mg</option>
+                                            <option value="g">g</option>
+                                            <option value="kg">kg</option>
+                                            <option value="t">t (tonne)</option>
+                                            <option value="oz">oz</option>
+                                            <option value="lb">lb</option>
+                                            <option value="ml">ml</option>
+                                            <option value="l">l</option>
+                                        </select>
+                                    </div>
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[12px] font-medium text-[#6B7280]">BBD</label>
-                                    <input 
-                                        type="text" 
+                                    <input
+                                        type="text"
                                         placeholder="12M"
                                         value={formData.shelfLife}
                                         onChange={e => setFormData({ ...formData, shelfLife: e.target.value })}
@@ -563,14 +600,45 @@ export default function AdminAddProductWorkspace() {
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[12px] font-medium text-[#6B7280]">Origin</label>
-                                    <input 
-                                        type="text" 
-                                        placeholder="EU/Asia"
+                                    <label className="text-[12px] font-medium text-[#6B7280]">Country of Origin</label>
+                                    <input
+                                        type="text"
+                                        placeholder="EU / Asia / Germany"
                                         value={formData.origin}
                                         onChange={e => setFormData({ ...formData, origin: e.target.value })}
                                         className="w-full h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#14B8A6]"
                                     />
+                                </div>
+                            </div>
+
+                            {/* EXW + supplementary EAN row. EAN already exists higher
+                                up but we surface it again here under "Logistics" so
+                                admins who scroll down to fill weight/BBD/Origin
+                                don't have to scroll back up to enter the barcode. */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <label className="text-[12px] font-medium text-[#6B7280] flex items-center gap-1.5">
+                                        EXW · Currently In <span className="text-[10px] text-rose-500 font-bold">REQUIRED</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="e.g. Hamburg, Germany"
+                                        value={formData.exwLocation}
+                                        onChange={e => setFormData({ ...formData, exwLocation: e.target.value })}
+                                        className="w-full h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#14B8A6]"
+                                    />
+                                    <p className="text-[10px] text-[#9CA3AF]">Where the goods physically sit today — used by logistics to quote transport.</p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-[12px] font-medium text-[#6B7280]">EAN / Barcode</label>
+                                    <input
+                                        type="text"
+                                        placeholder="EAN13 code, e.g. 5449000000996"
+                                        value={formData.barcode}
+                                        onChange={e => setFormData({ ...formData, barcode: e.target.value })}
+                                        className="w-full h-[44px] bg-white border border-[#E5E7EB] rounded-[10px] px-4 text-[14px] outline-none focus:border-[#14B8A6] font-mono tracking-wider"
+                                    />
+                                    <p className="text-[10px] text-[#9CA3AF]">8 / 12 / 13 / 14 digit international barcode — auto-fetched from EAN-DB if known.</p>
                                 </div>
                             </div>
 

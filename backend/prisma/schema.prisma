@@ -698,8 +698,22 @@ model EscrowTransaction {
 model NewsletterSubscriber {
   id        String   @id @default(uuid())
   email     String   @unique
-  status    String   @default("ACTIVE") // ACTIVE, BOUNCED, UNSUBSCRIBED
-  source    String?  // e.g., "Homepage Footer", "Direct RFQ"
+  /**
+   * Optional display name uploaded with the email — useful for the
+   * admin Newsletter UI to show "Acme Wholesale (purchasing@acme.com)"
+   * instead of just the address. Imports via the bulk-upload endpoint
+   * fill this from the sheet's Name column.
+   */
+  name      String?
+  /**
+   * ACTIVE       — receives campaigns
+   * UNSUBSCRIBED — opted out, never gets emails again
+   * BOUNCED      — bad address, suppressed by mailer
+   * BLOCKED      — admin-blocked, kept on file but cannot receive
+   * HIDDEN       — admin-hidden from default lists (soft-archive)
+   */
+  status    String   @default("ACTIVE")
+  source    String?  // e.g., "Homepage Footer", "Bulk Upload", "Direct RFQ"
   region    String?  // e.g., "Europe", "MENA"
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
