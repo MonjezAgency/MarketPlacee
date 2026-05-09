@@ -150,25 +150,27 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const mPallet    = isOwnProduct ? 1 : markups.pallet;
     const mContainer = isOwnProduct ? 1 : markups.container;
 
-    const cartonPrice = piecesPerCase > 0 ? basePerPiece * piecesPerCase * mPiece : null;
-    const palletPrice = piecesPerPallet > 0 ? basePerPiece * piecesPerPallet * mPallet : null;
-    const truckPrice  = (piecesPerPallet > 0 && palletsPerTruck > 0) ? basePerPiece * piecesPerPallet * palletsPerTruck * mContainer : null;
+    // Atlantis listing card pricing rule:
+    //   The card always shows a PER-CASE price (not the full truck total).
+    //   The markup applied to that per-case price is the TRUCK markup —
+    //   i.e. the cheapest possible per-case price, which is what the buyer
+    //   would pay if they bought a full truck. This tells them "from this
+    //   price per case", and clicking through to the PDP lets them see
+    //   what the per-case price becomes at Pallet or Case tier.
+    const basePerCase = piecesPerCase > 0 ? basePerPiece * piecesPerCase : basePerPiece;
+    const truckTierAvailable  = piecesPerCase > 0 && piecesPerPallet > 0 && palletsPerTruck > 0;
+    const palletTierAvailable = piecesPerCase > 0 && piecesPerPallet > 0;
+    const caseTierAvailable   = piecesPerCase > 0;
 
-    // Tier list — only include tiers we can compute.
-    type Tier = { key: 'truck' | 'pallet' | 'carton'; label: string; price: number };
-    const tiers: Tier[] = [];
-    if (truckPrice !== null)  tiers.push({ key: 'truck',  label: 'truck',  price: truckPrice });
-    if (palletPrice !== null) tiers.push({ key: 'pallet', label: 'pallet', price: palletPrice });
-    if (cartonPrice !== null) tiers.push({ key: 'carton', label: 'ctn',    price: cartonPrice });
-    if (tiers.length === 0)   tiers.push({ key: 'carton', label: String(product.unit || 'unit'), price: displayPrice });
-
-    // Headline price is FIXED on the admin-configured default unit (truck by
-    // default). One stable canonical price per card. Tier switching lives
-    // exclusively on the product detail page so each switch is a real
-    // engagement signal (a click into the PDP).
-    const headlineTier = tiers.find(t => t.key === defaultUnit) || tiers[0];
-    const cardPrice = headlineTier.price;
-    const cardUnit  = headlineTier.label;
+    // Pick the cheapest available tier markup — Truck if reachable,
+    // otherwise Pallet, otherwise Case. Cards still represent the best
+    // possible per-case price the buyer can unlock.
+    let cardPrice: number;
+    if (truckTierAvailable)       cardPrice = basePerCase * mContainer;
+    else if (palletTierAvailable) cardPrice = basePerCase * mPallet;
+    else if (caseTierAvailable)   cardPrice = basePerCase * mPiece;
+    else                           cardPrice = displayPrice;
+    const cardUnit = 'case';
 
     const rating = product.rating || 0;
     const reviews = product.reviewsCount || 0;

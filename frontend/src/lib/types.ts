@@ -53,6 +53,12 @@ export interface Product {
     weight?: number;
     shelfLife?: string;
     origin?: string;
+    /**
+     * EXW (Ex Works) — where the goods physically sit today. Required at
+     * supplier upload time and surfaced on the PDP next to Country of
+     * Origin so buyers can reason about the transport leg.
+     */
+    exwLocation?: string;
     basePrice?: number | null;
     variants?: ProductVariant[];
     adminNotes?: string;

@@ -92,6 +92,17 @@ export class CreateProductDto {
     @IsString()
     origin?: string;
 
+    /**
+     * EXW (Ex Works) — where the goods physically sit today. Atlantis
+     * logistics uses this to quote transport from origin warehouse to
+     * the buyer. The Excel importer makes this practically required:
+     * a row without an EXW value is held in PENDING with an explicit
+     * "EXW required" admin note until the supplier provides it.
+     */
+    @IsOptional()
+    @IsString()
+    exwLocation?: string;
+
     @IsOptional()
     @IsString()
     warehouseId?: string;

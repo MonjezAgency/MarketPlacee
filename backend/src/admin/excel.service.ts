@@ -243,6 +243,24 @@ export class ExcelService {
             'batchnumber': 'shelfLife', 'batchno': 'shelfLife', 'lot': 'shelfLife',
             'lotnumber': 'shelfLife', 'batchnumberexpirydate': 'shelfLife',
             'bbd': 'shelfLife', 'bestbeforedate': 'shelfLife',
+            // ── EXW (Ex Works location — where the goods physically sit) ─────
+            // Atlantis logistics uses this to quote transport from origin to
+            // the buyer. We accept many phrasings because suppliers write it
+            // a dozen different ways: "EXW", "Ex Works", "EXW Origin",
+            // "Origin Warehouse", "Stock Location", "Currently Located in",
+            // plus Arabic variants. normalize() strips spaces/dashes so
+            // "Ex-Works" → "exworks", "EXW Location" → "exwlocation", etc.
+            'exw': 'exwLocation', 'exworks': 'exwLocation', 'exwlocation': 'exwLocation',
+            'exwincoterm': 'exwLocation', 'exworigin': 'exwLocation',
+            'originwarehouse': 'exwLocation', 'warehouselocation': 'exwLocation',
+            'stocklocation': 'exwLocation', 'currentlocation': 'exwLocation',
+            'goodslocation': 'exwLocation', 'productlocation': 'exwLocation',
+            'shipfrom': 'exwLocation', 'departure': 'exwLocation',
+            'departurecountry': 'exwLocation', 'pickuplocation': 'exwLocation',
+            'incoterm': 'exwLocation', 'incoterms': 'exwLocation',
+            'مكانالبضاعة': 'exwLocation', 'مكانالمنتج': 'exwLocation',
+            'موقعالمنتج': 'exwLocation', 'بلدالمنشأ': 'exwLocation',
+            'مخزن': 'exwLocation', 'موقعالشحن': 'exwLocation',
             // ── images (URLs, comma/semicolon/pipe/newline-separated) ─────────
             'image': 'images', 'images': 'images', 'imageurl': 'images',
             'imageurls': 'images', 'photo': 'images', 'photos': 'images',
@@ -397,6 +415,17 @@ export class ExcelService {
         let successCount = 0;
         let errorCount = 0;
 
+        // ── Sheet-level EXW fallback ────────────────────────────────────────────
+        // Suppliers often write EXW once at the top OR bottom of the sheet
+        // ("Prices are EXW Thessaloniki -GR") rather than as a per-row column.
+        // We scan the whole sheet for a "EXW <country>" / "Ex Works <country>"
+        // pattern and use it as the default for any row that doesn't have its
+        // own exwLocation. Any explicit per-row EXW still wins.
+        const sheetLevelExw = this.detectSheetLevelExw(rows);
+        if (sheetLevelExw) {
+            this.logger.log(`[ExcelService] Sheet-level EXW detected: "${sheetLevelExw}" — applied as fallback to rows without an explicit EXW column.`);
+        }
+
         for (let i = headerRowIndex + 1; i < rows.length; i++) {
             const row = rows[i];
             if (!row) continue;
@@ -441,6 +470,23 @@ export class ExcelService {
             // out of "Pepsi Diet 150ml" and "150ml" out of the same name.
             this.enrichFromName(normalizedRow);
 
+            // ── EXW resolution ──────────────────────────────────────────────
+            // Required field. Resolution order:
+            //   1. The mapped exwLocation column (per-row).
+            //   2. An "EXW: <country>" / "Ex Works <country>" pattern found
+            //      anywhere in the row's cells (description, notes, etc.).
+            //   3. The sheet-level fallback we detected once at the top.
+            // If still missing, the row fails validation with a clear admin-
+            // facing message — Atlantis won't list a product without
+            // knowing where the goods physically are.
+            if (!normalizedRow.exwLocation) {
+                const inlineExw = this.extractExwFromCells(row);
+                if (inlineExw) normalizedRow.exwLocation = inlineExw;
+            }
+            if (!normalizedRow.exwLocation && sheetLevelExw) {
+                normalizedRow.exwLocation = sheetLevelExw;
+            }
+
             // Log first 3 data rows so the operator can verify extraction
             if (i - headerRowIndex <= 3) {
                 console.log(`[ExcelService] Row ${i + 1} extracted:`, JSON.stringify({
@@ -465,6 +511,22 @@ export class ExcelService {
             const instance = plainToInstance(dtoClass, normalizedRow, { enableImplicitConversion: true });
             const errors = await validate(instance as any);
 
+            // EXW is a hard requirement — Atlantis logistics needs to know
+            // where the goods physically are before quoting transport. If
+            // none of the resolution strategies above produced one, fail
+            // the row with a clear, supplier-actionable message.
+            if (!normalizedRow.exwLocation) {
+                errorCount++;
+                results.push({
+                    rowNumber: i + 1,
+                    success: false,
+                    errors: [
+                        'exwLocation: Missing EXW (origin warehouse). Add an "EXW" column to your sheet or write "EXW: <country/city>" anywhere in the product row. Without it the product cannot be listed.',
+                    ],
+                });
+                continue;
+            }
+
             if (errors.length > 0) {
                 errorCount++;
                 const errorMessages = errors.map(err =>
@@ -478,6 +540,57 @@ export class ExcelService {
         }
 
         return { totalRows: results.length, successCount, errorCount, results };
+    }
+
+    /**
+     * Walks every cell of every row to find an EXW value the supplier may
+     * have written somewhere other than a dedicated column — e.g. a footer
+     * note "Prices are EXW Thessaloniki -GR" or a description cell that
+     * starts "Ex Works: Hamburg, Germany". Returns the first match found,
+     * or null if the sheet contains no EXW signal at all.
+     */
+    private detectSheetLevelExw(rows: any[][]): string | null {
+        for (const row of rows) {
+            if (!row) continue;
+            const v = this.extractExwFromCells(row);
+            if (v) return v;
+        }
+        return null;
+    }
+
+    /**
+     * Pull an EXW value out of a single row's cells. Recognises:
+     *   "EXW Thessaloniki"           → "Thessaloniki"
+     *   "EXW: Thessaloniki -GR"      → "Thessaloniki -GR"
+     *   "Ex Works Hamburg, Germany"  → "Hamburg, Germany"
+     *   "Prices are EXW Hamburg"     → "Hamburg"
+     *   "Origin warehouse: Bucharest"→ "Bucharest"
+     * Stops at the first newline or pipe so multi-field cells don't bleed.
+     */
+    private extractExwFromCells(row: any[]): string | null {
+        if (!row) return null;
+        const patterns: RegExp[] = [
+            /\bexw\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
+            /\bex\s*works?\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
+            /\borigin\s*warehouse\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
+            /\bship\s*from\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
+            /\bstock\s*location\s*[:\-]?\s*([^\n|]+?)(?:[.,;]|$)/i,
+        ];
+        for (const cell of row) {
+            const s = String(cell ?? '').trim();
+            if (!s || s.length < 3 || s.length > 200) continue;
+            for (const re of patterns) {
+                const m = s.match(re);
+                if (m && m[1]) {
+                    const v = m[1].trim().replace(/^[\-:\s]+/, '').replace(/\s{2,}/g, ' ');
+                    // Reject obvious non-locations (numbers, single letters)
+                    if (v.length >= 2 && /[a-zA-Z؀-ۿ]/.test(v)) {
+                        return v.slice(0, 80);
+                    }
+                }
+            }
+        }
+        return null;
     }
 
     /**

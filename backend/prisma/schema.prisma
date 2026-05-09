@@ -170,6 +170,10 @@ model Product {
   shelfLife          String? // Expiry date or shelf-life string from supplier file
   weight             String? // Weight per unit (e.g., "250g", "1.5kg")
   origin             String? // Country of origin (e.g., "Germany", "China")
+  exwLocation        String? // Where the product physically sits today (EXW Incoterm)
+                              // — required by the supplier upload flow and shown on
+                              // the PDP next to MOQ / Country of Origin so buyers
+                              // can estimate transport cost from origin warehouse.
   previousPrice      Float?  // Last price before the most recent change (in EGP base) — used for price-change ticker
   priceChangedAt     DateTime? // Timestamp of the most recent price change
   readyForDispatch Boolean @default(true)

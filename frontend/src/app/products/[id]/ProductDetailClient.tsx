@@ -56,11 +56,28 @@ export default function ProductDetailClient() {
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
     // ── Tier pricing memo ─────────────────────────────────────────────────────
-    // Computes the customer-visible price for the currently selected unit tier
-    // (truck / pallet / carton). Used both in handleAdd() and in the pricing UI.
-    // Duplicated from the JSX IIFE so that handleAdd() always has the right price.
+    // Atlantis pricing rule: the headline number on every tier button AND in
+    // the main pricing block is always a PER-CASE price. What changes between
+    // tiers is the markup multiplier — Truck applies the lowest (container)
+    // markup, Pallet the middle one, Case the highest (piece). The buyer's
+    // quantity counter then counts in the chosen unit (1 truck, 2 pallets,
+    // 5 cases…) and the line total is per-case × cases-in-unit × qty.
+    //
+    // Returns:
+    //   perCasePrice   — what the buyer sees as "€X / case" for the active tier
+    //   perUnitTotal   — full price of ONE selected unit (truck / pallet / case),
+    //                    used as `price` when the line goes into the cart so
+    //                    cart total = perUnitTotal × quantity stays correct.
+    //   activeLabel    — "Truck" | "Pallet" | "Case" for UI copy.
+    //   activeKey      — canonical tier key used for cart locking.
+    //   casesInUnit    — multiplier from per-case to per-unit, also used in the
+    //                    "X cartons total" breakdown line.
     const tierData = useMemo(() => {
-        if (!currentProduct) return { tierPrice: 0, activeLabel: 'Unit', activeKey: 'carton' as const };
+        const fallback = {
+            perCasePrice: 0, perUnitTotal: 0, activeLabel: 'Case',
+            activeKey: 'carton' as const, casesInUnit: 1,
+        };
+        if (!currentProduct) return fallback;
         const p = currentProduct;
         const piecesPerCase   = p.unitsPerCase || 0;
         const casesPerPallet  = p.casesPerPallet || 0;
@@ -68,6 +85,9 @@ export default function ProductDetailClient() {
         const palletsPerTruck = p.palletsPerShipment || 0;
         const baseUnit        = String(p.unit || 'piece').toLowerCase();
 
+        // Reverse the supplier's stored unit into a per-piece base, then
+        // build a per-case base on top of it. Per-case is the canonical
+        // unit for the buyer-facing display.
         const rawBase = p.basePrice != null ? p.basePrice : p.price / markups.piece;
         let basePerPiece = rawBase;
         if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
@@ -77,24 +97,37 @@ export default function ProductDetailClient() {
         else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment') || baseUnit.includes('delivery')) && piecesPerPallet > 0 && palletsPerTruck > 0)
             basePerPiece = rawBase / (piecesPerPallet * palletsPerTruck);
 
-        const cartonPrice = piecesPerCase > 0   ? basePerPiece * piecesPerCase * markups.piece          : null;
-        const palletPrice = piecesPerPallet > 0  ? basePerPiece * piecesPerPallet * markups.pallet       : null;
-        const truckPrice  = (piecesPerPallet > 0 && palletsPerTruck > 0)
-            ? basePerPiece * piecesPerPallet * palletsPerTruck * markups.container : null;
-        const perPiece    = basePerPiece * markups.piece;
+        const basePerCase = piecesPerCase > 0 ? basePerPiece * piecesPerCase : basePerPiece;
 
-        const options: Array<{ key: 'truck' | 'pallet' | 'carton'; label: string; price: number | null }> = [];
-        if (truckPrice  !== null) options.push({ key: 'truck',  label: 'Truck',         price: truckPrice  });
-        if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet',        price: palletPrice });
-        if (cartonPrice !== null) options.push({ key: 'carton', label: 'Case',          price: cartonPrice });
-        // B2B marketplace — no single-piece option.
-        if (options.length === 0) options.push({ key: 'carton', label: p.unit || 'Case', price: p.price });
+        // Per-case price for each tier (markup-only difference).
+        const truckAvailable = piecesPerCase > 0 && casesPerPallet > 0 && palletsPerTruck > 0;
+        const palletAvailable = piecesPerCase > 0 && casesPerPallet > 0;
+        const caseAvailable = piecesPerCase > 0;
+
+        const perCaseTruck  = truckAvailable  ? basePerCase * markups.container : null;
+        const perCasePallet = palletAvailable ? basePerCase * markups.pallet    : null;
+        const perCaseCase   = caseAvailable   ? basePerCase * markups.piece     : null;
+
+        const options: Array<{ key: 'truck' | 'pallet' | 'carton'; label: string; perCasePrice: number | null; casesInUnit: number }> = [];
+        if (perCaseTruck  !== null) options.push({ key: 'truck',  label: 'Truck',  perCasePrice: perCaseTruck,  casesInUnit: casesPerPallet * palletsPerTruck });
+        if (perCasePallet !== null) options.push({ key: 'pallet', label: 'Pallet', perCasePrice: perCasePallet, casesInUnit: casesPerPallet });
+        if (perCaseCase   !== null) options.push({ key: 'carton', label: 'Case',   perCasePrice: perCaseCase,   casesInUnit: 1 });
+        if (options.length === 0) {
+            options.push({ key: 'carton', label: p.unit || 'Case', perCasePrice: p.price, casesInUnit: 1 });
+        }
 
         const initialSelected = options.find(o => o.key === adminDefaultUnit)?.key ?? options[0].key;
         const active          = options.find(o => o.key === (selectedUnit ?? initialSelected)) || options[0];
-        const tierPrice       = active.price != null ? active.price : perPiece;
+        const perCasePrice    = active.perCasePrice ?? 0;
+        const perUnitTotal    = perCasePrice * active.casesInUnit;
 
-        return { tierPrice, activeLabel: active.label, activeKey: active.key };
+        return {
+            perCasePrice,
+            perUnitTotal,
+            activeLabel: active.label,
+            activeKey: active.key,
+            casesInUnit: active.casesInUnit,
+        };
     }, [currentProduct, markups, selectedUnit, adminDefaultUnit]);
 
     const scroll = (direction: 'left' | 'right') => {
@@ -255,9 +288,11 @@ export default function ProductDetailClient() {
             id: product.id,
             name: product.name,
             brand: product.brand || 'Atlantis Premium',
-            // Use the tier-selected price (truck / pallet / carton) instead of
-            // the raw product.price, which was always the per-piece DB price.
-            price: tierData.tierPrice,
+            // Cart math: line total = price × quantity. We store the FULL
+            // per-unit price (one truck / one pallet / one case) here so
+            // the cart can render `formatPrice(price * quantity)` directly.
+            // perUnitTotal already has the chosen tier's markup baked in.
+            price: tierData.perUnitTotal,
             image: product.image || '',
             unit: tierData.activeLabel,
             category: product.category || 'Uncategorized',
@@ -377,11 +412,15 @@ export default function ProductDetailClient() {
                                 </span>
                             </div>
 
-                            {/* Pricing block with unit toggle (Truck / Pallet / Carton)
-                                The base product.price is for whatever unit was configured at creation
-                                time. Other unit prices are derived using conversion factors. Different
-                                markups per unit are applied server-side at order-time; here we surface
-                                the indicative buy-tier price so buyers can compare. */}
+                            {/* Pricing block with unit toggle (Truck / Pallet / Case).
+                                Atlantis pricing model: the headline number on every tier
+                                button AND in the main pricing area is always a PER-CASE
+                                price. What changes between tiers is the markup applied to
+                                that per-case price (Truck → container markup ≈ +2%, Pallet
+                                → pallet markup ≈ +5%, Case → piece markup ≈ +10%). The
+                                buyer's quantity counter then counts in the chosen unit
+                                (1 truck, 2 pallets, 5 cases…) so the line total is
+                                perCasePrice × casesPerUnit × qty. */}
                             {(() => {
                                 const piecesPerCase = product.unitsPerCase || 0;
                                 const casesPerPallet = product.casesPerPallet || 0;
@@ -389,9 +428,7 @@ export default function ProductDetailClient() {
                                 const palletsPerTruck = product.palletsPerShipment || 0;
                                 const baseUnit = String(product.unit || 'piece').toLowerCase();
 
-                                // ── Step 1: resolve per-piece BASE price (supplier raw, before markup) ──
-                                // product.basePrice is the supplier raw price.
-                                // If absent, reverse from product.price ÷ piece markup multiplier.
+                                // Resolve per-piece BASE (raw supplier price, no markup).
                                 const rawBase = product.basePrice != null
                                     ? product.basePrice
                                     : product.price / markups.piece;
@@ -404,33 +441,27 @@ export default function ProductDetailClient() {
                                 else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment') || baseUnit.includes('delivery')) && piecesPerPallet > 0 && palletsPerTruck > 0)
                                     basePerPiece = rawBase / (piecesPerPallet * palletsPerTruck);
 
-                                // ── Step 2: customer-visible tier prices (base × qty × tier markup) ──
-                                // Each tier uses its own markup: piece/carton → piece markup,
-                                // pallet → pallet markup, truck → container markup.
-                                const cartonPrice = piecesPerCase > 0
-                                    ? basePerPiece * piecesPerCase * markups.piece
-                                    : null;
-                                const palletPrice = piecesPerPallet > 0
-                                    ? basePerPiece * piecesPerPallet * markups.pallet
-                                    : null;
-                                const truckPrice = (piecesPerPallet > 0 && palletsPerTruck > 0)
-                                    ? basePerPiece * piecesPerPallet * palletsPerTruck * markups.container
-                                    : null;
+                                // Per-case BASE (no markup) — every tier prices off this.
+                                const basePerCase = piecesPerCase > 0 ? basePerPiece * piecesPerCase : basePerPiece;
 
-                                // Fallback per-piece customer price (with piece markup applied)
-                                const perPiece = basePerPiece * markups.piece;
+                                // Per-case price for each tier — same base, different markup.
+                                const truckAvailable  = piecesPerCase > 0 && casesPerPallet > 0 && palletsPerTruck > 0;
+                                const palletAvailable = piecesPerCase > 0 && casesPerPallet > 0;
+                                const caseAvailable   = piecesPerCase > 0;
 
-                                // qty = number of cartons inside the tier (so price/qty = per-carton price)
-                                // For 'piece', qty is fractional (1 / piecesPerCase) so the per-carton math
-                                // and the per-piece view stay consistent.
-                                const options: Array<{ key: 'truck'|'pallet'|'carton'; label: string; emoji: string; price: number | null; qty: number }> = [];
-                                if (truckPrice !== null)  options.push({ key: 'truck',  label: 'Truck',  emoji: '🚛', price: truckPrice,  qty: (casesPerPallet * palletsPerTruck) || 1 });
-                                if (palletPrice !== null) options.push({ key: 'pallet', label: 'Pallet', emoji: '📦', price: palletPrice, qty: casesPerPallet || 1 });
-                                if (cartonPrice !== null) options.push({ key: 'carton', label: 'Case',   emoji: '🗃️', price: cartonPrice, qty: 1 });
-                                // B2B marketplace — no single-piece option.
-                                if (options.length === 0) options.push({ key: 'carton', label: product.unit || 'Case', emoji: '📦', price: product.price, qty: 1 });
+                                const perCaseTruck  = truckAvailable  ? basePerCase * markups.container : null;
+                                const perCasePallet = palletAvailable ? basePerCase * markups.pallet    : null;
+                                const perCaseCase   = caseAvailable   ? basePerCase * markups.piece     : null;
 
-                                // Default: use admin-configured unit, fall back to the largest available
+                                // Each tier carries the per-case display price plus how many
+                                // cases sit inside one of its units (used for the line total).
+                                const options: Array<{ key: 'truck'|'pallet'|'carton'; label: string; emoji: string; perCasePrice: number | null; casesInUnit: number }> = [];
+                                if (perCaseTruck  !== null) options.push({ key: 'truck',  label: 'Truck',  emoji: '🚛', perCasePrice: perCaseTruck,  casesInUnit: casesPerPallet * palletsPerTruck });
+                                if (perCasePallet !== null) options.push({ key: 'pallet', label: 'Pallet', emoji: '📦', perCasePrice: perCasePallet, casesInUnit: casesPerPallet });
+                                if (perCaseCase   !== null) options.push({ key: 'carton', label: 'Case',   emoji: '🗃️', perCasePrice: perCaseCase,   casesInUnit: 1 });
+                                if (options.length === 0) options.push({ key: 'carton', label: product.unit || 'Case', emoji: '📦', perCasePrice: product.price, casesInUnit: 1 });
+
+                                // Default: admin-configured unit, fall back to the largest available
                                 const initialSelected = options.find(o => o.key === adminDefaultUnit)?.key ?? options[0].key;
                                 if (selectedUnit === undefined) {
                                     setTimeout(() => setSelectedUnit(initialSelected), 0);
@@ -446,10 +477,13 @@ export default function ProductDetailClient() {
                                     : (piecesPerCase || 1) * (casesPerPallet || 1) * (palletsPerTruck || 1);
                                 const minUnits = Math.max(1, Math.ceil(moqPieces / piecesPerActiveUnit));
 
-                                // tierPrice = full price for the selected tier (carton total, pallet total, or truck total)
-                                const tierPrice = active.price != null ? active.price : perPiece;
-                                // customTotal = grand total for quantity tiers ordered (tierTotal × qty)
-                                const customTotal = tierPrice * quantity;
+                                // perCasePrice  = headline number ("€7.20 / case") with active markup.
+                                // perUnitTotal  = price of ONE chosen unit (one truck / one pallet / one
+                                //                 case) — used for the per-unit subtitle and the cart.
+                                // customTotal   = grand total = perUnitTotal × qty.
+                                const perCasePrice = active.perCasePrice ?? 0;
+                                const perUnitTotal = perCasePrice * active.casesInUnit;
+                                const customTotal  = perUnitTotal * quantity;
 
                                 return (
                                     <div className="flex flex-col gap-4 py-5 border-y border-[#E5E7EB]">
@@ -493,9 +527,9 @@ export default function ProductDetailClient() {
                                                 >
                                                     <span className="text-[20px] mb-0.5">{opt.emoji}</span>
                                                     <span className="text-[11px] font-black uppercase tracking-widest">{opt.label}</span>
-                                                    {opt.price != null && (
+                                                    {opt.perCasePrice != null && (
                                                         <span className={cn('text-[11px] font-semibold mt-0.5', active.key === opt.key ? 'text-white/70' : 'text-[#9CA3AF]')}>
-                                                            {formatPrice(opt.price)} / {opt.label.toLowerCase()}
+                                                            {formatPrice(opt.perCasePrice)} / case
                                                         </span>
                                                     )}
                                                 </button>
@@ -509,21 +543,29 @@ export default function ProductDetailClient() {
                                             </div>
                                         )}
 
-                                        {/* Selected unit price + quantity multiplier */}
+                                        {/* Headline price = per-CASE price for the active tier.
+                                            Subtitle shows what one of the chosen unit costs
+                                            (perCasePrice × cases-in-unit). Grand total appears
+                                            only once the buyer scales qty above 1. */}
                                         <div className="flex items-end justify-between gap-4">
                                             <div>
                                                 <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1">
-                                                    {quantity > 1 ? `${quantity} × ${active.label}` : `Per ${active.label}`}
+                                                    Per case · {active.label} pricing
                                                 </p>
                                                 <div className="flex items-baseline gap-2">
                                                     <span className="text-[40px] font-black text-[#111827] tracking-tighter leading-none">
-                                                        {formatPrice(tierPrice)}
+                                                        {formatPrice(perCasePrice)}
                                                     </span>
-                                                    <span className="text-[15px] font-medium text-[#6B7280]">/ {active.label.toLowerCase()}</span>
+                                                    <span className="text-[15px] font-medium text-[#6B7280]">/ case</span>
                                                 </div>
+                                                {active.casesInUnit > 1 && (
+                                                    <p className="text-[12px] text-[#6B7280] mt-1">
+                                                        = <strong className="text-[#111827]">{formatPrice(perUnitTotal)}</strong> per {active.label.toLowerCase()} ({active.casesInUnit} cases)
+                                                    </p>
+                                                )}
                                                 {quantity > 1 && (
                                                     <p className="text-[12px] text-[#9CA3AF] mt-0.5">
-                                                        Total: <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
+                                                        {quantity} × {active.label.toLowerCase()}{quantity > 1 ? 's' : ''} total: <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
                                                     </p>
                                                 )}
                                             </div>
@@ -553,10 +595,10 @@ export default function ProductDetailClient() {
                                         {/* Breakdown hint (multi-unit orders) */}
                                         {quantity > 1 && (
                                             <p className="text-[12px] text-[#6B7280] bg-[#F8FAFC] rounded-xl px-3 py-2 leading-relaxed">
-                                                {quantity} {active.label.toLowerCase()}{quantity > 1 ? 's' : ''} × {formatPrice(active.price ?? product.price)} = <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
-                                                {active.key === 'truck' && palletsPerTruck > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * (casesPerPallet * palletsPerTruck)} cartons total)</span>}
-                                                {active.key === 'pallet' && casesPerPallet > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * casesPerPallet} cartons total)</span>}
-                                                {active.key === 'carton' && piecesPerCase > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * piecesPerCase} pcs)</span>}
+                                                {quantity} {active.label.toLowerCase()}{quantity > 1 ? 's' : ''} × {formatPrice(perUnitTotal)} = <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
+                                                {active.key === 'truck' && palletsPerTruck > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * (casesPerPallet * palletsPerTruck)} cases total)</span>}
+                                                {active.key === 'pallet' && casesPerPallet > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * casesPerPallet} cases total)</span>}
+                                                {active.key === 'carton' && piecesPerCase > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * piecesPerCase} pieces)</span>}
                                             </p>
                                         )}
 
@@ -786,6 +828,11 @@ export default function ProductDetailClient() {
                                     <div className="space-y-4">
                                         {[
                                             { label: 'Country of Origin', value: product.origin || 'N/A' },
+                                            // EXW (Ex Works) — where the goods physically sit today.
+                                            // Buyers use this to estimate the transport leg from this
+                                            // location to their delivery address, before the Atlantis
+                                            // logistics team confirms the carrier-negotiated price.
+                                            { label: 'EXW · Currently In', value: product.exwLocation || 'Pending supplier confirmation' },
                                             { label: 'BBD', value: product.shelfLife || 'N/A' },
                                             { label: 'Barcode (EAN)', value: product.ean || 'N/A' },
                                             { label: 'Brand Status', value: 'Verified by Atlantis' }
