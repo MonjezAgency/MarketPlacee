@@ -474,12 +474,15 @@ export class EmailService {
   <tr><td align="center">
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 12px 40px rgba(15,23,42,0.08);">
 
-      <!-- Header — Atlantis brand mark on gradient navy -->
+      <!-- Header — Atlantis brand mark on gradient navy. The logo is
+           the public PNG hosted at /icon.png on the frontend domain;
+           email clients can fetch any HTTPS URL but block local data
+           so a CDN-style hosted asset is the only reliable option. -->
       <tr><td style="background:linear-gradient(135deg,#0B1F3A 0%,#0F172A 100%);padding:40px 40px 56px;text-align:center;">
         <div style="display:inline-block;">
           <table role="presentation" cellpadding="0" cellspacing="0"><tr>
             <td style="vertical-align:middle;padding-right:14px;">
-              <div style="width:44px;height:44px;border-radius:12px;background:#2EC4B6;color:#0F172A;font-family:Inter,Arial,sans-serif;font-size:22px;font-weight:900;text-align:center;line-height:44px;">A</div>
+              <img src="${(process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '')}/icon.png" alt="Atlantis" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:12px;background:#ffffff;padding:4px;box-sizing:border-box;" />
             </td>
             <td style="vertical-align:middle;text-align:left;">
               <div style="color:#ffffff;font-family:Inter,Arial,sans-serif;font-weight:900;font-size:22px;letter-spacing:0.02em;line-height:1;">ATLANTIS</div>
@@ -520,7 +523,7 @@ export class EmailService {
       <tr><td style="background:#F8FAFC;padding:24px 40px;border-top:1px solid #E2E8F0;text-align:center;">
         <table role="presentation" cellpadding="0" cellspacing="0" align="center"><tr>
           <td style="vertical-align:middle;padding-right:10px;">
-            <div style="width:24px;height:24px;border-radius:6px;background:#2EC4B6;color:#0F172A;font-family:Inter,Arial,sans-serif;font-size:13px;font-weight:900;text-align:center;line-height:24px;">A</div>
+            <img src="${(process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '')}/icon.png" alt="Atlantis" width="28" height="28" style="display:block;width:28px;height:28px;border-radius:7px;" />
           </td>
           <td style="vertical-align:middle;text-align:left;">
             <span style="color:#0F172A;font-family:Inter,Arial,sans-serif;font-weight:900;font-size:13px;letter-spacing:0.01em;">ATLANTIS</span>

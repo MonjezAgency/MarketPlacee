@@ -168,7 +168,7 @@ function buildEmailHtml(blocks: Block[]): string {
                                         <table role="presentation" cellpadding="0" cellspacing="0">
                                             <tr>
                                                 <td style="padding-right:14px;">
-                                                    <div style="width:44px;height:44px;border-radius:12px;background:#2EC4B6;color:#0F172A;font-family:'Inter',Arial,sans-serif;font-size:22px;font-weight:900;text-align:center;line-height:44px;">A</div>
+                                                    <img src="https://www.atlantisfmcg.com/icon.png" alt="Atlantis" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:12px;background:#ffffff;padding:4px;box-sizing:border-box;" />
                                                 </td>
                                                 <td>
                                                     <div style="color:#ffffff;font-family:'Inter',Arial,sans-serif;font-weight:900;font-size:24px;letter-spacing:0.02em;">ATLANTIS</div>

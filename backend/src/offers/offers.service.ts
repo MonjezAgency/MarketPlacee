@@ -320,8 +320,15 @@ export class OffersService {
 <tr><td align="center">
 <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 12px 32px rgba(15,23,42,0.06);">
     <tr><td style="background:linear-gradient(135deg,#0B1F3A 0%,#0F172A 100%);padding:32px 40px;color:#fff;">
-        <div style="font-weight:900;font-size:24px;letter-spacing:0.02em;">ATLANTIS <span style="color:#2EC4B6;">FMCG</span></div>
-        <div style="margin-top:6px;font-size:11px;letter-spacing:0.4em;color:#2EC4B6;text-transform:uppercase;font-weight:700;">New Offer</div>
+        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+            <td style="vertical-align:middle;padding-right:12px;">
+                <img src="${(process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '')}/icon.png" alt="Atlantis" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:10px;background:#ffffff;padding:3px;box-sizing:border-box;" />
+            </td>
+            <td style="vertical-align:middle;">
+                <div style="font-weight:900;font-size:22px;letter-spacing:0.02em;line-height:1;">ATLANTIS <span style="color:#2EC4B6;">FMCG</span></div>
+                <div style="margin-top:6px;font-size:11px;letter-spacing:0.4em;color:#2EC4B6;text-transform:uppercase;font-weight:700;">New Offer</div>
+            </td>
+        </tr></table>
     </td></tr>
     <tr><td style="padding:36px 40px 8px;">
         <h1 style="color:#0F172A;font-size:26px;font-weight:900;margin:0 0 8px;">New Atlantis offer available</h1>
