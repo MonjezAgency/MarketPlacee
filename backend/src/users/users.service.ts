@@ -101,6 +101,40 @@ export class UsersService {
         return { users: decryptedUsers, total, page, lastPage };
     }
 
+    /**
+     * Returns a breakdown of every user on the platform grouped by
+     * role and status, plus the most recent 10 registrations regardless
+     * of role/status. Lets the operator quickly see "yes, the user I
+     * just registered is in the DB" without filtering through pages.
+     */
+    async getCounts() {
+        const users = await this.prisma.user.findMany({
+            where: { email: { not: { contains: '@removed.invalid' } } },
+            select: { role: true, status: true },
+        });
+        const roleStatus: Record<string, Record<string, number>> = {};
+        for (const u of users) {
+            const role = u.role || 'UNKNOWN';
+            const status = u.status || 'UNKNOWN';
+            if (!roleStatus[role]) roleStatus[role] = {};
+            roleStatus[role][status] = (roleStatus[role][status] || 0) + 1;
+        }
+        const recentRegistrations = await this.prisma.user.findMany({
+            where: { email: { not: { contains: '@removed.invalid' } } },
+            orderBy: { createdAt: 'desc' },
+            take: 10,
+            select: {
+                id: true, email: true, name: true, companyName: true,
+                role: true, status: true, createdAt: true,
+            },
+        });
+        return {
+            total: users.length,
+            byRoleAndStatus: roleStatus,
+            recentRegistrations,
+        };
+    }
+
     async approveAllPending() {
         const pending = await this.prisma.user.findMany({
             where: { 

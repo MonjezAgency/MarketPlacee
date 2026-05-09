@@ -36,6 +36,7 @@ export default function AdminBuyersPage() {
     const [selectedBuyer, setSelectedBuyer] = React.useState<Buyer | null>(null);
     const [buyers, setBuyers] = React.useState<Buyer[]>([]);
     const [loading, setLoading] = React.useState(true);
+    const [diag, setDiag] = React.useState<any>(null);
     const [activeTab, setActiveTab] = React.useState<'ALL' | 'ACTIVE' | 'PENDING'>('ALL');
     const [panelTab, setPanelTab] = React.useState<'profile' | 'orders' | 'kyc'>('profile');
 
@@ -45,11 +46,24 @@ export default function AdminBuyersPage() {
 
     const loadBuyers = async () => {
         try {
-            const res = await apiFetch('/users?role=CUSTOMER&limit=100', { cache: 'no-store' });
+            // Diagnostic counts in parallel — populates the orange banner
+            // at the top of the page so the operator can see at a glance
+            // "yes, there are N customers in the DB at status X" even
+            // when the table below shows zero (e.g. due to a stale tab
+            // filter or a deleted JWT).
+            const [res, cntRes] = await Promise.all([
+                apiFetch('/users?role=CUSTOMER&limit=100', { cache: 'no-store' }),
+                apiFetch('/users/counts', { cache: 'no-store' }).catch(() => null),
+            ]);
             if (res.ok) {
                 const result = await res.json();
                 const usersData = Array.isArray(result) ? result : (result.users || []);
                 setBuyers(usersData);
+            } else {
+                console.error('[BUYERS] /users returned', res.status, await res.text().catch(() => ''));
+            }
+            if (cntRes && cntRes.ok) {
+                try { setDiag(await cntRes.json()); } catch {}
             }
         } catch (err) {
             console.error("Failed to load buyers:", err);
@@ -130,6 +144,42 @@ export default function AdminBuyersPage() {
 
     return (
         <div className="flex flex-col h-full space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+
+            {/* Diagnostic banner — shows the actual DB-level user counts
+                so the operator can confirm a registration landed in the
+                database even when a tab filter or stale JWT hides it
+                from the table below. */}
+            {diag && diag.byRoleAndStatus && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-[12px] text-amber-900 flex items-start gap-3">
+                    <AlertCircle size={18} className="text-amber-500 mt-0.5 shrink-0" />
+                    <div className="flex-1">
+                        <p className="font-black mb-1">Database snapshot · {diag.total ?? 0} users total</p>
+                        <div className="flex flex-wrap gap-x-5 gap-y-1">
+                            {Object.entries(diag.byRoleAndStatus).map(([role, statuses]: any) => (
+                                <span key={role}>
+                                    <strong>{role}:</strong>{' '}
+                                    {Object.entries(statuses).map(([s, n]: any, i, arr) => (
+                                        <span key={s}>{n} {s}{i < arr.length - 1 ? ', ' : ''}</span>
+                                    ))}
+                                </span>
+                            ))}
+                        </div>
+                        {diag.recentRegistrations && diag.recentRegistrations.length > 0 && (
+                            <details className="mt-2">
+                                <summary className="cursor-pointer font-bold">10 most recent registrations</summary>
+                                <ul className="mt-2 space-y-1">
+                                    {diag.recentRegistrations.map((u: any) => (
+                                        <li key={u.id} className="font-mono text-[11px]">
+                                            {new Date(u.createdAt).toLocaleString()} · <strong>{u.role}</strong> · {u.status} · {u.email} {u.companyName && `(${u.companyName})`}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </details>
+                        )}
+                    </div>
+                </div>
+            )}
+
             {/* Header Area */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>

@@ -88,6 +88,19 @@ export class UsersController {
     // and SUPPORT can READ and APPROVE; only ADMIN/OWNER can do destructive
     // bulk-block / bulk-delete.
 
+    /**
+     * Diagnostic — returns a per-role + per-status breakdown of every
+     * user on the platform. Lets the operator verify "yes, the buyer
+     * I just registered IS in the database" without scrolling through
+     * a 100-row table. Useful for triaging the
+     * "I can't see new registrations" class of complaints.
+     */
+    @Get('counts')
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR, Role.SUPPORT)
+    async counts() {
+        return this.usersService.getCounts();
+    }
+
     @Get()
     @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR, Role.SUPPORT)
     async findAll(
