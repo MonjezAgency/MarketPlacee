@@ -80,8 +80,16 @@ export class UsersController {
         return { url };
     }
 
+    // ─── User-management endpoints ───────────────────────────────────────
+    // Previously gated by `Role.ADMIN` only — but the operator (logged in
+    // as OWNER) and other staff (MODERATOR / SUPPORT) couldn't see new
+    // pending registrations because the API silently returned 403, which
+    // the frontend rendered as an empty list. Now: OWNER, ADMIN, MODERATOR
+    // and SUPPORT can READ and APPROVE; only ADMIN/OWNER can do destructive
+    // bulk-block / bulk-delete.
+
     @Get()
-    @Roles(Role.ADMIN)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR, Role.SUPPORT)
     async findAll(
         @Query('status') status?: string,
         @Query('role') role?: string,
@@ -97,33 +105,33 @@ export class UsersController {
     }
 
     @Post('approve-all')
-    @Roles(Role.ADMIN)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
     async approveAll() {
         return this.usersService.approveAllPending();
     }
 
     @Post(':id/status')
-    @Roles(Role.ADMIN)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
     async updateStatus(@Param('id') id: string, @Body('status') status: string) {
         return this.usersService.updateStatus(id, status);
     }
 
     @Post('bulk-approve')
-    @Roles(Role.ADMIN)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
     async bulkApprove(@Body('ids') ids: string[]) {
         const result = await this.usersService.bulkUpdateStatus(ids, 'ACTIVE');
         return { message: `Successfully approved ${result.updated} users`, ...result };
     }
 
     @Post('bulk-block')
-    @Roles(Role.ADMIN)
+    @Roles(Role.OWNER, Role.ADMIN)
     async bulkBlock(@Body('ids') ids: string[]) {
         const result = await this.usersService.bulkUpdateStatus(ids, 'BLOCKED');
         return { message: `Successfully blocked ${result.updated} users`, ...result };
     }
 
     @Post('bulk-delete')
-    @Roles(Role.ADMIN)
+    @Roles(Role.OWNER, Role.ADMIN)
     async bulkDelete(@Body('ids') ids: string[]) {
         const result = await this.usersService.bulkDelete(ids);
         return { message: `Successfully deleted ${result.deleted} users`, ...result };
@@ -137,7 +145,7 @@ export class UsersController {
     }
 
     @Delete(':id')
-    @Roles(Role.ADMIN)
+    @Roles(Role.OWNER, Role.ADMIN)
     async deleteUser(@Param('id') id: string) {
         await this.usersService.deleteUser(id);
         return { message: 'User deleted successfully' };
