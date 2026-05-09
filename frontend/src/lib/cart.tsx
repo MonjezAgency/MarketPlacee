@@ -12,6 +12,16 @@ export interface CartItem {
     unit: string;
     category?: string;
     supplierId?: string;
+    /**
+     * The tier the buyer locked in on the product detail page.
+     * Once a product is in the cart at a given tier, the PDP forces
+     * any further interaction with the same product to that same
+     * tier — buyers can't mix Truck pricing with Pallet pricing for
+     * the same SKU. To switch tier, they must remove the line item
+     * first. `unit` carries a human label ("Truck", "Pallet",
+     * "Case"); `tier` is the canonical key the PDP locks on.
+     */
+    tier?: 'truck' | 'pallet' | 'carton';
 }
 
 interface CartContextType {

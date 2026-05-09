@@ -178,22 +178,16 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
         e.preventDefault();
         e.stopPropagation();
         if (!isLoggedIn) {
-            window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname);
+            window.location.href = '/auth/login?redirect=' + encodeURIComponent(`/products/${product.id}`);
             return;
         }
-        if (isAdded) return;
-
-        addItem({
-            id: product.id,
-            name: product.name,
-            brand: product.brand || 'Premium',
-            price: product.price,
-            image: product.image || '',
-            unit: product.unit || 'pcs',
-        });
-
-        setIsAdded(true);
-        setTimeout(() => setIsAdded(false), 2000);
+        // Tier matters — Atlantis enforces tier-locked carts (Truck /
+        // Pallet / Case). The card can't add directly because we don't
+        // know which tier the buyer wants. Route them to the PDP where
+        // the tier picker is, so the right markup is applied and the
+        // tier gets locked into the cart line. This also gives us a
+        // real engagement signal per tier click on the PDP.
+        window.location.href = `/products/${product.id}`;
     };
 
     return (

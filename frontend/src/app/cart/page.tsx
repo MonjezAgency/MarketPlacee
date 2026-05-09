@@ -10,6 +10,7 @@ import RecommendationsSidebar from '@/components/cart/RecommendationsSidebar';
 import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { cn } from '@/lib/utils';
 
 export default function CartPage() {
     const { items, removeItem, updateQuantity, total, clearCart } = useCart();
@@ -85,7 +86,19 @@ export default function CartPage() {
 
                                     {/* Info */}
                                     <div className="flex-1 min-w-0 text-center sm:text-start">
-                                        <span className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">{item.brand}</span>
+                                        <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
+                                            <span className="text-[10px] font-bold text-primary/60 uppercase tracking-widest">{item.brand}</span>
+                                            {item.tier && (
+                                                <span className={cn(
+                                                    "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border",
+                                                    item.tier === 'truck' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                                                    item.tier === 'pallet' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                                                    'bg-slate-50 text-slate-700 border-slate-200',
+                                                )}>
+                                                    {item.tier === 'truck' ? '🚛 Truck' : item.tier === 'pallet' ? '📦 Pallet' : '🗃️ Case'}
+                                                </span>
+                                            )}
+                                        </div>
                                         <h3 className="font-heading font-bold text-lg leading-tight mt-1 mb-2">{item.name}</h3>
                                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
                                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-xl">

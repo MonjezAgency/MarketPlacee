@@ -30,7 +30,7 @@ import ImageLightbox from '@/components/ImageLightbox';
 
 export default function ProductDetailClient() {
     const { id } = useParams();
-    const { addItem } = useCart();
+    const { addItem, items: cartItems } = useCart();
     const [quantity, setQuantity] = useState(1);
     const [isAdded, setIsAdded] = useState(false);
     const router = useRouter();
@@ -104,6 +104,25 @@ export default function ProductDetailClient() {
             scrollContainerRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
         }
     };
+
+    // ── Cart-driven tier lock ─────────────────────────────────────────────────
+    // If this exact product is already in the cart, the buyer locked in a tier
+    // (Truck / Pallet / Carton) when they added it. The PDP must enforce that
+    // tier on every subsequent visit until they remove the item — buyers can
+    // not mix Truck-priced quantities with Pallet-priced quantities for the
+    // same SKU. The other two tier buttons render as disabled with a tooltip
+    // explaining how to switch.
+    const lockedTier: 'truck' | 'pallet' | 'carton' | null = useMemo(() => {
+        if (!currentProduct) return null;
+        const existing = cartItems.find(it => it.id === currentProduct.id);
+        return existing?.tier ?? null;
+    }, [cartItems, currentProduct]);
+
+    useEffect(() => {
+        if (lockedTier && selectedUnit !== lockedTier) {
+            setSelectedUnit(lockedTier);
+        }
+    }, [lockedTier, selectedUnit]);
 
     // Fetch admin-configured default display unit + tier markups once on mount
     useEffect(() => {
@@ -242,6 +261,9 @@ export default function ProductDetailClient() {
             image: product.image || '',
             unit: tierData.activeLabel,
             category: product.category || 'Uncategorized',
+            // Lock the buyer to this tier for any future PDP visit on the
+            // same product. To switch tier they have to remove the line.
+            tier: tierData.activeKey,
         }, quantity);
         setIsAdded(true);
         setTimeout(() => setIsAdded(false), 2500);
@@ -432,12 +454,25 @@ export default function ProductDetailClient() {
                                 return (
                                     <div className="flex flex-col gap-4 py-5 border-y border-[#E5E7EB]">
 
-                                        {/* Unit tabs — Truck / Pallet / Carton */}
+                                        {/* Unit tabs — Truck / Pallet / Carton.
+                                            If the buyer already added this product to the cart at
+                                            a specific tier, the OTHER two tiers render as disabled
+                                            with a tooltip — Atlantis enforces one tier per SKU
+                                            per cart so prices can't be mixed across tiers. */}
                                         <div className="grid grid-cols-3 gap-2">
-                                            {options.map((opt) => (
+                                            {options.map((opt) => {
+                                                const isLockedOut = !!lockedTier && lockedTier !== opt.key;
+                                                return (
                                                 <button
                                                     key={opt.key}
+                                                    disabled={isLockedOut}
+                                                    title={isLockedOut
+                                                        ? 'This product is already in your cart as ' +
+                                                          (lockedTier === 'truck' ? 'Truck' : lockedTier === 'pallet' ? 'Pallet' : 'Case') +
+                                                          '. Remove it from the cart first to switch tier.'
+                                                        : undefined}
                                                     onClick={() => {
+                                                        if (isLockedOut) return;
                                                         // Compute minUnits for the NEW unit type before switching
                                                         const ppuNew =
                                                             opt.key === 'carton' ? (piecesPerCase || 1)
@@ -451,7 +486,9 @@ export default function ProductDetailClient() {
                                                         'flex flex-col items-center py-3 px-2 rounded-2xl border-2 text-center transition-all',
                                                         active.key === opt.key
                                                             ? 'border-[#0F172A] bg-[#0F172A] text-white shadow-lg'
-                                                            : 'border-[#E5E7EB] bg-white text-[#475569] hover:border-[#0F172A]/40'
+                                                            : isLockedOut
+                                                                ? 'border-[#E5E7EB] bg-[#F8FAFC] text-[#CBD5E1] cursor-not-allowed opacity-60'
+                                                                : 'border-[#E5E7EB] bg-white text-[#475569] hover:border-[#0F172A]/40'
                                                     )}
                                                 >
                                                     <span className="text-[20px] mb-0.5">{opt.emoji}</span>
@@ -462,8 +499,15 @@ export default function ProductDetailClient() {
                                                         </span>
                                                     )}
                                                 </button>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
+                                        {lockedTier && (
+                                            <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-semibold">
+                                                <span className="text-[14px]">🔒</span>
+                                                <span>Locked to <strong>{lockedTier === 'truck' ? 'Truck' : lockedTier === 'pallet' ? 'Pallet' : 'Case'}</strong> — this product is already in your cart at that tier. Remove it from the cart to switch tier.</span>
+                                            </div>
+                                        )}
 
                                         {/* Selected unit price + quantity multiplier */}
                                         <div className="flex items-end justify-between gap-4">
