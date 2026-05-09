@@ -595,20 +595,7 @@ function BlockEditor({
                 </div>
             )}
             {block.type === 'image' && (
-                <div className="grid grid-cols-2 gap-2">
-                    <input
-                        value={(block as ImageBlock).url}
-                        onChange={e => onChange({ url: e.target.value } as any)}
-                        placeholder="Image URL"
-                        className="h-10 px-3 rounded-lg border border-slate-200 bg-white text-[13px] outline-none focus:border-[#2EC4B6]"
-                    />
-                    <input
-                        value={(block as ImageBlock).alt}
-                        onChange={e => onChange({ alt: e.target.value } as any)}
-                        placeholder="Alt text (accessibility)"
-                        className="h-10 px-3 rounded-lg border border-slate-200 bg-white text-[13px] outline-none focus:border-[#2EC4B6]"
-                    />
-                </div>
+                <ImageBlockEditor block={block as ImageBlock} onChange={onChange} />
             )}
             {block.type === 'product' && (
                 <div className="space-y-2">
@@ -636,3 +623,122 @@ function BlockEditor({
         </div>
     );
 }
+
+
+// ─── Image block — URL input + Upload-from-device option ────────────────────
+
+function ImageBlockEditor({
+    block,
+    onChange,
+}: {
+    block: ImageBlock;
+    onChange: (patch: Partial<ImageBlock>) => void;
+}) {
+    const fileRef = React.useRef<HTMLInputElement | null>(null);
+    const [isUploading, setIsUploading] = React.useState(false);
+
+    /**
+     * Re-uses /products/upload-image — same Supabase / S3 storage that
+     * powers the product gallery. The endpoint accepts multipart with
+     * a `file` field and returns { url }. Image is then dropped into
+     * the block exactly the same as a manually pasted URL.
+     */
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setIsUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append("file", file);
+            const res = await apiFetch("/products/upload-image", {
+                method: "POST",
+                body: fd,
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                toast.error(err.message || "Upload failed");
+                return;
+            }
+            const data = await res.json();
+            if (!data?.url) {
+                toast.error("Upload did not return an image URL");
+                return;
+            }
+            onChange({ url: data.url, alt: block.alt || file.name.replace(/\.[^.]+$/, "") });
+            toast.success("Image uploaded");
+        } catch {
+            toast.error("Network error");
+        } finally {
+            setIsUploading(false);
+            if (fileRef.current) fileRef.current.value = "";
+        }
+    };
+
+    return (
+        <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+                <input
+                    value={block.url}
+                    onChange={(e) => onChange({ url: e.target.value })}
+                    placeholder="Paste image URL…"
+                    className="h-10 px-3 rounded-lg border border-slate-200 bg-white text-[13px] outline-none focus:border-[#2EC4B6]"
+                />
+                <input
+                    value={block.alt}
+                    onChange={(e) => onChange({ alt: e.target.value })}
+                    placeholder="Alt text (accessibility)"
+                    className="h-10 px-3 rounded-lg border border-slate-200 bg-white text-[13px] outline-none focus:border-[#2EC4B6]"
+                />
+            </div>
+
+            <div className="flex items-center gap-2">
+                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">or</span>
+                <button
+                    type="button"
+                    onClick={() => fileRef.current?.click()}
+                    disabled={isUploading}
+                    className="flex-1 h-10 rounded-lg border border-dashed border-slate-300 bg-slate-50 hover:bg-white hover:border-[#2EC4B6] text-[12px] font-bold text-slate-600 flex items-center justify-center gap-2 disabled:opacity-50 transition-all"
+                >
+                    {isUploading ? (
+                        <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                        <ImageIcon size={14} />
+                    )}
+                    {isUploading ? "Uploading…" : "Upload from your device"}
+                </button>
+                <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    onChange={handleUpload}
+                    className="hidden"
+                />
+            </div>
+
+            {block.url && (
+                <div className="rounded-lg border border-slate-200 bg-white p-2 flex items-center gap-3">
+                    <img
+                        src={block.url}
+                        alt={block.alt || "preview"}
+                        className="w-14 h-14 object-cover rounded-md bg-slate-100"
+                        onError={(e) => {
+                            (e.target as HTMLImageElement).style.opacity = "0.3";
+                        }}
+                    />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-bold text-slate-700 truncate">{block.url.split("/").pop()}</p>
+                        <p className="text-[10px] text-slate-400">{block.url.startsWith("http") ? "External URL" : "Hosted on Atlantis storage"}</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => onChange({ url: "" })}
+                        className="text-slate-400 hover:text-rose-500 text-[11px] font-bold"
+                    >
+                        Remove
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}
+
