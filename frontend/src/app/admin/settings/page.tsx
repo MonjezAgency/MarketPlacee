@@ -545,45 +545,33 @@ export default function SettingsDashboard() {
 
                         {activeSection === 'Pricing & Markup' && (
                             <SettingSection key="pricing" title="Global Pricing & Margin Control">
+                                {/* Shopify-style pricing rows. Each tier has TWO
+                                    fields side-by-side: the supplier's cost goes
+                                    in on the left, the markup % in the middle,
+                                    and the customer-facing price renders live
+                                    on the right. Mirrors Shopify's product-form
+                                    Cost / Margin / Price layout so admins see
+                                    exactly what buyers will pay before saving. */}
                                 <SettingCard title="Wholesale Unit Markup (%)">
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[12px] font-medium text-slate-500">Piece/Carton Markup</label>
-                                            <div className="relative">
-                                                <input 
-                                                    type="number" step="0.1"
-                                                    value={Math.round((markupPiece - 1) * 100 * 10) / 10}
-                                                    onChange={(e) => setMarkupPiece(1 + parseFloat(e.target.value || "0") / 100)}
-                                                    className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
-                                                />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
-                                            </div>
-                                            <p className="text-[10px] text-slate-400">Example: 10% profit margin</p>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[12px] font-medium text-slate-500">Pallet Markup</label>
-                                            <div className="relative">
-                                                <input 
-                                                    type="number" step="0.1"
-                                                    value={Math.round((markupPallet - 1) * 100 * 10) / 10}
-                                                    onChange={(e) => setMarkupPallet(1 + parseFloat(e.target.value || "0") / 100)}
-                                                    className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
-                                                />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[12px] font-medium text-slate-500">Container Markup</label>
-                                            <div className="relative">
-                                                <input 
-                                                    type="number" step="0.1"
-                                                    value={Math.round((markupContainer - 1) * 100 * 10) / 10}
-                                                    onChange={(e) => setMarkupContainer(1 + parseFloat(e.target.value || "0") / 100)}
-                                                    className="h-10 w-full px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-teal-500"
-                                                />
-                                                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-400">%</span>
-                                            </div>
-                                        </div>
+                                    <div className="space-y-4">
+                                        <ShopifyPricingRow
+                                            label="🗃️ Case (Carton) tier"
+                                            sub="Smallest order unit. Highest markup applies."
+                                            markupPct={Math.round((markupPiece - 1) * 100 * 10) / 10}
+                                            onMarkupChange={pct => setMarkupPiece(1 + pct / 100)}
+                                        />
+                                        <ShopifyPricingRow
+                                            label="📦 Pallet tier"
+                                            sub="Bulk pallet orders. Mid-range markup."
+                                            markupPct={Math.round((markupPallet - 1) * 100 * 10) / 10}
+                                            onMarkupChange={pct => setMarkupPallet(1 + pct / 100)}
+                                        />
+                                        <ShopifyPricingRow
+                                            label="🚛 Truck (Container) tier"
+                                            sub="Full-truck orders. Lowest markup — biggest customer reward."
+                                            markupPct={Math.round((markupContainer - 1) * 100 * 10) / 10}
+                                            onMarkupChange={pct => setMarkupContainer(1 + pct / 100)}
+                                        />
                                     </div>
                                 </SettingCard>
 
@@ -901,6 +889,96 @@ export default function SettingsDashboard() {
                     </div>
                 )}
             </AnimatePresence>
+        </div>
+    );
+}
+
+
+// ─── Shopify-style pricing row ───────────────────────────────────────────────
+
+/**
+ * One pricing tier rendered the way Shopify renders product pricing:
+ *   [ Sample cost ] → [ Markup % ] → [ Customer-facing price live preview ]
+ *
+ * The admin only edits the Markup % column (the platform-wide config);
+ * the Sample cost is a local sandbox they can change to sanity-check
+ * the math, and the Customer Price is a live calculated preview.
+ *
+ * Math: customerPrice = sampleCost × (1 + markupPct / 100)
+ */
+function ShopifyPricingRow({
+    label,
+    sub,
+    markupPct,
+    onMarkupChange,
+}: {
+    label: string;
+    sub: string;
+    markupPct: number;
+    onMarkupChange: (next: number) => void;
+}) {
+    const [sampleCost, setSampleCost] = React.useState(10);
+    const customerPrice = sampleCost * (1 + (markupPct || 0) / 100);
+
+    return (
+        <div className="bg-white border border-slate-200 rounded-2xl p-5">
+            <div className="flex items-center justify-between mb-4">
+                <div>
+                    <p className="text-[14px] font-black text-slate-900">{label}</p>
+                    <p className="text-[11px] text-slate-500 mt-0.5">{sub}</p>
+                </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {/* Sample cost — local sandbox */}
+                <div>
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">
+                        Sample supplier cost
+                    </label>
+                    <div className="relative">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] font-bold text-slate-400">€</span>
+                        <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={sampleCost}
+                            onChange={(e) => setSampleCost(Math.max(0, parseFloat(e.target.value || '0')))}
+                            className="h-11 w-full pl-8 pr-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-teal-500 font-mono"
+                        />
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">For preview only — not saved.</p>
+                </div>
+
+                {/* Markup % — the actual saved config */}
+                <div>
+                    <label className="text-[11px] font-black text-slate-500 uppercase tracking-widest mb-1.5 block">
+                        Markup
+                    </label>
+                    <div className="relative">
+                        <input
+                            type="number"
+                            step="0.1"
+                            value={markupPct}
+                            onChange={(e) => onMarkupChange(parseFloat(e.target.value || '0'))}
+                            className="h-11 w-full pl-3 pr-9 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-teal-500 font-mono"
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[13px] font-bold text-slate-400">%</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">Applied platform-wide on save.</p>
+                </div>
+
+                {/* Customer price — live preview, read-only */}
+                <div>
+                    <label className="text-[11px] font-black text-teal-600 uppercase tracking-widest mb-1.5 block">
+                        → Customer price
+                    </label>
+                    <div className="h-11 w-full px-4 bg-teal-50 border border-teal-200 rounded-xl text-sm font-black text-teal-700 outline-none flex items-center font-mono">
+                        € {customerPrice.toFixed(2)}
+                    </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                        Profit per unit: <strong className="text-emerald-600">€ {(customerPrice - sampleCost).toFixed(2)}</strong>
+                    </p>
+                </div>
+            </div>
         </div>
     );
 }

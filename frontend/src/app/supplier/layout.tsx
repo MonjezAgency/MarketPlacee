@@ -28,9 +28,29 @@ import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { apiFetch } from '@/lib/api';
+import { useLanguage } from '@/contexts/LanguageContext';
+import type { Locale } from '@/locales';
 import { formatPrice } from '@/lib/currency';
 import { GuidedTour } from '@/components/ui/GuidedTour';
 import NotificationBell from '@/components/ui/NotificationBell';
+
+// Languages available to suppliers — kept in sync with the public
+// Navbar list (LANGUAGES in components/layout/Navbar.tsx) so a
+// supplier sees the same options as a buyer.
+const SUPPLIER_LANGUAGES: { code: Locale; name: string; flag: string }[] = [
+    { code: 'en', name: 'English',     flag: '🇬🇧' },
+    { code: 'ar', name: 'العربية',     flag: '🇪🇬' },
+    { code: 'fr', name: 'Français',    flag: '🇫🇷' },
+    { code: 'ro', name: 'Română',      flag: '🇷🇴' },
+    { code: 'el', name: 'Ελληνικά',    flag: '🇬🇷' },
+    { code: 'it', name: 'Italiano',    flag: '🇮🇹' },
+    { code: 'es', name: 'Español',     flag: '🇪🇸' },
+    { code: 'de', name: 'Deutsch',     flag: '🇩🇪' },
+    { code: 'pt', name: 'Português',   flag: '🇵🇹' },
+    { code: 'nl', name: 'Nederlands',  flag: '🇳🇱' },
+    { code: 'pl', name: 'Polski',      flag: '🇵🇱' },
+    { code: 'tr', name: 'Türkçe',      flag: '🇹🇷' },
+];
 
 const SUPPLIER_LINKS = [
     { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
@@ -265,6 +285,12 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             <span className="text-[12px] font-semibold text-[#64748B]">Verified Supplier</span>
                         </div>
 
+                        {/* Language picker — supplier can switch to their
+                            language directly from the dashboard, matches
+                            the same dropdown style used in the public
+                            Navbar so it feels like one consistent app. */}
+                        <SupplierLanguagePicker />
+
                         {/* Theme Toggle */}
                         <button
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
@@ -348,6 +374,64 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                     setShowTour(false);
                 }} 
             />}
+        </div>
+    );
+}
+
+
+// ─── Supplier-side language picker ─────────────────────────────────────────
+
+function SupplierLanguagePicker() {
+    const { locale, setLocale } = useLanguage();
+    const [isOpen, setIsOpen] = React.useState(false);
+    const ref = React.useRef<HTMLDivElement>(null);
+    const current = SUPPLIER_LANGUAGES.find(l => l.code === locale) || SUPPLIER_LANGUAGES[0];
+
+    React.useEffect(() => {
+        const onClickOutside = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) setIsOpen(false);
+        };
+        document.addEventListener('mousedown', onClickOutside);
+        return () => document.removeEventListener('mousedown', onClickOutside);
+    }, []);
+
+    return (
+        <div ref={ref} className="relative">
+            <button
+                onClick={() => setIsOpen(o => !o)}
+                title="Change language"
+                className="h-10 px-3 rounded-full hover:bg-slate-50 flex items-center gap-2 text-[#475569] transition-all border border-transparent hover:border-[#E2E8F0]"
+            >
+                <span className="text-base">{current.flag}</span>
+                <span className="text-[12px] font-bold uppercase tracking-wider">{current.code}</span>
+            </button>
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 4 }}
+                        className="absolute right-0 top-full mt-2 bg-white border border-[#E2E8F0] rounded-xl shadow-2xl p-2 min-w-[200px] z-[110] max-h-[320px] overflow-y-auto"
+                    >
+                        {SUPPLIER_LANGUAGES.map(l => (
+                            <button
+                                key={l.code}
+                                onClick={() => { setLocale(l.code); setIsOpen(false); }}
+                                className={cn(
+                                    'w-full flex items-center justify-between px-3 py-2 text-[13px] font-semibold rounded-lg transition-colors',
+                                    locale === l.code ? 'bg-[#0EA5A4]/10 text-[#0EA5A4]' : 'text-[#475569] hover:bg-slate-50',
+                                )}
+                            >
+                                <span className="flex items-center gap-2">
+                                    <span>{l.flag}</span>
+                                    {l.name}
+                                </span>
+                                {locale === l.code && <span className="w-1.5 h-1.5 rounded-full bg-[#0EA5A4]" />}
+                            </button>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
