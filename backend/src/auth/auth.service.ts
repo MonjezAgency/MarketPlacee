@@ -191,26 +191,34 @@ export class AuthService {
 
         try {
             this.logger.log(`[AUTH] Attempting database creation for ${trimmedEmail} with status ${status}`);
+            // Defensive: any optional column with a Prisma @unique
+            // constraint MUST come in as `null` (not `""`) when the
+            // user left it blank — a second empty-string row would
+            // collide on the unique index. Normalise here so that
+            // even if a future caller forgets the frontend defensiveness
+            // the DB stays clean.
+            const blankToNull = (s: any) =>
+                typeof s === 'string' ? (s.trim() ? s.trim() : null) : (s ?? null);
             const user = await this.prisma.user.create({
                 data: {
                     email: trimmedEmail,
                     password: hashedPassword,
                     name: data.name,
-                    phone: data.phone,
-                    companyName: data.companyName,
-                    website: data.website,
-                    socialLinks: data.socialLinks,
-                    vatNumber: data.vatNumber,
-                    taxId: data.taxId ? this.cryptoService.encrypt(data.taxId) : null,
+                    phone: blankToNull(data.phone),
+                    companyName: blankToNull(data.companyName),
+                    website: blankToNull(data.website),
+                    socialLinks: blankToNull(data.socialLinks),
+                    vatNumber: blankToNull(data.vatNumber),
+                    taxId: blankToNull(data.taxId) ? this.cryptoService.encrypt(data.taxId) : null,
                     country: data.country,
-                    bankAddress: data.bankAddress,
-                    iban: data.iban ? this.cryptoService.encrypt(data.iban) : null,
-                    swiftCode: data.swiftCode ? this.cryptoService.encrypt(data.swiftCode) : null,
+                    bankAddress: blankToNull(data.bankAddress),
+                    iban: blankToNull(data.iban) ? this.cryptoService.encrypt(data.iban) : null,
+                    swiftCode: blankToNull(data.swiftCode) ? this.cryptoService.encrypt(data.swiftCode) : null,
                     role: data.role.toUpperCase(),
                     status,
                     verificationToken: null,
                     emailVerified: true,
-                    onboardingCompleted: true, 
+                    onboardingCompleted: true,
                 },
             });
 

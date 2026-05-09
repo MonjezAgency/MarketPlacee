@@ -140,12 +140,19 @@ function RegisterForm() {
                 password: form.password,
                 role: form.role,
                 inviteToken: inviteToken || undefined,
-                vatNumber: form.vatNumber,
-                taxId: form.taxId,
+                // Optional fields — send `undefined` (not "") when the
+                // user left them blank. Prisma has a `@unique` constraint
+                // on vatNumber / taxId / iban / swiftCode and treats two
+                // separate empty strings as a duplicate, so sending ""
+                // for a blank VAT triggered "Unique constraint failed
+                // on the fields: (vatNumber)" the second time anyone
+                // registered without a VAT.
+                vatNumber: form.vatNumber?.trim() || undefined,
+                taxId: form.taxId?.trim() || undefined,
                 country: form.country,
-                bankAddress: form.role === 'supplier' ? form.bankAddress : undefined,
-                iban: form.iban,
-                swiftCode: form.swiftCode,
+                bankAddress: form.role === 'supplier' ? (form.bankAddress?.trim() || undefined) : undefined,
+                iban: form.iban?.trim() || undefined,
+                swiftCode: form.swiftCode?.trim() || undefined,
                 locale,
             });
 
