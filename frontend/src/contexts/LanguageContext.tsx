@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translations, Locale } from '../locales';
+import { setAutoTranslateLocale } from '../lib/auto-translate';
 
 interface LanguageContextType {
     locale: Locale;
@@ -17,9 +18,17 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         const saved = localStorage.getItem('app-locale') as Locale;
-        if (saved && translations[saved]) {
-            setLocaleState(saved);
-        }
+        const initial = saved && translations[saved] ? saved : 'en';
+        if (initial !== locale) setLocaleState(initial);
+        // Fire the runtime auto-translator on initial mount so any
+        // hardcoded English on the marketing pages is converted to
+        // the user's saved locale immediately, without waiting for
+        // them to re-pick the language.
+        document.documentElement.dir = initial === 'ar' ? 'rtl' : 'ltr';
+        document.documentElement.lang = initial;
+        // Defer to next tick so React has a chance to mount the page.
+        setTimeout(() => setAutoTranslateLocale(initial), 0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const setLocale = (newLocale: Locale) => {
@@ -27,6 +36,10 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem('app-locale', newLocale);
         document.documentElement.dir = newLocale === 'ar' ? 'rtl' : 'ltr';
         document.documentElement.lang = newLocale;
+        // Trigger the DOM-walking translator. It will swap every
+        // visible English string into the new locale (or restore
+        // English if the user picked en).
+        setAutoTranslateLocale(newLocale);
     };
 
     const t = (section: keyof typeof translations['en'], key?: string) => {

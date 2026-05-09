@@ -37,17 +37,23 @@ import { useCart } from '@/lib/cart';
 import NotificationBell from '@/components/ui/NotificationBell';
 import { useRouter } from 'next/navigation';
 
+// Codes match locales/index.ts keys AND the auto-translate
+// LANGUAGE_NAMES map on the backend. Adding a new entry here is
+// enough to make a new language fully usable — the runtime
+// translator handles every string on every page.
 const LANGUAGES = [
-    { code: 'en', name: 'English', flag: '🇺🇸' },
+    { code: 'en', name: 'English', flag: '🇬🇧' },
     { code: 'ar', name: 'العربية', flag: '🇪🇬' },
     { code: 'fr', name: 'Français', flag: '🇫🇷' },
+    { code: 'ro', name: 'Română', flag: '🇷🇴' },
+    { code: 'el', name: 'Ελληνικά', flag: '🇬🇷' },
+    { code: 'it', name: 'Italiano', flag: '🇮🇹' },
     { code: 'es', name: 'Español', flag: '🇪🇸' },
     { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
+    { code: 'pt', name: 'Português', flag: '🇵🇹' },
+    { code: 'nl', name: 'Nederlands', flag: '🇳🇱' },
+    { code: 'pl', name: 'Polski', flag: '🇵🇱' },
     { code: 'tr', name: 'Türkçe', flag: '🇹🇷' },
-    { code: 'ru', name: 'Русский', flag: '🇷🇺' },
-    { code: 'cn', name: '中文', flag: '🇨🇳' },
-    { code: 'jp', name: '日本語', flag: '🇯🇵' },
-    { code: 'it', name: 'Italiano', flag: '🇮🇹' }
 ];
 
 const CURRENCIES = [

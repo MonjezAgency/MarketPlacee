@@ -35,6 +35,7 @@ import { StorageModule } from './storage/storage.module';
 import { AiAgentModule } from './ai-agent/ai-agent.module';
 import { NewsletterModule } from './newsletter/newsletter.module';
 import { EmailModule } from './email/email.module';
+import { I18nModule } from './i18n/i18n.module';
 
 @Module({
     imports: [
@@ -69,6 +70,7 @@ import { EmailModule } from './email/email.module';
         AiAgentModule,
         NewsletterModule,
         EmailModule,
+        I18nModule,
     ],
     controllers: [AppController],
     providers: [
