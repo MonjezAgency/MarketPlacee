@@ -60,7 +60,7 @@ interface AdminOffer {
         unitsPerCase?: number; casesPerPallet?: number;
         origin?: string; shelfLife?: string; weight?: string;
     };
-    supplier?: { id: string; name: string; email: string; companyName?: string };
+    supplier?: { id: string; name: string; email: string; companyName?: string; role?: string };
 }
 
 const asArray = (raw: any): any[] => {
@@ -74,9 +74,22 @@ export default function AdminWholesaleOffersPage() {
     const [offers, setOffers] = React.useState<AdminOffer[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [statusFilter, setStatusFilter] = React.useState<Status | 'ALL'>('PENDING');
+    /** Source split — admin's own offers vs supplier-submitted. */
+    const [sourceTab, setSourceTab] = React.useState<'Atlantis Offers' | 'Supplier Submissions'>('Supplier Submissions');
     const [busyId, setBusyId] = React.useState<string | null>(null);
     const [rejectingId, setRejectingId] = React.useState<string | null>(null);
     const [rejectReason, setRejectReason] = React.useState('');
+
+    // Admin offer = the offer was posted by an admin/owner/staff
+    // user (e.g. the operator backfilling on behalf of a supplier);
+    // everything else is a real supplier submission.
+    const STAFF_ROLES = new Set(['ADMIN', 'OWNER', 'MODERATOR', 'EDITOR', 'DEVELOPER', 'LOGISTICS', 'SUPPORT']);
+    const isAdminOffer = (o: AdminOffer) => {
+        const role = (o.supplier?.role || '').toUpperCase();
+        if (STAFF_ROLES.has(role)) return true;
+        if ((o.supplier?.email || '').toLowerCase() === 'info@atlantisfmcg.com') return true;
+        return false;
+    };
 
     const fetchAll = React.useCallback(async () => {
         setIsLoading(true);
@@ -91,11 +104,22 @@ export default function AdminWholesaleOffersPage() {
 
     React.useEffect(() => { fetchAll(); }, [fetchAll]);
 
+    // Apply the source filter first; status counts + the rendered
+    // list are then scoped to that source.
+    const sourceFilteredOffers = React.useMemo(
+        () => offers.filter(o => sourceTab === 'Atlantis Offers' ? isAdminOffer(o) : !isAdminOffer(o)),
+        [offers, sourceTab],
+    );
+
     const counts = React.useMemo(() => {
         const c: Record<string, number> = { PENDING: 0, APPROVED: 0, REJECTED: 0, EXPIRED: 0 };
-        offers.forEach(o => { c[o.status] = (c[o.status] || 0) + 1; });
+        sourceFilteredOffers.forEach(o => { c[o.status] = (c[o.status] || 0) + 1; });
         return c;
-    }, [offers]);
+    }, [sourceFilteredOffers]);
+
+    const adminOfferCount    = offers.filter(isAdminOffer).length;
+    const supplierOfferCount = offers.filter(o => !isAdminOffer(o)).length;
+    const supplierPendingOffersCount = offers.filter(o => !isAdminOffer(o) && o.status === 'PENDING').length;
 
     const handleApprove = async (id: string) => {
         setBusyId(id);
@@ -152,6 +176,35 @@ export default function AdminWholesaleOffersPage() {
                 <p className="text-[13px] text-slate-500 mt-1 max-w-xl">Suppliers post wholesale offers on existing platform products. When you approve, the offer is emailed to every active client + newsletter subscriber.</p>
             </div>
 
+            {/* Source tabs — Atlantis vs Supplier */}
+            <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 w-fit">
+                <button
+                    onClick={() => setSourceTab('Atlantis Offers')}
+                    className={cn(
+                        'h-10 px-5 rounded-lg text-[12px] font-black uppercase tracking-widest flex items-center gap-2',
+                        sourceTab === 'Atlantis Offers' ? 'bg-white shadow-sm text-[#0F172A]' : 'text-slate-500 hover:text-slate-700',
+                    )}
+                >
+                    🏛 Atlantis Offers
+                    <span className="text-[10px] tabular-nums opacity-70">{adminOfferCount}</span>
+                </button>
+                <button
+                    onClick={() => setSourceTab('Supplier Submissions')}
+                    className={cn(
+                        'h-10 px-5 rounded-lg text-[12px] font-black uppercase tracking-widest flex items-center gap-2',
+                        sourceTab === 'Supplier Submissions' ? 'bg-white shadow-sm text-[#0F172A]' : 'text-slate-500 hover:text-slate-700',
+                    )}
+                >
+                    🚚 Supplier Submissions
+                    <span className="text-[10px] tabular-nums opacity-70">{supplierOfferCount}</span>
+                    {supplierPendingOffersCount > 0 && (
+                        <span className="text-[10px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
+                            {supplierPendingOffersCount} pending
+                        </span>
+                    )}
+                </button>
+            </div>
+
             {/* Status tabs */}
             <div className="flex items-center gap-1 bg-slate-100 rounded-xl p-1 w-fit">
                 {TABS.map(t => (
@@ -173,14 +226,14 @@ export default function AdminWholesaleOffersPage() {
 
             {isLoading ? (
                 <div className="py-16 flex justify-center"><Loader2 className="animate-spin text-[#2EC4B6]" size={28} /></div>
-            ) : offers.length === 0 ? (
+            ) : sourceFilteredOffers.length === 0 ? (
                 <div className="bg-white border border-slate-200 rounded-2xl py-16 text-center text-slate-400">
                     <Clock size={28} className="mx-auto mb-3 opacity-40" />
                     <p className="font-bold text-slate-500">No offers in this view</p>
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {offers.map(o => {
+                    {sourceFilteredOffers.map(o => {
                         // Per-offer batch values fall back to the linked
                         // product when the supplier didn't override them.
                         const offerImg  = o.offerImageUrl  || o.product?.images?.[0] || '';

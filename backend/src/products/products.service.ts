@@ -324,7 +324,7 @@ export class ProductsService {
                 where,
                 include: {
                     supplier: {
-                        select: { id: true, name: true, email: true, companyName: true }
+                        select: { id: true, name: true, email: true, companyName: true, role: true }
                     }
                 },
                 orderBy,

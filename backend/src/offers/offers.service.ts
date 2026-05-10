@@ -260,7 +260,7 @@ export class OffersService {
             orderBy: { createdAt: 'desc' },
             include: {
                 product:  { select: { id: true, name: true, brand: true, images: true, ean: true, exwLocation: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true } },
-                supplier: { select: { id: true, name: true, email: true, companyName: true } },
+                supplier: { select: { id: true, name: true, email: true, companyName: true, role: true } },
             },
         });
     }
@@ -270,7 +270,7 @@ export class OffersService {
             where: { id },
             include: {
                 product: true,
-                supplier: { select: { id: true, name: true, email: true, companyName: true } },
+                supplier: { select: { id: true, name: true, email: true, companyName: true, role: true } },
             },
         });
         if (!o) throw new NotFoundException('Offer not found');

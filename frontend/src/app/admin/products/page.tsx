@@ -35,6 +35,8 @@ interface Product {
         name: string;
         email: string;
         id: string;
+        role?: string;
+        companyName?: string;
     };
     createdAt: string;
     completeness?: number;       // Calculated field (0-100)
@@ -180,6 +182,13 @@ export default function ProductsModerationPage() {
     const [isLoading, setIsLoading] = React.useState(true);
     const [searchTerm, setSearchTerm] = React.useState('');
     const [activeTab, setActiveTab] = React.useState('All Products');
+    /**
+     * Source tab — splits the catalog into the admin's own
+     * uploads ("Atlantis Catalog") vs supplier submissions
+     * waiting for / already through approval ("Supplier
+     * Submissions"). Each side keeps its own status sub-tab.
+     */
+    const [sourceTab, setSourceTab] = React.useState<'Atlantis Catalog' | 'Supplier Submissions'>('Atlantis Catalog');
     const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(null);
     const [activePanelTab, setActivePanelTab] = React.useState('Product Info');
     const [rejectReason, setRejectReason] = React.useState('');
@@ -627,11 +636,30 @@ export default function ProductsModerationPage() {
         }
     };
 
-    // Filters
-    const filteredProducts = products.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    // Source split — admin-uploaded vs supplier-submitted.
+    // A product counts as "Atlantis Catalog" when its uploader has
+    // a staff role (ADMIN / OWNER / MODERATOR / EDITOR / DEVELOPER /
+    // LOGISTICS / SUPPORT). Anything else is a supplier submission.
+    const STAFF_ROLES = new Set(['ADMIN', 'OWNER', 'MODERATOR', 'EDITOR', 'DEVELOPER', 'LOGISTICS', 'SUPPORT']);
+    const isAdminProduct = (p: Product) => {
+        const role = (p.supplier?.role || '').toUpperCase();
+        if (STAFF_ROLES.has(role)) return true;
+        // Legacy fallback for older rows where role wasn't selected
+        if ((p.supplier?.email || '').toLowerCase() === 'info@atlantisfmcg.com') return true;
+        return false;
+    };
+
+    // Top-level source tab + nested status tab.
+    // sourceTab: 'Atlantis Catalog' (admin's own) or 'Supplier Submissions'
+    // activeTab: existing All / Pending / Approved / Rejected within that scope
+    const sourceFilteredProducts = products.filter(p =>
+        sourceTab === 'Atlantis Catalog' ? isAdminProduct(p) : !isAdminProduct(p),
+    );
+
+    const filteredProducts = sourceFilteredProducts.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                              p.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesTab = 
+        const matchesTab =
             activeTab === 'All Products' ? true :
             activeTab === 'Pending Review' ? p.status === 'PENDING' :
             activeTab === 'Approved' ? p.status === 'APPROVED' :
@@ -639,15 +667,24 @@ export default function ProductsModerationPage() {
         return matchesSearch && matchesTab;
     });
 
+    // Stats are computed against the CURRENT source tab so the KPI
+    // cards reflect what's on screen — switching from "Atlantis
+    // Catalog" to "Supplier Submissions" updates the totals.
     const stats = {
-        total: products.length,
-        pending: products.filter(p => p.status === 'PENDING').length,
-        approved: products.filter(p => p.status === 'APPROVED').length,
-        rejected: products.filter(p => p.status === 'REJECTED').length,
-        missing: products.filter(p => (p.completeness || 0) < 80).length
+        total: sourceFilteredProducts.length,
+        pending: sourceFilteredProducts.filter(p => p.status === 'PENDING').length,
+        approved: sourceFilteredProducts.filter(p => p.status === 'APPROVED').length,
+        rejected: sourceFilteredProducts.filter(p => p.status === 'REJECTED').length,
+        missing: sourceFilteredProducts.filter(p => (p.completeness || 0) < 80).length,
     };
 
     const tabs = ['All Products', 'Pending Review', 'Approved', 'Rejected'];
+
+    // Source-tab counts shown in the segmented pill (so admin can
+    // see at a glance how many supplier submissions are waiting).
+    const adminCount    = products.filter(isAdminProduct).length;
+    const supplierCount = products.filter(p => !isAdminProduct(p)).length;
+    const supplierPendingCount = products.filter(p => !isAdminProduct(p) && p.status === 'PENDING').length;
 
     return (
         <div className="space-y-8 pb-20 max-w-[1600px] mx-auto">
@@ -710,10 +747,40 @@ export default function ProductsModerationPage() {
 
             {/* 3. Main Content Area */}
             <div className="grid grid-cols-12 gap-8 px-6 h-full min-h-[600px]">
-                
+
                 {/* LEFT: 65% Table Area */}
                 <div className="col-span-12 space-y-6">
-                    {/* Tabs */}
+
+                    {/* Source tabs — Admin catalog vs Supplier submissions */}
+                    <div className="flex items-center gap-2 p-1 bg-slate-100 border border-slate-200 rounded-xl w-fit">
+                        <button
+                            onClick={() => setSourceTab('Atlantis Catalog')}
+                            className={cn(
+                                'h-10 px-5 rounded-lg text-[12px] font-black uppercase tracking-widest flex items-center gap-2 transition-all',
+                                sourceTab === 'Atlantis Catalog' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700',
+                            )}
+                        >
+                            🏛 Atlantis Catalog
+                            <span className="text-[10px] tabular-nums opacity-70">{adminCount}</span>
+                        </button>
+                        <button
+                            onClick={() => setSourceTab('Supplier Submissions')}
+                            className={cn(
+                                'h-10 px-5 rounded-lg text-[12px] font-black uppercase tracking-widest flex items-center gap-2 transition-all',
+                                sourceTab === 'Supplier Submissions' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700',
+                            )}
+                        >
+                            🚚 Supplier Submissions
+                            <span className="text-[10px] tabular-nums opacity-70">{supplierCount}</span>
+                            {supplierPendingCount > 0 && (
+                                <span className="text-[10px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
+                                    {supplierPendingCount} pending
+                                </span>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Status tabs (within the chosen source) */}
                     <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-xl w-fit">
                         {tabs.map((tab) => (
                             <button
