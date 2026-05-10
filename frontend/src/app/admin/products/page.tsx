@@ -193,6 +193,10 @@ export default function ProductsModerationPage() {
     const [activePanelTab, setActivePanelTab] = React.useState('Product Info');
     const [rejectReason, setRejectReason] = React.useState('');
     const [showRejectInput, setShowRejectInput] = React.useState(false);
+    /** Admin → supplier comment thread on a submitted product. */
+    const [commentingProductId, setCommentingProductId] = React.useState<string | null>(null);
+    const [commentText, setCommentText] = React.useState('');
+    const [isSendingComment, setIsSendingComment] = React.useState(false);
     const panelScrollRef = React.useRef<HTMLDivElement>(null);
     
     // Bulk Selection
@@ -369,6 +373,42 @@ export default function ProductsModerationPage() {
             }
         } catch (err) {
             toast.error('Error during approval', { id: tid });
+        }
+    };
+
+    /**
+     * Admin sends a comment on a supplier product. Backend flips
+     * status to NEEDS_CHANGES, stores the message on adminNotes,
+     * fires an in-app + email notification to the supplier.
+     */
+    const handleSendComment = async () => {
+        if (!commentingProductId) return;
+        const message = commentText.trim();
+        if (!message) {
+            toast.error('Write the issue you want the supplier to fix.');
+            return;
+        }
+        setIsSendingComment(true);
+        const tid = toast.loading('Sending comment to supplier…');
+        try {
+            const res = await apiFetch(`/products/${commentingProductId}/comment`, {
+                method: 'PATCH',
+                body: JSON.stringify({ message }),
+            });
+            if (res.ok) {
+                toast.success('Comment sent — supplier will get an email + in-app notification.', { id: tid });
+                setCommentingProductId(null);
+                setCommentText('');
+                fetchData();
+                setSelectedProduct(null);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast.error(err?.message || 'Send failed', { id: tid });
+            }
+        } catch {
+            toast.error('Network error', { id: tid });
+        } finally {
+            setIsSendingComment(false);
         }
     };
 
@@ -1714,6 +1754,17 @@ export default function ProductsModerationPage() {
                                                         <CheckCircle2 size={14} /> Approve
                                                     </button>
                                                 )}
+                                                {/* Comment — only on supplier-submitted products that
+                                                    are NOT already APPROVED. Sends a message to the
+                                                    supplier and flips status to NEEDS_CHANGES. */}
+                                                {selectedProduct.status !== 'APPROVED' && !isAdminProduct(selectedProduct) && (
+                                                    <button
+                                                        onClick={() => { setCommentingProductId(selectedProduct.id); setCommentText(''); }}
+                                                        className="h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[13px] font-semibold shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center gap-2"
+                                                    >
+                                                        💬 Comment
+                                                    </button>
+                                                )}
                                                 {/* Already approved label */}
                                                 {selectedProduct.status === 'APPROVED' && (
                                                     <div className="h-12 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2">
@@ -2015,6 +2066,88 @@ export default function ProductsModerationPage() {
                         </motion.div>
                     </motion.div>
                 )}
+            </AnimatePresence>
+
+            {/* Admin → Supplier comment modal. Auto-fills the product
+                info (name + image + supplier name) so the admin only
+                has to type the issue + click Send. Backend flips
+                status to NEEDS_CHANGES + emails the supplier. */}
+            <AnimatePresence>
+                {commentingProductId && (() => {
+                    const target = products.find(p => p.id === commentingProductId);
+                    if (!target) return null;
+                    return (
+                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                            <motion.div
+                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                                onClick={() => setCommentingProductId(null)}
+                                className="absolute inset-0 bg-slate-900/80 backdrop-blur-md"
+                            />
+                            <motion.div
+                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                                animate={{ opacity: 1, scale: 1, y: 0 }}
+                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                                className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+                            >
+                                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Send a comment</p>
+                                        <h2 className="text-[18px] font-black text-slate-900">Ask the supplier to fix this product</h2>
+                                    </div>
+                                    <button onClick={() => setCommentingProductId(null)} className="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400">✕</button>
+                                </div>
+
+                                <div className="p-6 space-y-4">
+                                    {/* Auto-prefilled product summary */}
+                                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                                        {target.images?.[0] ? (
+                                            <img src={target.images[0]} alt={target.name} className="w-14 h-14 rounded-lg object-cover bg-white border border-slate-200" />
+                                        ) : (
+                                            <div className="w-14 h-14 rounded-lg bg-white border border-slate-200 flex items-center justify-center"><Package size={18} className="text-slate-400" /></div>
+                                        )}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-[13px] font-black text-slate-900 truncate">{target.name}</p>
+                                            <p className="text-[11px] text-slate-500 truncate">
+                                                Owner: <strong className="text-slate-700">{target.supplier?.companyName || target.supplier?.name || target.supplier?.email || '—'}</strong>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[12px] text-amber-800 leading-relaxed">
+                                        This message will be sent to the supplier as an in-app notification + email. The product status flips to <strong>NEEDS_CHANGES</strong>; the supplier sees a yellow callout, fixes the row, then clicks <strong>Resend for Review</strong>.
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">What needs to change?</label>
+                                        <textarea
+                                            value={commentText}
+                                            onChange={e => setCommentText(e.target.value)}
+                                            placeholder="e.g. The product photo is blurry — please re-upload a clear front-facing image at minimum 800×800. Also the EAN field is missing."
+                                            rows={5}
+                                            className="w-full p-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] outline-none focus:bg-white focus:border-amber-500 resize-y"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2">
+                                    <button
+                                        onClick={() => setCommentingProductId(null)}
+                                        className="h-11 px-5 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold text-[12px] uppercase tracking-widest"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        onClick={handleSendComment}
+                                        disabled={isSendingComment || !commentText.trim()}
+                                        className="h-11 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-[12px] uppercase tracking-widest flex items-center gap-2 disabled:opacity-50"
+                                    >
+                                        {isSendingComment ? '...' : '💬'} Send Comment
+                                    </button>
+                                </div>
+                            </motion.div>
+                        </div>
+                    );
+                })()}
             </AnimatePresence>
         </div>
     );

@@ -40,9 +40,10 @@ enum KYCStatus {
 }
 
 enum ProductStatus {
-  PENDING
-  APPROVED
-  REJECTED
+  PENDING        // submitted, awaiting admin review
+  APPROVED       // admin approved, live on the catalog
+  REJECTED       // admin rejected — supplier blocked from re-submitting
+  NEEDS_CHANGES  // admin sent a comment; supplier must fix and resend
 }
 
 enum PlacementType {

@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException, Logger } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
@@ -7,15 +7,17 @@ import { translateProduct } from '../common/translator';
 
 import { AiAgentService } from '../ai-agent/ai-agent.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { EmailService } from '../email/email.service';
 
 @Injectable()
 export class ProductsService {
     private readonly logger = new Logger(ProductsService.name);
     constructor(
-        private prisma: PrismaService, 
+        private prisma: PrismaService,
         private eanService: EanService,
         private aiAgent: AiAgentService,
         private notificationsService: NotificationsService,
+        private emailService: EmailService,
     ) { }
 
     private extractCategoryFromName(name: string, currentCategory?: string): string {
@@ -393,6 +395,120 @@ export class ProductsService {
             delta: p.price - (p.previousPrice ?? p.price),
             changedAt: p.priceChangedAt,
         }));
+    }
+
+    /**
+     * Required-fields gate. Supplier products MUST have every one of
+     * these populated before the row reaches admin review (operator
+     * decision). Description is the only free pass.
+     *
+     * Returns the list of missing field labels — empty array means
+     * the row is good to submit.
+     */
+    private requiredSupplierFieldsMissing(p: any): string[] {
+        const miss: string[] = [];
+        if (!p.name || String(p.name).trim().length < 2)            miss.push('Name');
+        if (!p.price || Number(p.price) <= 0)                       miss.push('Price');
+        if (p.stock == null || Number(p.stock) <= 0)                miss.push('Stock');
+        if (!p.category || String(p.category).trim() === '')        miss.push('Category');
+        if (!p.brand || String(p.brand).trim() === '')              miss.push('Brand');
+        if (!p.ean || String(p.ean).trim() === '')                  miss.push('EAN');
+        if (!p.weight || String(p.weight).trim() === '')            miss.push('Weight');
+        if (!p.origin || String(p.origin).trim() === '')            miss.push('Country of Origin');
+        if (!p.exwLocation || String(p.exwLocation).trim() === '')  miss.push('EXW location');
+        if (!p.shelfLife || String(p.shelfLife).trim() === '')      miss.push('BBD / Shelf life');
+        if (!p.unitsPerCase || Number(p.unitsPerCase) <= 0)         miss.push('Units per case');
+        if (!p.casesPerPallet || Number(p.casesPerPallet) <= 0)     miss.push('Cases per pallet');
+        if (!p.palletsPerShipment || Number(p.palletsPerShipment) <= 0) miss.push('Pallets per truck');
+        if (!p.moq || Number(p.moq) <= 0)                           miss.push('MOQ');
+        if (!Array.isArray(p.images) || p.images.length === 0)      miss.push('At least one product image');
+        // Description is intentionally OPTIONAL per operator decision.
+        return miss;
+    }
+
+    /**
+     * Admin sends a comment on a supplier product → status flips
+     * to NEEDS_CHANGES, supplier gets notified, the message is
+     * stored on adminNotes for the supplier UI to display.
+     */
+    async adminComment(productId: string, message: string) {
+        const text = (message || '').trim();
+        if (!text) throw new BadRequestException('Comment message is required.');
+        const product = await this.prisma.product.findUnique({
+            where: { id: productId },
+            include: { supplier: { select: { id: true, email: true, name: true, role: true } } },
+        });
+        if (!product) throw new NotFoundException('Product not found');
+
+        const updated = await this.prisma.product.update({
+            where: { id: productId },
+            data: {
+                status: ProductStatus.NEEDS_CHANGES,
+                adminNotes: text,
+            },
+        });
+
+        // Notify the supplier in-app + by email so they don't miss the comment.
+        if (product.supplierId) {
+            this.notificationsService.notifyUser(
+                product.supplierId,
+                'Atlantis sent you a comment on a product',
+                `Your product "${product.name}" needs changes before it can be approved.\n\nReason: ${text}\n\nFix the row in your inventory and click "Resend for Review".`,
+                'WARNING',
+                { productId: product.id, type: 'PRODUCT_NEEDS_CHANGES' },
+            ).catch(() => {});
+        }
+        if ((product as any).supplier?.email) {
+            this.emailService.sendMail(
+                (product as any).supplier.email,
+                `Atlantis · "${product.name}" needs changes`,
+                `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px;color:#0F172A;">
+                    <h2 style="margin:0 0 12px;">A change is needed on "${product.name}"</h2>
+                    <p style="color:#475569;line-height:1.6;">Hi ${(product as any).supplier.name || 'there'},</p>
+                    <p style="color:#475569;line-height:1.6;">Our team reviewed your product submission and left the following note:</p>
+                    <div style="border-left:4px solid #F59E0B;background:#FFFBEB;padding:16px 20px;margin:16px 0;border-radius:0 10px 10px 0;color:#0F172A;font-size:14px;line-height:1.6;">${text.replace(/\n/g, '<br/>')}</div>
+                    <p style="color:#475569;line-height:1.6;">Open your inventory, fix the row, then click <strong>Resend for Review</strong> to push it back to us.</p>
+                    <p style="color:#94A3B8;font-size:12px;margin-top:32px;">— The Atlantis team</p>
+                </div>`,
+            ).catch(() => {});
+        }
+
+        return updated;
+    }
+
+    /**
+     * Supplier resends a NEEDS_CHANGES product back for review.
+     * Re-runs the required-fields gate — supplier can't bypass
+     * by clicking Resend on a row that's still missing data.
+     */
+    async resendForReview(productId: string, requesterId: string, requesterRole: string) {
+        const product = await this.prisma.product.findUnique({ where: { id: productId } });
+        if (!product) throw new NotFoundException('Product not found');
+
+        const isStaff = ['ADMIN', 'OWNER', 'MODERATOR'].includes(requesterRole);
+        if (!isStaff && product.supplierId !== requesterId) {
+            throw new ForbiddenException('You can only resend your own products.');
+        }
+        const missing = this.requiredSupplierFieldsMissing(product);
+        if (missing.length > 0) {
+            throw new BadRequestException(
+                `Cannot resend yet — these fields are still missing: ${missing.join(', ')}.`,
+            );
+        }
+        const updated = await this.prisma.product.update({
+            where: { id: productId },
+            data: {
+                status: ProductStatus.PENDING,
+                adminNotes: null, // clear the prior comment so the next reviewer sees a fresh slate
+            },
+        });
+        this.notificationsService.notifyAdmins(
+            'Product resent for review',
+            `Supplier resubmitted "${product.name}" after addressing the requested changes.`,
+            'INFO',
+            { productId: product.id },
+        ).catch(() => {});
+        return updated;
     }
 
     async updateStatus(id: string, status: ProductStatus, adminNotes?: string) {

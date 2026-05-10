@@ -163,16 +163,43 @@ export class ProductsController {
 
     @Patch(':id/approve')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.ADMIN)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
     async approve(@Param('id') id: string) {
         return this.productsService.updateStatus(id, ProductStatus.APPROVED);
     }
 
     @Patch(':id/reject')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.ADMIN)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
     async reject(@Param('id') id: string) {
         return this.productsService.updateStatus(id, ProductStatus.REJECTED);
+    }
+
+    /**
+     * Admin sends a comment to the supplier on a submitted product
+     * ("photo blurry — re-upload", "EXW missing", etc). Flips the
+     * status to NEEDS_CHANGES and stores the message on adminNotes.
+     * The supplier sees a yellow callout on their /supplier/products
+     * row + an in-app notification + an email.
+     */
+    @Patch(':id/comment')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+    async comment(@Param('id') id: string, @Body() body: { message: string }) {
+        return this.productsService.adminComment(id, body?.message || '');
+    }
+
+    /**
+     * Supplier marks a NEEDS_CHANGES product as fixed and pushes
+     * it back into the admin review queue. The endpoint also
+     * re-runs the required-fields gate so a supplier can't bypass
+     * the validation by simply clicking Resend.
+     */
+    @Patch(':id/resend')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER)
+    async resend(@Param('id') id: string, @Request() req: any) {
+        return this.productsService.resendForReview(id, req.user.sub, (req.user.role || '').toUpperCase());
     }
 
     @Post()

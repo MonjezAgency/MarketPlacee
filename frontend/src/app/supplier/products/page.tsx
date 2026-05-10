@@ -260,10 +260,44 @@ export default function SupplierProductsPage() {
 
     const getStatusColor = (status: string | undefined) => {
         switch ((status || '').toUpperCase()) {
-            case 'ACTIVE': return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
-            case 'PENDING': return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
-            case 'REJECTED': return 'text-destructive bg-destructive/10 border-destructive/20';
+            case 'ACTIVE':
+            case 'APPROVED':       return 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20';
+            case 'PENDING':        return 'text-amber-500 bg-amber-500/10 border-amber-500/20';
+            case 'REJECTED':       return 'text-destructive bg-destructive/10 border-destructive/20';
+            case 'NEEDS_CHANGES':  return 'text-orange-600 bg-orange-50 border-orange-200';
             default: return 'text-muted-foreground bg-muted/10 border-border/50';
+        }
+    };
+
+    /**
+     * Supplier sees admin's comment on a NEEDS_CHANGES row, opens
+     * a popup to read the message, fixes the product (or not), and
+     * clicks "Resend for Review" to push it back to admin. The
+     * popup also surfaces the missing-fields list when the row
+     * still doesn't pass the required-fields gate.
+     */
+    const [openComment, setOpenComment] = React.useState<{ id: string; message: string; name: string } | null>(null);
+    const [isResending, setIsResending] = React.useState(false);
+
+    const handleResend = async (id: string) => {
+        setIsResending(true);
+        const tid = (await import('react-hot-toast')).toast.loading('Resending for review…');
+        try {
+            const res = await apiFetch(`/products/${id}/resend`, { method: 'PATCH' });
+            const data = await res.json().catch(() => ({}));
+            const { toast } = await import('react-hot-toast');
+            if (res.ok) {
+                toast.success('Resent — Atlantis will review it shortly.', { id: tid });
+                setOpenComment(null);
+                loadProducts();
+            } else {
+                toast.error(data?.message || 'Resend failed', { id: tid, duration: 8000 });
+            }
+        } catch {
+            const { toast } = await import('react-hot-toast');
+            toast.error('Network error', { id: tid });
+        } finally {
+            setIsResending(false);
         }
     };
 
@@ -491,12 +525,31 @@ export default function SupplierProductsPage() {
                                                     <span className="text-[10px] font-black uppercase tracking-widest text-primary/70">{product.category}</span>
                                                 </td>
                                                 <td className="px-6 py-5">
-                                                    <div className={cn(
-                                                        "inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-[10px] font-black",
-                                                        getStatusColor(product.status)
-                                                    )}>
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-current" />
-                                                        {product.status?.toUpperCase() || 'UNKNOWN'}
+                                                    <div className="flex flex-col gap-1.5">
+                                                        <div className={cn(
+                                                            "inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-[10px] font-black w-fit",
+                                                            getStatusColor(product.status)
+                                                        )}>
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                                                            {product.status?.toUpperCase() || 'UNKNOWN'}
+                                                        </div>
+                                                        {/* Admin sent a comment — surface it as a clickable pill so the
+                                                            supplier can read the message + Resend after fixing. */}
+                                                        {String(product.status).toUpperCase() === 'NEEDS_CHANGES' && (product as any).adminNotes && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setOpenComment({
+                                                                        id: product.id,
+                                                                        message: (product as any).adminNotes || '',
+                                                                        name: product.name,
+                                                                    });
+                                                                }}
+                                                                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 text-[10px] font-black w-fit"
+                                                            >
+                                                                💬 View comment
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="px-6 py-5">
@@ -826,6 +879,59 @@ export default function SupplierProductsPage() {
                 </AnimatePresence>,
                 document.body
             )}
+
+            {/* Admin comment popup — supplier reads the issue and
+                clicks Resend for Review after fixing. The Resend
+                endpoint re-runs the required-fields gate and will
+                refuse if the row is still incomplete. */}
+            <AnimatePresence>
+                {openComment && (
+                    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                        <motion.div
+                            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                            onClick={() => setOpenComment(null)}
+                            className="absolute inset-0 bg-slate-900/80 backdrop-blur-md"
+                        />
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                            className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
+                        >
+                            <div className="bg-amber-500 p-6 text-white">
+                                <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Atlantis comment</p>
+                                <h2 className="text-[18px] font-black mt-1">{openComment.name} needs changes</h2>
+                            </div>
+                            <div className="p-6 space-y-4">
+                                <p className="text-[12px] text-slate-500">
+                                    Atlantis reviewed your submission and asked for the following changes before approving:
+                                </p>
+                                <div className="border-l-4 border-amber-500 bg-amber-50 rounded-r-xl p-4 text-[14px] text-slate-800 leading-relaxed whitespace-pre-wrap">
+                                    {openComment.message}
+                                </div>
+                                <p className="text-[12px] text-slate-500">
+                                    Edit the product row below, fix the issue, then click <strong>Resend for Review</strong>.
+                                </p>
+                            </div>
+                            <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2">
+                                <button
+                                    onClick={() => setOpenComment(null)}
+                                    className="h-11 px-5 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold text-[12px] uppercase tracking-widest"
+                                >
+                                    Close
+                                </button>
+                                <button
+                                    onClick={() => handleResend(openComment.id)}
+                                    disabled={isResending}
+                                    className="h-11 px-6 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-[12px] uppercase tracking-widest flex items-center gap-2 disabled:opacity-50"
+                                >
+                                    {isResending ? '…' : '↻'} Resend for Review
+                                </button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }
