@@ -369,7 +369,17 @@ export class OffersService {
         const escape = (s: string) => String(s ?? '')
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        const img = (product.images && product.images[0]) || '';
+        // Per-offer batch values (filled by the supplier on the New
+        // Offer form) take priority over the product catalog values.
+        const img        = offer.offerImageUrl || (product.images && product.images[0]) || '';
+        const offerName  = offer.productNameSnap || product.name;
+        const ean        = offer.eanCode      || product.ean       || '';
+        const exw        = offer.exwLocation  || product.exwLocation || '';
+        const origin     = offer.origin       || product.origin    || '';
+        const bbd        = offer.bbd          || product.shelfLife || '';
+        const upc        = offer.unitsPerCase   || product.unitsPerCase;
+        const cpp        = offer.casesPerPallet || product.casesPerPallet;
+        const leadTime   = offer.leadTime || '';
         const supplierLabel = supplier?.companyName || supplier?.name || 'Atlantis';
         const valid = offer.validUntil
             ? `Valid until ${new Date(offer.validUntil).toLocaleDateString()}`
@@ -397,24 +407,29 @@ export class OffersService {
     <tr><td style="padding:36px 40px 8px;">
         <h1 style="color:#0F172A;font-size:26px;font-weight:900;margin:0 0 8px;">New Atlantis offer available</h1>
         <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 20px;">
-            ${escape(supplierLabel)} just published a new wholesale offer on <strong>${escape(product.name)}</strong>. Reply to this email or contact our team to lock the price.
+            ${escape(supplierLabel)} just published a new wholesale offer on <strong>${escape(offerName)}</strong>. Reply to this email or contact our team to lock the price.
         </p>
         <div style="border:1px solid #E2E8F0;border-radius:18px;overflow:hidden;margin:0 0 20px;">
             <div style="background:#0F172A;padding:14px 20px;color:#fff;font-size:11px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;">📦 &nbsp; Offer Details</div>
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                     <td style="padding:20px;width:60%;vertical-align:top;">
-                        <h3 style="color:#0F172A;font-size:18px;font-weight:900;margin:0 0 12px;">${escape(product.name)}</h3>
+                        <h3 style="color:#0F172A;font-size:18px;font-weight:900;margin:0 0 12px;">${escape(offerName)}</h3>
                         <table role="presentation" width="100%">
                             <tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Tier</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#2EC4B6;font-weight:800;">${tierLabel}</td></tr>
                             <tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Price / ${tierLabel.toLowerCase()}</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#2EC4B6;font-weight:800;">€ ${Number(offer.pricePerUnit).toFixed(2)}</td></tr>
                             <tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Available</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${offer.quantity} ${tierLabel.toLowerCase()}${offer.quantity === 1 ? '' : 's'}</td></tr>
-                            ${product.exwLocation ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">EXW</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${escape(product.exwLocation)}</td></tr>` : ''}
-                            ${product.ean ? `<tr><td style="padding:10px 0;font-size:13px;color:#0F172A;font-weight:700;">EAN</td><td style="padding:10px 0;text-align:right;color:#475569;font-weight:700;font-family:monospace;">${escape(product.ean)}</td></tr>` : ''}
+                            ${bbd ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">BBD</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${escape(bbd)}</td></tr>` : ''}
+                            ${upc ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Pcs / case</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${upc}</td></tr>` : ''}
+                            ${cpp ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Cases / pallet</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${cpp}</td></tr>` : ''}
+                            ${exw ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">EXW</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${escape(exw)}</td></tr>` : ''}
+                            ${origin ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Origin</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${escape(origin)}</td></tr>` : ''}
+                            ${leadTime ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Lead time</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${escape(leadTime)}</td></tr>` : ''}
+                            ${ean ? `<tr><td style="padding:10px 0;font-size:13px;color:#0F172A;font-weight:700;">EAN</td><td style="padding:10px 0;text-align:right;color:#475569;font-weight:700;font-family:monospace;">${escape(ean)}</td></tr>` : ''}
                         </table>
                     </td>
                     <td style="padding:20px;width:40%;text-align:center;vertical-align:top;">
-                        ${img ? `<img src="${escape(img)}" alt="${escape(product.name)}" style="max-width:100%;max-height:180px;display:inline-block;" />` : '<div style="background:#F1F5F9;border-radius:10px;padding:50px;color:#94A3B8;font-size:11px;">No image</div>'}
+                        ${img ? `<img src="${escape(img)}" alt="${escape(offerName)}" style="max-width:100%;max-height:180px;display:inline-block;" />` : '<div style="background:#F1F5F9;border-radius:10px;padding:50px;color:#94A3B8;font-size:11px;">No image</div>'}
                     </td>
                 </tr>
             </table>

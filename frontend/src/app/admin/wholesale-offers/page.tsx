@@ -40,9 +40,25 @@ interface AdminOffer {
     status: Status;
     adminNotes?: string | null;
     createdAt: string;
+
+    // Per-offer batch details (filled by the supplier on the New Offer
+    // form). Each field falls back to product.* in the UI when the
+    // supplier didn't override it.
+    productNameSnap?: string | null;
+    bbd?: string | null;
+    eanCode?: string | null;
+    unitsPerCase?: number | null;
+    casesPerPallet?: number | null;
+    exwLocation?: string | null;
+    leadTime?: string | null;
+    origin?: string | null;
+    offerImageUrl?: string | null;
+
     product?: {
         id: string; name: string; brand?: string; images?: string[];
         ean?: string; exwLocation?: string;
+        unitsPerCase?: number; casesPerPallet?: number;
+        origin?: string; shelfLife?: string; weight?: string;
     };
     supplier?: { id: string; name: string; email: string; companyName?: string };
 }
@@ -164,23 +180,43 @@ export default function AdminWholesaleOffersPage() {
                 </div>
             ) : (
                 <div className="space-y-4">
-                    {offers.map(o => (
+                    {offers.map(o => {
+                        // Per-offer batch values fall back to the linked
+                        // product when the supplier didn't override them.
+                        const offerImg  = o.offerImageUrl  || o.product?.images?.[0] || '';
+                        const offerName = o.productNameSnap || o.product?.name || '—';
+                        const ean       = o.eanCode        || o.product?.ean || '';
+                        const upc       = o.unitsPerCase   || o.product?.unitsPerCase;
+                        const cpp       = o.casesPerPallet || o.product?.casesPerPallet;
+                        const exw       = o.exwLocation    || o.product?.exwLocation || '';
+                        const origin    = o.origin         || o.product?.origin || '';
+                        const bbd       = o.bbd            || o.product?.shelfLife || '';
+                        return (
                         <div key={o.id} className="bg-white border border-slate-200 rounded-2xl p-5 grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
-                            {/* Product */}
+                            {/* Product + batch details */}
                             <div className="md:col-span-5 flex items-start gap-4">
-                                {o.product?.images?.[0] ? (
-                                    <img src={o.product.images[0]} alt={o.product.name} className="w-16 h-16 rounded-xl object-cover bg-slate-100" />
+                                {offerImg ? (
+                                    <img src={offerImg} alt={offerName} className="w-20 h-20 rounded-xl object-cover bg-slate-100 shrink-0" />
                                 ) : (
-                                    <div className="w-16 h-16 rounded-xl bg-slate-100 flex items-center justify-center"><Package size={22} className="text-slate-400" /></div>
+                                    <div className="w-20 h-20 rounded-xl bg-slate-100 flex items-center justify-center shrink-0"><Package size={22} className="text-slate-400" /></div>
                                 )}
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Product</p>
-                                    <h3 className="text-[15px] font-black text-[#0F172A] truncate">{o.product?.name || '—'}</h3>
-                                    <p className="text-[11px] text-slate-500 mt-0.5">
-                                        {o.product?.brand || ''}
-                                        {o.product?.ean ? ` · EAN ${o.product.ean}` : ''}
-                                        {o.product?.exwLocation ? ` · EXW ${o.product.exwLocation}` : ''}
-                                    </p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Product (this batch)</p>
+                                    <h3 className="text-[15px] font-black text-[#0F172A]">{offerName}</h3>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">{o.product?.brand || ''}</p>
+                                    <div className="grid grid-cols-2 gap-x-3 gap-y-1 mt-2 text-[11px]">
+                                        {bbd && <p><span className="text-slate-400">BBD:</span> <span className="font-bold text-slate-700">{bbd}</span></p>}
+                                        {ean && <p><span className="text-slate-400">EAN:</span> <span className="font-mono text-slate-700">{ean}</span></p>}
+                                        {upc !== null && upc !== undefined && upc > 0 && (
+                                            <p><span className="text-slate-400">Pcs/case:</span> <span className="font-bold text-slate-700">{upc}</span></p>
+                                        )}
+                                        {cpp !== null && cpp !== undefined && cpp > 0 && (
+                                            <p><span className="text-slate-400">Cases/pallet:</span> <span className="font-bold text-slate-700">{cpp}</span></p>
+                                        )}
+                                        {exw && <p className="col-span-2"><span className="text-slate-400">EXW:</span> <span className="font-bold text-slate-700">{exw}</span></p>}
+                                        {origin && <p className="col-span-2"><span className="text-slate-400">Origin:</span> <span className="font-bold text-slate-700">{origin}</span></p>}
+                                        {o.leadTime && <p className="col-span-2"><span className="text-slate-400">Lead time:</span> <span className="font-bold text-slate-700">{o.leadTime}</span></p>}
+                                    </div>
                                 </div>
                             </div>
 
@@ -267,7 +303,8 @@ export default function AdminWholesaleOffersPage() {
                                 </div>
                             )}
                         </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
