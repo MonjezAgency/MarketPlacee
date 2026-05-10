@@ -365,84 +365,237 @@ export class OffersService {
         return { total: recipients.length, successCount };
     }
 
+    /**
+     * Atlantis offer email — pixel-faithful reproduction of the
+     * KitKat sample the operator referenced. One email per offer
+     * (even rows from a 20-product bulk sheet upload). Image,
+     * product name, EXW, EAN, units-per-case and cases-per-pallet
+     * are pulled straight from the offer; falls back to the
+     * underlying product when the supplier didn't override.
+     *
+     * Layout (top→bottom, matches screenshot):
+     *   1. Brand header (navy gradient + curved divider, logo on
+     *      left, Info@ / www. on right).
+     *   2. Two-column intro: "Hello, …" copy on the left,
+     *      product photo on the right.
+     *   3. "Best regards, The Atlantis Team".
+     *   4. PRODUCT INFORMATION dark navy bar.
+     *   5. Card: bold product name + 4 icon-rows (Trade Terms,
+     *      EAN, Units per case, Cases per pallet) on the left,
+     *      "Verified Suppliers / Global Marketplace / Secure
+     *      Transactions" feature panel on the right.
+     *   6. "Interested in this product?" CTA strip with a dark
+     *      Contact Us button.
+     *   7. Dark footer: "Bridging Markets. Building Opportunities."
+     *      + social icon row.
+     */
     private renderOfferEmail(offer: any, product: any, supplier: any): string {
         const escape = (s: string) => String(s ?? '')
             .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-        // Per-offer batch values (filled by the supplier on the New
-        // Offer form) take priority over the product catalog values.
-        const img        = offer.offerImageUrl || (product.images && product.images[0]) || '';
-        const offerName  = offer.productNameSnap || product.name;
-        const ean        = offer.eanCode      || product.ean       || '';
-        const exw        = offer.exwLocation  || product.exwLocation || '';
-        const origin     = offer.origin       || product.origin    || '';
-        const bbd        = offer.bbd          || product.shelfLife || '';
-        const upc        = offer.unitsPerCase   || product.unitsPerCase;
-        const cpp        = offer.casesPerPallet || product.casesPerPallet;
-        const leadTime   = offer.leadTime || '';
-        const supplierLabel = supplier?.companyName || supplier?.name || 'Atlantis';
-        const valid = offer.validUntil
-            ? `Valid until ${new Date(offer.validUntil).toLocaleDateString()}`
-            : 'Subject to availability';
+
+        // offer.* takes priority — supplier may override per-batch.
+        const img       = offer.offerImageUrl || (product.images && product.images[0]) || '';
+        const offerName = offer.productNameSnap || product.name;
+        const ean       = offer.eanCode      || product.ean       || '';
+        const exw       = offer.exwLocation  || product.exwLocation || '';
+        const upc       = offer.unitsPerCase   || product.unitsPerCase;
+        const cpp       = offer.casesPerPallet || product.casesPerPallet;
+
         const tierLabel = offer.unit === 'truck' ? 'Truck' : offer.unit === 'pallet' ? 'Pallet' : 'Case';
+        const baseUrl = (process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '');
+        const logoUrl = `${baseUrl}/icon.png`;
+
+        const tradeTermsValue = exw ? `EXW ${exw}` : (offer.origin || product.origin || '—');
+
+        // Spec rows in the product card. Each row is icon (left
+        // teal pill) + label + value, exactly as the screenshot.
+        const specRow = (icon: string, label: string, value: string) => `
+            <tr>
+                <td style="padding:14px 0;border-bottom:1px solid #E2E8F0;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                            <td width="44" style="vertical-align:middle;">
+                                <div style="width:36px;height:36px;border-radius:50%;background:#2EC4B6;color:#ffffff;text-align:center;line-height:36px;font-size:16px;">${icon}</div>
+                            </td>
+                            <td style="vertical-align:middle;padding-left:14px;color:#0F172A;font-weight:800;font-size:14px;font-family:Inter,Arial,sans-serif;">${escape(label)}</td>
+                            <td style="vertical-align:middle;text-align:right;color:#2EC4B6;font-weight:800;font-size:14px;font-family:Inter,Arial,sans-serif;">${escape(value)}</td>
+                        </tr>
+                    </table>
+                </td>
+            </tr>
+        `;
 
         return `
 <!DOCTYPE html>
-<html><head><meta charset="utf-8"/></head>
-<body style="margin:0;padding:0;background:#F8FAFC;font-family:'Inter',Arial,sans-serif;">
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px;background:#F8FAFC;">
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>New offer · ${escape(offerName)}</title>
+</head>
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:Inter,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px;background:#F1F5F9;">
 <tr><td align="center">
-<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#fff;border-radius:24px;overflow:hidden;box-shadow:0 12px 32px rgba(15,23,42,0.06);">
-    <tr><td style="background:linear-gradient(135deg,#0B1F3A 0%,#0F172A 100%);padding:32px 40px;color:#fff;">
-        <table role="presentation" cellpadding="0" cellspacing="0"><tr>
-            <td style="vertical-align:middle;padding-right:12px;">
-                <img src="${(process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '')}/icon.png" alt="Atlantis" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:10px;background:#ffffff;padding:3px;box-sizing:border-box;" />
-            </td>
-            <td style="vertical-align:middle;">
-                <div style="font-weight:900;font-size:22px;letter-spacing:0.02em;line-height:1;">ATLANTIS <span style="color:#2EC4B6;">FMCG</span></div>
-                <div style="margin-top:6px;font-size:11px;letter-spacing:0.4em;color:#2EC4B6;text-transform:uppercase;font-weight:700;">New Offer</div>
-            </td>
-        </tr></table>
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:20px;overflow:hidden;box-shadow:0 12px 28px rgba(15,23,42,0.06);">
+
+    <!-- 1. BRAND HEADER (gradient navy + curved divider) -->
+    <tr><td style="background:#0B1F3A;padding:0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="padding:28px 36px 24px;vertical-align:middle;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td style="vertical-align:middle;padding-right:14px;">
+                                <img src="${logoUrl}" alt="Atlantis" width="46" height="46" style="display:block;width:46px;height:46px;border-radius:10px;background:#ffffff;padding:3px;box-sizing:border-box;" />
+                            </td>
+                            <td style="vertical-align:middle;">
+                                <div style="color:#ffffff;font-weight:900;font-size:26px;letter-spacing:0.04em;line-height:1;">ATLANTIS</div>
+                                <div style="color:#2EC4B6;font-weight:700;font-size:11px;letter-spacing:0.55em;margin-top:4px;line-height:1;">FMCG</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+                <td align="right" style="padding:28px 36px 24px;vertical-align:middle;color:#ffffff;font-size:13px;font-family:Inter,Arial,sans-serif;line-height:1.9;">
+                    <div>✉&nbsp;&nbsp;Info@atlantisfmcg.com</div>
+                    <div>🌐&nbsp;&nbsp;www.atlantisfmcg.com</div>
+                </td>
+            </tr>
+        </table>
+        <!-- Curved divider — teal swoosh under the navy header -->
+        <div style="height:18px;background:#2EC4B6;border-radius:0 0 50% 50% / 0 0 100% 100%;margin-bottom:-1px;"></div>
     </td></tr>
+
+    <!-- 2. INTRO + product photo (two columns) -->
     <tr><td style="padding:36px 40px 8px;">
-        <h1 style="color:#0F172A;font-size:26px;font-weight:900;margin:0 0 8px;">New Atlantis offer available</h1>
-        <p style="color:#475569;font-size:15px;line-height:1.6;margin:0 0 20px;">
-            ${escape(supplierLabel)} just published a new wholesale offer on <strong>${escape(offerName)}</strong>. Reply to this email or contact our team to lock the price.
-        </p>
-        <div style="border:1px solid #E2E8F0;border-radius:18px;overflow:hidden;margin:0 0 20px;">
-            <div style="background:#0F172A;padding:14px 20px;color:#fff;font-size:11px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;">📦 &nbsp; Offer Details</div>
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-                <tr>
-                    <td style="padding:20px;width:60%;vertical-align:top;">
-                        <h3 style="color:#0F172A;font-size:18px;font-weight:900;margin:0 0 12px;">${escape(offerName)}</h3>
-                        <table role="presentation" width="100%">
-                            <tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Tier</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#2EC4B6;font-weight:800;">${tierLabel}</td></tr>
-                            <tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Price / ${tierLabel.toLowerCase()}</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#2EC4B6;font-weight:800;">€ ${Number(offer.pricePerUnit).toFixed(2)}</td></tr>
-                            <tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Available</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${offer.quantity} ${tierLabel.toLowerCase()}${offer.quantity === 1 ? '' : 's'}</td></tr>
-                            ${bbd ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">BBD</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${escape(bbd)}</td></tr>` : ''}
-                            ${upc ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Pcs / case</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${upc}</td></tr>` : ''}
-                            ${cpp ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Cases / pallet</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${cpp}</td></tr>` : ''}
-                            ${exw ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">EXW</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${escape(exw)}</td></tr>` : ''}
-                            ${origin ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Origin</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${escape(origin)}</td></tr>` : ''}
-                            ${leadTime ? `<tr><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;font-size:13px;color:#0F172A;font-weight:700;">Lead time</td><td style="padding:10px 0;border-bottom:1px solid #E2E8F0;text-align:right;color:#0F172A;font-weight:800;">${escape(leadTime)}</td></tr>` : ''}
-                            ${ean ? `<tr><td style="padding:10px 0;font-size:13px;color:#0F172A;font-weight:700;">EAN</td><td style="padding:10px 0;text-align:right;color:#475569;font-weight:700;font-family:monospace;">${escape(ean)}</td></tr>` : ''}
-                        </table>
-                    </td>
-                    <td style="padding:20px;width:40%;text-align:center;vertical-align:top;">
-                        ${img ? `<img src="${escape(img)}" alt="${escape(offerName)}" style="max-width:100%;max-height:180px;display:inline-block;" />` : '<div style="background:#F1F5F9;border-radius:10px;padding:50px;color:#94A3B8;font-size:11px;">No image</div>'}
-                    </td>
-                </tr>
-            </table>
-        </div>
-        ${offer.notes ? `<div style="background:#F0FDFA;border-left:4px solid #2EC4B6;padding:12px 18px;margin:0 0 20px;color:#0F172A;font-size:13px;border-radius:0 8px 8px 0;font-style:italic;">${escape(offer.notes)}</div>` : ''}
-        <p style="color:#94A3B8;font-size:11px;margin:0 0 12px;font-style:italic;">${valid}</p>
-        <table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#0F172A;border-radius:14px;">
-            <a href="https://www.atlantisfmcg.com/contact" style="display:inline-block;padding:14px 32px;color:#fff;font-weight:800;font-size:14px;text-decoration:none;letter-spacing:0.02em;">Contact Atlantis</a>
-        </td></tr></table>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="vertical-align:top;width:60%;padding-right:20px;">
+                    <h1 style="color:#0F172A;font-size:30px;font-weight:900;margin:0 0 18px;">Hello,</h1>
+                    <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 14px;">
+                        Thank you for your interest in our products. Please find below an example of a product listing available on the <span style="color:#2EC4B6;font-weight:800;">Atlantis</span> marketplace.
+                    </p>
+                    <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 18px;">
+                        We connect buyers and verified sellers worldwide to make trade simple and reliable.
+                    </p>
+                    <p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">
+                        Best regards,<br/>
+                        The <span style="color:#2EC4B6;font-weight:800;">Atlantis</span> Team
+                    </p>
+                </td>
+                <td style="vertical-align:middle;width:40%;text-align:center;">
+                    ${img
+                        ? `<img src="${escape(img)}" alt="${escape(offerName)}" style="max-width:100%;max-height:220px;display:inline-block;" />`
+                        : '<div style="background:#F1F5F9;border-radius:14px;padding:60px 20px;color:#94A3B8;font-size:12px;">Product image</div>'}
+                </td>
+            </tr>
+        </table>
     </td></tr>
-    <tr><td style="background:#0F172A;padding:24px 40px;color:#94A3B8;font-size:12px;text-align:center;">
-        <div style="margin-bottom:6px;color:#fff;font-weight:900;">Bridging Markets. <span style="color:#2EC4B6;">Building Opportunities.</span></div>
-        <div style="opacity:0.6;">© ${new Date().getFullYear()} Atlantis FMCG · Offer ref ${escape(offer.id.slice(0, 8))}</div>
+
+    <!-- 3. PRODUCT INFORMATION card -->
+    <tr><td style="padding:28px 40px 24px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:24px;overflow:hidden;border:1px solid #E2E8F0;">
+            <!-- Dark navy bar with title + Atlantis micro-logo -->
+            <tr><td style="background:#0B1F3A;padding:18px 24px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="vertical-align:middle;color:#ffffff;font-size:13px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;">
+                            <span style="display:inline-block;width:26px;height:26px;border-radius:7px;background:#2EC4B6;color:#0B1F3A;text-align:center;line-height:26px;margin-right:10px;font-size:14px;vertical-align:middle;">📦</span>
+                            <span style="vertical-align:middle;">Product Information</span>
+                        </td>
+                        <td align="right" style="vertical-align:middle;color:#ffffff;font-size:11px;font-weight:900;letter-spacing:0.04em;border-left:1px solid rgba(255,255,255,0.15);padding-left:14px;">
+                            ATLANTIS <span style="color:#2EC4B6;font-size:9px;letter-spacing:0.4em;">FMCG</span>
+                        </td>
+                    </tr>
+                </table>
+            </td></tr>
+            <!-- Card body — two columns: spec table + feature panel -->
+            <tr><td style="background:#ffffff;padding:24px 24px 28px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="vertical-align:top;width:60%;padding-right:18px;">
+                            <h2 style="color:#0F172A;font-size:22px;font-weight:900;margin:0 0 16px;">${escape(offerName)}</h2>
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                ${specRow('📍', 'Trade Terms',     tradeTermsValue)}
+                                ${ean ? specRow('▏▏▎', 'EAN',       ean) : ''}
+                                ${upc ? specRow('📦', 'Units per case',  String(upc)) : ''}
+                                ${cpp ? specRow('🏗', 'Cases per pallet', String(cpp)) : ''}
+                            </table>
+                        </td>
+                        <td style="vertical-align:top;width:40%;padding-left:18px;border-left:1px solid #F1F5F9;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:18px;">
+                                <tr><td style="padding:18px;">
+                                    <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🛡 Verified Suppliers</p>
+                                    <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 14px;">All our sellers are verified for your peace of mind.</p>
+                                    <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🌐 Global Marketplace</p>
+                                    <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 14px;">Access a wide range of FMCG products from trusted sellers.</p>
+                                    <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🤝 Secure Transactions</p>
+                                    <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0;">Safe and transparent trading experience from inquiry to delivery.</p>
+                                </td></tr>
+                            </table>
+                        </td>
+                    </tr>
+                </table>
+            </td></tr>
+        </table>
+    </td></tr>
+
+    <!-- 4. CTA strip -->
+    <tr><td style="padding:0 40px 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F0FDFA;border:1px solid #99F6E4;border-radius:16px;">
+            <tr>
+                <td style="padding:18px 22px;vertical-align:middle;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td style="vertical-align:middle;padding-right:14px;">
+                                <div style="width:40px;height:40px;border-radius:50%;background:#2EC4B6;color:#ffffff;text-align:center;line-height:40px;font-size:18px;">✉</div>
+                            </td>
+                            <td style="vertical-align:middle;">
+                                <p style="color:#0F172A;font-size:14px;font-weight:900;margin:0 0 2px;">Interested in this product?</p>
+                                <p style="color:#64748B;font-size:11px;margin:0;">Contact us today for price, availability, and more information.</p>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+                <td align="right" style="padding:18px 22px;vertical-align:middle;">
+                    <a href="${baseUrl}/contact" style="display:inline-block;padding:14px 30px;background:#0B1F3A;color:#ffffff;text-decoration:none;border-radius:14px;font-weight:800;font-size:13px;letter-spacing:0.02em;">Contact Us</a>
+                </td>
+            </tr>
+        </table>
+    </td></tr>
+
+    <!-- 5. DARK FOOTER -->
+    <tr><td style="background:#0B1F3A;padding:24px 40px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="vertical-align:middle;color:#ffffff;font-size:14px;font-weight:900;line-height:1.5;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td style="vertical-align:middle;padding-right:12px;">
+                                <img src="${logoUrl}" alt="A" width="34" height="34" style="display:block;width:34px;height:34px;border-radius:8px;background:#ffffff;padding:2px;box-sizing:border-box;" />
+                            </td>
+                            <td style="vertical-align:middle;">
+                                <div>Bridging Markets.</div>
+                                <div>Building <span style="color:#2EC4B6;">Opportunities.</span></div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+                <td align="right" style="vertical-align:middle;">
+                    <a href="https://www.linkedin.com/company/atlantis-fmcg" style="display:inline-block;width:30px;height:30px;background:#2EC4B6;color:#0B1F3A;text-align:center;line-height:30px;border-radius:50%;text-decoration:none;font-weight:900;font-size:14px;margin-left:6px;">in</a>
+                    <a href="https://www.facebook.com/atlantisfmcg" style="display:inline-block;width:30px;height:30px;background:#2EC4B6;color:#0B1F3A;text-align:center;line-height:30px;border-radius:50%;text-decoration:none;font-weight:900;font-size:14px;margin-left:6px;">f</a>
+                    <a href="https://www.instagram.com/atlantisfmcg" style="display:inline-block;width:30px;height:30px;background:#2EC4B6;color:#0B1F3A;text-align:center;line-height:30px;border-radius:50%;text-decoration:none;font-weight:900;font-size:14px;margin-left:6px;">◎</a>
+                </td>
+            </tr>
+        </table>
+    </td></tr>
+
+    <!-- 6. Caption -->
+    <tr><td style="background:#0B1F3A;padding:0 40px 22px;text-align:center;color:#94A3B8;font-size:11px;">
+        <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:16px;">
+            This email is an example of a product listing on the Atlantis marketplace.<br/>
+            © ${new Date().getFullYear()} Atlantis FMCG. All rights reserved · Offer ref ${escape(String(offer.id).slice(0, 8))}
+        </div>
     </td></tr>
 </table>
 </td></tr></table>
