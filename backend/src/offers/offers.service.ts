@@ -13,6 +13,19 @@ interface OfferInput {
     quantity: number;
     validUntil?: string;
     notes?: string;
+
+    // Per-offer batch details (operator requirement). All required at
+    // form-submit time except notes/validUntil. Pre-filled from the
+    // picked product on the supplier UI but editable per offer.
+    productNameSnap?: string;
+    bbd?: string;
+    eanCode?: string;
+    unitsPerCase?: number;
+    casesPerPallet?: number;
+    exwLocation?: string;
+    leadTime?: string;
+    origin?: string;
+    offerImageUrl?: string;
 }
 
 @Injectable()
@@ -93,6 +106,48 @@ export class OffersService {
         if (!input.quantity || input.quantity <= 0) {
             throw new BadRequestException('quantity must be a positive integer');
         }
+
+        // Per-offer batch detail enforcement. Operator requirement:
+        // every New Offer must carry these fields. We pre-fill from
+        // the linked product wherever possible so the supplier sees
+        // a populated form, but they can override any value before
+        // submitting. Bulk-upload rows (which don't carry these
+        // fields yet) inherit the product's values automatically.
+        const required = (label: string, val: any) => {
+            if (val === undefined || val === null || String(val).trim() === '') {
+                throw new BadRequestException(`${label} is required for every offer.`);
+            }
+        };
+
+        const productNameSnap = input.productNameSnap?.trim() || product.name;
+        const bbd            = input.bbd?.trim()         || product.shelfLife || '';
+        const eanCode        = input.eanCode?.trim()     || product.ean || '';
+        const unitsPerCase   = input.unitsPerCase        || product.unitsPerCase || 0;
+        const casesPerPallet = input.casesPerPallet      || product.casesPerPallet || 0;
+        const exwLocation    = input.exwLocation?.trim() || (product as any).exwLocation || '';
+        const leadTime       = input.leadTime?.trim()    || '';
+        const origin         = input.origin?.trim()      || product.origin || '';
+        const offerImageUrl  = input.offerImageUrl?.trim() || product.images?.[0] || '';
+
+        // Skip strict enforcement when the call originated from the
+        // bulk-upload sheet (only price/qty/unit/name available there).
+        // Bulk rows use the product's defaults — supplier can edit
+        // each row from /supplier/wholesale-offers afterwards.
+        const isBulkSubmission = !input.productNameSnap && !input.bbd
+            && !input.eanCode && !input.exwLocation && !input.leadTime;
+
+        if (!isBulkSubmission) {
+            required('Product name',       productNameSnap);
+            required('BBD',                bbd);
+            required('EAN code',           eanCode);
+            required('Pcs per case',       unitsPerCase);
+            required('Cases per pallet',   casesPerPallet);
+            required('EXW location',       exwLocation);
+            required('Lead time',          leadTime);
+            required('Origin country',     origin);
+            required('Product picture',    offerImageUrl);
+        }
+
         return this.prisma.offer.create({
             data: {
                 supplierId,
@@ -102,6 +157,15 @@ export class OffersService {
                 quantity: Math.max(1, parseInt(String(input.quantity), 10)),
                 validUntil: input.validUntil ? new Date(input.validUntil) : null,
                 notes: input.notes || null,
+                productNameSnap,
+                bbd:            bbd || null,
+                eanCode:        eanCode || null,
+                unitsPerCase:   unitsPerCase || null,
+                casesPerPallet: casesPerPallet || null,
+                exwLocation:    exwLocation || null,
+                leadTime:       leadTime || null,
+                origin:         origin || null,
+                offerImageUrl:  offerImageUrl || null,
                 status: 'PENDING',
             },
             include: { product: true },

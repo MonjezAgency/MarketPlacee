@@ -725,6 +725,22 @@ model Offer {
   validUntil   DateTime?
   notes        String?
 
+  // ── Offer-specific batch details (operator requirement) ───────────────
+  // These are required at form-submit time. Pre-filled from the linked
+  // Product where applicable, but the supplier can override per offer
+  // (different batch BBD, different EXW location, batch-specific photo,
+  // etc). All optional in the DB so old rows don't break — required at
+  // the controller layer when status would flip to PENDING.
+  productNameSnap   String?   // "KitKat Chunky 40g" — full name as on the offer
+  bbd               String?   // batch best-before date / shelf-life (free text)
+  eanCode           String?
+  unitsPerCase      Int?
+  casesPerPallet    Int?
+  exwLocation       String?   // where this batch sits today
+  leadTime          String?   // how soon supplier can ship (e.g. "5 working days")
+  origin            String?   // country of origin for this batch
+  offerImageUrl     String?   // batch-specific photo of the product
+
   status       String   @default("PENDING") // PENDING | APPROVED | REJECTED | EXPIRED
   adminNotes   String?
   approvedAt   DateTime?

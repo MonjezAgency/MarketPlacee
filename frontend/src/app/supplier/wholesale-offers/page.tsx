@@ -83,6 +83,42 @@ export default function SupplierOffersPage() {
 
     React.useEffect(() => { fetchAll(); }, [fetchAll]);
 
+    const [pickedProductId, setPickedProductId] = React.useState('');
+    const [offerImageUrl, setOfferImageUrl] = React.useState('');
+    const [isUploadingOfferImg, setIsUploadingOfferImg] = React.useState(false);
+    const offerImgRef = React.useRef<HTMLInputElement | null>(null);
+
+    // When the supplier picks a product, prefill batch fields from
+    // its values so they only have to type the deltas (BBD, lead
+    // time, batch photo). Each input is still editable per offer.
+    const pickedProduct = React.useMemo(
+        () => products.find(p => p.id === pickedProductId),
+        [pickedProductId, products],
+    );
+
+    const handleOfferImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setIsUploadingOfferImg(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await apiFetch('/products/upload-image', { method: 'POST', body: fd });
+            if (res.ok) {
+                const data = await res.json();
+                setOfferImageUrl(data?.url || '');
+                toast.success('Image uploaded');
+            } else {
+                toast.error('Upload failed');
+            }
+        } catch {
+            toast.error('Network error');
+        } finally {
+            setIsUploadingOfferImg(false);
+            if (offerImgRef.current) offerImgRef.current.value = '';
+        }
+    };
+
     const handleManualAdd = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
@@ -93,15 +129,41 @@ export default function SupplierOffersPage() {
             quantity: parseInt(String(fd.get('quantity') || '0'), 10),
             validUntil: String(fd.get('validUntil') || '') || undefined,
             notes: String(fd.get('notes') || '') || undefined,
+            // Per-offer batch details (operator-required).
+            productNameSnap: String(fd.get('productNameSnap') || '').trim(),
+            bbd:             String(fd.get('bbd') || '').trim(),
+            eanCode:         String(fd.get('eanCode') || '').trim(),
+            unitsPerCase:    parseInt(String(fd.get('unitsPerCase') || '0'), 10) || undefined,
+            casesPerPallet:  parseInt(String(fd.get('casesPerPallet') || '0'), 10) || undefined,
+            exwLocation:     String(fd.get('exwLocation') || '').trim(),
+            leadTime:        String(fd.get('leadTime') || '').trim(),
+            origin:          String(fd.get('origin') || '').trim(),
+            offerImageUrl:   offerImageUrl || pickedProduct?.images?.[0] || '',
         };
         if (!payload.productId) return toast.error('Pick a product from the catalog');
         if (!(payload.pricePerUnit > 0)) return toast.error('Enter a valid price');
         if (!(payload.quantity > 0)) return toast.error('Enter a valid quantity');
+        // Frontend pre-validation — backend re-checks. Friendlier UX.
+        const missing: string[] = [];
+        if (!payload.productNameSnap) missing.push('Product name');
+        if (!payload.bbd) missing.push('BBD');
+        if (!payload.eanCode) missing.push('EAN code');
+        if (!payload.unitsPerCase) missing.push('Pcs per case');
+        if (!payload.casesPerPallet) missing.push('Cases per pallet');
+        if (!payload.exwLocation) missing.push('EXW location');
+        if (!payload.leadTime) missing.push('Lead time');
+        if (!payload.origin) missing.push('Origin');
+        if (!payload.offerImageUrl) missing.push('Product picture');
+        if (missing.length > 0) {
+            return toast.error(`Required: ${missing.join(', ')}`);
+        }
         try {
             const res = await apiFetch('/offers', { method: 'POST', body: JSON.stringify(payload) });
             if (res.ok) {
                 toast.success('Offer submitted — waiting for admin approval');
                 setIsAddOpen(false);
+                setPickedProductId('');
+                setOfferImageUrl('');
                 fetchAll();
             } else {
                 const err = await res.json().catch(() => ({}));
@@ -324,61 +386,172 @@ export default function SupplierOffersPage() {
                             initial={{ opacity: 0, scale: 0.95, y: 20 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                            className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl p-7 space-y-4"
+                            /* Modal taller now (9 fields) — max-h + scroll
+                               so the submit button stays reachable on every
+                               screen size. */
+                            className="relative w-full max-w-2xl max-h-[92vh] bg-white rounded-3xl shadow-2xl flex flex-col"
                         >
-                            <div className="flex items-center justify-between">
-                                <h2 className="text-[18px] font-black text-[#0F172A]">New offer</h2>
+                            <input ref={offerImgRef} type="file" accept="image/*" onChange={handleOfferImageUpload} className="hidden" />
+
+                            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-[18px] font-black text-[#0F172A]">New offer</h2>
+                                    <p className="text-[11px] text-slate-500">All fields are required for the admin review.</p>
+                                </div>
                                 <button type="button" onClick={() => setIsAddOpen(false)} className="p-1 hover:bg-slate-100 rounded"><X size={20} /></button>
                             </div>
 
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Product *</label>
-                                <select required name="productId" className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]">
-                                    <option value="">— Pick from your approved products —</option>
-                                    {products.map(p => (
-                                        <option key={p.id} value={p.id}>{p.name}{p.brand ? ` · ${p.brand}` : ''}</option>
-                                    ))}
-                                </select>
-                                <p className="text-[11px] text-slate-400">
-                                    {products.length === 0
-                                        ? 'You have no approved products yet. Upload a product from /supplier/products and wait for admin approval before posting offers.'
-                                        : 'You can only post offers on YOUR own products that Atlantis has already approved. Pending or rejected listings won\'t appear here.'}
-                                </p>
-                            </div>
-
-                            <div className="grid grid-cols-3 gap-3">
-                                <div className="space-y-1.5 col-span-1">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Tier *</label>
-                                    <select required name="unit" defaultValue="carton" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]">
-                                        <option value="truck">🚛 Truck</option>
-                                        <option value="pallet">📦 Pallet</option>
-                                        <option value="carton">🗃️ Case</option>
+                            <div className="p-6 space-y-5 overflow-y-auto flex-1">
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Product *</label>
+                                    <select
+                                        required
+                                        name="productId"
+                                        value={pickedProductId}
+                                        onChange={e => setPickedProductId(e.target.value)}
+                                        className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]"
+                                    >
+                                        <option value="">— Pick from your approved products —</option>
+                                        {products.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name}{p.brand ? ` · ${p.brand}` : ''}</option>
+                                        ))}
                                     </select>
+                                    <p className="text-[11px] text-slate-400">
+                                        {products.length === 0
+                                            ? 'You have no approved products yet. Upload a product from /supplier/products and wait for admin approval before posting offers.'
+                                            : 'Pre-fills batch fields below — you can override any of them per offer.'}
+                                    </p>
                                 </div>
-                                <div className="space-y-1.5 col-span-1">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Price / unit (€) *</label>
-                                    <input required name="pricePerUnit" type="number" step="0.01" min="0" placeholder="0.00" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6] font-mono" />
+
+                                {/* 1. Product name + weight (g/kg). Pre-filled from picked product. */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Product name (with weight, g/kg) *</label>
+                                    <input
+                                        required
+                                        name="productNameSnap"
+                                        type="text"
+                                        defaultValue={pickedProduct?.name ? `${pickedProduct.name}${pickedProduct.weight ? ` ${pickedProduct.weight}` : ''}` : ''}
+                                        key={`pname-${pickedProductId}`}
+                                        placeholder="e.g. KitKat Chunky 40g"
+                                        className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]"
+                                    />
                                 </div>
-                                <div className="space-y-1.5 col-span-1">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Quantity *</label>
-                                    <input required name="quantity" type="number" min="1" placeholder="0" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+
+                                {/* Tier / Price / Qty */}
+                                <div className="grid grid-cols-3 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Tier *</label>
+                                        <select required name="unit" defaultValue="carton" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]">
+                                            <option value="truck">🚛 Truck</option>
+                                            <option value="pallet">📦 Pallet</option>
+                                            <option value="carton">🗃️ Case</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Price / unit (€) *</label>
+                                        <input required name="pricePerUnit" type="number" step="0.01" min="0" placeholder="0.00" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6] font-mono" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Quantity *</label>
+                                        <input required name="quantity" type="number" min="1" placeholder="0" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                    </div>
+                                </div>
+
+                                {/* 2. BBD + 3. EAN code */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">BBD *</label>
+                                        <input required name="bbd" type="text" defaultValue={pickedProduct?.shelfLife || ''} key={`bbd-${pickedProductId}`} placeholder="e.g. 12/2026 or 18 months" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <p className="text-[10px] text-slate-400">Best-before date or shelf life of THIS batch.</p>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">EAN code *</label>
+                                        <input required name="eanCode" type="text" defaultValue={pickedProduct?.ean || ''} key={`ean-${pickedProductId}`} placeholder="e.g. 5449000000996" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-mono tracking-wider outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                    </div>
+                                </div>
+
+                                {/* 4. Pcs per case + 5. Cases per pallet */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Pcs per case *</label>
+                                        <input required name="unitsPerCase" type="number" min="1" defaultValue={pickedProduct?.unitsPerCase || ''} key={`upc-${pickedProductId}`} placeholder="e.g. 24" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Cases per pallet *</label>
+                                        <input required name="casesPerPallet" type="number" min="1" defaultValue={pickedProduct?.casesPerPallet || ''} key={`cpp-${pickedProductId}`} placeholder="e.g. 60" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                    </div>
+                                </div>
+
+                                {/* 6. EXW + 7. Lead time */}
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">EXW location *</label>
+                                        <input required name="exwLocation" type="text" defaultValue={pickedProduct?.exwLocation || ''} key={`exw-${pickedProductId}`} placeholder="e.g. Hamburg, Germany" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <p className="text-[10px] text-slate-400">Where this batch sits today.</p>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Lead time *</label>
+                                        <input required name="leadTime" type="text" placeholder="e.g. 5 working days" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <p className="text-[10px] text-slate-400">How soon you can ship after PO.</p>
+                                    </div>
+                                </div>
+
+                                {/* 8. Origin */}
+                                <div className="space-y-1.5">
+                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Origin (country) *</label>
+                                    <input required name="origin" type="text" defaultValue={pickedProduct?.origin || ''} key={`org-${pickedProductId}`} placeholder="e.g. Germany / EU / Turkey" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                </div>
+
+                                {/* 9. Picture of product */}
+                                <div className="space-y-2">
+                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Product picture *</label>
+                                    <div className="flex items-start gap-3">
+                                        <div className="w-24 h-24 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
+                                            {(offerImageUrl || pickedProduct?.images?.[0]) ? (
+                                                <img src={offerImageUrl || pickedProduct?.images?.[0]} alt="preview" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <Package size={28} className="text-slate-400" />
+                                            )}
+                                        </div>
+                                        <div className="flex-1 space-y-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => offerImgRef.current?.click()}
+                                                disabled={isUploadingOfferImg}
+                                                className="w-full h-10 rounded-lg border border-dashed border-slate-300 bg-slate-50 hover:bg-white hover:border-[#2EC4B6] text-[12px] font-bold text-slate-600 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                                            >
+                                                {isUploadingOfferImg ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+                                                {isUploadingOfferImg ? 'Uploading…' : 'Upload batch photo'}
+                                            </button>
+                                            <p className="text-[10px] text-slate-400">
+                                                {offerImageUrl
+                                                    ? '✅ New batch photo uploaded.'
+                                                    : pickedProduct?.images?.[0]
+                                                        ? 'Using the product\'s catalog photo. Click above to replace it with a batch-specific photo.'
+                                                        : 'Required — upload a clear photo of the actual product/batch.'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Optional fields */}
+                                <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Valid until <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                                        <input name="validUntil" type="date" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Notes <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                                        <input name="notes" type="text" placeholder="e.g. Mixed pallet OK" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1.5">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Valid until (optional)</label>
-                                    <input name="validUntil" type="date" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
-                                </div>
-                                <div className="space-y-1.5">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Notes (optional)</label>
-                                    <input name="notes" type="text" placeholder="e.g. Mixed pallet OK" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
-                                </div>
+                            <div className="p-5 border-t border-slate-100 bg-slate-50/50">
+                                <button type="submit" className="w-full h-12 bg-[#0F172A] hover:bg-[#2EC4B6] text-white rounded-xl font-black uppercase text-[13px] tracking-widest transition-all flex items-center justify-center gap-2">
+                                    <Plus size={16} /> Submit for review
+                                </button>
                             </div>
-
-                            <button type="submit" className="w-full h-12 bg-[#0F172A] hover:bg-[#2EC4B6] text-white rounded-xl font-black uppercase text-[13px] tracking-widest transition-all flex items-center justify-center gap-2">
-                                <Plus size={16} /> Submit for review
-                            </button>
                         </motion.form>
                     </div>
                 )}
