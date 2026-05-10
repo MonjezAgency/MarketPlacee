@@ -37,6 +37,7 @@ import { NewsletterModule } from './newsletter/newsletter.module';
 import { EmailModule } from './email/email.module';
 import { I18nModule } from './i18n/i18n.module';
 import { OffersModule } from './offers/offers.module';
+import { EmailTrackingModule } from './email-tracking/email-tracking.module';
 
 @Module({
     imports: [
@@ -73,6 +74,7 @@ import { OffersModule } from './offers/offers.module';
         EmailModule,
         I18nModule,
         OffersModule,
+        EmailTrackingModule,
     ],
     controllers: [AppController],
     providers: [

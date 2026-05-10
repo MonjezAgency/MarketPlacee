@@ -1,6 +1,7 @@
 import { Injectable, ConflictException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
+import { EmailTrackingService } from '../email-tracking/email-tracking.service';
 import * as XLSX from 'xlsx';
 
 @Injectable()
@@ -8,7 +9,8 @@ export class NewsletterService {
     private readonly logger = new Logger(NewsletterService.name);
     constructor(
         private prisma: PrismaService,
-        private emailService: EmailService
+        private emailService: EmailService,
+        private emailTracking: EmailTrackingService,
     ) {}
 
     async subscribe(email: string, source?: string, region?: string, name?: string) {
@@ -275,9 +277,26 @@ export class NewsletterService {
         // verifies their sending domain.
         let successCount = 0;
         const errors: Record<string, number> = {};
+        // We persist the campaign FIRST (in a placeholder pass below)
+        // so we have a campaignId to attach to each EmailEvent. The
+        // actual Campaign row is created after the loop too — to
+        // keep that working without a circular dependency we generate
+        // the id up front.
+        const placeholderCampaignId = (require('crypto') as typeof import('crypto')).randomUUID();
         for (const r of recipients) {
             try {
-                const result = await this.emailService.sendMailDetailed(r.email, subject, finalHtml);
+                // Per-recipient tracking id + open pixel + click rewrites.
+                const trackingId = await this.emailTracking.registerSentEmail({
+                    recipient: r.email,
+                    subject,
+                    campaignId: placeholderCampaignId,
+                });
+                const wrappedHtml = this.emailTracking.wrapLinks(finalHtml, trackingId);
+                const trackedHtml = wrappedHtml.replace(
+                    /<\/body>/i,
+                    `${this.emailTracking.trackingPixelHtml(trackingId)}</body>`,
+                );
+                const result = await this.emailService.sendMailDetailed(r.email, subject, trackedHtml);
                 if (result.success) {
                     successCount++;
                 } else if (result.error) {
@@ -297,6 +316,7 @@ export class NewsletterService {
 
         const campaign = await this.prisma.campaign.create({
             data: {
+                id: placeholderCampaignId,
                 subject,
                 html: finalHtml,
                 audience,

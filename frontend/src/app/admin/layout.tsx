@@ -96,6 +96,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         icon: Megaphone,
         links: [
             { label: 'Newsletter Hub', translationKey: 'newsletter', href: '/admin/newsletter', icon: MessageCircle },
+            { label: 'Email Analytics', translationKey: 'emailAnalytics', href: '/admin/email-analytics', icon: Activity },
             { label: 'Coupons & Codes', translationKey: 'coupons', href: '/admin/coupons', icon: Ticket },
             { label: 'Ads & Placements', translationKey: 'ads', href: '/admin/placements', icon: Star },
         ]

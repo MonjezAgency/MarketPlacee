@@ -776,6 +776,42 @@ model Campaign {
   @@index([status])
 }
 
+/**
+ * Append-only email-tracking log. One row per email-related event:
+ *   SENT    — written when the platform fires an email (campaign,
+ *             offer blast, system transactional). Captures the
+ *             recipient + subject + a unique tracking id used by
+ *             the open / click pixels.
+ *   OPEN    — written when the recipient's mail client loads the
+ *             tracking pixel. Multiple per recipient is fine.
+ *   CLICK   — written when the recipient clicks a wrapped link.
+ *             linkUrl carries the destination they were heading to.
+ *
+ * The admin email-analytics page reads these rows back to compute
+ * sent / opened / clicked / open-rate / click-rate per campaign or
+ * per offer.
+ */
+model EmailEvent {
+  id          String   @id @default(uuid())
+  trackingId  String   @unique     // shared between SENT and the OPEN/CLICK rows that follow
+  type        String              // SENT | OPEN | CLICK | BOUNCE
+  recipient   String              // lowercased email
+  subject     String?
+  campaignId  String?             // when this email belongs to a /newsletter campaign
+  offerId     String?             // when this email is an approved-offer blast
+  linkUrl     String?             // populated for CLICK events
+  userAgent   String?
+  ip          String?
+  createdAt   DateTime @default(now())
+
+  @@index([trackingId])
+  @@index([campaignId])
+  @@index([offerId])
+  @@index([recipient])
+  @@index([type])
+  @@index([createdAt])
+}
+
 model NewsletterSubscriber {
   id        String   @id @default(uuid())
   email     String   @unique

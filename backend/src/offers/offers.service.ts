@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
+import { EmailTrackingService } from '../email-tracking/email-tracking.service';
 import * as XLSX from 'xlsx';
 
 interface OfferInput {
@@ -35,6 +36,7 @@ export class OffersService {
     constructor(
         private prisma: PrismaService,
         private emailService: EmailService,
+        private emailTracking: EmailTrackingService,
     ) {}
 
     /**
@@ -354,7 +356,20 @@ export class OffersService {
         let successCount = 0;
         for (const r of recipients) {
             try {
-                const ok = await this.emailService.sendMail(r.email, subject, html);
+                // Per-recipient tracking. Pixel + click rewrites are
+                // injected into the offer email exactly the same way
+                // the campaign sender does it.
+                const trackingId = await this.emailTracking.registerSentEmail({
+                    recipient: r.email,
+                    subject,
+                    offerId,
+                });
+                const wrappedHtml = this.emailTracking.wrapLinks(html, trackingId);
+                const trackedHtml = wrappedHtml.replace(
+                    /<\/body>/i,
+                    `${this.emailTracking.trackingPixelHtml(trackingId)}</body>`,
+                );
+                const ok = await this.emailService.sendMail(r.email, subject, trackedHtml);
                 if (ok) successCount++;
             } catch (err) {
                 this.logger.warn(`Failed to email ${r.email}: ${(err as any)?.message}`);

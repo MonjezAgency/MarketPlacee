@@ -36,6 +36,10 @@ const PUBLIC_PATHS = [
   'health',
   'health/database',
   'health/payments',
+  // Email tracking endpoints — recipients' mail clients fetch
+  // these (the 1×1 open pixel + click-through redirect) and they
+  // never carry auth cookies. Must stay public.
+  'email/track',
 ];
 
 async function handler(
@@ -43,7 +47,11 @@ async function handler(
   { params }: { params: { path: string[] } }
 ) {
   const backendPath = params.path.join('/');
-  const isPublic = PUBLIC_PATHS.some(p => backendPath === p || backendPath.startsWith(p + '?'));
+  const isPublic = PUBLIC_PATHS.some(p =>
+    backendPath === p ||
+    backendPath.startsWith(p + '?') ||
+    backendPath.startsWith(p + '/'),
+  );
 
   // Get token from either cookie (standard login) or session (Google login)
   const session = await getServerSession(authOptions);

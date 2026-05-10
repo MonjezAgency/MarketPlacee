@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { OffersController } from './offers.controller';
 import { OffersService } from './offers.service';
 import { EmailModule } from '../email/email.module';
+import { EmailTrackingModule } from '../email-tracking/email-tracking.module';
 
 @Module({
-    imports: [EmailModule],
+    imports: [EmailModule, EmailTrackingModule],
     controllers: [OffersController],
     providers: [OffersService],
     exports: [OffersService],
