@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsInt, Min, IsEnum, MinLength } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsInt, Min, IsEnum, MinLength, Matches } from 'class-validator';
 import { ProductStatus } from '@prisma/client';
 
 export class CreateProductDto {
@@ -35,8 +35,18 @@ export class CreateProductDto {
     @IsString({ each: true })
     images?: string[];
 
+    /**
+     * EAN / UPC / ITF-14 barcode. Must be exactly 8, 12, 13, or 14
+     * digits when present — anything else is a supplier internal SKU
+     * and gets routed elsewhere. The frontend form blocks save when
+     * the format is wrong, but we re-check on the API to keep raw
+     * `curl` posters honest.
+     */
     @IsOptional()
     @IsString()
+    @Matches(/^(\d{8}|\d{12}|\d{13}|\d{14})$/, {
+        message: 'EAN must be exactly 8, 12, 13, or 14 digits (EAN-8, UPC-A, EAN-13, or ITF-14).',
+    })
     ean?: string;
 
     @IsOptional()
