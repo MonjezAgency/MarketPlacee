@@ -4,6 +4,7 @@ import {
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
 import { EmailTrackingService } from '../email-tracking/email-tracking.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import * as XLSX from 'xlsx';
 
 interface OfferInput {
@@ -37,6 +38,7 @@ export class OffersService {
         private prisma: PrismaService,
         private emailService: EmailService,
         private emailTracking: EmailTrackingService,
+        private notifications: NotificationsService,
     ) {}
 
     /**
@@ -150,7 +152,7 @@ export class OffersService {
             required('Product picture',    offerImageUrl);
         }
 
-        return this.prisma.offer.create({
+        const created = await this.prisma.offer.create({
             data: {
                 supplierId,
                 productId: product.id,
@@ -170,8 +172,31 @@ export class OffersService {
                 offerImageUrl:  offerImageUrl || null,
                 status: 'PENDING',
             },
-            include: { product: true },
+            include: { product: true, supplier: { select: { name: true, companyName: true, email: true } } },
         });
+
+        // Tell the admins a new offer is waiting for review. Without
+        // this they only see it on the next time they refresh
+        // /admin/wholesale-offers — which the operator complained about
+        // ("the offer goes in but nothing notifies us"). Best-effort:
+        // we swallow notification errors so a flaky notification
+        // service never fails the actual create.
+        try {
+            const supplierLabel =
+                (created as any).supplier?.companyName ||
+                (created as any).supplier?.name ||
+                'A supplier';
+            await this.notifications.notifyAdmins(
+                'New wholesale offer waiting for review',
+                `${supplierLabel} just submitted "${productNameSnap}" — ${input.quantity} × ${input.unit} at €${Number(input.pricePerUnit).toFixed(2)}. Open Admin → Wholesale Offers to approve or reject.`,
+                'INFO' as any,
+                { offerId: created.id, productId: product.id },
+            );
+        } catch (e) {
+            this.logger.warn(`notifyAdmins failed for offer ${created.id}: ${(e as any)?.message}`);
+        }
+
+        return created;
     }
 
     /**
@@ -416,6 +441,16 @@ export class OffersService {
         const exw       = offer.exwLocation  || product.exwLocation || '';
         const upc       = offer.unitsPerCase   || product.unitsPerCase;
         const cpp       = offer.casesPerPallet || product.casesPerPallet;
+        const lead      = offer.leadTime       || '';
+        const originVal = offer.origin         || product.origin || '';
+        // validUntil — when set, surface as a small "Offer valid until <date>"
+        // strip near the CTA so the customer knows the offer expires. We
+        // store it as a Date; render YYYY-MM-DD only.
+        const validUntil = offer.validUntil
+            ? (offer.validUntil instanceof Date
+                ? offer.validUntil.toISOString().slice(0, 10)
+                : String(offer.validUntil).slice(0, 10))
+            : '';
 
         const tierLabel = offer.unit === 'truck' ? 'Truck' : offer.unit === 'pallet' ? 'Pallet' : 'Case';
         const baseUrl = (process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '');
@@ -532,9 +567,12 @@ export class OffersService {
                             <h2 style="color:#0F172A;font-size:22px;font-weight:900;margin:0 0 16px;">${escape(offerName)}</h2>
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                                 ${specRow('📍', 'Trade Terms',     tradeTermsValue)}
+                                ${originVal && originVal !== exw ? specRow('🏭', 'Country of Origin', originVal) : ''}
                                 ${ean ? specRow('▏▏▎', 'EAN',       ean) : ''}
                                 ${upc ? specRow('📦', 'Units per case',  String(upc)) : ''}
                                 ${cpp ? specRow('🏗', 'Cases per pallet', String(cpp)) : ''}
+                                ${lead ? specRow('⏱', 'Lead time',   lead) : ''}
+                                ${tierLabel ? specRow('🎯', 'Tier',  tierLabel) : ''}
                             </table>
                         </td>
                         <td style="vertical-align:top;width:40%;padding-left:18px;border-left:1px solid #F1F5F9;">
@@ -568,6 +606,7 @@ export class OffersService {
                             <td style="vertical-align:middle;">
                                 <p style="color:#0F172A;font-size:14px;font-weight:900;margin:0 0 2px;">Interested in this product?</p>
                                 <p style="color:#64748B;font-size:11px;margin:0;">Contact us today for price, availability, and more information.</p>
+                                ${validUntil ? `<p style="color:#0B1F3A;font-size:11px;font-weight:800;margin:6px 0 0;">⏳ Offer valid until ${escape(validUntil)}</p>` : ''}
                             </td>
                         </tr>
                     </table>
