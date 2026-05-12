@@ -354,9 +354,9 @@ export default function ProductEditorForm({
     // ---------------- Render ----------------
     if (isLoading || !formData) {
         return (
-            <div className="min-h-[60vh] flex items-center justify-center">
-                <div className="flex items-center gap-3 text-slate-500">
-                    <Loader2 className="animate-spin" size={20} />
+            <div className="min-h-[60vh] flex items-center justify-center bg-slate-50 dark:bg-[#0a0a0b]">
+                <div className="flex items-center gap-3 text-slate-500 dark:text-zinc-500">
+                    <Loader2 className="animate-spin" size={18} />
                     <span className="text-sm font-medium">Loading product…</span>
                 </div>
             </div>
@@ -375,33 +375,48 @@ export default function ProductEditorForm({
         : 'NEW';
 
     return (
-        <div className="bg-slate-50 min-h-full">
+        // ─────────────────────────────────────────────────────────────
+        // Premium B2B-SaaS palette inspired by Linear / Stripe / Vercel.
+        //
+        // Light mode keeps the same slate scale. Dark mode uses a tight,
+        // layered set of neutral zinc surfaces — page < section < card <
+        // input — so depth comes from background contrast, not borders.
+        // Borders, when used, are tiny white-alpha rings (≤8% opacity)
+        // and accent colours sit on subtle 10–20% tints rather than
+        // solid blocks.
+        //
+        // Spacing rhythm: the page has wide breathing room (p-8 lg:p-10)
+        // and each card uses p-6/p-7 to create distinct focus areas.
+        // Headers use a thin top border + backdrop blur so the page
+        // doesn't feel boxed-in.
+        // ─────────────────────────────────────────────────────────────
+        <div className="min-h-full bg-slate-50 dark:bg-[#0a0a0b]">
             {/* ── Page header ── */}
-            <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
+            <div className="sticky top-0 z-20 backdrop-blur-xl bg-white/80 dark:bg-[#0a0a0b]/85 border-b border-slate-200 dark:border-white/[0.06]">
                 <div className="px-6 lg:px-10 py-5 flex items-center justify-between gap-4">
                     <div className="flex items-center gap-4 min-w-0">
                         <button
                             type="button"
                             onClick={() => router.push(backHref)}
-                            className="w-10 h-10 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center transition-colors flex-shrink-0"
+                            className="w-10 h-10 rounded-xl text-slate-500 dark:text-zinc-400 hover:text-slate-900 dark:hover:text-zinc-100 hover:bg-slate-100 dark:hover:bg-white/[0.06] flex items-center justify-center transition-colors flex-shrink-0"
                             title="Back to products"
                         >
                             <ArrowLeft size={20} />
                         </button>
                         <div className="min-w-0">
-                            <h1 className="text-2xl font-bold text-slate-900 tracking-tight truncate">
+                            <h1 className="text-[22px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight truncate leading-none">
                                 Edit Product
                             </h1>
-                            <p className="text-sm text-slate-500 mt-0.5">
+                            <p className="text-[13px] text-slate-500 dark:text-zinc-500 mt-1.5">
                                 Update your product details and settings
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         <button
                             type="button"
                             onClick={() => router.push(backHref)}
-                            className="h-11 px-5 rounded-xl bg-white border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                            className="h-10 px-4 rounded-lg bg-transparent text-slate-700 dark:text-zinc-300 text-[13px] font-medium hover:bg-slate-100 dark:hover:bg-white/[0.06] transition-colors"
                         >
                             Cancel
                         </button>
@@ -409,9 +424,9 @@ export default function ProductEditorForm({
                             type="button"
                             onClick={handleSave}
                             disabled={isSaving}
-                            className="h-11 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold flex items-center gap-2 transition-colors shadow-lg shadow-slate-900/20 disabled:opacity-60"
+                            className="h-10 px-5 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-zinc-50 dark:hover:bg-white text-white dark:text-zinc-900 text-[13px] font-semibold flex items-center gap-2 transition-all shadow-sm hover:shadow disabled:opacity-50"
                         >
-                            {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                            {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                             Save Changes
                         </button>
                     </div>
@@ -419,10 +434,10 @@ export default function ProductEditorForm({
             </div>
 
             {/* ── Body ── */}
-            <div className="p-6 lg:p-10">
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1400px] mx-auto">
+            <div className="px-6 lg:px-10 py-8 lg:py-10">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:gap-6 max-w-[1320px] mx-auto">
                     {/* ─── Left column ─── */}
-                    <div className="lg:col-span-4 space-y-6">
+                    <div className="lg:col-span-4 space-y-5">
                         {/* Product Images card — supports MULTIPLE uploads & URLs.
                             The user explicitly asked for this: "ما بيقدرش يرفع
                             أو يضيف كذا رابط للصورة أو يرفع كذا صورة" — the
@@ -431,18 +446,18 @@ export default function ProductEditorForm({
                             explicit Add button (not just Enter), and every
                             uploaded image renders as a thumbnail tile with a
                             "Main" badge on the first one. */}
-                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                        <div className="bg-white dark:bg-[#131316] rounded-2xl border border-slate-200 dark:border-white/[0.05] shadow-sm dark:shadow-xl dark:shadow-black/40 p-6 space-y-4">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <h3 className="text-base font-bold text-slate-900">
+                                    <h3 className="text-[15px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">
                                         Product Images
                                     </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">
+                                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">
                                         Upload one or more product photos. First image is shown as the main.
                                     </p>
                                 </div>
                                 {(formData.images?.length ?? 0) > 0 && (
-                                    <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
+                                    <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-zinc-400 text-[11px] font-medium">
                                         {formData.images!.length} image
                                         {formData.images!.length === 1 ? '' : 's'}
                                     </span>
@@ -450,7 +465,7 @@ export default function ProductEditorForm({
                             </div>
 
                             {/* Main image (largest tile) */}
-                            <div className="aspect-square rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center relative group">
+                            <div className="aspect-square rounded-xl bg-slate-100 dark:bg-[#1c1c20] border border-slate-200 dark:border-white/[0.06] overflow-hidden flex items-center justify-center relative group">
                                 {formData.images?.[0] ? (
                                     <>
                                         <img
@@ -462,13 +477,13 @@ export default function ProductEditorForm({
                                             }}
                                             className="w-full h-full object-contain p-4"
                                         />
-                                        <span className="absolute top-2 left-2 inline-flex items-center h-6 px-2.5 rounded-full bg-slate-900/85 text-white text-[10px] font-bold uppercase tracking-wider">
+                                        <span className="absolute top-2 left-2 inline-flex items-center h-6 px-2.5 rounded-full bg-slate-900/85 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-bold uppercase tracking-wider">
                                             Main
                                         </span>
                                         <button
                                             type="button"
                                             onClick={() => removeImage(0)}
-                                            className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-red-50 text-slate-500 hover:text-red-600 flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity"
+                                            className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 dark:bg-zinc-900/90 hover:bg-red-50 dark:hover:bg-red-500/15 text-slate-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity"
                                             title="Remove image"
                                         >
                                             <Trash2 size={14} />
@@ -478,7 +493,7 @@ export default function ProductEditorForm({
                                     <button
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
-                                        className="flex flex-col items-center text-slate-400 hover:text-slate-600 transition-colors w-full h-full justify-center"
+                                        className="flex flex-col items-center text-slate-400 dark:text-zinc-600 hover:text-slate-600 dark:hover:text-zinc-400 transition-colors w-full h-full justify-center"
                                     >
                                         <ImageIcon size={36} strokeWidth={1.5} />
                                         <span className="text-xs mt-2 font-semibold">
@@ -497,10 +512,10 @@ export default function ProductEditorForm({
                                         <div
                                             key={img + idx}
                                             className={
-                                                'relative aspect-square rounded-lg border bg-white overflow-hidden group/thumb cursor-pointer transition-all ' +
+                                                'relative aspect-square rounded-lg border bg-white dark:bg-[#1c1c20] overflow-hidden group/thumb cursor-pointer transition-all ' +
                                                 (idx === 0
-                                                    ? 'border-slate-900 ring-2 ring-slate-900/10'
-                                                    : 'border-slate-200 hover:border-slate-400')
+                                                    ? 'border-slate-900 dark:border-zinc-100 ring-2 ring-slate-900/10 dark:ring-zinc-100/15'
+                                                    : 'border-slate-200 dark:border-white/[0.06] hover:border-slate-400 dark:hover:border-white/20')
                                             }
                                             onClick={() => {
                                                 if (idx === 0 || !formData) return;
@@ -532,7 +547,7 @@ export default function ProductEditorForm({
                                                     e.stopPropagation();
                                                     removeImage(idx);
                                                 }}
-                                                className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-white/90 hover:bg-red-50 text-slate-500 hover:text-red-600 flex items-center justify-center shadow opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                                                className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-white/90 dark:bg-zinc-900/90 hover:bg-red-50 dark:hover:bg-red-500/15 text-slate-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 flex items-center justify-center shadow opacity-0 group-hover/thumb:opacity-100 transition-opacity"
                                                 title="Remove image"
                                             >
                                                 <Trash2 size={10} />
@@ -545,7 +560,7 @@ export default function ProductEditorForm({
                                         type="button"
                                         onClick={() => fileInputRef.current?.click()}
                                         disabled={isUploading}
-                                        className="aspect-square rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400 text-slate-400 hover:text-slate-600 flex flex-col items-center justify-center transition-colors disabled:opacity-50"
+                                        className="aspect-square rounded-lg border border-dashed border-slate-300 dark:border-white/[0.12] bg-slate-50 dark:bg-white/[0.02] hover:bg-slate-100 dark:hover:bg-white/[0.05] hover:border-slate-400 dark:hover:border-white/25 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 flex flex-col items-center justify-center transition-colors disabled:opacity-50"
                                         title="Add more images"
                                     >
                                         <Plus size={18} />
@@ -562,7 +577,7 @@ export default function ProductEditorForm({
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={isUploading}
-                                className="w-full h-11 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                                className="w-full h-10 rounded-lg bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.07] hover:bg-slate-100 dark:hover:bg-white/[0.07] hover:border-slate-300 dark:hover:border-white/[0.12] text-slate-700 dark:text-zinc-200 text-[13px] font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                             >
                                 <Upload size={15} />
                                 {isUploading
@@ -588,7 +603,7 @@ export default function ProductEditorForm({
                                             setUrlInputValue('');
                                         }
                                     }}
-                                    className="flex-1 h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                    className="flex-1 h-10 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-xs text-slate-700 dark:text-zinc-200 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05]"
                                 />
                                 <button
                                     type="button"
@@ -597,13 +612,13 @@ export default function ProductEditorForm({
                                         setUrlInputValue('');
                                     }}
                                     disabled={!urlInputValue.trim()}
-                                    className="h-10 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                    className="h-10 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
                                 >
                                     Add URL
                                 </button>
                             </div>
 
-                            <p className="text-[11px] text-slate-400 text-center">
+                            <p className="text-[11px] text-slate-400 dark:text-zinc-600 text-center">
                                 JPG, PNG or WEBP. You can upload multiple files at once. Max 5MB each.
                             </p>
 
@@ -619,24 +634,24 @@ export default function ProductEditorForm({
 
                         {/* Product Status card — admin only */}
                         {mode === 'admin' && (
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                            <div className="bg-white dark:bg-[#131316] rounded-2xl border border-slate-200 dark:border-white/[0.05] shadow-sm dark:shadow-xl dark:shadow-black/40 p-6 space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <h3 className="text-base font-bold text-slate-900">
+                                    <h3 className="text-[15px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">
                                         Product Status
                                     </h3>
                                     {formData.status === 'APPROVED' && (
-                                        <div className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                                        <div className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-semibold">
                                             <ShieldCheck size={13} />
                                             Verified
                                         </div>
                                     )}
                                 </div>
-                                <p className="text-xs text-slate-500">
+                                <p className="text-xs text-slate-500 dark:text-zinc-500 leading-relaxed">
                                     This product is reviewed and verified by Atlantis.
                                 </p>
 
-                                <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-white/[0.05]">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Status
                                     </label>
                                     <select
@@ -644,7 +659,7 @@ export default function ProductEditorForm({
                                         onChange={(e) =>
                                             setFormData({ ...formData, status: e.target.value as any })
                                         }
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12] appearance-none"
                                     >
                                         {STATUS_OPTIONS.map((s) => (
                                             <option key={s.value} value={s.value}>
@@ -654,27 +669,27 @@ export default function ProductEditorForm({
                                     </select>
                                 </div>
 
-                                <div className="space-y-2 pt-2 border-t border-slate-100">
+                                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-white/[0.05]">
                                     <div>
-                                        <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                                        <p className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-zinc-600 font-semibold">
                                             Product ID
                                         </p>
-                                        <p className="text-sm font-bold text-slate-900 mt-1">
+                                        <p className="text-[14px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight mt-1">
                                             {shortId}
                                         </p>
                                     </div>
                                     <div>
-                                        <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                                        <p className="text-[10px] uppercase tracking-wider text-slate-400 dark:text-zinc-600 font-semibold">
                                             Added on
                                         </p>
-                                        <p className="text-sm font-semibold text-slate-700 mt-1">
+                                        <p className="text-sm font-medium text-slate-700 dark:text-zinc-300 mt-1">
                                             {verifiedDate}
                                         </p>
                                     </div>
                                 </div>
 
-                                <div className="space-y-1.5 pt-2 border-t border-slate-100">
-                                    <label className="text-[11px] font-medium text-slate-500 flex items-center gap-1.5">
+                                <div className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-white/[0.05]">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider flex items-center gap-1.5">
                                         <FileText size={11} /> Admin Notes (internal)
                                     </label>
                                     <textarea
@@ -684,7 +699,7 @@ export default function ProductEditorForm({
                                         onChange={(e) =>
                                             setFormData({ ...formData, adminNotes: e.target.value })
                                         }
-                                        className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 resize-none"
+                                        className="w-full rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 py-2.5 text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] resize-none leading-relaxed"
                                     />
                                 </div>
                             </div>
@@ -717,24 +732,24 @@ export default function ProductEditorForm({
                             لحد ما يوصل الوزن"). Pure typing UX. */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             {/* Price card */}
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                            <div className="bg-white dark:bg-[#131316] rounded-2xl border border-slate-200 dark:border-white/[0.05] shadow-sm dark:shadow-xl dark:shadow-black/40 p-6 space-y-4">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
-                                        <Euro size={18} />
+                                    <div className="w-9 h-9 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 ring-1 ring-blue-100 dark:ring-blue-500/20 flex items-center justify-center">
+                                        <Euro size={16} />
                                     </div>
-                                    <h3 className="text-sm font-bold text-slate-900">
+                                    <h3 className="text-[14px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">
                                         Currency & Price per Piece
                                     </h3>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-medium text-slate-500">
+                                        <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                             Currency
                                         </label>
                                         <select
                                             value={activeCurrency}
                                             onChange={(e) => setActiveCurrency(e.target.value)}
-                                            className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
+                                            className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12] appearance-none"
                                         >
                                             {SUPPORTED_CURRENCIES.map((c) => (
                                                 <option key={c.code} value={c.code}>
@@ -744,11 +759,11 @@ export default function ProductEditorForm({
                                         </select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-medium text-slate-500">
+                                        <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                             Price per Piece
                                         </label>
                                         <div className="relative">
-                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">
+                                            <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-zinc-500 font-semibold text-sm pointer-events-none">
                                                 {symbol}
                                             </span>
                                             <input
@@ -768,25 +783,25 @@ export default function ProductEditorForm({
                                                         setPricePerPieceInput(v.toFixed(2));
                                                     }
                                                 }}
-                                                className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-base font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                className="w-full h-10 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] pl-8 pr-3 text-sm font-semibold text-slate-900 dark:text-zinc-100 tabular-nums outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                             />
                                         </div>
                                     </div>
                                 </div>
                                 {/* Live case-price preview */}
-                                <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5 flex items-center justify-between">
-                                    <div className="text-[11px] text-slate-500">
+                                <div className="rounded-lg bg-slate-50 dark:bg-white/[0.025] border border-slate-200/70 dark:border-white/[0.05] px-3.5 py-2.5 flex items-center justify-between">
+                                    <div className="text-[11px] text-slate-500 dark:text-zinc-500">
                                         {(formData.unitsPerCase ?? 0) > 0
                                             ? `${formData.unitsPerCase} pieces per case`
                                             : 'Set "Pieces per Case" below to compute the case price'}
                                     </div>
-                                    <div className="text-sm font-bold text-slate-900">
+                                    <div className="text-sm font-semibold text-slate-900 dark:text-zinc-100 tabular-nums">
                                         {symbol}
                                         {(
                                             (parseFloat(pricePerPieceInput.replace(',', '.')) || 0) *
                                             (formData.unitsPerCase ?? 0)
                                         ).toFixed(2)}
-                                        <span className="text-[10px] text-slate-400 font-semibold ml-1">
+                                        <span className="text-[10px] text-slate-400 dark:text-zinc-600 font-medium ml-1">
                                             / case
                                         </span>
                                     </div>
@@ -794,25 +809,25 @@ export default function ProductEditorForm({
                             </div>
 
                             {/* Stock card */}
-                            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                            <div className="bg-white dark:bg-[#131316] rounded-2xl border border-slate-200 dark:border-white/[0.05] shadow-sm dark:shadow-xl dark:shadow-black/40 p-6 space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
-                                            <Box size={18} />
+                                        <div className="w-9 h-9 rounded-lg bg-teal-50 dark:bg-teal-500/10 text-teal-600 dark:text-teal-400 ring-1 ring-teal-100 dark:ring-teal-500/20 flex items-center justify-center">
+                                            <Box size={16} />
                                         </div>
-                                        <h3 className="text-sm font-bold text-slate-900">
+                                        <h3 className="text-[14px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">
                                             Stock Level (Cases)
                                         </h3>
                                     </div>
                                     {(formData.stock ?? 0) > 0 && (
-                                        <span className="inline-flex items-center gap-1 h-6 px-2.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
+                                        <span className="inline-flex items-center gap-1 h-6 px-2.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-[11px] font-semibold">
                                             <Check size={11} />
                                             In Stock
                                         </span>
                                     )}
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Available Stock
                                     </label>
                                     <div className="flex items-end gap-2">
@@ -828,21 +843,21 @@ export default function ProductEditorForm({
                                                     stock: v === '' ? 0 : parseInt(v, 10),
                                                 });
                                             }}
-                                            className="w-28 h-11 rounded-xl border border-slate-200 bg-white px-3 text-2xl font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                            className="w-24 h-10 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3 text-2xl font-semibold text-slate-900 dark:text-zinc-50 tabular-nums outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05]"
                                         />
-                                        <span className="text-sm text-slate-500 pb-2.5">cases</span>
+                                        <span className="text-xs text-slate-500 dark:text-zinc-500 pb-2.5">cases</span>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         {/* Product Details */}
-                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
-                            <h3 className="text-base font-bold text-slate-900">Product Details</h3>
+                        <div className="bg-white dark:bg-[#131316] rounded-2xl border border-slate-200 dark:border-white/[0.05] shadow-sm dark:shadow-xl dark:shadow-black/40 p-6 space-y-5">
+                            <h3 className="text-[15px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">Product Details</h3>
 
                             {/* Name — full width */}
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-medium text-slate-500">
+                                <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                     Product Name <span className="text-red-500">*</span>
                                 </label>
                                 <input
@@ -853,14 +868,14 @@ export default function ProductEditorForm({
                                     onChange={(e) =>
                                         setFormData({ ...formData, name: e.target.value })
                                     }
-                                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                    className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-[15px] font-medium text-slate-900 dark:text-zinc-100 placeholder:font-normal placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                 />
                             </div>
 
                             {/* Brand + EAN */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Brand
                                     </label>
                                     <input
@@ -870,11 +885,11 @@ export default function ProductEditorForm({
                                         onChange={(e) =>
                                             setFormData({ ...formData, brand: e.target.value })
                                         }
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         EAN / Barcode
                                     </label>
                                     <input
@@ -901,18 +916,18 @@ export default function ProductEditorForm({
                                             }
                                         }}
                                         className={
-                                            'w-full h-11 rounded-xl border bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 ' +
+                                            'w-full h-11 rounded-lg border bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium tracking-wide text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:ring-2 ' +
                                             (eanError
-                                                ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
-                                                : 'border-slate-200 focus:border-slate-400 focus:ring-slate-100')
+                                                ? 'border-red-300 dark:border-red-500/40 focus:border-red-400 dark:focus:border-red-400 focus:ring-red-100 dark:focus:ring-red-500/15'
+                                                : 'border-slate-200 dark:border-white/[0.07] focus:border-slate-400 dark:focus:border-white/20 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]')
                                         }
                                     />
                                     {eanError ? (
-                                        <p className="text-[11px] text-red-600 font-medium">
+                                        <p className="text-[11px] text-red-600 dark:text-red-400 font-medium">
                                             {eanError}
                                         </p>
                                     ) : (
-                                        <p className="text-[11px] text-slate-400">
+                                        <p className="text-[11px] text-slate-400 dark:text-zinc-600">
                                             EAN-13 / EAN-8 / UPC-A / ITF-14 accepted
                                         </p>
                                     )}
@@ -921,7 +936,7 @@ export default function ProductEditorForm({
 
                             {/* Description */}
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-medium text-slate-500">
+                                <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                     Description
                                 </label>
                                 <textarea
@@ -931,13 +946,13 @@ export default function ProductEditorForm({
                                     onChange={(e) =>
                                         setFormData({ ...formData, description: e.target.value })
                                     }
-                                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 resize-none"
+                                    className="w-full rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 py-2.5 text-sm text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] resize-none leading-relaxed"
                                 />
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Unit Type <span className="text-red-500">*</span>
                                     </label>
                                     <select
@@ -945,7 +960,7 @@ export default function ProductEditorForm({
                                         onChange={(e) =>
                                             setFormData({ ...formData, unit: e.target.value })
                                         }
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12] appearance-none"
                                     >
                                         {UNIT_TYPES.map((u) => (
                                             <option key={u.value} value={u.value}>
@@ -955,7 +970,7 @@ export default function ProductEditorForm({
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Minimum Order ({formData.unit || 'Cases'}){' '}
                                         <span className="text-red-500">*</span>
                                     </label>
@@ -968,12 +983,12 @@ export default function ProductEditorForm({
                                             const v = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 1;
                                             setFormData({ ...formData, minOrder: v, moq: v });
                                         }}
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                     />
                                 </div>
 
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Weight per Unit (kg) <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -999,14 +1014,14 @@ export default function ProductEditorForm({
                                                 weight: isNaN(v) ? 0 : v,
                                             });
                                         }}
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                     />
-                                    <p className="text-[11px] text-slate-400">
+                                    <p className="text-[11px] text-slate-400 dark:text-zinc-600">
                                         Auto-extracted from product name if left blank (e.g. "250g" → 0.250)
                                     </p>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         BBD (Best Before Date) <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -1016,7 +1031,7 @@ export default function ProductEditorForm({
                                         onChange={(e) =>
                                             setFormData({ ...formData, shelfLife: e.target.value })
                                         }
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                     />
                                 </div>
                             </div>
@@ -1024,7 +1039,7 @@ export default function ProductEditorForm({
                             {/* Category + Country of Origin */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Category <span className="text-red-500">*</span>
                                     </label>
                                     <select
@@ -1032,7 +1047,7 @@ export default function ProductEditorForm({
                                         onChange={(e) =>
                                             setFormData({ ...formData, category: e.target.value })
                                         }
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12] appearance-none"
                                     >
                                         {CATEGORIES_LIST.map((c) => (
                                             <option key={c} value={c}>
@@ -1042,7 +1057,7 @@ export default function ProductEditorForm({
                                     </select>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Country of Origin <span className="text-red-500">*</span>
                                     </label>
                                     <select
@@ -1050,7 +1065,7 @@ export default function ProductEditorForm({
                                         onChange={(e) =>
                                             setFormData({ ...formData, origin: e.target.value })
                                         }
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12] appearance-none"
                                     >
                                         <option value="">Select country…</option>
                                         {COUNTRIES.map((c) => (
@@ -1064,16 +1079,16 @@ export default function ProductEditorForm({
                         </div>
 
                         {/* Logistics card — pieces/case, cases/pallet, pallets/shipment, EXW */}
-                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+                        <div className="bg-white dark:bg-[#131316] rounded-2xl border border-slate-200 dark:border-white/[0.05] shadow-sm dark:shadow-xl dark:shadow-black/40 p-6 space-y-5">
                             <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
-                                    <Truck size={18} />
+                                <div className="w-9 h-9 rounded-lg bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 ring-1 ring-amber-100 dark:ring-amber-500/20 flex items-center justify-center">
+                                    <Truck size={16} />
                                 </div>
                                 <div>
-                                    <h3 className="text-base font-bold text-slate-900">
+                                    <h3 className="text-[15px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">
                                         Logistics & Packaging
                                     </h3>
-                                    <p className="text-xs text-slate-500 mt-0.5">
+                                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">
                                         Used to quote shipping costs from origin to the buyer.
                                     </p>
                                 </div>
@@ -1081,7 +1096,7 @@ export default function ProductEditorForm({
 
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Pieces per Case <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -1095,11 +1110,11 @@ export default function ProductEditorForm({
                                                 unitsPerCase: isNaN(v) ? 0 : v,
                                             });
                                         }}
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Cases per Pallet <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -1113,11 +1128,11 @@ export default function ProductEditorForm({
                                                 casesPerPallet: isNaN(v) ? 0 : v,
                                             });
                                         }}
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                     />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Pallets per Shipment <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -1131,14 +1146,14 @@ export default function ProductEditorForm({
                                                 palletsPerShipment: isNaN(v) ? 0 : v,
                                             });
                                         }}
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                     />
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Currently In (EXW Location) <span className="text-red-500">*</span>
                                     </label>
                                     <input
@@ -1148,14 +1163,14 @@ export default function ProductEditorForm({
                                         onChange={(e) =>
                                             setFormData({ ...formData, exwLocation: e.target.value })
                                         }
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                     />
-                                    <p className="text-[11px] text-slate-400">
+                                    <p className="text-[11px] text-slate-400 dark:text-zinc-600">
                                         Where the goods physically sit today
                                     </p>
                                 </div>
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-medium text-slate-500">
+                                    <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
                                         Lead Time (days)
                                     </label>
                                     <input
@@ -1169,7 +1184,7 @@ export default function ProductEditorForm({
                                                 leadTime: isNaN(v) ? 0 : v,
                                             });
                                         }}
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
                                     />
                                 </div>
                             </div>
@@ -1181,7 +1196,7 @@ export default function ProductEditorForm({
                                 <button
                                     type="button"
                                     onClick={handleDelete}
-                                    className="h-11 px-5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold flex items-center gap-2 transition-colors"
+                                    className="h-10 px-4 rounded-lg bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/15 text-red-600 dark:text-red-400 text-[13px] font-medium ring-1 ring-red-100 dark:ring-red-500/20 flex items-center gap-2 transition-colors"
                                 >
                                     <Trash2 size={15} /> Delete Product
                                 </button>
