@@ -42,6 +42,10 @@ export default function SupplierProductsPage() {
     const [selectedCategory, setSelectedCategory] = React.useState('All');
     const [currentPage, setCurrentPage] = React.useState(1);
     const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
+    // Status filter — All | APPROVED | PENDING | NEEDS_CHANGES | REJECTED
+    // Drives the filter chip row above the table; "All" is the default
+    // landing view so a new supplier sees every listing they have.
+    const [statusFilter, setStatusFilter] = React.useState<'All' | 'APPROVED' | 'PENDING' | 'NEEDS_CHANGES' | 'REJECTED'>('All');
 
     const [isBulkModalOpen, setIsBulkModalOpen] = React.useState(false);
     const [bulkFiles, setBulkFiles] = React.useState<File[]>([]);
@@ -214,12 +218,30 @@ export default function SupplierProductsPage() {
     // saves happen inside ProductEditorForm, the table just navigates.
     // Create is still handled by AddProductDrawer below.
 
+    // Count how many products sit in each status bucket so the
+    // filter chips can show a live "{N}" badge next to the label.
+    // Computed off the full list (NOT the filtered list) so the
+    // counts stay stable regardless of search / category.
+    const statusCounts = React.useMemo(() => {
+        const counts = { All: products.length, APPROVED: 0, PENDING: 0, NEEDS_CHANGES: 0, REJECTED: 0 };
+        for (const p of products) {
+            const s = String(p.status || '').toUpperCase();
+            if (s === 'APPROVED') counts.APPROVED++;
+            else if (s === 'PENDING') counts.PENDING++;
+            else if (s === 'NEEDS_CHANGES') counts.NEEDS_CHANGES++;
+            else if (s === 'REJECTED') counts.REJECTED++;
+        }
+        return counts;
+    }, [products]);
+
     const filteredProducts = products.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (p.description || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
             (p.ean || '').includes(searchTerm);
         const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
-        return matchesSearch && matchesCategory;
+        const status = String(p.status || '').toUpperCase();
+        const matchesStatus = statusFilter === 'All' || status === statusFilter;
+        return matchesSearch && matchesCategory && matchesStatus;
     });
 
     const ITEMS_PER_PAGE = 10;
@@ -415,6 +437,67 @@ export default function SupplierProductsPage() {
                         ))}
                     </select>
                 </div>
+            </div>
+
+            {/* ── Status filter chips ──
+                Operator request: quick way to slice the table by
+                listing status. Five chips:
+                  • All              — default landing view
+                  • Approved         — emerald, live on Atlantis
+                  • Pending          — amber, waiting for review
+                  • Has Comment      — orange, NEEDS_CHANGES (admin
+                                       sent feedback; supplier acts on it)
+                  • Rejected         — red, admin rejected the listing
+                Each chip shows the live count of matching rows so
+                the supplier sees the breakdown without opening each
+                filter. Counts are computed off the FULL list so they
+                don't change when search/category narrows the view. */}
+            <div className="flex flex-wrap items-center gap-2">
+                {([
+                    { key: 'All',           label: 'All',           color: 'slate' },
+                    { key: 'APPROVED',      label: 'Approved',      color: 'emerald' },
+                    { key: 'PENDING',       label: 'Pending review', color: 'amber' },
+                    { key: 'NEEDS_CHANGES', label: 'Has comment',   color: 'orange' },
+                    { key: 'REJECTED',      label: 'Rejected',      color: 'red' },
+                ] as const).map((tab) => {
+                    const active = statusFilter === tab.key;
+                    const count = statusCounts[tab.key];
+                    // Tailwind safelist hint — colour classes must be
+                    // literal so the JIT compiler keeps them. We map
+                    // each colour name to its three flavours below.
+                    const palette: Record<string, { activeBg: string; activeText: string; idleText: string; idleHover: string; badge: string }> = {
+                        slate:   { activeBg: 'bg-slate-900 text-white',    activeText: '',  idleText: 'text-slate-600 hover:text-slate-900', idleHover: 'hover:bg-slate-100', badge: 'bg-slate-200 text-slate-700' },
+                        emerald: { activeBg: 'bg-emerald-600 text-white',  activeText: '',  idleText: 'text-emerald-700 hover:text-emerald-900', idleHover: 'hover:bg-emerald-50', badge: 'bg-emerald-100 text-emerald-700' },
+                        amber:   { activeBg: 'bg-amber-500 text-white',    activeText: '',  idleText: 'text-amber-700 hover:text-amber-900', idleHover: 'hover:bg-amber-50', badge: 'bg-amber-100 text-amber-700' },
+                        orange:  { activeBg: 'bg-orange-500 text-white',   activeText: '',  idleText: 'text-orange-700 hover:text-orange-900', idleHover: 'hover:bg-orange-50', badge: 'bg-orange-100 text-orange-700' },
+                        red:     { activeBg: 'bg-rose-600 text-white',     activeText: '',  idleText: 'text-rose-700 hover:text-rose-900', idleHover: 'hover:bg-rose-50', badge: 'bg-rose-100 text-rose-700' },
+                    };
+                    const p = palette[tab.color];
+                    return (
+                        <button
+                            key={tab.key}
+                            type="button"
+                            onClick={() => { setStatusFilter(tab.key as any); setCurrentPage(1); }}
+                            className={cn(
+                                'h-10 px-4 rounded-full inline-flex items-center gap-2 text-[12px] font-bold tracking-wide border transition-all',
+                                active
+                                    ? `${p.activeBg} border-transparent shadow-sm`
+                                    : `bg-white border-border/50 ${p.idleText} ${p.idleHover}`,
+                            )}
+                            aria-pressed={active}
+                        >
+                            <span>{tab.label}</span>
+                            <span
+                                className={cn(
+                                    'inline-flex items-center justify-center min-w-[22px] h-5 px-1.5 rounded-full text-[10px] font-black',
+                                    active ? 'bg-white/20 text-white' : p.badge,
+                                )}
+                            >
+                                {count}
+                            </span>
+                        </button>
+                    );
+                })}
             </div>
 
             {/* Products List (Table on Desktop, Cards on Mobile) */}
