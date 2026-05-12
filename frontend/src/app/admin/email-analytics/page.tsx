@@ -18,13 +18,14 @@
 
 import * as React from 'react';
 import {
-    Mail, Eye, MousePointer2, Send, TrendingUp, Loader2, Users, Activity,
+    Mail, Eye, MousePointer2, Send, TrendingUp, Loader2, Users, Activity, Beaker,
 } from 'lucide-react';
 import {
     AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
 } from 'recharts';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { toast } from 'react-hot-toast';
 
 interface Overview {
     windowDays: number;
@@ -52,6 +53,46 @@ export default function EmailAnalyticsPage() {
 
     React.useEffect(() => { fetchData(); }, [fetchData]);
 
+    // Send-test-email diagnostic.
+    // Hits POST /offers/send-test-email which renders the real
+    // offer-blast template, registers a tracking id, wraps the
+    // click links + injects the pixel, and forwards to Resend.
+    // Operator uses it to verify the whole pipeline (delivery →
+    // open tracking → analytics row) without waiting for a real
+    // supplier submission. Defaults to the operator's QA address.
+    const [testTo, setTestTo] = React.useState('monjez@monjez-agency.com');
+    const [isTesting, setIsTesting] = React.useState(false);
+    const handleSendTest = async () => {
+        const target = testTo.trim();
+        if (!target) {
+            toast.error('Enter a recipient email.');
+            return;
+        }
+        setIsTesting(true);
+        const tid = toast.loading(`Sending test offer email to ${target}…`);
+        try {
+            const res = await apiFetch('/offers/send-test-email', {
+                method: 'POST',
+                body: JSON.stringify({ to: target }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data?.ok) {
+                toast.success(
+                    `Sent to ${target}. Tracking id: ${data.trackingId?.slice(0, 8) || 'logged'}. Refresh the dashboard in ~30s to see the row.`,
+                    { id: tid, duration: 7000 },
+                );
+                // Auto-refresh shortly after so the new send shows up
+                setTimeout(() => fetchData(), 3000);
+            } else {
+                toast.error(`Send failed: ${data?.error || data?.message || 'unknown error'}`, { id: tid });
+            }
+        } catch (err: any) {
+            toast.error(`Network error: ${err?.message || ''}`, { id: tid });
+        } finally {
+            setIsTesting(false);
+        }
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-700 pb-16">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -73,6 +114,44 @@ export default function EmailAnalyticsPage() {
                             {d}d
                         </button>
                     ))}
+                </div>
+            </div>
+
+            {/* ── Send Test Email diagnostic ──
+                Fires a real offer-template email at any address so
+                the operator can verify the full pipeline (Resend
+                delivery + open pixel + click rewrites + analytics
+                row). Uses the same registerSentEmail → wrapLinks →
+                trackingPixelHtml path the production blast uses, so
+                a successful test = production is verified. */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-violet-50 text-violet-600 ring-1 ring-violet-100 flex items-center justify-center flex-shrink-0">
+                        <Beaker size={18} />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-slate-900">Send a test offer email</p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                            Real template, real tracking. The row lands in the dashboard once Resend confirms delivery.
+                        </p>
+                    </div>
+                </div>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <input
+                        type="email"
+                        value={testTo}
+                        onChange={(e) => setTestTo(e.target.value)}
+                        placeholder="recipient@example.com"
+                        className="flex-1 sm:w-64 h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                    />
+                    <button
+                        onClick={handleSendTest}
+                        disabled={isTesting || !testTo.trim()}
+                        className="h-10 px-5 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-[12px] font-bold uppercase tracking-widest flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                        {isTesting ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                        Send Test
+                    </button>
                 </div>
             </div>
 

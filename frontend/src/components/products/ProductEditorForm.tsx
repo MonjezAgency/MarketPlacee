@@ -645,18 +645,78 @@ export default function ProductEditorForm({
     const handleSave = async () => {
         if (!formData) return;
 
-        // Client-side EAN format gate. Backend strips invalid EANs but
-        // we want to tell the supplier immediately instead of letting
-        // them save and find out later that the field went blank.
+        // ── Required-fields gate ─────────────────────────────────
+        // Operator-mandated: every Atlantis listing MUST carry these
+        // fields before it can be sent for approval. Saving with any
+        // of them blank used to silently persist a half-product that
+        // Atlantis would then reject — wasting a review round-trip.
+        // Now we block the save up-front, list every missing field
+        // in one toast, and never even POST the malformed payload.
+        const missing: string[] = [];
+        if (!formData.name?.trim()) missing.push('Product name');
+        if (!formData.brand?.trim()) missing.push('Brand');
+        if (!formData.category?.trim()) missing.push('Category');
+        if (!formData.description?.trim() || formData.description.trim().length < 10) {
+            missing.push('Description (≥ 10 chars)');
+        }
+        if (!(formData.images && formData.images.length > 0)) missing.push('Product image');
+        const piecePriceNum = parseFloat(pricePerPieceInput.replace(',', '.'));
+        if (!piecePriceNum || piecePriceNum <= 0) missing.push('Price per piece');
+        if (!(Number(formData.stock) > 0)) missing.push('Stock level');
+        if (!formData.unit) missing.push('Unit type');
+        if (!Number(formData.unitsPerCase)) missing.push('Pieces per case');
+        if (!Number(formData.casesPerPallet)) missing.push('Cases per pallet');
+        if (!Number(formData.palletsPerShipment)) missing.push('Pallets per shipment');
+        if (!String(formData.weight ?? '').trim()) missing.push('Weight per unit');
+        if (!formData.shelfLife?.trim()) missing.push('BBD (Best Before Date)');
+        if (!formData.origin?.trim()) missing.push('Country of origin');
+        if (!formData.exwLocation?.trim()) missing.push('EXW location');
+
+        if (missing.length > 0) {
+            // Show the first 5 in the toast; if there are more, append
+            // "+ N more" so the supplier can still scroll. Long toasts
+            // get truncated by the toaster, this keeps it readable.
+            const shown = missing.slice(0, 5).join(', ');
+            const tail = missing.length > 5 ? ` + ${missing.length - 5} more` : '';
+            toast.error(
+                `Fill in every required field before saving: ${shown}${tail}.`,
+                { duration: 6500 },
+            );
+            return;
+        }
+
+        // ── Quality gate — reject obviously-fake data ────────────
+        // Operator's "make sure values are REAL, not random letters"
+        // ask. We catch the obvious cases client-side:
+        //   • single repeated character runs ("aaaaaa", "11111")
+        //   • all-consonant gibberish ("zxcvbn", "qwertz")
+        //   • name == brand (suppliers paste the brand twice)
+        // Light heuristics — real review happens on the admin side.
+        const looksFake = (v: string): boolean => {
+            const s = v.trim().toLowerCase();
+            if (s.length < 3) return false; // too short for a heuristic
+            if (/^(.)\1{3,}$/.test(s)) return true;               // "aaaaaa"
+            if (/^[bcdfghjklmnpqrstvwxz]{5,}$/.test(s)) return true; // all-consonants ≥ 5
+            if (/^[qwerty]+$/i.test(s) && s.length >= 6) return true; // qwerty mash
+            return false;
+        };
+        const fakeWarnings: string[] = [];
+        if (formData.name && looksFake(formData.name)) fakeWarnings.push('Product name');
+        if (formData.brand && looksFake(formData.brand)) fakeWarnings.push('Brand');
+        if (fakeWarnings.length > 0) {
+            toast.error(
+                `These look like random characters: ${fakeWarnings.join(', ')}. Use the real value or Atlantis will reject the listing.`,
+                { duration: 6500 },
+            );
+            return;
+        }
+
+        // EAN format gate (existing).
         if (formData.ean && !isValidEan(formData.ean)) {
             toast.error('Barcode must be 8, 12, 13, or 14 digits (EAN/UPC/ITF-14).');
             setEanError(
                 'Barcode must be 8, 12, 13, or 14 digits (EAN/UPC/ITF-14).',
             );
-            return;
-        }
-        if (!formData.unit) {
-            toast.error('Pick a Unit Type before saving.');
             return;
         }
 

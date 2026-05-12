@@ -406,6 +406,101 @@ export class OffersService {
     }
 
     /**
+     * Admin diagnostic — send the offer email to a single address
+     * for QA. Walks the same render + track + send path the real
+     * blast uses, so a successful test confirms:
+     *   • SMTP / Resend credentials are wired
+     *   • Tracking-pixel registration writes a row
+     *   • Click-rewrites point at our domain
+     *   • The template renders cleanly in the target inbox
+     * Returns { ok, trackingId } so the caller can verify the row
+     * landed in EmailEvent.
+     */
+    async sendTestEmail(to: string, offerId?: string): Promise<{ ok: boolean; trackingId?: string; error?: string }> {
+        const target = (to || '').trim();
+        if (!target || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+            throw new BadRequestException('Provide a valid recipient email.');
+        }
+
+        // Resolve the offer — caller's id wins; otherwise grab the
+        // most recently approved offer; failing both, build a
+        // synthetic Lavazza fixture so the operator can fire the
+        // test even on a fresh DB.
+        let offer: any = null;
+        let product: any = null;
+        let supplier: any = null;
+        if (offerId) {
+            offer = await this.prisma.offer.findUnique({
+                where: { id: offerId },
+                include: { product: true, supplier: true },
+            });
+        }
+        if (!offer) {
+            offer = await this.prisma.offer.findFirst({
+                where: { status: 'APPROVED' },
+                orderBy: { approvedAt: 'desc' },
+                include: { product: true, supplier: true },
+            });
+        }
+        if (offer) {
+            product = (offer as any).product;
+            supplier = (offer as any).supplier;
+        } else {
+            // Fixture — render a synthetic Lavazza offer so the test
+            // works on a fresh DB.
+            offer = {
+                id: 'fixture-test',
+                pricePerUnit: 26.5,
+                unit: 'pallet',
+                quantity: 12,
+                validUntil: new Date(Date.now() + 30 * 86400 * 1000),
+                productNameSnap: 'Lavazza Crema e Gusto Espresso 250g',
+                bbd: '2027-03-31',
+                eanCode: '8000070016185',
+                unitsPerCase: 20,
+                casesPerPallet: 20,
+                exwLocation: 'Netherlands',
+                leadTime: '10 working days',
+                origin: 'Italy',
+                offerImageUrl: '',
+            };
+            product = {
+                name: offer.productNameSnap,
+                images: [],
+                ean: offer.eanCode,
+                unitsPerCase: offer.unitsPerCase,
+                casesPerPallet: offer.casesPerPallet,
+                origin: offer.origin,
+                exwLocation: offer.exwLocation,
+                shelfLife: offer.bbd,
+            };
+            supplier = { name: 'Atlantis FMCG', companyName: 'Atlantis FMCG SRL', email: 'info@atlantisfmcg.com' };
+        }
+
+        const subject = `[TEST] Atlantis offer: ${product.name}`;
+        const html = this.renderOfferEmail(offer, product, supplier);
+
+        try {
+            const trackingId = await this.emailTracking.registerSentEmail({
+                recipient: target,
+                subject,
+                offerId: offer.id?.startsWith('fixture-') ? undefined : offer.id,
+            });
+            const wrappedHtml = this.emailTracking.wrapLinks(html, trackingId);
+            const trackedHtml = wrappedHtml.replace(
+                /<\/body>/i,
+                `${this.emailTracking.trackingPixelHtml(trackingId)}</body>`,
+            );
+            const ok = await this.emailService.sendMail(target, subject, trackedHtml);
+            this.logger.log(`[TEST_EMAIL] to=${target} trackingId=${trackingId} ok=${ok}`);
+            return { ok, trackingId };
+        } catch (err: any) {
+            this.logger.error(`[TEST_EMAIL_FAIL] to=${target} err=${err?.message}`);
+            return { ok: false, error: err?.message || 'Send failed' };
+        }
+    }
+
+    /**
      * Atlantis offer email — pixel-faithful reproduction of the
      * KitKat sample the operator referenced. One email per offer
      * (even rows from a 20-product bulk sheet upload). Image,

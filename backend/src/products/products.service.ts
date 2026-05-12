@@ -484,6 +484,23 @@ export class ProductsService {
      * Returns the list of missing field labels — empty array means
      * the row is good to submit.
      */
+    /**
+     * Public wrapper around requiredSupplierFieldsMissing. Loads the
+     * existing product, merges the PATCH payload on top, and runs the
+     * supplier-required-fields gate against the merged state. Used by
+     * the controller to reject a supplier edit BEFORE we persist a
+     * partial product. Admin edits don't go through this — they're
+     * allowed to triage with missing fields.
+     */
+    async validateSupplierEdit(id: string, patch: any): Promise<string[]> {
+        const existing = await this.findOne(id);
+        if (!existing) return [];
+        const merged = { ...existing, ...patch } as any;
+        // The supplier form sends pricePerPiece × unitsPerCase as
+        // `price` on save, so price = 0 is a real signal here.
+        return this.requiredSupplierFieldsMissing(merged);
+    }
+
     private requiredSupplierFieldsMissing(p: any): string[] {
         const miss: string[] = [];
         if (!p.name || String(p.name).trim().length < 2)            miss.push('Name');

@@ -193,12 +193,23 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     };
 
     return (
+        // Card animation tuning:
+        //   • Mount: short fade-up. The previous `delay: index * 0.05`
+        //     stacked linearly with the row index, so a card at #20 was
+        //     waiting one full second before appearing. We cap at
+        //     ~0.18 s so any card past the first 6 lands together —
+        //     the customer sees the grid feel responsive on scroll.
+        //   • Mount duration trimmed to 0.18 s (was Framer default 0.5).
+        //   • Hover: a single transition-all duration-200 promotes
+        //     shadow + transform together so the card lifts smoothly
+        //     in one frame group instead of separate shadow/colour
+        //     animations colliding.
         <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            transition={{ delay: index * 0.05 }}
-            className="group bg-card text-card-foreground rounded-lg border border-border/60 hover:shadow-lg transition-shadow duration-300 flex flex-col h-full overflow-hidden"
+            transition={{ duration: 0.18, delay: Math.min(index * 0.03, 0.18) }}
+            className="group bg-card text-card-foreground rounded-lg border border-border/60 hover:shadow-md hover:border-border hover:-translate-y-0.5 transition-all duration-200 ease-out flex flex-col h-full overflow-hidden will-change-transform"
         >
             <div
                 className="relative p-4 flex justify-center items-center h-[200px] border-b border-border/30 bg-white"
@@ -211,7 +222,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                         alt={product.name}
                         referrerPolicy="no-referrer"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        className="max-h-[160px] max-w-full object-contain mix-blend-multiply transition-opacity duration-300"
+                        className="max-h-[160px] max-w-full object-contain mix-blend-multiply transition-opacity duration-150 group-hover:scale-[1.02] transition-transform"
                         loading="lazy"
                         decoding="async"
                     />

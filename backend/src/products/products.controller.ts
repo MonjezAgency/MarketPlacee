@@ -491,13 +491,34 @@ export class ProductsController {
     @UseGuards(JwtAuthGuard, RolesGuard, PolicyGuard)
     @Roles(Role.SUPPLIER, Role.ADMIN)
     @CheckOwnership('PRODUCT')
-    async update(@Param('id') id: string, @Body() updateProductDto: any) {
+    async update(@Param('id') id: string, @Body() updateProductDto: any, @Request() req) {
+        // ── Supplier required-fields gate ─────────────────────────
+        // Operator rule: a supplier can't save partial product data.
+        // Every required Atlantis field must be present in the
+        // post-update state, otherwise we reject the PATCH and the
+        // supplier sees the exact list of missing fields.
+        //
+        // Admins bypass this gate — they edit during review and may
+        // legitimately leave a field blank while triaging.
+        const isAdmin = ['ADMIN', 'OWNER'].includes((req.user?.role || '').toUpperCase());
+        if (!isAdmin) {
+            const missing = await this.productsService.validateSupplierEdit(
+                id,
+                updateProductDto,
+            );
+            if (missing.length > 0) {
+                throw new BadRequestException(
+                    `Fill in every required field before saving. Missing: ${missing.join(', ')}.`,
+                );
+            }
+        }
+
         // AI Auto-Categorization on update if name changed and category is missing/General
         if (updateProductDto.name && (!updateProductDto.category || updateProductDto.category === 'General')) {
             const categories = ['Food & Beverages', 'Personal Care', 'Household', 'Packaging'];
             const autoCat = await this.aiAgent.categorizeProduct(
-                updateProductDto.name, 
-                updateProductDto.description || '', 
+                updateProductDto.name,
+                updateProductDto.description || '',
                 categories
             );
             if (autoCat) updateProductDto.category = autoCat;

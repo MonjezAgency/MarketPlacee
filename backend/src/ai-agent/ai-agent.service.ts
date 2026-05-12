@@ -9,12 +9,30 @@ const ALLOWED_ACTIONS = new Set([
     'SEND_NOTIFICATION',
     'FLAG_ORDER_FOR_REVIEW',
     'FLAG_PAYMENT_FOR_REVIEW',
-    'REMIND_KYC',
+    // 'REMIND_KYC' is DISABLED — KYC enforcement is currently off on
+    // the platform (operator decision). The hourly agent was still
+    // pinging suppliers with "KYC Verification Required" even though
+    // we don't gate listings on it, so suppliers were getting noise
+    // for a feature they couldn't act on. Re-enable here when KYC
+    // is brought back as a hard requirement.
     'LOG_ISSUE',
     'APPROVE_KYC',
     'REJECT_KYC',
     'CATEGORIZE_PRODUCT',
 ]);
+
+// Which auto-fix branches inside the scan are allowed to fire a
+// supplier-facing notification. We had two recurring spam sources:
+//   • KYC reminders — feature disabled, see ALLOWED_ACTIONS comment.
+//   • Rejected-product nudges — already surfaced as a status badge
+//     plus a "💬 View comment" pill on /supplier/products, and the
+//     admin comment flow sends a one-off email. An hourly cron-
+//     ping was redundant noise.
+// Flipping these to `false` stops the proactive pings without
+// gutting the scan — the issues still appear in /admin/ai-agent
+// for the admin to action manually.
+const SUPPLIER_PING_KYC_REMINDER = false;
+const SUPPLIER_PING_REJECTED_PRODUCT = false;
 
 export interface AgentReport {
     id: string;
@@ -173,7 +191,7 @@ export class AiAgentService {
                 autoFixed: false,
             });
 
-            if (ALLOWED_ACTIONS.has('REMIND_KYC')) {
+            if (SUPPLIER_PING_KYC_REMINDER && ALLOWED_ACTIONS.has('REMIND_KYC')) {
                 try {
                     await this.notifications.create(
                         user.id,
@@ -211,7 +229,7 @@ export class AiAgentService {
                 autoFixed: false,
             });
 
-            if (product.supplierId && ALLOWED_ACTIONS.has('SEND_NOTIFICATION')) {
+            if (SUPPLIER_PING_REJECTED_PRODUCT && product.supplierId && ALLOWED_ACTIONS.has('SEND_NOTIFICATION')) {
                 try {
                     await this.notifications.create(
                         product.supplierId,

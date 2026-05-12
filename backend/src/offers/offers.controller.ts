@@ -79,4 +79,25 @@ export class OffersController {
     async delete(@Param('id') id: string, @Req() req: any) {
         return this.svc.deleteOne(id, req.user.sub, req.user.role);
     }
+
+    /**
+     * Admin diagnostic: send a sample offer email (real template,
+     * real tracking pixel + click rewrites) to a target address.
+     * Operator uses this to verify the full pipeline — Resend
+     * delivery, open tracking, click tracking, analytics dashboard
+     * — without waiting for a real supplier to submit and approve.
+     *
+     * POST /offers/send-test-email
+     *   body: { to: "monjez@monjez-agency.com", offerId?: "uuid" }
+     *
+     * If offerId is provided, that specific offer is rendered.
+     * Otherwise we render a synthetic Lavazza fixture so the
+     * operator can fire the test even before any real offers
+     * exist.
+     */
+    @Post('send-test-email')
+    @Roles(Role.ADMIN, Role.OWNER)
+    async sendTestEmail(@Body() body: { to: string; offerId?: string }) {
+        return this.svc.sendTestEmail(body?.to, body?.offerId);
+    }
 }
