@@ -254,6 +254,22 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                     )}
                 </div>
 
+                {/* ── "Your listing" badge ────────────────────────────────
+                    Only the supplier who owns this product sees this pill.
+                    Customers, anonymous visitors, and other suppliers
+                    never see it — to them the product looks exactly the
+                    same as any other Atlantis listing. Operator-requested
+                    so a supplier browsing the public catalog can tell
+                    "this row is mine" at a glance. Top-right corner so it
+                    doesn't collide with Top Rated / Bulk Save chips on
+                    the top-left. */}
+                {isOwnProduct && (
+                    <div className="absolute top-2 end-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-[#0B1F3A] text-white text-[10px] font-bold uppercase tracking-wider shadow-md">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                        Your listing
+                    </div>
+                )}
+
                 {isOutOfStock && (
                     <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10">
                         <span className="bg-[#0B1F3A] text-white px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-widest">Out of Stock</span>

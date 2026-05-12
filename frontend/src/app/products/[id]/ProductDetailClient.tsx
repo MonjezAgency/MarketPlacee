@@ -442,6 +442,35 @@ export default function ProductDetailClient() {
                     {/* MIDDLE: Product Information */}
                     <div className="lg:col-span-5 flex flex-col">
                         <div className="flex flex-col gap-6">
+                            {/* ── "Your listing" banner ────────────────────
+                                Only renders when the visitor is the supplier
+                                who owns this product. Buyers / anonymous
+                                visitors / other suppliers see nothing — to
+                                them this is just an Atlantis product. The
+                                banner gives the owner an at-a-glance signal
+                                + a direct link to the edit page so they don't
+                                have to bounce back through /supplier/products. */}
+                            {user?.role?.toUpperCase() === 'SUPPLIER' &&
+                                (product as any).supplierId &&
+                                user?.id === (product as any).supplierId && (
+                                <div className="rounded-xl bg-[#0B1F3A] text-white px-4 py-3 flex items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                        <span className="text-[12px] font-bold uppercase tracking-widest">
+                                            Your listing
+                                        </span>
+                                        <span className="text-[11px] text-white/60 font-medium">
+                                            — this is how the public catalog sees your product.
+                                        </span>
+                                    </div>
+                                    <Link
+                                        href={`/supplier/products/${product.id}/edit`}
+                                        className="inline-flex items-center h-7 px-3 rounded-md bg-white/10 hover:bg-white/20 text-[11px] font-bold transition-colors"
+                                    >
+                                        Edit
+                                    </Link>
+                                </div>
+                            )}
                             <div className="flex">
                                 <span className="text-[12px] font-bold text-[#14B8A6] bg-[#14B8A6]/5 px-4 py-1.5 rounded-full uppercase tracking-widest border border-[#14B8A6]/10">
                                     {getDisplayCategory(product)}
