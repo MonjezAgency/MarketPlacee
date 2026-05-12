@@ -166,6 +166,24 @@ export class ExcelService {
             // ── price ─────────────────────────────────────────────────────────
             'price': 'price', 'cost': 'price', 'rate': 'price', 'amount': 'price',
             'unitprice': 'price', 'saleprice': 'price', 'sellingprice': 'price', 'baseprice': 'price',
+            // Per-piece price variants — operator's Atlantis CSV uses
+            // "Price per Piece (USD)" which used to fall through.
+            'priceperpiece': 'price', 'priceperpieceusd': 'price',
+            'priceperpieceeur': 'price', 'priceperpiecegbp': 'price',
+            'pricepiece': 'price', 'priceperunit': 'price', 'priceperunitusd': 'price',
+            // Per-case / per-carton variants
+            'pricepercase': 'price', 'priceperpack': 'price', 'priceperpackusd': 'price',
+            'pricepercaseusd': 'price', 'pricepercaseeur': 'price',
+            'pricepercarton': 'price', 'pricepercartonusd': 'price',
+            // Offer/wholesale variants — Tena offer file used "Price offer".
+            'priceoffer': 'price', 'offerprice': 'price', 'wholesaleprice': 'price',
+            'wholesalepriceusd': 'price', 'wholesalepriceeur': 'price',
+            'b2bprice': 'price', 'tradeprice': 'price',
+            // "Price Exw <city>" pattern — Swiffer file. Both the price
+            // AND the EXW origin are stuffed into one header. We map it
+            // to price; sheet-level EXW extraction (detectSheetLevelExw)
+            // separately picks the city out of the same header text.
+            'priceexw': 'price', 'priceexworks': 'price',
             'السعر': 'price', 'سعرالبيع': 'price', 'سعر': 'price', 'القيمة': 'price', 'ثمن': 'price',
             // ── stock ─────────────────────────────────────────────────────────
             'stock': 'stock', 'stockcount': 'stock', 'quantity': 'stock', 'qty': 'stock',
@@ -181,6 +199,14 @@ export class ExcelService {
             'المجموعة': 'category', 'مجموعة': 'category',
             // ── ean / item number ─────────────────────────────────────────────
             'ean': 'ean', 'barcode': 'ean', 'upc': 'ean', 'sku': 'ean',
+            // Compound headers — these used to fall through after we
+            // raised the partial-match cutoff to 6 chars. 'ean' / 'upc'
+            // by themselves only match exact now, so spell out the
+            // common compound variants explicitly.
+            'eancode': 'ean', 'eannumber': 'ean', 'ean13': 'ean', 'ean8': 'ean',
+            'upccode': 'ean', 'upcnumber': 'ean',
+            'barcodeean': 'ean', 'barcodenumber': 'ean', 'barcodeno': 'ean',
+            'productbarcode': 'ean', 'productean': 'ean',
             'code': 'ean', 'productcode': 'ean', 'itemnumber': 'ean', 'itemno': 'ean',
             'itemnr': 'ean', 'artikelnummer': 'ean', 'articlenumber': 'ean',
             'الباركود': 'ean', 'كودالمنتج': 'ean', 'كود': 'ean', 'رقم': 'ean',
@@ -281,6 +307,17 @@ export class ExcelService {
             'batchnumber': 'shelfLife', 'batchno': 'shelfLife', 'lot': 'shelfLife',
             'lotnumber': 'shelfLife', 'batchnumberexpirydate': 'shelfLife',
             'bbd': 'shelfLife', 'bestbeforedate': 'shelfLife',
+            // ── origin (country of manufacture / origin) ─────────────────────
+            // Atlantis FMCG catalog uses "Country of Origin", other
+            // suppliers shorten to "Origin" or "Made in". This is
+            // distinct from EXW location (where goods physically sit
+            // today vs where they were manufactured).
+            'origin': 'origin', 'countryoforigin': 'origin', 'origincountry': 'origin',
+            'madein': 'origin', 'manufacturedin': 'origin', 'producedin': 'origin',
+            'countryofmanufacture': 'origin', 'countryofproduction': 'origin',
+            'productorigin': 'origin', 'sourcecountry': 'origin',
+            'بلدالمنشأ': 'origin', 'منشأ': 'origin', 'المنشأ': 'origin',
+            'بلدالصنع': 'origin', 'صنعفي': 'origin',
             // ── EXW (Ex Works location — where the goods physically sit) ─────
             // Atlantis logistics uses this to quote transport from origin to
             // the buyer. We accept many phrasings because suppliers write it
@@ -304,7 +341,11 @@ export class ExcelService {
             'physicallocation': 'exwLocation', 'physicallyin': 'exwLocation',
             'incoterm': 'exwLocation', 'incoterms': 'exwLocation',
             'مكانالبضاعة': 'exwLocation', 'مكانالمنتج': 'exwLocation',
-            'موقعالمنتج': 'exwLocation', 'بلدالمنشأ': 'exwLocation',
+            'موقعالمنتج': 'exwLocation',
+            // NOTE: 'بلدالمنشأ' (country of origin) intentionally lives in
+            // the origin alias block above, not here. The exwLocation
+            // semantic is "where the goods physically sit today" which
+            // is distinct from country of manufacture.
             'مخزن': 'exwLocation', 'موقعالشحن': 'exwLocation',
             // ── images (URLs, comma/semicolon/pipe/newline-separated) ─────────
             'image': 'images', 'images': 'images', 'imageurl': 'images',
@@ -376,14 +417,46 @@ export class ExcelService {
         };
 
         // After matching, resolve same-target conflicts by keeping the
-        // highest-confidence column per target field.
-        const resolveConflicts = (raw: Record<number, { target: string; confidence: number }>): Record<number, string> => {
+        // highest-confidence column per target field. When two columns
+        // tie on confidence, we apply a semantic tiebreak using the
+        // original header text — needed for cases like the Atlantis
+        // CSV which has BOTH "Pallet per Truck" (truck capacity) AND
+        // "Pallets in Shipment" (actual count). Both alias-match to
+        // palletsPerShipment, but the "shipment" header is the one we
+        // actually want for the order. headerRow is passed in so the
+        // tiebreak can read the original cell strings.
+        const resolveConflicts = (
+            raw: Record<number, { target: string; confidence: number }>,
+            headerRow: any[],
+        ): Record<number, string> => {
+            // Per-target semantic priority. Headers that contain any of
+            // the listed substrings (post-normalize) get a +0.5
+            // confidence bump so they win tiebreaks against more
+            // generic synonyms. The bump is < 1 so an exact match
+            // anywhere else still trumps a partial-match here.
+            const SEMANTIC_PRIORITY: Record<string, string[]> = {
+                palletsPerShipment: ['shipment', 'load', 'container', 'fcl'],
+                exwLocation: ['exw', 'currently', 'physical', 'stock'],
+                origin: ['origin', 'manufactured', 'madein', 'produced'],
+                price: ['piece', 'unit', 'wholesale', 'offer', 'b2b'],
+            };
+            const score = (col: number, target: string, baseConf: number): number => {
+                const priorities = SEMANTIC_PRIORITY[target];
+                if (!priorities) return baseConf;
+                const cell = normalize(String(headerRow[col] ?? ''));
+                if (priorities.some((p) => cell.includes(p))) {
+                    return baseConf + 0.5;
+                }
+                return baseConf;
+            };
+
             const bestPerTarget: Record<string, { col: number; confidence: number }> = {};
             for (const [colStr, info] of Object.entries(raw)) {
                 const col = Number(colStr);
+                const adjusted = score(col, info.target, info.confidence);
                 const existing = bestPerTarget[info.target];
-                if (!existing || info.confidence > existing.confidence) {
-                    bestPerTarget[info.target] = { col, confidence: info.confidence };
+                if (!existing || adjusted > existing.confidence) {
+                    bestPerTarget[info.target] = { col, confidence: adjusted };
                 }
             }
             const flat: Record<number, string> = {};
@@ -423,7 +496,7 @@ export class ExcelService {
 
             if (totalMatches >= 2) {
                 headerRowIndex = i;
-                mapping = resolveConflicts(mergedRaw);
+                mapping = resolveConflicts(mergedRaw, row);
                 if (i + 1 < rows.length) {
                     const nextRow = rows[i + 1] || [];
                     const { matches: c2 } = matchRow(nextRow);
@@ -554,20 +627,28 @@ export class ExcelService {
             }
 
             // ── EXW resolution ──────────────────────────────────────────────
-            // Required field. Resolution order:
-            //   1. The mapped exwLocation column (per-row).
-            //   2. An "EXW: <country>" / "Ex Works <country>" pattern found
-            //      anywhere in the row's cells (description, notes, etc.).
-            //   3. The sheet-level fallback we detected once at the top.
-            // If still missing, the row fails validation with a clear admin-
-            // facing message — Atlantis won't list a product without
-            // knowing where the goods physically are.
+            // Best-effort: try column → row inline → sheet-level. If still
+            // empty we DON'T fail the row anymore — the supplier can fill
+            // it in from the product edit page after the upload lands.
+            // Operator decision: blocking 57 KitKat rows because a
+            // supplier sheet didn't bake "EXW" into a header was a
+            // worse experience than letting them complete it later.
             if (!normalizedRow.exwLocation) {
                 const inlineExw = this.extractExwFromCells(row);
                 if (inlineExw) normalizedRow.exwLocation = inlineExw;
             }
             if (!normalizedRow.exwLocation && sheetLevelExw) {
                 normalizedRow.exwLocation = sheetLevelExw;
+            }
+
+            // ── Unit type fallback ─────────────────────────────────────────
+            // Most B2B uploads are case-level (the file has a Pcs/case
+            // column, MOQ in cases, etc.). When the sheet doesn't pin
+            // a unit type explicitly, default to "case" so the row
+            // doesn't get rejected for `unit: Missing`. Suppliers can
+            // still flip it to Piece/Pallet/Truck from the edit page.
+            if (!normalizedRow.unit) {
+                normalizedRow.unit = 'case';
             }
 
             // Log first 3 data rows so the operator can verify extraction
@@ -594,21 +675,10 @@ export class ExcelService {
             const instance = plainToInstance(dtoClass, normalizedRow, { enableImplicitConversion: true });
             const errors = await validate(instance as any);
 
-            // EXW is a hard requirement — Atlantis logistics needs to know
-            // where the goods physically are before quoting transport. If
-            // none of the resolution strategies above produced one, fail
-            // the row with a clear, supplier-actionable message.
-            if (!normalizedRow.exwLocation) {
-                errorCount++;
-                results.push({
-                    rowNumber: i + 1,
-                    success: false,
-                    errors: [
-                        'exwLocation: Missing EXW (origin warehouse). Add an "EXW" column to your sheet or write "EXW: <country/city>" anywhere in the product row. Without it the product cannot be listed.',
-                    ],
-                });
-                continue;
-            }
+            // EXW is now best-effort, not a hard requirement. If still
+            // empty after column / inline / sheet-level resolution, the
+            // row passes through and the supplier completes it on the
+            // edit page. See block above for the operator rationale.
 
             if (errors.length > 0) {
                 errorCount++;
@@ -825,6 +895,14 @@ export class ExcelService {
         const name = String(row.name || '').toLowerCase().trim();
         if (!name) return true; // empty rows → skip (won't validate anyway)
 
+        // Single short brand-label row (e.g. just "SWIFFER" or "TENA") —
+        // Greek/EU suppliers often write the brand on its own row before
+        // the listing block. Detect: name is short (≤ 2 words), no EAN,
+        // no price, no logistics, and no descriptive content. Treat as
+        // a section header, not a product.
+        const wordCount = name.split(/\s+/).filter(Boolean).length;
+        if (wordCount <= 2 && name.length <= 25) return true;
+
         const noteSignals = [
             'minimum order', 'min order', 'min. order',
             'prices are', 'all prices', 'incl. vat', 'excl. vat',
@@ -939,7 +1017,39 @@ export class ExcelService {
         }
         if (row.brand !== undefined && row.brand !== null) row.brand = String(row.brand).trim();
         if (row.unit !== undefined && row.unit !== null) row.unit = String(row.unit).trim().toLowerCase();
-        if (row.shelfLife !== undefined && row.shelfLife !== null) row.shelfLife = String(row.shelfLife).trim();
+        if (row.shelfLife !== undefined && row.shelfLife !== null) {
+            // Date normalisation pipeline. shelfLife can arrive in three
+            // flavours:
+            //   1) Excel serial number  (44927.0  → "2023-01-01")
+            //   2) Excel ISO timestamp  ("2026-12-31T00:00:00.000Z")
+            //   3) Plain YYYYMMDD       ("20260731")
+            // We always emit ISO YYYY-MM-DD so the BBD field on the
+            // product detail page renders consistently and the supplier
+            // can read it without thinking "what's 46387.083?".
+            const raw = row.shelfLife;
+            const rawStr = String(raw).trim();
+
+            // Case 1: numeric (Excel serial) — values between 30000-60000
+            // correspond to ~1982-2064, the realistic BBD window.
+            const asNumber = typeof raw === 'number' ? raw : parseFloat(rawStr);
+            if (!isNaN(asNumber) && asNumber > 30000 && asNumber < 70000 && !/-/.test(rawStr)) {
+                // Excel serial dates are days since 1900-01-01 (with the
+                // famous 1900-leap-year bug, hence +1 offset).
+                const epochMs = (asNumber - 25569) * 86400 * 1000;
+                const d = new Date(epochMs);
+                if (!isNaN(d.getTime())) {
+                    row.shelfLife = d.toISOString().slice(0, 10);
+                }
+            } else if (/^\d{4}-\d{2}-\d{2}T/.test(rawStr)) {
+                // Case 2: ISO timestamp — keep just the date portion.
+                row.shelfLife = rawStr.slice(0, 10);
+            } else if (/^\d{8}$/.test(rawStr)) {
+                // Case 3: YYYYMMDD compact — insert dashes.
+                row.shelfLife = `${rawStr.slice(0, 4)}-${rawStr.slice(4, 6)}-${rawStr.slice(6, 8)}`;
+            } else {
+                row.shelfLife = rawStr;
+            }
+        }
 
         // Force price to number (handle European decimals like "1.58", "0.38")
         if (row.price !== undefined && row.price !== null) {
