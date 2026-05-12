@@ -317,9 +317,14 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                         <span className="text-muted-foreground text-xs font-medium">
                             / {cardUnit}
                         </span>
-                        {isOwnProduct && (
-                            <span className="ms-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">Your Price</span>
-                        )}
+                        {/* "Your Price" badge intentionally removed — the
+                            "Your listing" pill in the image corner is enough
+                            to tell the supplier this is their product. The
+                            old "Your Price" label hinted that buyers see a
+                            DIFFERENT price (i.e. revealed the platform
+                            markup), which the operator wants kept private.
+                            Supplier just sees the price plainly now —
+                            no inside-baseball signal. */}
                     </div>
 
                     <div className="flex items-center justify-between gap-3">
