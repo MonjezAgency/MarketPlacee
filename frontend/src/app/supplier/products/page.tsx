@@ -31,7 +31,6 @@ import { Product, ProductStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getActiveCurrency } from '@/lib/currency';
-import ProductEditorModal from '@/app/dashboard/supplier/ProductEditorModal';
 import AddProductDrawer from '@/components/product/AddProductDrawer';
 
 export default function SupplierProductsPage() {
@@ -42,9 +41,7 @@ export default function SupplierProductsPage() {
     const [searchTerm, setSearchTerm] = React.useState('');
     const [selectedCategory, setSelectedCategory] = React.useState('All');
     const [currentPage, setCurrentPage] = React.useState(1);
-    const [isEditorOpen, setIsEditorOpen] = React.useState(false);
     const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
-    const [editingProduct, setEditingProduct] = React.useState<Product | null>(null);
 
     const [isBulkModalOpen, setIsBulkModalOpen] = React.useState(false);
     const [bulkFiles, setBulkFiles] = React.useState<File[]>([]);
@@ -213,38 +210,9 @@ export default function SupplierProductsPage() {
         }
     };
 
-    const handleSaveProduct = async (formData: any) => {
-        try {
-            const endpoint = editingProduct
-                ? `/products/${editingProduct.id}`
-                : '/products';
-            const method = editingProduct ? 'PATCH' : 'POST';
-
-            // Map image to images for backend schema compatibility
-            const payload = { ...formData };
-            if (payload.image) {
-                payload.images = [payload.image, ...(payload.images || [])];
-                delete payload.image;
-            }
-
-            const res = await apiFetch(endpoint, {
-                method,
-                body: JSON.stringify(payload),
-            });
-
-            if (!res.ok) {
-                const error = await res.json().catch(() => ({}));
-                throw new Error(error.message || 'Failed to save product');
-            }
-
-            setIsEditorOpen(false);
-            setEditingProduct(null);
-            loadProducts();
-        } catch (err: any) {
-            console.error('Product save error:', err);
-            alert(`Error: ${err.message}`);
-        }
-    };
+    // Edit is now a dedicated route at /supplier/products/[id]/edit —
+    // saves happen inside ProductEditorForm, the table just navigates.
+    // Create is still handled by AddProductDrawer below.
 
     const filteredProducts = products.filter(p => {
         const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -566,7 +534,7 @@ export default function SupplierProductsPage() {
                                                 <td className="px-8 py-5 text-end">
                                                     <div className="flex items-center justify-end gap-2">
                                                         <button
-                                                            onClick={() => { setEditingProduct(product); setIsEditorOpen(true); }}
+                                                            onClick={() => { router.push(`/supplier/products/${product.id}/edit`); }}
                                                             className="w-9 h-9 rounded-lg bg-muted hover:bg-primary/10 text-muted-foreground hover:text-primary transition-all flex items-center justify-center"
                                                             title="Edit"
                                                         >
@@ -642,7 +610,7 @@ export default function SupplierProductsPage() {
                                         </div>
                                     </div>
                                     <div className="absolute bottom-4 end-4 flex gap-2">
-                                        <button onClick={() => { setEditingProduct(product); setIsEditorOpen(true); }} className="p-2 text-muted-foreground hover:text-primary"><Edit2 size={16} /></button>
+                                        <button onClick={() => { router.push(`/supplier/products/${product.id}/edit`); }} className="p-2 text-muted-foreground hover:text-primary"><Edit2 size={16} /></button>
                                         <button onClick={() => handleDeleteProduct(product.id, product.name)} className="p-2 text-muted-foreground hover:text-destructive"><Trash2 size={16} /></button>
                                     </div>
                                 </motion.div>
@@ -689,13 +657,7 @@ export default function SupplierProductsPage() {
                 </div>
             )}
 
-            {/* Product Editor Modal — for EDITING existing products */}
-            <ProductEditorModal
-                isOpen={isEditorOpen}
-                onClose={() => setIsEditorOpen(false)}
-                onSave={handleSaveProduct}
-                product={editingProduct as any}
-            />
+            {/* Editing happens at /supplier/products/[id]/edit — no modal here. */}
 
             {/* Add Product Side Drawer — for creating NEW products */}
             <AddProductDrawer

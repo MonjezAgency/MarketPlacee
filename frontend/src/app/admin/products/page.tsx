@@ -19,7 +19,6 @@ import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/contexts/LanguageContext';
 import AddProductDrawer from '@/components/product/AddProductDrawer';
 import ImageLightbox from '@/components/ImageLightbox';
-import ProductEditorModal from '@/app/dashboard/supplier/ProductEditorModal';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -215,13 +214,12 @@ export default function ProductsModerationPage() {
     }, []);
 
     // Edit Mode State
-    // `isEditing` / `editData` powers the legacy INLINE edit panel still
-    // rendered inside the side drawer (used by the existing inline image
-    // grid, EAN search, etc). The new clean modal — controlled by
-    // `isEditModalOpen` — is what the "Edit Product Details" button now
-    // opens and is the only path the user sees. The inline state is kept
-    // around because other features in this file still poke at it; once
-    // we strip the inline panel entirely they can go.
+    // `isEditing` / `editData` originally powered an inline edit panel
+    // inside the side drawer (image grid, EAN search, etc). The actual
+    // edit flow now lives at /admin/products/[id]/edit — see
+    // ProductEditorForm. We keep this state around because other
+    // features in this file still poke at it; once nothing reads from
+    // `editData` we can strip it entirely.
     const [isEditing, setIsEditing] = React.useState(false);
     const [editData, setEditData] = React.useState<any>(null);
     const [isSavingEdit, setIsSavingEdit] = React.useState(false);
@@ -230,51 +228,11 @@ export default function ProductsModerationPage() {
     const [showUploadGuide, setShowUploadGuide] = React.useState(false);
     const [showUrlInput, setShowUrlInput] = React.useState(false);
     const [urlInputValue, setUrlInputValue] = React.useState('');
-    const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
-
+    // Edit is now a dedicated route at /admin/products/[id]/edit. The
+    // table's "Edit Product Details" button navigates there instead of
+    // opening a modal; saves happen inside ProductEditorForm.
     const startEditing = (product: any) => {
-        // Both code paths get the same source object: the modal saves
-        // through `handleModalSave` below, the legacy inline panel can
-        // still read `editData` if anything still depends on it.
-        setEditData({ ...product });
-        setIsEditModalOpen(true);
-    };
-
-    const handleModalSave = async (data: any) => {
-        if (!data?.id && !selectedProduct?.id) return;
-        const tid = toast.loading('Saving changes...');
-        try {
-            const id = data.id || selectedProduct?.id;
-            // Mirror the inline edit's stability rule: only send `price`
-            // when the supplier-raw price actually changed, otherwise the
-            // backend re-runs markup × basePrice on every save and the
-            // price drifts.
-            const basePriceChanged =
-                selectedProduct &&
-                Number(data.basePrice ?? data.price) !== Number(selectedProduct.basePrice);
-            const patchPayload: any = { ...data };
-            delete patchPayload.price;
-            if (basePriceChanged) {
-                patchPayload.price = data.basePrice ?? data.price;
-            } else {
-                delete patchPayload.basePrice;
-            }
-            const res = await apiFetch(`/products/${id}`, {
-                method: 'PATCH',
-                body: JSON.stringify(patchPayload),
-            });
-            if (res.ok) {
-                toast.success('Product updated successfully', { id: tid });
-                setIsEditModalOpen(false);
-                fetchData();
-                setSelectedProduct({ ...selectedProduct, ...data } as any);
-            } else {
-                const err = await res.json().catch(() => ({}));
-                toast.error(err.message || 'Failed to save changes', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Connection error', { id: tid });
-        }
+        router.push(`/admin/products/${product.id}/edit`);
     };
 
     const handleSaveEdit = async () => {
@@ -2199,18 +2157,7 @@ export default function ProductsModerationPage() {
                 })()}
             </AnimatePresence>
 
-            {/* Clean Edit Product modal — opened by "Edit Product Details" */}
-            <ProductEditorModal
-                isOpen={isEditModalOpen}
-                onClose={() => setIsEditModalOpen(false)}
-                product={editData}
-                onSave={handleModalSave}
-                mode="admin"
-                onDelete={(id) => {
-                    setIsEditModalOpen(false);
-                    handleDelete(id);
-                }}
-            />
+            {/* Editing happens at /admin/products/[id]/edit — no modal here. */}
         </div>
     );
 }
