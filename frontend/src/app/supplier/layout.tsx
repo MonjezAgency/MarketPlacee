@@ -55,6 +55,12 @@ const SUPPLIER_LANGUAGES: { code: Locale; name: string; flag: string }[] = [
 const SUPPLIER_LINKS = [
     { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
     { label: 'Inventory Manager', href: '/supplier/products', icon: Box, key: 'products' },
+    // New "Stock & Reservations" tab — operator request.
+    // Shows per-product breakdown: in-stock vs reserved (pending +
+    // processing + shipped orders) vs sold (delivered) vs cancelled
+    // (restored to stock). The supplier reads this to answer "what's
+    // committed vs what's free vs what's left the warehouse".
+    { label: 'Stock & Reservations', href: '/supplier/inventory', icon: Box, key: 'inventory' },
     { label: 'Wholesale Offers', href: '/supplier/wholesale-offers', icon: ListPlus, key: 'wholesale-offers' },
     { label: 'Offers & Ads', href: '/supplier/offers', icon: ListPlus },
     { label: 'My Sales', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },

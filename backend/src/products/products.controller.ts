@@ -72,6 +72,27 @@ export class ProductsController {
         }));
     }
 
+    /**
+     * Inventory dashboard for the supplier. Per product:
+     *   • total stock     — current Product.stock (what they can still sell)
+     *   • reserved units  — sum of OrderItem.quantity for orders still
+     *                       in PENDING / PROCESSING / SHIPPED (decremented
+     *                       from stock at order time but not yet
+     *                       finally delivered or cancelled)
+     *   • sold units      — sum of OrderItem.quantity for DELIVERED orders
+     *   • cancelled units — sum of OrderItem.quantity for CANCELLED orders
+     *                       (these were restored back to stock)
+     * The supplier reads this to know "how many am I committed to ship
+     * vs how many have already shipped vs how many are still on the
+     * shelf for new orders".
+     */
+    @Get('inventory')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPPLIER)
+    async getInventory(@Request() req) {
+        return this.productsService.getInventoryForSupplier(req.user.sub);
+    }
+
     // ─── Static routes MUST come before :id param routes ───────────────────
 
     @Get('admin/all')

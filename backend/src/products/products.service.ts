@@ -1052,6 +1052,108 @@ export class ProductsService {
         return this.prisma.product.findMany({ where: { supplierId } });
     }
 
+    /**
+     * Build the supplier inventory breakdown for every product they own.
+     * Returns one row per product with the four buckets the supplier
+     * page expects: in-stock / reserved / sold / cancelled. Computed by
+     * joining Product → OrderItem.order.status so we get a fresh tally
+     * on every page load (no caching — the table is small).
+     */
+    async getInventoryForSupplier(supplierId: string) {
+        const products = await this.prisma.product.findMany({
+            where: { supplierId },
+            select: {
+                id: true,
+                name: true,
+                images: true,
+                stock: true,
+                basePrice: true,
+                price: true,
+                ean: true,
+                category: true,
+                unit: true,
+                unitsPerCase: true,
+                casesPerPallet: true,
+                status: true,
+                exwLocation: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        if (products.length === 0) return [];
+
+        // Aggregate quantities per (productId, orderStatus) in one go.
+        const aggregates = await this.prisma.orderItem.groupBy({
+            by: ['productId'],
+            where: { productId: { in: products.map((p) => p.id) } },
+            _sum: { quantity: true },
+        });
+        // We need a separate group-by per status bucket to compute
+        // reserved vs sold vs cancelled. Run the three queries in
+        // parallel — each is just a fast aggregate against an indexed
+        // foreign key, so the round-trip cost is small.
+        const [reserved, sold, cancelled] = await Promise.all([
+            this.prisma.orderItem.groupBy({
+                by: ['productId'],
+                where: {
+                    productId: { in: products.map((p) => p.id) },
+                    order: { status: { in: ['PENDING', 'PROCESSING', 'SHIPPED'] } },
+                },
+                _sum: { quantity: true },
+            }),
+            this.prisma.orderItem.groupBy({
+                by: ['productId'],
+                where: {
+                    productId: { in: products.map((p) => p.id) },
+                    order: { status: 'DELIVERED' },
+                },
+                _sum: { quantity: true },
+            }),
+            this.prisma.orderItem.groupBy({
+                by: ['productId'],
+                where: {
+                    productId: { in: products.map((p) => p.id) },
+                    order: { status: 'CANCELLED' },
+                },
+                _sum: { quantity: true },
+            }),
+        ]);
+
+        const indexBy = (rows: any[]) => {
+            const map: Record<string, number> = {};
+            for (const r of rows) {
+                if (r.productId) map[r.productId] = Number(r._sum?.quantity || 0);
+            }
+            return map;
+        };
+        const totalOrdered = indexBy(aggregates);
+        const reservedMap = indexBy(reserved);
+        const soldMap = indexBy(sold);
+        const cancelledMap = indexBy(cancelled);
+
+        return products.map((p) => ({
+            id: p.id,
+            name: p.name,
+            image: p.images?.[0] || null,
+            ean: p.ean,
+            category: p.category,
+            unit: p.unit,
+            status: p.status,
+            exwLocation: p.exwLocation,
+            unitsPerCase: p.unitsPerCase,
+            casesPerPallet: p.casesPerPallet,
+            // Pricing — surface supplier's raw case price, not the
+            // marked-up customer price. Consistent with /my-products.
+            price: p.basePrice ?? p.price,
+            // Stock buckets
+            stock: p.stock,                            // still available to sell
+            reserved: reservedMap[p.id] || 0,           // committed to ship
+            sold: soldMap[p.id] || 0,                   // delivered to customers
+            cancelled: cancelledMap[p.id] || 0,         // returned to stock
+            totalOrdered: totalOrdered[p.id] || 0,      // gross lifetime orders
+        }));
+    }
+
     async rateProduct(id: string, newRating: number) {
         const product = await this.findOne(id);
         if (!product) throw new BadRequestException('Product not found');

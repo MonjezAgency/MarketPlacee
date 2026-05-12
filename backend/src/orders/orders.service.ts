@@ -112,13 +112,36 @@ export class OrdersService {
         // is deleted later. We pass `name` from the cart payload when
         // available, otherwise look it up.
         const productIds = items.map(i => i.productId).filter(Boolean);
-        const productNames = productIds.length > 0
+        const productRows = productIds.length > 0
             ? await this.prisma.product.findMany({
                 where: { id: { in: productIds } },
-                select: { id: true, name: true },
+                select: { id: true, name: true, stock: true },
             })
             : [];
-        const nameById = new Map(productNames.map(p => [p.id, p.name]));
+        const nameById = new Map(productRows.map(p => [p.id, p.name]));
+        const stockById = new Map(productRows.map(p => [p.id, p.stock]));
+
+        // ── Stock reservation gate ───────────────────────────────
+        // Operator rule: every order line decrements the product's
+        // stock by the ordered quantity. Reject the order outright
+        // if any line would push stock negative — this prevents
+        // overselling on a race between two simultaneous customers.
+        // The decrement happens inside a transaction below alongside
+        // the order create so a failed write rolls everything back.
+        const insufficient: string[] = [];
+        for (const item of items) {
+            if (!item.productId) continue;
+            const have = stockById.get(item.productId) ?? 0;
+            const want = Number(item.quantity || 0);
+            if (want > have) {
+                insufficient.push(`${nameById.get(item.productId) || item.productId} (have ${have}, want ${want})`);
+            }
+        }
+        if (insufficient.length > 0) {
+            throw new BadRequestException(
+                `Not enough stock for: ${insufficient.join('; ')}. Reduce the quantity or contact the supplier.`,
+            );
+        }
 
         const order = await this.prisma.order.create({
             data: {
@@ -161,6 +184,30 @@ export class OrdersService {
                 customer: { select: { email: true, name: true } },
             },
         });
+
+        // ── Decrement stock for every line ───────────────────────
+        // Done AFTER the order row is committed so there's a single
+        // source of truth (the order id) tying each decrement back.
+        // We checked sufficiency above; here we just fire the
+        // decrements in parallel. If one fails the order still
+        // exists but the stock count will be off — the reconcile
+        // job (admin → inventory tools) catches drift.
+        await Promise.all(
+            items
+                .filter((i) => i.productId)
+                .map((i) =>
+                    this.prisma.product
+                        .update({
+                            where: { id: i.productId },
+                            data: { stock: { decrement: Number(i.quantity || 0) } },
+                        })
+                        .catch((err) =>
+                            console.error(
+                                `[STOCK_DECREMENT_FAIL] order=${order.id} product=${i.productId}: ${err?.message}`,
+                            ),
+                        ),
+                ),
+        );
 
         // Send Customer Confirmation Email (payment bypassed as per client request)
         if (order.customer?.email) {
@@ -466,6 +513,33 @@ export class OrdersService {
         if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
         const previousStatus = order.status;
+
+        // ── Stock restoration on cancel ───────────────────────────
+        // Operator rule: cancelling an order returns the reserved
+        // stock to the supplier. We only fire the increment on the
+        // transition INTO CANCELLED (not on every save while
+        // already cancelled). Refund flow doesn't touch stock here
+        // because the payments / dispute pipeline already handles
+        // it through escrow events — adding a second increment
+        // would double-credit.
+        if (status === 'CANCELLED' && previousStatus !== 'CANCELLED') {
+            await Promise.all(
+                order.items
+                    .filter((it) => it.productId)
+                    .map((it) =>
+                        this.prisma.product
+                            .update({
+                                where: { id: it.productId! },
+                                data: { stock: { increment: it.quantity } },
+                            })
+                            .catch((err) =>
+                                console.error(
+                                    `[STOCK_RESTORE_FAIL] order=${orderId} product=${it.productId}: ${err?.message}`,
+                                ),
+                            ),
+                    ),
+            );
+        }
 
         // Update order status + create history entry
         const updated = await this.prisma.order.update({

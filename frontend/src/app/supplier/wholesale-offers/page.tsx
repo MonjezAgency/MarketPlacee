@@ -51,6 +51,11 @@ const asArray = (raw: any): any[] => {
 export default function SupplierOffersPage() {
     const [offers, setOffers] = React.useState<Offer[]>([]);
     const [products, setProducts] = React.useState<any[]>([]);
+    // Discount percentage the supplier picked. Stored as a 0-90 integer.
+    // We multiply the picked product's current case price by (1 - pct/100)
+    // to derive the actual pricePerUnit sent to the API on submit.
+    // Default 10% — a reasonable wholesale starting point.
+    const [discountPct, setDiscountPct] = React.useState<number>(10);
     const [isLoading, setIsLoading] = React.useState(true);
     const [isAddOpen, setIsAddOpen] = React.useState(false);
     const [isUploadInfoOpen, setIsUploadInfoOpen] = React.useState(false);
@@ -122,9 +127,14 @@ export default function SupplierOffersPage() {
     const handleManualAdd = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const fd = new FormData(e.currentTarget);
+        // Derive pricePerUnit from discount % × current product price.
+        // The form no longer exposes a "price" input — the supplier picks
+        // a discount and we compute the resulting offer price here.
+        const currentCasePrice = Number(pickedProduct?.basePrice ?? pickedProduct?.price ?? 0);
+        const derivedPrice = +(currentCasePrice * (1 - discountPct / 100)).toFixed(2);
         const payload = {
             productId: String(fd.get('productId') || ''),
-            pricePerUnit: parseFloat(String(fd.get('pricePerUnit') || '0')),
+            pricePerUnit: derivedPrice,
             unit: String(fd.get('unit') || 'carton') as Tier,
             quantity: parseInt(String(fd.get('quantity') || '0'), 10),
             validUntil: String(fd.get('validUntil') || '') || undefined,
@@ -437,7 +447,37 @@ export default function SupplierOffersPage() {
                                     />
                                 </div>
 
-                                {/* Tier / Price / Qty */}
+                                {/* ── Reference card — current product context ──
+                                    Operator request: the supplier won't remember
+                                    what they listed the product at. Surface the
+                                    current case price, EXW location, and live
+                                    stock right above the price input so they
+                                    have an anchor when picking a discount. */}
+                                {pickedProduct && (
+                                    <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 grid grid-cols-3 gap-4">
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current price (per case)</p>
+                                            <p className="text-[18px] font-bold text-slate-900 mt-1 tabular-nums">
+                                                € {Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0).toFixed(2)}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">EXW · Currently In</p>
+                                            <p className="text-[14px] font-bold text-slate-900 mt-1 truncate">
+                                                {pickedProduct.exwLocation || '—'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">In stock</p>
+                                            <p className="text-[14px] font-bold text-slate-900 mt-1">
+                                                {pickedProduct.stock ?? 0}
+                                                <span className="text-[11px] text-slate-400 font-medium ml-1">cases</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Tier / Discount picker / Qty */}
                                 <div className="grid grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
                                         <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Tier *</label>
@@ -447,13 +487,79 @@ export default function SupplierOffersPage() {
                                             <option value="carton">🗃️ Case</option>
                                         </select>
                                     </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Price / unit (€) *</label>
-                                        <input required name="pricePerUnit" type="number" step="0.01" min="0" placeholder="0.00" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6] font-mono" />
+                                    {/* Discount % picker — operator-requested.
+                                        Suppliers won't remember the absolute
+                                        case price, so they pick a discount
+                                        relative to the live price above
+                                        (5/10/15/25/50% chips + custom slider).
+                                        We derive the offer price below and
+                                        ship it as `pricePerUnit` to the API,
+                                        so backend doesn't change. */}
+                                    <div className="space-y-1.5 col-span-2">
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                                            Discount % * <span className="text-slate-400 font-medium normal-case tracking-normal">— applied to current case price</span>
+                                        </label>
+                                        <div className="flex items-center gap-2">
+                                            {[5, 10, 15, 25, 50].map((p) => (
+                                                <button
+                                                    key={p}
+                                                    type="button"
+                                                    onClick={() => setDiscountPct(p)}
+                                                    className={cn(
+                                                        'flex-1 h-12 rounded-xl text-[13px] font-black border-2 transition-all',
+                                                        discountPct === p
+                                                            ? 'bg-[#2EC4B6] border-[#2EC4B6] text-white'
+                                                            : 'bg-slate-50 border-transparent text-slate-600 hover:bg-slate-100',
+                                                    )}
+                                                >
+                                                    -{p}%
+                                                </button>
+                                            ))}
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={90}
+                                                step={1}
+                                                value={discountPct}
+                                                onChange={(e) => {
+                                                    const v = parseInt(e.target.value);
+                                                    setDiscountPct(isNaN(v) ? 0 : Math.max(0, Math.min(90, v)));
+                                                }}
+                                                placeholder="custom"
+                                                className="w-20 h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold text-center outline-none focus:bg-white focus:border-[#2EC4B6]"
+                                            />
+                                        </div>
+                                        {pickedProduct && (
+                                            <p className="text-[11px] text-slate-500 mt-1">
+                                                Offer price will be{' '}
+                                                <strong className="text-[#2EC4B6]">
+                                                    € {(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0) * (1 - discountPct / 100)).toFixed(2)}
+                                                </strong>{' '}
+                                                per case (
+                                                <s className="text-slate-400">€ {Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0).toFixed(2)}</s>{' '}
+                                                — saving customers€{' '}
+                                                {(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0) * (discountPct / 100)).toFixed(2)}
+                                                ).
+                                            </p>
+                                        )}
                                     </div>
+                                </div>
+
+                                {/* Quantity */}
+                                <div className="grid grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Quantity *</label>
-                                        <input required name="quantity" type="number" min="1" placeholder="0" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                                            Quantity * <span className="text-slate-400 font-medium normal-case tracking-normal">— max {pickedProduct?.stock ?? '?'} in stock</span>
+                                        </label>
+                                        <input
+                                            required
+                                            name="quantity"
+                                            type="number"
+                                            min="1"
+                                            max={pickedProduct?.stock || undefined}
+                                            placeholder="0"
+                                            className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]"
+                                        />
                                     </div>
                                 </div>
 
