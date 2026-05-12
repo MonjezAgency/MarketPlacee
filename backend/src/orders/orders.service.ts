@@ -419,15 +419,34 @@ export class OrdersService {
             orderBy: { createdAt: 'desc' },
         });
 
-        return orders.map(order => ({
+        return orders.map(order => {
+            // Privacy mask: suppliers should NOT see the customer's
+            // real name or full email. Atlantis is the principal in
+            // the transaction; the supplier ships to the warehouse
+            // address, not the customer. We surface a redacted form
+            // so the supplier can still differentiate orders in the
+            // table ("Customer A" vs "Customer B") without learning
+            // who they are.
+            const masked = (raw?: string) =>
+                raw ? raw.split(' ').map((p) => (p ? p[0] + '***' : '')).join(' ') : 'Customer';
+            const maskedEmail = (raw?: string) =>
+                raw ? raw.replace(/^(.{2}).*@/, '$1***@') : '';
+            return {
             id: order.id,
             status: order.status,
             totalAmount: order.totalAmount,
             shippingCompany: order.shippingCompany,
             createdAt: order.createdAt,
+            // The supplier UI reads `buyer` — keep this as the canonical
+            // shape. We also include `customer` as a back-compat alias
+            // in case any older client still expects it.
+            buyer: {
+                name: masked(order.customer?.name),
+                email: maskedEmail(order.customer?.email),
+            },
             customer: {
-                name: order.customer?.name ? order.customer.name.split(' ').map((p, i) => i === 0 ? p[0] + '***' : p[0] + '***').join(' ') : 'Customer',
-                email: order.customer?.email ? order.customer.email.replace(/^(.{2}).*@/, '$1***@') : '',
+                name: masked(order.customer?.name),
+                email: maskedEmail(order.customer?.email),
             },
             items: order.items.map(item => ({
                 id: item.id,
@@ -444,7 +463,8 @@ export class OrdersService {
                 selectedTier: (item as any).selectedTier ?? null,
                 selectedVariants: (item as any).selectedVariants ?? null,
             })),
-        }));
+            };
+        });
     }
 
     // ─── Admin Stats ─────────────────────────────────────────────────

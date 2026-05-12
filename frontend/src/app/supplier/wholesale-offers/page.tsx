@@ -495,26 +495,54 @@ export default function SupplierOffersPage() {
                                         We derive the offer price below and
                                         ship it as `pricePerUnit` to the API,
                                         so backend doesn't change. */}
-                                    <div className="space-y-1.5 col-span-2">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                                            Discount % * <span className="text-slate-400 font-medium normal-case tracking-normal">— applied to current case price</span>
-                                        </label>
-                                        <div className="flex items-center gap-2">
+                                    {/* ── Discount % picker ──
+                                        Operator bug: on smaller screens the chip
+                                        row + custom input collided and the
+                                        selected value wasn't obvious. Redesign:
+                                          • Big "Selected: -X%" headline at top
+                                            so the supplier always sees what
+                                            they've picked, even on a phone.
+                                          • Chips wrap with flex-wrap and have
+                                            a fixed min-width.
+                                          • Custom input shown on its OWN row
+                                            with a "Custom %" label so it
+                                            doesn't compete with the chip row.
+                                          • Input clamped 1-90 (over 90 is a
+                                            free product, not a discount).
+                                    */}
+                                    <div className="space-y-2 col-span-2">
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">
+                                                Discount % *
+                                            </label>
+                                            <div className="inline-flex items-center gap-2">
+                                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Selected</span>
+                                                <span className="inline-flex items-center h-7 px-3 rounded-full bg-[#2EC4B6] text-white text-[13px] font-black tabular-nums">
+                                                    -{discountPct}%
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
                                             {[5, 10, 15, 25, 50].map((p) => (
                                                 <button
                                                     key={p}
                                                     type="button"
                                                     onClick={() => setDiscountPct(p)}
                                                     className={cn(
-                                                        'flex-1 h-12 rounded-xl text-[13px] font-black border-2 transition-all',
+                                                        'flex-1 min-w-[80px] h-12 rounded-xl text-[13px] font-black border-2 transition-all',
                                                         discountPct === p
-                                                            ? 'bg-[#2EC4B6] border-[#2EC4B6] text-white'
-                                                            : 'bg-slate-50 border-transparent text-slate-600 hover:bg-slate-100',
+                                                            ? 'bg-[#2EC4B6] border-[#2EC4B6] text-white shadow-md'
+                                                            : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100 hover:border-slate-200',
                                                     )}
                                                 >
                                                     -{p}%
                                                 </button>
                                             ))}
+                                        </div>
+                                        <div className="flex items-center gap-2 pt-1">
+                                            <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap">
+                                                Or custom %:
+                                            </label>
                                             <input
                                                 type="number"
                                                 min={1}
@@ -525,19 +553,25 @@ export default function SupplierOffersPage() {
                                                     const v = parseInt(e.target.value);
                                                     setDiscountPct(isNaN(v) ? 0 : Math.max(0, Math.min(90, v)));
                                                 }}
-                                                placeholder="custom"
-                                                className="w-20 h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold text-center outline-none focus:bg-white focus:border-[#2EC4B6]"
+                                                placeholder="0"
+                                                className={cn(
+                                                    'flex-1 h-10 px-3 border-2 rounded-xl text-[14px] font-bold text-center outline-none transition-colors',
+                                                    [5, 10, 15, 25, 50].includes(discountPct)
+                                                        ? 'bg-slate-50 border-slate-100 text-slate-600 focus:bg-white focus:border-[#2EC4B6]'
+                                                        : 'bg-[#2EC4B6]/10 border-[#2EC4B6] text-[#0F766E] focus:bg-white',
+                                                )}
                                             />
+                                            <span className="text-[11px] font-bold text-slate-400">(1–90)</span>
                                         </div>
                                         {pickedProduct && (
-                                            <p className="text-[11px] text-slate-500 mt-1">
+                                            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                                                 Offer price will be{' '}
                                                 <strong className="text-[#2EC4B6]">
                                                     € {(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0) * (1 - discountPct / 100)).toFixed(2)}
                                                 </strong>{' '}
                                                 per case (
                                                 <s className="text-slate-400">€ {Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0).toFixed(2)}</s>{' '}
-                                                — saving customers€{' '}
+                                                — saving customers €{' '}
                                                 {(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0) * (discountPct / 100)).toFixed(2)}
                                                 ).
                                             </p>

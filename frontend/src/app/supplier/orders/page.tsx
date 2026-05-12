@@ -74,7 +74,7 @@ export default function SupplierOrdersPage() {
 
     const filtered = orders.filter(o =>
         o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        o.buyer.name.toLowerCase().includes(searchTerm.toLowerCase())
+        (o.buyer?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
