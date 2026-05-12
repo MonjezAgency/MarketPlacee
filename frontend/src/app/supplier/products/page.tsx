@@ -477,6 +477,11 @@ export default function SupplierProductsPage() {
                                                                 <img
                                                                     src={product.images[0]}
                                                                     alt={product.name}
+                                                                    onError={(e) => {
+                                                                        // Hide on load failure so the URL
+                                                                        // text doesn't leak as an alt label.
+                                                                        (e.target as HTMLImageElement).style.display = 'none';
+                                                                    }}
                                                                     className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                                                                 />
                                                             ) : (
@@ -581,7 +586,14 @@ export default function SupplierProductsPage() {
                                 >
                                     <div className="w-20 h-20 rounded-xl bg-muted border border-border/50 overflow-hidden flex-shrink-0 flex items-center justify-center p-2">
                                         {product.images?.[0] ? (
-                                            <img src={product.images[0]} alt={product.name} className="w-full h-full object-contain" />
+                                            <img
+                                                src={product.images[0]}
+                                                alt={product.name}
+                                                onError={(e) => {
+                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                }}
+                                                className="w-full h-full object-contain"
+                                            />
                                         ) : (
                                             <Camera size={24} className="text-muted-foreground/20" />
                                         )}

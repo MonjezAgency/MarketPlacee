@@ -443,11 +443,33 @@ export default function ProductEditorForm({
 
     const addImageUrl = (url: string) => {
         if (!formData) return;
-        const trimmed = url.trim();
-        if (!trimmed) return;
+        // Sanitise: suppliers occasionally paste a JSON-escaped URL
+        // ("data:image/jpeg;base64,..." with the surrounding quotes
+        // included). Browsers can't load that as <img src>, so the
+        // image silently breaks. Strip leading/trailing quotes,
+        // whitespace, and angle brackets before we accept the value.
+        const cleaned = url
+            .trim()
+            .replace(/^["'<\s]+/, '')
+            .replace(/["'>\s]+$/, '')
+            .trim();
+        if (!cleaned) return;
+        // Reject obviously malformed: must be http(s) or a real
+        // data:image URL. Anything else is probably a search-results
+        // page URL that won't render — better to silently no-op than
+        // to litter the gallery with broken tiles.
+        const looksValid =
+            /^https?:\/\//i.test(cleaned) ||
+            /^data:image\/[a-z+]+;base64,/i.test(cleaned);
+        if (!looksValid) {
+            try {
+                toast.error('That URL doesn\'t look like an image. Paste a direct image link.');
+            } catch {}
+            return;
+        }
         const existing = formData.images || [];
-        if (existing.includes(trimmed)) return;
-        const combined = [...existing, trimmed];
+        if (existing.includes(cleaned)) return;
+        const combined = [...existing, cleaned];
         setFormData({ ...formData, images: combined, image: combined[0] });
     };
 
@@ -458,6 +480,26 @@ export default function ProductEditorForm({
             ...formData,
             images: remaining,
             image: remaining[0] || '',
+        });
+    };
+
+    /**
+     * Move an image up (towards index 0) or down in the list.
+     * The first image in the array is always the "main" — the one
+     * the buyer sees on the catalog grid and on the PDP hero, so
+     * reordering effectively lets the supplier pick which photo
+     * leads the listing.
+     */
+    const moveImage = (idx: number, direction: -1 | 1) => {
+        if (!formData) return;
+        const images = [...(formData.images || [])];
+        const target = idx + direction;
+        if (target < 0 || target >= images.length) return;
+        [images[idx], images[target]] = [images[target], images[idx]];
+        setFormData({
+            ...formData,
+            images,
+            image: images[0] || '',
         });
     };
 
@@ -778,8 +820,48 @@ export default function ProductEditorForm({
                                                 src={img}
                                                 alt=""
                                                 referrerPolicy="no-referrer"
+                                                onError={(e) => {
+                                                    // Image failed to load (malformed URL,
+                                                    // 404, etc). Hide the broken <img> so
+                                                    // the tile doesn't render the alt text
+                                                    // or the URL as visible text.
+                                                    (e.target as HTMLImageElement).style.display = 'none';
+                                                    (e.target as HTMLImageElement).parentElement?.classList.add('broken-image');
+                                                }}
                                                 className="w-full h-full object-contain p-1"
                                             />
+                                            {/* Reorder + remove controls. Up/down move
+                                                the image one slot in the list so the
+                                                supplier can pick exactly which photo is
+                                                "main" (= first) and what order the rest
+                                                follow on the PDP gallery. Buttons only
+                                                fade in on hover so the strip stays clean. */}
+                                            <div className="absolute top-0.5 left-0.5 flex flex-col gap-0.5 opacity-0 group-hover/thumb:opacity-100 transition-opacity">
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveImage(idx, -1);
+                                                    }}
+                                                    disabled={idx === 0}
+                                                    className="w-5 h-5 rounded-md bg-white/90 dark:bg-zinc-900/90 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center shadow"
+                                                    title="Move earlier"
+                                                >
+                                                    <ChevronUp size={11} />
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        moveImage(idx, 1);
+                                                    }}
+                                                    disabled={idx === (formData.images?.length ?? 0) - 1}
+                                                    className="w-5 h-5 rounded-md bg-white/90 dark:bg-zinc-900/90 hover:bg-slate-100 dark:hover:bg-zinc-800 text-slate-600 dark:text-zinc-300 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center shadow"
+                                                    title="Move later"
+                                                >
+                                                    <ChevronDown size={11} />
+                                                </button>
+                                            </div>
                                             <button
                                                 type="button"
                                                 onClick={(e) => {
@@ -791,6 +873,11 @@ export default function ProductEditorForm({
                                             >
                                                 <Trash2 size={10} />
                                             </button>
+                                            {idx === 0 && (
+                                                <span className="absolute bottom-0.5 left-0.5 inline-flex items-center h-4 px-1.5 rounded-md bg-slate-900/85 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[9px] font-bold uppercase tracking-wider">
+                                                    Main
+                                                </span>
+                                            )}
                                         </div>
                                     ))}
                                     {/* "Add more" tile — gives a visual hint that you
@@ -1363,35 +1450,72 @@ export default function ProductEditorForm({
 
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider">
-                                        Weight per Unit (kg) <span className="text-red-500">*</span>
+                                        Weight per Unit <span className="text-red-500">*</span>
                                     </label>
-                                    <input
-                                        type="text"
-                                        inputMode="decimal"
-                                        placeholder="e.g. 0.330"
-                                        value={formData.weight ?? ''}
-                                        onChange={(e) => {
-                                            // Allow only digits + one decimal separator
-                                            // (. or ,). No spinner arrows.
-                                            const v = e.target.value.replace(/[^0-9.,]/g, '');
-                                            setFormData({
-                                                ...formData,
-                                                weight: v as any,
-                                            });
-                                        }}
-                                        onBlur={(e) => {
-                                            const v = parseFloat(
-                                                e.target.value.replace(',', '.'),
-                                            );
-                                            setFormData({
-                                                ...formData,
-                                                weight: isNaN(v) ? 0 : v,
-                                            });
-                                        }}
-                                        className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
-                                    />
+                                    {/* Numeric value + unit dropdown composite.
+                                        The DB column is a free-form string so a
+                                        bag of pasta can be "500g" while a tin
+                                        of paint is "5kg" and bottled water is
+                                        "1.5L". We split the input into a
+                                        number field and a unit picker, and
+                                        concatenate them ("500g" / "1.5L") on
+                                        every change so formData.weight always
+                                        carries a renderable string.
+
+                                        Parse-back on load: if the stored
+                                        weight already has a unit suffix
+                                        ("500g"), we pre-populate the picker
+                                        with that unit. Pure numeric values
+                                        default to "kg" (the old behaviour). */}
+                                    {(() => {
+                                        const WEIGHT_UNITS = ['g', 'kg', 'mg', 'ml', 'cl', 'L', 'oz', 'lb', 'tn'];
+                                        const raw = String(formData.weight ?? '').trim();
+                                        const m = raw.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)?$/);
+                                        const numPart = m?.[1] ?? '';
+                                        let unitPart = (m?.[2] || 'kg').toLowerCase();
+                                        // Normalise common variants
+                                        if (unitPart === 'l') unitPart = 'L';
+                                        if (unitPart === 't' || unitPart === 'ton' || unitPart === 'tonne') unitPart = 'tn';
+                                        const safeUnit = WEIGHT_UNITS.includes(unitPart) ? unitPart : 'kg';
+                                        return (
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    inputMode="decimal"
+                                                    placeholder="e.g. 0.330"
+                                                    value={numPart}
+                                                    onChange={(e) => {
+                                                        const cleaned = e.target.value.replace(/[^0-9.,]/g, '');
+                                                        setFormData({
+                                                            ...formData,
+                                                            weight: cleaned ? (`${cleaned}${safeUnit}` as any) : ('' as any),
+                                                        });
+                                                    }}
+                                                    className="flex-1 h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
+                                                />
+                                                <select
+                                                    value={safeUnit}
+                                                    onChange={(e) => {
+                                                        const next = e.target.value;
+                                                        setFormData({
+                                                            ...formData,
+                                                            weight: numPart ? (`${numPart}${next}` as any) : ('' as any),
+                                                        });
+                                                    }}
+                                                    className="w-24 h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-2.5 text-sm font-semibold text-slate-900 dark:text-zinc-100 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12] appearance-none"
+                                                    title="Weight unit"
+                                                >
+                                                    {WEIGHT_UNITS.map((u) => (
+                                                        <option key={u} value={u}>
+                                                            {u}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                        );
+                                    })()}
                                     <p className="text-[11px] text-slate-400 dark:text-zinc-600">
-                                        Auto-extracted from product name if left blank (e.g. "250g" → 0.250)
+                                        Pick g / kg / ml / L / oz / lb / tn — whatever fits the product.
                                     </p>
                                 </div>
                                 <div className="space-y-1.5">
