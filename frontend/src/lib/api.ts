@@ -80,6 +80,9 @@ function mapProduct(item: any): Product {
         moq: item.moq ?? item.minOrder ?? 10,
         image: (item.images && item.images.length > 0) ? item.images[0] : '',
         images: item.images || [],
+        // Videos array — short product demo clips. Falls through to []
+        // for legacy rows that don't carry the field.
+        videos: item.videos || [],
         stock: item.stock ?? 0,
         inStock: (item.stock ?? 0) > 0,
         category: item.category,
@@ -90,7 +93,20 @@ function mapProduct(item: any): Product {
         weight: item.weight ?? undefined,
         shelfLife: item.shelfLife ?? undefined,
         origin: item.origin ?? undefined,
+        // EXW location (where the goods physically sit). Was being
+        // dropped at the mapping boundary, which broke the spec
+        // panel on the PDP for legitimate rows.
+        exwLocation: item.exwLocation ?? undefined,
+        description: item.description ?? undefined,
         status: item.status || ProductStatus.APPROVED,
+        // Admin's comment / system notes on the product. Critical
+        // for the supplier UI: when status === NEEDS_CHANGES we
+        // surface this string on a "💬 View comment" pill so the
+        // supplier sees exactly what the admin asked them to fix.
+        // Before this line was added the field was dropped at the
+        // mapping boundary and suppliers saw "needs change" with
+        // zero explanation — operator-reported bug.
+        adminNotes: item.adminNotes ?? undefined,
         // Logistics / pack configuration — critical for unit selector
         unitsPerCase: item.unitsPerCase ?? undefined,
         casesPerPallet: item.casesPerPallet ?? undefined,
@@ -101,6 +117,8 @@ function mapProduct(item: any): Product {
         isNew: item.isNew ?? false,
         bulkSave: item.bulkSave ?? false,
         leadTime: item.leadTime ?? undefined,
+        createdAt: item.createdAt ?? undefined,
+        updatedAt: item.updatedAt ?? undefined,
     };
 }
 

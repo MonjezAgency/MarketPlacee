@@ -582,22 +582,59 @@ export default function SupplierProductsPage() {
                                                 </td>
                                                 <td className="px-6 py-5">
                                                     <div className="flex flex-col gap-1.5">
-                                                        <div className={cn(
-                                                            "inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-[10px] font-black w-fit",
-                                                            getStatusColor(product.status)
-                                                        )}>
-                                                            <div className="w-1.5 h-1.5 rounded-full bg-current" />
-                                                            {product.status?.toUpperCase() || 'UNKNOWN'}
-                                                        </div>
-                                                        {/* Admin sent a comment — surface it as a clickable pill so the
-                                                            supplier can read the message + Resend after fixing. */}
-                                                        {String(product.status).toUpperCase() === 'NEEDS_CHANGES' && (product as any).adminNotes && (
+                                                        {(() => {
+                                                            const isNeedsChanges = String(product.status).toUpperCase() === 'NEEDS_CHANGES';
+                                                            const note = (product as any).adminNotes || '';
+                                                            // When the row needs changes, the status badge
+                                                            // itself becomes the clickable trigger — opens
+                                                            // the comment modal. We render it as <button>
+                                                            // so it gets keyboard focus + a hover state.
+                                                            // For other statuses the badge stays a div.
+                                                            const openMine = () =>
+                                                                setOpenComment({
+                                                                    id: product.id,
+                                                                    message: note || 'The admin marked this product as needing changes but didn\'t leave a written note. Please review the product page and resubmit if you\'re happy with the data.',
+                                                                    name: product.name,
+                                                                });
+                                                            const badgeClasses = cn(
+                                                                'inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-[10px] font-black w-fit',
+                                                                getStatusColor(product.status),
+                                                                isNeedsChanges && 'cursor-pointer hover:opacity-80 transition-opacity',
+                                                            );
+                                                            return isNeedsChanges ? (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => { e.stopPropagation(); openMine(); }}
+                                                                    title="Click to read the admin's comment"
+                                                                    className={badgeClasses}
+                                                                >
+                                                                    <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                                                                    {product.status?.toUpperCase() || 'UNKNOWN'}
+                                                                </button>
+                                                            ) : (
+                                                                <div className={badgeClasses}>
+                                                                    <div className="w-1.5 h-1.5 rounded-full bg-current" />
+                                                                    {product.status?.toUpperCase() || 'UNKNOWN'}
+                                                                </div>
+                                                            );
+                                                        })()}
+                                                        {/* "💬 View comment" pill — only shows on
+                                                            NEEDS_CHANGES rows. Same handler as the badge
+                                                            above; we keep both because the badge is
+                                                            visually paired with the status colour and
+                                                            the pill makes the action explicit. Even
+                                                            when the admin didn't leave a written note,
+                                                            the pill still appears so the supplier can
+                                                            open the modal and see a helpful fallback
+                                                            instead of "needs change" with zero context. */}
+                                                        {String(product.status).toUpperCase() === 'NEEDS_CHANGES' && (
                                                             <button
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     setOpenComment({
                                                                         id: product.id,
-                                                                        message: (product as any).adminNotes || '',
+                                                                        message: (product as any).adminNotes
+                                                                            || 'The admin marked this product as needing changes but didn\'t leave a written note. Please review the product page and resubmit if you\'re happy with the data.',
                                                                         name: product.name,
                                                                     });
                                                                 }}
