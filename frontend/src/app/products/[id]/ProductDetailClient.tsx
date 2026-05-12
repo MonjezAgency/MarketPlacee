@@ -803,7 +803,46 @@ export default function ProductDetailClient() {
                                 </div>
                         )}
 
-                        {activeTab === 'Specifications' && (
+                        {activeTab === 'Specifications' && (() => {
+                            // ── Defensive renderers ──────────────────────────
+                            // BBD: legacy products were uploaded before the
+                            // parser converted Excel-serial dates, so the DB
+                            // still holds raw numbers like "46477". Normalise
+                            // here as a safety net — three accepted shapes:
+                            //   • Excel serial (30000-70000)  → 2027-03-31
+                            //   • ISO timestamp                → 2027-03-31
+                            //   • YYYYMMDD compact             → 2027-03-31
+                            // Anything else falls through untouched.
+                            const formatBbd = (raw: unknown): string => {
+                                if (raw === null || raw === undefined || raw === '') return 'N/A';
+                                const s = String(raw).trim();
+                                if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+                                const num = parseFloat(s);
+                                if (!isNaN(num) && num > 30000 && num < 70000 && !/-/.test(s)) {
+                                    const ms = (num - 25569) * 86400 * 1000;
+                                    const d = new Date(ms);
+                                    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+                                }
+                                if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
+                                if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+                                return s;
+                            };
+
+                            // Brand verification — only show "Verified by
+                            // Atlantis" when the product was actually approved
+                            // by an admin. Pending products get a softer
+                            // "Under review" label so buyers don't see a
+                            // false trust signal on an unreviewed listing.
+                            const verifBadge =
+                                product.status === 'APPROVED'
+                                    ? 'Verified by Atlantis'
+                                    : product.status === 'PENDING'
+                                      ? 'Under review'
+                                      : product.status === 'REJECTED'
+                                        ? 'Not approved'
+                                        : 'Listing in progress';
+
+                            return (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div className="bg-slate-50 rounded-2xl p-8 border border-slate-100">
                                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Logistics & Physical</h4>
@@ -812,9 +851,15 @@ export default function ProductDetailClient() {
                                             // Don't append "kg" if the weight already contains a unit (g, kg, ml, etc).
                                             // Suppliers commonly type "100g" or "1.5kg" directly.
                                             { label: 'Weight per Unit', value: product.weight ? (/[a-z]/i.test(String(product.weight)) ? String(product.weight) : `${product.weight} kg`) : 'N/A' },
-                                            { label: 'Units per Pallet', value: `${product.unitsPerPallet || 'N/A'} pcs` },
-                                            { label: 'Pallet per Truck', value: product.palletsPerShipment || 'N/A' },
-                                            { label: 'Unit Type', value: product.unit || 'Standard' }
+                                            { label: 'Pieces per Case', value: product.unitsPerCase ? `${product.unitsPerCase} pcs` : 'N/A' },
+                                            { label: 'Cases per Pallet', value: product.casesPerPallet ? `${product.casesPerPallet} cases` : 'N/A' },
+                                            { label: 'Units per Pallet', value: product.unitsPerPallet ? `${product.unitsPerPallet} pcs` : 'N/A' },
+                                            // Renamed from "Pallet per Truck" — the field on the
+                                            // product model is `palletsPerShipment`, which is the
+                                            // actual pallet count in one shipment (not the truck
+                                            // capacity). Old label was misleading buyers.
+                                            { label: 'Pallets per Shipment', value: product.palletsPerShipment ? `${product.palletsPerShipment} pallets` : 'N/A' },
+                                            { label: 'Unit Type', value: (product.unit || 'Case').replace(/^./, (c: string) => c.toUpperCase()) },
                                         ].map((item, i) => (
                                             <div key={i} className="flex justify-between py-3 border-b border-slate-200 last:border-0">
                                                 <span className="text-[13px] font-medium text-slate-500">{item.label}</span>
@@ -827,15 +872,20 @@ export default function ProductDetailClient() {
                                     <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Trade & Quality</h4>
                                     <div className="space-y-4">
                                         {[
+                                            // Brand row — was hidden before; buyers couldn't
+                                            // see who actually makes the product. Falls back to
+                                            // the verifBadge when the supplier left it blank.
+                                            { label: 'Brand', value: product.brand || '—' },
                                             { label: 'Country of Origin', value: product.origin || 'N/A' },
                                             // EXW (Ex Works) — where the goods physically sit today.
                                             // Buyers use this to estimate the transport leg from this
                                             // location to their delivery address, before the Atlantis
                                             // logistics team confirms the carrier-negotiated price.
                                             { label: 'EXW · Currently In', value: product.exwLocation || 'Pending supplier confirmation' },
-                                            { label: 'BBD', value: product.shelfLife || 'N/A' },
+                                            { label: 'Lead Time', value: product.leadTime ? `${product.leadTime} days` : 'N/A' },
+                                            { label: 'BBD', value: formatBbd(product.shelfLife) },
                                             { label: 'Barcode (EAN)', value: product.ean || 'N/A' },
-                                            { label: 'Brand Status', value: 'Verified by Atlantis' }
+                                            { label: 'Brand Status', value: verifBadge },
                                         ].map((item, i) => (
                                             <div key={i} className="flex justify-between py-3 border-b border-slate-200 last:border-0">
                                                 <span className="text-[13px] font-medium text-slate-500">{item.label}</span>
@@ -845,7 +895,8 @@ export default function ProductDetailClient() {
                                     </div>
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
                         
                         {activeTab === 'Reviews' && (
                             <ReviewSection
