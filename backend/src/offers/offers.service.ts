@@ -618,10 +618,10 @@ export class OffersService {
                 <td style="vertical-align:top;width:60%;padding-right:20px;">
                     <h1 style="color:#0F172A;font-size:30px;font-weight:900;margin:0 0 18px;">Hello,</h1>
                     <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 14px;">
-                        Thank you for your interest in our products. Please find below an example of a product listing available on the <span style="color:#2EC4B6;font-weight:800;">Atlantis</span> marketplace.
+                        Thank you for your interest in our products. Below is one of the items currently available from the <span style="color:#2EC4B6;font-weight:800;">Atlantis</span> catalog.
                     </p>
                     <p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 18px;">
-                        We connect buyers and verified sellers worldwide to make trade simple and reliable.
+                        We source quality FMCG products and ship them worldwide to make trade simple and reliable.
                     </p>
                     <p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">
                         Best regards,<br/>
@@ -673,10 +673,10 @@ export class OffersService {
                         <td style="vertical-align:top;width:40%;padding-left:18px;border-left:1px solid #F1F5F9;">
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:18px;">
                                 <tr><td style="padding:18px;">
-                                    <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🛡 Verified Suppliers</p>
-                                    <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 14px;">All our sellers are verified for your peace of mind.</p>
-                                    <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🌐 Global Marketplace</p>
-                                    <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 14px;">Access a wide range of FMCG products from trusted sellers.</p>
+                                    <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🛡 Quality Guaranteed</p>
+                                    <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 14px;">Every product in our catalog is sourced and quality-checked by the Atlantis team.</p>
+                                    <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🌐 Global Distribution</p>
+                                    <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 14px;">We ship FMCG products to buyers across Europe and beyond.</p>
                                     <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🤝 Secure Transactions</p>
                                     <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0;">Safe and transparent trading experience from inquiry to delivery.</p>
                                 </td></tr>

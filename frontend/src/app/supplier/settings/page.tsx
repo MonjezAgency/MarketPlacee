@@ -40,6 +40,56 @@ export default function SupplierSettingsPage() {
     const [isSaving, setIsSaving] = React.useState(false);
     const [toast, setToast] = React.useState<{ type: 'success' | 'error', msg: string } | null>(null);
 
+    // Notification preferences — operator-requested. The user gets a
+    // toggle per notification class plus a "mute toast popups" master
+    // switch. Persisted via GET/PATCH /users/me/notification-prefs.
+    // Defaults to all-on so legacy users behave exactly as before.
+    type NotifPrefs = {
+        orderUpdates: boolean;
+        productComments: boolean;
+        lowStockAlerts: boolean;
+        inboundOffers: boolean;
+        marketingEmails: boolean;
+        muteToasts: boolean;
+    };
+    const [prefs, setPrefs] = React.useState<NotifPrefs>({
+        orderUpdates: true,
+        productComments: true,
+        lowStockAlerts: true,
+        inboundOffers: true,
+        marketingEmails: true,
+        muteToasts: false,
+    });
+    React.useEffect(() => {
+        (async () => {
+            try {
+                const { apiFetch } = await import('@/lib/api');
+                const res = await apiFetch('/users/me/notification-prefs');
+                if (res.ok) {
+                    const data = await res.json();
+                    setPrefs((p) => ({ ...p, ...data }));
+                }
+            } catch {}
+        })();
+    }, []);
+    const togglePref = async (key: keyof NotifPrefs) => {
+        const next = { ...prefs, [key]: !prefs[key] };
+        setPrefs(next); // optimistic
+        try {
+            const { apiFetch } = await import('@/lib/api');
+            const res = await apiFetch('/users/me/notification-prefs', {
+                method: 'PATCH',
+                body: JSON.stringify(next),
+            });
+            if (!res.ok) {
+                setPrefs(prefs); // rollback
+                showToast('error', 'Could not save preference');
+            }
+        } catch {
+            setPrefs(prefs);
+        }
+    };
+
     const showToast = (type: 'success' | 'error', msg: string) => {
         setToast({ type, msg });
         setTimeout(() => setToast(null), 5000);
@@ -287,25 +337,40 @@ export default function SupplierSettingsPage() {
                             </div>
                             {t('admin', 'notifications')}
                         </h3>
+                        {/* Live toggles, persisted to /users/me/notification-prefs.
+                            Operator request: every supplier picks which alerts
+                            they want; "Mute toast pop-ups" turns off in-page
+                            popovers while keeping the bell badge alive. */}
                         <div className="space-y-4">
-                            {[
-                                { label: 'Inventory Alerts', active: true },
-                                { label: 'Order Updates', active: true },
-                                { label: 'Policy Changes', active: false },
-                            ].map((item, idx) => (
-                                <div key={idx} className="flex items-center justify-between group cursor-pointer">
-                                    <p className="text-xs font-bold text-card-foreground group-hover:text-primary transition-colors">{item.label}</p>
-                                    <div className={cn(
-                                        "w-10 h-6 rounded-full border transition-all relative",
-                                        item.active ? "bg-primary/20 border-primary/20" : "bg-muted border-border"
-                                    )}>
+                            {([
+                                { key: 'orderUpdates',     label: 'Order updates (new orders, status changes)', invert: false },
+                                { key: 'productComments',  label: 'Admin comments on my products',              invert: false },
+                                { key: 'lowStockAlerts',   label: 'Low stock alerts',                            invert: false },
+                                { key: 'inboundOffers',    label: 'Inbound buyer enquiries',                     invert: false },
+                                { key: 'marketingEmails',  label: 'Atlantis news & marketing emails',            invert: false },
+                                { key: 'muteToasts',       label: 'Mute toast pop-ups (keep bell only)',         invert: true  },
+                            ] as const).map((item) => {
+                                const active = item.invert ? !prefs[item.key] : prefs[item.key];
+                                return (
+                                    <button
+                                        key={item.key}
+                                        type="button"
+                                        onClick={() => togglePref(item.key)}
+                                        className="w-full flex items-center justify-between group"
+                                    >
+                                        <p className="text-xs font-bold text-card-foreground text-start group-hover:text-primary transition-colors">{item.label}</p>
                                         <div className={cn(
-                                            "absolute top-1 w-3 h-3 rounded-full transition-all",
-                                            item.active ? "end-1 bg-primary shadow-lg shadow-primary/50" : "start-1 bg-muted-foreground/50"
-                                        )} />
-                                    </div>
-                                </div>
-                            ))}
+                                            "w-10 h-6 rounded-full border transition-all relative flex-shrink-0",
+                                            active ? "bg-primary/20 border-primary/20" : "bg-muted border-border"
+                                        )}>
+                                            <div className={cn(
+                                                "absolute top-1 w-3 h-3 rounded-full transition-all",
+                                                active ? "end-1 bg-primary shadow-lg shadow-primary/50" : "start-1 bg-muted-foreground/50"
+                                            )} />
+                                        </div>
+                                    </button>
+                                );
+                            })}
                         </div>
                     </div>
                 </div>

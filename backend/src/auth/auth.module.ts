@@ -17,9 +17,23 @@ import { PrismaModule } from '../common/prisma.module';
         EmailModule,
         PrismaModule,
         forwardRef(() => NotificationsModule),
+        // ── Session length ──────────────────────────────────────
+        // Operator pain point: closing the browser tab logged the user
+        // out. Two settings combine to control this:
+        //   • signOptions.expiresIn — the JWT itself expires this far
+        //     in the future. We push to 30d so the access token stays
+        //     valid through normal customer behaviour (close laptop,
+        //     come back next morning, tab is still authed).
+        //   • Cookie maxAge on /login + /register (in auth.controller)
+        //     — extended to match (30d for access, 90d for refresh)
+        //     so the browser keeps the cookie across restarts.
+        // The refresh-token rotation guard inside the auth service
+        // still kicks in for compromised tokens. This change is just
+        // about closing the gap between "JWT not expired" and "user
+        // is asked to log in again".
         JwtModule.register({
             secret: process.env.JWT_SECRET || 'secretKey',
-            signOptions: { expiresIn: '1d' },
+            signOptions: { expiresIn: '30d' },
         }),
     ],
     controllers: [AuthController],

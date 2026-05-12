@@ -62,7 +62,12 @@ const SUPPLIER_LINKS = [
     // committed vs what's free vs what's left the warehouse".
     { label: 'Stock & Reservations', href: '/supplier/inventory', icon: Box, key: 'inventory' },
     { label: 'Wholesale Offers', href: '/supplier/wholesale-offers', icon: ListPlus, key: 'wholesale-offers' },
-    { label: 'Offers & Ads', href: '/supplier/offers', icon: ListPlus },
+    // "Offers & Ads" is gated behind the payment integration —
+    // suppliers can't run paid placements until billing is live, so
+    // we lock the row and show a "Soon" badge instead of opening
+    // the (incomplete) page. Operator decision: ship the UI placeholder
+    // now, unlock when Stripe Connect ads-billing flow lands.
+    { label: 'Offers & Ads', href: '/supplier/offers', icon: ListPlus, locked: true, comingSoon: true },
     { label: 'My Sales', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
     { label: 'Analytics', href: '/supplier/analytics', icon: TrendingUp },
     { label: 'Payment Methods', href: '/supplier/payment-methods', icon: CreditCard, locked: true },
@@ -244,7 +249,17 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                         {badgeCount}
                                     </span>
                                 )}
-                                {link.locked && isOpen && <Lock size={14} className="text-[#94A3B8]/50" />}
+                                {/* "Soon" pill for features that aren't shipped yet.
+                                    Takes priority over the lock icon when both are
+                                    set — the lock alone reads as "you don't have
+                                    permission" whereas "Soon" reads as "we haven't
+                                    built it yet". */}
+                                {(link as any).comingSoon && isOpen && (
+                                    <span className="inline-flex items-center h-5 px-2 rounded-full bg-amber-500/15 text-amber-400 text-[9px] font-bold uppercase tracking-wider border border-amber-500/20">
+                                        Soon
+                                    </span>
+                                )}
+                                {link.locked && isOpen && !(link as any).comingSoon && <Lock size={14} className="text-[#94A3B8]/50" />}
                             </Link>
                         );
                     })}

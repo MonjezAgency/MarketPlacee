@@ -38,8 +38,14 @@ export class AuthController {
         const result = await this.authService.loginStep1(user);
         if (result && 'access_token' in result) {
             // Persistent sessions: 2h for access token, 30d for refresh token
-            res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
-            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            // Persistent sessions, Facebook-style. The access cookie
+            // matches the JWT expiry (30d), and the refresh cookie
+            // lives even longer (90d) so an idle returning user is
+            // re-authed silently when the access JWT eventually
+            // lapses. The previous 2h access cookie was the reason
+            // closing a tab kicked the user back to /auth/login.
+            res.cookie('token', result.access_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(90 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
@@ -48,8 +54,14 @@ export class AuthController {
     async register(@Body() registerDto: any, @Res({ passthrough: true }) res: any) {
         const result = await this.authService.register(registerDto);
         if (result && 'access_token' in result) {
-            res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
-            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            // Persistent sessions, Facebook-style. The access cookie
+            // matches the JWT expiry (30d), and the refresh cookie
+            // lives even longer (90d) so an idle returning user is
+            // re-authed silently when the access JWT eventually
+            // lapses. The previous 2h access cookie was the reason
+            // closing a tab kicked the user back to /auth/login.
+            res.cookie('token', result.access_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(90 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
@@ -103,8 +115,14 @@ export class AuthController {
         
         const result = await this.authService.refreshTokens(refreshToken);
         if (result && 'access_token' in result) {
-            res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
-            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            // Persistent sessions, Facebook-style. The access cookie
+            // matches the JWT expiry (30d), and the refresh cookie
+            // lives even longer (90d) so an idle returning user is
+            // re-authed silently when the access JWT eventually
+            // lapses. The previous 2h access cookie was the reason
+            // closing a tab kicked the user back to /auth/login.
+            res.cookie('token', result.access_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(90 * 24 * 60 * 60 * 1000));
         }
         return result;
     }
@@ -149,8 +167,14 @@ export class AuthController {
     async googleLogin(@Body('email') email: string, @Body('name') name: string, @Body('avatar') avatar: string, @Body('googleId') googleId: string, @Res({ passthrough: true }) res: any) {
         const result = await this.authService.googleLogin({ email, name, avatar, googleId });
         if (result && 'access_token' in result) {
-            res.cookie('token', result.access_token, this.getCookieOptions(2 * 60 * 60 * 1000));
-            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            // Persistent sessions, Facebook-style. The access cookie
+            // matches the JWT expiry (30d), and the refresh cookie
+            // lives even longer (90d) so an idle returning user is
+            // re-authed silently when the access JWT eventually
+            // lapses. The previous 2h access cookie was the reason
+            // closing a tab kicked the user back to /auth/login.
+            res.cookie('token', result.access_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            res.cookie('refreshToken', (result as any).refresh_token, this.getCookieOptions(90 * 24 * 60 * 60 * 1000));
         }
         return result;
     }

@@ -62,6 +62,51 @@ export class UsersController {
     }
 
     /**
+     * Per-user notification preferences. Returns the current map +
+     * the canonical default keys so the settings UI can render every
+     * toggle even on first-load. Empty / null = "all on".
+     */
+    @Get('me/notification-prefs')
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
+    async getNotificationPrefs(@Request() req) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: req.user.sub },
+            select: { notificationPrefs: true },
+        });
+        const DEFAULTS = {
+            orderUpdates: true,
+            productComments: true,
+            lowStockAlerts: true,
+            inboundOffers: true,
+            marketingEmails: true,
+            muteToasts: false,
+        };
+        const saved = (user?.notificationPrefs as Record<string, boolean>) || {};
+        return { ...DEFAULTS, ...saved };
+    }
+
+    @Patch('me/notification-prefs')
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
+    async setNotificationPrefs(@Request() req, @Body() body: Record<string, boolean>) {
+        // Whitelist the accepted keys + coerce booleans. Anything
+        // outside the list is dropped silently so a malicious caller
+        // can't stuff arbitrary JSON into the field.
+        const ALLOWED = [
+            'orderUpdates', 'productComments', 'lowStockAlerts',
+            'inboundOffers', 'marketingEmails', 'muteToasts',
+        ];
+        const clean: Record<string, boolean> = {};
+        for (const k of ALLOWED) {
+            if (k in body) clean[k] = !!body[k];
+        }
+        await this.prisma.user.update({
+            where: { id: req.user.sub },
+            data: { notificationPrefs: clean as any },
+        });
+        return { ok: true, prefs: clean };
+    }
+
+    /**
      * Upload / replace the authenticated user's avatar. Routes through the
      * existing StorageService used for product images so the same Cloudinary
      * (or local fallback) configuration applies.

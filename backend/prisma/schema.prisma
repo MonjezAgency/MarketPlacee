@@ -89,6 +89,15 @@ model User {
   stripeCustomerId     String?    // Stripe customer ID for saved cards (buyers)
   stripeAccountId      String?    // Stripe Connect account ID (suppliers)
   permissions          Json? // Array of permission strings
+  // Per-user notification preferences. Operator-requested.
+  // Shape: { orderUpdates: boolean, productComments: boolean,
+  //          lowStockAlerts: boolean, inboundOffers: boolean,
+  //          marketingEmails: boolean, muteToasts: boolean }
+  // When `muteToasts` is true the bell icon still updates but no
+  // pop-over toast appears — quiet mode for users who don't want
+  // visual interrupts. Missing keys default to true (subscribed)
+  // so legacy rows behave exactly as before.
+  notificationPrefs    Json?
 
   // Two-Factor Authentication
   twoFactorEnabled     Boolean   @default(false)
