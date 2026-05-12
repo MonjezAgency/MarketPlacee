@@ -39,6 +39,8 @@ import {
     HelpCircle,
     ChevronDown,
     ChevronUp,
+    Layers,
+    X,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -82,6 +84,215 @@ const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
     { value: 'REJECTED', label: 'Rejected', color: 'text-red-700 bg-red-50 border-red-200' },
     { value: 'NEEDS_CHANGES', label: 'Needs Changes', color: 'text-orange-700 bg-orange-50 border-orange-200' },
 ];
+
+// ─────────────────────────────────────────────────────────────────────
+//  VariantsEditor — Shopify-style options builder
+// ─────────────────────────────────────────────────────────────────────
+//
+// Render contract:
+//   value:    Array<{ name: string; values: string[] }>
+//   onChange: (next) => void
+//
+// Behaviour:
+//   • "Add another option" appends an empty group at the end.
+//   • Each group has its own name input + value chips. Removing a chip
+//     splices it out; pressing Enter or comma in the input appends.
+//   • Removing the entire group drops it from the array.
+//   • Empty groups are kept in state while the user types but get
+//     filtered out at save time (handled by the parent's onChange
+//     normaliser). For now we accept them in state — the cleanup
+//     happens in handleSave's payload prep.
+type VariantGroup = { name: string; values: string[] };
+
+function VariantsEditor({
+    value,
+    onChange,
+}: {
+    value: VariantGroup[];
+    onChange: (next: VariantGroup[]) => void;
+}) {
+    const [drafts, setDrafts] = React.useState<Record<number, string>>({});
+
+    // Normalise legacy / loose shapes. Some products in the DB carry
+    // variants in slightly different shapes (e.g. {name, value: "x"}
+    // single-value, or extra translation entries with name starting
+    // with "__"). Strip / fold those before rendering so the UI never
+    // explodes on a malformed row.
+    const groups: VariantGroup[] = React.useMemo(() => {
+        if (!Array.isArray(value)) return [];
+        return value
+            .filter((v: any) => v && typeof v === 'object' && !String(v.name || '').startsWith('__'))
+            .map((v: any) => ({
+                name: String(v.name || ''),
+                values: Array.isArray(v.values)
+                    ? v.values.map((x: any) => String(x))
+                    : v.value
+                      ? [String(v.value)]
+                      : [],
+            }));
+    }, [value]);
+
+    const update = (idx: number, patch: Partial<VariantGroup>) => {
+        const next = groups.map((g, i) => (i === idx ? { ...g, ...patch } : g));
+        onChange(next);
+    };
+
+    const addGroup = () => onChange([...groups, { name: '', values: [] }]);
+    const removeGroup = (idx: number) => onChange(groups.filter((_, i) => i !== idx));
+
+    const addValue = (idx: number) => {
+        const raw = (drafts[idx] || '').trim();
+        if (!raw) return;
+        // Split on comma so "Small, Medium, Large" adds three at once.
+        const parts = raw.split(',').map((s) => s.trim()).filter(Boolean);
+        const existing = groups[idx]?.values || [];
+        const merged = [...existing, ...parts.filter((p) => !existing.includes(p))];
+        update(idx, { values: merged });
+        setDrafts((d) => ({ ...d, [idx]: '' }));
+    };
+
+    const removeValue = (idx: number, vIdx: number) => {
+        const next = (groups[idx]?.values || []).filter((_, i) => i !== vIdx);
+        update(idx, { values: next });
+    };
+
+    return (
+        <div className="bg-white dark:bg-[#131316] rounded-2xl border border-slate-200 dark:border-white/[0.05] shadow-sm dark:shadow-xl dark:shadow-black/40 p-6 space-y-5">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 ring-1 ring-violet-100 dark:ring-violet-500/20 flex items-center justify-center">
+                        <Layers size={16} />
+                    </div>
+                    <div>
+                        <h3 className="text-[15px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">
+                            Variants &amp; Options
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1">
+                            Add sizes, flavours, pack counts, or colours buyers can pick from.
+                        </p>
+                    </div>
+                </div>
+                {groups.length > 0 && (
+                    <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-zinc-400 text-[11px] font-medium">
+                        {groups.length} option{groups.length === 1 ? '' : 's'}
+                    </span>
+                )}
+            </div>
+
+            {groups.length === 0 && (
+                <div className="rounded-xl border border-dashed border-slate-300 dark:border-white/[0.10] bg-slate-50 dark:bg-white/[0.02] p-6 text-center">
+                    <Layers size={20} className="mx-auto text-slate-400 dark:text-zinc-500 mb-2" />
+                    <p className="text-[13px] font-medium text-slate-700 dark:text-zinc-300">
+                        No options yet
+                    </p>
+                    <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1 mb-4 max-w-sm mx-auto leading-relaxed">
+                        Skip this if your product comes in just one configuration. Add an option
+                        when buyers need to pick (e.g. "Size: Small / Medium / Large").
+                    </p>
+                    <button
+                        type="button"
+                        onClick={addGroup}
+                        className="h-9 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold inline-flex items-center gap-2 transition-colors"
+                    >
+                        <Plus size={14} /> Add an option
+                    </button>
+                </div>
+            )}
+
+            {groups.map((g, idx) => (
+                <div
+                    key={idx}
+                    className="rounded-xl border border-slate-200 dark:border-white/[0.06] bg-slate-50/60 dark:bg-white/[0.02] p-4 space-y-3"
+                >
+                    <div className="flex items-center gap-3">
+                        <div className="flex-1">
+                            <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                                Option name
+                            </label>
+                            <input
+                                type="text"
+                                placeholder="e.g. Size, Flavour, Pack, Colour"
+                                value={g.name}
+                                onChange={(e) => update(idx, { name: e.target.value })}
+                                className="w-full h-10 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05]"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => removeGroup(idx)}
+                            className="self-end h-10 w-10 rounded-lg text-slate-500 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 flex items-center justify-center transition-colors"
+                            title="Remove this option"
+                        >
+                            <Trash2 size={14} />
+                        </button>
+                    </div>
+
+                    <div>
+                        <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                            Values
+                        </label>
+                        <div className="flex flex-wrap gap-1.5 mb-2 min-h-[26px]">
+                            {g.values.map((v, vIdx) => (
+                                <span
+                                    key={vIdx}
+                                    className="inline-flex items-center gap-1 h-7 pl-3 pr-1 rounded-full bg-white dark:bg-white/[0.06] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-zinc-200 text-[12px] font-medium"
+                                >
+                                    {v}
+                                    <button
+                                        type="button"
+                                        onClick={() => removeValue(idx, vIdx)}
+                                        className="w-5 h-5 rounded-full hover:bg-red-50 dark:hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-400 text-slate-400 dark:text-zinc-500 flex items-center justify-center transition-colors"
+                                        title={`Remove "${v}"`}
+                                    >
+                                        <X size={11} />
+                                    </button>
+                                </span>
+                            ))}
+                            {g.values.length === 0 && (
+                                <span className="text-[11px] text-slate-400 dark:text-zinc-600 italic py-1.5">
+                                    No values yet — add one below.
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex gap-2">
+                            <input
+                                type="text"
+                                placeholder="Type a value (comma to add multiple) and press Enter"
+                                value={drafts[idx] || ''}
+                                onChange={(e) => setDrafts((d) => ({ ...d, [idx]: e.target.value }))}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        addValue(idx);
+                                    }
+                                }}
+                                className="flex-1 h-10 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3 text-xs text-slate-700 dark:text-zinc-200 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05]"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => addValue(idx)}
+                                disabled={!(drafts[idx] || '').trim()}
+                                className="h-10 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                            >
+                                Add
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ))}
+
+            {groups.length > 0 && (
+                <button
+                    type="button"
+                    onClick={addGroup}
+                    className="w-full h-10 rounded-lg border border-dashed border-slate-300 dark:border-white/[0.10] bg-transparent hover:bg-slate-50 dark:hover:bg-white/[0.04] text-slate-600 dark:text-zinc-400 text-[12px] font-medium flex items-center justify-center gap-2 transition-colors"
+                >
+                    <Plus size={14} /> Add another option
+                </button>
+            )}
+        </div>
+    );
+}
 
 // Valid EAN/UPC formats. Backend ExcelService accepts the same set.
 const VALID_EAN_LENGTHS = [8, 12, 13, 14];
@@ -312,6 +523,24 @@ export default function ProductEditorForm({
                 leadTime: formData.leadTime,
                 readyForDispatch: formData.readyForDispatch,
                 images: formData.images,
+                // Variants — drop empty groups and groups with no values
+                // before sending; suppliers often start typing then
+                // abandon a row, no point persisting noise. We preserve
+                // any pre-existing non-variant entries (e.g. the
+                // legacy "__translations" object some old products
+                // carry inside variants) so we don't strip translations
+                // during a normal product save.
+                variants: Array.isArray(formData.variants)
+                    ? (formData.variants as any[]).filter((v: any) => {
+                          if (!v || typeof v !== 'object') return false;
+                          if (String(v.name || '').startsWith('__')) return true; // keep meta entries
+                          const cleanName = String(v.name || '').trim();
+                          const cleanValues = Array.isArray(v.values)
+                              ? v.values.map((x: any) => String(x).trim()).filter(Boolean)
+                              : [];
+                          return cleanName.length > 0 && cleanValues.length > 0;
+                      })
+                    : [],
             };
 
             if (basePriceChanged) {
@@ -1334,6 +1563,30 @@ export default function ProductEditorForm({
                                 </div>
                             </div>
                         </div>
+
+                        {/* ── Variants & Options card ──────────────────────
+                            Shopify-style configurable products. Each variant
+                            "group" has a name ("Size") and a list of values
+                            ("Small", "Medium", "Large"). Buyers pick one
+                            value per group on the PDP before they can add
+                            the product to cart — their selection travels
+                            with the order line so the admin sees exactly
+                            what was ordered.
+
+                            Storage: product.variants (Json) — array of
+                            { name, values: string[] }. The existing schema
+                            already has the column, so this is purely a UI
+                            addition.
+
+                            Examples:
+                              Single group  → Size: Small / Medium / Large
+                              Multi-group   → Size: S/M/L + Flavour: Vanilla/Cocoa
+                              Pack variants → Pack: 6-pack / 12-pack / 24-pack
+                        */}
+                        <VariantsEditor
+                            value={(formData.variants as any) || []}
+                            onChange={(v) => setFormData({ ...formData, variants: v as any })}
+                        />
 
                         {/* Delete (admin only — footer of right col) */}
                         {mode === 'admin' && (

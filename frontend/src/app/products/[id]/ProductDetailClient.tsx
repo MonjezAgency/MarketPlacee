@@ -33,6 +33,12 @@ export default function ProductDetailClient() {
     const { addItem, items: cartItems } = useCart();
     const [quantity, setQuantity] = useState(1);
     const [isAdded, setIsAdded] = useState(false);
+    // Variant picks the buyer makes on this PDP — e.g.
+    //   { "Size": "Large", "Flavour": "Vanilla" }
+    // Mandatory before Add to Cart: every group with values must have
+    // a selection. Carried into the cart line so the same product at
+    // a different variant combo is a SEPARATE line, not a merge.
+    const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
     const router = useRouter();
     const { t, locale } = useLanguage();
     const isAr = locale === 'ar';
@@ -284,8 +290,19 @@ export default function ProductDetailClient() {
             router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname));
             return;
         }
+        // Cart-line key has to include the variant signature, otherwise
+        // adding "Size: Large" then "Size: Small" of the same product
+        // would merge into one line instead of staying as two distinct
+        // configurations. We append a deterministic suffix.
+        const variantKeys = Object.keys(selectedVariants).sort();
+        const variantSig = variantKeys.length
+            ? variantKeys.map((k) => `${k}=${selectedVariants[k]}`).join('|')
+            : '';
+        const cartLineId = variantSig ? `${product.id}::${variantSig}` : product.id;
+
         addItem({
-            id: product.id,
+            id: cartLineId,
+            productId: product.id,
             name: product.name,
             brand: product.brand || 'Atlantis Premium',
             // Cart math: line total = price × quantity. We store the FULL
@@ -299,6 +316,8 @@ export default function ProductDetailClient() {
             // Lock the buyer to this tier for any future PDP visit on the
             // same product. To switch tier they have to remove the line.
             tier: tierData.activeKey,
+            // Shopify-style variant picks — travel with the order line.
+            selectedVariants: variantKeys.length ? selectedVariants : undefined,
         }, quantity);
         setIsAdded(true);
         setTimeout(() => setIsAdded(false), 2500);
@@ -651,6 +670,85 @@ export default function ProductDetailClient() {
                             </div>
 
 
+                            {/* ── Variant picker (Shopify-style) ──
+                                Renders one chip-group per option the supplier
+                                set on the product (Size, Flavour, Pack…). The
+                                buyer must pick one value per group before the
+                                Add to Cart button enables. Missing picks are
+                                highlighted in red so the buyer knows exactly
+                                which option still needs a choice.
+
+                                Storage: the picks ride along with the cart
+                                line in `selectedVariants`, and the cart line
+                                key is suffixed with a signature of the picks
+                                so two different configurations of the same
+                                product live as two separate cart lines.
+                            */}
+                            {(() => {
+                                const rawVariants = (product.variants as any[]) || [];
+                                const variantGroups = rawVariants
+                                    .filter((v) => v && typeof v === 'object' && !String(v.name || '').startsWith('__'))
+                                    .map((v) => ({
+                                        name: String(v.name || ''),
+                                        values: Array.isArray(v.values)
+                                            ? v.values.map((x: any) => String(x))
+                                            : v.value
+                                              ? [String(v.value)]
+                                              : [],
+                                    }))
+                                    .filter((g) => g.name && g.values.length > 0);
+
+                                if (variantGroups.length === 0) return null;
+
+                                return (
+                                    <div className="pt-6 space-y-4">
+                                        {variantGroups.map((g) => {
+                                            const picked = selectedVariants[g.name];
+                                            return (
+                                                <div key={g.name}>
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">
+                                                            {g.name}
+                                                        </p>
+                                                        {picked ? (
+                                                            <span className="text-[12px] font-semibold text-[#111827]">
+                                                                {picked}
+                                                            </span>
+                                                        ) : (
+                                                            <span className="text-[11px] font-medium text-rose-500">
+                                                                Please choose
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {g.values.map((v: string) => {
+                                                            const active = picked === v;
+                                                            return (
+                                                                <button
+                                                                    key={v}
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setSelectedVariants((prev) => ({ ...prev, [g.name]: v }))
+                                                                    }
+                                                                    className={cn(
+                                                                        'h-10 px-4 rounded-xl border text-[13px] font-semibold transition-all',
+                                                                        active
+                                                                            ? 'bg-[#111827] border-[#111827] text-white shadow-md'
+                                                                            : 'bg-white border-[#E5E7EB] text-[#374151] hover:border-[#111827]/40 hover:bg-slate-50',
+                                                                    )}
+                                                                >
+                                                                    {v}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                );
+                            })()}
+
                             <div className="flex flex-col gap-5 pt-6">
                                 <div className="flex items-center gap-4">
                                     <div className="flex items-center h-14 bg-white border border-[#E5E7EB] rounded-2xl p-1 shrink-0 shadow-sm">
@@ -664,7 +762,15 @@ export default function ProductDetailClient() {
                                     </div>
                                     <Button
                                         onClick={handleAdd}
-                                        className="h-14 flex-1 bg-[#14B8A6] hover:bg-[#0D9488] text-white font-bold text-md rounded-2xl transition-all shadow-xl shadow-[#14B8A6]/20 flex items-center justify-center gap-3"
+                                        disabled={(() => {
+                                            const rawVariants = (product.variants as any[]) || [];
+                                            const required = rawVariants
+                                                .filter((v) => v && typeof v === 'object' && !String(v.name || '').startsWith('__'))
+                                                .map((v) => String(v.name || ''))
+                                                .filter(Boolean);
+                                            return required.some((name) => !selectedVariants[name]);
+                                        })()}
+                                        className="h-14 flex-1 bg-[#14B8A6] hover:bg-[#0D9488] text-white font-bold text-md rounded-2xl transition-all shadow-xl shadow-[#14B8A6]/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#14B8A6]"
                                     >
                                         {isAdded ? <><Check size={20} /> Added to Order</> : <><ShoppingCart size={20} /> {isLoggedIn ? 'Add to Procurement List' : 'Login to Order'}</>}
                                     </Button>

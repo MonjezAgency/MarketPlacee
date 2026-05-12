@@ -355,6 +355,34 @@ export default function AdminOrderDetailPage() {
                                                             <p className="text-[11px] text-slate-500 mt-0.5">
                                                                 {p.brand ? `${p.brand} · ` : ''}{p.category || '—'}
                                                             </p>
+                                                            {/* Shopify-style variant snapshot. The buyer
+                                                                picked these on the PDP and they were
+                                                                stored on OrderItem.selectedVariants at
+                                                                checkout — admin can see the exact
+                                                                configuration without going back to the
+                                                                product page. selectedTier appears as a
+                                                                small badge (Truck / Pallet / Case) so the
+                                                                ops team can match the markup tier to the
+                                                                line price. */}
+                                                            {((it as any).selectedVariants || (it as any).selectedTier) && (
+                                                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                                                                    {(it as any).selectedTier && (
+                                                                        <span className="inline-flex items-center h-5 px-2 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-wider">
+                                                                            {(it as any).selectedTier}
+                                                                        </span>
+                                                                    )}
+                                                                    {(it as any).selectedVariants &&
+                                                                        Object.entries((it as any).selectedVariants).map(([k, v]) => (
+                                                                            <span
+                                                                                key={k}
+                                                                                className="inline-flex items-center h-5 px-2 rounded-md bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-semibold"
+                                                                            >
+                                                                                <span className="text-violet-400 font-normal">{k}:</span>
+                                                                                <span className="ms-1">{String(v)}</span>
+                                                                            </span>
+                                                                        ))}
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </td>

@@ -3,7 +3,22 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 
 export interface CartItem {
+    /**
+     * Cart-line identifier. For configurable products this is the
+     * product id PLUS a variant signature (`<productId>::Size=Large|Flavour=Vanilla`)
+     * so the same product at two different variant combos lives as
+     * two distinct cart lines instead of merging into one. For
+     * single-config products this is just the product id.
+     */
     id: string;
+    /**
+     * The pure product id, without the variant signature suffix. Used
+     * when checking out so the backend can look up the underlying
+     * product (orders.productId, stock guards, etc.) without parsing
+     * the cart-line key. Optional for backwards-compat with old cart
+     * entries that pre-date this field — falls back to `id` then.
+     */
+    productId?: string;
     name: string;
     brand: string;
     price: number;
@@ -22,6 +37,13 @@ export interface CartItem {
      * "Case"); `tier` is the canonical key the PDP locks on.
      */
     tier?: 'truck' | 'pallet' | 'carton';
+    /**
+     * Shopify-style variant picks for configurable products, e.g.
+     *   { "Size": "Large", "Flavour": "Vanilla" }
+     * Travels with the cart line into the order so the admin can
+     * see the exact configuration the buyer ordered.
+     */
+    selectedVariants?: Record<string, string>;
 }
 
 interface CartContextType {

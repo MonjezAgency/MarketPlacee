@@ -313,6 +313,20 @@ model OrderItem {
   // Snapshot of the product name at order time, in case the product is later
   // deleted. Optional — populated on order creation.
   productNameSnapshot String?
+  // Shopify-style variant picks the buyer made on the PDP (size /
+  // flavour / pack count / colour). Stored as a flat {group: value}
+  // map so the admin order page can render the exact configuration
+  // the buyer ordered:
+  //   { "Size": "Large", "Flavour": "Vanilla", "Pack": "12-pack" }
+  // The product itself keeps the available options in its own
+  // `variants` Json column; this field is the snapshot of WHICH ones
+  // were chosen for this order line. Optional — non-configurable
+  // products leave it null.
+  selectedVariants Json?
+  // Selected tier (truck / pallet / case) at order time. Persisted
+  // alongside the variants so the admin order page can show the
+  // exact basket configuration without inferring it from price math.
+  selectedTier String?
 }
 
 model AdminActionLog {

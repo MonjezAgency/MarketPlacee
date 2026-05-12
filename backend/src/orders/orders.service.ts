@@ -133,6 +133,18 @@ export class OrdersService {
                         quantity: item.quantity,
                         price: item.price,
                         productNameSnapshot: item.name || nameById.get(item.productId) || null,
+                        // Shopify-style variant snapshot + tier — captured at
+                        // order time so the admin order page (and any
+                        // downstream invoice / shipping label) can show
+                        // exactly what the buyer ordered, e.g.
+                        //   "Glucerna Shake · Vanilla · 12-pack · Pallet tier"
+                        // Both fields are optional in the schema, so plain
+                        // (non-configurable, no-tier) products write null.
+                        selectedVariants:
+                            item.selectedVariants && typeof item.selectedVariants === 'object'
+                                ? item.selectedVariants
+                                : undefined,
+                        selectedTier: item.tier || null,
                     })),
                 },
                 history: {
@@ -693,6 +705,13 @@ export class OrdersService {
                 unitPrice: item.price,
                 totalPrice: item.price * item.quantity,
                 product: item.product ?? null,
+                // Surface the Shopify-style snapshot the buyer chose at
+                // checkout (variants + tier). The admin /orders/[id] page
+                // renders these as chips under the product name so ops
+                // can see exactly what was ordered without inferring it
+                // from price math.
+                selectedVariants: (item as any).selectedVariants ?? null,
+                selectedTier: (item as any).selectedTier ?? null,
             })),
         };
     }

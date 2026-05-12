@@ -160,7 +160,19 @@ export default function CheckoutPage() {
             const res = await apiFetch('/orders', {
                 method: 'POST',
                 body: JSON.stringify({
-                    items: items.map(i => ({ productId: i.id, quantity: i.quantity, price: i.price })),
+                    // `i.id` for older cart entries IS the productId; for
+                    // configurable-product entries it's `${productId}::sig`,
+                    // so prefer the explicit `productId` field when present.
+                    // selectedVariants + tier ride along so the order item
+                    // captures the exact buyer-chosen configuration.
+                    items: items.map(i => ({
+                        productId: (i as any).productId || i.id.split('::')[0],
+                        quantity: i.quantity,
+                        price: i.price,
+                        name: i.name,
+                        tier: i.tier,
+                        selectedVariants: (i as any).selectedVariants,
+                    })),
                     totalAmount: grandTotal,
                     shippingCompany: selectedShipping?.name,
                     shippingCost: selectedShipping?.cost,
