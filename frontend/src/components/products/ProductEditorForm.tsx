@@ -91,6 +91,7 @@ export default function ProductEditorForm({
     const [isUploading, setIsUploading] = useState(false);
     const [originalProduct, setOriginalProduct] = useState<Product | null>(null);
     const [formData, setFormData] = useState<Product | null>(null);
+    const [urlInputValue, setUrlInputValue] = useState('');
 
     // active display currency — synced with the rest of the app
     const [activeCurrency, setActiveCurrency] = useState(() => {
@@ -372,15 +373,33 @@ export default function ProductEditorForm({
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-[1400px] mx-auto">
                     {/* ─── Left column ─── */}
                     <div className="lg:col-span-4 space-y-6">
-                        {/* Product Image card */}
+                        {/* Product Images card — supports MULTIPLE uploads & URLs.
+                            The user explicitly asked for this: "ما بيقدرش يرفع
+                            أو يضيف كذا رابط للصورة أو يرفع كذا صورة" — the
+                            previous single-image UX confused suppliers. Now the
+                            file picker has `multiple` on, the URL field has an
+                            explicit Add button (not just Enter), and every
+                            uploaded image renders as a thumbnail tile with a
+                            "Main" badge on the first one. */}
                         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
-                            <div>
-                                <h3 className="text-base font-bold text-slate-900">Product Image</h3>
-                                <p className="text-xs text-slate-500 mt-0.5">
-                                    Upload a clear image of your product
-                                </p>
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="text-base font-bold text-slate-900">
+                                        Product Images
+                                    </h3>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        Upload one or more product photos. First image is shown as the main.
+                                    </p>
+                                </div>
+                                {(formData.images?.length ?? 0) > 0 && (
+                                    <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-slate-100 text-slate-600 text-[11px] font-semibold">
+                                        {formData.images!.length} image
+                                        {formData.images!.length === 1 ? '' : 's'}
+                                    </span>
+                                )}
                             </div>
 
+                            {/* Main image (largest tile) */}
                             <div className="aspect-square rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center relative group">
                                 {formData.images?.[0] ? (
                                     <>
@@ -393,6 +412,9 @@ export default function ProductEditorForm({
                                             }}
                                             className="w-full h-full object-contain p-4"
                                         />
+                                        <span className="absolute top-2 left-2 inline-flex items-center h-6 px-2.5 rounded-full bg-slate-900/85 text-white text-[10px] font-bold uppercase tracking-wider">
+                                            Main
+                                        </span>
                                         <button
                                             type="button"
                                             onClick={() => removeImage(0)}
@@ -403,13 +425,89 @@ export default function ProductEditorForm({
                                         </button>
                                     </>
                                 ) : (
-                                    <div className="flex flex-col items-center text-slate-400">
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        className="flex flex-col items-center text-slate-400 hover:text-slate-600 transition-colors w-full h-full justify-center"
+                                    >
                                         <ImageIcon size={36} strokeWidth={1.5} />
-                                        <span className="text-xs mt-2">No image yet</span>
-                                    </div>
+                                        <span className="text-xs mt-2 font-semibold">
+                                            Click to add images
+                                        </span>
+                                    </button>
                                 )}
                             </div>
 
+                            {/* Thumbnail strip — every uploaded image, including the
+                                first one so the user always sees the full set.
+                                Click a thumb to promote it to "main" position. */}
+                            {(formData.images || []).length > 0 && (
+                                <div className="grid grid-cols-4 gap-2">
+                                    {formData.images!.map((img, idx) => (
+                                        <div
+                                            key={img + idx}
+                                            className={
+                                                'relative aspect-square rounded-lg border bg-white overflow-hidden group/thumb cursor-pointer transition-all ' +
+                                                (idx === 0
+                                                    ? 'border-slate-900 ring-2 ring-slate-900/10'
+                                                    : 'border-slate-200 hover:border-slate-400')
+                                            }
+                                            onClick={() => {
+                                                if (idx === 0 || !formData) return;
+                                                const reordered = [
+                                                    img,
+                                                    ...formData.images!.filter((_, i) => i !== idx),
+                                                ];
+                                                setFormData({
+                                                    ...formData,
+                                                    images: reordered,
+                                                    image: reordered[0],
+                                                });
+                                            }}
+                                            title={
+                                                idx === 0
+                                                    ? 'Main image'
+                                                    : 'Click to set as main image'
+                                            }
+                                        >
+                                            <img
+                                                src={img}
+                                                alt=""
+                                                referrerPolicy="no-referrer"
+                                                className="w-full h-full object-contain p-1"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    removeImage(idx);
+                                                }}
+                                                className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-white/90 hover:bg-red-50 text-slate-500 hover:text-red-600 flex items-center justify-center shadow opacity-0 group-hover/thumb:opacity-100 transition-opacity"
+                                                title="Remove image"
+                                            >
+                                                <Trash2 size={10} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    {/* "Add more" tile — gives a visual hint that you
+                                        can keep adding without finding the button. */}
+                                    <button
+                                        type="button"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        disabled={isUploading}
+                                        className="aspect-square rounded-lg border-2 border-dashed border-slate-300 bg-slate-50 hover:bg-slate-100 hover:border-slate-400 text-slate-400 hover:text-slate-600 flex flex-col items-center justify-center transition-colors disabled:opacity-50"
+                                        title="Add more images"
+                                    >
+                                        <Plus size={18} />
+                                        <span className="text-[9px] font-semibold mt-0.5">
+                                            Add
+                                        </span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Upload button — explicitly says "Upload Images" so
+                                suppliers know they can pick multiple files at once. */}
                             <button
                                 type="button"
                                 onClick={() => fileInputRef.current?.click()}
@@ -417,49 +515,46 @@ export default function ProductEditorForm({
                                 className="w-full h-11 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                             >
                                 <Upload size={15} />
-                                {isUploading ? 'Uploading…' : 'Change Image'}
+                                {isUploading
+                                    ? 'Uploading…'
+                                    : (formData.images?.length ?? 0) > 0
+                                      ? 'Upload More Images'
+                                      : 'Upload Images'}
                             </button>
 
-                            <input
-                                type="url"
-                                placeholder="Or paste an image URL…"
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        addImageUrl((e.target as HTMLInputElement).value);
-                                        (e.target as HTMLInputElement).value = '';
-                                    }
-                                }}
-                                className="w-full h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-                            />
-
-                            {/* Image gallery thumbnails — if more than one */}
-                            {(formData.images || []).length > 1 && (
-                                <div className="grid grid-cols-4 gap-2 pt-2">
-                                    {formData.images!.slice(1).map((img, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="relative aspect-square rounded-lg border border-slate-200 bg-white overflow-hidden group/thumb"
-                                        >
-                                            <img
-                                                src={img}
-                                                alt=""
-                                                className="w-full h-full object-contain p-1"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => removeImage(idx + 1)}
-                                                className="absolute inset-0 bg-red-600/80 text-white opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center"
-                                            >
-                                                <Trash2 size={14} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                            {/* URL input + explicit Add button. Pressing Enter
+                                still works, but the button makes it obvious that
+                                the URL doesn't auto-add when you tab away. */}
+                            <div className="flex gap-2">
+                                <input
+                                    type="url"
+                                    value={urlInputValue}
+                                    onChange={(e) => setUrlInputValue(e.target.value)}
+                                    placeholder="Or paste an image URL…"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            addImageUrl(urlInputValue);
+                                            setUrlInputValue('');
+                                        }
+                                    }}
+                                    className="flex-1 h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        addImageUrl(urlInputValue);
+                                        setUrlInputValue('');
+                                    }}
+                                    disabled={!urlInputValue.trim()}
+                                    className="h-10 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Add URL
+                                </button>
+                            </div>
 
                             <p className="text-[11px] text-slate-400 text-center">
-                                JPG, PNG or WEBP. Max size 5MB.
+                                JPG, PNG or WEBP. You can upload multiple files at once. Max 5MB each.
                             </p>
 
                             <input

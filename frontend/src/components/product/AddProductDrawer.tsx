@@ -160,60 +160,11 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
         setImageUrlInput('');
     };
 
-    // ── EAN AI image search (white-bg catalog photos only) ────────────────
-    const [eanSearchResult, setEanSearchResult] = React.useState<{
-        images: string[];
-        confidence_score: number;
-        matched: boolean;
-        cached: boolean;
-        source: string;
-        reason?: string;
-        rejected_candidates?: Array<{ url: string; confidence: number; reason?: string }>;
-    } | null>(null);
-    const [showRejected, setShowRejected] = React.useState(false);
-    const [isSearchingEan, setIsSearchingEan] = React.useState(false);
-
-    const handleEanSearch = async () => {
-        const ean = (form.ean || '').trim();
-        if (!ean) {
-            toast.error('Enter the EAN / Barcode first');
-            return;
-        }
-        setIsSearchingEan(true);
-        setEanSearchResult(null);
-        const tid = toast.loading('Searching catalog images by EAN…');
-        try {
-            const res = await apiFetch('/products/ean-lookup', {
-                method: 'POST',
-                body: JSON.stringify({
-                    ean,
-                    title: form.name,
-                    brand: form.brand,
-                    image_count: 5,
-                }),
-            });
-            const data = await res.json();
-            setEanSearchResult(data);
-            if (data.matched && data.images?.length > 0) {
-                toast.success(`Found ${data.images.length} verified image${data.images.length > 1 ? 's' : ''} (${(data.confidence_score * 100).toFixed(0)}% conf)`, { id: tid });
-            } else {
-                toast.error(data.reason || 'No catalog-quality images found', { id: tid });
-            }
-        } catch (err: any) {
-            toast.error(`Search failed: ${err.message}`, { id: tid });
-        } finally {
-            setIsSearchingEan(false);
-        }
-    };
-
-    const addCandidateImage = (url: string) => {
-        if (form.images.includes(url)) {
-            toast.error('Already added');
-            return;
-        }
-        setForm(prev => ({ ...prev, images: [...prev.images, url] }));
-        toast.success('Image added');
-    };
+    // EAN AI image search was removed — operator decision. The
+    // /products/ean-lookup endpoint still exists on the backend (used by
+    // bulk-upload enrichment for missing images) but we don't expose it
+    // here anymore. Suppliers upload their own photos; admin catalog
+    // curation gets done from a separate internal tool.
 
     // Fetch suppliers (admin only)
     React.useEffect(() => {
@@ -686,120 +637,8 @@ export default function AddProductDrawer({ isOpen, onClose, onCreated, role }: A
                                     </button>
                                 </div>
 
-                                {/* AI EAN Search — fetch white-bg catalog photos */}
-                                <button
-                                    type="button"
-                                    onClick={handleEanSearch}
-                                    disabled={isSearchingEan || !form.ean}
-                                    className="w-full mt-3 h-11 rounded-xl bg-gradient-to-r from-violet-500 to-indigo-500 text-white text-[13px] font-bold hover:from-violet-600 hover:to-indigo-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                    title={form.ean ? `Search by EAN ${form.ean}` : 'Enter EAN/Barcode in the Basic section first'}
-                                >
-                                    {isSearchingEan ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                                    {isSearchingEan ? 'Searching…' : 'Find images by EAN (AI verified, white-bg only)'}
-                                </button>
-
-                                {/* EAN search results */}
-                                {eanSearchResult && (
-                                    <div className="mt-3 rounded-2xl border border-violet-200 bg-violet-50/40 p-3 space-y-2">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <Sparkles size={12} className="text-violet-600" />
-                                                <span className="text-[10px] font-black text-violet-700 uppercase tracking-widest">
-                                                    {eanSearchResult.matched ? 'AI Verified · Catalog Quality' : 'No Match'}
-                                                </span>
-                                                {eanSearchResult.matched && (
-                                                    <span className="text-[10px] font-bold text-violet-500">
-                                                        conf {(eanSearchResult.confidence_score * 100).toFixed(0)}%
-                                                    </span>
-                                                )}
-                                                {eanSearchResult.cached && (
-                                                    <span className="text-[9px] font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">cached</span>
-                                                )}
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setEanSearchResult(null)}
-                                                className="text-[12px] text-slate-400 hover:text-slate-700"
-                                            >
-                                                ✕
-                                            </button>
-                                        </div>
-                                        {eanSearchResult.reason && !eanSearchResult.matched && (
-                                            <p className="text-[11px] text-red-600 leading-relaxed">{eanSearchResult.reason}</p>
-                                        )}
-                                        {/* Low-confidence fallback: when the AI rejected
-                                            everything, give the admin a chance to review
-                                            the highest-scoring rejects and add manually
-                                            if they actually look right. */}
-                                        {!eanSearchResult.matched && (eanSearchResult.rejected_candidates?.length ?? 0) > 0 && (
-                                            <div className="pt-2 border-t border-violet-200/60">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setShowRejected(s => !s)}
-                                                    className="text-[11px] font-bold text-violet-700 hover:text-violet-900 underline underline-offset-2"
-                                                >
-                                                    {showRejected ? 'Hide low-confidence candidates' : `Show ${eanSearchResult.rejected_candidates!.length} low-confidence candidate${eanSearchResult.rejected_candidates!.length === 1 ? '' : 's'}`}
-                                                </button>
-                                                {showRejected && (
-                                                    <div className="mt-2 space-y-1.5">
-                                                        <p className="text-[10px] text-slate-500 leading-relaxed">
-                                                            ⚠ AI rejected these. Review carefully — they may not match the product. Click only if it really is the right product.
-                                                        </p>
-                                                        <div className="grid grid-cols-3 gap-2">
-                                                            {eanSearchResult.rejected_candidates!.map((c, i) => (
-                                                                <button
-                                                                    type="button"
-                                                                    key={c.url + i}
-                                                                    onClick={() => addCandidateImage(c.url)}
-                                                                    className="group relative aspect-square rounded-xl border border-amber-200 bg-white overflow-hidden hover:border-amber-500 hover:shadow-lg transition-all"
-                                                                    title={c.reason || `Confidence ${(c.confidence * 100).toFixed(0)}%`}
-                                                                >
-                                                                    <img src={c.url} alt="" referrerPolicy="no-referrer" className="absolute inset-0 w-full h-full object-contain p-1" />
-                                                                    <span className="absolute top-1 right-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-800">
-                                                                        {(c.confidence * 100).toFixed(0)}%
-                                                                    </span>
-                                                                </button>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        )}
-                                        {eanSearchResult.images.length > 0 && (
-                                            <>
-                                                <p className="text-[10px] text-slate-500">Click an image to add it to this product:</p>
-                                                <div className="grid grid-cols-3 gap-2">
-                                                    {eanSearchResult.images.map((url, i) => (
-                                                        <button
-                                                            type="button"
-                                                            key={url}
-                                                            onClick={() => addCandidateImage(url)}
-                                                            className="group relative aspect-square rounded-xl border border-violet-200 bg-white overflow-hidden hover:border-violet-500 hover:shadow-lg transition-all"
-                                                            title={`Image ${i + 1} — click to add`}
-                                                        >
-                                                            <img src={url} alt="" referrerPolicy="no-referrer" className="absolute inset-0 w-full h-full object-contain p-1" />
-                                                            <div className="absolute inset-0 bg-violet-500/0 group-hover:bg-violet-500/20 transition-colors flex items-center justify-center">
-                                                                <Plus size={20} className="text-white opacity-0 group-hover:opacity-100 drop-shadow-lg transition-opacity" />
-                                                            </div>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        const newOnes = eanSearchResult.images.filter(url => !form.images.includes(url));
-                                                        if (newOnes.length === 0) { toast.error('All already added'); return; }
-                                                        setForm(prev => ({ ...prev, images: [...prev.images, ...newOnes] }));
-                                                        toast.success(`Added ${newOnes.length} image${newOnes.length > 1 ? 's' : ''}`);
-                                                    }}
-                                                    className="w-full h-9 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-[11px] font-bold transition-colors"
-                                                >
-                                                    Add all
-                                                </button>
-                                            </>
-                                        )}
-                                    </div>
-                                )}
+                                {/* EAN AI image search removed — suppliers upload
+                                    their own images, no auto-fetch by barcode. */}
 
                                 {form.images.length > 0 && (
                                     <div className="flex flex-wrap gap-2 mt-3">
