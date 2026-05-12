@@ -157,6 +157,12 @@ model Product {
   stock       Int           @default(0)
   category    String
   images      String[]
+  // Short product demo videos — same array shape as images. Each
+  // entry is a public URL: an uploaded MP4/WebM/MOV under /uploads,
+  // or an https direct-link the supplier pasted. NOT YouTube/Vimeo
+  // embeds — operator rule: short demo clips only, max 60 seconds.
+  // The PDP renders them inline with native <video> controls.
+  videos      String[]      @default([])
   ean         String?
   brand       String?
   unit        String        @default("carton")

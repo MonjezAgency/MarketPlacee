@@ -5,6 +5,10 @@ import * as crypto from 'crypto';
 
 const KYC_BUCKET = 'kyc-documents';
 const PRODUCT_BUCKET = 'product-images';
+// Same bucket as images but tagged in a `videos/` prefix so we can
+// audit storage cost separately. Public so the buyer's <video> tag
+// can stream it without a signed URL.
+const PRODUCT_VIDEO_BUCKET = 'product-videos';
 // Signed URL valid for 1 hour — admin reviews within this window
 const SIGNED_URL_EXPIRES_IN = 3600;
 
@@ -62,6 +66,43 @@ export class SupabaseStorageService implements OnModuleInit {
 
         const { data } = this.client.storage
             .from(PRODUCT_BUCKET)
+            .getPublicUrl(storagePath);
+
+        return data.publicUrl;
+    }
+
+    /**
+     * Upload a short product demo video to a public bucket. Returns
+     * a public URL the PDP can stream with a native <video> tag.
+     *
+     * Caller is responsible for enforcing duration / size limits —
+     * we cap the request body at 25 MB in the controller and reject
+     * non-video mime types there too. The bucket is created with a
+     * 30 MB ceiling as a defence-in-depth.
+     */
+    async uploadProductVideo(
+        fileBuffer: Buffer,
+        originalName: string,
+        mimeType: string,
+    ): Promise<string> {
+        const ext = extname(originalName) || '.mp4';
+        const uniqueName = `${crypto.randomBytes(16).toString('hex')}${ext}`;
+        const storagePath = `public/${uniqueName}`;
+
+        const { error } = await this.client.storage
+            .from(PRODUCT_VIDEO_BUCKET)
+            .upload(storagePath, fileBuffer, {
+                contentType: mimeType,
+                upsert: false,
+            });
+
+        if (error) {
+            this.logger.error(`[PRODUCT_VIDEO_UPLOAD_FAIL] ${error.message}`);
+            throw new InternalServerErrorException('Failed to upload product video.');
+        }
+
+        const { data } = this.client.storage
+            .from(PRODUCT_VIDEO_BUCKET)
             .getPublicUrl(storagePath);
 
         return data.publicUrl;
@@ -142,9 +183,19 @@ export class SupabaseStorageService implements OnModuleInit {
 
         // Product Bucket
         if (!buckets?.some(b => b.name === PRODUCT_BUCKET)) {
-            await this.client.storage.createBucket(PRODUCT_BUCKET, { 
+            await this.client.storage.createBucket(PRODUCT_BUCKET, {
                 public: true,
                 fileSizeLimit: 15 * 1024 * 1024 // 15MB
+            });
+        }
+
+        // Product Video Bucket — 30 MB ceiling. Frontend rejects clips
+        // longer than 60 seconds and the controller caps the request
+        // body at 25 MB, so the bucket limit is just defence-in-depth.
+        if (!buckets?.some(b => b.name === PRODUCT_VIDEO_BUCKET)) {
+            await this.client.storage.createBucket(PRODUCT_VIDEO_BUCKET, {
+                public: true,
+                fileSizeLimit: 30 * 1024 * 1024, // 30 MB
             });
         }
     }

@@ -244,6 +244,42 @@ export class ProductsController {
     }
 
     /**
+     * Upload a short product demo video. Operator rule: 60 seconds
+     * max, 25 MB max, MP4 / WebM / MOV only. We can't measure
+     * duration server-side without ffmpeg, so the frontend enforces
+     * the 60s cap via HTMLVideoElement.duration before submitting;
+     * here we enforce mime + size as a server-side safety net.
+     */
+    @Post('upload-video')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPPLIER, Role.ADMIN)
+    @UseInterceptors(
+        FileInterceptor('file', {
+            limits: { fileSize: 25 * 1024 * 1024 }, // 25 MB
+        }),
+    )
+    async uploadVideo(@UploadedFile() file: any) {
+        if (!file) throw new BadRequestException('No file uploaded');
+        const allowedMimes = [
+            'video/mp4',
+            'video/webm',
+            'video/quicktime', // .mov
+            'video/x-quicktime',
+        ];
+        if (!allowedMimes.includes(file.mimetype)) {
+            throw new BadRequestException(
+                `Unsupported video format (${file.mimetype}). Use MP4, WebM, or MOV.`,
+            );
+        }
+        const url = await this.storageService.uploadProductVideo(
+            file.buffer,
+            file.originalname,
+            file.mimetype,
+        );
+        return { url };
+    }
+
+    /**
      * Parse the uploaded Excel WITHOUT persisting. Returns an inspection
      * payload the frontend can show to the admin BEFORE committing —
      * helpful for catching gotchas like supplier files where prices look

@@ -36,6 +36,12 @@ export interface Product {
     // Media
     image?: string;
     images?: string[];
+    /**
+     * Optional short product demo videos. Same shape as `images` —
+     * each entry is a public URL the PDP can play with a native
+     * <video> tag. Capped to clips ≤ 60 s and ≤ 25 MB on upload.
+     */
+    videos?: string[];
 
     // Inventory & Status
     stock?: number;

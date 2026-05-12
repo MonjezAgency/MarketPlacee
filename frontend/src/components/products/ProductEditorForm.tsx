@@ -41,6 +41,8 @@ import {
     ChevronUp,
     Layers,
     X,
+    Video,
+    Play,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -331,6 +333,16 @@ export default function ProductEditorForm({
     // next to the upload button and only opens when they click for it,
     // so it doesn't crowd the layout.
     const [showImageHelp, setShowImageHelp] = useState(false);
+    // Videos — short demo clips. Capped to 60 s + 25 MB on upload,
+    // YouTube/Vimeo URLs rejected because the operator's rule is
+    // "short demo clips, not 10-minute YouTube videos". Kept as
+    // its own state slice so the rest of the form stays untouched
+    // when toggling videos.
+    const [videoUrlInput, setVideoUrlInput] = useState('');
+    const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+    const videoInputRef = useRef<HTMLInputElement>(null);
+    const MAX_VIDEO_SECONDS = 60;
+    const MAX_VIDEO_MB = 25;
 
     // active display currency — synced with the rest of the app
     const [activeCurrency, setActiveCurrency] = useState(() => {
@@ -483,6 +495,132 @@ export default function ProductEditorForm({
         });
     };
 
+    // ─────────────────────────────────────────────────────────────
+    //  Video handlers
+    // ─────────────────────────────────────────────────────────────
+    //
+    // The operator's rule is "short demo clips only — no 10-minute
+    // YouTube videos". We enforce three guards client-side:
+    //   1. File size  ≤ 25 MB  (cheap reject — size shown by the OS).
+    //   2. Duration   ≤ 60 s   (we measure via HTMLVideoElement before
+    //                            sending the file to the API).
+    //   3. URL paste  rejects youtube.com / vimeo.com / tiktok.com
+    //                  — those are embeds, not direct media files;
+    //                  the <video> tag can't stream them anyway.
+    //
+    // Backend caps body size at 25 MB and validates mime type as a
+    // server-side safety net.
+
+    const probeVideoDuration = (file: File): Promise<number> =>
+        new Promise((resolve, reject) => {
+            const url = URL.createObjectURL(file);
+            const v = document.createElement('video');
+            v.preload = 'metadata';
+            v.onloadedmetadata = () => {
+                URL.revokeObjectURL(url);
+                resolve(v.duration);
+            };
+            v.onerror = () => {
+                URL.revokeObjectURL(url);
+                reject(new Error('Could not read the video file.'));
+            };
+            v.src = url;
+        });
+
+    const handleVideoUpload = async (
+        e: React.ChangeEvent<HTMLInputElement>,
+    ) => {
+        const files = Array.from(e.target.files || []);
+        if (files.length === 0 || !formData) return;
+
+        setIsUploadingVideo(true);
+        try {
+            const uploaded: string[] = [];
+            for (const file of files) {
+                // 1) Size gate
+                if (file.size > MAX_VIDEO_MB * 1024 * 1024) {
+                    toast.error(
+                        `${file.name} is ${(file.size / 1024 / 1024).toFixed(1)} MB — max is ${MAX_VIDEO_MB} MB.`,
+                    );
+                    continue;
+                }
+                // 2) Duration gate
+                let duration = 0;
+                try {
+                    duration = await probeVideoDuration(file);
+                } catch {
+                    toast.error(`Could not read ${file.name}. Try a different file.`);
+                    continue;
+                }
+                if (duration > MAX_VIDEO_SECONDS) {
+                    toast.error(
+                        `${file.name} is ${duration.toFixed(0)} s long — max is ${MAX_VIDEO_SECONDS} s. Trim the clip first.`,
+                    );
+                    continue;
+                }
+                // 3) Upload
+                const fd = new FormData();
+                fd.append('file', file);
+                const res = await apiFetch('/products/upload-video', {
+                    method: 'POST',
+                    body: fd,
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data?.url) uploaded.push(data.url);
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    toast.error(err.message || `Failed to upload ${file.name}`);
+                }
+            }
+            if (uploaded.length > 0) {
+                const combined = [...(formData.videos || []), ...uploaded];
+                setFormData({ ...formData, videos: combined });
+                toast.success(`Added ${uploaded.length} video${uploaded.length > 1 ? 's' : ''}`);
+            }
+        } finally {
+            setIsUploadingVideo(false);
+            if (e.target) e.target.value = '';
+        }
+    };
+
+    const addVideoUrl = (url: string) => {
+        if (!formData) return;
+        const cleaned = url
+            .trim()
+            .replace(/^["'<\s]+/, '')
+            .replace(/["'>\s]+$/, '')
+            .trim();
+        if (!cleaned) return;
+        // Reject embed-style URLs — they're long-form content and the
+        // <video> tag can't stream them anyway.
+        const BLOCKED_HOSTS = /(?:youtube\.com|youtu\.be|vimeo\.com|tiktok\.com|instagram\.com|facebook\.com\/watch)/i;
+        if (BLOCKED_HOSTS.test(cleaned)) {
+            toast.error('YouTube / Vimeo / TikTok links aren\'t allowed — upload a short MP4/WebM/MOV file instead.');
+            return;
+        }
+        if (!/^https?:\/\//i.test(cleaned)) {
+            toast.error('Paste a direct https URL to an MP4 / WebM / MOV file.');
+            return;
+        }
+        // Hint to the operator if the URL doesn't look like a media file.
+        if (!/\.(mp4|webm|mov|m4v)(\?|#|$)/i.test(cleaned)) {
+            toast.error('That URL doesn\'t end in .mp4 / .webm / .mov. Use a direct media link.');
+            return;
+        }
+        const existing = formData.videos || [];
+        if (existing.includes(cleaned)) return;
+        setFormData({ ...formData, videos: [...existing, cleaned] });
+    };
+
+    const removeVideo = (idx: number) => {
+        if (!formData) return;
+        setFormData({
+            ...formData,
+            videos: (formData.videos || []).filter((_, i) => i !== idx),
+        });
+    };
+
     /**
      * Move an image up (towards index 0) or down in the list.
      * The first image in the array is always the "main" — the one
@@ -565,6 +703,7 @@ export default function ProductEditorForm({
                 leadTime: formData.leadTime,
                 readyForDispatch: formData.readyForDispatch,
                 images: formData.images,
+                videos: formData.videos || [],
                 // Variants — drop empty groups and groups with no values
                 // before sending; suppliers often start typing then
                 // abandon a row, no point persisting noise. We preserve
@@ -1091,6 +1230,153 @@ export default function ProductEditorForm({
                                     </p>
                                 </div>
                             )}
+                        </div>
+
+                        {/* ── Product Videos card ──
+                            Optional short demo clips. Same layout pattern
+                            as the Images card: a vertical stack of upload
+                            tile + URL input + thumbnail list, with the same
+                            dark-mode palette. Each video thumbnail uses the
+                            native <video preload="metadata"> so the browser
+                            grabs a single frame and shows the duration
+                            without burning bandwidth. Removing a video is
+                            instant; the duration cap is enforced before
+                            upload, so anything that lands here has already
+                            passed the 60-second gate. */}
+                        <div className="bg-white dark:bg-[#131316] rounded-2xl border border-slate-200 dark:border-white/[0.05] shadow-sm dark:shadow-xl dark:shadow-black/40 p-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-9 h-9 rounded-lg bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 ring-1 ring-rose-100 dark:ring-rose-500/20 flex items-center justify-center">
+                                        <Video size={16} />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-[15px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">
+                                            Demo Videos
+                                        </h3>
+                                        <p className="text-xs text-slate-500 dark:text-zinc-500 mt-0.5">
+                                            Short product clips (≤ {MAX_VIDEO_SECONDS}s, ≤ {MAX_VIDEO_MB} MB each)
+                                        </p>
+                                    </div>
+                                </div>
+                                {(formData.videos?.length ?? 0) > 0 && (
+                                    <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-slate-100 dark:bg-white/[0.06] text-slate-600 dark:text-zinc-400 text-[11px] font-medium">
+                                        {formData.videos!.length} video
+                                        {formData.videos!.length === 1 ? '' : 's'}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Thumbnail strip */}
+                            {(formData.videos || []).length > 0 && (
+                                <div className="space-y-2">
+                                    {formData.videos!.map((vid, idx) => (
+                                        <div
+                                            key={vid + idx}
+                                            className="relative rounded-lg border border-slate-200 dark:border-white/[0.06] bg-slate-50 dark:bg-white/[0.02] overflow-hidden flex items-stretch gap-3 p-2 group/vid"
+                                        >
+                                            <video
+                                                src={vid}
+                                                preload="metadata"
+                                                muted
+                                                playsInline
+                                                controls
+                                                className="w-32 h-20 rounded-md bg-black object-contain flex-shrink-0"
+                                            />
+                                            <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
+                                                <p className="text-[11px] text-slate-500 dark:text-zinc-500 truncate font-mono">
+                                                    {vid.split('/').pop()?.slice(0, 32) || vid}
+                                                </p>
+                                                <p className="text-[10px] text-slate-400 dark:text-zinc-600">
+                                                    Position {idx + 1} of {formData.videos!.length}
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => removeVideo(idx)}
+                                                className="self-start h-7 w-7 rounded-md bg-white/90 dark:bg-zinc-900/90 hover:bg-red-50 dark:hover:bg-red-500/15 text-slate-500 dark:text-zinc-400 hover:text-red-600 dark:hover:text-red-400 flex items-center justify-center shadow-sm transition-colors"
+                                                title="Remove video"
+                                            >
+                                                <Trash2 size={13} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Empty state placeholder when no videos uploaded yet. */}
+                            {(formData.videos || []).length === 0 && (
+                                <button
+                                    type="button"
+                                    onClick={() => videoInputRef.current?.click()}
+                                    disabled={isUploadingVideo}
+                                    className="w-full aspect-[5/2] rounded-xl border border-dashed border-slate-300 dark:border-white/[0.12] bg-slate-50 dark:bg-white/[0.02] hover:bg-slate-100 dark:hover:bg-white/[0.05] hover:border-slate-400 dark:hover:border-white/25 text-slate-400 dark:text-zinc-500 hover:text-slate-600 dark:hover:text-zinc-300 flex flex-col items-center justify-center gap-1.5 transition-colors disabled:opacity-50"
+                                >
+                                    <Play size={22} />
+                                    <span className="text-xs font-semibold">
+                                        Click to add a product video
+                                    </span>
+                                    <span className="text-[10px] text-slate-400 dark:text-zinc-600">
+                                        Optional — buyers see it on the product page
+                                    </span>
+                                </button>
+                            )}
+
+                            {/* Upload button */}
+                            <button
+                                type="button"
+                                onClick={() => videoInputRef.current?.click()}
+                                disabled={isUploadingVideo}
+                                className="w-full h-10 rounded-lg bg-slate-50 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.07] hover:bg-slate-100 dark:hover:bg-white/[0.07] hover:border-slate-300 dark:hover:border-white/[0.12] text-slate-700 dark:text-zinc-200 text-[13px] font-medium flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+                            >
+                                <Upload size={15} />
+                                {isUploadingVideo
+                                    ? 'Uploading…'
+                                    : (formData.videos?.length ?? 0) > 0
+                                      ? 'Upload More Videos'
+                                      : 'Upload Video'}
+                            </button>
+
+                            {/* Direct-URL paste */}
+                            <div className="flex gap-2">
+                                <input
+                                    type="url"
+                                    value={videoUrlInput}
+                                    onChange={(e) => setVideoUrlInput(e.target.value)}
+                                    placeholder="Or paste a direct .mp4 / .webm / .mov URL…"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                            addVideoUrl(videoUrlInput);
+                                            setVideoUrlInput('');
+                                        }
+                                    }}
+                                    className="flex-1 h-10 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-xs text-slate-700 dark:text-zinc-200 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05]"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        addVideoUrl(videoUrlInput);
+                                        setVideoUrlInput('');
+                                    }}
+                                    disabled={!videoUrlInput.trim()}
+                                    className="h-10 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                                >
+                                    Add URL
+                                </button>
+                            </div>
+
+                            <p className="text-[11px] text-slate-400 dark:text-zinc-600 text-center">
+                                MP4 / WebM / MOV — short demo clips only. YouTube and Vimeo links aren't accepted.
+                            </p>
+
+                            <input
+                                ref={videoInputRef}
+                                type="file"
+                                accept="video/mp4,video/webm,video/quicktime"
+                                multiple
+                                className="hidden"
+                                onChange={handleVideoUpload}
+                            />
                         </div>
 
                         {/* Product Status card — admin only */}

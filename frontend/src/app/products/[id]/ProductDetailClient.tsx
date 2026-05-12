@@ -405,6 +405,38 @@ export default function ProductDetailClient() {
                                 ))}
                             </div>
                         )}
+
+                        {/* ── Demo videos ──
+                            Short product demo clips. Rendered BELOW the
+                            image gallery so the lead photo stays the
+                            hero; videos sit as a stack of native <video>
+                            players that buyers can play inline. Each
+                            uses preload="metadata" so we only load the
+                            poster frame until the buyer presses play —
+                            keeps the PDP fast even with multiple clips.
+                            The track gets a small "VIDEO" badge so it
+                            visually separates from the photo thumbnails
+                            above. */}
+                        {Array.isArray(product.videos) && product.videos.length > 0 && (
+                            <div className="mt-6 space-y-3">
+                                <div className="flex items-center gap-2 text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">
+                                    <span className="inline-flex items-center gap-1.5 h-5 px-2 rounded-md bg-rose-50 text-rose-600 border border-rose-100">
+                                        ▶ Video
+                                    </span>
+                                    <span>{product.videos.length} clip{product.videos.length === 1 ? '' : 's'}</span>
+                                </div>
+                                {product.videos.map((vid, i) => (
+                                    <video
+                                        key={vid + i}
+                                        src={vid}
+                                        controls
+                                        preload="metadata"
+                                        playsInline
+                                        className="w-full rounded-xl border border-[#E5E7EB] bg-black aspect-video"
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </div>
 
                     {/* MIDDLE: Product Information */}

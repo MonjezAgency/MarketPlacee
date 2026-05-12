@@ -36,6 +36,16 @@ export class CreateProductDto {
     images?: string[];
 
     /**
+     * Optional product demo videos — same shape as images. Each
+     * entry is a public URL (an uploaded MP4/WebM/MOV under our
+     * Supabase bucket, or an https direct link). Frontend caps
+     * clip length at 60 s and file size at 25 MB.
+     */
+    @IsOptional()
+    @IsString({ each: true })
+    videos?: string[];
+
+    /**
      * EAN / UPC / ITF-14 barcode. Must be exactly 8, 12, 13, or 14
      * digits when present — anything else is a supplier internal SKU
      * and gets routed elsewhere. The frontend form blocks save when

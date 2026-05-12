@@ -281,6 +281,7 @@ export class ProductsService {
                 basePrice: dto.price,
                 price: dto.price * finalMarkup,
                 images: productImages,
+                videos: Array.isArray(dto.videos) ? dto.videos.filter((v: any) => typeof v === 'string' && v.trim()) : [],
                 supplierId: dto.supplierId,
                 unit: dto.unit || 'piece',
                 moq: dto.moq ?? null,
@@ -912,6 +913,11 @@ export class ProductsService {
         }
         if (data.stock !== undefined) updateData.stock = data.stock;
         if (data.images !== undefined) updateData.images = data.images;
+        if (data.videos !== undefined) {
+            updateData.videos = Array.isArray(data.videos)
+                ? data.videos.filter((v: any) => typeof v === 'string' && v.trim())
+                : [];
+        }
         if (data.ean !== undefined) updateData.ean = data.ean;
         if (data.variants !== undefined) updateData.variants = data.variants;
         if (data.unit !== undefined) updateData.unit = data.unit;
