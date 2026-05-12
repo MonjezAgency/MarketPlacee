@@ -1,614 +1,102 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { X, Upload, Save, Image as ImageIcon, Sparkles, DollarSign, Package, Plus, Trash2, Info, Truck, Check } from 'lucide-react';
+/**
+ * ProductEditorModal — clean, focused product editor used by both
+ * the supplier (`/supplier/products`) and the admin
+ * (`/admin/products`) pages.
+ *
+ * The previous version (KitKat-era) tried to be a single mega-modal
+ * with AI-boost, EAN image scraping, variant builders, and a live
+ * customer preview pane. Suppliers found it overwhelming and the
+ * admin team kept asking why a tool labelled "supplier editor"
+ * exposed catalog-curation features. We replaced it with the
+ * minimal layout the operator drew up: image · price · stock ·
+ * product details · save. Nothing else.
+ *
+ * Two modes:
+ *   • mode="supplier" (default) — no verification badge, no admin
+ *     metadata. Supplier types raw price; backend stores it as
+ *     `basePrice` and re-applies markup for `price`.
+ *   • mode="admin" — shows the "Verified by Atlantis" status card
+ *     with product ID + created date.
+ *
+ * Currency conversion: the modal works in `activeCurrency` (read
+ * from localStorage). On open we display `basePrice ?? price`
+ * converted FROM the platform base; on save we convert back so
+ * the API always receives base-currency values.
+ */
+
+import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertFromBase, convertToBase } from '@/lib/currency';
-import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+    X,
+    Upload,
+    Save,
+    Image as ImageIcon,
+    Package,
+    Trash2,
+    ShieldCheck,
+    Euro,
+    Box,
+    Check,
+} from 'lucide-react';
+
+import {
+    getCurrencyInfo,
+    SUPPORTED_CURRENCIES,
+    convertFromBase,
+    convertToBase,
+} from '@/lib/currency';
+import { COUNTRIES } from '@/lib/countries';
+import { CATEGORIES_LIST } from '@/lib/products';
 import { ProductStatus } from '@/lib/types';
 import type { Product } from '@/lib/types';
-import { CATEGORIES_LIST } from '@/lib/products';
 
-interface VariantGroup {
-    name: string;
-    values: string[];
-}
-
+// ---------------------------------------------------------------
+//  Public props
+// ---------------------------------------------------------------
 interface ProductEditorModalProps {
     isOpen: boolean;
     onClose: () => void;
     product?: Product | null;
     onSave: (data: Product) => void;
+    /**
+     * When "admin" the modal shows the Verified-by-Atlantis status
+     * card and the product ID / created date. Defaults to "supplier".
+     */
+    mode?: 'admin' | 'supplier';
+    /**
+     * Optional delete handler. When provided, the footer renders a
+     * red "Delete Product" button on the left. Admin pages pass this;
+     * supplier pages leave it undefined (deletion happens from the
+     * table row menu, with an extra confirm).
+     */
+    onDelete?: (id: string) => void;
 }
 
-const ALL_CATEGORIES = CATEGORIES_LIST;
+const UNIT_TYPES = [
+    { value: 'Piece', label: 'Piece', icon: '📦' },
+    { value: 'Case', label: 'Case', icon: '📦' },
+    { value: 'Pallet', label: 'Pallet', icon: '🏗️' },
+    { value: 'Truck', label: 'Truck', icon: '🚛' },
+];
 
-
-
-interface ModalPortalContentProps {
-    isOpen: boolean;
-    onClose: () => void;
-    formData: Product;
-    setFormData: (data: any) => void;
-    handleSubmit: (e: React.FormEvent) => void;
-    symbol: string;
-    removeImage: (index: number) => void;
-    addImageUrl: (url: string) => void;
-    fileInputRef: React.RefObject<HTMLInputElement>;
-    handleImageUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    eanLimit: number;
-    setEanLimit: (val: number) => void;
-    isFetchingEan: boolean;
-    fetchEanImages: () => void;
-    newVariantName: string;
-    setNewVariantName: (val: string) => void;
-    addVariantGroup: () => void;
-    removeVariantGroup: (index: number) => void;
-    newVariantValue: { [key: number]: string };
-    setNewVariantValue: (val: any) => void;
-    addVariantValue: (index: number) => void;
-    removeVariantValue: (gi: number, vi: number) => void;
-    product: Product | null | undefined;
-    isGeneratingAI: boolean;
-    handleAIDescription: () => void;
-    activeCurrency: string;
-    setActiveCurrency: (val: string) => void;
-}
-
-function ModalPortalContent({
-    isOpen, onClose, formData, setFormData, handleSubmit, symbol,
-    removeImage, addImageUrl, fileInputRef, handleImageUpload,
-    eanLimit, setEanLimit, isFetchingEan, fetchEanImages,
-    newVariantName, setNewVariantName, addVariantGroup, removeVariantGroup,
-    newVariantValue, setNewVariantValue, addVariantValue, removeVariantValue,
-    product, isGeneratingAI, handleAIDescription, activeCurrency, setActiveCurrency
-}: ModalPortalContentProps) {
-    return (
-        <AnimatePresence mode="wait">
-            {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 w-screen h-screen overflow-hidden">
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        onClick={onClose}
-                        className="absolute inset-0 bg-black/80 backdrop-blur-xl"
-                    />
-
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                        animate={{ opacity: 1, scale: 1, y: 0 }}
-                        exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="relative w-full max-w-6xl max-h-[92vh] flex flex-col bg-background border border-border/50 rounded-[40px] premium-shadow z-10 overflow-hidden"
-                    >
-                        {/* Sticky Header */}
-                        <div className="shrink-0 px-8 py-6 border-b border-border/50 flex items-center justify-between bg-background/80 backdrop-blur-md z-30">
-                            <div>
-                                <h2 className="text-2xl font-black text-foreground tracking-tight">{product ? 'Edit Product' : 'Create New Product'}</h2>
-                                <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest mt-1">Design and configure your product presentation</p>
-                            </div>
-                            <button
-                                onClick={onClose}
-                                className="w-12 h-12 bg-muted/50 hover:bg-muted rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-all"
-                            >
-                                <X size={24} />
-                            </button>
-                        </div>
-
-                        {/* Scrollable Body */}
-                        <div className="flex-1 overflow-y-auto p-8 lg:p-12 space-y-12">
-                            <form id="product-editor-form" onSubmit={handleSubmit}>
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-20">
-
-                                    {/* Left Column: Visuals */}
-                                    <div className="lg:col-span-4 space-y-10">
-                                        <div className="space-y-4">
-                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Product Gallery</label>
-                                            <div className="w-full bg-muted/20 border border-border/50 rounded-3xl p-6 space-y-6">
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    {(formData.images || []).map((img, idx) => (
-                                                        <div key={idx} className="relative group/img aspect-square bg-white rounded-2xl border border-border/50 overflow-hidden shadow-sm">
-                                                            <img src={img} alt={`Preview ${idx}`} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Invalid+URL'; }} className="w-full h-full object-contain p-2" />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => removeImage(idx)}
-                                                                className="absolute top-2 end-2 w-8 h-8 bg-destructive/10 hover:bg-destructive text-destructive hover:text-white rounded-full flex items-center justify-center backdrop-blur-md opacity-0 group-hover/img:opacity-100 transition-all shadow-lg"
-                                                            >
-                                                                <Trash2 size={16} />
-                                                            </button>
-                                                            {idx === 0 && (
-                                                                <div className="absolute bottom-2 start-2 bg-primary text-white text-[8px] font-black uppercase px-2 py-1 rounded-full shadow-lg">Main</div>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    <button 
-                                                        type="button"
-                                                        onClick={() => fileInputRef.current?.click()}
-                                                        className="aspect-square bg-muted/30 border-2 border-dashed border-border/50 rounded-2xl flex flex-col items-center justify-center text-muted-foreground hover:border-primary/50 hover:text-primary transition-all group"
-                                                    >
-                                                        <Plus size={24} className="group-hover:scale-110 transition-transform" />
-                                                        <span className="text-[9px] font-black uppercase tracking-widest mt-2">{formData.images?.length ? 'Add More' : 'Upload'}</span>
-                                                    </button>
-                                                </div>
-
-                                                <div className="flex items-center gap-2 bg-background border border-border/50 rounded-xl p-1 shadow-inner focus-within:ring-2 ring-primary/10 transition-all">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Paste image URL..."
-                                                        onKeyDown={e => {
-                                                            if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                addImageUrl((e.target as HTMLInputElement).value);
-                                                                (e.target as HTMLInputElement).value = '';
-                                                            }
-                                                        }}
-                                                        className="flex-1 bg-transparent px-3 py-2 outline-none text-xs font-bold"
-                                                    />
-                                                    <Button
-                                                        type="button"
-                                                        size="sm"
-                                                        variant="secondary"
-                                                        className="rounded-lg h-8 px-3"
-                                                        onClick={() => fileInputRef.current?.click()}
-                                                    >
-                                                        <Upload size={14} />
-                                                    </Button>
-                                                </div>
-                                                <input
-                                                    ref={fileInputRef}
-                                                    type="file"
-                                                    accept="image/*"
-                                                    multiple
-                                                    className="hidden"
-                                                    onChange={handleImageUpload}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        {/* "Display Settings" / Wholesale Verified badge block — hidden
-                                            from suppliers. Verification status / source labels are an
-                                            Atlantis-only signal shown on the public catalog, never edited
-                                            by suppliers themselves. */}
-
-                                        <div className="bg-card rounded-[32px] p-6 border border-border/50 space-y-4 opacity-80 group hover:opacity-100 transition-opacity">
-                                            <div className="flex items-center justify-between">
-                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                                    <Package size={14} className="text-secondary" /> Customer Preview
-                                                </h4>
-                                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                            </div>
-                                            <div className="bg-background rounded-2xl border border-border shadow-sm group-hover:shadow-lg transition-all">
-                                                <div className="aspect-[4/3] bg-muted/10 flex items-center justify-center">
-                                                    {(formData.images || [])[0] ? (
-                                                        <img src={formData.images?.[0]} alt="Preview" referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400?text=Invalid+URL'; }} className="w-full h-full object-contain p-4" />
-                                                    ) : (
-                                                        <ImageIcon size={32} className="text-muted-foreground/20" />
-                                                    )}
-                                                </div>
-                                                <div className="p-4 space-y-2">
-                                                    <p className="text-[9px] font-black uppercase tracking-widest text-primary">{formData.brand || 'Your Brand'}</p>
-                                                    <p className="font-black text-xs leading-tight line-clamp-1">{formData.name || 'Product Name...'}</p>
-                                                    <div className="flex items-center justify-between pt-2">
-                                                        <p className="font-black text-sm text-foreground">{symbol}{formData.price > 0 ? formData.price.toFixed(2) : '0.00'}</p>
-                                                        <div className="h-4 px-1.5 bg-secondary/10 text-secondary text-[8px] font-black rounded uppercase flex items-center">MOQ {formData.minOrder || 1}</div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Right Column: Configuration */}
-                                    <div className="lg:col-span-8 space-y-10">
-                                        <div className="space-y-6">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Brand</label>
-                                                    <input
-                                                        type="text"
-                                                        required
-                                                        placeholder="e.g. Coca Cola"
-                                                        value={formData.brand}
-                                                        onChange={e => setFormData({ ...formData, brand: e.target.value })}
-                                                        className="w-full bg-card border border-border/50 rounded-2xl px-6 py-4 outline-none focus:border-primary/50 text-foreground font-bold transition-all"
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Category</label>
-                                                    <select
-                                                        value={formData.category}
-                                                        onChange={e => setFormData({ ...formData, category: e.target.value })}
-                                                        className="w-full bg-card border border-border/50 rounded-2xl px-6 py-4 outline-none focus:border-primary/50 text-foreground font-bold transition-all appearance-none"
-                                                    >
-                                                        {ALL_CATEGORIES.map(cat => (
-                                                            <option key={cat} value={cat}>{cat}</option>
-                                                        ))}
-                                                    </select>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Full Public Name</label>
-                                                <input
-                                                    type="text"
-                                                    required
-                                                    placeholder="e.g. Classic Cola 330ml Can (24 Pack)"
-                                                    value={formData.name}
-                                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                                    className="w-full bg-card border border-border/50 rounded-2xl px-6 py-4 outline-none focus:border-primary/50 text-foreground font-black text-2xl transition-all"
-                                                />
-                                            </div>
-
-                                            <div className="grid grid-cols-1 gap-6">
-                                                <div className="space-y-2">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">EAN / UPC / Barcode</label>
-                                                    <input
-                                                        type="text"
-                                                        placeholder="e.g. 5449000000996"
-                                                        value={formData.ean}
-                                                        onChange={e => setFormData({ ...formData, ean: e.target.value })}
-                                                        className="w-full bg-card border border-border/50 rounded-2xl px-6 py-4 outline-none focus:border-primary/50 text-foreground font-bold transition-all"
-                                                    />
-                                                </div>
-                                                {/* "Image Auto-Match" (AI/EAN image fetcher) — hidden from
-                                                    suppliers. This is an Atlantis-only enrichment tool used
-                                                    when curating the public catalog; suppliers upload their
-                                                    own product photos directly. Keeping the variable hooks
-                                                    alive (eanLimit / fetchEanImages) so the shared props
-                                                    interface still satisfies. */}
-                                                <div className="space-y-2 hidden">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Image Auto-Match</label>
-                                                    <div className="flex gap-2">
-                                                        <Button
-                                                            type="button"
-                                                            disabled={!formData.ean || isFetchingEan}
-                                                            onClick={fetchEanImages}
-                                                            className="h-14 rounded-2xl px-6 flex-1 gap-2 font-black uppercase tracking-widest shadow-lg shadow-primary/10"
-                                                        >
-                                                            {isFetchingEan ? (
-                                                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                                            ) : (
-                                                                <><Sparkles size={16} /> Fetch {eanLimit} Images</>
-                                                            )}
-                                                        </Button>
-                                                        <input
-                                                            type="number"
-                                                            min="1"
-                                                            max="10"
-                                                            value={eanLimit}
-                                                            onChange={e => setEanLimit(parseInt(e.target.value) || 1)}
-                                                            className="w-20 bg-card border border-border/50 rounded-2xl px-2 py-4 outline-none focus:border-primary/50 text-foreground font-black text-center"
-                                                        />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                {/* "AI Boost" description generator — hidden from suppliers.
-                                                    Admin-only feature used during catalog curation. */}
-                                                <div className="flex items-center justify-between mb-1 ms-2">
-                                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description / Highlights</label>
-                                                </div>
-                                                <textarea
-                                                    placeholder="Focus on case size, expiration date, or origin..."
-                                                    value={formData.description}
-                                                    onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                                    className="w-full h-32 bg-card border border-border/50 rounded-2xl px-6 py-4 outline-none focus:border-primary/50 text-foreground font-medium resize-none transition-all"
-                                                />
-                                            </div>
-
-                                            <div className="p-8 bg-muted/30 rounded-[32px] border border-border/50 space-y-8">
-                                                <div className="grid grid-cols-2 gap-8">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Currency & Price Per Case</label>
-                                                        <div className="flex gap-2">
-                                                            <select
-                                                                value={activeCurrency}
-                                                                onChange={e => setActiveCurrency(e.target.value)}
-                                                                className="h-14 bg-background border border-border/50 rounded-2xl px-4 outline-none focus:border-primary/50 text-foreground font-black text-sm appearance-none"
-                                                            >
-                                                                {SUPPORTED_CURRENCIES.map(c => (
-                                                                    <option key={c.code} value={c.code}>{c.symbol} {c.code}</option>
-                                                                ))}
-                                                            </select>
-                                                            <div className="relative flex-1">
-                                                                <span className="absolute start-5 top-1/2 -translate-y-1/2 text-primary font-black text-xl">{SUPPORTED_CURRENCIES.find(c => c.code === activeCurrency)?.symbol}</span>
-                                                                <input
-                                                                    type="number"
-                                                                    step="0.01"
-                                                                    required
-                                                                    value={formData.price || ''}
-                                                                    onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
-                                                                    className="w-full bg-background border border-border/50 rounded-2xl ps-12 pe-6 py-4 outline-none focus:border-primary/50 text-foreground font-black text-2xl transition-all"
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Stock Level (Cases)</label>
-                                                        <div className="relative">
-                                                            <Package className="absolute start-5 top-1/2 -translate-y-1/2 text-secondary w-5 h-5" />
-                                                            <input
-                                                                type="number"
-                                                                required
-                                                                value={formData.stock || ''}
-                                                                onChange={e => setFormData({ ...formData, stock: parseInt(e.target.value) || 0 })}
-                                                                className="w-full bg-background border border-border/50 rounded-2xl ps-12 pe-6 py-4 outline-none focus:border-primary/50 text-foreground font-black text-2xl transition-all"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-6">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Unit Type <span className="text-primary">*</span></label>
-                                                        <select
-                                                            value={formData.unit}
-                                                            onChange={e => setFormData({ ...formData, unit: e.target.value, unitsPerPallet: 0, palletsPerShipment: 0 })}
-                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold appearance-none"
-                                                        >
-                                                            <option value="Piece">📦 Piece</option>
-                                                            <option value="Pallet">🏗️ Pallet</option>
-                                                            <option value="Truck">🚛 Truck</option>
-                                                        </select>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Minimum Order ({formData.unit || 'Units'})</label>
-                                                        <input
-                                                            type="number"
-                                                            placeholder={`min ${formData.unit?.toLowerCase() || 'pcs'}`}
-                                                            value={formData.minOrder || ''}
-                                                            onChange={e => setFormData({ ...formData, minOrder: parseInt(e.target.value) || 1 })}
-                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/10">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
-                                                            Weight per Unit (kg) <span className="text-primary">(Required)</span>
-                                                            <div className="group/tip relative cursor-help">
-                                                                <Info size={10} className="text-muted-foreground" />
-                                                                <div className="absolute bottom-full mb-2 hidden group-hover/tip:block w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg shadow-xl z-50 normal-case font-medium">
-                                                                    Needed for calculating total shipment weight and container shipping costs.
-                                                                </div>
-                                                            </div>
-                                                        </label>
-                                                        <input
-                                                            type="number"
-                                                            step="0.001"
-                                                            placeholder="e.g. 0.330"
-                                                            value={formData.weight || ''}
-                                                            onChange={e => setFormData({ ...formData, weight: parseFloat(e.target.value) || 0 })}
-                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
-                                                            BBD (Best Before Date) <span className="text-primary">(Required)</span>
-                                                            <div className="group/tip relative cursor-help">
-                                                                <Info size={10} className="text-muted-foreground" />
-                                                                <div className="absolute bottom-full mb-2 hidden group-hover/tip:block w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg shadow-xl z-50 normal-case font-medium">
-                                                                    Buyers need this to ensure product longevity for international distribution.
-                                                                </div>
-                                                            </div>
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="e.g. 18 Months"
-                                                            value={formData.shelfLife || ''}
-                                                            onChange={e => setFormData({ ...formData, shelfLife: e.target.value })}
-                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/10">
-                                                    <div className="space-y-2">
-                                                        <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
-                                                            Country of Origin <span className="text-primary">(Required)</span>
-                                                            <div className="group/tip relative cursor-help">
-                                                                <Info size={10} className="text-muted-foreground" />
-                                                                <div className="absolute bottom-full mb-2 hidden group-hover/tip:block w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg shadow-xl z-50 normal-case font-medium">
-                                                                    Mandatory for customs clearance and international trade agreements.
-                                                                </div>
-                                                            </div>
-                                                        </label>
-                                                        <input
-                                                            type="text"
-                                                            placeholder="e.g. Egypt"
-                                                            value={formData.origin || ''}
-                                                            onChange={e => setFormData({ ...formData, origin: e.target.value })}
-                                                            className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
-                                                        />
-                                                    </div>
-                                                    
-                                                    {(formData.unit === 'Pallet' || formData.unit === 'Shipment') && (
-                                                        <div className="space-y-2">
-                                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
-                                                                Units per Pallet <span className="text-primary">(Required)</span>
-                                                                <div className="group/tip relative cursor-help">
-                                                                    <Info size={10} className="text-muted-foreground" />
-                                                                    <div className="absolute bottom-full mb-2 hidden group-hover/tip:block w-48 p-2 bg-slate-900 text-white text-[10px] rounded-lg shadow-xl z-50 normal-case font-medium">
-                                                                        Essential for buyers to calculate container capacity (FCL/LCL).
-                                                                    </div>
-                                                                </div>
-                                                            </label>
-                                                            <input
-                                                                type="number"
-                                                                placeholder="e.g. 1440"
-                                                                value={formData.unitsPerPallet || ''}
-                                                                onChange={e => setFormData({ ...formData, unitsPerPallet: parseInt(e.target.value) || 0 })}
-                                                                className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {formData.unit === 'Shipment' && (
-                                                    <div className="grid grid-cols-2 gap-6 pt-4 border-t border-border/10">
-                                                        <div className="space-y-2">
-                                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Pallet per Truck</label>
-                                                            <input
-                                                                type="number"
-                                                                placeholder="e.g. 26"
-                                                                value={formData.palletsPerShipment || ''}
-                                                                onChange={e => setFormData({ ...formData, palletsPerShipment: parseInt(e.target.value) || 0 })}
-                                                                className="w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none focus:border-primary/50 text-sm font-bold"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                <div className="pt-6 border-t border-border/10 space-y-6">
-                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                                                        <Truck size={14} /> Logistics & Readiness
-                                                    </h4>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-background/50 p-6 rounded-2xl border border-border/30">
-                                                        <div className="space-y-4">
-                                                            <label className="flex items-center gap-3 cursor-pointer group">
-                                                                <div className={cn(
-                                                                    "w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all",
-                                                                    formData.readyForDispatch ? "bg-primary border-primary shadow-lg shadow-primary/20" : "border-muted-foreground/30 group-hover:border-primary/50"
-                                                                )}>
-                                                                    {formData.readyForDispatch && <Check size={16} className="text-white" />}
-                                                                </div>
-                                                                <input 
-                                                                    type="checkbox" 
-                                                                    className="hidden" 
-                                                                    checked={formData.readyForDispatch}
-                                                                    onChange={e => setFormData({ ...formData, readyForDispatch: e.target.checked })}
-                                                                />
-                                                                <div>
-                                                                    <p className="text-sm font-black text-foreground uppercase tracking-tight">Ready for Dispatch</p>
-                                                                    <p className="text-[10px] text-muted-foreground font-medium">Item is in stock and can ship immediately</p>
-                                                                </div>
-                                                            </label>
-                                                        </div>
-
-                                                        <div className="space-y-2">
-                                                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2 flex items-center gap-1.5">
-                                                                Production Lead Time (Days)
-                                                                {!formData.readyForDispatch && <span className="text-primary">(Required)</span>}
-                                                            </label>
-                                                            <div className="relative">
-                                                                <input
-                                                                    type="number"
-                                                                    disabled={formData.readyForDispatch}
-                                                                    placeholder="e.g. 7"
-                                                                    value={formData.leadTime || ''}
-                                                                    onChange={e => setFormData({ ...formData, leadTime: parseInt(e.target.value) || 0 })}
-                                                                    className={cn(
-                                                                        "w-full h-12 bg-background border border-border/50 rounded-xl px-4 outline-none transition-all text-sm font-bold",
-                                                                        formData.readyForDispatch ? "opacity-30 grayscale cursor-not-allowed" : "focus:border-primary/50"
-                                                                    )}
-                                                                />
-                                                                <span className="absolute end-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-muted-foreground uppercase tracking-widest">Days</span>
-                                                            </div>
-                                                            <p className="text-[9px] text-muted-foreground/60 italic px-2">Time needed to prepare product if not in stock.</p>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-card rounded-[32px] p-8 border border-border/50 space-y-6">
-                                                <div className="flex items-center justify-between">
-                                                    <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                                        <Sparkles size={14} className="text-primary" /> Product Variants
-                                                    </h4>
-                                                </div>
-
-                                                <div className="space-y-4">
-                                                    {(formData.variants || []).map((group: any, gi: number) => (
-                                                        <div key={gi} className="p-4 bg-muted/30 rounded-2xl border border-border/50 space-y-3">
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-xs font-black text-foreground uppercase tracking-widest">{group.name}</span>
-                                                                <button type="button" onClick={() => removeVariantGroup(gi)} className="w-8 h-8 flex items-center justify-center bg-destructive/10 text-destructive rounded-lg hover:bg-destructive hover:text-white transition-all">
-                                                                    <Trash2 size={14} />
-                                                                </button>
-                                                            </div>
-                                                            <div className="flex flex-wrap gap-2">
-                                                                {group.values.map((val: string, vi: number) => (
-                                                                    <span key={vi} className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-[10px] font-black px-3 py-1.5 rounded-full border border-primary/20 bg-background shadow-sm">
-                                                                        {val}
-                                                                        <button type="button" onClick={() => removeVariantValue(gi, vi)} className="hover:text-destructive">
-                                                                            <X size={12} />
-                                                                        </button>
-                                                                    </span>
-                                                                ))}
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                <input
-                                                                    type="text"
-                                                                    placeholder={`Add ${group.name}...`}
-                                                                    value={newVariantValue[gi] || ''}
-                                                                    onChange={e => setNewVariantValue({ ...newVariantValue, [gi]: e.target.value })}
-                                                                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVariantValue(gi); } }}
-                                                                    className="flex-1 bg-background border border-border/50 rounded-xl px-4 py-2 text-xs font-bold outline-none focus:border-primary/50"
-                                                                />
-                                                                <Button type="button" size="sm" variant="outline" className="rounded-xl h-10 w-10 p-0" onClick={() => addVariantValue(gi)}>
-                                                                    <Plus size={14} />
-                                                                </Button>
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-
-                                                <div className="flex gap-2 p-2 bg-muted/20 rounded-2xl border border-border/50">
-                                                    <input
-                                                        type="text"
-                                                        placeholder="Option name (e.g. Size, Flavor...)"
-                                                        value={newVariantName}
-                                                        onChange={e => setNewVariantName(e.target.value)}
-                                                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addVariantGroup(); } }}
-                                                        className="flex-1 bg-transparent px-4 py-2 text-xs font-bold outline-none"
-                                                    />
-                                                    <Button type="button" variant="outline" size="sm" className="rounded-xl font-black uppercase text-[10px]" onClick={addVariantGroup}>
-                                                        <Plus size={14} /> Add Option
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </form>
-                        </div>
-
-                        {/* Sticky Footer */}
-                        <div className="shrink-0 px-8 py-6 border-t border-border/50 flex items-center justify-end bg-background/80 backdrop-blur-md z-30">
-                            <div className="flex items-center gap-4">
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    className="px-8 h-14 rounded-2xl font-black text-xs uppercase tracking-widest text-muted-foreground hover:bg-muted transition-all"
-                                >
-                                    Discard Changes
-                                </button>
-                                <Button 
-                                    form="product-editor-form"
-                                    type="submit" 
-                                    size="xl" 
-                                    className="rounded-2xl px-12 font-black text-sm uppercase tracking-widest gap-3 shadow-xl shadow-primary/20"
-                                >
-                                    <Save size={20} />
-                                    {product ? 'Update Product' : 'List on Atlantis'}
-                                </Button>
-                            </div>
-                        </div>
-                    </motion.div>
-                </div>
-            )}
-        </AnimatePresence>
-
-    );
-}
-
-export default function ProductEditorModal({ isOpen, onClose, product, onSave }: ProductEditorModalProps) {
+// ---------------------------------------------------------------
+//  Component
+// ---------------------------------------------------------------
+export default function ProductEditorModal({
+    isOpen,
+    onClose,
+    product,
+    onSave,
+    mode = 'supplier',
+    onDelete,
+}: ProductEditorModalProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const { symbol } = getCurrencyInfo(false); 
-    const [activeCurrency, setActiveCurrency] = React.useState(() => {
+
+    // active display currency — synced with the rest of the app
+    const [activeCurrency, setActiveCurrency] = useState(() => {
         if (typeof window !== 'undefined') {
             const saved = localStorage.getItem('platform-currency');
             if (saved) return saved;
@@ -616,261 +104,617 @@ export default function ProductEditorModal({ isOpen, onClose, product, onSave }:
         return getCurrencyInfo().code;
     });
 
-    // Sync currency when changed elsewhere
-    React.useEffect(() => {
-        const handleCurrencyChange = () => {
+    useEffect(() => {
+        const onCurrencyChanged = () => {
             const saved = localStorage.getItem('platform-currency');
             if (saved) setActiveCurrency(saved);
         };
-        window.addEventListener('currency-changed', handleCurrencyChange);
-        window.addEventListener('storage', handleCurrencyChange);
+        window.addEventListener('currency-changed', onCurrencyChanged);
+        window.addEventListener('storage', onCurrencyChanged);
         return () => {
-            window.removeEventListener('currency-changed', handleCurrencyChange);
-            window.removeEventListener('storage', handleCurrencyChange);
+            window.removeEventListener('currency-changed', onCurrencyChanged);
+            window.removeEventListener('storage', onCurrencyChanged);
         };
     }, []);
 
+    const symbol =
+        SUPPORTED_CURRENCIES.find((c) => c.code === activeCurrency)?.symbol ||
+        '€';
+
+    // ---------- form state ----------
     const defaultData: Product = {
         id: '',
-        name: '', brand: '', price: 0, stock: 0, image: '', images: [],
-        category: 'Beverages', description: '', unit: 'Case (24 pcs)',
-        minOrder: 1, ean: '', variants: [], inStock: true,
-        unitsPerPallet: 0, palletsPerShipment: 0,
-        weight: 0, shelfLife: '', origin: '',
+        name: '',
+        brand: '',
+        price: 0,
+        stock: 0,
+        image: '',
+        images: [],
+        category: 'Beverages',
+        description: '',
+        unit: 'Piece',
+        minOrder: 1,
+        ean: '',
+        variants: [],
+        inStock: true,
+        unitsPerPallet: 0,
+        palletsPerShipment: 0,
+        weight: 0,
+        shelfLife: '',
+        origin: '',
         status: ProductStatus.PENDING,
-        isNew: false, bulkSave: false
+        isNew: false,
+        bulkSave: false,
     };
 
     const [formData, setFormData] = useState<Product>(defaultData);
-    const [newVariantName, setNewVariantName] = useState('');
-    const [newVariantValue, setNewVariantValue] = useState<{ [key: number]: string }>({});
+    const [isUploading, setIsUploading] = useState(false);
 
+    // Hydrate form when a product is passed in (or reset on close).
     useEffect(() => {
         if (product) {
-            const rawPrice = product.basePrice ?? product.price;
+            const rawPrice = product.basePrice ?? product.price ?? 0;
             const displayPrice = convertFromBase(rawPrice, activeCurrency);
-            
             setFormData({
                 ...defaultData,
                 ...product,
                 price: displayPrice,
-                variants: product.variants || [],
-                images: product.images || [],
+                images: product.images || (product.image ? [product.image] : []),
             });
         } else {
             setFormData(defaultData);
         }
-        setNewVariantName('');
-        setNewVariantValue({});
+        // We deliberately exclude defaultData from deps — it's a fresh
+        // object each render and would loop.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [product, isOpen, activeCurrency]);
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        
-        const egpPrice = convertToBase(formData.price, activeCurrency);
-        
-        const dataToSave = {
-            ...formData,
-            price: egpPrice,
-            basePrice: egpPrice
-        };
-
-        // Ensure we don't send an empty ID for new products
-        if (!dataToSave.id) {
-            delete (dataToSave as any).id;
-        }
-        
-        onSave(dataToSave);
-        onClose();
-    };
-
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // ---------- image upload ----------
+    const handleImageUpload = async (
+        e: React.ChangeEvent<HTMLInputElement>,
+    ) => {
         const files = Array.from(e.target.files || []);
         if (files.length === 0) return;
 
-        const uploadFile = async (file: File): Promise<string | null> => {
-            try {
+        setIsUploading(true);
+        try {
+            const { apiFetch } = await import('@/lib/api');
+            const uploaded: string[] = [];
+            for (const file of files) {
                 const fd = new FormData();
                 fd.append('file', file);
-
-                const { apiFetch } = await import('@/lib/api');
                 const res = await apiFetch('/products/upload-image', {
                     method: 'POST',
                     body: fd,
                 });
-
                 if (res.ok) {
                     const data = await res.json();
-                    return data.url;
-                } else {
-                    console.error(`Upload failed for ${file.name}: ${res.status}`);
-                    return null;
+                    if (data?.url) uploaded.push(data.url);
                 }
-            } catch (err) {
-                console.error(`Upload error for ${file.name}:`, err);
-                return null;
             }
-        };
-
-        try {
-            const results = await Promise.all(files.map(uploadFile));
-            const validUrls = results.filter((url): url is string => url !== null);
-
-            if (validUrls.length > 0) {
-                setFormData((prev: Product) => {
-                    const existing = prev.images || [];
-                    const newOnes = validUrls.filter(r => !existing.includes(r));
-                    const combined = [...existing, ...newOnes];
-                    return { ...prev, images: combined, image: combined[0] };
+            if (uploaded.length > 0) {
+                const combined = [...(formData.images || []), ...uploaded];
+                setFormData({
+                    ...formData,
+                    images: combined,
+                    image: combined[0],
                 });
-            }
-
-            if (validUrls.length < files.length) {
-                console.warn(`${files.length - validUrls.length} image(s) failed to upload`);
             }
         } catch (err) {
             console.error('Image upload failed:', err);
-        }
-    };
-
-    const [isFetchingEan, setIsFetchingEan] = useState(false);
-    const [eanLimit, setEanLimit] = useState(3);
-
-    const fetchEanImages = async () => {
-        if (!formData.ean || isFetchingEan) return;
-        setIsFetchingEan(true);
-        try {
-            const { fetchImagesByEan } = await import('@/lib/api');
-            const images = await fetchImagesByEan(formData.ean, eanLimit);
-            if (images.length > 0) {
-                setFormData(prev => {
-                    const existing = prev.images || [];
-                    const combined = [...existing];
-                    images.forEach(img => {
-                        if (!combined.includes(img)) combined.push(img);
-                    });
-                    return { ...prev, images: combined, image: combined[0] };
-                });
-            }
-        } catch (err) {
-            console.error("EAN fetch failed:", err);
         } finally {
-            setIsFetchingEan(false);
+            setIsUploading(false);
+            if (e.target) e.target.value = '';
         }
-    };
-
-    const removeImage = (index: number) => {
-        const newImages = (formData.images || []).filter((_, i) => i !== index);
-        setFormData({ ...formData, images: newImages, image: newImages[0] || '' });
     };
 
     const addImageUrl = (url: string) => {
-        if (!url.trim()) return;
-        setFormData(prev => {
-            const newImages = [...(prev.images || [])];
-            if (!newImages.includes(url)) newImages.push(url);
-            return { ...prev, images: newImages, image: newImages[0] };
-        });
+        const trimmed = url.trim();
+        if (!trimmed) return;
+        const existing = formData.images || [];
+        if (existing.includes(trimmed)) return;
+        const combined = [...existing, trimmed];
+        setFormData({ ...formData, images: combined, image: combined[0] });
     };
 
-    const addVariantGroup = () => {
-        if (!newVariantName.trim()) return;
+    const removeImage = (idx: number) => {
+        const remaining = (formData.images || []).filter((_, i) => i !== idx);
         setFormData({
             ...formData,
-            variants: [...(formData.variants || []), { name: newVariantName.trim(), values: [] }]
+            images: remaining,
+            image: remaining[0] || '',
         });
-        setNewVariantName('');
     };
 
-    const removeVariantGroup = (index: number) => {
-        setFormData({
+    // ---------- submit ----------
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        // Convert the typed display price back to base currency before
+        // sending to the API. The backend stores `basePrice` and applies
+        // the platform markup for the customer-facing `price`.
+        const basePrice = convertToBase(formData.price || 0, activeCurrency);
+        const payload: Product = {
             ...formData,
-            variants: (formData.variants || []).filter((_: any, i: number) => i !== index)
-        });
-    };
-
-    const addVariantValue = (groupIndex: number) => {
-        const value = newVariantValue[groupIndex]?.trim();
-        if (!value) return;
-        const updated = [...(formData.variants || [])];
-        const values = updated[groupIndex].values || [];
-        if (!values.includes(value)) {
-            updated[groupIndex] = {
-                ...updated[groupIndex],
-                values: [...values, value]
-            };
-            setFormData({ ...formData, variants: updated });
-        }
-        setNewVariantValue({ ...newVariantValue, [groupIndex]: '' });
-    };
-
-    const removeVariantValue = (groupIndex: number, valueIndex: number) => {
-        const updated = [...(formData.variants || [])];
-        const values = updated[groupIndex].values || [];
-        updated[groupIndex] = {
-            ...updated[groupIndex],
-            values: values.filter((_: any, i: number) => i !== valueIndex)
+            price: basePrice,
+            basePrice,
         };
-        setFormData({ ...formData, variants: updated });
-    };
-
-    const [isGeneratingAI, setIsGeneratingAI] = useState(false);
-    const handleAIDescription = async () => {
-        if (!formData.name) return;
-        setIsGeneratingAI(true);
-        try {
-            await new Promise(r => setTimeout(r, 1500));
-            const existingDesc = formData.description?.trim() || '';
-            const brandStr = formData.brand ? ` by ${formData.brand}` : '';
-            const categoryStr = formData.category ? ` in the ${formData.category} category` : '';
-            
-            let generated: string;
-            if (existingDesc.length > 10) {
-                // Enhance existing description
-                generated = `${existingDesc}\n\n${formData.name}${brandStr}${categoryStr} — professionally sourced and optimized for B2B wholesale distribution. Features verified quality documentation, standardized export-ready packaging, and full compliance with international food & safety regulations. Ideal for high-volume retailers and enterprise supply chains seeking consistent quality with reliable lead times.`;
-            } else {
-                // Generate from scratch
-                generated = `${formData.name}${brandStr}${categoryStr} — a premium-grade product natively optimized for B2B procurement and wholesale distribution. Featuring verified documentation, standardized packaging for international export, and strict compliance with food & safety regulations. Designed for high-volume retailers and enterprise supply chains looking for consistent quality and reliable lead times across global markets.`;
-            }
-            setFormData(prev => ({ ...prev, description: generated }));
-        } finally {
-            setIsGeneratingAI(false);
+        if (!payload.id) {
+            delete (payload as any).id;
         }
+        onSave(payload);
+        onClose();
     };
 
-
+    // ---------- render ----------
     if (typeof window === 'undefined') return null;
+    if (!isOpen) return null;
 
-    return createPortal(
-        <ModalPortalContent
-            isOpen={isOpen}
-            onClose={onClose}
-            formData={formData}
-            setFormData={setFormData}
-            handleSubmit={handleSubmit}
-            symbol={symbol}
-            removeImage={removeImage}
-            addImageUrl={addImageUrl}
-            fileInputRef={fileInputRef}
-            handleImageUpload={handleImageUpload}
-            eanLimit={eanLimit}
-            setEanLimit={setEanLimit}
-            isFetchingEan={isFetchingEan}
-            fetchEanImages={fetchEanImages}
-            newVariantName={newVariantName}
-            setNewVariantName={setNewVariantName}
-            addVariantGroup={addVariantGroup}
-            removeVariantGroup={removeVariantGroup}
-            newVariantValue={newVariantValue}
-            setNewVariantValue={setNewVariantValue}
-            addVariantValue={addVariantValue}
-            removeVariantValue={removeVariantValue}
-            product={product}
-            isGeneratingAI={isGeneratingAI}
-            handleAIDescription={handleAIDescription}
-            activeCurrency={activeCurrency}
-            setActiveCurrency={setActiveCurrency}
-        />,
-        document.body
+    const verifiedDate = product?.createdAt
+        ? new Date(product.createdAt).toLocaleDateString(undefined, {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+          })
+        : '—';
+    const shortId = product?.id ? `MOD ${product.id.slice(0, 6)}` : 'NEW';
+
+    const modal = (
+        <AnimatePresence>
+            {isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-6">
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={onClose}
+                        className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+                    />
+
+                    <motion.div
+                        initial={{ opacity: 0, scale: 0.97, y: 20 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.97, y: 20 }}
+                        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+                        className="relative w-full max-w-6xl max-h-[94vh] flex flex-col bg-slate-50 rounded-3xl shadow-2xl ring-1 ring-slate-200/80 overflow-hidden z-10"
+                    >
+                        {/* Header */}
+                        <div className="shrink-0 px-8 py-6 bg-white border-b border-slate-200 flex items-center justify-between">
+                            <div>
+                                <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
+                                    {product ? 'Edit Product' : 'Add Product'}
+                                </h2>
+                                <p className="text-sm text-slate-500 mt-1">
+                                    Update your product details and settings
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={onClose}
+                                aria-label="Close"
+                                className="w-10 h-10 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                            >
+                                <X size={22} />
+                            </button>
+                        </div>
+
+                        {/* Body */}
+                        <form
+                            id="product-editor-form"
+                            onSubmit={handleSubmit}
+                            className="flex-1 overflow-y-auto p-6 sm:p-8"
+                        >
+                            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                                {/* ─── Left column ─── */}
+                                <div className="lg:col-span-4 space-y-6">
+                                    {/* Product Image card */}
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                                        <div>
+                                            <h3 className="text-base font-bold text-slate-900">
+                                                Product Image
+                                            </h3>
+                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                Upload a clear image of your product
+                                            </p>
+                                        </div>
+
+                                        <div className="aspect-square rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center relative group">
+                                            {formData.images?.[0] ? (
+                                                <>
+                                                    <img
+                                                        src={formData.images[0]}
+                                                        alt={formData.name || 'Product image'}
+                                                        referrerPolicy="no-referrer"
+                                                        onError={(e) => {
+                                                            (e.target as HTMLImageElement).style.display = 'none';
+                                                        }}
+                                                        className="w-full h-full object-contain p-4"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeImage(0)}
+                                                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-red-50 text-slate-500 hover:text-red-600 flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        title="Remove image"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <div className="flex flex-col items-center text-slate-400">
+                                                    <ImageIcon size={36} strokeWidth={1.5} />
+                                                    <span className="text-xs mt-2">
+                                                        No image yet
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            disabled={isUploading}
+                                            className="w-full h-11 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
+                                        >
+                                            <Upload size={15} />
+                                            {isUploading ? 'Uploading…' : 'Change Image'}
+                                        </button>
+
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="url"
+                                                placeholder="Or paste an image URL…"
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter') {
+                                                        e.preventDefault();
+                                                        addImageUrl((e.target as HTMLInputElement).value);
+                                                        (e.target as HTMLInputElement).value = '';
+                                                    }
+                                                }}
+                                                className="flex-1 h-10 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-700 placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                            />
+                                        </div>
+
+                                        <p className="text-[11px] text-slate-400 text-center">
+                                            JPG, PNG or WEBP. Max size 5MB.
+                                        </p>
+
+                                        <input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            className="hidden"
+                                            onChange={handleImageUpload}
+                                        />
+                                    </div>
+
+                                    {/* Product Status — admin only */}
+                                    {mode === 'admin' && (
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="text-base font-bold text-slate-900">
+                                                    Product Status
+                                                </h3>
+                                                <div className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
+                                                    <ShieldCheck size={13} />
+                                                    Verified
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-slate-500">
+                                                This product is verified by Atlantis
+                                            </p>
+                                            <div className="space-y-3 pt-2 border-t border-slate-100">
+                                                <div>
+                                                    <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                                                        Product ID
+                                                    </p>
+                                                    <p className="text-sm font-bold text-slate-900 mt-1">
+                                                        {shortId}
+                                                    </p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
+                                                        Added on
+                                                    </p>
+                                                    <p className="text-sm font-semibold text-slate-700 mt-1">
+                                                        {verifiedDate}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* ─── Right column ─── */}
+                                <div className="lg:col-span-8 space-y-6">
+                                    {/* Top stats: Price + Stock */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                        {/* Price card */}
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                                                    <Euro size={18} />
+                                                </div>
+                                                <h3 className="text-sm font-bold text-slate-900">
+                                                    Currency & Price per Case
+                                                </h3>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-medium text-slate-500">
+                                                        Currency
+                                                    </label>
+                                                    <select
+                                                        value={activeCurrency}
+                                                        onChange={(e) =>
+                                                            setActiveCurrency(e.target.value)
+                                                        }
+                                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
+                                                    >
+                                                        {SUPPORTED_CURRENCIES.map((c) => (
+                                                            <option key={c.code} value={c.code}>
+                                                                {c.code}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <label className="text-[11px] font-medium text-slate-500">
+                                                        Price per Case
+                                                    </label>
+                                                    <div className="relative">
+                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">
+                                                            {symbol}
+                                                        </span>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            required
+                                                            value={formData.price || ''}
+                                                            onChange={(e) =>
+                                                                setFormData({
+                                                                    ...formData,
+                                                                    price: parseFloat(e.target.value) || 0,
+                                                                })
+                                                            }
+                                                            className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-base font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Stock card */}
+                                        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center">
+                                                        <Box size={18} />
+                                                    </div>
+                                                    <h3 className="text-sm font-bold text-slate-900">
+                                                        Stock Level (Cases)
+                                                    </h3>
+                                                </div>
+                                                {(formData.stock ?? 0) > 0 && (
+                                                    <span className="inline-flex items-center gap-1 h-6 px-2.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
+                                                        <Check size={11} />
+                                                        In Stock
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-medium text-slate-500">
+                                                    Available Stock
+                                                </label>
+                                                <div className="flex items-end gap-2">
+                                                    <input
+                                                        type="number"
+                                                        required
+                                                        min={0}
+                                                        value={formData.stock ?? ''}
+                                                        onChange={(e) =>
+                                                            setFormData({
+                                                                ...formData,
+                                                                stock: parseInt(e.target.value) || 0,
+                                                            })
+                                                        }
+                                                        className="w-24 h-11 rounded-xl border border-slate-200 bg-white px-3 text-2xl font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                    />
+                                                    <span className="text-sm text-slate-500 pb-2.5">
+                                                        cases
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Product Details */}
+                                    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
+                                        <h3 className="text-base font-bold text-slate-900">
+                                            Product Details
+                                        </h3>
+
+                                        {/* Product name — full width */}
+                                        <div className="space-y-1.5">
+                                            <label className="text-[11px] font-medium text-slate-500">
+                                                Product Name <span className="text-red-500">*</span>
+                                            </label>
+                                            <input
+                                                type="text"
+                                                required
+                                                placeholder="e.g. Lavazza Crema e Gusto Espresso 250g"
+                                                value={formData.name || ''}
+                                                onChange={(e) =>
+                                                    setFormData({ ...formData, name: e.target.value })
+                                                }
+                                                className="w-full h-11 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-900 placeholder:font-normal placeholder:text-slate-400 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                            />
+                                        </div>
+
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-medium text-slate-500">
+                                                    Unit Type <span className="text-red-500">*</span>
+                                                </label>
+                                                <select
+                                                    value={formData.unit || 'Piece'}
+                                                    onChange={(e) =>
+                                                        setFormData({ ...formData, unit: e.target.value })
+                                                    }
+                                                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
+                                                >
+                                                    {UNIT_TYPES.map((u) => (
+                                                        <option key={u.value} value={u.value}>
+                                                            {u.icon} {u.label}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-medium text-slate-500">
+                                                    Minimum Order ({formData.unit || 'Cases'}) <span className="text-red-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    min={1}
+                                                    required
+                                                    value={formData.minOrder || formData.moq || ''}
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            minOrder: parseInt(e.target.value) || 1,
+                                                            moq: parseInt(e.target.value) || 1,
+                                                        })
+                                                    }
+                                                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-medium text-slate-500">
+                                                    Weight per Unit (kg) <span className="text-red-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="number"
+                                                    step="0.001"
+                                                    placeholder="e.g. 0.330"
+                                                    value={formData.weight || ''}
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            weight: parseFloat(e.target.value) || 0,
+                                                        })
+                                                    }
+                                                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                />
+                                                <p className="text-[11px] text-slate-400">
+                                                    Enter weight per single unit
+                                                </p>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-medium text-slate-500">
+                                                    BBD (Best Before Date) <span className="text-red-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="YYYYMMDD"
+                                                    value={formData.shelfLife || ''}
+                                                    onChange={(e) =>
+                                                        setFormData({
+                                                            ...formData,
+                                                            shelfLife: e.target.value,
+                                                        })
+                                                    }
+                                                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                />
+                                                <p className="text-[11px] text-slate-400">
+                                                    Format: YYYYMMDD
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        {/* Category + Country of Origin */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-medium text-slate-500">
+                                                    Category <span className="text-red-500">*</span>
+                                                </label>
+                                                <select
+                                                    value={formData.category || ''}
+                                                    onChange={(e) =>
+                                                        setFormData({ ...formData, category: e.target.value })
+                                                    }
+                                                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
+                                                >
+                                                    {CATEGORIES_LIST.map((c) => (
+                                                        <option key={c} value={c}>
+                                                            {c}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[11px] font-medium text-slate-500">
+                                                    Country of Origin <span className="text-red-500">*</span>
+                                                </label>
+                                                <select
+                                                    value={formData.origin || ''}
+                                                    onChange={(e) =>
+                                                        setFormData({ ...formData, origin: e.target.value })
+                                                    }
+                                                    className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
+                                                >
+                                                    <option value="">Select country…</option>
+                                                    {COUNTRIES.map((c) => (
+                                                        <option key={c.iso} value={c.name}>
+                                                            {c.flag} {c.name}
+                                                        </option>
+                                                    ))}
+                                                </select>
+                                                <p className="text-[11px] text-slate-400">
+                                                    Where the product is manufactured
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+
+                        {/* Footer */}
+                        <div className="shrink-0 bg-white border-t border-slate-200 px-6 sm:px-8 py-4 flex items-center justify-between gap-4">
+                            <div>
+                                {onDelete && product?.id && (
+                                    <button
+                                        type="button"
+                                        onClick={() => onDelete(product.id)}
+                                        className="h-11 px-5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold flex items-center gap-2 transition-colors"
+                                    >
+                                        <Trash2 size={15} /> Delete Product
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="h-11 px-6 rounded-xl bg-white border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    form="product-editor-form"
+                                    className="h-11 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold flex items-center gap-2 transition-colors shadow-lg shadow-slate-900/20"
+                                >
+                                    <Save size={15} /> Save Changes
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+        </AnimatePresence>
     );
+
+    return createPortal(modal, document.body);
 }
