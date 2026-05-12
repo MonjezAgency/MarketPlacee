@@ -189,7 +189,18 @@ export class ExcelService {
             'pcscase': 'unitsPerCase', 'piecespercase': 'unitsPerCase',
             'itemspercase': 'unitsPerCase', 'qtypercase': 'unitsPerCase',
             'percase': 'unitsPerCase',
+            // "Pieces per Carton" (and the "carton" family) — many supplier
+            // CSVs use "carton" instead of "case". Treat them as synonyms.
+            'piecespercarton': 'unitsPerCase', 'pcspercarton': 'unitsPerCase',
+            'pcscarton': 'unitsPerCase', 'unitspercarton': 'unitsPerCase',
+            'itemspercarton': 'unitsPerCase', 'qtypercarton': 'unitsPerCase',
+            'percarton': 'unitsPerCase', 'piecespercartonctn': 'unitsPerCase',
+            'piecesperctn': 'unitsPerCase', 'pcsperctn': 'unitsPerCase',
+            'piecesperbox': 'unitsPerCase', 'unitsperbox': 'unitsPerCase',
+            'pcsperbox': 'unitsPerCase', 'itemsperbox': 'unitsPerCase',
+            'perbox': 'unitsPerCase', 'pcsbox': 'unitsPerCase',
             'عددالوحداتفيالكرتون': 'unitsPerCase', 'وحداتالكرتون': 'unitsPerCase',
+            'القطعةفيالكرتون': 'unitsPerCase', 'قطعكرتون': 'unitsPerCase',
             // ── casesPerPallet ────────────────────────────────────────────────
             'casesperpallet': 'casesPerPallet', 'boxesperpallet': 'casesPerPallet',
             'cartonsperpallets': 'casesPerPallet', 'caseperpallet': 'casesPerPallet',
@@ -197,7 +208,12 @@ export class ExcelService {
             // — without this alias the column was silently dropped.
             'casepallet': 'casesPerPallet', 'cartonpallet': 'casesPerPallet',
             'boxpallet': 'casesPerPallet',
+            // "Cartons per Pallet" — the carton/case synonym again.
+            'cartonsperpallet': 'casesPerPallet', 'cartonperpallet': 'casesPerPallet',
+            'ctnperpallet': 'casesPerPallet', 'ctnsperpallet': 'casesPerPallet',
+            'boxperpallet': 'casesPerPallet',
             'كراتينالبالتة': 'casesPerPallet', 'عددالكراتينفيالبالتة': 'casesPerPallet',
+            'كرتونبالتة': 'casesPerPallet',
             // ── unitsPerPallet ────────────────────────────────────────────────
             // NOTE: do NOT map "Available physical in pallets" here — that
             // is the total stock expressed in pallet units (e.g. 2.62 pallets
@@ -216,8 +232,15 @@ export class ExcelService {
             // ── palletsPerShipment ────────────────────────────────────────────
             'palletspershipment': 'palletsPerShipment', 'palletsperload': 'palletsPerShipment',
             'shipmentpallets': 'palletsPerShipment',
+            // "Pallets in Shipment" / "Pallets per Truck" / "Pallets per Container"
+            'palletsinshipment': 'palletsPerShipment', 'palletsintruck': 'palletsPerShipment',
+            'palletspertruck': 'palletsPerShipment', 'palletpertruck': 'palletsPerShipment',
+            'palletspercontainer': 'palletsPerShipment',
+            'pallettruck': 'palletsPerShipment', 'palletcontainer': 'palletsPerShipment',
+            'truckpallets': 'palletsPerShipment', 'containerpallets': 'palletsPerShipment',
+            'palletsinload': 'palletsPerShipment', 'palletsinfcl': 'palletsPerShipment',
             'عددالبالتاتفيالشحنة': 'palletsPerShipment', 'البالتاتفيالشحنة': 'palletsPerShipment',
-            'بالتاتالشحنة': 'palletsPerShipment',
+            'بالتاتالشحنة': 'palletsPerShipment', 'بالتاتالشاحنة': 'palletsPerShipment',
             // ── moq / minOrder ────────────────────────────────────────────────
             // DTO field name is "moq". All common aliases point to it.
             'moq': 'moq', 'mqq': 'moq', 'minorder': 'moq',
@@ -257,6 +280,13 @@ export class ExcelService {
             'goodslocation': 'exwLocation', 'productlocation': 'exwLocation',
             'shipfrom': 'exwLocation', 'departure': 'exwLocation',
             'departurecountry': 'exwLocation', 'pickuplocation': 'exwLocation',
+            // "Currently In" / "Currently Located" / "Currently Stocked In"
+            'currentlyin': 'exwLocation', 'currentlylocated': 'exwLocation',
+            'currentlylocatedin': 'exwLocation', 'currentlystockedin': 'exwLocation',
+            'currentlystored': 'exwLocation', 'currentlystoredin': 'exwLocation',
+            'storedin': 'exwLocation', 'locatedin': 'exwLocation',
+            'whereis': 'exwLocation', 'wherelocated': 'exwLocation',
+            'physicallocation': 'exwLocation', 'physicallyin': 'exwLocation',
             'incoterm': 'exwLocation', 'incoterms': 'exwLocation',
             'مكانالبضاعة': 'exwLocation', 'مكانالمنتج': 'exwLocation',
             'موقعالمنتج': 'exwLocation', 'بلدالمنشأ': 'exwLocation',

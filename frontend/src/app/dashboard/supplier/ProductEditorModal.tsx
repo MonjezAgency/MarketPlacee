@@ -167,19 +167,10 @@ function ModalPortalContent({
                                             </div>
                                         </div>
 
-                                        <div className="bg-card rounded-[32px] p-6 border border-border/50 space-y-4">
-                                            <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                                                <Sparkles size={14} className="text-primary" /> Display Settings
-                                            </h4>
-                                            <div className="flex flex-wrap gap-2">
-                                                <div className="bg-primary/10 text-primary text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-primary/20">
-                                                    New Arrival
-                                                </div>
-                                                <div className="bg-emerald-500/10 text-emerald-500 text-[9px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest border border-emerald-500/20">
-                                                    Wholesale Verified
-                                                </div>
-                                            </div>
-                                        </div>
+                                        {/* "Display Settings" / Wholesale Verified badge block — hidden
+                                            from suppliers. Verification status / source labels are an
+                                            Atlantis-only signal shown on the public catalog, never edited
+                                            by suppliers themselves. */}
 
                                         <div className="bg-card rounded-[32px] p-6 border border-border/50 space-y-4 opacity-80 group hover:opacity-100 transition-opacity">
                                             <div className="flex items-center justify-between">
@@ -249,7 +240,7 @@ function ModalPortalContent({
                                                 />
                                             </div>
 
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                                            <div className="grid grid-cols-1 gap-6">
                                                 <div className="space-y-2">
                                                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">EAN / UPC / Barcode</label>
                                                     <input
@@ -260,7 +251,13 @@ function ModalPortalContent({
                                                         className="w-full bg-card border border-border/50 rounded-2xl px-6 py-4 outline-none focus:border-primary/50 text-foreground font-bold transition-all"
                                                     />
                                                 </div>
-                                                <div className="space-y-2">
+                                                {/* "Image Auto-Match" (AI/EAN image fetcher) — hidden from
+                                                    suppliers. This is an Atlantis-only enrichment tool used
+                                                    when curating the public catalog; suppliers upload their
+                                                    own product photos directly. Keeping the variable hooks
+                                                    alive (eanLimit / fetchEanImages) so the shared props
+                                                    interface still satisfies. */}
+                                                <div className="space-y-2 hidden">
                                                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ms-2">Image Auto-Match</label>
                                                     <div className="flex gap-2">
                                                         <Button
@@ -288,16 +285,10 @@ function ModalPortalContent({
                                             </div>
 
                                             <div className="space-y-2">
+                                                {/* "AI Boost" description generator — hidden from suppliers.
+                                                    Admin-only feature used during catalog curation. */}
                                                 <div className="flex items-center justify-between mb-1 ms-2">
                                                     <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Description / Highlights</label>
-                                                    <button 
-                                                        type="button"
-                                                        onClick={handleAIDescription}
-                                                        disabled={isGeneratingAI || !formData.name}
-                                                        className="h-8 px-3 rounded-lg bg-primary/10 text-primary text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 hover:bg-primary hover:text-white transition-all disabled:opacity-50"
-                                                    >
-                                                        <Sparkles size={12} /> {isGeneratingAI ? 'Generating...' : 'AI Boost'}
-                                                    </button>
                                                 </div>
                                                 <textarea
                                                     placeholder="Focus on case size, expiration date, or origin..."
