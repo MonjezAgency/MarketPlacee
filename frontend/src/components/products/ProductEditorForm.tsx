@@ -36,6 +36,9 @@ import {
     Plus,
     FileText,
     Truck,
+    HelpCircle,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -110,6 +113,13 @@ export default function ProductEditorForm({
     const [pricePerPieceInput, setPricePerPieceInput] = useState('');
     // EAN validation message (live, shown under the field).
     const [eanError, setEanError] = useState<string | null>(null);
+    // Image help drawer toggle. Operators report suppliers commonly
+    // paste a Google Images RESULTS-PAGE URL (instead of the actual
+    // image URL) and then complain "the image doesn't show up". A
+    // collapsible "How to copy a real image link" walkthrough sits
+    // next to the upload button and only opens when they click for it,
+    // so it doesn't crowd the layout.
+    const [showImageHelp, setShowImageHelp] = useState(false);
 
     // active display currency — synced with the rest of the app
     const [activeCurrency, setActiveCurrency] = useState(() => {
@@ -630,6 +640,141 @@ export default function ProductEditorForm({
                                 className="hidden"
                                 onChange={handleImageUpload}
                             />
+
+                            {/* ── How to copy an image URL (collapsible help) ──
+                                Suppliers regularly paste a Google Images
+                                results-page link and complain that the image
+                                "doesn't show up". This drawer walks them
+                                through the right-click → "Open image in new
+                                tab" → copy URL workflow. Collapsed by
+                                default so it doesn't dominate the card;
+                                opens with a single click. */}
+                            <button
+                                type="button"
+                                onClick={() => setShowImageHelp((s) => !s)}
+                                className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-50 dark:bg-white/[0.03] hover:bg-slate-100 dark:hover:bg-white/[0.06] border border-slate-200 dark:border-white/[0.06] text-slate-700 dark:text-zinc-300 text-[12px] font-medium transition-colors"
+                                aria-expanded={showImageHelp}
+                                aria-controls="image-url-help"
+                            >
+                                <span className="flex items-center gap-2">
+                                    <HelpCircle size={14} className="text-slate-500 dark:text-zinc-400" />
+                                    How to copy an image URL from Google
+                                </span>
+                                {showImageHelp ? (
+                                    <ChevronUp size={14} className="text-slate-500 dark:text-zinc-400" />
+                                ) : (
+                                    <ChevronDown size={14} className="text-slate-500 dark:text-zinc-400" />
+                                )}
+                            </button>
+
+                            {showImageHelp && (
+                                <div
+                                    id="image-url-help"
+                                    className="rounded-xl bg-blue-50 dark:bg-blue-500/[0.06] border border-blue-200 dark:border-blue-500/20 p-4 space-y-3"
+                                >
+                                    <p className="text-[12px] text-blue-900 dark:text-blue-100 font-semibold leading-snug">
+                                        Use these steps if "Add URL" leaves the
+                                        image broken — most often the URL points
+                                        to a Google results page, not the actual
+                                        image file.
+                                    </p>
+                                    <ol className="space-y-2.5 text-[12px] text-slate-700 dark:text-zinc-300 leading-relaxed">
+                                        <li className="flex gap-2.5">
+                                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-700 dark:text-blue-300 text-[10px] font-bold flex items-center justify-center">
+                                                1
+                                            </span>
+                                            <span>
+                                                Open{' '}
+                                                <a
+                                                    href="https://www.google.com/imghp"
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-700 dark:text-blue-300 underline underline-offset-2 font-semibold"
+                                                >
+                                                    Google Images
+                                                </a>{' '}
+                                                and search for the product name (e.g.{' '}
+                                                <em className="text-slate-900 dark:text-zinc-100 not-italic font-semibold">
+                                                    "{formData.name || 'Lavazza Crema e Gusto 250g'}"
+                                                </em>
+                                                ).
+                                            </span>
+                                        </li>
+                                        <li className="flex gap-2.5">
+                                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-700 dark:text-blue-300 text-[10px] font-bold flex items-center justify-center">
+                                                2
+                                            </span>
+                                            <span>
+                                                Pick the image you want and{' '}
+                                                <strong className="text-slate-900 dark:text-zinc-100">
+                                                    right-click
+                                                </strong>{' '}
+                                                on it (on macOS:{' '}
+                                                <kbd className="px-1 py-0.5 rounded bg-white dark:bg-zinc-800 border border-slate-300 dark:border-white/10 text-[10px] font-mono">
+                                                    Ctrl
+                                                </kbd>{' '}
+                                                +&nbsp;click).
+                                            </span>
+                                        </li>
+                                        <li className="flex gap-2.5">
+                                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-700 dark:text-blue-300 text-[10px] font-bold flex items-center justify-center">
+                                                3
+                                            </span>
+                                            <span>
+                                                In the menu, choose{' '}
+                                                <strong className="text-slate-900 dark:text-zinc-100">
+                                                    "Open image in new tab"
+                                                </strong>
+                                                . A new tab opens with just the image visible.
+                                            </span>
+                                        </li>
+                                        <li className="flex gap-2.5">
+                                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-700 dark:text-blue-300 text-[10px] font-bold flex items-center justify-center">
+                                                4
+                                            </span>
+                                            <span>
+                                                Copy the URL from that new tab — it should end in{' '}
+                                                <code className="px-1 py-0.5 rounded bg-white dark:bg-zinc-800 border border-slate-300 dark:border-white/10 text-[10px] font-mono">
+                                                    .jpg
+                                                </code>{' '}
+                                                /{' '}
+                                                <code className="px-1 py-0.5 rounded bg-white dark:bg-zinc-800 border border-slate-300 dark:border-white/10 text-[10px] font-mono">
+                                                    .png
+                                                </code>{' '}
+                                                /{' '}
+                                                <code className="px-1 py-0.5 rounded bg-white dark:bg-zinc-800 border border-slate-300 dark:border-white/10 text-[10px] font-mono">
+                                                    .webp
+                                                </code>
+                                                .
+                                            </span>
+                                        </li>
+                                        <li className="flex gap-2.5">
+                                            <span className="flex-shrink-0 w-5 h-5 rounded-full bg-blue-500/15 dark:bg-blue-500/25 text-blue-700 dark:text-blue-300 text-[10px] font-bold flex items-center justify-center">
+                                                5
+                                            </span>
+                                            <span>
+                                                Paste it into the{' '}
+                                                <strong className="text-slate-900 dark:text-zinc-100">
+                                                    "Or paste an image URL"
+                                                </strong>{' '}
+                                                box above and press{' '}
+                                                <strong className="text-slate-900 dark:text-zinc-100">
+                                                    Add URL
+                                                </strong>
+                                                . The image will appear in the preview.
+                                            </span>
+                                        </li>
+                                    </ol>
+                                    <p className="text-[11px] text-slate-500 dark:text-zinc-500 leading-relaxed pt-1 border-t border-blue-200/60 dark:border-blue-500/20">
+                                        <strong className="text-slate-700 dark:text-zinc-300">Easier option:</strong>{' '}
+                                        download the image to your computer first, then click{' '}
+                                        <em className="not-italic text-slate-700 dark:text-zinc-300 font-semibold">
+                                            Upload Images
+                                        </em>{' '}
+                                        and pick the file. No URL needed.
+                                    </p>
+                                </div>
+                            )}
                         </div>
 
                         {/* Product Status card — admin only */}
