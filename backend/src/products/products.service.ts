@@ -57,6 +57,62 @@ export class ProductsService {
         return currentCategory || 'General';
     }
 
+    /**
+     * Pull a brand out of a free-form product name when the supplier
+     * didn't fill the brand field. First tries a known-brand list; if
+     * nothing matches, falls back to the first capitalised token ≥3
+     * chars that isn't a number or weight token. Mirrors the same
+     * heuristic in ExcelService.enrichFromName so single creates and
+     * bulk uploads behave identically.
+     */
+    private extractBrandFromName(name: string): string | null {
+        if (!name) return null;
+        const KNOWN = [
+            'Nestle', 'Nestlé', 'Pepsi', 'Coca-Cola', 'Coca Cola', 'Red Bull',
+            'KitKat', 'Kit Kat', 'Tena', 'Pampers', 'Always',
+            'P&G', 'Procter', 'Unilever', 'Mars', 'Ferrero', 'Kellogg',
+            'Haribo', 'Storck', 'Bahlsen', 'Lindt', 'Cadbury', 'Hershey',
+            'Trolli', 'Nesquik', 'Lipton', 'Ahmad', 'Twinings',
+            "Lay's", 'Pringles', 'Doritos', "Tony's Chocolonely",
+            'Ritter Sport', 'Milka', 'Toblerone',
+            'Swiffer', 'Ariel', 'Tide', 'Persil', 'Comfort',
+            'Lavazza', 'Nescafé', 'Nescafe', 'Heinz', 'Barilla',
+            'Evian', 'Tabasco', 'Domestos', 'Flash', 'Fairy', 'Tork',
+            'Dettol', 'Dove', 'Colgate', 'Head & Shoulders', 'Gillette',
+            'Navigator', 'Post-it', 'BIC', '3M', 'Ansell', 'Portwest',
+            'Centrum', 'Glucerna', 'Abbott',
+        ];
+        const lower = name.toLowerCase();
+        for (const b of KNOWN) {
+            const re = new RegExp(`\\b${b.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i');
+            if (re.test(name) || lower.includes(b.toLowerCase())) return b;
+        }
+        const firstWord = name.split(/\s+/)[0];
+        if (
+            firstWord &&
+            firstWord.length >= 3 &&
+            /^[A-Z]/.test(firstWord) &&
+            !/^\d/.test(firstWord) &&
+            !/^(case|pack|carton|box|pallet|piece|unit)$/i.test(firstWord)
+        ) {
+            return firstWord;
+        }
+        return null;
+    }
+
+    /**
+     * Pull a weight / size token out of a free-form product name.
+     * Returns the raw token (e.g. "250g", "237ml", "1.5L") rather
+     * than a numeric kg value so the DB string column stays
+     * lossless — the frontend renders it as-is.
+     */
+    private extractWeightFromName(name: string): string | null {
+        if (!name) return null;
+        const match = name.match(/(\d+(?:[.,]\d+)?\s*(?:ml|l|kg|g|oz|lb|cl))\b/i);
+        if (!match) return null;
+        return match[1].replace(/\s+/g, '').toLowerCase();
+    }
+
     async getAppConfigs() {
         return this.prisma.appConfig.findMany();
     }
@@ -184,6 +240,28 @@ export class ProductsService {
             if (catList && catList.length > 0 && createProductDto.name) {
                 const suggested = await this.aiAgent.categorizeProduct(createProductDto.name, createProductDto.description || '', catList);
                 if (suggested) finalCategory = suggested;
+            }
+        }
+
+        // Auto-extract brand + weight from the product name when the
+        // caller didn't supply them. Mirrors the Excel parser's
+        // enrichFromName so single-product creates (supplier form,
+        // admin form) get the same intelligent fill-in:
+        //
+        //   "Pepsi Diet 150ml" → brand "Pepsi", weight "150ml"
+        //   "Lavazza Crema 250g" → brand "Lavazza", weight "250g"
+        //
+        // Operator-requested: the supplier shouldn't have to retype
+        // weight + brand if both are already in the name string.
+        const dtoMutable = createProductDto as any;
+        if (dtoMutable.name) {
+            if (!dtoMutable.brand) {
+                const extracted = this.extractBrandFromName(dtoMutable.name);
+                if (extracted) dtoMutable.brand = extracted;
+            }
+            if (!dtoMutable.weight) {
+                const extracted = this.extractWeightFromName(dtoMutable.name);
+                if (extracted) dtoMutable.weight = extracted;
             }
         }
 

@@ -256,11 +256,26 @@ export class ExcelService {
             'moqunit': 'moqUnit', 'minorderunit': 'moqUnit',
             'orderunit': 'moqUnit', 'unitofmoq': 'moqUnit',
             // ── brand ─────────────────────────────────────────────────────────
+            // NOTE: do NOT map "Brand Status" here. That's a verification
+            // flag ("Verified by Atlantis" / "Unverified"), not the brand
+            // name. It used to partial-match "brand" and overwrite the
+            // brand field with the literal string "Verified by Atlantis".
+            // The "brandstatus" alias below is explicitly dropped so the
+            // column is left unmapped.
             'brand': 'brand', 'make': 'brand', 'manufacturer': 'brand',
+            'productbrand': 'brand', 'brandname': 'brand',
             'براند': 'brand', 'الماركة': 'brand', 'الشركةالمصنعة': 'brand',
             // ── unit ──────────────────────────────────────────────────────────
-            'unit': 'unit', 'measure': 'unit', 'packaging': 'unit',
-            'الوحدة': 'unit', 'التعبئة': 'unit',
+            // "Unit Type" was being CORRUPTED before this fix: the partial
+            // matcher saw "Weight per Unit (kg)" (normalized to
+            // "weightperunitkg") and matched the substring "unit", which
+            // pointed the column at the `unit` field instead of `weight`.
+            // We now add an explicit "unittype" alias (exact match wins)
+            // and the partial-match cutoff was raised to 6 chars below so
+            // 4-char aliases like "unit" can only match exactly.
+            'unit': 'unit', 'unittype': 'unit', 'producttype': 'unit',
+            'measure': 'unit', 'packaging': 'unit', 'packtype': 'unit',
+            'الوحدة': 'unit', 'التعبئة': 'unit', 'نوعالوحدة': 'unit',
             // ── shelfLife / expiry ────────────────────────────────────────────
             'expirydate': 'shelfLife', 'expiry': 'shelfLife', 'bestbefore': 'shelfLife',
             'batchnumber': 'shelfLife', 'batchno': 'shelfLife', 'lot': 'shelfLife',
@@ -323,10 +338,33 @@ export class ExcelService {
                     matches++;
                     return;
                 }
-                // Partial fallback — only if alias is at least 4 chars to avoid
-                // wildly broad matches like "item" snagging "Item number".
+                // ── Deny list ────────────────────────────────────────
+                // Columns we deliberately refuse to map, even by partial
+                // match. These tend to collide with a short alias and
+                // overwrite the real field with garbage. "Brand Status"
+                // is the canonical example — it used to partial-match
+                // "brand" and set the brand to the literal string
+                // "Verified by Atlantis".
+                const DENY = new Set<string>([
+                    'brandstatus',     // verification flag, not a brand
+                    'productstatus',
+                    'status',
+                    'verified',
+                    'verification',
+                    'exwusd',          // numeric price column — NOT an
+                    'exwprice',        // EXW LOCATION (despite the name).
+                ]);
+                if (DENY.has(normalizedCell)) return;
+
+                // Partial fallback — only if alias is at least 6 chars.
+                // Earlier we used 4, which let aliases like "unit" / "moq"
+                // / "brand" / "name" partial-match compound headers like
+                // "Weight per Unit (kg)" and corrupt the data. 6 chars
+                // means only specific multi-word aliases (e.g. "weight",
+                // "origin", "shelfLife", "pallets") survive — short
+                // generic aliases must match the header EXACTLY.
                 for (const [alias, target] of Object.entries(headerAliases)) {
-                    if (alias.length < 4) continue;
+                    if (alias.length < 6) continue;
                     if (normalizedCell.length > 2 && (normalizedCell.includes(alias) || alias.includes(normalizedCell))) {
                         tempMapping[idx] = { target, confidence: 1 };
                         matches++;

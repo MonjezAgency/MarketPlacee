@@ -61,9 +61,14 @@ interface ProductEditorFormProps {
     backHref: string;
 }
 
+// Unit Type intentionally lists Case first — Atlantis is a wholesale
+// B2B platform and 90% of supplier listings are case-level, not piece.
+// Operator-requested: don't default to "Piece" — force a deliberate
+// pick or land on Case as the safer default.
 const UNIT_TYPES = [
-    { value: 'Piece', label: 'Piece', icon: '📦' },
+    { value: '', label: 'Select unit type…', icon: '' },
     { value: 'Case', label: 'Case', icon: '📦' },
+    { value: 'Piece', label: 'Piece', icon: '🧩' },
     { value: 'Pallet', label: 'Pallet', icon: '🏗️' },
     { value: 'Truck', label: 'Truck', icon: '🚛' },
 ];
@@ -74,6 +79,13 @@ const STATUS_OPTIONS: { value: string; label: string; color: string }[] = [
     { value: 'REJECTED', label: 'Rejected', color: 'text-red-700 bg-red-50 border-red-200' },
     { value: 'NEEDS_CHANGES', label: 'Needs Changes', color: 'text-orange-700 bg-orange-50 border-orange-200' },
 ];
+
+// Valid EAN/UPC formats. Backend ExcelService accepts the same set.
+const VALID_EAN_LENGTHS = [8, 12, 13, 14];
+const isValidEan = (ean: string): boolean => {
+    const digits = (ean || '').replace(/[^0-9X]/gi, '');
+    return digits.length === 0 || VALID_EAN_LENGTHS.includes(digits.length);
+};
 
 // ---------------------------------------------------------------
 //  Component
@@ -92,6 +104,12 @@ export default function ProductEditorForm({
     const [originalProduct, setOriginalProduct] = useState<Product | null>(null);
     const [formData, setFormData] = useState<Product | null>(null);
     const [urlInputValue, setUrlInputValue] = useState('');
+    // Per-piece price the supplier types — separate from the form-data
+    // `price` (which is per-case, persisted as basePrice). We multiply
+    // by unitsPerCase to compute the case price on save.
+    const [pricePerPieceInput, setPricePerPieceInput] = useState('');
+    // EAN validation message (live, shown under the field).
+    const [eanError, setEanError] = useState<string | null>(null);
 
     // active display currency — synced with the rest of the app
     const [activeCurrency, setActiveCurrency] = useState(() => {
@@ -124,11 +142,12 @@ export default function ProductEditorForm({
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data: Product = await res.json();
                 if (cancelled) return;
-                const rawPrice = data.basePrice ?? data.price ?? 0;
+                const rawCasePrice = data.basePrice ?? data.price ?? 0;
+                const displayCasePrice = convertFromBase(rawCasePrice, activeCurrency);
                 setOriginalProduct(data);
                 setFormData({
                     ...data,
-                    price: convertFromBase(rawPrice, activeCurrency),
+                    price: displayCasePrice,
                     images:
                         data.images && data.images.length > 0
                             ? data.images
@@ -136,6 +155,12 @@ export default function ProductEditorForm({
                               ? [data.image]
                               : [],
                 });
+                // Derive per-piece price from the stored case price.
+                // If unitsPerCase is missing we fall back to the case
+                // price itself so the field is never empty.
+                const upc = Number(data.unitsPerCase) || 0;
+                const piecePrice = upc > 0 ? displayCasePrice / upc : displayCasePrice;
+                setPricePerPieceInput(piecePrice ? piecePrice.toFixed(2) : '');
             } catch (err) {
                 console.error('Failed to load product:', err);
                 toast.error('Could not load product.');
@@ -218,10 +243,35 @@ export default function ProductEditorForm({
     // ---------------- Save ----------------
     const handleSave = async () => {
         if (!formData) return;
+
+        // Client-side EAN format gate. Backend strips invalid EANs but
+        // we want to tell the supplier immediately instead of letting
+        // them save and find out later that the field went blank.
+        if (formData.ean && !isValidEan(formData.ean)) {
+            toast.error('Barcode must be 8, 12, 13, or 14 digits (EAN/UPC/ITF-14).');
+            setEanError(
+                'Barcode must be 8, 12, 13, or 14 digits (EAN/UPC/ITF-14).',
+            );
+            return;
+        }
+        if (!formData.unit) {
+            toast.error('Pick a Unit Type before saving.');
+            return;
+        }
+
         setIsSaving(true);
         const tid = toast.loading('Saving changes…');
         try {
-            const displayPrice = formData.price || 0;
+            // Compute the case price the backend persists as basePrice.
+            // Pricing model: supplier types per-piece, system multiplies
+            // by unitsPerCase. If unitsPerCase isn't set yet, we treat
+            // the typed value as already-per-case so the legacy path
+            // (admin who just wants to set the case price directly)
+            // still works.
+            const piecePrice =
+                parseFloat(pricePerPieceInput.replace(',', '.')) || 0;
+            const upc = Number(formData.unitsPerCase) || 0;
+            const displayPrice = upc > 0 ? piecePrice * upc : piecePrice;
             const newBasePrice = convertToBase(displayPrice, activeCurrency);
 
             // Stability rule: only send `price` to PATCH when the
@@ -643,7 +693,28 @@ export default function ProductEditorForm({
 
                     {/* ─── Right column ─── */}
                     <div className="lg:col-span-8 space-y-6">
-                        {/* Top stats: Price + Stock */}
+                        {/* Top stats: Price + Stock
+                            ───────────────────────────────────────────
+                            Pricing model:
+                            The supplier types the PER-PIECE price (not
+                            per-case). We multiply by `unitsPerCase` to
+                            derive the per-case price that the backend
+                            stores as `basePrice` (and the platform
+                            markup is applied on top of that for the
+                            customer-facing `price`).
+
+                            Why this UX flip: when suppliers list a
+                            wholesale offer they think in piece prices
+                            ("my Glucerna shake costs me €1.20"). They
+                            then declare "case has 24 pieces" → we do
+                            the math. Asking them to pre-multiply was
+                            error-prone.
+
+                            All number inputs use `inputMode="decimal"`
+                            with `type="text"` so the browser doesn't
+                            render the up/down spinner arrows the
+                            operator complained about ("بيقعد يعلي
+                            لحد ما يوصل الوزن"). Pure typing UX. */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             {/* Price card */}
                             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
@@ -652,7 +723,7 @@ export default function ProductEditorForm({
                                         <Euro size={18} />
                                     </div>
                                     <h3 className="text-sm font-bold text-slate-900">
-                                        Currency & Price per Case
+                                        Currency & Price per Piece
                                     </h3>
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
@@ -674,26 +745,50 @@ export default function ProductEditorForm({
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[11px] font-medium text-slate-500">
-                                            Price per Case
+                                            Price per Piece
                                         </label>
                                         <div className="relative">
                                             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">
                                                 {symbol}
                                             </span>
                                             <input
-                                                type="number"
-                                                step="0.01"
+                                                type="text"
+                                                inputMode="decimal"
                                                 required
-                                                value={formData.price || ''}
+                                                placeholder="0.00"
+                                                value={pricePerPieceInput}
                                                 onChange={(e) =>
-                                                    setFormData({
-                                                        ...formData,
-                                                        price: parseFloat(e.target.value) || 0,
-                                                    })
+                                                    setPricePerPieceInput(e.target.value)
                                                 }
+                                                onBlur={() => {
+                                                    const v = parseFloat(
+                                                        pricePerPieceInput.replace(',', '.'),
+                                                    );
+                                                    if (!isNaN(v)) {
+                                                        setPricePerPieceInput(v.toFixed(2));
+                                                    }
+                                                }}
                                                 className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-base font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                             />
                                         </div>
+                                    </div>
+                                </div>
+                                {/* Live case-price preview */}
+                                <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2.5 flex items-center justify-between">
+                                    <div className="text-[11px] text-slate-500">
+                                        {(formData.unitsPerCase ?? 0) > 0
+                                            ? `${formData.unitsPerCase} pieces per case`
+                                            : 'Set "Pieces per Case" below to compute the case price'}
+                                    </div>
+                                    <div className="text-sm font-bold text-slate-900">
+                                        {symbol}
+                                        {(
+                                            (parseFloat(pricePerPieceInput.replace(',', '.')) || 0) *
+                                            (formData.unitsPerCase ?? 0)
+                                        ).toFixed(2)}
+                                        <span className="text-[10px] text-slate-400 font-semibold ml-1">
+                                            / case
+                                        </span>
                                     </div>
                                 </div>
                             </div>
@@ -722,16 +817,17 @@ export default function ProductEditorForm({
                                     </label>
                                     <div className="flex items-end gap-2">
                                         <input
-                                            type="number"
+                                            type="text"
+                                            inputMode="numeric"
                                             required
-                                            min={0}
                                             value={formData.stock ?? ''}
-                                            onChange={(e) =>
+                                            onChange={(e) => {
+                                                const v = e.target.value.replace(/[^0-9]/g, '');
                                                 setFormData({
                                                     ...formData,
-                                                    stock: parseInt(e.target.value) || 0,
-                                                })
-                                            }
+                                                    stock: v === '' ? 0 : parseInt(v, 10),
+                                                });
+                                            }}
                                             className="w-28 h-11 rounded-xl border border-slate-200 bg-white px-3 text-2xl font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                         />
                                         <span className="text-sm text-slate-500 pb-2.5">cases</span>
@@ -783,13 +879,43 @@ export default function ProductEditorForm({
                                     </label>
                                     <input
                                         type="text"
+                                        inputMode="numeric"
                                         placeholder="13-digit barcode"
+                                        maxLength={14}
                                         value={formData.ean || ''}
-                                        onChange={(e) =>
-                                            setFormData({ ...formData, ean: e.target.value })
+                                        onChange={(e) => {
+                                            // Strip everything but digits (EAN/UPC/ITF). Cap
+                                            // at 14 chars (longest valid format, ITF-14).
+                                            const digits = e.target.value
+                                                .replace(/[^0-9]/g, '')
+                                                .slice(0, 14);
+                                            setFormData({ ...formData, ean: digits });
+                                            // Live validation: anything non-empty must be
+                                            // one of the accepted lengths.
+                                            if (digits && !isValidEan(digits)) {
+                                                setEanError(
+                                                    `Barcode must be 8, 12, 13, or 14 digits. You entered ${digits.length}.`,
+                                                );
+                                            } else {
+                                                setEanError(null);
+                                            }
+                                        }}
+                                        className={
+                                            'w-full h-11 rounded-xl border bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:ring-2 ' +
+                                            (eanError
+                                                ? 'border-red-300 focus:border-red-400 focus:ring-red-100'
+                                                : 'border-slate-200 focus:border-slate-400 focus:ring-slate-100')
                                         }
-                                        className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                     />
+                                    {eanError ? (
+                                        <p className="text-[11px] text-red-600 font-medium">
+                                            {eanError}
+                                        </p>
+                                    ) : (
+                                        <p className="text-[11px] text-slate-400">
+                                            EAN-13 / EAN-8 / UPC-A / ITF-14 accepted
+                                        </p>
+                                    )}
                                 </div>
                             </div>
 
@@ -834,12 +960,12 @@ export default function ProductEditorForm({
                                         <span className="text-red-500">*</span>
                                     </label>
                                     <input
-                                        type="number"
-                                        min={1}
+                                        type="text"
+                                        inputMode="numeric"
                                         required
                                         value={formData.minOrder || formData.moq || ''}
                                         onChange={(e) => {
-                                            const v = parseInt(e.target.value) || 1;
+                                            const v = parseInt(e.target.value.replace(/[^0-9]/g, '')) || 1;
                                             setFormData({ ...formData, minOrder: v, moq: v });
                                         }}
                                         className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
@@ -851,19 +977,33 @@ export default function ProductEditorForm({
                                         Weight per Unit (kg) <span className="text-red-500">*</span>
                                     </label>
                                     <input
-                                        type="number"
-                                        step="0.001"
+                                        type="text"
+                                        inputMode="decimal"
                                         placeholder="e.g. 0.330"
-                                        value={formData.weight || ''}
-                                        onChange={(e) =>
+                                        value={formData.weight ?? ''}
+                                        onChange={(e) => {
+                                            // Allow only digits + one decimal separator
+                                            // (. or ,). No spinner arrows.
+                                            const v = e.target.value.replace(/[^0-9.,]/g, '');
                                             setFormData({
                                                 ...formData,
-                                                weight: parseFloat(e.target.value) || 0,
-                                            })
-                                        }
+                                                weight: v as any,
+                                            });
+                                        }}
+                                        onBlur={(e) => {
+                                            const v = parseFloat(
+                                                e.target.value.replace(',', '.'),
+                                            );
+                                            setFormData({
+                                                ...formData,
+                                                weight: isNaN(v) ? 0 : v,
+                                            });
+                                        }}
                                         className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                     />
-                                    <p className="text-[11px] text-slate-400">Enter weight per single unit</p>
+                                    <p className="text-[11px] text-slate-400">
+                                        Auto-extracted from product name if left blank (e.g. "250g" → 0.250)
+                                    </p>
                                 </div>
                                 <div className="space-y-1.5">
                                     <label className="text-[11px] font-medium text-slate-500">
@@ -945,15 +1085,16 @@ export default function ProductEditorForm({
                                         Pieces per Case <span className="text-red-500">*</span>
                                     </label>
                                     <input
-                                        type="number"
-                                        min={1}
+                                        type="text"
+                                        inputMode="numeric"
                                         value={formData.unitsPerCase ?? ''}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
+                                            const v = parseInt(e.target.value.replace(/[^0-9]/g, ''));
                                             setFormData({
                                                 ...formData,
-                                                unitsPerCase: parseInt(e.target.value) || 0,
-                                            })
-                                        }
+                                                unitsPerCase: isNaN(v) ? 0 : v,
+                                            });
+                                        }}
                                         className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                     />
                                 </div>
@@ -962,15 +1103,16 @@ export default function ProductEditorForm({
                                         Cases per Pallet <span className="text-red-500">*</span>
                                     </label>
                                     <input
-                                        type="number"
-                                        min={1}
+                                        type="text"
+                                        inputMode="numeric"
                                         value={formData.casesPerPallet ?? ''}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
+                                            const v = parseInt(e.target.value.replace(/[^0-9]/g, ''));
                                             setFormData({
                                                 ...formData,
-                                                casesPerPallet: parseInt(e.target.value) || 0,
-                                            })
-                                        }
+                                                casesPerPallet: isNaN(v) ? 0 : v,
+                                            });
+                                        }}
                                         className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                     />
                                 </div>
@@ -979,15 +1121,16 @@ export default function ProductEditorForm({
                                         Pallets per Shipment <span className="text-red-500">*</span>
                                     </label>
                                     <input
-                                        type="number"
-                                        min={1}
+                                        type="text"
+                                        inputMode="numeric"
                                         value={formData.palletsPerShipment ?? ''}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
+                                            const v = parseInt(e.target.value.replace(/[^0-9]/g, ''));
                                             setFormData({
                                                 ...formData,
-                                                palletsPerShipment: parseInt(e.target.value) || 0,
-                                            })
-                                        }
+                                                palletsPerShipment: isNaN(v) ? 0 : v,
+                                            });
+                                        }}
                                         className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                     />
                                 </div>
@@ -1016,15 +1159,16 @@ export default function ProductEditorForm({
                                         Lead Time (days)
                                     </label>
                                     <input
-                                        type="number"
-                                        min={0}
+                                        type="text"
+                                        inputMode="numeric"
                                         value={formData.leadTime ?? ''}
-                                        onChange={(e) =>
+                                        onChange={(e) => {
+                                            const v = parseInt(e.target.value.replace(/[^0-9]/g, ''));
                                             setFormData({
                                                 ...formData,
-                                                leadTime: parseInt(e.target.value) || 0,
-                                            })
-                                        }
+                                                leadTime: isNaN(v) ? 0 : v,
+                                            });
+                                        }}
                                         className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                     />
                                 </div>
