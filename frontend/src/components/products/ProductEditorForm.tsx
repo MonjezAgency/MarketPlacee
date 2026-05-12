@@ -1814,12 +1814,23 @@ export default function ProductEditorForm({
                                         with that unit. Pure numeric values
                                         default to "kg" (the old behaviour). */}
                                     {(() => {
+                                        // Operator bug: picking a unit (ml / L / etc.)
+                                        // before typing a number lost the choice because
+                                        // we only persisted the unit when there was a
+                                        // numeric prefix to concatenate. Fix: allow the
+                                        // unit half to live in formData.weight on its
+                                        // own — e.g. "ml" with no number. The regex
+                                        // tolerates a missing number prefix. Save logic
+                                        // also covers the inverse: typing a number
+                                        // before picking a unit keeps the picker's last
+                                        // pick (or the default 'kg').
                                         const WEIGHT_UNITS = ['g', 'kg', 'mg', 'ml', 'cl', 'L', 'oz', 'lb', 'tn'];
                                         const raw = String(formData.weight ?? '').trim();
-                                        const m = raw.match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-Z]+)?$/);
+                                        // Tolerant parse: number is optional, unit is
+                                        // optional, but at least one of them must exist.
+                                        const m = raw.match(/^(\d+(?:[.,]\d+)?)?\s*([a-zA-Z]+)?$/);
                                         const numPart = m?.[1] ?? '';
                                         let unitPart = (m?.[2] || 'kg').toLowerCase();
-                                        // Normalise common variants
                                         if (unitPart === 'l') unitPart = 'L';
                                         if (unitPart === 't' || unitPart === 'ton' || unitPart === 'tonne') unitPart = 'tn';
                                         const safeUnit = WEIGHT_UNITS.includes(unitPart) ? unitPart : 'kg';
@@ -1832,9 +1843,11 @@ export default function ProductEditorForm({
                                                     value={numPart}
                                                     onChange={(e) => {
                                                         const cleaned = e.target.value.replace(/[^0-9.,]/g, '');
+                                                        // Keep the current unit even when
+                                                        // the number is being cleared/typed.
                                                         setFormData({
                                                             ...formData,
-                                                            weight: cleaned ? (`${cleaned}${safeUnit}` as any) : ('' as any),
+                                                            weight: (cleaned + safeUnit) as any,
                                                         });
                                                     }}
                                                     className="flex-1 h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12]"
@@ -1843,9 +1856,14 @@ export default function ProductEditorForm({
                                                     value={safeUnit}
                                                     onChange={(e) => {
                                                         const next = e.target.value;
+                                                        // Persist the unit choice even
+                                                        // when there's no number yet.
+                                                        // The string will be just "ml"
+                                                        // until the supplier types a
+                                                        // number, then it becomes "500ml".
                                                         setFormData({
                                                             ...formData,
-                                                            weight: numPart ? (`${numPart}${next}` as any) : ('' as any),
+                                                            weight: (numPart + next) as any,
                                                         });
                                                     }}
                                                     className="w-24 h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-2.5 text-sm font-semibold text-slate-900 dark:text-zinc-100 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12] appearance-none"

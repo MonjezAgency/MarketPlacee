@@ -273,17 +273,41 @@ export default function AdminWholesaleOffersPage() {
                                 </div>
                             </div>
 
-                            {/* Supplier */}
+                            {/* Supplier — name + email + click-through to
+                                their full portfolio so the admin can audit
+                                the rest of the listings before approving
+                                this offer. /admin/suppliers?id=<id> focuses
+                                the matching row in the suppliers table. */}
                             <div className="md:col-span-3">
                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Supplier</p>
-                                <div className="text-[13px] font-bold text-[#0F172A] flex items-center gap-1.5">
-                                    <Building2 size={13} className="text-slate-400" />
-                                    {o.supplier?.companyName || o.supplier?.name || '—'}
-                                </div>
+                                {o.supplier?.id ? (
+                                    <a
+                                        href={`/admin/suppliers?id=${o.supplier.id}`}
+                                        className="text-[13px] font-bold text-[#0F172A] hover:text-[#2EC4B6] inline-flex items-center gap-1.5 group transition-colors"
+                                        title="Open supplier portfolio"
+                                    >
+                                        <Building2 size={13} className="text-slate-400 group-hover:text-[#2EC4B6] transition-colors" />
+                                        {o.supplier?.companyName || o.supplier?.name || '—'}
+                                        <span className="text-[10px] font-bold text-slate-400 group-hover:text-[#2EC4B6] transition-colors">↗</span>
+                                    </a>
+                                ) : (
+                                    <div className="text-[13px] font-bold text-[#0F172A] flex items-center gap-1.5">
+                                        <Building2 size={13} className="text-slate-400" />
+                                        {o.supplier?.companyName || o.supplier?.name || '—'}
+                                    </div>
+                                )}
                                 {o.supplier?.email && (
                                     <div className="text-[11px] text-slate-500 flex items-center gap-1.5 mt-0.5">
                                         <Mail size={11} className="text-slate-400" /> {o.supplier.email}
                                     </div>
+                                )}
+                                {o.supplier?.id && (
+                                    <a
+                                        href={`/admin/products?supplierId=${o.supplier.id}`}
+                                        className="text-[11px] font-bold text-[#2EC4B6] hover:underline mt-1 inline-flex items-center gap-1"
+                                    >
+                                        View all listings →
+                                    </a>
                                 )}
                             </div>
 

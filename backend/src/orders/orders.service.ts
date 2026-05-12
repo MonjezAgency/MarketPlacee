@@ -437,6 +437,12 @@ export class OrdersService {
                 image: (item as any).product?.images?.[0] ?? null,
                 quantity: item.quantity,
                 price: item.price,
+                // Forward the Shopify-style tier + variant snapshot so the
+                // supplier order page can render "10 × Pallet" next to qty
+                // (operator-requested) and the chosen variants for buyers
+                // who configured the product.
+                selectedTier: (item as any).selectedTier ?? null,
+                selectedVariants: (item as any).selectedVariants ?? null,
             })),
         }));
     }

@@ -82,6 +82,7 @@ export default function ProductDetailClient() {
         const fallback = {
             perCasePrice: 0, perUnitTotal: 0, activeLabel: 'Case',
             activeKey: 'carton' as const, casesInUnit: 1,
+            basePerCase: 0,
         };
         if (!currentProduct) return fallback;
         const p = currentProduct;
@@ -133,6 +134,11 @@ export default function ProductDetailClient() {
             activeLabel: active.label,
             activeKey: active.key,
             casesInUnit: active.casesInUnit,
+            // Exposed for the admin pricing-formula panel below. Same
+            // base-per-case the tier prices are derived from, before
+            // any markup is applied. Lets the admin see "raw" anchor
+            // next to "customer" prices.
+            basePerCase,
         };
     }, [currentProduct, markups, selectedUnit, adminDefaultUnit]);
 
@@ -151,6 +157,17 @@ export default function ProductDetailClient() {
     // not mix Truck-priced quantities with Pallet-priced quantities for the
     // same SKU. The other two tier buttons render as disabled with a tooltip
     // explaining how to switch.
+    // Role flags lifted to component scope so they're usable both in
+    // the tier-picker IIFE further down AND in the admin pricing
+    // formula panel which lives outside it.
+    const isSupplierOwner =
+        user?.role?.toUpperCase() === 'SUPPLIER' &&
+        (currentProduct as any)?.supplierId &&
+        user?.id === (currentProduct as any)?.supplierId;
+    const isAdminUser = ['ADMIN', 'OWNER'].includes(
+        (user?.role || '').toUpperCase(),
+    );
+
     const lockedTier: 'truck' | 'pallet' | 'carton' | null = useMemo(() => {
         if (!currentProduct) return null;
         const existing = cartItems.find(it => it.id === currentProduct.id);
@@ -524,14 +541,33 @@ export default function ProductDetailClient() {
                                 // Per-case BASE (no markup) — every tier prices off this.
                                 const basePerCase = piecesPerCase > 0 ? basePerPiece * piecesPerCase : basePerPiece;
 
+                                // ── Role-aware markup ───────────────────────────
+                                // Customer / anonymous → see prices WITH markup applied
+                                //   (the buyer-facing tiered ladder).
+                                // Supplier viewing OWN product → see raw prices, no
+                                //   markup. They never see the buyer-facing premium
+                                //   so they can't reverse-engineer the spread.
+                                // Admin viewing any product → see raw prices on the
+                                //   tier ladder PLUS a dedicated formula panel below
+                                //   that breaks down "base × markup% = customer price"
+                                //   per tier. Lets the operator audit the math without
+                                //   bouncing to /admin/pricing.
+                                // isSupplierOwner / isAdminUser are computed at the
+                                // component top level so the formula panel outside this
+                                // IIFE can read them too.
+                                const useRawPrices = isSupplierOwner || isAdminUser;
+                                const mTruck   = useRawPrices ? 1 : markups.container;
+                                const mPallet  = useRawPrices ? 1 : markups.pallet;
+                                const mCase    = useRawPrices ? 1 : markups.piece;
+
                                 // Per-case price for each tier — same base, different markup.
                                 const truckAvailable  = piecesPerCase > 0 && casesPerPallet > 0 && palletsPerTruck > 0;
                                 const palletAvailable = piecesPerCase > 0 && casesPerPallet > 0;
                                 const caseAvailable   = piecesPerCase > 0;
 
-                                const perCaseTruck  = truckAvailable  ? basePerCase * markups.container : null;
-                                const perCasePallet = palletAvailable ? basePerCase * markups.pallet    : null;
-                                const perCaseCase   = caseAvailable   ? basePerCase * markups.piece     : null;
+                                const perCaseTruck  = truckAvailable  ? basePerCase * mTruck  : null;
+                                const perCasePallet = palletAvailable ? basePerCase * mPallet : null;
+                                const perCaseCase   = caseAvailable   ? basePerCase * mCase   : null;
 
                                 // Each tier carries the per-case display price plus how many
                                 // cases sit inside one of its units (used for the line total).
@@ -842,6 +878,61 @@ export default function ProductDetailClient() {
                                     that exposes markup math and invites haggling. The
                                     component is still imported for the admin variants
                                     if/when those are wired up. */}
+
+                                {/* ── Admin Pricing Formula panel ───────────────
+                                    Visible to ADMIN / OWNER only. Shows the live
+                                    markup math per tier:
+                                       base × (1 + markup%) = customer price
+                                    Reads markups from the same AppConfig the
+                                    /admin/pricing page edits, so changing the
+                                    settings reflects here without a reload of
+                                    this PDP (each visit re-fetches markups).
+                                    Operator-requested for review-time visibility
+                                    so they can verify the spread before approving
+                                    a supplier listing.
+                                */}
+                                {isAdminUser && (
+                                    <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4 space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-[11px] font-black uppercase tracking-widest text-blue-700">
+                                                Admin · Pricing formula
+                                            </p>
+                                            <span className="text-[10px] text-blue-500 font-bold">
+                                                base × (1 + markup) = customer
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 leading-relaxed">
+                                            Live markups from <a href="/admin/pricing" className="font-bold underline">/admin/pricing</a>.
+                                            You're seeing <strong>raw supplier prices</strong> above. Below is what
+                                            the buyer's cart actually shows for each tier.
+                                        </p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {([
+                                                { label: 'Truck',   m: markups.container },
+                                                { label: 'Pallet',  m: markups.pallet },
+                                                { label: 'Case',    m: markups.piece },
+                                            ] as const).map((tier) => {
+                                                const customer = tierData.basePerCase * tier.m;
+                                                const pct = ((tier.m - 1) * 100).toFixed(1);
+                                                return (
+                                                    <div key={tier.label} className="bg-white rounded-xl border border-blue-100 p-3">
+                                                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{tier.label} · markup</p>
+                                                        <p className="text-[14px] font-bold text-blue-700 tabular-nums">+{pct}%</p>
+                                                        <p className="text-[10px] text-slate-500 mt-2">
+                                                            Base{' '}
+                                                            <strong className="font-mono">€{tierData.basePerCase.toFixed(2)}</strong>
+                                                        </p>
+                                                        <p className="text-[10px] text-slate-500">
+                                                            Customer{' '}
+                                                            <strong className="font-mono text-[#0F172A]">€{customer.toFixed(2)}</strong>
+                                                            <span className="ms-1 text-slate-400">/ case</span>
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="pt-8 border-t border-[#E5E7EB] space-y-4">

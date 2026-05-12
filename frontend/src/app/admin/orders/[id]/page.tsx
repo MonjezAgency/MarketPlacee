@@ -393,7 +393,18 @@ export default function AdminOrderDetailPage() {
                                                     )}
                                                 </td>
                                                 <td className="py-4 px-2 sm:px-3 text-[13px] font-bold text-slate-900">
-                                                    {it.quantity}
+                                                    {/* Operator request: surface the unit
+                                                        the customer ordered (Truck / Pallet
+                                                        / Case) next to the count. Pulls from
+                                                        the order line's selectedTier first
+                                                        (snapshot at checkout), falls back to
+                                                        the product's default unit. */}
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span>{it.quantity}</span>
+                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                                            × {(it as any).selectedTier || p.unit || 'unit'}
+                                                        </span>
+                                                    </div>
                                                 </td>
                                                 <td className="py-4 px-2 sm:px-3 text-[13px] font-semibold text-slate-700">
                                                     {fmtMoney(it.unitPrice)}

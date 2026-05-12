@@ -237,7 +237,12 @@ export default function SupplierOrdersPage() {
                                                             <div className="flex items-center gap-8 text-end">
                                                                 <div>
                                                                     <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Qty</p>
-                                                                    <p className="font-bold">{item.quantity}</p>
+                                                                    <p className="font-bold">
+                                                                        {item.quantity}
+                                                                        <span className="ms-1 text-[10px] text-muted-foreground uppercase tracking-wider">
+                                                                            × {(item as any).selectedTier || 'unit'}
+                                                                        </span>
+                                                                    </p>
                                                                 </div>
                                                                 <div>
                                                                     <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Unit Price</p>
