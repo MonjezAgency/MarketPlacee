@@ -1061,7 +1061,11 @@ export class ProductsService {
      */
     async getInventoryForSupplier(supplierId: string) {
         const products = await this.prisma.product.findMany({
-            where: { supplierId },
+            // Operator rule: only APPROVED listings show on the inventory
+            // dashboard. PENDING / REJECTED / NEEDS_CHANGES rows live on
+            // /supplier/products where the supplier handles them — there's
+            // no warehouse number to manage until Atlantis says yes.
+            where: { supplierId, status: 'APPROVED' },
             select: {
                 id: true,
                 name: true,
@@ -1076,6 +1080,8 @@ export class ProductsService {
                 casesPerPallet: true,
                 status: true,
                 exwLocation: true,
+                variants: true,
+                variantStock: true,
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -1131,27 +1137,125 @@ export class ProductsService {
         const soldMap = indexBy(sold);
         const cancelledMap = indexBy(cancelled);
 
-        return products.map((p) => ({
-            id: p.id,
-            name: p.name,
-            image: p.images?.[0] || null,
-            ean: p.ean,
-            category: p.category,
-            unit: p.unit,
-            status: p.status,
-            exwLocation: p.exwLocation,
-            unitsPerCase: p.unitsPerCase,
-            casesPerPallet: p.casesPerPallet,
-            // Pricing — surface supplier's raw case price, not the
-            // marked-up customer price. Consistent with /my-products.
-            price: p.basePrice ?? p.price,
-            // Stock buckets
-            stock: p.stock,                            // still available to sell
-            reserved: reservedMap[p.id] || 0,           // committed to ship
-            sold: soldMap[p.id] || 0,                   // delivered to customers
-            cancelled: cancelledMap[p.id] || 0,         // returned to stock
-            totalOrdered: totalOrdered[p.id] || 0,      // gross lifetime orders
-        }));
+        return products.map((p) => {
+            // ── Variant breakdown ─────────────────────────────────
+            // Compute the cartesian product of the supplier's variant
+            // groups so the inventory page can render every possible
+            // combination, even ones the supplier hasn't given a
+            // stock number to yet. Empty groups or admin-meta entries
+            // (name starts with "__") are skipped.
+            //
+            // For each combination we look up the saved count in
+            // variantStock (key = "Group1=Val1|Group2=Val2", groups
+            // sorted) and fall back to 0 when missing. This keeps the
+            // UI deterministic regardless of how the supplier seeded
+            // the map.
+            const rawVariants = Array.isArray(p.variants) ? (p.variants as any[]) : [];
+            const groups = rawVariants
+                .filter((v) => v && typeof v === 'object' && !String(v.name || '').startsWith('__'))
+                .map((v) => ({
+                    name: String(v.name || ''),
+                    values: Array.isArray(v.values)
+                        ? v.values.map((x: any) => String(x))
+                        : v.value
+                          ? [String(v.value)]
+                          : [],
+                }))
+                .filter((g) => g.name && g.values.length > 0);
+
+            const variantStockMap: Record<string, number> =
+                p.variantStock && typeof p.variantStock === 'object'
+                    ? (p.variantStock as Record<string, number>)
+                    : {};
+
+            // Cartesian helper — { Size: [S,M], Flavour: [V,C] }
+            //   → [ {Size:S,Flavour:V}, {Size:S,Flavour:C}, {Size:M,Flavour:V}, ... ]
+            const cartesian = (gs: { name: string; values: string[] }[]): Array<Record<string, string>> => {
+                if (gs.length === 0) return [];
+                let acc: Array<Record<string, string>> = [{}];
+                for (const g of gs) {
+                    const next: Array<Record<string, string>> = [];
+                    for (const a of acc) {
+                        for (const v of g.values) {
+                            next.push({ ...a, [g.name]: v });
+                        }
+                    }
+                    acc = next;
+                }
+                return acc;
+            };
+
+            const sigOf = (combo: Record<string, string>): string =>
+                Object.keys(combo)
+                    .sort()
+                    .map((k) => `${k}=${combo[k]}`)
+                    .join('|');
+
+            const combos = cartesian(groups);
+            const variantBreakdown = combos.map((c) => ({
+                signature: sigOf(c),
+                picks: c,
+                stock: Number(variantStockMap[sigOf(c)] ?? 0),
+            }));
+
+            return {
+                id: p.id,
+                name: p.name,
+                image: p.images?.[0] || null,
+                ean: p.ean,
+                category: p.category,
+                unit: p.unit,
+                status: p.status,
+                exwLocation: p.exwLocation,
+                unitsPerCase: p.unitsPerCase,
+                casesPerPallet: p.casesPerPallet,
+                // Pricing — surface supplier's raw case price, not the
+                // marked-up customer price. Consistent with /my-products.
+                price: p.basePrice ?? p.price,
+                // Stock buckets
+                stock: p.stock,                            // still available to sell
+                reserved: reservedMap[p.id] || 0,           // committed to ship
+                sold: soldMap[p.id] || 0,                   // delivered to customers
+                cancelled: cancelledMap[p.id] || 0,         // returned to stock
+                totalOrdered: totalOrdered[p.id] || 0,      // gross lifetime orders
+                // Per-variant rows — empty array when the product
+                // isn't configurable. Frontend uses this to expand
+                // a row into one inline sub-row per combination.
+                variantBreakdown,
+                hasVariants: variantBreakdown.length > 0,
+            };
+        });
+    }
+
+    /**
+     * Set the stock count for a specific variant combination on a
+     * product. Supplier-scoped — the controller enforces ownership.
+     *   • signature  — "Group1=Val1|Group2=Val2" (sorted)
+     *   • newStock   — integer ≥ 0, clamped against int max
+     * Returns the freshly-saved variantStock map so the UI can swap
+     * its local optimistic value for the canonical one.
+     */
+    async setVariantStock(productId: string, signature: string, newStock: number) {
+        const product = await this.prisma.product.findUnique({
+            where: { id: productId },
+            select: { variantStock: true },
+        });
+        if (!product) throw new NotFoundException('Product not found');
+
+        const current: Record<string, number> =
+            product.variantStock && typeof product.variantStock === 'object'
+                ? ({ ...(product.variantStock as any) } as Record<string, number>)
+                : {};
+        const sig = String(signature || '').trim();
+        if (!sig) throw new BadRequestException('Variant signature is required');
+        const safeStock = Math.max(0, Math.min(2_000_000_000, Math.floor(Number(newStock) || 0)));
+        current[sig] = safeStock;
+
+        await this.prisma.product.update({
+            where: { id: productId },
+            data: { variantStock: current as any },
+        });
+        return { variantStock: current };
     }
 
     async rateProduct(id: string, newRating: number) {

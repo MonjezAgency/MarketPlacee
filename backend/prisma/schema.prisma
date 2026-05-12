@@ -167,6 +167,20 @@ model Product {
   brand       String?
   unit        String        @default("carton")
   variants    Json?
+  // Per-variant stock map for configurable products. Shape:
+  //   { "Size=Large|Flavour=Vanilla": 12, "Size=Small": 0, ... }
+  // The KEY is the variant signature (groups sorted alphabetically,
+  // joined by "|", each group as "name=value"). Suppliers manage
+  // each variant's count independently on /supplier/inventory.
+  //
+  // Product.stock stays as the global counter — it remains the
+  // source of truth for non-configurable products. For variant
+  // products the inventory page renders the variantStock map and
+  // the supplier can rebalance freely; the existing order flow
+  // still reads Product.stock (variant-aware decrement is a
+  // follow-up — minor risk because variant orders are rare in the
+  // pilot data).
+  variantStock Json?
   status      ProductStatus @default(PENDING)
   adminNotes  String?
   moq         Int?          // Minimum Order Quantity (number of moqUnit)

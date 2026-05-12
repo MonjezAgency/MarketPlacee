@@ -13,6 +13,7 @@ import {
     UseInterceptors,
     UploadedFile,
     BadRequestException,
+    ForbiddenException,
     Logger
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -91,6 +92,33 @@ export class ProductsController {
     @Roles(Role.SUPPLIER)
     async getInventory(@Request() req) {
         return this.productsService.getInventoryForSupplier(req.user.sub);
+    }
+
+    /**
+     * Set the stock count for one variant of a configurable product
+     * (e.g. "Size=Large|Flavour=Vanilla" → 12). Supplier can hit it
+     * from the inventory page's inline +/- controls.
+     *
+     * Ownership check: the supplier must own the product. Admins
+     * and owners bypass — they can rebalance any catalog row during
+     * triage.
+     */
+    @Patch(':id/variant-stock')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER)
+    async setVariantStock(
+        @Param('id') id: string,
+        @Body() body: { signature: string; stock: number },
+        @Request() req,
+    ) {
+        const isStaff = ['ADMIN', 'OWNER'].includes((req.user?.role || '').toUpperCase());
+        if (!isStaff) {
+            const product = await this.productsService.findOne(id);
+            if (!product || product.supplierId !== req.user.sub) {
+                throw new ForbiddenException('You can only manage stock on your own products.');
+            }
+        }
+        return this.productsService.setVariantStock(id, body?.signature, body?.stock);
     }
 
     // ─── Static routes MUST come before :id param routes ───────────────────
