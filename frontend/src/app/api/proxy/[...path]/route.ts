@@ -116,6 +116,27 @@ async function handler(
       clearTimeout(timeoutId);
 
       const responseData = await res.arrayBuffer();
+      // Catch Railway's service-level 404 ("Application not found") and
+      // rewrite it into an actionable message so every page the user
+      // touches doesn't surface the same confusing string.
+      if (res.status === 404) {
+        try {
+          const peek = new TextDecoder().decode(responseData.slice(0, 500));
+          if (/application not found/i.test(peek) && /"code"\s*:\s*404/.test(peek)) {
+            return NextResponse.json(
+              {
+                message:
+                  `Backend service is unreachable at ${getBackendUrl()}. ` +
+                  `The URL is mis-configured — find the live Railway URL ` +
+                  `(Railway dashboard → service → Settings → Networking → ` +
+                  `Public URL) and set BACKEND_URL on Vercel.`,
+                backend: getBackendUrl(),
+              },
+              { status: 503 },
+            );
+          }
+        } catch { /* fall through to raw passthrough below */ }
+      }
       return new NextResponse(responseData, {
         status: res.status,
         headers: {

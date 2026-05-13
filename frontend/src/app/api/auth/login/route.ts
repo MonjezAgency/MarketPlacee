@@ -69,6 +69,25 @@ export async function POST(request: Request) {
     }
 
     if (!res.ok) {
+      // Railway returns this JSON when the service URL is wrong /
+      // deleted / renamed — `{"status":"error","code":404,"message":
+      // "Application not found"}`. We rewrite it into something the
+      // operator can act on instead of surfacing the raw Railway text
+      // (the user just saw "Application not found" on the login form
+      // with no idea what to do).
+      const msg = String(data?.message || '').toLowerCase();
+      if (res.status === 404 && msg.includes('application not found')) {
+        return NextResponse.json(
+          {
+            message:
+              `Backend service is unreachable at ${BACKEND_BASE()}. ` +
+              `The URL is mis-configured — find the correct Railway URL ` +
+              `(Railway dashboard → service → Settings → Networking → ` +
+              `Public URL) and set BACKEND_URL on Vercel.`,
+          },
+          { status: 503 },
+        );
+      }
       return NextResponse.json(data, { status: res.status });
     }
 
