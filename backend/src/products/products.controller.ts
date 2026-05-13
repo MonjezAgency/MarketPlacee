@@ -32,6 +32,7 @@ import { EanService } from './ean.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { AiAgentService } from '../ai-agent/ai-agent.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { PrismaService } from '../common/prisma.service';
 
 @Controller('products')
 export class ProductsController {
@@ -41,8 +42,43 @@ export class ProductsController {
         private readonly eanService: EanService,
         private readonly storageService: SupabaseStorageService,
         private readonly aiAgent: AiAgentService,
-        private readonly notificationsService: NotificationsService
+        private readonly notificationsService: NotificationsService,
+        private readonly prisma: PrismaService,
     ) { }
+
+    /**
+     * Resolve the Atlantis "platform" supplier — the User row that owns
+     * every product Atlantis directly stocks (instead of a third-party
+     * supplier). When admin creates a product without an explicit
+     * `supplierId` in the payload, we attribute it here so the public
+     * PDP credits "Atlantis FMCG" as the brand, not the individual
+     * admin who keyed it in.
+     *
+     * Lookup order: OWNER-role user with the platform email first, then
+     * any OWNER role, then any ADMIN role, then null (caller falls back
+     * to req.user.sub so the create still succeeds).
+     */
+    private async resolvePlatformSupplierId(): Promise<string | null> {
+        const platformEmail = (process.env.PLATFORM_OWNER_EMAIL || 'Info@atlantisfmcg.com').toLowerCase();
+        // Email is stored case-sensitively in some installs — try both ways.
+        const byEmail = await this.prisma.user.findFirst({
+            where: {
+                role: { in: [Role.OWNER, Role.ADMIN] },
+                OR: [
+                    { email: platformEmail },
+                    { email: platformEmail.toUpperCase() },
+                    { email: { contains: 'atlantisfmcg.com', mode: 'insensitive' } },
+                ],
+            },
+            select: { id: true },
+        });
+        if (byEmail) return byEmail.id;
+        const anyOwner = await this.prisma.user.findFirst({
+            where: { role: Role.OWNER },
+            select: { id: true },
+        });
+        return anyOwner?.id ?? null;
+    }
 
     private readonly logger = new Logger(ProductsController.name);
 
@@ -263,10 +299,24 @@ export class ProductsController {
 
     @Post()
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.SUPPLIER, Role.ADMIN)
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER)
     async create(@Body() createProductDto: any, @Request() req) {
-        const isAdmin = req.user.role === Role.ADMIN;
-        const supplierId = isAdmin ? (createProductDto.supplierId || req.user.sub) : req.user.sub;
+        const isAdmin = req.user.role === Role.ADMIN || req.user.role === Role.OWNER;
+        // Admin-created products default to the Atlantis platform supplier
+        // (not the admin's personal account) so the PDP credits "Atlantis"
+        // as the brand. Admin can still override with an explicit supplierId
+        // in the payload (when re-listing on behalf of a third-party supplier).
+        let supplierId: string;
+        if (isAdmin) {
+            if (createProductDto.supplierId) {
+                supplierId = createProductDto.supplierId;
+            } else {
+                const platformId = await this.resolvePlatformSupplierId();
+                supplierId = platformId || req.user.sub;
+            }
+        } else {
+            supplierId = req.user.sub;
+        }
 
         // AI Auto-Categorization
         if (!createProductDto.category || createProductDto.category === 'General') {

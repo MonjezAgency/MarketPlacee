@@ -63,10 +63,21 @@ export class EmailService {
    */
   private htmlToPlainText(html: string): string {
     return html
+      // Drop style/script/title — they are not user-facing copy.
       .replace(/<style[\s\S]*?<\/style>/gi, '')
       .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<\/(p|div|h[1-6]|li|tr|br|table)>/gi, '\n')
+      .replace(/<title[\s\S]*?<\/title>/gi, '')
+      .replace(/<head[\s\S]*?<\/head>/gi, '')
+      // Table cell boundaries become " · " separators so the plain-text
+      // version stays readable when an email client falls back to text
+      // (the previous version collapsed every cell into one giant blob
+      // — "Trade TermsEXW EgyptEAN8000070016185Units per case20" — and
+      // the operator legitimately read it as "the template is missing").
+      .replace(/<\/td>\s*<td[^>]*>/gi, ' · ')
+      // Row/block-level closures become real line breaks.
+      .replace(/<\/(p|div|h[1-6]|li|tr|table|section|article)>/gi, '\n')
       .replace(/<br\s*\/?>/gi, '\n')
+      // Drop every remaining tag, then unescape entities.
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
       .replace(/&amp;/g, '&')
@@ -74,7 +85,9 @@ export class EmailService {
       .replace(/&gt;/g, '>')
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
-      .replace(/[ \t]+\n/g, '\n')
+      // Collapse multiple spaces but keep paragraph breaks intact.
+      .replace(/[ \t]+/g, ' ')
+      .replace(/ \n/g, '\n')
       .replace(/\n{3,}/g, '\n\n')
       .trim()
       .slice(0, 4000);

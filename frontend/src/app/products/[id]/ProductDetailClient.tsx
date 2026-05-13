@@ -123,16 +123,20 @@ export default function ProductDetailClient() {
         const palletAvailable = piecesPerCase > 0 && casesPerPallet > 0;
         const caseAvailable = piecesPerCase > 0;
 
-        // Role-aware markup multipliers. Supplier-owners + admin see
-        // RAW base prices (multiplier = 1.0) so the tier ladder shows
-        // the same number across all three buttons. Customers see the
-        // full marked-up ladder. This is the fix for the operator-
-        // reported markup leak — the IIFE further down was role-aware
-        // but tierData (which drives the headline price + cart) was
-        // not, so the supplier saw different prices on each tier.
-        const mTruck  = useRawPricesRole ? 1 : markups.container;
-        const mPallet = useRawPricesRole ? 1 : markups.pallet;
-        const mCase   = useRawPricesRole ? 1 : markups.piece;
+        // Role-aware markup multipliers.
+        //   - Supplier viewing OWN product → raw prices (1.0) so they
+        //     never reverse-engineer the spread Atlantis charges buyers.
+        //   - Admin → sees CUSTOMER prices (with full markup) on the
+        //     tier ladder so they can verify exactly what shoppers see,
+        //     plus the admin-only formula panel below for the breakdown.
+        //   - Customers → customer prices (with markup) as expected.
+        // Previous version stripped the markup for admin too, which made
+        // every tier show identical prices and hid the per-tier % spread
+        // the operator was trying to audit on the PDP.
+        const useRawForTiers = isSupplierOwner;
+        const mTruck  = useRawForTiers ? 1 : markups.container;
+        const mPallet = useRawForTiers ? 1 : markups.pallet;
+        const mCase   = useRawForTiers ? 1 : markups.piece;
 
         const perCaseTruck  = truckAvailable  ? basePerCase * mTruck  : null;
         const perCasePallet = palletAvailable ? basePerCase * mPallet : null;
@@ -557,20 +561,14 @@ export default function ProductDetailClient() {
                                 const basePerCase = piecesPerCase > 0 ? basePerPiece * piecesPerCase : basePerPiece;
 
                                 // ── Role-aware markup ───────────────────────────
-                                // Customer / anonymous → see prices WITH markup applied
-                                //   (the buyer-facing tiered ladder).
-                                // Supplier viewing OWN product → see raw prices, no
-                                //   markup. They never see the buyer-facing premium
+                                // Customer / anonymous / admin → see prices WITH markup
+                                //   applied. Admin sees the same ladder customers see
+                                //   so they can audit the cart number without leaving
+                                //   the PDP; the admin formula panel below explains
+                                //   "base × (1 + %)" alongside.
+                                // Supplier viewing OWN product → raw prices, no markup,
                                 //   so they can't reverse-engineer the spread.
-                                // Admin viewing any product → see raw prices on the
-                                //   tier ladder PLUS a dedicated formula panel below
-                                //   that breaks down "base × markup% = customer price"
-                                //   per tier. Lets the operator audit the math without
-                                //   bouncing to /admin/pricing.
-                                // isSupplierOwner / isAdminUser are computed at the
-                                // component top level so the formula panel outside this
-                                // IIFE can read them too.
-                                const useRawPrices = isSupplierOwner || isAdminUser;
+                                const useRawPrices = isSupplierOwner;
                                 const mTruck   = useRawPrices ? 1 : markups.container;
                                 const mPallet  = useRawPrices ? 1 : markups.pallet;
                                 const mCase    = useRawPrices ? 1 : markups.piece;
@@ -918,8 +916,8 @@ export default function ProductDetailClient() {
                                         </div>
                                         <p className="text-[11px] text-slate-500 leading-relaxed">
                                             Live markups from <a href="/admin/pricing" className="font-bold underline">/admin/pricing</a>.
-                                            You're seeing <strong>raw supplier prices</strong> above. Below is what
-                                            the buyer's cart actually shows for each tier.
+                                            The tier ladder above shows what the <strong>buyer sees</strong> at checkout.
+                                            The breakdown below decomposes it into base × (1 + %).
                                         </p>
                                         <div className="grid grid-cols-3 gap-2">
                                             {([
