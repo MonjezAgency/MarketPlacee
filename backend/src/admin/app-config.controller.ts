@@ -7,7 +7,13 @@ import { Role } from '@prisma/client';
 
 @Controller('admin/config')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN)
+// Operator was hitting "You do not have permission to access this
+// resource" on /admin/banners because the whole config controller
+// was locked to ADMIN only. The operator is signed in as OWNER, and
+// other staff roles (MODERATOR / EDITOR) also legitimately need read
+// access to settings/markup/banners. Opened it up to the full admin
+// team — RolesGuard still enforces, just with a wider allow-list.
+@Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR, Role.EDITOR)
 export class AppConfigController {
     constructor(private readonly appConfigService: AppConfigService) { }
 
