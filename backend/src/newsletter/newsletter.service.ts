@@ -255,20 +255,98 @@ export class NewsletterService {
             }
         }
 
-        const fallbackShell = (body: string) => `
-            <div style="font-family: sans-serif; padding: 40px; color: #333; max-width: 600px; margin: 0 auto; background: #fff; border-radius: 12px; border: 1px solid #eee;">
-                <h1 style="color: #0F172A; font-size: 24px; font-weight: 900; margin-bottom: 24px;">Atlantis Marketplace</h1>
-                <div style="font-size: 16px; line-height: 1.6; color: #555;">
-                    ${body.replace(/\n/g, '<br/>')}
-                </div>
-                <hr style="margin: 40px 0; border: 0; border-top: 1px solid #eee;" />
-                <p style="font-size: 12px; color: #999; text-align: center;">
-                    You received this because you subscribed to Atlantis Marketplace updates.<br/>
-                    © ${new Date().getFullYear()} Atlantis Marketplace. All rights reserved.
-                </p>
-            </div>
-        `;
-        const finalHtml = (opts.html && opts.html.trim()) ? opts.html : fallbackShell(content || '');
+        // ─── Canonical Atlantis email shell ─────────────────────────────────
+        // ALL campaigns get wrapped in this shell on the backend, regardless
+        // of what HTML the frontend sends. This is the exact same shell the
+        // /offers blast email uses (the Red Bull screenshot the operator
+        // approved as the "good" template). Doing the wrap server-side
+        // means:
+        //   1. Cached Vercel deploys can never deliver a broken old shell
+        //   2. Every email — campaign, offer, transactional — looks the same
+        //   3. The frontend builder is now PREVIEW-ONLY; the canonical HTML
+        //      is generated here.
+        // The frontend sends inner body HTML (block markup) OR a full HTML
+        // document; we strip everything outside `<body>` so we only keep
+        // the content blocks and reattach our shell around them.
+        const extractBody = (raw: string): string => {
+            const m = raw.match(/<body[^>]*>([\s\S]*)<\/body>/i);
+            if (m) return m[1];
+            // If they sent fragments without <body>, also strip any leading
+            // <!DOCTYPE>/<html>/<head> so we don't double-up.
+            return raw
+                .replace(/<!DOCTYPE[\s\S]*?>/i, '')
+                .replace(/<\/?(html|head)[^>]*>/gi, '')
+                .replace(/<title[\s\S]*?<\/title>/gi, '')
+                .replace(/<meta[^>]*>/gi, '');
+        };
+
+        const renderShell = (bodyContent: string, subj: string): string => `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<meta name="x-apple-disable-message-reformatting" />
+</head>
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:Inter,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px;background:#F1F5F9;">
+<tr><td align="center">
+<table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 12px 28px rgba(15,23,42,0.06);">
+
+    <!-- BRAND HEADER (navy + teal curved divider) -->
+    <tr><td style="background:#0B1F3A;padding:0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="padding:28px 36px 24px;vertical-align:middle;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                        <tr>
+                            <td style="vertical-align:middle;padding-right:14px;">
+                                <img src="https://www.atlantisfmcg.com/icon.png" alt="Atlantis" width="46" height="46" style="display:block;width:46px;height:46px;border-radius:10px;background:#ffffff;padding:3px;box-sizing:border-box;" />
+                            </td>
+                            <td style="vertical-align:middle;">
+                                <div style="color:#ffffff;font-weight:900;font-size:24px;letter-spacing:0.04em;line-height:1;">ATLANTIS</div>
+                                <div style="color:#2EC4B6;font-weight:700;font-size:11px;letter-spacing:0.5em;margin-top:4px;line-height:1;">FMCG</div>
+                            </td>
+                        </tr>
+                    </table>
+                </td>
+                <td align="right" style="padding:28px 36px 24px;vertical-align:middle;color:#ffffff;font-size:13px;line-height:1.9;">
+                    <div>✉&nbsp;&nbsp;Info@atlantisfmcg.com</div>
+                    <div>🌐&nbsp;&nbsp;www.atlantisfmcg.com</div>
+                </td>
+            </tr>
+        </table>
+        <div style="height:14px;background:#2EC4B6;border-radius:0 0 50% 50% / 0 0 100% 100%;margin-bottom:-1px;"></div>
+    </td></tr>
+
+    <!-- MAIN BODY -->
+    <tr><td style="padding:36px 40px 20px;">
+        ${bodyContent}
+    </td></tr>
+
+    <!-- DARK FOOTER -->
+    <tr><td style="background:#0B1F3A;padding:24px 40px;color:#94A3B8;font-size:12px;text-align:center;">
+        <div style="margin-bottom:6px;">
+            <span style="color:#ffffff;font-weight:900;letter-spacing:0.02em;">Bridging Markets.</span>
+            &nbsp;<span style="color:#2EC4B6;font-weight:900;">Building Opportunities.</span>
+        </div>
+        <div style="opacity:0.6;">© ${new Date().getFullYear()} Atlantis FMCG. All rights reserved.</div>
+    </td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+
+        // Decide what content to wrap:
+        //   - opts.html  → take its body content (or whole string if no body)
+        //   - content    → plain-text-ish; wrap in a <p> so the shell renders it
+        let innerBody: string;
+        if (opts.html && opts.html.trim()) {
+            innerBody = extractBody(opts.html);
+        } else {
+            innerBody = `<p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">${(content || '').replace(/\n/g, '<br/>')}</p>`;
+        }
+        const finalHtml = renderShell(innerBody, subject);
 
         // Track per-recipient outcomes so we can show the admin the
         // ACTUAL reason emails failed instead of "successCount: 0" with
