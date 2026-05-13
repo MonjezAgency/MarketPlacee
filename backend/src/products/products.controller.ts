@@ -170,8 +170,20 @@ export class ProductsController {
     async getRecommendations(@Request() req) {
         const categories = req.query.categories ? req.query.categories.split(',').filter(Boolean) : [];
         const excludeIds = req.query.excludeIds ? req.query.excludeIds.split(',').filter(Boolean) : [];
+        // Operator request: cart suggestions should mix same-category +
+        // same-supplier so buyers can consolidate one supplier's shipment.
+        // Frontend passes a comma-separated list of supplier ids from the
+        // products already sitting in the cart.
+        const supplierIds = req.query.supplierIds ? req.query.supplierIds.split(',').filter(Boolean) : [];
+        const limitParam = parseInt(req.query.limit, 10);
+        const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 24) : 10;
 
-        const recommendations = await this.productsService.findRecommendations(categories, excludeIds);
+        const recommendations = await this.productsService.findRecommendations(
+            categories,
+            excludeIds,
+            limit,
+            supplierIds,
+        );
         return plainToInstance(ProductDto, recommendations);
     }
 

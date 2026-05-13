@@ -543,31 +543,13 @@ export default function AdminOrderDetailPage() {
                                                         </>
                                                     )}
                                                     {supplier?.id && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={async () => {
-                                                                const msg = window.prompt(
-                                                                    `Send an in-app message to ${supplier.name || 'this supplier'}:`,
-                                                                    `Hi ${supplier.name || ''},\n\nWe just received an order on Atlantis that includes "${p.name}" (${it.quantity} ${(it as any).selectedTier || p.unit || 'units'}). Could you confirm you have the stock ready to ship?\n\nThanks,\nAtlantis Operations`,
-                                                                );
-                                                                if (!msg || !msg.trim()) return;
-                                                                try {
-                                                                    await apiFetch('/chat/send', {
-                                                                        method: 'POST',
-                                                                        body: JSON.stringify({
-                                                                            content: msg.trim(),
-                                                                            receiverId: supplier.id,
-                                                                        }),
-                                                                    });
-                                                                    toast.success('Message sent to supplier');
-                                                                } catch {
-                                                                    toast.error('Failed to send message');
-                                                                }
-                                                            }}
+                                                        <Link
+                                                            href={`/admin/support?search=${supplier.id}`}
                                                             className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                                                            title="Open Atlantis Talk conversation with this supplier"
                                                         >
                                                             💬 Message supplier
-                                                        </button>
+                                                        </Link>
                                                     )}
                                                 </div>
                                             </div>
@@ -827,14 +809,28 @@ export default function AdminOrderDetailPage() {
                             <p className="text-[13px] font-bold text-teal-600">Atlantis Marketplace</p>
                         </div>
 
-                        {/* Contact Customer button */}
-                        <button
-                            onClick={() => setChatOpen(true)}
-                            className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#0B1F3A] hover:bg-[#1a3a6b] text-white font-bold text-[13px] rounded-2xl transition-all shadow-sm"
-                        >
-                            <MessageSquare size={16} />
-                            Contact Customer
-                        </button>
+                        {/* Contact Customer — opens the full Support tab with
+                            this customer already selected. We send the admin
+                            to /admin/support?search=<id> rather than popping
+                            a tiny modal so the conversation lives in the
+                            normal Atlantis Talk thread on the right pane. */}
+                        {order.customer?.id ? (
+                            <Link
+                                href={`/admin/support?search=${order.customer.id}`}
+                                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#0B1F3A] hover:bg-[#1a3a6b] text-white font-bold text-[13px] rounded-2xl transition-all shadow-sm"
+                            >
+                                <MessageSquare size={16} />
+                                Contact Customer
+                            </Link>
+                        ) : (
+                            <button
+                                onClick={() => setChatOpen(true)}
+                                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#0B1F3A] hover:bg-[#1a3a6b] text-white font-bold text-[13px] rounded-2xl transition-all shadow-sm"
+                            >
+                                <MessageSquare size={16} />
+                                Contact Customer
+                            </button>
+                        )}
                     </section>
 
                     {/* Order Chat Modal */}

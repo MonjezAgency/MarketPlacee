@@ -389,12 +389,33 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
 
                 {messages.map((msg, idx) => {
                     const isMine = (msg.senderId === user?.id) && !msg.isBot;
-                    
+                    // Auto-close rule: if the gap between this message and
+                    // the previous one is > 10 minutes, the previous chat
+                    // is considered "closed" and a new one starts here.
+                    // We render a divider so operators + customers see the
+                    // boundary clearly — matches the operator instruction:
+                    // "بعد عشر دقايق Conversation بتخلص وتبدأ واحدة جديدة".
+                    const prev = idx > 0 ? messages[idx - 1] : null;
+                    const gapMs = prev ? (new Date(msg.createdAt).getTime() - new Date(prev.createdAt).getTime()) : 0;
+                    const isNewConversation = !!prev && gapMs > 10 * 60 * 1000;
+
                     return (
-                        <div
-                            key={msg.id}
-                            className={cn("flex w-full gap-3", isMine ? "justify-end" : "justify-start")}
-                        >
+                        <React.Fragment key={msg.id}>
+                            {isNewConversation && (
+                                <div className="flex items-center gap-3 my-4 px-2">
+                                    <div className={cn("flex-1 h-px", isLight ? "bg-slate-200" : "bg-white/10")} />
+                                    <span className={cn(
+                                        "text-[9px] font-black uppercase tracking-[0.2em] px-3 py-1 rounded-full",
+                                        isLight ? "bg-slate-100 text-slate-500" : "bg-white/5 text-white/50",
+                                    )}>
+                                        — New conversation —
+                                    </span>
+                                    <div className={cn("flex-1 h-px", isLight ? "bg-slate-200" : "bg-white/10")} />
+                                </div>
+                            )}
+                            <div
+                                className={cn("flex w-full gap-3", isMine ? "justify-end" : "justify-start")}
+                            >
                             {!isMine && (
                                 <div className={cn(
                                     "w-8 h-8 rounded-full flex items-center justify-center shrink-0 mt-1 border",
@@ -423,7 +444,8 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
                                     {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             </div>
-                        </div>
+                            </div>
+                        </React.Fragment>
                     );
                 })}
                 </AnimatePresence>

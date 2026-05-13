@@ -41,12 +41,20 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
 
             const categories = Array.from(new Set(items.map(item => item.category).filter(Boolean)));
             const excludeIds = items.map(item => item.id);
+            // Operator rule: cart suggestions should mix same-category +
+            // same-supplier so buyers can consolidate one supplier's
+            // shipment (e.g. all from Egypt) instead of pulling from
+            // multiple origins. Backend splits the limit 50/50 across
+            // the two motives + dedupes.
+            const supplierIds = Array.from(new Set(items.map(item => item.supplierId).filter(Boolean)));
 
             setIsLoading(true);
             try {
                 const params = new URLSearchParams();
                 params.append('categories', categories.join(','));
                 params.append('excludeIds', excludeIds.join(','));
+                if (supplierIds.length) params.append('supplierIds', supplierIds.join(','));
+                params.append('limit', '10');
 
                 const res = await apiFetch(`/products/cart/recommendations?${params.toString()}`, {
                     signal: controller.signal

@@ -1303,49 +1303,82 @@ export class ProductsService {
         });
     }
 
-    async findRecommendations(categories: string[], excludeIds: string[], limit: number = 4) {
-        // Fetch up to 10 random approved products from these categories, not matching excluded IDs
-        let products = await this.prisma.product.findMany({
-            where: {
-                status: ProductStatus.APPROVED,
-                category: {
-                    in: categories,
-                },
-                id: {
-                    notIn: excludeIds,
-                }
-            },
-            take: 10,
-        });
+    async findRecommendations(
+        categories: string[],
+        excludeIds: string[],
+        limit: number = 10,
+        supplierIds: string[] = [],
+    ) {
+        const hasImage = (p: any) =>
+            !!p?.name?.trim() && Array.isArray(p?.images) && p.images.some((img: any) => img && String(img).trim() !== '');
 
-        // Filter for quality: must have name and at least one real image
-        let filtered = products.filter(p => 
-            p.name && 
-            p.name.trim() !== '' && 
-            p.images && 
-            p.images.some(img => img && img.trim() !== '')
-        );
+        // Operator rule: cart suggestions should mix two motives —
+        //   half from the same CATEGORY (so the buyer rounds out the
+        //     order with related items)
+        //   half from the same SUPPLIER (so they consolidate one
+        //     supplier's shipment instead of a multi-origin order)
+        // We split the requested `limit` 50/50 and dedupe in the final pass.
+        const halfCat = Math.ceil(limit / 2);
+        const halfSup = limit - halfCat;
 
-        if (filtered.length < limit) {
-            const fallback = await this.prisma.product.findMany({
+        // ── (a) Same-category bucket ───────────────────────────────
+        const sameCategory = categories.length > 0
+            ? await this.prisma.product.findMany({
                 where: {
                     status: ProductStatus.APPROVED,
-                    id: { notIn: [...excludeIds, ...filtered.map(p => p.id)] }
+                    category: { in: categories },
+                    id: { notIn: excludeIds },
                 },
-                take: limit - filtered.length + 5,
-            });
-            const fallbackFiltered = fallback.filter(p => 
-                p.name && 
-                p.name.trim() !== '' && 
-                p.images && 
-                p.images.some(img => img && img.trim() !== '')
-            );
-            filtered = [...filtered, ...fallbackFiltered];
+                take: halfCat * 3,
+            })
+            : [];
+
+        // ── (b) Same-supplier bucket ───────────────────────────────
+        const sameSupplier = supplierIds.length > 0
+            ? await this.prisma.product.findMany({
+                where: {
+                    status: ProductStatus.APPROVED,
+                    supplierId: { in: supplierIds },
+                    id: { notIn: excludeIds },
+                },
+                take: halfSup * 3,
+            })
+            : [];
+
+        // Shuffle each bucket independently and pick the target slice.
+        const shuffle = <T,>(arr: T[]) => arr.slice().sort(() => 0.5 - Math.random());
+        const pickedCat = shuffle(sameCategory.filter(hasImage)).slice(0, halfCat);
+        const pickedSup = shuffle(sameSupplier.filter(hasImage)).slice(0, halfSup);
+
+        // Merge + dedupe by id (a product can match both buckets).
+        const merged: any[] = [];
+        const seen = new Set<string>();
+        for (const p of [...pickedSup, ...pickedCat]) {
+            if (seen.has(p.id)) continue;
+            seen.add(p.id);
+            merged.push(p);
         }
 
-        // Shuffle the results and take the requested limit for random variety
-        const shuffled = filtered.sort(() => 0.5 - Math.random());
-        return shuffled.slice(0, limit);
+        // ── (c) Fallback if we still don't have enough — pull random
+        //        approved products to fill the remaining slots.
+        if (merged.length < limit) {
+            const fillerIds = [...excludeIds, ...merged.map(p => p.id)];
+            const filler = await this.prisma.product.findMany({
+                where: {
+                    status: ProductStatus.APPROVED,
+                    id: { notIn: fillerIds },
+                },
+                take: (limit - merged.length) * 3,
+            });
+            for (const p of shuffle(filler.filter(hasImage))) {
+                if (merged.length >= limit) break;
+                if (seen.has(p.id)) continue;
+                seen.add(p.id);
+                merged.push(p);
+            }
+        }
+
+        return merged.slice(0, limit);
     }
 
     async fixupIncompleteProducts() {

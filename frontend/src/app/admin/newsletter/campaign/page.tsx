@@ -162,6 +162,26 @@ function renderBlock(b: Block): string {
     return '';
 }
 
+/**
+ * Body-only render — what we actually send to the backend.
+ *
+ * The backend (`newsletter.service.ts`) wraps incoming campaign HTML
+ * in a canonical Atlantis shell (header + footer + outer 640px table).
+ * If the frontend ALSO sends a full shell, we end up double-nested:
+ * the backend's shell renders, but the inner shell becomes plain text
+ * inside it (the "ATLANTIS FMCG ✉ Info@... Hello, Thank you…" run-on
+ * paragraph the operator kept seeing).
+ *
+ * So `handleSend` sends `renderBodyOnly(blocks)` — just the block rows
+ * inside one `<table>` — and lets the backend supply the shell. The
+ * iframe preview keeps using buildEmailHtml() since it needs the full
+ * document to render in isolation.
+ */
+function renderBodyOnly(blocks: Block[]): string {
+    const bodyRows = blocks.map(renderBlock).join('\n');
+    return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">${bodyRows}</table>`;
+}
+
 function buildEmailHtml(blocks: Block[]): string {
     // Body rows are now bare `<tr>` rows (renderBlock wraps each block
     // in a row), so the body slot lives directly inside the main 640px
@@ -360,7 +380,13 @@ export default function CampaignBuilderPage() {
         } as Partial<ProductBlock>);
     };
 
+    // Full document — used by the iframe preview only.
     const html = React.useMemo(() => buildEmailHtml(blocks), [blocks]);
+    // Body-only — what the backend actually receives. The backend wraps
+    // this in the canonical Atlantis shell (header + footer). Sending the
+    // full document here caused the body to render as plain text inside
+    // a second nested shell.
+    const bodyHtml = React.useMemo(() => renderBodyOnly(blocks), [blocks]);
 
     const handleSend = async () => {
         if (!subject.trim()) return toast.error('Subject is required');
@@ -369,7 +395,7 @@ export default function CampaignBuilderPage() {
         try {
             const res = await apiFetch('/newsletter/send-campaign', {
                 method: 'POST',
-                body: JSON.stringify({ subject, html, audience }),
+                body: JSON.stringify({ subject, html: bodyHtml, audience }),
             });
             if (res.ok) {
                 const r = await res.json();
