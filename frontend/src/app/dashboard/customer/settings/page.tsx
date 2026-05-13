@@ -55,8 +55,17 @@ export default function SettingsPage() {
     const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
+        // Client-side guards BEFORE hitting the API so the customer
+        // gets an instant, specific reason — not a generic "Upload
+        // failed" from the server bouncing back.
+        if (!file.type.startsWith('image/')) {
+            toast.error('Only image files are allowed (JPG, PNG, WebP).');
+            if (fileInputRef.current) fileInputRef.current.value = '';
+            return;
+        }
         if (file.size > 4 * 1024 * 1024) {
-            toast.error('Image too large (max 4 MB)');
+            toast.error(`Image is ${(file.size / 1024 / 1024).toFixed(1)} MB — max is 4 MB. Try a smaller file.`);
+            if (fileInputRef.current) fileInputRef.current.value = '';
             return;
         }
         setAvatarUploading(true);
@@ -64,7 +73,19 @@ export default function SettingsPage() {
             const fd = new FormData();
             fd.append('file', file);
             const res = await apiFetch('/users/me/avatar', { method: 'POST', body: fd });
-            if (!res.ok) throw new Error('Upload failed');
+            if (!res.ok) {
+                // Surface the REAL server message (e.g. "Supabase bucket
+                // does not exist", "service role key invalid", etc.)
+                // instead of swallowing it as a generic "Upload failed".
+                let detail = '';
+                try {
+                    const errJson = await res.json();
+                    detail = errJson?.message || '';
+                } catch {
+                    try { detail = await res.text(); } catch { /* noop */ }
+                }
+                throw new Error(detail || `Upload failed (HTTP ${res.status})`);
+            }
             const data = await res.json();
             setAvatarUrl(data.url);
             toast.success('Profile picture updated');

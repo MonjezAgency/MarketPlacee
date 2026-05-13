@@ -48,6 +48,16 @@ export class SupabaseStorageService implements OnModuleInit {
         originalName: string,
         mimeType: string,
     ): Promise<string> {
+        // Fail fast with an actionable message if Supabase env vars are
+        // missing — previously this produced an opaque
+        // "Failed to upload product image" 500 with no clue why, and
+        // customers saw a generic "Upload failed" toast on avatar upload.
+        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            const reason = 'Image upload service is not configured on the server. Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY on Railway and redeploy.';
+            this.logger.error(`[PRODUCT_UPLOAD_FAIL] ${reason}`);
+            throw new InternalServerErrorException(reason);
+        }
+
         const ext = extname(originalName) || '.jpg';
         const uniqueName = `${crypto.randomBytes(16).toString('hex')}${ext}`;
         const storagePath = `public/${uniqueName}`;
@@ -60,8 +70,13 @@ export class SupabaseStorageService implements OnModuleInit {
             });
 
         if (error) {
-            this.logger.error(`[PRODUCT_UPLOAD_FAIL] ${error.message}`);
-            throw new InternalServerErrorException('Failed to upload product image.');
+            // Surface the real Supabase error to the API consumer instead
+            // of swallowing it. Common causes: bucket doesn't exist,
+            // RLS policy blocking the service role, file too large.
+            this.logger.error(`[PRODUCT_UPLOAD_FAIL] ${error.message}`, error);
+            throw new InternalServerErrorException(
+                `Image upload failed: ${error.message}. Check Supabase bucket "${PRODUCT_BUCKET}" exists + service role key is valid.`,
+            );
         }
 
         const { data } = this.client.storage
