@@ -132,7 +132,7 @@ export class OrdersController {
     }
 
     @Patch(':id/status')
-    @Roles(Role.SUPPLIER, Role.ADMIN)
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS)
     @UseGuards(PolicyGuard)
     @CheckOwnership('ORDER')
     async updateStatus(
@@ -141,6 +141,18 @@ export class OrdersController {
         @Body('reason') reason: string,
         @Request() req,
     ) {
+        // Suppliers can ONLY transition an order from PENDING →
+        // PROCESSING (Confirm). SHIPPED / DELIVERED / CANCELLED are
+        // admin/logistics responsibilities — keep the supplier from
+        // bypassing the UI lock by hitting the API directly.
+        const callerRole = String(req.user?.role || '').toUpperCase();
+        if (callerRole === 'SUPPLIER') {
+            if (status !== OrderStatus.PROCESSING) {
+                throw new ForbiddenException(
+                    'Suppliers can only confirm orders (PENDING → PROCESSING). Shipping and delivery transitions are handled by admin/logistics.',
+                );
+            }
+        }
         // reason is optional, service handles default
         const order = await this.ordersService.updateStatus(
             id,

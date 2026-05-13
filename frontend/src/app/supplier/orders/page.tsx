@@ -31,14 +31,17 @@ const STATUS_STYLES: Record<OrderStatus, string> = {
     CANCELLED: 'bg-red-500/10 text-red-400 border-red-500/20',
 };
 
+// Suppliers can ONLY move PENDING → PROCESSING (Confirm Order).
+// Marking an order as SHIPPED is now an admin/logistics responsibility
+// per operator request — the carrier assignment + tracking number live
+// in /admin/orders, so the "Mark as Shipped" button has been removed
+// from the supplier-facing table. Suppliers stop after they confirm.
 const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
     PENDING: 'PROCESSING',
-    PROCESSING: 'SHIPPED',
 };
 
 const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
     PENDING: 'Confirm Order',
-    PROCESSING: 'Mark as Shipped',
 };
 
 export default function SupplierOrdersPage() {
@@ -74,12 +77,12 @@ export default function SupplierOrdersPage() {
             });
             if (res.ok) {
                 setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+                // Suppliers only confirm orders now — SHIPPED is handled
+                // by admin/logistics. Toast wording reflects that.
                 toast.success(
                     status === 'PROCESSING'
                         ? 'Order confirmed — admin has been notified.'
-                        : status === 'SHIPPED'
-                            ? 'Marked as shipped — customer notified.'
-                            : `Order updated to ${status}.`
+                        : `Order updated to ${status}.`
                 );
             } else {
                 const err = await res.json().catch(() => null);
