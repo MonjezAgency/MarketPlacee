@@ -19,8 +19,13 @@ export class PolicyGuard implements CanActivate {
             return false;
         }
 
-        // Admins bypass all ownership checks
-        if (user.role === 'ADMIN') {
+        // Staff bypass — anyone with a platform-management role skips
+        // the ownership check. Previously only ADMIN bypassed, which
+        // meant OWNER/MODERATOR/SUPPORT users hit a "You do not have
+        // permission to access this resource" 403 even though they
+        // legitimately manage every order/product on the platform.
+        const role = String(user.role || '').toUpperCase();
+        if (['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'LOGISTICS'].includes(role)) {
             return true;
         }
 
@@ -50,13 +55,44 @@ export class PolicyGuard implements CanActivate {
                 });
                 isOwner = product?.supplierId === user.sub;
                 break;
-            case 'ORDER':
+            case 'ORDER': {
+                // An order has TWO legitimate owners: the customer who
+                // placed it AND every supplier whose products appear in
+                // it. Previously only the customer was checked, so the
+                // supplier clicked "Confirm Order" → PATCH bounced back
+                // with a 403 → frontend showed "You do not have
+                // permission to access this resource". Now both paths
+                // pass.
                 const order = await this.prisma.order.findUnique({
                     where: { id: resourceId },
-                    select: { customerId: true },
+                    select: {
+                        customerId: true,
+                        supplierId: true,
+                        items: {
+                            select: { product: { select: { supplierId: true } } },
+                        },
+                    },
                 });
-                isOwner = order?.customerId === user.sub;
+                if (!order) {
+                    isOwner = false;
+                    break;
+                }
+                if (order.customerId === user.sub) {
+                    isOwner = true;
+                    break;
+                }
+                // Direct supplierId on the order (set when the order was
+                // routed to a single supplier).
+                if (order.supplierId && order.supplierId === user.sub) {
+                    isOwner = true;
+                    break;
+                }
+                // Otherwise: does the caller supply any product on the
+                // order? That's how multi-supplier orders qualify the
+                // supplier as an "owner of the line they care about".
+                isOwner = order.items.some(it => it.product?.supplierId === user.sub);
                 break;
+            }
             // Add more resources as needed
         }
 
