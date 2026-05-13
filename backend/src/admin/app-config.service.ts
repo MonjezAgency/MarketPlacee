@@ -214,47 +214,47 @@ export class AppConfigService {
      * via /config/homepage-banners; admin reads + writes via the
      * /admin/config/homepage-banners endpoint pair.
      */
-    async getHomepageBanners(): Promise<Record<string, any[]>> {
+    /**
+     * Each section now stores not just the ordered banner list but
+     * also rotation behaviour:
+     *   { items: BannerData[], animated: boolean, intervalMs: number }
+     * Legacy shapes (raw array OR a single object) are coerced into the
+     * new envelope on read so old saves keep working.
+     */
+    async getHomepageBanners(): Promise<Record<string, any>> {
         const config = await this.prisma.appConfig.findUnique({
             where: { key: 'HOMEPAGE_BANNERS' },
         });
         if (!config || !config.value) return {};
         try {
             const raw = JSON.parse(config.value);
-            // Normalize legacy single-object slot shape into the new
-            // array shape on read, so the frontend never sees both.
-            const out: Record<string, any[]> = {};
-            for (const [slot, value] of Object.entries(raw || {})) {
-                if (Array.isArray(value)) out[slot] = value;
-                else if (value && typeof value === 'object') out[slot] = [value];
-            }
-            return out;
+            return normalizeBannerMap(raw);
         } catch { return {}; }
     }
 
     async setHomepageBanners(data: Record<string, any>) {
-        // Each slot now stores an ORDERED ARRAY of banners (carousel /
-        // rotation). The order in the array is the order shown on the
-        // live homepage. We also accept the legacy single-object shape
-        // ({ imageUrl, linkUrl, alt }) and silently coerce it to a
-        // one-element array so old saves keep working.
-        const cleaned: Record<string, any[]> = {};
+        const cleaned: Record<string, any> = {};
         for (const [slot, value] of Object.entries(data || {})) {
-            const arr = Array.isArray(value)
-                ? value
-                : (value && typeof value === 'object' ? [value] : []);
-            const validated: any[] = [];
-            for (const item of arr) {
+            // Accept either { items, animated, intervalMs }, a raw array,
+            // or a legacy single object. Coerce to the new envelope.
+            const envelope = wrapAsEnvelope(value);
+            const items: any[] = [];
+            for (const item of envelope.items || []) {
                 if (!item || typeof item !== 'object') continue;
                 if (!('imageUrl' in item) || !item.imageUrl) continue;
-                validated.push({
+                items.push({
                     imageUrl: String(item.imageUrl),
                     linkUrl: item.linkUrl ? String(item.linkUrl) : null,
                     alt: item.alt ? String(item.alt) : '',
                     updatedAt: new Date().toISOString(),
                 });
             }
-            if (validated.length > 0) cleaned[slot] = validated;
+            if (items.length === 0) continue;
+            cleaned[slot] = {
+                items,
+                animated: !!envelope.animated,
+                intervalMs: Math.max(1000, Math.min(60_000, Number(envelope.intervalMs) || 5000)),
+            };
         }
         await this.prisma.appConfig.upsert({
             where: { key: 'HOMEPAGE_BANNERS' },
@@ -306,4 +306,40 @@ export class AppConfigService {
         });
         return { content, version: v, updatedAt: now };
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// Helpers shared between read/write so the legacy shapes (raw array, raw
+// single object) get folded into the new { items, animated, intervalMs }
+// envelope on every code path.
+// ─────────────────────────────────────────────────────────────────────────
+function wrapAsEnvelope(value: any): { items: any[]; animated: boolean; intervalMs: number } {
+    if (!value) return { items: [], animated: false, intervalMs: 5000 };
+    if (Array.isArray(value)) {
+        return { items: value, animated: false, intervalMs: 5000 };
+    }
+    if (typeof value === 'object') {
+        // New envelope shape
+        if ('items' in value && Array.isArray(value.items)) {
+            return {
+                items: value.items,
+                animated: !!value.animated,
+                intervalMs: Number(value.intervalMs) || 5000,
+            };
+        }
+        // Legacy single-banner object → wrap as one-item list
+        if ('imageUrl' in value) {
+            return { items: [value], animated: false, intervalMs: 5000 };
+        }
+    }
+    return { items: [], animated: false, intervalMs: 5000 };
+}
+
+function normalizeBannerMap(raw: any): Record<string, any> {
+    const out: Record<string, any> = {};
+    for (const [slot, value] of Object.entries(raw || {})) {
+        const env = wrapAsEnvelope(value);
+        if (env.items.length > 0) out[slot] = env;
+    }
+    return out;
 }

@@ -56,12 +56,25 @@ export class AppController {
         if (!config?.value) return {};
         try {
             const raw = JSON.parse(config.value);
-            // Normalize legacy single-object slot shape → array, so
-            // public consumers (homepage) only need one render path.
-            const out: Record<string, any[]> = {};
+            // Normalize legacy shapes → new envelope so the homepage
+            // only needs one render path.
+            const out: Record<string, any> = {};
             for (const [slot, value] of Object.entries(raw || {})) {
-                if (Array.isArray(value)) out[slot] = value;
-                else if (value && typeof value === 'object') out[slot] = [value];
+                if (!value) continue;
+                if (Array.isArray(value)) {
+                    out[slot] = { items: value, animated: false, intervalMs: 5000 };
+                } else if (typeof value === 'object') {
+                    const obj = value as any;
+                    if (Array.isArray(obj.items)) {
+                        out[slot] = {
+                            items: obj.items,
+                            animated: !!obj.animated,
+                            intervalMs: Number(obj.intervalMs) || 5000,
+                        };
+                    } else if ('imageUrl' in obj) {
+                        out[slot] = { items: [obj], animated: false, intervalMs: 5000 };
+                    }
+                }
             }
             return out;
         } catch { return {}; }
