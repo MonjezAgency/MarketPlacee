@@ -48,6 +48,15 @@ export class AppController {
         return this.appService.getPublicMarkup();
     }
 
+    @Get('config/homepage-banners')
+    async getPublicHomepageBanners() {
+        const config = await this.prisma.appConfig.findUnique({
+            where: { key: 'HOMEPAGE_BANNERS' },
+        });
+        if (!config?.value) return {};
+        try { return JSON.parse(config.value); } catch { return {}; }
+    }
+
     @Get('config/terms')
     async getPublicTerms() {
         const [body, version, updatedAt] = await Promise.all([

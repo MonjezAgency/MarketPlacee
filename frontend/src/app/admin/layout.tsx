@@ -49,6 +49,7 @@ import {
     Activity,
     CheckCircle2,
     ScrollText,
+    Image as ImageIcon,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -63,7 +64,7 @@ interface SidebarGroup {
     title: string;
     titleKey: string;
     icon: React.ElementType;
-    links: { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean }[];
+    links: { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean }[];
 }
 
 // Owner-only group — بيظهر بس لـ OWNER
@@ -99,7 +100,16 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             { label: 'Newsletter Hub', translationKey: 'newsletter', href: '/admin/newsletter', icon: MessageCircle },
             { label: 'Email Analytics', translationKey: 'emailAnalytics', href: '/admin/email-analytics', icon: Activity },
             { label: 'Coupons & Codes', translationKey: 'coupons', href: '/admin/coupons', icon: Ticket },
-            { label: 'Ads & Placements', translationKey: 'ads', href: '/admin/placements', icon: Star },
+            // Homepage banners — visual placement map where admin clicks
+            // a section, sees the recommended dimensions, and uploads /
+            // swaps the image inline. Same UX as the old supplier ads
+            // map but for static homepage hero / featured banners.
+            { label: 'Homepage Banners', translationKey: 'homepageBanners', href: '/admin/banners', icon: ImageIcon },
+            // Ads & Placements is paused — full self-service ads flow will
+            // return after the bidding engine is in place. Renders as a
+            // disabled "SOON" pill so the operator can still see it on
+            // the roadmap but can't click into a half-built page.
+            { label: 'Ads & Placements', translationKey: 'ads', href: '/admin/placements', icon: Star, soon: true },
         ]
     },
     {
@@ -207,7 +217,28 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
                     {group.links.map((link) => {
                         const Icon = link.icon;
                         const isActive = pathname === link.href;
-                        
+                        // Links flagged with `soon: true` render as a
+                        // visually-disabled row with a SOON pill — no
+                        // navigation, just a roadmap signal.
+                        if (link.soon) {
+                            return (
+                                <div
+                                    key={link.href}
+                                    aria-disabled="true"
+                                    className="flex items-center justify-between px-4 h-[44px] text-[14px] font-medium rounded-xl text-slate-500 opacity-70 cursor-not-allowed select-none"
+                                    title="Coming soon"
+                                >
+                                    <div className="flex items-center gap-3">
+                                        <Icon size={18} />
+                                        <span>{t('admin', link.translationKey) || link.label}</span>
+                                    </div>
+                                    <span className="text-[9px] font-black uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                        Soon
+                                    </span>
+                                </div>
+                            );
+                        }
+
                         return (
                             <Link
                                 key={link.href}

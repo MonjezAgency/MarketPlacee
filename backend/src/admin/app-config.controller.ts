@@ -107,4 +107,15 @@ export class AppConfigController {
     async setTerms(@Body() body: { content: string; version?: string }) {
         return this.appConfigService.setTerms(body.content || '', body.version);
     }
+
+    // ── Homepage banner slots ─────────────────────────────────────────────
+    @Get('homepage-banners')
+    async getHomepageBanners() {
+        return this.appConfigService.getHomepageBanners();
+    }
+
+    @Post('homepage-banners')
+    async setHomepageBanners(@Body() body: Record<string, any>) {
+        return this.appConfigService.setHomepageBanners(body || {});
+    }
 }

@@ -207,6 +207,43 @@ export class AppConfigService {
         }
     }
 
+    /**
+     * Homepage banner map — the visual placement editor at /admin/banners.
+     * Stores a JSON map keyed by slot id ("hero", "promo-1", "promo-2", …)
+     * with { imageUrl, linkUrl, alt, updatedAt }. Public readers fetch
+     * via /config/homepage-banners; admin reads + writes via the
+     * /admin/config/homepage-banners endpoint pair.
+     */
+    async getHomepageBanners(): Promise<Record<string, any>> {
+        const config = await this.prisma.appConfig.findUnique({
+            where: { key: 'HOMEPAGE_BANNERS' },
+        });
+        if (!config || !config.value) return {};
+        try { return JSON.parse(config.value); } catch { return {}; }
+    }
+
+    async setHomepageBanners(data: Record<string, any>) {
+        // Drop empty slots so the JSON stays compact. An empty string
+        // / null in imageUrl deletes the slot from the saved map.
+        const cleaned: Record<string, any> = {};
+        for (const [slot, value] of Object.entries(data || {})) {
+            if (!value || typeof value !== 'object') continue;
+            if (!('imageUrl' in value) || !value.imageUrl) continue;
+            cleaned[slot] = {
+                imageUrl: String(value.imageUrl),
+                linkUrl: value.linkUrl ? String(value.linkUrl) : null,
+                alt: value.alt ? String(value.alt) : '',
+                updatedAt: new Date().toISOString(),
+            };
+        }
+        await this.prisma.appConfig.upsert({
+            where: { key: 'HOMEPAGE_BANNERS' },
+            create: { key: 'HOMEPAGE_BANNERS', value: JSON.stringify(cleaned) },
+            update: { value: JSON.stringify(cleaned) },
+        });
+        return cleaned;
+    }
+
     async setAdPlacements(data: any) {
         return this.prisma.appConfig.upsert({
             where: { key: 'AD_PLACEMENTS' },
