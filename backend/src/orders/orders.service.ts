@@ -772,7 +772,21 @@ export class OrdersService {
                                 category: true, ean: true, unit: true,
                                 unitsPerCase: true, casesPerPallet: true,
                                 unitsPerPallet: true, palletsPerShipment: true,
-                                shelfLife: true, weight: true,
+                                shelfLife: true, weight: true, stock: true,
+                                exwLocation: true, origin: true,
+                                // Pull the supplier with contact details so the
+                                // admin order page can render a per-item
+                                // "Contact Supplier" panel + portfolio link.
+                                // Operator workflow: admin sees the order →
+                                // pings the supplier to confirm they have the
+                                // stock → only after the supplier confirms
+                                // does the admin move the order to PROCESSING.
+                                supplier: {
+                                    select: {
+                                        id: true, name: true, email: true, phone: true,
+                                        companyName: true, country: true,
+                                    },
+                                },
                             },
                         },
                     },

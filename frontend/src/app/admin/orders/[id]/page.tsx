@@ -47,6 +47,21 @@ type AdminOrderItem = {
         palletsPerShipment?: number;
         shelfLife?: string;
         images?: string[];
+        stock?: number;
+        exwLocation?: string;
+        origin?: string;
+        // Supplier the listing belongs to. Admin uses this to ping
+        // the supplier ("do you have N cases in stock?") before
+        // confirming the order. Optional because legacy orders
+        // pre-date the include — and a deleted product carries null.
+        supplier?: {
+            id: string;
+            name: string;
+            email?: string;
+            phone?: string;
+            companyName?: string;
+            country?: string;
+        } | null;
     };
 };
 
@@ -430,18 +445,107 @@ export default function AdminOrderDetailPage() {
                             if (p.unitsPerPallet) specs.push(['Pcs / Pallet', String(p.unitsPerPallet)]);
                             if (p.palletsPerShipment) specs.push(['Pallets / Truck', String(p.palletsPerShipment)]);
                             if (p.shelfLife) specs.push(['BBD', String(p.shelfLife)]);
-                            if (specs.length === 0) return null;
+                            if (typeof p.stock === 'number') specs.push(['Stock', `${p.stock} cases`]);
+                            if (p.exwLocation) specs.push(['EXW · Currently In', String(p.exwLocation)]);
+                            if (p.origin) specs.push(['Country of Origin', String(p.origin)]);
+                            const supplier = (p as any).supplier as AdminOrderItem['product'] extends { supplier?: infer S } ? S : any;
+                            const hasSupplier = supplier && (supplier.id || supplier.name);
+                            if (specs.length === 0 && !hasSupplier) return null;
                             return (
-                                <div key={`specs-${it.id}`} className="mt-4 p-4 bg-slate-50/60 border border-slate-100 rounded-xl">
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">{p.name} — specifications</p>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                        {specs.map(([k, v]) => (
-                                            <div key={k}>
-                                                <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{k}</p>
-                                                <p className="text-[12px] font-bold text-slate-800 mt-0.5">{v}</p>
+                                <div key={`specs-${it.id}`} className="mt-4 space-y-3">
+                                    {specs.length > 0 && (
+                                        <div className="p-4 bg-slate-50/60 border border-slate-100 rounded-xl">
+                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">{p.name} — specifications</p>
+                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                                                {specs.map(([k, v]) => (
+                                                    <div key={k}>
+                                                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{k}</p>
+                                                        <p className="text-[12px] font-bold text-slate-800 mt-0.5">{v}</p>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
-                                    </div>
+                                        </div>
+                                    )}
+
+                                    {/* ── Supplier panel ──
+                                        Operator workflow: admin checks each line's
+                                        supplier, pings them to confirm stock, then
+                                        flips the order to PROCESSING. This card
+                                        surfaces every supplier-side contact path:
+                                          • Portfolio link  → /admin/suppliers?id=…
+                                                              (admin sees this supplier's
+                                                              full catalog in context)
+                                          • All listings    → /admin/products?supplierId=…
+                                                              (zoom into the supplier's
+                                                              product table)
+                                          • Email           → mailto: with a pre-filled
+                                                              subject referencing the
+                                                              order id, so the supplier
+                                                              knows exactly which order
+                                                              to confirm
+                                          • Phone           → tel: link
+                                        Customer-facing data stays masked elsewhere
+                                        but the admin sees the supplier in full.
+                                    */}
+                                    {hasSupplier && (
+                                        <div className="p-4 bg-blue-50/40 border border-blue-100 rounded-xl">
+                                            <div className="flex items-start justify-between gap-4 flex-wrap">
+                                                <div className="min-w-0">
+                                                    <p className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1">Supplier · {p.name}</p>
+                                                    <p className="text-[14px] font-bold text-slate-900">
+                                                        {supplier?.companyName || supplier?.name || 'Unknown supplier'}
+                                                    </p>
+                                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 mt-1">
+                                                        {supplier?.country && (
+                                                            <span>📍 {supplier.country}</span>
+                                                        )}
+                                                        {supplier?.email && (
+                                                            <a
+                                                                href={`mailto:${supplier.email}?subject=${encodeURIComponent(`Atlantis · order ${order.id.slice(0, 8)} — please confirm stock for "${p.name}"`)}&body=${encodeURIComponent(`Hi ${supplier.name || ''},\n\nWe just received an order on Atlantis that includes "${p.name}" (${it.quantity} ${(it as any).selectedTier || p.unit || 'units'}). Could you confirm you have the stock ready to ship?\n\nOnce you confirm, we'll process the order on our side.\n\nThanks,\nAtlantis Operations`)}`}
+                                                                className="text-blue-700 hover:underline font-semibold"
+                                                            >
+                                                                ✉ {supplier.email}
+                                                            </a>
+                                                        )}
+                                                        {supplier?.phone && (
+                                                            <a
+                                                                href={`tel:${supplier.phone}`}
+                                                                className="text-blue-700 hover:underline font-semibold"
+                                                            >
+                                                                📞 {supplier.phone}
+                                                            </a>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    {supplier?.id && (
+                                                        <>
+                                                            <Link
+                                                                href={`/admin/suppliers?id=${supplier.id}`}
+                                                                className="h-9 px-3 rounded-lg bg-white border border-blue-200 hover:border-blue-400 text-blue-700 text-[12px] font-bold flex items-center gap-1.5 transition-colors"
+                                                            >
+                                                                Open portfolio →
+                                                            </Link>
+                                                            <Link
+                                                                href={`/admin/products?supplierId=${supplier.id}`}
+                                                                className="h-9 px-3 rounded-lg bg-white border border-blue-200 hover:border-blue-400 text-blue-700 text-[12px] font-bold flex items-center gap-1.5 transition-colors"
+                                                            >
+                                                                All their listings
+                                                            </Link>
+                                                        </>
+                                                    )}
+                                                    {supplier?.email && (
+                                                        <a
+                                                            href={`mailto:${supplier.email}?subject=${encodeURIComponent(`Atlantis · order ${order.id.slice(0, 8)} — please confirm stock for "${p.name}"`)}&body=${encodeURIComponent(`Hi ${supplier.name || ''},\n\nWe just received an order on Atlantis that includes "${p.name}" (${it.quantity} ${(it as any).selectedTier || p.unit || 'units'}). Could you confirm you have the stock ready to ship?\n\nOnce you confirm, we'll process the order on our side.\n\nThanks,\nAtlantis Operations`)}`}
+                                                            className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                                                        >
+                                                            ✉ Contact supplier
+                                                        </a>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             );
                         })}
