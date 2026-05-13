@@ -356,7 +356,14 @@ export default function HomePage() {
                         {BUSINESS_CATEGORIES.map((c) => (
                             <Link
                                 key={c.slug}
-                                href={`/categories/${c.slug}`}
+                                // BUG FIX: previous href `/categories/<slug>` 404'd
+                                // because there's no `[slug]` route — only the
+                                // `/categories` page with a `?category=` query
+                                // param. We now route to the filterable page
+                                // and pass the category NAME (the same value
+                                // products are tagged with in the DB) so the
+                                // filter sidebar pre-selects it on arrival.
+                                href={`/categories?category=${encodeURIComponent(c.name)}`}
                                 className="bg-white border border-[#E5E7EB] rounded-xl p-3 sm:p-4 flex flex-col items-center text-center gap-2 hover:border-[#14B8A6] hover:shadow-sm transition-all no-underline group"
                             >
                                 <div className="w-10 h-10 rounded-lg bg-[#F1F5F9] flex items-center justify-center text-[#14B8A6] group-hover:bg-[#14B8A6] group-hover:text-white transition-colors">
