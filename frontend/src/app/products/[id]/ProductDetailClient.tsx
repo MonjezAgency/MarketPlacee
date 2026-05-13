@@ -107,20 +107,15 @@ export default function ProductDetailClient() {
         const casesPerPallet  = p.casesPerPallet || 0;
         const piecesPerPallet = p.unitsPerPallet || (piecesPerCase * casesPerPallet) || 0;
         const palletsPerTruck = p.palletsPerShipment || 0;
-        const baseUnit        = String(p.unit || 'piece').toLowerCase();
 
-        // Reverse the supplier's stored unit into a per-piece base, then
-        // build a per-case base on top of it. Per-case is the canonical
-        // unit for the buyer-facing display.
+        // basePrice is ALWAYS the per-case price (the supplier form
+        // stores pricePerPiece × unitsPerCase). The old unit-aware
+        // reversal divided by pallet/truck pack sizes when `unit`
+        // happened to be "truck", which made €8.64/case render as
+        // €0.03/case on the public card. We now treat basePrice as
+        // the canonical per-case price across the platform.
         const rawBase = p.basePrice != null ? p.basePrice : p.price / markups.piece;
-        let basePerPiece = rawBase;
-        if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
-            basePerPiece = rawBase / piecesPerCase;
-        else if (baseUnit.includes('pallet') && piecesPerPallet > 0)
-            basePerPiece = rawBase / piecesPerPallet;
-        else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment') || baseUnit.includes('delivery')) && piecesPerPallet > 0 && palletsPerTruck > 0)
-            basePerPiece = rawBase / (piecesPerPallet * palletsPerTruck);
-
+        const basePerPiece = piecesPerCase > 0 ? rawBase / piecesPerCase : rawBase;
         const basePerCase = piecesPerCase > 0 ? basePerPiece * piecesPerCase : basePerPiece;
 
         // Per-case price for each tier (markup-only difference).

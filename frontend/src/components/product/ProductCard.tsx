@@ -129,21 +129,23 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const palletsPerTruck = product.palletsPerShipment || 0;
 
     // ── Resolve per-piece BASE price (supplier raw, before markup) ────────────
-    // Suppliers viewing their own product see raw base prices (no markup).
-    // Everyone else: derive base from product.basePrice or reverse from product.price ÷ piece markup.
-    const baseUnit = String(product.unit || 'piece').toLowerCase();
-
+    // Operator bug: the admin table showed €8.64/case for a KitKat
+    // listing but the public card rendered €0.03/case. Trace:
+    //   • Supplier form stores basePrice = pricePerPiece × unitsPerCase
+    //     i.e. ALWAYS the per-case price.
+    //   • Legacy reversal code divided by piecesPerPallet × palletsPerTruck
+    //     when `unit` was set to "truck" — turning €8.64 into €0.0009/piece
+    //     then × unitsPerCase = €0.01.
+    // Fix: `basePrice` is ALWAYS per-case on this platform. We derive
+    // per-piece by dividing by `unitsPerCase` only (or fall back to
+    // rawBase when the supplier hasn't filled unitsPerCase). The
+    // `unit` field is for display only — it does NOT change the
+    // pricing granularity anymore.
     const rawBase = isOwnProduct
         ? displayPrice
         : (product.basePrice != null ? product.basePrice : displayPrice / markups.piece);
 
-    let basePerPiece = rawBase;
-    if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
-        basePerPiece = rawBase / piecesPerCase;
-    else if (baseUnit.includes('pallet') && piecesPerPallet > 0)
-        basePerPiece = rawBase / piecesPerPallet;
-    else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment')) && piecesPerPallet > 0 && palletsPerTruck > 0)
-        basePerPiece = rawBase / (piecesPerPallet * palletsPerTruck);
+    const basePerPiece = piecesPerCase > 0 ? rawBase / piecesPerCase : rawBase;
 
     // Tier-specific markup multipliers (suppliers see base prices, no markup)
     const mPiece     = isOwnProduct ? 1 : markups.piece;

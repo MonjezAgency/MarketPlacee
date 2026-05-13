@@ -148,13 +148,37 @@ export default function AdminCouponsPage() {
             </div>
 
             <div className="max-w-[1440px] mx-auto px-8 py-6 space-y-6">
-                {/* KPI Cards Section */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-[16px]">
+                {/* KPI Cards Section — wired to REAL coupon data so the
+                    operator stops staring at the same fake "12 / 45 / 1284 /
+                    $42.5k" numbers. Active = !isExpired && isActive,
+                    Expired = isExpired, Redemptions = sum of usageCount,
+                    Revenue Impact stays hidden until we have order-level
+                    redemption history to compute it accurately. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-[16px]">
                     {[
-                        { label: 'Active Coupons', value: '12', icon: Zap, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-                        { label: 'Expired Coupons', value: '45', icon: Clock, color: 'text-slate-400', bg: 'bg-slate-50' },
-                        { label: 'Total Redemptions', value: '1,284', icon: Users, color: 'text-blue-500', bg: 'bg-blue-50' },
-                        { label: 'Revenue Impact', value: '$42.5k', icon: DollarSign, color: 'text-teal-600', bg: 'bg-teal-50' }
+                        {
+                            label: 'Active Coupons',
+                            value: String(coupons.filter(c => c.status === 'ACTIVE').length),
+                            icon: Zap,
+                            color: 'text-emerald-500',
+                            bg: 'bg-emerald-50',
+                        },
+                        {
+                            label: 'Expired Coupons',
+                            value: String(coupons.filter(c => c.status === 'EXPIRED').length),
+                            icon: Clock,
+                            color: 'text-slate-400',
+                            bg: 'bg-slate-50',
+                        },
+                        {
+                            label: 'Total Redemptions',
+                            value: coupons
+                                .reduce((sum, c) => sum + (Number(c.usageCount) || 0), 0)
+                                .toLocaleString(),
+                            icon: Users,
+                            color: 'text-blue-500',
+                            bg: 'bg-blue-50',
+                        },
                     ].map((card, i) => (
                         <div key={i} className="h-[110px] p-[20px] bg-white border border-[#E6EAF0] rounded-[16px] flex flex-col justify-between hover:shadow-md transition-shadow">
                             <div className="flex items-center justify-between">
