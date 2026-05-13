@@ -542,23 +542,19 @@ export default function ProductDetailClient() {
                                 const casesPerPallet = product.casesPerPallet || 0;
                                 const piecesPerPallet = product.unitsPerPallet || (piecesPerCase * casesPerPallet) || 0;
                                 const palletsPerTruck = product.palletsPerShipment || 0;
-                                const baseUnit = String(product.unit || 'piece').toLowerCase();
 
-                                // Resolve per-piece BASE (raw supplier price, no markup).
+                                // basePrice is ALWAYS the per-case price (the
+                                // supplier form stores `pricePerPiece × unitsPerCase`).
+                                // The previous unit-aware reversal divided by
+                                // pallet/truck pack sizes when `unit` happened
+                                // to be "truck" — which is what reduced KitKat
+                                // €9.07/case to €0.03/case on the PDP. We now
+                                // treat basePrice as canonical per-case (same
+                                // logic as the tierData useMemo above).
                                 const rawBase = product.basePrice != null
                                     ? product.basePrice
                                     : product.price / markups.piece;
-
-                                let basePerPiece = rawBase;
-                                if ((baseUnit.includes('case') || baseUnit.includes('carton') || baseUnit.includes('box')) && piecesPerCase > 0)
-                                    basePerPiece = rawBase / piecesPerCase;
-                                else if (baseUnit.includes('pallet') && piecesPerPallet > 0)
-                                    basePerPiece = rawBase / piecesPerPallet;
-                                else if ((baseUnit.includes('truck') || baseUnit.includes('container') || baseUnit.includes('shipment') || baseUnit.includes('delivery')) && piecesPerPallet > 0 && palletsPerTruck > 0)
-                                    basePerPiece = rawBase / (piecesPerPallet * palletsPerTruck);
-
-                                // Per-case BASE (no markup) — every tier prices off this.
-                                const basePerCase = piecesPerCase > 0 ? basePerPiece * piecesPerCase : basePerPiece;
+                                const basePerCase = rawBase;
 
                                 // ── Role-aware markup ───────────────────────────
                                 // Customer / anonymous / admin → see prices WITH markup

@@ -108,115 +108,120 @@ function escapeHtml(s: string): string {
 }
 
 function renderBlock(b: Block): string {
-    if (b.type === 'h1') return `<h1 style="color:#0F172A;font-family:'Inter',Arial,sans-serif;font-size:32px;font-weight:900;line-height:1.2;margin:0 0 18px;">${escapeHtml(b.text)}</h1>`;
-    if (b.type === 'h2') return `<h2 style="color:#0F172A;font-family:'Inter',Arial,sans-serif;font-size:24px;font-weight:800;line-height:1.3;margin:0 0 14px;">${escapeHtml(b.text)}</h2>`;
-    if (b.type === 'h3') return `<h3 style="color:#0F172A;font-family:'Inter',Arial,sans-serif;font-size:18px;font-weight:700;line-height:1.4;margin:0 0 10px;">${escapeHtml(b.text)}</h3>`;
-    if (b.type === 'p') return `<p style="color:#475569;font-family:'Inter',Arial,sans-serif;font-size:15px;line-height:1.7;margin:0 0 16px;">${escapeHtml(b.text).replace(/\n/g, '<br/>')}</p>`;
-    if (b.type === 'quote') return `<blockquote style="border-left:4px solid #2EC4B6;padding:8px 18px;margin:0 0 16px;color:#0F172A;font-style:italic;background:#F0FDFA;border-radius:0 8px 8px 0;">${escapeHtml(b.text)}</blockquote>`;
-    if (b.type === 'button') return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 18px;"><tr><td style="background:#0F172A;border-radius:14px;"><a href="${escapeHtml(b.url || '#')}" style="display:inline-block;padding:14px 30px;color:#ffffff;font-family:'Inter',Arial,sans-serif;font-weight:800;font-size:14px;text-decoration:none;letter-spacing:0.02em;">${escapeHtml(b.text)}</a></td></tr></table>`;
-    if (b.type === 'image' && b.url) return `<img src="${escapeHtml(b.url)}" alt="${escapeHtml(b.alt || '')}" style="max-width:100%;height:auto;border-radius:12px;display:block;margin:0 0 16px;" />`;
+    // Wrap every block in a table row so the email stays pure-table
+    // structure (no `<div>` wrappers). Pure-table is what the proven
+    // /offers blast email uses and what renders reliably in Gmail
+    // and Outlook. The previous campaign template mixed `<div>` and
+    // `<table>` which made Gmail fall back to the text/plain part.
+    const wrap = (inner: string) =>
+        `<tr><td style="padding:0 0 18px;font-family:Inter,Arial,sans-serif;">${inner}</td></tr>`;
+
+    if (b.type === 'h1') return wrap(`<h1 style="color:#0F172A;font-size:30px;font-weight:900;line-height:1.2;margin:0;">${escapeHtml(b.text)}</h1>`);
+    if (b.type === 'h2') return wrap(`<h2 style="color:#0F172A;font-size:24px;font-weight:800;line-height:1.3;margin:0;">${escapeHtml(b.text)}</h2>`);
+    if (b.type === 'h3') return wrap(`<h3 style="color:#0F172A;font-size:18px;font-weight:700;line-height:1.4;margin:0;">${escapeHtml(b.text)}</h3>`);
+    if (b.type === 'p') return wrap(`<p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">${escapeHtml(b.text).replace(/\n/g, '<br/>')}</p>`);
+    if (b.type === 'quote') return wrap(`<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="border-left:4px solid #2EC4B6;padding:8px 18px;color:#0F172A;font-style:italic;background:#F0FDFA;">${escapeHtml(b.text)}</td></tr></table>`);
+    if (b.type === 'button') return wrap(`<table role="presentation" cellpadding="0" cellspacing="0"><tr><td style="background:#0B1F3A;border-radius:14px;"><a href="${escapeHtml(b.url || '#')}" style="display:inline-block;padding:14px 30px;color:#ffffff;font-weight:800;font-size:14px;text-decoration:none;letter-spacing:0.02em;">${escapeHtml(b.text)}</a></td></tr></table>`);
+    if (b.type === 'image' && b.url) return wrap(`<img src="${escapeHtml(b.url)}" alt="${escapeHtml(b.alt || '')}" style="max-width:100%;height:auto;display:block;" />`);
     if (b.type === 'product') {
-        // Product card mirroring the KitKat sample — image on the right at
-        // a fixed cell, product info on the left as a definition list.
+        // Pure-table product card — same shape as the offers blast email
+        // (the Red Bull example the operator sent), so both flows match.
         const rows: Array<[string, string]> = [];
-        if (b.exwLocation) rows.push(['Trade Terms', `EXW ${escapeHtml(b.exwLocation)}`]);
-        if (b.ean)         rows.push(['EAN', escapeHtml(b.ean)]);
-        if (b.unitsPerCase) rows.push(['Units per case', String(b.unitsPerCase)]);
+        if (b.exwLocation)    rows.push(['Trade Terms',    `EXW ${escapeHtml(b.exwLocation)}`]);
+        if (b.ean)            rows.push(['EAN',            escapeHtml(b.ean)]);
+        if (b.unitsPerCase)   rows.push(['Units per case', String(b.unitsPerCase)]);
         if (b.casesPerPallet) rows.push(['Cases per pallet', String(b.casesPerPallet)]);
-        if (b.bbd)         rows.push(['Best-Before', escapeHtml(b.bbd)]);
-        if (b.origin)      rows.push(['Origin', escapeHtml(b.origin)]);
-        if (b.family)      rows.push(['Family', escapeHtml(b.family)]);
-        // NOTE: adminNote is INTENTIONALLY omitted from the email body — it
-        // is an internal-only side note for the campaign editor.
+        if (b.bbd)            rows.push(['Best-Before',    escapeHtml(b.bbd)]);
+        if (b.origin)         rows.push(['Origin',         escapeHtml(b.origin)]);
+        if (b.family)         rows.push(['Family',         escapeHtml(b.family)]);
+        // adminNote stays internal — never goes to recipients.
         const rowsHtml = rows.map(([k, v]) =>
-            `<tr><td style="padding:14px 0;border-bottom:1px solid #E2E8F0;color:#0F172A;font-weight:700;font-size:14px;font-family:'Inter',Arial,sans-serif;">${k}</td><td style="padding:14px 0;border-bottom:1px solid #E2E8F0;color:#2EC4B6;font-weight:800;font-size:14px;text-align:right;font-family:'Inter',Arial,sans-serif;">${v}</td></tr>`
+            `<tr><td style="padding:14px 0;border-bottom:1px solid #E2E8F0;color:#0F172A;font-weight:700;font-size:14px;">${k}</td><td style="padding:14px 0;border-bottom:1px solid #E2E8F0;color:#2EC4B6;font-weight:800;font-size:14px;text-align:right;">${v}</td></tr>`
         ).join('');
         const safeName = escapeHtml(b.name || 'Product');
         const safeImg = escapeHtml(b.image || '');
-        return `
-            <div style="border-radius:24px;overflow:hidden;border:1px solid #E2E8F0;margin:0 0 24px;background:#ffffff;">
-                <div style="background:#0F172A;padding:18px 24px;color:#ffffff;font-family:'Inter',Arial,sans-serif;font-weight:800;font-size:13px;letter-spacing:0.18em;text-transform:uppercase;">📦 &nbsp; Product Information</div>
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        const card = `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #E2E8F0;border-radius:14px;overflow:hidden;background:#ffffff;">
+            <tr><td style="background:#0B1F3A;padding:18px 24px;color:#ffffff;font-weight:800;font-size:13px;letter-spacing:0.18em;text-transform:uppercase;">📦 &nbsp; Product Information</td></tr>
+            <tr><td style="padding:0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                         <td style="padding:24px 24px 12px;vertical-align:top;width:60%;">
-                            <h3 style="color:#0F172A;font-family:'Inter',Arial,sans-serif;font-size:20px;font-weight:900;margin:0 0 18px;line-height:1.2;">${safeName}</h3>
+                            <h3 style="color:#0F172A;font-size:20px;font-weight:900;margin:0 0 18px;line-height:1.2;">${safeName}</h3>
                             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rowsHtml}</table>
                         </td>
-                        <td style="padding:24px 24px 12px;vertical-align:top;width:40%;text-align:center;">
-                            ${safeImg ? `<img src="${safeImg}" alt="${safeName}" style="max-width:100%;height:auto;max-height:200px;display:inline-block;" />` : '<div style="background:#F1F5F9;border-radius:12px;padding:60px 20px;color:#94A3B8;font-size:12px;">No image</div>'}
+                        <td style="padding:24px 24px 12px;vertical-align:middle;width:40%;text-align:center;">
+                            ${safeImg ? `<img src="${safeImg}" alt="${safeName}" style="max-width:100%;height:auto;max-height:200px;display:inline-block;" />` : '<div style="background:#F1F5F9;color:#94A3B8;font-size:12px;padding:60px 20px;">No image</div>'}
                         </td>
                     </tr>
                 </table>
-            </div>
-        `;
+            </td></tr>
+        </table>`;
+        return wrap(card);
     }
     return '';
 }
 
 function buildEmailHtml(blocks: Block[]): string {
-    const body = blocks.map(renderBlock).join('\n');
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Atlantis Marketplace</title>
-</head>
-<body style="margin:0;padding:0;background:#F8FAFC;font-family:'Inter',Arial,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;padding:40px 16px;">
-        <tr>
-            <td align="center">
-                <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:24px;overflow:hidden;box-shadow:0 12px 32px rgba(15,23,42,0.06);">
+    // Body rows are now bare `<tr>` rows (renderBlock wraps each block
+    // in a row), so the body slot lives directly inside the main 640px
+    // table. This mirrors the OFFERS blast template (the Red Bull
+    // sample the operator approved) — pure-table, no `<div>`, no
+    // `<head>` block. Gmail/Outlook render it as styled HTML; previous
+    // versions sometimes fell back to text-only.
+    const bodyRows = blocks.map(renderBlock).join('\n');
+    return `<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8" /><meta name="viewport" content="width=device-width,initial-scale=1" /></head>
+<body style="margin:0;padding:0;background:#F1F5F9;font-family:Inter,Arial,sans-serif;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px;background:#F1F5F9;">
+    <tr><td align="center">
+        <table role="presentation" width="640" cellpadding="0" cellspacing="0" style="max-width:640px;width:100%;background:#ffffff;border-radius:18px;overflow:hidden;box-shadow:0 12px 28px rgba(15,23,42,0.06);">
 
-                    <!-- Atlantis brand header (gradient + curved divider) -->
+            <!-- 1. BRAND HEADER (solid navy + teal curved divider) -->
+            <tr><td style="background:#0B1F3A;padding:0;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                     <tr>
-                        <td style="background:linear-gradient(135deg,#0B1F3A 0%,#0F172A 100%);padding:36px 40px 48px;position:relative;">
-                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                        <td style="padding:28px 36px 24px;vertical-align:middle;">
+                            <table role="presentation" cellpadding="0" cellspacing="0">
                                 <tr>
-                                    <td>
-                                        <table role="presentation" cellpadding="0" cellspacing="0">
-                                            <tr>
-                                                <td style="padding-right:14px;">
-                                                    <img src="https://www.atlantisfmcg.com/icon.png" alt="Atlantis" width="48" height="48" style="display:block;width:48px;height:48px;border-radius:12px;background:#ffffff;padding:4px;box-sizing:border-box;" />
-                                                </td>
-                                                <td>
-                                                    <div style="color:#ffffff;font-family:'Inter',Arial,sans-serif;font-weight:900;font-size:24px;letter-spacing:0.02em;">ATLANTIS</div>
-                                                    <div style="color:#2EC4B6;font-family:'Inter',Arial,sans-serif;font-weight:700;font-size:11px;letter-spacing:0.4em;margin-top:2px;">FMCG</div>
-                                                </td>
-                                            </tr>
-                                        </table>
+                                    <td style="vertical-align:middle;padding-right:14px;">
+                                        <img src="https://www.atlantisfmcg.com/icon.png" alt="Atlantis" width="46" height="46" style="display:block;width:46px;height:46px;border-radius:10px;background:#ffffff;padding:3px;box-sizing:border-box;" />
                                     </td>
-                                    <td align="right" style="color:#ffffff;font-family:'Inter',Arial,sans-serif;font-size:13px;line-height:1.7;">
-                                        <div>✉ Info@atlantisfmcg.com</div>
-                                        <div>🌐 www.atlantisfmcg.com</div>
+                                    <td style="vertical-align:middle;">
+                                        <div style="color:#ffffff;font-weight:900;font-size:24px;letter-spacing:0.04em;line-height:1;">ATLANTIS</div>
+                                        <div style="color:#2EC4B6;font-weight:700;font-size:11px;letter-spacing:0.5em;margin-top:4px;line-height:1;">FMCG</div>
                                     </td>
                                 </tr>
                             </table>
                         </td>
-                    </tr>
-
-                    <!-- Main content -->
-                    <tr>
-                        <td style="padding:48px 40px 8px;">
-                            ${body}
-                        </td>
-                    </tr>
-
-                    <!-- Footer -->
-                    <tr>
-                        <td style="background:#0F172A;padding:32px 40px;color:#94A3B8;font-family:'Inter',Arial,sans-serif;font-size:12px;text-align:center;">
-                            <div style="margin-bottom:6px;">
-                                <span style="color:#ffffff;font-weight:900;letter-spacing:0.02em;">Bridging Markets.</span>
-                                &nbsp;<span style="color:#2EC4B6;font-weight:900;">Building Opportunities.</span>
-                            </div>
-                            <div style="opacity:0.6;">© ${new Date().getFullYear()} Atlantis FMCG. All rights reserved.</div>
+                        <td align="right" style="padding:28px 36px 24px;vertical-align:middle;color:#ffffff;font-size:13px;line-height:1.9;">
+                            <div>✉&nbsp;&nbsp;Info@atlantisfmcg.com</div>
+                            <div>🌐&nbsp;&nbsp;www.atlantisfmcg.com</div>
                         </td>
                     </tr>
                 </table>
-            </td>
-        </tr>
-    </table>
+                <div style="height:14px;background:#2EC4B6;border-radius:0 0 50% 50% / 0 0 100% 100%;margin-bottom:-1px;"></div>
+            </td></tr>
+
+            <!-- 2. MAIN BODY — campaign blocks (each renderBlock emits a <tr>) -->
+            <tr><td style="padding:36px 40px 8px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    ${bodyRows}
+                </table>
+            </td></tr>
+
+            <!-- 3. DARK FOOTER -->
+            <tr><td style="background:#0B1F3A;padding:24px 40px;color:#94A3B8;font-size:12px;text-align:center;">
+                <div style="margin-bottom:6px;">
+                    <span style="color:#ffffff;font-weight:900;letter-spacing:0.02em;">Bridging Markets.</span>
+                    &nbsp;<span style="color:#2EC4B6;font-weight:900;">Building Opportunities.</span>
+                </div>
+                <div style="opacity:0.6;">© ${new Date().getFullYear()} Atlantis FMCG. All rights reserved.</div>
+            </td></tr>
+        </table>
+    </td></tr>
+</table>
 </body>
 </html>
     `;
