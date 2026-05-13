@@ -152,6 +152,13 @@ export class OffersService {
             required('Product picture',    offerImageUrl);
         }
 
+        // Atlantis own-catalog offers auto-approve. Operator rule:
+        // when ADMIN / OWNER posts an offer (Atlantis IS the platform —
+        // there's no third party to approve their own listing), we
+        // skip the PENDING state, stamp APPROVED immediately, and
+        // fire the email blast inline. Supplier-submitted offers
+        // still go through the manual review queue.
+        const initialStatus = isAdmin ? 'APPROVED' : 'PENDING';
         const created = await this.prisma.offer.create({
             data: {
                 supplierId,
@@ -170,30 +177,42 @@ export class OffersService {
                 leadTime:       leadTime || null,
                 origin:         origin || null,
                 offerImageUrl:  offerImageUrl || null,
-                status: 'PENDING',
+                status: initialStatus,
+                approvedAt: isAdmin ? new Date() : null,
+                approvedBy: isAdmin ? supplierId : null, // admin acting as the approver
             },
             include: { product: true, supplier: { select: { name: true, companyName: true, email: true } } },
         });
 
-        // Tell the admins a new offer is waiting for review. Without
-        // this they only see it on the next time they refresh
-        // /admin/wholesale-offers — which the operator complained about
-        // ("the offer goes in but nothing notifies us"). Best-effort:
-        // we swallow notification errors so a flaky notification
-        // service never fails the actual create.
-        try {
-            const supplierLabel =
-                (created as any).supplier?.companyName ||
-                (created as any).supplier?.name ||
-                'A supplier';
-            await this.notifications.notifyAdmins(
-                'New wholesale offer waiting for review',
-                `${supplierLabel} just submitted "${productNameSnap}" — ${input.quantity} × ${input.unit} at €${Number(input.pricePerUnit).toFixed(2)}. Open Admin → Wholesale Offers to approve or reject.`,
-                'INFO' as any,
-                { offerId: created.id, productId: product.id },
-            );
-        } catch (e) {
-            this.logger.warn(`notifyAdmins failed for offer ${created.id}: ${(e as any)?.message}`);
+        if (isAdmin) {
+            // Auto-blast for Atlantis-authored offers. Same path the
+            // manual approve flow runs.
+            try {
+                await this.blastApprovedOffer(created.id);
+            } catch (e) {
+                this.logger.warn(`auto-blast failed for offer ${created.id}: ${(e as any)?.message}`);
+            }
+        } else {
+            // Tell the admins a new offer is waiting for review. Without
+            // this they only see it on the next time they refresh
+            // /admin/wholesale-offers — which the operator complained about
+            // ("the offer goes in but nothing notifies us"). Best-effort:
+            // we swallow notification errors so a flaky notification
+            // service never fails the actual create.
+            try {
+                const supplierLabel =
+                    (created as any).supplier?.companyName ||
+                    (created as any).supplier?.name ||
+                    'A supplier';
+                await this.notifications.notifyAdmins(
+                    'New wholesale offer waiting for review',
+                    `${supplierLabel} just submitted "${productNameSnap}" — ${input.quantity} × ${input.unit} at €${Number(input.pricePerUnit).toFixed(2)}. Open Admin → Wholesale Offers to approve or reject.`,
+                    'INFO' as any,
+                    { offerId: created.id, productId: product.id },
+                );
+            } catch (e) {
+                this.logger.warn(`notifyAdmins failed for offer ${created.id}: ${(e as any)?.message}`);
+            }
         }
 
         return created;

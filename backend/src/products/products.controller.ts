@@ -220,8 +220,18 @@ export class ProductsController {
     @Patch(':id/reject')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
-    async reject(@Param('id') id: string) {
-        return this.productsService.updateStatus(id, ProductStatus.REJECTED);
+    async reject(@Param('id') id: string, @Body('reason') reason?: string) {
+        // Operator request: admin types a reason → it lands on
+        // adminNotes so the supplier reads "why" on their product
+        // row. Once REJECTED, the supplier can't edit the product
+        // anymore — they have to create a fresh listing avoiding
+        // the same mistakes.
+        const text = (reason || '').trim();
+        return this.productsService.updateStatus(
+            id,
+            ProductStatus.REJECTED,
+            text || 'Rejected by admin. No specific reason provided — please create a fresh listing avoiding the gaps noted on our review queue.',
+        );
     }
 
     /**

@@ -1078,6 +1078,7 @@ export class ProductsService {
                 unit: true,
                 unitsPerCase: true,
                 casesPerPallet: true,
+                palletsPerShipment: true,
                 status: true,
                 exwLocation: true,
                 variants: true,
@@ -1198,6 +1199,22 @@ export class ProductsService {
                 stock: Number(variantStockMap[sigOf(c)] ?? 0),
             }));
 
+            // ── Stock per tier breakdown ─────────────────────────
+            // Operator request: "the supplier should know stock in
+            // Trucks / Pallets / Cases — not just a number". Stock is
+            // stored as cases on the platform (the canonical unit).
+            // We derive the larger tiers by dividing through the pack
+            // sizes the supplier configured on the product. floor()
+            // because a partial pallet doesn't count as one until
+            // it's filled. Cases stays as the raw number.
+            const cpp = Number(p.casesPerPallet) || 0;
+            const pps = Number(p.palletsPerShipment) || 0;
+            const stockCases = Number(p.stock) || 0;
+            const stockPallets = cpp > 0 ? Math.floor(stockCases / cpp) : 0;
+            const stockTrucks = (cpp > 0 && pps > 0)
+                ? Math.floor(stockCases / (cpp * pps))
+                : 0;
+
             return {
                 id: p.id,
                 name: p.name,
@@ -1209,11 +1226,14 @@ export class ProductsService {
                 exwLocation: p.exwLocation,
                 unitsPerCase: p.unitsPerCase,
                 casesPerPallet: p.casesPerPallet,
+                palletsPerShipment: (p as any).palletsPerShipment ?? null,
                 // Pricing — surface supplier's raw case price, not the
                 // marked-up customer price. Consistent with /my-products.
                 price: p.basePrice ?? p.price,
                 // Stock buckets
-                stock: p.stock,                            // still available to sell
+                stock: p.stock,                            // still available to sell (cases)
+                stockPallets,                              // derived: floor(cases ÷ casesPerPallet)
+                stockTrucks,                               // derived: floor(cases ÷ (casesPerPallet × palletsPerTruck))
                 reserved: reservedMap[p.id] || 0,           // committed to ship
                 sold: soldMap[p.id] || 0,                   // delivered to customers
                 cancelled: cancelledMap[p.id] || 0,         // returned to stock

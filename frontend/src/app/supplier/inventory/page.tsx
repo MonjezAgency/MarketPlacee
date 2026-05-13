@@ -47,6 +47,9 @@ interface InventoryRow {
     unitsPerCase: number | null;
     casesPerPallet: number | null;
     stock: number;
+    stockPallets: number;
+    stockTrucks: number;
+    palletsPerShipment?: number | null;
     reserved: number;
     sold: number;
     cancelled: number;
@@ -299,18 +302,33 @@ export default function SupplierInventoryPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-4 py-4 text-right">
-                                                    <span
-                                                        className={cn(
-                                                            'inline-flex items-center justify-center min-w-[40px] h-7 px-3 rounded-full text-[12px] font-black tabular-nums',
-                                                            r.stock <= 0
-                                                                ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                                                : r.stock < 10
-                                                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                                                  : 'bg-slate-100 text-slate-700',
-                                                        )}
-                                                    >
-                                                        {r.stock}
-                                                    </span>
+                                                    {/* Stock cell — primary pill is cases
+                                                        (canonical unit). Underneath in tiny
+                                                        text we show the same stock expressed
+                                                        in pallets and trucks so the supplier
+                                                        knows "42 cases = 1 pallet = 0 trucks"
+                                                        without doing the math themselves.
+                                                        Computed server-side using the
+                                                        supplier's own pack-size config. */}
+                                                    <div className="flex flex-col items-end gap-1">
+                                                        <span
+                                                            className={cn(
+                                                                'inline-flex items-center justify-center min-w-[40px] h-7 px-3 rounded-full text-[12px] font-black tabular-nums',
+                                                                r.stock <= 0
+                                                                    ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                                                    : r.stock < 10
+                                                                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                                                      : 'bg-slate-100 text-slate-700',
+                                                            )}
+                                                            title={`${r.stock} cases · ${r.stockPallets} pallets · ${r.stockTrucks} trucks`}
+                                                        >
+                                                            {r.stock}
+                                                            <span className="text-[9px] font-bold uppercase tracking-wider opacity-60 ms-1">cases</span>
+                                                        </span>
+                                                        <span className="text-[10px] text-slate-400 font-medium tabular-nums">
+                                                            {r.stockPallets} pallets · {r.stockTrucks} trucks
+                                                        </span>
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 py-4 text-right">
                                                     <span className="text-[12px] font-bold text-amber-700 tabular-nums">

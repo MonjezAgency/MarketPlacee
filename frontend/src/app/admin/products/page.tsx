@@ -714,6 +714,45 @@ export default function ProductsModerationPage() {
         return matchesSearch && matchesTab;
     });
 
+    // ── Sort + Pagination ───────────────────────────────────────
+    // Operator request: control which order rows appear in (newest /
+    // approved / pending / alphabetical / oldest), and pick how many
+    // rows per page. The full table is local-state filtered so we
+    // sort + slice in memory.
+    const [sortBy, setSortBy] = React.useState<'NEWEST' | 'OLDEST' | 'AZ' | 'ZA' | 'STATUS' | 'PRICE_HIGH' | 'PRICE_LOW'>('NEWEST');
+    const [perPage, setPerPage] = React.useState<number>(25);
+    const [adminPage, setAdminPage] = React.useState<number>(1);
+    React.useEffect(() => {
+        // Reset to first page whenever the filter / sort / source / tab
+        // changes — otherwise the supplier lands on an empty page.
+        setAdminPage(1);
+    }, [sortBy, perPage, searchTerm, activeTab, sourceTab]);
+
+    const sortedProducts = React.useMemo(() => {
+        const arr = [...filteredProducts];
+        const ts = (p: any) => {
+            const d = p.createdAt || p.updatedAt;
+            return d ? new Date(d).getTime() : 0;
+        };
+        switch (sortBy) {
+            case 'NEWEST':     return arr.sort((a, b) => ts(b) - ts(a));
+            case 'OLDEST':     return arr.sort((a, b) => ts(a) - ts(b));
+            case 'AZ':         return arr.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+            case 'ZA':         return arr.sort((a, b) => String(b.name).localeCompare(String(a.name)));
+            case 'STATUS':     return arr.sort((a, b) => {
+                // PENDING first → NEEDS_CHANGES → APPROVED → REJECTED
+                const order: Record<string, number> = { PENDING: 0, NEEDS_CHANGES: 1, APPROVED: 2, REJECTED: 3 };
+                return (order[String(a.status).toUpperCase()] ?? 9) - (order[String(b.status).toUpperCase()] ?? 9);
+            });
+            case 'PRICE_HIGH': return arr.sort((a, b) => Number(b.basePrice ?? b.price ?? 0) - Number(a.basePrice ?? a.price ?? 0));
+            case 'PRICE_LOW':  return arr.sort((a, b) => Number(a.basePrice ?? a.price ?? 0) - Number(b.basePrice ?? b.price ?? 0));
+            default:           return arr;
+        }
+    }, [filteredProducts, sortBy]);
+
+    const totalPagesAdmin = Math.max(1, Math.ceil(sortedProducts.length / perPage));
+    const paginatedProducts = sortedProducts.slice((adminPage - 1) * perPage, adminPage * perPage);
+
     // Stats are computed against the CURRENT source tab so the KPI
     // cards reflect what's on screen — switching from "Atlantis
     // Catalog" to "Supplier Submissions" updates the totals.
@@ -827,22 +866,54 @@ export default function ProductsModerationPage() {
                         </button>
                     </div>
 
-                    {/* Status tabs (within the chosen source) */}
-                    <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-xl w-fit">
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={cn(
-                                    "h-9 px-4 rounded-lg text-xs font-semibold transition-all",
-                                    activeTab === tab 
-                                        ? "bg-teal-50 text-teal-700 shadow-sm border border-teal-100" 
-                                        : "text-slate-500 hover:text-slate-900"
-                                )}
+                    {/* Status tabs + sort + per-page picker — operator
+                        wanted control over WHICH rows show, what ORDER they
+                        appear in, and HOW MANY per page. All three drop the
+                        viewer back to page 1 to avoid empty-page jumps. */}
+                    <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-xl w-fit">
+                            {tabs.map((tab) => (
+                                <button
+                                    key={tab}
+                                    onClick={() => setActiveTab(tab)}
+                                    className={cn(
+                                        "h-9 px-4 rounded-lg text-xs font-semibold transition-all",
+                                        activeTab === tab
+                                            ? "bg-teal-50 text-teal-700 shadow-sm border border-teal-100"
+                                            : "text-slate-500 hover:text-slate-900"
+                                    )}
+                                >
+                                    {tab}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Sort</label>
+                            <select
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value as any)}
+                                className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50"
                             >
-                                {tab}
-                            </button>
-                        ))}
+                                <option value="NEWEST">Newest first</option>
+                                <option value="OLDEST">Oldest first</option>
+                                <option value="AZ">Name A→Z</option>
+                                <option value="ZA">Name Z→A</option>
+                                <option value="STATUS">Status (pending first)</option>
+                                <option value="PRICE_HIGH">Price high → low</option>
+                                <option value="PRICE_LOW">Price low → high</option>
+                            </select>
+                            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ms-2">Per page</label>
+                            <select
+                                value={perPage}
+                                onChange={(e) => setPerPage(parseInt(e.target.value, 10) || 25)}
+                                className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50"
+                            >
+                                <option value={10}>10</option>
+                                <option value={25}>25</option>
+                                <option value={50}>50</option>
+                                <option value={100}>100</option>
+                            </select>
+                        </div>
                     </div>
 
                     {/* Table (Desktop/Tablet) */}
@@ -876,7 +947,7 @@ export default function ProductsModerationPage() {
                                                 <td colSpan={8} className="px-6 py-4 h-16 bg-slate-50/50" />
                                             </tr>
                                         ))
-                                    ) : filteredProducts.map((p) => (
+                                    ) : paginatedProducts.map((p) => (
                                         <tr 
                                             key={p.id} 
                                             onClick={() => setSelectedProduct(p)}
@@ -921,7 +992,7 @@ export default function ProductsModerationPage() {
 
                     {/* Cards (Mobile) */}
                     <div className="grid grid-cols-1 gap-4 md:hidden">
-                        {filteredProducts.map(p => (
+                        {paginatedProducts.map(p => (
                             <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm active:scale-95 transition-all">
                                 <div className="flex items-center gap-4">
                                     <img src={p.images?.[0] || 'https://via.placeholder.com/64'} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=NA'; }} className="w-16 h-16 rounded-xl object-cover border border-slate-100" />
@@ -938,6 +1009,65 @@ export default function ProductsModerationPage() {
                             </div>
                         ))}
                     </div>
+
+                    {/* Pagination footer — appears under both desktop
+                        table and mobile cards. Shows "Showing N–M of K"
+                        plus prev/next buttons + numeric page chips. */}
+                    {sortedProducts.length > perPage && (
+                        <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
+                            <p className="text-[11px] text-slate-500 font-semibold">
+                                Showing <span className="text-slate-900 font-bold">{(adminPage - 1) * perPage + 1}</span>
+                                {'–'}
+                                <span className="text-slate-900 font-bold">{Math.min(adminPage * perPage, sortedProducts.length)}</span>
+                                {' of '}
+                                <span className="text-slate-900 font-bold">{sortedProducts.length}</span>
+                            </p>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setAdminPage((p) => Math.max(1, p - 1))}
+                                    disabled={adminPage === 1}
+                                    className="h-9 px-3 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    ← Prev
+                                </button>
+                                {Array.from({ length: totalPagesAdmin }).slice(0, 7).map((_, i) => {
+                                    // Show up to 7 page chips around the active one.
+                                    const half = 3;
+                                    let pageNum = i + 1;
+                                    if (totalPagesAdmin > 7) {
+                                        const start = Math.max(1, Math.min(adminPage - half, totalPagesAdmin - 6));
+                                        pageNum = start + i;
+                                    }
+                                    if (pageNum < 1 || pageNum > totalPagesAdmin) return null;
+                                    const active = pageNum === adminPage;
+                                    return (
+                                        <button
+                                            key={pageNum}
+                                            type="button"
+                                            onClick={() => setAdminPage(pageNum)}
+                                            className={cn(
+                                                'h-9 min-w-[36px] px-2 rounded-lg text-xs font-bold tabular-nums transition-colors',
+                                                active
+                                                    ? 'bg-teal-600 text-white shadow-sm'
+                                                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50',
+                                            )}
+                                        >
+                                            {pageNum}
+                                        </button>
+                                    );
+                                })}
+                                <button
+                                    type="button"
+                                    onClick={() => setAdminPage((p) => Math.min(totalPagesAdmin, p + 1))}
+                                    disabled={adminPage >= totalPagesAdmin}
+                                    className="h-9 px-3 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    Next →
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
             </div>

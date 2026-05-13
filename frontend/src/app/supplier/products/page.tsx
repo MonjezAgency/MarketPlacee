@@ -583,29 +583,32 @@ export default function SupplierProductsPage() {
                                                 <td className="px-6 py-5">
                                                     <div className="flex flex-col gap-1.5">
                                                         {(() => {
-                                                            const isNeedsChanges = String(product.status).toUpperCase() === 'NEEDS_CHANGES';
+                                                            const statusUpper = String(product.status).toUpperCase();
+                                                            const isNeedsChanges = statusUpper === 'NEEDS_CHANGES';
+                                                            const isRejected = statusUpper === 'REJECTED';
+                                                            // Either status carries a written admin reason
+                                                            // on adminNotes. We make the badge clickable on
+                                                            // both, with role-aware fallback copy.
+                                                            const isClickable = isNeedsChanges || isRejected;
                                                             const note = (product as any).adminNotes || '';
-                                                            // When the row needs changes, the status badge
-                                                            // itself becomes the clickable trigger — opens
-                                                            // the comment modal. We render it as <button>
-                                                            // so it gets keyboard focus + a hover state.
-                                                            // For other statuses the badge stays a div.
                                                             const openMine = () =>
                                                                 setOpenComment({
                                                                     id: product.id,
-                                                                    message: note || 'The admin marked this product as needing changes but didn\'t leave a written note. Please review the product page and resubmit if you\'re happy with the data.',
+                                                                    message: note || (isRejected
+                                                                        ? 'This listing was rejected. The admin didn\'t leave a specific reason — please create a fresh listing avoiding the gaps you noticed on review.'
+                                                                        : 'The admin marked this product as needing changes but didn\'t leave a written note. Please review the product page and resubmit if you\'re happy with the data.'),
                                                                     name: product.name,
                                                                 });
                                                             const badgeClasses = cn(
                                                                 'inline-flex items-center gap-1.5 h-7 px-3 rounded-full border text-[10px] font-black w-fit',
                                                                 getStatusColor(product.status),
-                                                                isNeedsChanges && 'cursor-pointer hover:opacity-80 transition-opacity',
+                                                                isClickable && 'cursor-pointer hover:opacity-80 transition-opacity',
                                                             );
-                                                            return isNeedsChanges ? (
+                                                            return isClickable ? (
                                                                 <button
                                                                     type="button"
                                                                     onClick={(e) => { e.stopPropagation(); openMine(); }}
-                                                                    title="Click to read the admin's comment"
+                                                                    title={isRejected ? 'Click to read the rejection reason' : 'Click to read the admin\'s comment'}
                                                                     className={badgeClasses}
                                                                 >
                                                                     <div className="w-1.5 h-1.5 rounded-full bg-current" />
@@ -641,6 +644,22 @@ export default function SupplierProductsPage() {
                                                                 className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-orange-200 bg-orange-50 hover:bg-orange-100 text-orange-700 text-[10px] font-black w-fit"
                                                             >
                                                                 💬 View comment
+                                                            </button>
+                                                        )}
+                                                        {String(product.status).toUpperCase() === 'REJECTED' && (
+                                                            <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setOpenComment({
+                                                                        id: product.id,
+                                                                        message: (product as any).adminNotes
+                                                                            || 'This listing was rejected. The admin didn\'t leave a specific reason — please create a fresh listing avoiding the gaps you noticed on review.',
+                                                                        name: product.name,
+                                                                    });
+                                                                }}
+                                                                className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-[10px] font-black w-fit"
+                                                            >
+                                                                💬 View reason
                                                             </button>
                                                         )}
                                                     </div>

@@ -329,7 +329,38 @@ export default function OrderTrackingPage() {
                         {order.trackingNumber && (
                             <div>
                                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tracking #</p>
-                                <p className="text-base font-black mt-1 font-mono">{order.trackingNumber}</p>
+                                {/* Operator request: tracking number should
+                                    be a deep link to the carrier's tracking
+                                    page so the customer doesn't have to copy
+                                    the number and paste it into Google.
+                                    Helper resolves the right URL per carrier;
+                                    falls back to a search engine when the
+                                    carrier name doesn't match a known one. */}
+                                {(() => {
+                                    const num = String(order.trackingNumber).trim();
+                                    const carrier = String(order.carrier || '').toUpperCase();
+                                    const url =
+                                        carrier.includes('DHL') ? `https://www.dhl.com/en/express/tracking.html?AWB=${encodeURIComponent(num)}` :
+                                        carrier.includes('FEDEX') ? `https://www.fedex.com/apps/fedextrack/?tracknumbers=${encodeURIComponent(num)}` :
+                                        carrier.includes('UPS') ? `https://www.ups.com/track?tracknum=${encodeURIComponent(num)}` :
+                                        carrier.includes('ARAMEX') ? `https://www.aramex.com/track/results?ShipmentNumber=${encodeURIComponent(num)}` :
+                                        carrier.includes('TNT') ? `https://www.tnt.com/express/en_eg/site/shipping-tools/tracking.html?searchType=con&cons=${encodeURIComponent(num)}` :
+                                        carrier.includes('DPD') ? `https://tracking.dpd.de/status/en_DE/parcel/${encodeURIComponent(num)}` :
+                                        carrier.includes('GLS') ? `https://gls-group.com/track/${encodeURIComponent(num)}` :
+                                        `https://www.google.com/search?q=${encodeURIComponent(`${order.carrier || 'shipment'} tracking ${num}`)}`;
+                                    return (
+                                        <a
+                                            href={url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1.5 text-base font-black mt-1 font-mono text-primary hover:underline"
+                                            title="Open tracking on the carrier's website"
+                                        >
+                                            {num}
+                                            <span aria-hidden="true" className="text-[10px]">↗</span>
+                                        </a>
+                                    );
+                                })()}
                                 {order.carrier && <p className="text-[10px] text-muted-foreground font-medium">via {order.carrier}</p>}
                             </div>
                         )}
