@@ -326,6 +326,32 @@ export default function ProductEditorForm({
     const [pricePerPieceInput, setPricePerPieceInput] = useState('');
     // EAN validation message (live, shown under the field).
     const [eanError, setEanError] = useState<string | null>(null);
+    // Markup multipliers loaded from /config/markup. Admin uses these
+    // to see "Case = €24, +10% = €26.40, etc." next to the supplier-
+    // facing per-case preview. Defaults are sane multipliers (1.10 /
+    // 1.05 / 1.02 = +10% / +5% / +2%) until the fetch resolves.
+    const [markups, setMarkups] = useState<{ piece: number; pallet: number; container: number }>({
+        piece: 1.10, pallet: 1.05, container: 1.02,
+    });
+    useEffect(() => {
+        if (mode !== 'admin') return;
+        (async () => {
+            try {
+                const { apiFetch } = await import('@/lib/api');
+                const res = await apiFetch('/config/markup');
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && typeof data === 'object') {
+                        setMarkups((m) => ({
+                            piece: Number(data.piece) || m.piece,
+                            pallet: Number(data.pallet) || m.pallet,
+                            container: Number(data.container) || m.container,
+                        }));
+                    }
+                }
+            } catch {}
+        })();
+    }, [mode]);
     // Image help drawer toggle. Operators report suppliers commonly
     // paste a Google Images RESULTS-PAGE URL (instead of the actual
     // image URL) and then complain "the image doesn't show up". A
@@ -1613,6 +1639,70 @@ export default function ProductEditorForm({
                                         </span>
                                     </div>
                                 </div>
+
+                                {/* ── Admin Pricing Formula ──
+                                    Visible to ADMIN / OWNER only. Renders the
+                                    live markup math per tier as PERCENTAGES
+                                    (not the 1.10 / 1.05 multipliers — the
+                                    operator wants %, not the raw float).
+
+                                    Math:
+                                       basePerCase = pricePerPiece × unitsPerCase
+                                       customer    = basePerCase × (1 + markup%)
+
+                                    Pulls markups from /config/markup (same
+                                    AppConfig /admin/settings edits) so editing
+                                    the markup there reflects here on next
+                                    render. Bag-of-bands UI: 3 chips, each
+                                    showing "Case → +10% → Customer €26.40".
+                                */}
+                                {mode === 'admin' && (
+                                    <div className="rounded-xl bg-blue-50/40 dark:bg-blue-500/[0.06] border border-blue-200 dark:border-blue-500/20 px-3.5 py-3 space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-blue-700 dark:text-blue-300">
+                                                Admin · Pricing Formula
+                                            </p>
+                                            <span className="text-[10px] text-blue-500 dark:text-blue-400 font-bold">
+                                                base × (1 + markup%) = customer
+                                            </span>
+                                        </div>
+                                        {(() => {
+                                            const piecePrice = parseFloat(pricePerPieceInput.replace(',', '.')) || 0;
+                                            const upc = Number(formData.unitsPerCase) || 0;
+                                            const basePerCase = piecePrice * upc;
+                                            const rows = [
+                                                { label: 'Case',   m: markups.piece },
+                                                { label: 'Pallet', m: markups.pallet },
+                                                { label: 'Truck',  m: markups.container },
+                                            ];
+                                            return (
+                                                <div className="grid grid-cols-3 gap-2">
+                                                    {rows.map((r) => {
+                                                        const pct = ((r.m - 1) * 100).toFixed(1);
+                                                        const customer = basePerCase * r.m;
+                                                        return (
+                                                            <div key={r.label} className="bg-white dark:bg-[#131316] rounded-lg border border-blue-100 dark:border-blue-500/15 p-2.5">
+                                                                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-zinc-500">{r.label}</p>
+                                                                <p className="text-[15px] font-bold text-blue-700 dark:text-blue-300 tabular-nums mt-0.5">+{pct}%</p>
+                                                                <div className="mt-1.5 text-[10px] text-slate-500 dark:text-zinc-500 leading-tight">
+                                                                    <p>Base <span className="font-mono text-slate-700 dark:text-zinc-300">{symbol}{basePerCase.toFixed(2)}</span></p>
+                                                                    <p>Cust <span className="font-mono font-bold text-slate-900 dark:text-zinc-100">{symbol}{customer.toFixed(2)}</span></p>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            );
+                                        })()}
+                                        <p className="text-[10px] text-slate-500 dark:text-zinc-500 leading-relaxed pt-1 border-t border-blue-200/60 dark:border-blue-500/20">
+                                            Edit markups at{' '}
+                                            <a href="/admin/settings" className="font-bold text-blue-700 dark:text-blue-300 underline">
+                                                /admin/settings
+                                            </a>
+                                            . Suppliers don't see this — only Atlantis ops.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Stock card */}

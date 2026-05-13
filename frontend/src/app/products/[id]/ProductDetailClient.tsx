@@ -78,6 +78,23 @@ export default function ProductDetailClient() {
     //   activeKey      — canonical tier key used for cart locking.
     //   casesInUnit    — multiplier from per-case to per-unit, also used in the
     //                    "X cartons total" breakdown line.
+    // ── Role detection — must run BEFORE tierData useMemo so the
+    //    markup multipliers can fork on visitor role. Previously these
+    //    lived below tierData and tierData kept applying full markup
+    //    even when the visitor was the supplier-owner — that's why the
+    //    operator screenshot showed tier prices €8.32 / €8.71 / €11.88
+    //    on a "Your listing" product card. With the flags lifted, the
+    //    multiplier branch inside tierData (further down) now reads
+    //    them and clamps to 1.0 for supplier-owner + admin.
+    const isSupplierOwner =
+        user?.role?.toUpperCase() === 'SUPPLIER' &&
+        (currentProduct as any)?.supplierId &&
+        user?.id === (currentProduct as any)?.supplierId;
+    const isAdminUser = ['ADMIN', 'OWNER'].includes(
+        (user?.role || '').toUpperCase(),
+    );
+    const useRawPricesRole = isSupplierOwner || isAdminUser;
+
     const tierData = useMemo(() => {
         const fallback = {
             perCasePrice: 0, perUnitTotal: 0, activeLabel: 'Case',
@@ -111,9 +128,20 @@ export default function ProductDetailClient() {
         const palletAvailable = piecesPerCase > 0 && casesPerPallet > 0;
         const caseAvailable = piecesPerCase > 0;
 
-        const perCaseTruck  = truckAvailable  ? basePerCase * markups.container : null;
-        const perCasePallet = palletAvailable ? basePerCase * markups.pallet    : null;
-        const perCaseCase   = caseAvailable   ? basePerCase * markups.piece     : null;
+        // Role-aware markup multipliers. Supplier-owners + admin see
+        // RAW base prices (multiplier = 1.0) so the tier ladder shows
+        // the same number across all three buttons. Customers see the
+        // full marked-up ladder. This is the fix for the operator-
+        // reported markup leak — the IIFE further down was role-aware
+        // but tierData (which drives the headline price + cart) was
+        // not, so the supplier saw different prices on each tier.
+        const mTruck  = useRawPricesRole ? 1 : markups.container;
+        const mPallet = useRawPricesRole ? 1 : markups.pallet;
+        const mCase   = useRawPricesRole ? 1 : markups.piece;
+
+        const perCaseTruck  = truckAvailable  ? basePerCase * mTruck  : null;
+        const perCasePallet = palletAvailable ? basePerCase * mPallet : null;
+        const perCaseCase   = caseAvailable   ? basePerCase * mCase   : null;
 
         const options: Array<{ key: 'truck' | 'pallet' | 'carton'; label: string; perCasePrice: number | null; casesInUnit: number }> = [];
         if (perCaseTruck  !== null) options.push({ key: 'truck',  label: 'Truck',  perCasePrice: perCaseTruck,  casesInUnit: casesPerPallet * palletsPerTruck });
@@ -140,7 +168,7 @@ export default function ProductDetailClient() {
             // next to "customer" prices.
             basePerCase,
         };
-    }, [currentProduct, markups, selectedUnit, adminDefaultUnit]);
+    }, [currentProduct, markups, selectedUnit, adminDefaultUnit, useRawPricesRole]);
 
     const scroll = (direction: 'left' | 'right') => {
         if (scrollContainerRef.current) {
@@ -157,16 +185,8 @@ export default function ProductDetailClient() {
     // not mix Truck-priced quantities with Pallet-priced quantities for the
     // same SKU. The other two tier buttons render as disabled with a tooltip
     // explaining how to switch.
-    // Role flags lifted to component scope so they're usable both in
-    // the tier-picker IIFE further down AND in the admin pricing
-    // formula panel which lives outside it.
-    const isSupplierOwner =
-        user?.role?.toUpperCase() === 'SUPPLIER' &&
-        (currentProduct as any)?.supplierId &&
-        user?.id === (currentProduct as any)?.supplierId;
-    const isAdminUser = ['ADMIN', 'OWNER'].includes(
-        (user?.role || '').toUpperCase(),
-    );
+    // isSupplierOwner / isAdminUser are lifted ABOVE tierData useMemo
+    // (see top of component) so tier prices fork on visitor role.
 
     const lockedTier: 'truck' | 'pallet' | 'carton' | null = useMemo(() => {
         if (!currentProduct) return null;

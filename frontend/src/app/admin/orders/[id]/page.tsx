@@ -281,7 +281,15 @@ export default function AdminOrderDetailPage() {
     const cancelled = (order.status || '').toUpperCase() === 'CANCELLED';
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        // Force LTR on this page — every label, table header, money,
+        // and ID is in English and reads left-to-right. The parent
+        // layout may inherit a `dir="rtl"` from the global language
+        // setting, which was making half the order page right-aligned
+        // (Arabic style) and the other half left-aligned (English),
+        // hence the operator's "نص بادئ من اليمين و نص بادئ من الشمال"
+        // complaint. text-left/right were also flipped to logical
+        // text-start/text-end so columns line up consistently.
+        <div dir="ltr" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
             {/* Top bar — Back + actions */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -339,14 +347,14 @@ export default function AdminOrderDetailPage() {
                         </h2>
 
                         <div className="overflow-x-auto -mx-2 sm:mx-0">
-                            <table className="w-full text-left min-w-[520px]">
+                            <table className="w-full text-start min-w-[520px]">
                                 <thead>
                                     <tr className="text-[10px] font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100">
                                         <th className="py-3 px-2 sm:px-3">Product</th>
                                         <th className="py-3 px-2 sm:px-3">SKU / EAN</th>
                                         <th className="py-3 px-2 sm:px-3">Qty</th>
                                         <th className="py-3 px-2 sm:px-3">Unit Price</th>
-                                        <th className="py-3 px-2 sm:px-3 text-right">Total</th>
+                                        <th className="py-3 px-2 sm:px-3 text-end">Total</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-50">
@@ -424,7 +432,7 @@ export default function AdminOrderDetailPage() {
                                                 <td className="py-4 px-2 sm:px-3 text-[13px] font-semibold text-slate-700">
                                                     {fmtMoney(it.unitPrice)}
                                                 </td>
-                                                <td className="py-4 px-2 sm:px-3 text-[13px] font-bold text-slate-900 text-right">
+                                                <td className="py-4 px-2 sm:px-3 text-[13px] font-bold text-slate-900 text-end">
                                                     {fmtMoney(it.totalPrice)}
                                                 </td>
                                             </tr>
