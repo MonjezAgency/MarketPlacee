@@ -25,8 +25,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { CATEGORIES_LIST } from '@/lib/products';
-import { fetchMyProducts, apiFetch, apiUrl, requestAdPlacement } from '@/lib/api';
-import { Zap, Rocket } from 'lucide-react';
+import { fetchMyProducts, apiFetch, apiUrl } from '@/lib/api';
 import { Product, ProductStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -200,19 +199,11 @@ export default function SupplierProductsPage() {
         }
     };
 
-    const handleQuickBoost = async (productId: string, productName: string) => {
-        if (!confirm(`Boost "${productName}" to the Featured section for $300?`)) return;
-        try {
-            await requestAdPlacement({
-                productId,
-                type: 'FEATURED',
-                durationDays: 7
-            });
-            alert('Boost request submitted! An admin will review it shortly.');
-        } catch (err: any) {
-            alert(`Failed to boost: ${err.message}`);
-        }
-    };
+    // handleQuickBoost was removed — the operator decided the per-row
+    // ⚡ Boost button next to Edit/Delete created friction (a confirm
+    // popup asking "$300?" on every accidental click). Suppliers who
+    // want to promote a product now go through /supplier/placements
+    // explicitly, where they pick tier + duration deliberately.
 
     // Edit is now a dedicated route at /supplier/products/[id]/edit —
     // saves happen inside ProductEditorForm, the table just navigates.
@@ -683,13 +674,6 @@ export default function SupplierProductsPage() {
                                                             title="Edit"
                                                         >
                                                             <Edit2 size={16} />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleQuickBoost(product.id, product.name)}
-                                                            className="w-9 h-9 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-white transition-all flex items-center justify-center shadow-lg shadow-primary/5"
-                                                            title="Boost"
-                                                        >
-                                                            <Zap size={16} />
                                                         </button>
                                                         <button
                                                             onClick={() => handleDeleteProduct(product.id, product.name)}
