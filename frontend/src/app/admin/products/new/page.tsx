@@ -88,13 +88,17 @@ export default function AdminAddProductWorkspace() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const bulkInputRef = useRef<HTMLInputElement>(null);
 
-    // Auto-assign Atlantis (the logged-in admin) as the supplier — no picker.
-    // The admin IS the platform: every product they add belongs to Atlantis.
-    useEffect(() => {
-        if (user?.id) {
-            setFormData(prev => ({ ...prev, supplierId: user.id }));
-        }
-    }, [user?.id]);
+    // DO NOT pre-fill supplierId with the admin's own user.id. Earlier
+    // versions set `supplierId = user.id` here, which made every admin-
+    // uploaded product appear as if THAT specific admin user was the
+    // supplier — so the operator would log in as a Supplier role and
+    // see their inbox full of products they never uploaded ("Admin
+    // ضاف عند Supplier"). We now leave supplierId BLANK from the
+    // frontend; the backend's `resolvePlatformSupplierId()` in
+    // products.controller.ts assigns it to the Atlantis OWNER user
+    // (Info@atlantisfmcg.com) automatically. That gives every admin-
+    // keyed product a single canonical "supplier" — the platform
+    // itself — instead of leaking the admin's personal account.
 
     const handleAIDescription = async () => {
         if (!formData.name) return;
@@ -242,7 +246,11 @@ export default function AdminAddProductWorkspace() {
                 description: formData.description,
                 ean: formData.barcode,
                 images: formData.images,
-                supplierId: formData.supplierId,
+                // Only send supplierId if the admin explicitly chose one via a
+                // picker (currently no picker). Sending undefined lets the
+                // backend assign the Atlantis platform supplier instead of
+                // the admin's own user.id.
+                supplierId: formData.supplierId || undefined,
                 // Compose the weight as "<value><unit>" so storage stays
                 // string-based and consistent with the importer's output
                 // (e.g. "150ml", "1.5kg", "12oz"). If the supplier already

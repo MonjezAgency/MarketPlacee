@@ -681,6 +681,45 @@ export class ProductsController {
     }
 
     /**
+     * Owner-only cleanup: re-attribute every product whose current
+     * supplierId points to an ADMIN/OWNER user (i.e. it was uploaded
+     * by an admin under their own account) to the canonical Atlantis
+     * platform supplier. Use this once after deploying the new
+     * `resolvePlatformSupplierId()` flow to clean up historical rows
+     * that were created when admins were auto-assigned as the supplier.
+     */
+    @Post('admin/reattribute-to-platform')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.OWNER)
+    async reattributeAdminProductsToPlatform() {
+        const platformId = await this.resolvePlatformSupplierId();
+        if (!platformId) {
+            throw new BadRequestException('No platform OWNER/Atlantis user found — cannot reattribute.');
+        }
+        // Every user with role ADMIN / OWNER except the platform itself
+        // is considered a "wrong" supplier for products.
+        const adminUsers = await this.prisma.user.findMany({
+            where: { role: { in: [Role.ADMIN, Role.OWNER] } },
+            select: { id: true, email: true, role: true },
+        });
+        const wrongIds = adminUsers.filter(u => u.id !== platformId).map(u => u.id);
+        if (wrongIds.length === 0) {
+            return { message: 'Nothing to migrate — no admin-owned products found.', moved: 0, platformId };
+        }
+        const result = await this.prisma.product.updateMany({
+            where: { supplierId: { in: wrongIds } },
+            data: { supplierId: platformId },
+        });
+        this.logger.log(`Re-attributed ${result.count} products from admin accounts → platform supplier ${platformId}`);
+        return {
+            message: `Moved ${result.count} products under the Atlantis platform supplier.`,
+            moved: result.count,
+            platformId,
+            fromAdminIds: wrongIds,
+        };
+    }
+
+    /**
      * Admin tool: re-convert existing products from a wrongly-assumed
      * source currency to the platform base. Two modes:
      *

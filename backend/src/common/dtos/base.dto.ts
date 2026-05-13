@@ -88,7 +88,13 @@ export class ProductDto {
     @Expose()
     images: string[];
 
-    @Exclude()
+    // Surface supplierId so the public PDP can detect when the viewer is
+    // the supplier-owner of the product and switch the tier ladder to
+    // RAW prices (no markup). Hiding it caused supplier owners to see
+    // customer prices (with markup) on every PDP, which is exactly the
+    // spread-leak we wanted to prevent. The supplier name + branding
+    // are already public on the PDP, so exposing the id is not new info.
+    @Expose()
     supplierId: string;
 
     @Expose()
