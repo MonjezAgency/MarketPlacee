@@ -888,60 +888,16 @@ export default function ProductDetailClient() {
                                     component is still imported for the admin variants
                                     if/when those are wired up. */}
 
-                                {/* ── Admin Pricing Formula panel ───────────────
-                                    Visible to ADMIN / OWNER only. Shows the live
-                                    markup math per tier:
-                                       base × (1 + markup%) = customer price
-                                    Reads markups from the same AppConfig the
-                                    /admin/pricing page edits, so changing the
-                                    settings reflects here without a reload of
-                                    this PDP (each visit re-fetches markups).
-                                    Operator-requested for review-time visibility
-                                    so they can verify the spread before approving
-                                    a supplier listing.
-                                */}
-                                {isAdminUser && (
-                                    <div className="rounded-2xl border border-blue-200 bg-blue-50/40 p-4 space-y-3">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-[11px] font-black uppercase tracking-widest text-blue-700">
-                                                Admin · Pricing formula
-                                            </p>
-                                            <span className="text-[10px] text-blue-500 font-bold">
-                                                base × (1 + markup) = customer
-                                            </span>
-                                        </div>
-                                        <p className="text-[11px] text-slate-500 leading-relaxed">
-                                            Live markups from <a href="/admin/pricing" className="font-bold underline">/admin/pricing</a>.
-                                            The tier ladder above shows what the <strong>buyer sees</strong> at checkout.
-                                            The breakdown below decomposes it into base × (1 + %).
-                                        </p>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {([
-                                                { label: 'Truck',   m: markups.container },
-                                                { label: 'Pallet',  m: markups.pallet },
-                                                { label: 'Case',    m: markups.piece },
-                                            ] as const).map((tier) => {
-                                                const customer = tierData.basePerCase * tier.m;
-                                                const pct = ((tier.m - 1) * 100).toFixed(1);
-                                                return (
-                                                    <div key={tier.label} className="bg-white rounded-xl border border-blue-100 p-3">
-                                                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">{tier.label} · markup</p>
-                                                        <p className="text-[14px] font-bold text-blue-700 tabular-nums">+{pct}%</p>
-                                                        <p className="text-[10px] text-slate-500 mt-2">
-                                                            Base{' '}
-                                                            <strong className="font-mono">€{tierData.basePerCase.toFixed(2)}</strong>
-                                                        </p>
-                                                        <p className="text-[10px] text-slate-500">
-                                                            Customer{' '}
-                                                            <strong className="font-mono text-[#0F172A]">€{customer.toFixed(2)}</strong>
-                                                            <span className="ms-1 text-slate-400">/ case</span>
-                                                        </p>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
+                                {/* The Admin Pricing Formula panel used to render
+                                    here when isAdminUser was true. Removed per
+                                    operator request: "أنا مش عايز ال-formula
+                                    عند ال-admin تظهر في ال-product page". The
+                                    formula UI now lives ONLY inside the admin
+                                    dashboard (/admin/products detail modal +
+                                    /admin/pricing). The public PDP — even when
+                                    visited by an admin account — stays clean
+                                    so what an admin sees on PDP matches what
+                                    a customer sees, full stop. */}
                             </div>
 
                             <div className="pt-8 border-t border-[#E5E7EB] space-y-4">

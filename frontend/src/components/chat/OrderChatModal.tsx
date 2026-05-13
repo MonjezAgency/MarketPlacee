@@ -45,9 +45,22 @@ export default function OrderChatModal({ orderId, orderTotal, customerName, isAd
     const fetchMessages = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
         try {
-            const data = await apiFetch(`/chat/order/${orderId}/messages`);
+            // BUG FIX: apiFetch returns a Response, NOT parsed JSON. The
+            // previous version did `Array.isArray(data)` directly on the
+            // Response object — always false — so `setMessages([])` ran
+            // every time and the operator opened a thread that already
+            // had messages and saw the empty "Start a conversation"
+            // state. Parse the body here.
+            const res = await apiFetch(`/chat/order/${orderId}/messages`);
+            if (!res.ok) {
+                if (!silent) console.warn(`Order chat fetch failed: HTTP ${res.status}`);
+                return;
+            }
+            const data = await res.json();
             setMessages(Array.isArray(data) ? data : []);
-        } catch { /* silent fail on poll */ } finally {
+        } catch (err) {
+            if (!silent) console.warn('Order chat fetch error:', err);
+        } finally {
             if (!silent) setLoading(false);
         }
     }, [orderId]);
@@ -67,13 +80,15 @@ export default function OrderChatModal({ orderId, orderTotal, customerName, isAd
         setSending(true);
         setInput('');
         try {
-            await apiFetch(`/chat/order/${orderId}/send`, {
+            const res = await apiFetch(`/chat/order/${orderId}/send`, {
                 method: 'POST',
                 body: JSON.stringify({ content: text }),
             });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
             await fetchMessages(true);
-        } catch {
-            setInput(text); // restore on error
+        } catch (err) {
+            console.warn('Failed to send order message:', err);
+            setInput(text); // restore on error so the user can retry
         } finally {
             setSending(false);
             setTimeout(() => inputRef.current?.focus(), 50);
