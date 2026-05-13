@@ -1,10 +1,9 @@
 'use client';
 import { apiFetch } from '@/lib/api';
 
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { Ticket, ArrowLeft, Percent, Calendar, CheckCircle2, Box, Tag } from 'lucide-react';
+import { Ticket, ArrowLeft, Percent, Calendar, CheckCircle2, Box, Tag, Search, Image as ImageIcon, Building2, Globe2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -16,11 +15,26 @@ interface Placement {
         id: string;
         name: string;
         price: number;
+        images?: string[];
+        sku?: string;
+        ean?: string;
+        supplierId?: string;
+        supplier?: { id: string; name?: string; companyName?: string; email?: string };
     };
     price: number;
     startDate: string;
     endDate: string;
 }
+
+type Scope = 'ALL' | 'ATLANTIS';
+
+// Atlantis-owned products: the supplier user that represents the platform itself.
+// We treat any supplier whose name or company contains "atlantis" as the platform.
+const isAtlantisSupplier = (s?: Placement['product']['supplier']) => {
+    if (!s) return false;
+    const haystack = `${s.name ?? ''} ${s.companyName ?? ''} ${s.email ?? ''}`.toLowerCase();
+    return haystack.includes('atlantis');
+};
 
 export default function CreateCouponPage() {
     const router = useRouter();
@@ -31,6 +45,8 @@ export default function CreateCouponPage() {
     const [code, setCode] = useState('');
     const [discountPercent, setDiscountPercent] = useState('');
     const [expirationDate, setExpirationDate] = useState('');
+    const [scope, setScope] = useState<Scope>('ALL');
+    const [search, setSearch] = useState('');
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
@@ -54,6 +70,33 @@ export default function CreateCouponPage() {
         fetchPlacements();
     }, []);
 
+    // Filter placements by scope + search
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return placements
+            .filter(p => {
+                if (scope === 'ATLANTIS' && !isAtlantisSupplier(p.product?.supplier)) return false;
+                if (!q) return true;
+                const fields = [
+                    p.product?.name,
+                    p.product?.sku,
+                    p.product?.ean,
+                    p.product?.supplier?.name,
+                    p.product?.supplier?.companyName,
+                ]
+                    .filter(Boolean)
+                    .map(s => String(s).toLowerCase());
+                return fields.some(f => f.includes(q));
+            });
+    }, [placements, scope, search]);
+
+    // Reset selection when filters change and current isn't visible anymore
+    useEffect(() => {
+        if (selectedPlacementId && !filtered.some(p => p.id === selectedPlacementId)) {
+            setSelectedPlacementId('');
+        }
+    }, [filtered, selectedPlacementId]);
+
     const handleGenerateRandomCode = () => {
         const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         let result = '';
@@ -69,26 +112,22 @@ export default function CreateCouponPage() {
         setIsSubmitting(true);
 
         try {
-            
             const res = await apiFetch('/coupons', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     placementId: selectedPlacementId,
                     code: code.toUpperCase(),
                     discountPercent: parseFloat(discountPercent),
-                    expirationDate: expirationDate
-                })
+                    expirationDate: expirationDate,
+                }),
             });
 
             if (res.ok) {
                 router.push('/admin/coupons');
             } else {
-                const data = await res.json();
-                setError(data.message || 'Failed to create coupon.');
+                const data = await res.json().catch(() => null);
+                setError(data?.message || 'Failed to create coupon.');
             }
         } catch (err) {
             setError('An unexpected error occurred.');
@@ -132,33 +171,117 @@ export default function CreateCouponPage() {
                         </div>
                     )}
 
-                    {/* Offer Selection */}
+                    {/* Scope toggle + Search */}
                     <div className="space-y-4">
                         <label className="text-xs font-black text-muted-foreground uppercase tracking-widest flex items-center gap-2">
                             <Box size={14} /> Connect to Offer (Placement)
                         </label>
-                        {isLoadingPlacements ? (
-                            <div className="h-16 bg-muted animate-pulse rounded-2xl w-full border border-border/50" />
-                        ) : (
-                            <div className="relative group">
-                                <select
-                                    required
-                                    value={selectedPlacementId}
-                                    onChange={(e) => setSelectedPlacementId(e.target.value)}
-                                    className="w-full h-16 bg-muted border border-border/50 rounded-2xl ps-12 pe-6 text-foreground appearance-none outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all font-medium"
+
+                        <div className="flex flex-wrap items-center gap-3">
+                            <div className="inline-flex rounded-2xl border border-border/50 bg-muted p-1">
+                                <button
+                                    type="button"
+                                    onClick={() => setScope('ALL')}
+                                    className={cn(
+                                        'h-10 px-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-colors',
+                                        scope === 'ALL' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                                    )}
                                 >
-                                    <option value="" disabled className="bg-background text-muted-foreground">Select an active offer...</option>
-                                    {placements.map(p => (
-                                        <option key={p.id} value={p.id} className="bg-card text-foreground py-2">
-                                            {p.product?.name || 'Unknown Product'} - ${p.product?.price}
-                                        </option>
-                                    ))}
-                                </select>
-                                <Tag size={20} className="absolute start-4 top-1/2 -translate-y-1/2 text-muted-foreground/50 group-focus-within:text-primary pointer-events-none transition-colors" />
+                                    <Globe2 size={14} /> All platform
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setScope('ATLANTIS')}
+                                    className={cn(
+                                        'h-10 px-4 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-2 transition-colors',
+                                        scope === 'ATLANTIS' ? 'bg-primary text-primary-foreground shadow' : 'text-muted-foreground hover:text-foreground'
+                                    )}
+                                >
+                                    <Building2 size={14} /> Atlantis only
+                                </button>
                             </div>
-                        )}
-                        {placements.length === 0 && !isLoadingPlacements && (
-                            <p className="text-sm text-destructive mt-2">You don't have any active offers available right now.</p>
+
+                            <div className="relative flex-1 min-w-[220px]">
+                                <Search size={16} className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                                <input
+                                    type="text"
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    placeholder="Search by name, SKU, EAN, or supplier…"
+                                    className="w-full h-10 ps-10 pe-4 rounded-xl border border-border/50 bg-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                                />
+                            </div>
+                        </div>
+
+                        {isLoadingPlacements ? (
+                            <div className="h-32 bg-muted animate-pulse rounded-2xl w-full border border-border/50" />
+                        ) : filtered.length === 0 ? (
+                            <div className="p-6 rounded-2xl border border-dashed border-border/60 bg-muted/30 text-center">
+                                <p className="text-sm text-muted-foreground">
+                                    {placements.length === 0
+                                        ? "No active offers available right now."
+                                        : "No offers match the current filter."}
+                                </p>
+                            </div>
+                        ) : (
+                            <div className="max-h-[420px] overflow-y-auto rounded-2xl border border-border/50 bg-background/40 divide-y divide-border/40">
+                                {filtered.map((p) => {
+                                    const selected = selectedPlacementId === p.id;
+                                    const supplierLabel =
+                                        p.product?.supplier?.companyName ||
+                                        p.product?.supplier?.name ||
+                                        'Unknown supplier';
+                                    const isAtlantis = isAtlantisSupplier(p.product?.supplier);
+                                    const img = p.product?.images?.[0];
+                                    return (
+                                        <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => setSelectedPlacementId(p.id)}
+                                            className={cn(
+                                                'w-full flex items-center gap-4 p-4 text-start transition-colors',
+                                                selected ? 'bg-primary/10' : 'hover:bg-muted/60'
+                                            )}
+                                        >
+                                            <div className="w-14 h-14 shrink-0 rounded-xl bg-muted flex items-center justify-center overflow-hidden border border-border/50">
+                                                {img ? (
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    <img src={img} alt="" className="w-full h-full object-contain" />
+                                                ) : (
+                                                    <ImageIcon size={20} className="text-muted-foreground/50" />
+                                                )}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <p className="text-sm font-bold text-foreground truncate">
+                                                        {p.product?.name || 'Unknown Product'}
+                                                    </p>
+                                                    {isAtlantis && (
+                                                        <span className="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full bg-teal-500/15 text-teal-600">
+                                                            Atlantis
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <p className="text-[11px] text-muted-foreground mt-0.5 truncate">
+                                                    {supplierLabel}
+                                                    {p.product?.sku && <> · SKU {p.product.sku}</>}
+                                                    {p.product?.ean && <> · EAN {p.product.ean}</>}
+                                                </p>
+                                            </div>
+                                            <div className="text-end shrink-0">
+                                                <p className="text-sm font-black text-foreground">€{p.product?.price?.toFixed?.(2) ?? p.product?.price}</p>
+                                                {selected ? (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary mt-1">
+                                                        <CheckCircle2 size={12} /> Selected
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-muted-foreground">Tap to select</span>
+                                                )}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         )}
                     </div>
 
@@ -229,7 +352,7 @@ export default function CreateCouponPage() {
                     <div className="pt-8 border-t border-border/50">
                         <button
                             type="submit"
-                            disabled={isSubmitting || placements.length === 0}
+                            disabled={isSubmitting || !selectedPlacementId}
                             className="w-full h-16 bg-primary text-primary-foreground font-black text-xl rounded-2xl hover:scale-[1.02] transition-transform shadow-2xl shadow-primary/20 disabled:opacity-50 disabled:scale-100 flex items-center justify-center gap-3"
                         >
                             {isSubmitting ? (
@@ -240,7 +363,7 @@ export default function CreateCouponPage() {
                             ) : (
                                 <>
                                     <CheckCircle2 size={24} />
-                                    Publish Coupon
+                                    {selectedPlacementId ? 'Publish Coupon' : 'Select an offer first'}
                                 </>
                             )}
                         </button>

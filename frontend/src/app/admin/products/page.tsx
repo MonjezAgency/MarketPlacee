@@ -547,20 +547,37 @@ export default function ProductsModerationPage() {
 
     const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
         if (selectedIds.length === 0) return;
-        
-        const confirmMsg = action === 'delete' 
-            ? `Are you sure you want to delete ${selectedIds.length} products?`
-            : `Are you sure you want to ${action} ${selectedIds.length} products?`;
-            
-        if (!window.confirm(confirmMsg)) return;
+
+        let reason = '';
+        if (action === 'reject') {
+            // Operations rule: every bulk rejection must carry a reason so
+            // each supplier sees the same explanation on their dashboard.
+            const input = window.prompt(
+                `Reject ${selectedIds.length} products. Enter the reason that will be shown to every affected supplier:`,
+                'Did not meet Atlantis quality / compliance standards.',
+            );
+            if (input === null) return; // cancelled
+            reason = input.trim();
+            if (!reason) {
+                toast.error('A rejection reason is required for bulk rejection');
+                return;
+            }
+        } else {
+            const confirmMsg = action === 'delete'
+                ? `Are you sure you want to delete ${selectedIds.length} products?`
+                : `Are you sure you want to ${action} ${selectedIds.length} products?`;
+            if (!window.confirm(confirmMsg)) return;
+        }
 
         const tid = toast.loading(`${action.charAt(0).toUpperCase() + action.slice(1)}ing products...`);
         setIsBulkLoading(true);
         try {
             const endpoint = `/products/bulk-${action}`;
+            const body: any = { ids: selectedIds };
+            if (action === 'reject') body.reason = reason;
             const res = await apiFetch(endpoint, {
                 method: 'POST',
-                body: JSON.stringify({ ids: selectedIds })
+                body: JSON.stringify(body),
             });
 
             if (res.ok) {

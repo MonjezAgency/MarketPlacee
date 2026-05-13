@@ -542,13 +542,32 @@ export default function AdminOrderDetailPage() {
                                                             </Link>
                                                         </>
                                                     )}
-                                                    {supplier?.email && (
-                                                        <a
-                                                            href={`mailto:${supplier.email}?subject=${encodeURIComponent(`Atlantis · order ${order.id.slice(0, 8)} — please confirm stock for "${p.name}"`)}&body=${encodeURIComponent(`Hi ${supplier.name || ''},\n\nWe just received an order on Atlantis that includes "${p.name}" (${it.quantity} ${(it as any).selectedTier || p.unit || 'units'}). Could you confirm you have the stock ready to ship?\n\nOnce you confirm, we'll process the order on our side.\n\nThanks,\nAtlantis Operations`)}`}
+                                                    {supplier?.id && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={async () => {
+                                                                const msg = window.prompt(
+                                                                    `Send an in-app message to ${supplier.name || 'this supplier'}:`,
+                                                                    `Hi ${supplier.name || ''},\n\nWe just received an order on Atlantis that includes "${p.name}" (${it.quantity} ${(it as any).selectedTier || p.unit || 'units'}). Could you confirm you have the stock ready to ship?\n\nThanks,\nAtlantis Operations`,
+                                                                );
+                                                                if (!msg || !msg.trim()) return;
+                                                                try {
+                                                                    await apiFetch('/chat/send', {
+                                                                        method: 'POST',
+                                                                        body: JSON.stringify({
+                                                                            content: msg.trim(),
+                                                                            receiverId: supplier.id,
+                                                                        }),
+                                                                    });
+                                                                    toast.success('Message sent to supplier');
+                                                                } catch {
+                                                                    toast.error('Failed to send message');
+                                                                }
+                                                            }}
                                                             className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-bold flex items-center gap-1.5 transition-colors shadow-sm"
                                                         >
-                                                            ✉ Contact supplier
-                                                        </a>
+                                                            💬 Message supplier
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>

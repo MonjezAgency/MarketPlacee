@@ -56,6 +56,11 @@ interface ProductBlock extends BaseBlock {
     ean: string;
     unitsPerCase: number | string;
     casesPerPallet: number | string;
+    // ── Custom fields requested by operations ───────────────────────────────
+    bbd?: string;            // Best-Before Date (free text — e.g. "12 months from production")
+    origin?: string;         // Country of origin
+    family?: string;         // Product family / brand range
+    adminNote?: string;      // 🔒 Internal — never rendered in the email body
 }
 type Block = TextBlock | ButtonBlock | ImageBlock | ProductBlock;
 
@@ -118,6 +123,11 @@ function renderBlock(b: Block): string {
         if (b.ean)         rows.push(['EAN', escapeHtml(b.ean)]);
         if (b.unitsPerCase) rows.push(['Units per case', String(b.unitsPerCase)]);
         if (b.casesPerPallet) rows.push(['Cases per pallet', String(b.casesPerPallet)]);
+        if (b.bbd)         rows.push(['Best-Before', escapeHtml(b.bbd)]);
+        if (b.origin)      rows.push(['Origin', escapeHtml(b.origin)]);
+        if (b.family)      rows.push(['Family', escapeHtml(b.family)]);
+        // NOTE: adminNote is INTENTIONALLY omitted from the email body — it
+        // is an internal-only side note for the campaign editor.
         const rowsHtml = rows.map(([k, v]) =>
             `<tr><td style="padding:14px 0;border-bottom:1px solid #E2E8F0;color:#0F172A;font-weight:700;font-size:14px;font-family:'Inter',Arial,sans-serif;">${k}</td><td style="padding:14px 0;border-bottom:1px solid #E2E8F0;color:#2EC4B6;font-weight:800;font-size:14px;text-align:right;font-family:'Inter',Arial,sans-serif;">${v}</td></tr>`
         ).join('');
@@ -304,6 +314,7 @@ export default function CampaignBuilderPage() {
             base.productId = ''; base.name = ''; base.image = '';
             base.exwLocation = ''; base.ean = '';
             base.unitsPerCase = ''; base.casesPerPallet = '';
+            base.bbd = ''; base.origin = ''; base.family = ''; base.adminNote = '';
         }
         setBlocks(prev => [...prev, base]);
     };
@@ -338,6 +349,9 @@ export default function CampaignBuilderPage() {
             ean: p.ean || '',
             unitsPerCase: p.unitsPerCase || '',
             casesPerPallet: p.casesPerPallet || '',
+            origin: p.origin || p.countryOfOrigin || '',
+            family: p.family || p.brand || '',
+            bbd: p.bbd || p.shelfLife || '',
         } as Partial<ProductBlock>);
     };
 
@@ -619,13 +633,51 @@ function BlockEditor({
                         ))}
                     </select>
                     {(block as ProductBlock).productId && (
-                        <div className="grid grid-cols-2 gap-2 text-[12px] bg-white border border-slate-200 rounded-lg p-3">
-                            <div><span className="text-slate-400">Name:</span> <span className="font-bold">{(block as ProductBlock).name}</span></div>
-                            <div><span className="text-slate-400">EXW:</span> <span className="font-bold">{(block as ProductBlock).exwLocation || '—'}</span></div>
-                            <div><span className="text-slate-400">EAN:</span> <span className="font-bold">{(block as ProductBlock).ean || '—'}</span></div>
-                            <div><span className="text-slate-400">Units/case:</span> <span className="font-bold">{(block as ProductBlock).unitsPerCase || '—'}</span></div>
-                            <div className="col-span-2"><span className="text-slate-400">Cases/pallet:</span> <span className="font-bold">{(block as ProductBlock).casesPerPallet || '—'}</span></div>
-                        </div>
+                        <>
+                            <div className="grid grid-cols-2 gap-2 text-[12px] bg-white border border-slate-200 rounded-lg p-3">
+                                <div><span className="text-slate-400">Name:</span> <span className="font-bold">{(block as ProductBlock).name}</span></div>
+                                <div><span className="text-slate-400">EXW:</span> <span className="font-bold">{(block as ProductBlock).exwLocation || '—'}</span></div>
+                                <div><span className="text-slate-400">EAN:</span> <span className="font-bold">{(block as ProductBlock).ean || '—'}</span></div>
+                                <div><span className="text-slate-400">Units/case:</span> <span className="font-bold">{(block as ProductBlock).unitsPerCase || '—'}</span></div>
+                                <div className="col-span-2"><span className="text-slate-400">Cases/pallet:</span> <span className="font-bold">{(block as ProductBlock).casesPerPallet || '—'}</span></div>
+                            </div>
+
+                            {/* Custom fields surfaced in the email body */}
+                            <div className="grid grid-cols-3 gap-2">
+                                <input
+                                    value={(block as ProductBlock).bbd ?? ''}
+                                    onChange={e => onChange({ bbd: e.target.value } as any)}
+                                    placeholder="BBD (Best-Before)"
+                                    className="h-10 px-3 rounded-lg border border-slate-200 bg-white text-[12px] outline-none focus:border-[#2EC4B6]"
+                                />
+                                <input
+                                    value={(block as ProductBlock).origin ?? ''}
+                                    onChange={e => onChange({ origin: e.target.value } as any)}
+                                    placeholder="Origin"
+                                    className="h-10 px-3 rounded-lg border border-slate-200 bg-white text-[12px] outline-none focus:border-[#2EC4B6]"
+                                />
+                                <input
+                                    value={(block as ProductBlock).family ?? ''}
+                                    onChange={e => onChange({ family: e.target.value } as any)}
+                                    placeholder="Family"
+                                    className="h-10 px-3 rounded-lg border border-slate-200 bg-white text-[12px] outline-none focus:border-[#2EC4B6]"
+                                />
+                            </div>
+
+                            {/* Admin-only side note — NEVER emitted in HTML */}
+                            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-2">
+                                <label className="block text-[10px] font-black uppercase tracking-widest text-amber-700 mb-1">
+                                    🔒 Internal Side-Note (admin only — not shown to recipients)
+                                </label>
+                                <textarea
+                                    value={(block as ProductBlock).adminNote ?? ''}
+                                    onChange={e => onChange({ adminNote: e.target.value } as any)}
+                                    placeholder="Anything you want admins to remember about this card — never goes out in the email"
+                                    rows={2}
+                                    className="w-full p-2 rounded border border-amber-200 bg-white text-[12px] outline-none focus:border-amber-400 resize-y"
+                                />
+                            </div>
+                        </>
                     )}
                 </div>
             )}

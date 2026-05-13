@@ -53,6 +53,18 @@ export class OrdersController {
         return this.ordersService.getOrderStats();
     }
 
+    /**
+     * Logistics view: every order whose shippingCompany matches the
+     * logged-in LOGISTICS user (by companyName or display name). Lets
+     * a shipping company log in and see only the orders they should
+     * be picking up / dropping off, with tracking + addresses pre-filled.
+     */
+    @Get('logistics/assigned')
+    @Roles(Role.LOGISTICS, Role.ADMIN, Role.OWNER)
+    async findLogisticsAssigned(@Request() req) {
+        return this.ordersService.findOrdersForLogisticsUser(req.user.sub);
+    }
+
     @Get('admin-analytics')
     @Roles(Role.ADMIN, Role.OWNER)
     async getAdminAnalytics(@Query('timeframe') timeframe?: string) {

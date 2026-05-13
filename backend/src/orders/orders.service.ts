@@ -246,6 +246,52 @@ export class OrdersService {
         return order;
     }
 
+    /**
+     * Logistics dashboard query: pull every order whose shippingCompany
+     * field matches the logged-in user's companyName / name (case-
+     * insensitive). The match is fuzzy because admin-typed carrier
+     * names ("DHL", "DHL Express", "DHL EU") all describe the same
+     * carrier — substring contains-either-direction is good enough
+     * without a hard FK between Users(LOGISTICS) and Orders.
+     */
+    async findOrdersForLogisticsUser(userId: string) {
+        const user = await this.prisma.user.findUnique({
+            where: { id: userId },
+            select: { id: true, name: true, companyName: true, role: true },
+        });
+        if (!user) return [];
+
+        const candidates = [user.companyName, user.name]
+            .filter(Boolean)
+            .map(s => String(s).trim())
+            .filter(s => s.length > 0);
+
+        // Pull every order with a shippingCompany set, then filter in JS so
+        // we can do a fuzzy two-way contains match without bending Prisma.
+        const orders = await this.prisma.order.findMany({
+            where: { shippingCompany: { not: null } },
+            include: {
+                customer: { select: { id: true, name: true, email: true, phone: true } },
+                items: {
+                    include: {
+                        product: { select: { id: true, name: true, images: true, weight: true } },
+                    },
+                },
+                shipment: true,
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 500,
+        });
+
+        if (candidates.length === 0) return [];
+        const lc = candidates.map(c => c.toLowerCase());
+        return orders.filter(o => {
+            const ship = (o.shippingCompany || '').toLowerCase().trim();
+            if (!ship) return false;
+            return lc.some(c => ship.includes(c) || c.includes(ship));
+        });
+    }
+
     async findAll() {
         const orders = await this.prisma.order.findMany({
             include: {

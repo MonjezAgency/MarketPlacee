@@ -103,6 +103,18 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
     const dir = locale === 'ar' ? 'rtl' : 'ltr';
 
+    // Keep the <html> root in sync so global CSS hooks (Tailwind's
+    // ms-/me-/ps-/pe- + custom logical-direction selectors) see the
+    // correct direction without relying on a wrapping div. This avoids
+    // bugs where fixed-position elements (modals, drawers) ignored the
+    // direction because they were portaled out of the wrapping <div>.
+    useEffect(() => {
+        if (typeof document !== 'undefined') {
+            document.documentElement.setAttribute('dir', dir);
+            document.documentElement.setAttribute('lang', locale);
+        }
+    }, [dir, locale]);
+
     return (
         <LanguageContext.Provider value={{ locale, setLocale, t, dir }}>
             <div dir={dir} lang={locale}>

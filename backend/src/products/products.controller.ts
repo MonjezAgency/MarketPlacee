@@ -290,16 +290,23 @@ export class ProductsController {
 
     @Post('upload-image')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.SUPPLIER, Role.ADMIN)
-    @UseInterceptors(FileInterceptor('file'))
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.EDITOR)
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 15 * 1024 * 1024 } }))
     async uploadImage(@UploadedFile() file: any) {
         if (!file) throw new BadRequestException('No file uploaded');
-        const url = await this.storageService.uploadProductImage(
-            file.buffer,
-            file.originalname,
-            file.mimetype
-        );
-        return { url };
+        if (!file.mimetype?.startsWith('image/')) {
+            throw new BadRequestException('Only image files are allowed');
+        }
+        try {
+            const url = await this.storageService.uploadProductImage(
+                file.buffer,
+                file.originalname,
+                file.mimetype
+            );
+            return { url };
+        } catch (e: any) {
+            throw new BadRequestException(e?.message || 'Image upload failed');
+        }
     }
 
     /**
@@ -615,10 +622,11 @@ export class ProductsController {
 
     @Post('bulk-reject')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.ADMIN)
-    async rejectBulk(@Body() body: { ids: string[] }) {
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+    async rejectBulk(@Body() body: { ids: string[]; reason?: string }) {
         if (!body.ids || !body.ids.length) return { message: 'No IDs provided' };
-        await this.productsService.bulkReject(body.ids);
+        const reason = (body.reason || '').trim();
+        await this.productsService.bulkReject(body.ids, reason || undefined);
         return { message: 'Products rejected', count: body.ids.length };
     }
 

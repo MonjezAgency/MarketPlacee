@@ -31,13 +31,10 @@ function RegisterForm() {
     const inviteToken = searchParams.get('invite') || '';
     const rawInviteRole = searchParams.get('role') || '';
     const isFixedRole = searchParams.get('fixed') === 'true';
-    // Hard rule: ?role=supplier is ONLY honoured when the link is also
-    // accompanied by an invite token or the admin-issued fixed flag.
-    // Otherwise we silently downgrade to customer so a public visitor
-    // cannot self-register as a supplier by hand-crafting the URL.
-    const inviteRole = (rawInviteRole === 'supplier' || rawInviteRole === 'SUPPLIER')
-        ? (inviteToken || isFixedRole ? rawInviteRole : 'customer')
-        : rawInviteRole;
+    // Public signup now exposes both Supplier + Buyer choices — supplier
+    // accounts still go through KYC + admin approval before they go live,
+    // so allowing self-selection is safe.
+    const inviteRole = rawInviteRole;
     const [form, setForm] = useState({
         name: '', email: inviteEmail, phone: '', phoneCode: '+20', companyName: '', website: '', socialLinks: '', password: '', confirmPassword: '', role: inviteRole || 'customer',
         vatNumber: '', taxId: '', country: 'Egypt', bankAddress: '', iban: '', swiftCode: ''
@@ -530,25 +527,37 @@ function RegisterForm() {
                                     ))}
                                 </div>
 
-                                {/* Public registration is buyer-only. The
-                                    "Supplier" option used to be exposed here
-                                    publicly, but Atlantis sells directly and
-                                    supplier onboarding is invite-only — the
-                                    supplier role appears ONLY when the user
-                                    arrives with a valid invite token (or via
-                                    the admin-issued ?role=supplier&fixed=true
-                                    link from /admin/invite). */}
+                                {/* Public registration — pick Buyer or Supplier.
+                                    Supplier accounts always go through admin
+                                    KYC + approval before going live. */}
                                 {!inviteToken && !isFixedRole && (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
-                                        <label className={labelClass}>Account Type</label>
-                                        <button
-                                            type="button"
-                                            onClick={() => update('role', 'customer')}
-                                            className={`w-full h-20 rounded-[24px] text-xs font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 ${form.role === 'customer' ? 'bg-[#0A1A2F] border-[#0A1A2F] text-white shadow-xl shadow-[#0A1A2F]/20' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
-                                        >
-                                            <span className="text-lg">📦</span>
-                                            Business Buyer Account
-                                        </button>
+                                        <label className={labelClass}>Account Type <span className="text-[#1BC7C9]">*</span></label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <button
+                                                type="button"
+                                                onClick={() => update('role', 'customer')}
+                                                className={`h-24 rounded-[24px] text-xs font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 px-4 ${form.role === 'customer' ? 'bg-[#0A1A2F] border-[#0A1A2F] text-white shadow-xl shadow-[#0A1A2F]/20' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                            >
+                                                <span className="text-2xl mb-0.5">📦</span>
+                                                <span>Business Buyer</span>
+                                                <span className="text-[9px] font-medium tracking-normal opacity-70 normal-case">Source from verified suppliers</span>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => update('role', 'supplier')}
+                                                className={`h-24 rounded-[24px] text-xs font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 px-4 ${form.role === 'supplier' ? 'bg-[#1BC7C9] border-[#1BC7C9] text-white shadow-xl shadow-[#1BC7C9]/20' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                            >
+                                                <span className="text-2xl mb-0.5">🏭</span>
+                                                <span>Supplier / Brand</span>
+                                                <span className="text-[9px] font-medium tracking-normal opacity-70 normal-case">Sell inventory at scale</span>
+                                            </button>
+                                        </div>
+                                        {form.role === 'supplier' && (
+                                            <p className="text-[10px] font-bold text-[#1BC7C9] ms-2">
+                                                Supplier accounts require KYC + admin approval before going live.
+                                            </p>
+                                        )}
                                     </div>
                                 )}
 

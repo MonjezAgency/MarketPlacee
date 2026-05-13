@@ -890,15 +890,21 @@ export class ProductsService {
         return result;
     }
 
-    async bulkReject(ids: string[]) {
+    async bulkReject(ids: string[], reason?: string) {
         const products = await this.prisma.product.findMany({
             where: { id: { in: ids } },
             select: { id: true, name: true, supplierId: true }
         });
 
+        const explanation = (reason || '').trim()
+            || 'Rejected in a bulk action. No specific reason was provided.';
+
         const result = await this.prisma.product.updateMany({
             where: { id: { in: ids } },
-            data: { status: ProductStatus.REJECTED }
+            data: {
+                status: ProductStatus.REJECTED,
+                adminNotes: explanation,
+            },
         });
 
         // Notify Suppliers
@@ -907,9 +913,9 @@ export class ProductsService {
                 this.notificationsService.notifyUser(
                     p.supplierId,
                     'Product Rejected',
-                    `Your product "${p.name}" was rejected in a bulk action.`,
+                    `Your product "${p.name}" was rejected. Reason: ${explanation}`,
                     'ERROR',
-                    { productId: p.id }
+                    { productId: p.id, reason: explanation }
                 ).catch(() => {});
             }
         }

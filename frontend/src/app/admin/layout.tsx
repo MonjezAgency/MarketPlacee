@@ -48,6 +48,7 @@ import {
     MessageCircle,
     Activity,
     CheckCircle2,
+    ScrollText,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -129,6 +130,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         links: [
             { label: 'Security Reports', translationKey: 'reports', href: '/admin/security', icon: Activity },
             { label: 'System Settings', translationKey: 'settings', href: '/admin/settings', icon: Settings },
+            { label: 'Terms & Conditions', translationKey: 'termsAndConditions', href: '/admin/terms', icon: ScrollText },
             { label: 'AI Intelligence', translationKey: 'aiAgent', href: '/admin/ai-agent', icon: Bot },
         ]
     },

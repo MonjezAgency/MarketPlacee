@@ -37,10 +37,32 @@ export default function AdminTeamPage() {
     const [selectedMember, setSelectedMember] = React.useState<TeamMember | null>(null);
     const [tempPermissions, setTempPermissions] = React.useState<string[]>([]);
 
-    const AVAILABLE_PERMISSIONS = [
-        'ALL_ACCESS', 'APPROVE_OFFERS', 'MANAGE_USERS', 'VIEW_ORDERS',
-        'CHAT_SUPPORT', 'MANAGE_PLACEMENTS', 'FINANCIAL_REPORTS'
-    ];
+    // Pulled from /owner/permissions/list — the source of truth lives in
+    // backend/src/owner/owner.service.ts (ALL_PERMISSIONS). We keep the
+    // ALL_ACCESS shortcut at the top.
+    const [permissionCatalog, setPermissionCatalog] = React.useState<{ key: string; label: string }[]>([
+        { key: 'ALL_ACCESS', label: 'Full Access (super-user)' },
+    ]);
+    const AVAILABLE_PERMISSIONS = React.useMemo(
+        () => permissionCatalog.map(p => p.key),
+        [permissionCatalog],
+    );
+
+    React.useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch('/api/proxy/owner/permissions/list', { cache: 'no-store' });
+                if (!res.ok) return;
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    setPermissionCatalog([
+                        { key: 'ALL_ACCESS', label: 'Full Access (super-user)' },
+                        ...data,
+                    ]);
+                }
+            } catch { /* leave default */ }
+        })();
+    }, []);
 
     const [team, setTeam] = React.useState<TeamMember[]>([]);
     const [isInviting, setIsInviting] = React.useState(false);
@@ -133,11 +155,28 @@ export default function AdminTeamPage() {
         setTempPermissions(newPerms);
     };
 
-    const handleSavePermissions = () => {
+    const handleSavePermissions = async () => {
         if (!selectedMember) return;
-        setTeam(team.map(m => m.id === selectedMember.id ? { ...m, permissions: tempPermissions } : m));
-        setIsPermissionsModalOpen(false);
-        setSelectedMember(null);
+        try {
+            const res = await fetch(
+                `/api/proxy/owner/team/${selectedMember.id}/permissions`,
+                {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ permissions: tempPermissions }),
+                },
+            );
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.message || 'Failed to update permissions');
+            }
+            setTeam(team.map(m => m.id === selectedMember.id ? { ...m, permissions: tempPermissions } : m));
+            toast.success(`Permissions saved for ${selectedMember.name}`);
+            setIsPermissionsModalOpen(false);
+            setSelectedMember(null);
+        } catch (e: any) {
+            toast.error(e?.message || 'Failed to update permissions');
+        }
     };
 
     const handleDeleteMember = async (member: TeamMember) => {
@@ -449,7 +488,8 @@ export default function AdminTeamPage() {
                             </div>
 
                             <div className="space-y-4 max-h-[50vh] overflow-y-auto no-scrollbar pe-2 mb-8">
-                                {AVAILABLE_PERMISSIONS.map((perm) => {
+                                {permissionCatalog.map((entry) => {
+                                    const perm = entry.key;
                                     const isAllowed = tempPermissions.includes(perm) || (perm !== 'ALL_ACCESS' && tempPermissions.includes('ALL_ACCESS'));
                                     return (
                                         <button key={perm} onClick={() => handleTogglePermission(perm)}
@@ -466,7 +506,10 @@ export default function AdminTeamPage() {
                                                 )}>
                                                     {isAllowed && <CheckCircle2 size={14} strokeWidth={3} />}
                                                 </div>
-                                                <span className="font-black text-sm tracking-wide">{perm.replace('_', ' ')}</span>
+                                                <div className="flex flex-col">
+                                                    <span className="font-black text-sm tracking-wide">{entry.label}</span>
+                                                    <span className="text-[10px] font-mono opacity-60 mt-0.5">{perm}</span>
+                                                </div>
                                             </div>
                                             {perm === 'ALL_ACCESS' && (
                                                 <span className="text-[10px] font-bold uppercase tracking-widest bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full">Dangerous</span>

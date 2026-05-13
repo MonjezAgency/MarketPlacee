@@ -135,8 +135,11 @@ export default function RootLayout({
 }: {
     children: React.ReactNode;
 }) {
+    // The HTML root defaults to English/LTR; the LanguageProvider wraps a
+    // <div dir={...}> around the app and flips to RTL once the locale has
+    // hydrated from localStorage. SSR-stable, no mismatch.
     return (
-        <html lang="ar" dir="rtl" suppressHydrationWarning>
+        <html lang="en" dir="ltr" suppressHydrationWarning>
             <head>
                 <script
                     type="application/ld+json"

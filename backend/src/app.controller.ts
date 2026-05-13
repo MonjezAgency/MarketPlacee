@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, HttpCode } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpCode, Logger } from '@nestjs/common';
 import { IsEmail, IsString, IsOptional } from 'class-validator';
 import { AppService } from './app.service';
 import { EmailService } from './email/email.service';
+import { PrismaService } from './common/prisma.service';
 
 class ContactDto {
     @IsString() name: string;
@@ -13,9 +14,12 @@ class ContactDto {
 
 @Controller()
 export class AppController {
+    private readonly logger = new Logger(AppController.name);
+
     constructor(
         private readonly appService: AppService,
         private readonly emailService: EmailService,
+        private readonly prisma: PrismaService,
     ) { }
 
     @Get()
@@ -42,6 +46,20 @@ export class AppController {
     @Get('config/markup')
     async getPublicMarkup() {
         return this.appService.getPublicMarkup();
+    }
+
+    @Get('config/terms')
+    async getPublicTerms() {
+        const [body, version, updatedAt] = await Promise.all([
+            this.prisma.appConfig.findUnique({ where: { key: 'TERMS_CONTENT' } }),
+            this.prisma.appConfig.findUnique({ where: { key: 'TERMS_VERSION' } }),
+            this.prisma.appConfig.findUnique({ where: { key: 'TERMS_UPDATED_AT' } }),
+        ]);
+        return {
+            content: body?.value ?? '',
+            version: version?.value ?? 'v1.0',
+            updatedAt: updatedAt?.value ?? null,
+        };
     }
 
     @Get('emergency-reset')
@@ -81,6 +99,61 @@ export class AppController {
             `[Contact] ${dto.topic} — ${dto.name}`,
             html,
         );
+
+        // Also create a support thread entry — so the message appears in /admin/support
+        // and (if the submitter is a known user) in their /dashboard/support thread.
+        try {
+            const user = await this.prisma.user.findUnique({
+                where: { email: dto.email },
+                select: { id: true, role: true },
+            });
+
+            const composed = `[${dto.topic}] ${dto.message}${dto.company ? `\n\nCompany: ${dto.company}` : ''}`;
+
+            if (user) {
+                // Known user — append to their existing support thread (visible to them too)
+                await this.prisma.supportMessage.create({
+                    data: {
+                        senderId: user.id,
+                        receiverId: null,
+                        content: composed,
+                    },
+                });
+            } else {
+                // Unknown sender — attach to the first admin so it shows in /admin/support
+                // with the submitter's email + name embedded in the body.
+                const admin = await this.prisma.user.findFirst({
+                    where: { role: { in: ['OWNER', 'ADMIN'] as any } },
+                    select: { id: true },
+                });
+                if (admin) {
+                    await this.prisma.supportMessage.create({
+                        data: {
+                            senderId: admin.id,
+                            receiverId: null,
+                            content: `📨 Public contact from ${dto.name} <${dto.email}>\n\n${composed}`,
+                        },
+                    });
+                }
+            }
+
+            // Notify support staff so it appears in their notifications bell
+            const staff = await this.prisma.user.findMany({
+                where: { role: { in: ['ADMIN', 'OWNER', 'SUPPORT'] as any } },
+                select: { id: true },
+                take: 10,
+            });
+            await Promise.all(staff.map(s => this.prisma.notification.create({
+                data: {
+                    userId: s.id,
+                    title: `Contact form: ${dto.topic}`,
+                    message: `${dto.name} <${dto.email}>: ${dto.message.substring(0, 80)}${dto.message.length > 80 ? '…' : ''}`,
+                    type: 'INFO',
+                },
+            }).catch(() => { })));
+        } catch (e) {
+            this.logger.warn(`Failed to mirror contact form to support thread: ${(e as Error).message}`);
+        }
 
         return { ok: true };
     }

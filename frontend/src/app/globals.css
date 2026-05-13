@@ -2,6 +2,81 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Print-clean rules ───────────────────────────────────────────────────────
+   Hide all app chrome (sidebars, headers, footers, toolbars, navigation,
+   chat widgets, toast containers, modals, decorative elements) when the
+   user prints the page. The main content keeps printing — and any element
+   tagged `data-print="hidden"` or `.no-print` is forced off. Anything tagged
+   `.print-only` becomes visible. Tables get clean borders + page-break
+   hints so multi-page invoices/orders look right.
+*/
+@media print {
+    /* App chrome */
+    header,
+    nav,
+    aside,
+    footer,
+    [role="navigation"],
+    [data-print="hidden"],
+    .no-print,
+    .print-hide,
+    /* Floating UI we never want on paper */
+    .toaster,
+    [data-sonner-toaster],
+    .floating-chat,
+    [data-floating-ui-portal],
+    /* Action toolbars / sticky bars */
+    .print-toolbar,
+    button[type="button"][data-action="print"],
+    /* Sticky panels from admin layouts */
+    .sticky.top-0.z-40,
+    .sticky.top-0.z-50 {
+        display: none !important;
+    }
+
+    /* Force-show print-only elements */
+    .print-only {
+        display: block !important;
+    }
+
+    /* Strip backgrounds + shadows for ink-friendly output */
+    *, *::before, *::after {
+        background: transparent !important;
+        box-shadow: none !important;
+        text-shadow: none !important;
+    }
+
+    body {
+        background: white !important;
+        color: black !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Force main content to fill the page */
+    main {
+        display: block !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Page-break hints */
+    .page-break-before { page-break-before: always; }
+    .page-break-after  { page-break-after: always; }
+    .avoid-break       { page-break-inside: avoid; }
+    table { page-break-inside: auto; }
+    tr    { page-break-inside: avoid; page-break-after: auto; }
+
+    /* Anchor links: show the URL after the link text */
+    a[href]:not([href^="#"])::after {
+        content: " (" attr(href) ")";
+        font-size: 0.85em;
+        color: #555;
+    }
+}
+
 @keyframes marquee {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }

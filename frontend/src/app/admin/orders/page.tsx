@@ -298,44 +298,121 @@ export default function AdminOrdersPage() {
         returned: 12, // Mocked for visual
     };
 
-    const handleExport = async () => {
+    /**
+     * Export the current orders table to PDF by opening a print-styled
+     * window and calling window.print(). The user can save as PDF from
+     * the browser's print dialog — works in every browser, no heavy
+     * client-side PDF library required.
+     *
+     * Also still offers a CSV fallback via the Cmd/Ctrl-click path.
+     */
+    const handleExport = async (format: 'pdf' | 'csv' = 'pdf') => {
         setIsExporting(true);
-        const tid = toast.loading('Generating export...');
+        const tid = toast.loading(`Generating ${format.toUpperCase()} export...`);
         try {
-            // In a real app, you might fetch all orders or a filtered set
-            // For now, we'll convert the current visible 'orders' state to CSV
             if (orders.length === 0) {
                 toast.error('No orders to export', { id: tid });
                 setIsExporting(false);
                 return;
             }
 
-            const headers = ['Order ID', 'Customer', 'Supplier', 'Total', 'Status', 'Date'];
-            const rows = orders.map(o => [
-                o.id,
-                o.customer,
-                o.supplier,
-                o.total.toString(),
-                o.status,
-                new Date(o.date).toLocaleDateString()
-            ]);
+            if (format === 'csv') {
+                const headers = ['Order ID', 'Customer', 'Supplier', 'Total', 'Status', 'Date'];
+                const rows = orders.map(o => [
+                    o.id,
+                    o.customer,
+                    o.supplier,
+                    o.total.toString(),
+                    o.status,
+                    new Date(o.date).toLocaleDateString(),
+                ]);
+                const csvContent = [
+                    headers.join(','),
+                    ...rows.map(r => r.map(cell => `"${cell}"`).join(',')),
+                ].join('\n');
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                link.setAttribute('href', url);
+                link.setAttribute('download', `atlantis-orders-${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                toast.success('CSV downloaded', { id: tid });
+                return;
+            }
 
-            const csvContent = [
-                headers.join(','),
-                ...rows.map(r => r.map(cell => `"${cell}"`).join(','))
-            ].join('\n');
+            // ── PDF path: open a print-styled window + call window.print()
+            const escape = (s: any) =>
+                String(s ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+            const now = new Date().toLocaleString();
+            const rowsHtml = orders.map(o => `
+                <tr>
+                    <td><span class="mono">${escape(o.id.slice(-8).toUpperCase())}</span></td>
+                    <td>${escape(o.customer)}</td>
+                    <td>${escape(o.supplier)}</td>
+                    <td style="text-align:right;">€ ${Number(o.total || 0).toFixed(2)}</td>
+                    <td><span class="badge badge-${escape((o.status || '').toLowerCase())}">${escape(o.status)}</span></td>
+                    <td>${escape(new Date(o.date).toLocaleDateString('en-GB'))}</td>
+                </tr>
+            `).join('');
+            const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
 
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            const url = URL.createObjectURL(blob);
-            link.setAttribute('href', url);
-            link.setAttribute('download', `atlantis-orders-${new Date().toISOString().split('T')[0]}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+            const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
+<title>Atlantis Orders Export — ${now}</title>
+<style>
+    body { font-family: 'Inter', Arial, sans-serif; color: #0F172A; padding: 32px; margin: 0; }
+    h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.02em; }
+    .meta { color: #64748B; font-size: 12px; margin-bottom: 24px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: left; vertical-align: top; }
+    th { background: #F8FAFC; color: #475569; text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; font-weight: 800; }
+    tr:nth-child(even) td { background: #FAFBFC; }
+    .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #334155; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
+    .badge-delivered { background: #DCFCE7; color: #166534; }
+    .badge-shipped { background: #DBEAFE; color: #1E40AF; }
+    .badge-processing { background: #FEF3C7; color: #92400E; }
+    .badge-pending { background: #FEF3C7; color: #92400E; }
+    .badge-cancelled { background: #FEE2E2; color: #991B1B; }
+    .footer { margin-top: 24px; font-size: 11px; color: #64748B; display: flex; justify-content: space-between; }
+    @page { margin: 16mm; }
+</style></head><body>
+<h1>Atlantis Marketplace — Orders Export</h1>
+<p class="meta">Generated on ${now} · ${orders.length} order${orders.length === 1 ? '' : 's'} · Total: € ${totalRevenue.toFixed(2)}</p>
+<table>
+    <thead>
+        <tr>
+            <th>Order #</th>
+            <th>Customer</th>
+            <th>Supplier</th>
+            <th style="text-align:right;">Total</th>
+            <th>Status</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>${rowsHtml}</tbody>
+</table>
+<div class="footer">
+    <span>© ${new Date().getFullYear()} Atlantis FMCG</span>
+    <span>Bridging Markets. Building Opportunities.</span>
+</div>
+<script>window.onload = () => setTimeout(() => window.print(), 250);</script>
+</body></html>`;
 
-            toast.success('Export downloaded successfully', { id: tid });
+            const w = window.open('', '_blank', 'noopener,noreferrer');
+            if (!w) {
+                toast.error('Pop-up blocked. Allow pop-ups to export PDF.', { id: tid });
+                return;
+            }
+            w.document.open();
+            w.document.write(html);
+            w.document.close();
+            toast.success('PDF print dialog opened — choose "Save as PDF"', { id: tid });
         } catch (err) {
             toast.error('Export failed', { id: tid });
         } finally {
@@ -382,13 +459,25 @@ export default function AdminOrdersPage() {
                         <Filter size={16} />
                         Filters
                     </button>
-                    <button 
-                        onClick={handleExport}
-                        className="h-10 px-4 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20"
-                    >
-                        <Download size={16} />
-                        Export
-                    </button>
+                    <div className="flex items-center gap-1 rounded-xl bg-teal-600 shadow-md shadow-teal-600/20 overflow-hidden">
+                        <button
+                            onClick={() => handleExport('pdf')}
+                            disabled={isExporting}
+                            className="h-10 ps-4 pe-3 text-white text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all disabled:opacity-60"
+                            title="Open print dialog → Save as PDF"
+                        >
+                            <Download size={16} />
+                            Export PDF
+                        </button>
+                        <button
+                            onClick={() => handleExport('csv')}
+                            disabled={isExporting}
+                            className="h-10 px-3 text-white/90 text-[11px] font-bold border-s border-white/20 hover:bg-teal-700 transition-all disabled:opacity-60"
+                            title="Download CSV"
+                        >
+                            CSV
+                        </button>
+                    </div>
                 </div>
             </div>
 

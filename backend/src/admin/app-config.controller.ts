@@ -96,4 +96,15 @@ export class AppConfigController {
         await this.appConfigService.setAdPlacements(data);
         return { message: 'Ad placements updated successfully' };
     }
+
+    // ── Terms & Conditions (markdown) ─────────────────────────────────────
+    @Get('terms')
+    async getTerms() {
+        return this.appConfigService.getTerms();
+    }
+
+    @Post('terms')
+    async setTerms(@Body() body: { content: string; version?: string }) {
+        return this.appConfigService.setTerms(body.content || '', body.version);
+    }
 }

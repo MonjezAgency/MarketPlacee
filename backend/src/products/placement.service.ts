@@ -79,7 +79,13 @@ export class PlacementService {
     async findAll() {
         return this.prisma.productPlacement.findMany({
             include: {
-                product: true,
+                product: {
+                    include: {
+                        supplier: {
+                            select: { id: true, name: true, companyName: true, email: true },
+                        },
+                    },
+                },
                 history: true,
             },
         });

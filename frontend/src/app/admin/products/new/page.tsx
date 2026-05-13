@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import { getCurrencyInfo, SUPPORTED_CURRENCIES, convertToBase } from '@/lib/currency';
 import { Loader2 } from 'lucide-react';
 import { CATEGORIES_LIST } from '@/lib/products';
@@ -131,8 +132,22 @@ export default function AdminAddProductWorkspace() {
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(e.target.files || []);
+        if (!files.length) return;
+        const uploadingToast = toast.loading(`Uploading ${files.length} image${files.length === 1 ? '' : 's'}…`);
+        let ok = 0;
+        let failed = 0;
         for (const file of files) {
             try {
+                if (file.size > 15 * 1024 * 1024) {
+                    toast.error(`${file.name} is larger than 15 MB`);
+                    failed++;
+                    continue;
+                }
+                if (!file.type.startsWith('image/')) {
+                    toast.error(`${file.name} is not an image`);
+                    failed++;
+                    continue;
+                }
                 const fd = new FormData();
                 fd.append('file', file);
                 const res = await apiFetch('/products/upload-image', {
@@ -141,12 +156,27 @@ export default function AdminAddProductWorkspace() {
                 });
                 if (res.ok) {
                     const data = await res.json();
-                    setFormData(prev => ({ ...prev, images: [...prev.images, data.url] }));
+                    if (data?.url) {
+                        setFormData(prev => ({ ...prev, images: [...prev.images, data.url] }));
+                        ok++;
+                    } else {
+                        failed++;
+                    }
+                } else {
+                    const err = await res.json().catch(() => null);
+                    toast.error(err?.message || `Upload failed (${res.status})`);
+                    failed++;
                 }
-            } catch (err) {
-                console.error('Upload failed', err);
+            } catch (err: any) {
+                toast.error(err?.message || 'Upload failed — check your connection');
+                failed++;
             }
         }
+        toast.dismiss(uploadingToast);
+        if (ok) toast.success(`${ok} image${ok === 1 ? '' : 's'} uploaded`);
+        if (failed && !ok) toast.error(`${failed} upload${failed === 1 ? '' : 's'} failed`);
+        // Reset input so the same file can be re-selected if needed
+        if (fileInputRef.current) fileInputRef.current.value = '';
     };
 
     const [bulkReport, setBulkReport] = useState<any>(null);

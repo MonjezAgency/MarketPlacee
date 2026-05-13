@@ -214,4 +214,39 @@ export class AppConfigService {
             update: { value: JSON.stringify(data) }
         });
     }
+
+    // ── Terms & Conditions (markdown body + version label) ────────────────
+    async getTerms() {
+        const [body, version, updatedAt] = await Promise.all([
+            this.prisma.appConfig.findUnique({ where: { key: 'TERMS_CONTENT' } }),
+            this.prisma.appConfig.findUnique({ where: { key: 'TERMS_VERSION' } }),
+            this.prisma.appConfig.findUnique({ where: { key: 'TERMS_UPDATED_AT' } }),
+        ]);
+        return {
+            content: body?.value ?? '',
+            version: version?.value ?? 'v1.0',
+            updatedAt: updatedAt?.value ?? null,
+        };
+    }
+
+    async setTerms(content: string, version?: string) {
+        const now = new Date().toISOString();
+        const v = version || `v${Math.floor(Date.now() / 1000)}`;
+        await this.prisma.appConfig.upsert({
+            where: { key: 'TERMS_CONTENT' },
+            create: { key: 'TERMS_CONTENT', value: content },
+            update: { value: content },
+        });
+        await this.prisma.appConfig.upsert({
+            where: { key: 'TERMS_VERSION' },
+            create: { key: 'TERMS_VERSION', value: v },
+            update: { value: v },
+        });
+        await this.prisma.appConfig.upsert({
+            where: { key: 'TERMS_UPDATED_AT' },
+            create: { key: 'TERMS_UPDATED_AT', value: now },
+            update: { value: now },
+        });
+        return { content, version: v, updatedAt: now };
+    }
 }

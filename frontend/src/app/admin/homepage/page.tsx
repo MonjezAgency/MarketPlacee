@@ -63,13 +63,56 @@ export default function AdminHomepageConfig() {
         }
     };
 
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, catIndex: number, itemIndex: number) => {
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, catIndex: number, itemIndex: number) => {
         const file = e.target.files?.[0];
-        if (file) {
+        if (!file) return;
+        if (!file.type.startsWith('image/')) {
+            alert('Only image files are allowed.');
+            return;
+        }
+        if (file.size > 15 * 1024 * 1024) {
+            alert('Image must be smaller than 15 MB.');
+            return;
+        }
+
+        // Hint the user about the recommended dimension for catalog tiles.
+        try {
+            const dims = await new Promise<{ w: number; h: number }>((resolve, reject) => {
+                const img = new window.Image();
+                img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+                img.onerror = reject;
+                img.src = URL.createObjectURL(file);
+            });
+            // Catalog tiles render as squares — warn (not block) if far off.
+            const ratio = dims.w / dims.h;
+            if (Math.abs(ratio - 1) > 0.25) {
+                const ok = window.confirm(
+                    `This image is ${dims.w}×${dims.h}. Catalog tiles look best at a roughly square ratio (recommended 600×600). Use anyway?`,
+                );
+                if (!ok) return;
+            }
+        } catch { /* non-fatal — fall through */ }
+
+        // Upload to storage so the URL is permanent (not a giant base64 blob).
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await apiFetch('/products/upload-image', { method: 'POST', body: fd });
+            if (res.ok) {
+                const data = await res.json();
+                if (data?.url) {
+                    handleChangeItem(catIndex, itemIndex, 'image', data.url);
+                    return;
+                }
+            } else {
+                const err = await res.json().catch(() => null);
+                alert(err?.message || 'Image upload failed.');
+            }
+        } catch (err) {
+            console.error('Upload failed', err);
+            // Final fallback — keep working offline by inlining the base64.
             const reader = new FileReader();
-            reader.onloadend = () => {
-                handleChangeItem(catIndex, itemIndex, 'image', reader.result as string);
-            };
+            reader.onloadend = () => handleChangeItem(catIndex, itemIndex, 'image', reader.result as string);
             reader.readAsDataURL(file);
         }
     };
@@ -173,6 +216,7 @@ export default function AdminHomepageConfig() {
                             {cat.items.map((item: any, itemIndex: number) => (
                                 <div key={itemIndex} className="border border-border/50 rounded-xl p-4 bg-background/50 space-y-3 flex flex-col items-center">
                                     <div className="text-xs font-black text-primary uppercase tracking-widest w-full text-center">Tile {itemIndex + 1}</div>
+                                    <p className="text-[10px] text-muted-foreground text-center -mt-1.5">Recommended: 600×600 · square · ≤ 500 KB</p>
                                     {item.image ? (
                                         <div className="w-20 h-20 rounded bg-muted overflow-hidden flex-shrink-0">
                                             <img src={item.image} alt={item.label} className="w-full h-full object-cover" onError={(e) => { e.currentTarget.src = 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97' }} />
