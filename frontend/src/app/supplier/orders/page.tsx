@@ -9,6 +9,7 @@ import {
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
+import toast from 'react-hot-toast';
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -63,13 +64,32 @@ export default function SupplierOrdersPage() {
     const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
         setUpdatingId(orderId);
         try {
+            // BUG FIX: backend declares @Patch(':id/status') — the previous
+            // PUT here was a no-op (404 silently swallowed by the try/catch),
+            // which is why clicking "Confirm Order" on the supplier dashboard
+            // did nothing visible. Method now matches the controller.
             const res = await apiFetch(`/orders/${orderId}/status`, {
-                method: 'PUT',
+                method: 'PATCH',
                 body: JSON.stringify({ status }),
             });
-            if (res.ok) setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-        } catch (_e) { /* ignore */ }
-        finally { setUpdatingId(null); }
+            if (res.ok) {
+                setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
+                toast.success(
+                    status === 'PROCESSING'
+                        ? 'Order confirmed — admin has been notified.'
+                        : status === 'SHIPPED'
+                            ? 'Marked as shipped — customer notified.'
+                            : `Order updated to ${status}.`
+                );
+            } else {
+                const err = await res.json().catch(() => null);
+                toast.error(err?.message || `Failed to update order (${res.status})`);
+            }
+        } catch (e: any) {
+            toast.error(e?.message || 'Network error — try again.');
+        } finally {
+            setUpdatingId(null);
+        }
     };
 
     const filtered = orders.filter(o =>

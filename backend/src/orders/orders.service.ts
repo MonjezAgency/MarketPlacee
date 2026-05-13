@@ -682,6 +682,9 @@ export class OrdersService {
             order.items.map((item: any) => item.product?.supplier?.id).filter(Boolean)
         )];
         for (const supplierId of supplierIds) {
+            // Skip notifying the supplier who just acted — they triggered
+            // the change themselves, no need to ping their own bell.
+            if (supplierId === changedById) continue;
             this.notificationsService.create(
                 supplierId as string,
                 `Order ${STATUS_LABELS[status] || status}`,
@@ -689,6 +692,31 @@ export class OrdersService {
                 'INFO',
                 { orderId },
             ).catch(() => {});
+        }
+
+        // Notify admin team when a SUPPLIER performs the change — so the
+        // operator's "supplier confirmed the order" complaint surfaces on
+        // the admin orders page + notification bell instead of being a
+        // silent state update. We check if the actor is a supplier (i.e.
+        // they appear in this order's supplierIds) before pinging admins.
+        const actorIsSupplier = supplierIds.includes(changedById);
+        if (actorIsSupplier) {
+            const actor = await this.prisma.user.findUnique({
+                where: { id: changedById },
+                select: { name: true, companyName: true },
+            }).catch(() => null);
+            const actorLabel = actor?.companyName || actor?.name || 'Supplier';
+            const verb =
+                status === 'PROCESSING' ? 'confirmed'
+                : status === 'SHIPPED'    ? 'shipped'
+                : status === 'CANCELLED'  ? 'cancelled'
+                : 'updated';
+            await this.notificationsService.notifyAdmins(
+                `${actorLabel} ${verb} order #${orderId.slice(-8).toUpperCase()}`,
+                `${actorLabel} marked order #${orderId.slice(-8).toUpperCase()} as ${STATUS_LABELS[status] || status}.`,
+                'INFO',
+                { orderId, supplierId: changedById, newStatus: status },
+            ).catch(() => { });
         }
 
         // Handle invoice generation on delivery
