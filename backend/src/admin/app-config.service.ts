@@ -214,27 +214,47 @@ export class AppConfigService {
      * via /config/homepage-banners; admin reads + writes via the
      * /admin/config/homepage-banners endpoint pair.
      */
-    async getHomepageBanners(): Promise<Record<string, any>> {
+    async getHomepageBanners(): Promise<Record<string, any[]>> {
         const config = await this.prisma.appConfig.findUnique({
             where: { key: 'HOMEPAGE_BANNERS' },
         });
         if (!config || !config.value) return {};
-        try { return JSON.parse(config.value); } catch { return {}; }
+        try {
+            const raw = JSON.parse(config.value);
+            // Normalize legacy single-object slot shape into the new
+            // array shape on read, so the frontend never sees both.
+            const out: Record<string, any[]> = {};
+            for (const [slot, value] of Object.entries(raw || {})) {
+                if (Array.isArray(value)) out[slot] = value;
+                else if (value && typeof value === 'object') out[slot] = [value];
+            }
+            return out;
+        } catch { return {}; }
     }
 
     async setHomepageBanners(data: Record<string, any>) {
-        // Drop empty slots so the JSON stays compact. An empty string
-        // / null in imageUrl deletes the slot from the saved map.
-        const cleaned: Record<string, any> = {};
+        // Each slot now stores an ORDERED ARRAY of banners (carousel /
+        // rotation). The order in the array is the order shown on the
+        // live homepage. We also accept the legacy single-object shape
+        // ({ imageUrl, linkUrl, alt }) and silently coerce it to a
+        // one-element array so old saves keep working.
+        const cleaned: Record<string, any[]> = {};
         for (const [slot, value] of Object.entries(data || {})) {
-            if (!value || typeof value !== 'object') continue;
-            if (!('imageUrl' in value) || !value.imageUrl) continue;
-            cleaned[slot] = {
-                imageUrl: String(value.imageUrl),
-                linkUrl: value.linkUrl ? String(value.linkUrl) : null,
-                alt: value.alt ? String(value.alt) : '',
-                updatedAt: new Date().toISOString(),
-            };
+            const arr = Array.isArray(value)
+                ? value
+                : (value && typeof value === 'object' ? [value] : []);
+            const validated: any[] = [];
+            for (const item of arr) {
+                if (!item || typeof item !== 'object') continue;
+                if (!('imageUrl' in item) || !item.imageUrl) continue;
+                validated.push({
+                    imageUrl: String(item.imageUrl),
+                    linkUrl: item.linkUrl ? String(item.linkUrl) : null,
+                    alt: item.alt ? String(item.alt) : '',
+                    updatedAt: new Date().toISOString(),
+                });
+            }
+            if (validated.length > 0) cleaned[slot] = validated;
         }
         await this.prisma.appConfig.upsert({
             where: { key: 'HOMEPAGE_BANNERS' },

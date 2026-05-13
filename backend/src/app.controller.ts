@@ -54,7 +54,17 @@ export class AppController {
             where: { key: 'HOMEPAGE_BANNERS' },
         });
         if (!config?.value) return {};
-        try { return JSON.parse(config.value); } catch { return {}; }
+        try {
+            const raw = JSON.parse(config.value);
+            // Normalize legacy single-object slot shape → array, so
+            // public consumers (homepage) only need one render path.
+            const out: Record<string, any[]> = {};
+            for (const [slot, value] of Object.entries(raw || {})) {
+                if (Array.isArray(value)) out[slot] = value;
+                else if (value && typeof value === 'object') out[slot] = [value];
+            }
+            return out;
+        } catch { return {}; }
     }
 
     @Get('config/terms')

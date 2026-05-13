@@ -1,23 +1,17 @@
 'use client';
 
 /**
- * Homepage Banner Manager — visual placement map.
+ * Homepage Banner Manager — visual placement map with ordered carousels.
  *
- * Renders the homepage as a wireframe-style map of every banner slot
- * with its recommended dimensions baked in. Admin can:
- *   • Hover any slot → see the dimensions in a tooltip
- *   • Click a slot → opens an upload sheet that:
- *       - re-states the dimensions
- *       - opens a file picker (image only, < 5 MB)
- *       - uploads via /products/upload-image (Supabase-backed)
- *       - lets admin add a target URL the banner clicks through to
- *       - lets admin add alt text for accessibility
- *   • Remove an existing image via the trash icon
- * All slots are saved together via /admin/config/homepage-banners.
- *
- * The slot definitions are intentionally hard-coded here so the map
- * mirrors the actual homepage layout (HomeClient.tsx); when the
- * homepage is redesigned, update SLOTS to match.
+ * Every slot on the homepage can now hold MULTIPLE banners that rotate
+ * in the order saved here. The page shows:
+ *   • The live order of banners in each slot (1, 2, 3, …)
+ *   • A "+" tile to append a new banner
+ *   • Per-banner controls: ↑ / ↓ to reorder, ✏️ to edit, 🗑️ to remove
+ *   • Recommended dimensions baked into each slot
+ * Uploads go through /products/upload-image (Supabase) and the
+ * resulting URL is appended to the slot's banner array. All slots
+ * persist together via /admin/config/homepage-banners.
  */
 
 import * as React from 'react';
@@ -25,23 +19,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import {
     Layout, Upload, Trash2, Save, X, Image as ImageIcon, Maximize2,
-    Info, Plus, ExternalLink, Loader2,
+    Info, Plus, ExternalLink, Loader2, ArrowUp, ArrowDown, Pencil,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-// ────────────────────────────────────────────────────────────────────
-// Slot definitions — must mirror what HomeClient.tsx actually renders.
-// `size` is the recommended dimension shown in tooltips + upload sheet.
-// `aspectRatio` controls how big the empty cell looks on the map.
-// ────────────────────────────────────────────────────────────────────
 interface Slot {
     id: string;
     label: string;
-    size: string; // e.g. "1600 × 600"
+    size: string;
     blurb: string;
-    aspectRatio: string; // CSS aspect-ratio value e.g. "16/6"
-    col?: number; // grid column span
+    aspectRatio: string;
+    col?: number;
 }
 
 const SLOTS: Slot[] = [
@@ -61,24 +50,33 @@ interface BannerData {
     updatedAt?: string;
 }
 
-type BannerMap = Record<string, BannerData>;
+// `slotId` → ordered banner list. Order in the array IS display order.
+type BannerMap = Record<string, BannerData[]>;
 
 export default function AdminHomepageBannersPage() {
     const [banners, setBanners] = React.useState<BannerMap>({});
     const [loading, setLoading] = React.useState(true);
     const [saving, setSaving] = React.useState(false);
-    const [editingSlot, setEditingSlot] = React.useState<Slot | null>(null);
+    const [editing, setEditing] = React.useState<{ slot: Slot; index: number | null } | null>(null);
 
-    // Initial load
     React.useEffect(() => {
         (async () => {
             try {
                 const res = await apiFetch('/admin/config/homepage-banners');
                 if (res.ok) {
                     const data = await res.json();
-                    if (data && typeof data === 'object') setBanners(data);
+                    // Backend normalizes to arrays on read — but be defensive
+                    // for legacy responses that still ship objects.
+                    if (data && typeof data === 'object') {
+                        const norm: BannerMap = {};
+                        for (const [k, v] of Object.entries(data)) {
+                            if (Array.isArray(v)) norm[k] = v as BannerData[];
+                            else if (v && typeof v === 'object') norm[k] = [v as BannerData];
+                        }
+                        setBanners(norm);
+                    }
                 }
-            } catch { /* fall through to empty map */ }
+            } catch { /* leave empty */ }
             finally { setLoading(false); }
         })();
     }, []);
@@ -95,8 +93,14 @@ export default function AdminHomepageBannersPage() {
                 throw new Error(err?.message || `Save failed (HTTP ${res.status})`);
             }
             const saved = await res.json();
-            setBanners(saved && typeof saved === 'object' ? saved : next);
-            toast.success('Homepage banners updated');
+            // Normalize the saved response too
+            const norm: BannerMap = {};
+            for (const [k, v] of Object.entries(saved || {})) {
+                if (Array.isArray(v)) norm[k] = v as BannerData[];
+                else if (v && typeof v === 'object') norm[k] = [v as BannerData];
+            }
+            setBanners(norm);
+            toast.success('Homepage banners saved');
         } catch (e: any) {
             toast.error(e?.message || 'Could not save');
         } finally {
@@ -104,10 +108,26 @@ export default function AdminHomepageBannersPage() {
         }
     };
 
-    const removeSlot = async (slotId: string) => {
-        const next = { ...banners };
-        delete next[slotId];
-        await persist(next);
+    const removeBanner = (slotId: string, index: number) => {
+        const list = banners[slotId] || [];
+        const next = { ...banners, [slotId]: list.filter((_, i) => i !== index) };
+        if (next[slotId].length === 0) delete next[slotId];
+        persist(next);
+    };
+
+    const moveBanner = (slotId: string, index: number, dir: -1 | 1) => {
+        const list = [...(banners[slotId] || [])];
+        const target = index + dir;
+        if (target < 0 || target >= list.length) return;
+        [list[index], list[target]] = [list[target], list[index]];
+        persist({ ...banners, [slotId]: list });
+    };
+
+    const saveBanner = (slotId: string, index: number | null, data: BannerData) => {
+        const list = [...(banners[slotId] || [])];
+        if (index === null) list.push(data);
+        else list[index] = { ...list[index], ...data };
+        return persist({ ...banners, [slotId]: list });
     };
 
     return (
@@ -122,8 +142,9 @@ export default function AdminHomepageBannersPage() {
                         <p className="text-[10px] font-black uppercase tracking-[0.3em] text-teal-500">Visual placement map</p>
                         <h1 className="text-3xl font-black tracking-tight">Homepage Banners</h1>
                         <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
-                            This is the live wireframe of the homepage. Hover any slot to see its recommended dimensions,
-                            click to upload a banner. Removing an image clears that slot on the live homepage immediately.
+                            Each slot below can hold one OR multiple banners. The order of
+                            the thumbnails IS the order shown on the live homepage. Use ↑ /
+                            ↓ to reorder, ✏️ to edit, 🗑 to remove, or "+ Add" to append.
                         </p>
                     </div>
                 </div>
@@ -136,78 +157,98 @@ export default function AdminHomepageBannersPage() {
             </div>
 
             {/* Map */}
-            <div className="bg-gradient-to-b from-slate-50 to-white border border-slate-200 rounded-3xl p-6 shadow-sm">
-                {loading ? (
-                    <div className="py-24 flex justify-center">
-                        <Loader2 className="animate-spin text-teal-500" size={28} />
-                    </div>
-                ) : (
-                    <>
-                        {/* Top label — looks like a browser chrome bar so the
-                            admin understands "this is what the homepage looks like" */}
-                        <div className="flex items-center gap-2 mb-4 pb-3 border-b border-slate-200">
-                            <div className="flex gap-1.5">
-                                <span className="w-3 h-3 rounded-full bg-rose-300" />
-                                <span className="w-3 h-3 rounded-full bg-amber-300" />
-                                <span className="w-3 h-3 rounded-full bg-emerald-300" />
-                            </div>
-                            <div className="flex-1 mx-3">
-                                <div className="h-6 rounded-md bg-white border border-slate-200 flex items-center px-3">
-                                    <span className="text-[11px] font-mono text-slate-400">atlantisfmcg.com</span>
+            {loading ? (
+                <div className="py-24 flex justify-center">
+                    <Loader2 className="animate-spin text-teal-500" size={28} />
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {SLOTS.map(slot => {
+                        const slotBanners = banners[slot.id] || [];
+                        return (
+                            <div key={slot.id} className="bg-white border border-slate-200 rounded-3xl p-5 shadow-sm">
+                                {/* Slot header */}
+                                <div className="flex items-start justify-between gap-4 mb-4">
+                                    <div className="min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <h2 className="text-[15px] font-black text-slate-900">{slot.label}</h2>
+                                            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-teal-50 text-teal-700 border border-teal-200">
+                                                {slot.size}
+                                            </span>
+                                            <span className={cn(
+                                                'text-[10px] font-bold px-2 py-0.5 rounded-full',
+                                                slotBanners.length === 0
+                                                    ? 'bg-slate-100 text-slate-500'
+                                                    : 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+                                            )}>
+                                                {slotBanners.length} banner{slotBanners.length === 1 ? '' : 's'}
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] text-slate-500 mt-1 max-w-2xl">{slot.blurb}</p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditing({ slot, index: null })}
+                                        className="h-10 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-[12px] font-black flex items-center gap-2 shadow-sm shrink-0"
+                                    >
+                                        <Plus size={14} /> Add banner
+                                    </button>
                                 </div>
-                            </div>
-                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">Live preview</span>
-                        </div>
 
-                        {/* The actual placement grid */}
-                        <div className="grid grid-cols-12 gap-3">
-                            {SLOTS.map(slot => {
-                                const banner = banners[slot.id];
-                                return (
-                                    <SlotTile
-                                        key={slot.id}
-                                        slot={slot}
-                                        banner={banner}
-                                        onClick={() => setEditingSlot(slot)}
-                                        onRemove={() => removeSlot(slot.id)}
-                                    />
-                                );
-                            })}
-                        </div>
-                    </>
-                )}
-            </div>
+                                {slotBanners.length === 0 ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditing({ slot, index: null })}
+                                        style={{ aspectRatio: slot.aspectRatio }}
+                                        className="w-full rounded-2xl border-2 border-dashed border-slate-300 hover:border-teal-500 bg-slate-50 hover:bg-teal-50/40 transition-all flex flex-col items-center justify-center text-slate-400"
+                                    >
+                                        <Plus size={22} className="mb-1.5" />
+                                        <span className="text-[12px] font-bold">Click to add your first banner here</span>
+                                        <span className="text-[10px] font-mono mt-1">Recommended {slot.size}</span>
+                                    </button>
+                                ) : (
+                                    <div className={cn(
+                                        'grid gap-3',
+                                        slot.col && slot.col >= 12 ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1',
+                                    )}>
+                                        {slotBanners.map((b, i) => (
+                                            <BannerCard
+                                                key={`${slot.id}-${i}`}
+                                                slot={slot}
+                                                banner={b}
+                                                index={i}
+                                                total={slotBanners.length}
+                                                onEdit={() => setEditing({ slot, index: i })}
+                                                onRemove={() => removeBanner(slot.id, i)}
+                                                onMoveUp={() => moveBanner(slot.id, i, -1)}
+                                                onMoveDown={() => moveBanner(slot.id, i, +1)}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             {/* Legend */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-[12px]">
-                <LegendCard
-                    icon={Maximize2}
-                    title="Dimensions matter"
-                    body="Stick to the recommended size — larger images get compressed, smaller ones look fuzzy."
-                />
-                <LegendCard
-                    icon={Info}
-                    title="Hover to inspect"
-                    body="Each empty slot shows its dimensions as a tooltip when you hover over it."
-                />
-                <LegendCard
-                    icon={ExternalLink}
-                    title="Click-through URL"
-                    body="When you upload a banner you can also set the URL it links to (e.g. a category page)."
-                />
+                <LegendCard icon={Maximize2} title="Dimensions matter" body="Stick to the recommended size — larger images get compressed, smaller ones look fuzzy." />
+                <LegendCard icon={ArrowUp}   title="Order = position"  body="Banner #1 in the list shows first on the live homepage. Use ↑ / ↓ to reorder." />
+                <LegendCard icon={ExternalLink} title="Click-through URL" body="Each banner can carry an optional URL it links to (a category page, an offer, …)." />
             </div>
 
-            {/* Upload sheet — Modal-style */}
+            {/* Upload / Edit sheet */}
             <AnimatePresence>
-                {editingSlot && (
+                {editing && (
                     <UploadSheet
-                        slot={editingSlot}
-                        existing={banners[editingSlot.id]}
-                        onCancel={() => setEditingSlot(null)}
+                        slot={editing.slot}
+                        existing={editing.index !== null ? banners[editing.slot.id]?.[editing.index] : undefined}
+                        onCancel={() => setEditing(null)}
                         onSave={async (data) => {
-                            const next = { ...banners, [editingSlot.id]: data };
-                            await persist(next);
-                            setEditingSlot(null);
+                            await saveBanner(editing.slot.id, editing.index, data);
+                            setEditing(null);
                         }}
                     />
                 )}
@@ -217,78 +258,91 @@ export default function AdminHomepageBannersPage() {
 }
 
 // ────────────────────────────────────────────────────────────────────
-// Single slot tile on the visual map.
+// Single banner thumbnail with reorder + edit + remove controls.
 // ────────────────────────────────────────────────────────────────────
-function SlotTile({
-    slot, banner, onClick, onRemove,
+function BannerCard({
+    slot, banner, index, total, onEdit, onRemove, onMoveUp, onMoveDown,
 }: {
     slot: Slot;
-    banner?: BannerData;
-    onClick: () => void;
+    banner: BannerData;
+    index: number;
+    total: number;
+    onEdit: () => void;
     onRemove: () => void;
+    onMoveUp: () => void;
+    onMoveDown: () => void;
 }) {
     return (
         <div
-            className="relative group"
-            style={{
-                gridColumn: `span ${slot.col || 12} / span ${slot.col || 12}`,
-            }}
+            className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-900 group"
+            style={{ aspectRatio: slot.aspectRatio }}
         >
-            <button
-                type="button"
-                onClick={onClick}
-                style={{ aspectRatio: slot.aspectRatio }}
-                className={cn(
-                    'w-full rounded-2xl border-2 border-dashed transition-all overflow-hidden flex flex-col items-center justify-center',
-                    banner
-                        ? 'border-transparent bg-slate-900'
-                        : 'border-slate-300 hover:border-teal-500 bg-white hover:bg-teal-50/40',
-                )}
-                title={`${slot.label} · Recommended ${slot.size}`}
-            >
-                {banner ? (
-                    <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src={banner.imageUrl}
-                            alt={banner.alt || slot.label}
-                            className="w-full h-full object-cover"
-                        />
-                    </>
-                ) : (
-                    <div className="flex flex-col items-center gap-1 text-slate-400">
-                        <Plus size={20} />
-                        <span className="text-[11px] font-black uppercase tracking-widest">
-                            {slot.label}
-                        </span>
-                        <span className="text-[10px] font-mono">{slot.size}</span>
-                    </div>
-                )}
-            </button>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+                src={banner.imageUrl}
+                alt={banner.alt || slot.label}
+                className="w-full h-full object-cover"
+            />
 
-            {/* Slot label badge on top — always visible */}
-            <div className="absolute top-2 start-2 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-slate-900/80 backdrop-blur text-white text-[9px] font-black uppercase tracking-wider">
-                {slot.label}
-                <span className="text-teal-300 font-mono normal-case tracking-normal">{slot.size}</span>
+            {/* Order badge — top-left, always visible */}
+            <div className="absolute top-2 start-2 inline-flex items-center gap-1.5 h-7 px-2.5 rounded-full bg-slate-900/85 backdrop-blur text-white text-[10px] font-black">
+                <span className="w-5 h-5 rounded-full bg-teal-500 text-white text-[11px] flex items-center justify-center">
+                    {index + 1}
+                </span>
+                <span className="uppercase tracking-wider">of {total}</span>
             </div>
 
-            {/* Remove button when an image exists */}
-            {banner && (
+            {/* Link badge if set */}
+            {banner.linkUrl && (
+                <div className="absolute bottom-2 start-2 inline-flex items-center gap-1.5 h-6 px-2 rounded-full bg-white/90 backdrop-blur text-slate-700 text-[10px] font-mono max-w-[200px]">
+                    <ExternalLink size={10} />
+                    <span className="truncate">{banner.linkUrl}</span>
+                </div>
+            )}
+
+            {/* Action toolbar — top-right */}
+            <div className="absolute top-2 end-2 flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                 <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); onRemove(); }}
-                    className="absolute top-2 end-2 w-7 h-7 rounded-full bg-white/95 border border-rose-200 text-rose-600 hover:bg-rose-50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                    onClick={onMoveUp}
+                    disabled={index === 0}
+                    title="Move up"
+                    className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-slate-700 flex items-center justify-center shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                    <ArrowUp size={13} />
+                </button>
+                <button
+                    type="button"
+                    onClick={onMoveDown}
+                    disabled={index >= total - 1}
+                    title="Move down"
+                    className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-slate-700 flex items-center justify-center shadow-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                    <ArrowDown size={13} />
+                </button>
+                <button
+                    type="button"
+                    onClick={onEdit}
+                    title="Edit banner"
+                    className="w-7 h-7 rounded-full bg-white/95 hover:bg-white text-slate-700 flex items-center justify-center shadow-sm"
+                >
+                    <Pencil size={13} />
+                </button>
+                <button
+                    type="button"
+                    onClick={onRemove}
                     title="Remove banner"
+                    className="w-7 h-7 rounded-full bg-white/95 hover:bg-rose-50 border border-rose-200 text-rose-600 flex items-center justify-center shadow-sm"
                 >
                     <Trash2 size={13} />
                 </button>
-            )}
+            </div>
         </div>
     );
 }
 
 // ────────────────────────────────────────────────────────────────────
-// Upload sheet — opens when admin clicks a slot.
+// Upload / edit sheet.
 // ────────────────────────────────────────────────────────────────────
 function UploadSheet({
     slot, existing, onCancel, onSave,
@@ -307,10 +361,7 @@ function UploadSheet({
     const handlePick = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-        if (!file.type.startsWith('image/')) {
-            toast.error('Only image files are allowed.');
-            return;
-        }
+        if (!file.type.startsWith('image/')) { toast.error('Only image files are allowed.'); return; }
         if (file.size > 5 * 1024 * 1024) {
             toast.error(`Image is ${(file.size / 1024 / 1024).toFixed(1)} MB — max is 5 MB.`);
             return;
@@ -327,7 +378,7 @@ function UploadSheet({
             const data = await res.json();
             if (!data?.url) throw new Error('Upload returned no URL');
             setPreviewUrl(data.url);
-            toast.success('Image uploaded — click "Save banner" to publish.');
+            toast.success('Image uploaded — click Save to publish.');
         } catch (e: any) {
             toast.error(e?.message || 'Upload failed');
         } finally {
@@ -354,16 +405,17 @@ function UploadSheet({
                 onClick={e => e.stopPropagation()}
                 className="w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col"
             >
-                {/* Header */}
                 <div className="flex items-start justify-between p-6 border-b border-slate-100">
                     <div>
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-500">Editing slot</p>
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-teal-500">
+                            {existing ? 'Editing banner' : 'Adding banner'}
+                        </p>
                         <h2 className="text-xl font-black text-slate-900 mt-0.5">{slot.label}</h2>
                         <p className="text-[11px] text-slate-500 mt-1 max-w-sm">{slot.blurb}</p>
                         <p className="text-[12px] font-bold text-slate-700 mt-2">
                             Recommended size:&nbsp;
                             <span className="font-mono text-teal-600">{slot.size}</span>&nbsp;
-                            <span className="text-slate-400 font-normal">· keep under 500 KB for fast load</span>
+                            <span className="text-slate-400 font-normal">· keep under 500 KB</span>
                         </p>
                     </div>
                     <button
@@ -375,9 +427,7 @@ function UploadSheet({
                     </button>
                 </div>
 
-                {/* Body */}
                 <div className="p-6 space-y-5 overflow-y-auto flex-1">
-                    {/* Preview / picker */}
                     <button
                         type="button"
                         onClick={() => fileRef.current?.click()}
@@ -393,22 +443,14 @@ function UploadSheet({
                         ) : (
                             <div className="flex flex-col items-center gap-2 text-slate-500">
                                 {uploading ? <Loader2 className="animate-spin" /> : <Upload size={22} />}
-                                <p className="text-[13px] font-bold">
-                                    {uploading ? 'Uploading…' : 'Click to upload image'}
-                                </p>
+                                <p className="text-[13px] font-bold">{uploading ? 'Uploading…' : 'Click to upload image'}</p>
                                 <p className="text-[10px] text-slate-400 font-mono">
                                     {slot.size} · ≤ 5 MB · JPG / PNG / WebP
                                 </p>
                             </div>
                         )}
                     </button>
-                    <input
-                        ref={fileRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handlePick}
-                    />
+                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePick} />
                     {previewUrl && !uploading && (
                         <button
                             type="button"
@@ -419,7 +461,6 @@ function UploadSheet({
                         </button>
                     )}
 
-                    {/* Optional click-through URL */}
                     <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
                             Click-through URL <span className="text-slate-400 font-normal normal-case">(optional)</span>
@@ -433,7 +474,6 @@ function UploadSheet({
                         />
                     </div>
 
-                    {/* Alt text */}
                     <div>
                         <label className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1.5">
                             Alt text <span className="text-slate-400 font-normal normal-case">(for screen readers)</span>
@@ -448,7 +488,6 @@ function UploadSheet({
                     </div>
                 </div>
 
-                {/* Footer */}
                 <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
                     <button
                         type="button"
@@ -467,7 +506,7 @@ function UploadSheet({
                         })}
                         className="h-11 px-5 rounded-xl bg-teal-600 hover:bg-teal-700 text-white text-[13px] font-black inline-flex items-center gap-2 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                        <Save size={15} /> Save banner
+                        <Save size={15} /> {existing ? 'Save changes' : 'Add to slot'}
                     </button>
                 </div>
             </motion.div>
