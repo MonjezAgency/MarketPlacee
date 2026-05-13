@@ -401,18 +401,60 @@ export default function AdminOrdersPage() {
     <span>© ${new Date().getFullYear()} Atlantis FMCG</span>
     <span>Bridging Markets. Building Opportunities.</span>
 </div>
-<script>window.onload = () => setTimeout(() => window.print(), 250);</script>
 </body></html>`;
 
-            const w = window.open('', '_blank', 'noopener,noreferrer');
-            if (!w) {
-                toast.error('Pop-up blocked. Allow pop-ups to export PDF.', { id: tid });
+            // Use a hidden iframe instead of window.open() so Chrome's
+            // pop-up blocker (default-on for any non-direct-click flow,
+            // and definitely for our async toast→export path) can't
+            // intercept us. The iframe lives in the current document,
+            // so no extra permission is needed.
+            const existing = document.getElementById('atlantis-pdf-export-frame');
+            if (existing) existing.remove();
+            const iframe = document.createElement('iframe');
+            iframe.id = 'atlantis-pdf-export-frame';
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.style.opacity = '0';
+            iframe.setAttribute('aria-hidden', 'true');
+            document.body.appendChild(iframe);
+
+            const doc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (!doc) {
+                toast.error('Could not initialize PDF export frame.', { id: tid });
+                iframe.remove();
                 return;
             }
-            w.document.open();
-            w.document.write(html);
-            w.document.close();
-            toast.success('PDF print dialog opened — choose "Save as PDF"', { id: tid });
+            doc.open();
+            doc.write(html);
+            doc.close();
+
+            // Trigger print after the iframe has parsed the document.
+            // onload covers most browsers; the setTimeout fallback covers
+            // Safari, which sometimes fires onload before images settle.
+            const triggerPrint = () => {
+                try {
+                    iframe.contentWindow?.focus();
+                    iframe.contentWindow?.print();
+                } catch (e) {
+                    console.warn('iframe print failed', e);
+                }
+                // Clean up a few seconds later — long enough for the
+                // print dialog to read from it, short enough not to leak.
+                setTimeout(() => { iframe.remove(); }, 30_000);
+            };
+            iframe.onload = () => setTimeout(triggerPrint, 200);
+            // Belt-and-braces: if the iframe never fires onload (rare),
+            // force the print after a generous timeout so the operator
+            // doesn't get a silent no-op.
+            setTimeout(() => {
+                if (document.body.contains(iframe)) triggerPrint();
+            }, 1200);
+
+            toast.success('Print dialog will open — choose "Save as PDF"', { id: tid });
         } catch (err) {
             toast.error('Export failed', { id: tid });
         } finally {
