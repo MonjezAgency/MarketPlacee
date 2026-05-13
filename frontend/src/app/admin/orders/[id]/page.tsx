@@ -76,6 +76,9 @@ type AdminOrder = {
     carrier?: string | null;
     expectedDelivery?: string | null;
     shippingCompany?: string | null;
+    // Snapshot of the carrier the buyer chose at checkout. Stays
+    // pinned even if admin re-assigns shippingCompany later.
+    customerShippingCompany?: string | null;
     shippingCost?: number | null;
     paymentMethod?: string | null;
     customer?: {
@@ -639,6 +642,35 @@ export default function AdminOrderDetailPage() {
                                     </span>
                                 )}
                             </div>
+
+                            {/* Buyer's chosen carrier banner — surfaced from
+                                Order.customerShippingCompany, which is the
+                                snapshot taken at checkout. Always renders
+                                regardless of what the admin re-assigned later. */}
+                            {order.customerShippingCompany && (
+                                <div className="flex items-center gap-3 p-3 rounded-xl border border-blue-200 bg-blue-50/60">
+                                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                                        🛒
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">
+                                            Buyer picked at checkout
+                                        </p>
+                                        <p className="text-[14px] font-black text-blue-900 mt-0.5 truncate">
+                                            {order.customerShippingCompany}
+                                        </p>
+                                    </div>
+                                    {order.shippingCompany &&
+                                        order.shippingCompany !== order.customerShippingCompany && (
+                                            <span
+                                                title="Admin re-assigned a different carrier"
+                                                className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full shrink-0"
+                                            >
+                                                Overridden
+                                            </span>
+                                        )}
+                                </div>
+                            )}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Shipping Company</label>

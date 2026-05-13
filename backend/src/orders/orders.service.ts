@@ -148,6 +148,11 @@ export class OrdersService {
                 customerId,
                 totalAmount,
                 shippingCompany: shippingCompany ?? null,
+                // Snapshot the buyer's chosen carrier so the admin order
+                // detail can always surface "this is what the customer
+                // picked at checkout", even after operations re-routes
+                // the shipment via /admin/orders/[id] later.
+                customerShippingCompany: shippingCompany ?? null,
                 shippingCost: shippingCost ?? null,
                 status: OrderStatus.PENDING,
                 items: {

@@ -285,6 +285,11 @@ model Order {
 
   shippingCompany String?
   shippingCost    Float?
+  // The shipping company the buyer picked at checkout. Captured at
+  // order-creation time and never overwritten by admin re-assignment —
+  // so the admin order detail page can always show "this is what the
+  // customer chose" even after operations re-routes the shipment.
+  customerShippingCompany String?
 
   customerId String
   customer   User   @relation("CustomerOrders", fields: [customerId], references: [id])

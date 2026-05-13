@@ -14,6 +14,9 @@ export class OrderDto {
     shippingCompany: string;
 
     @Expose()
+    customerShippingCompany: string;
+
+    @Expose()
     shippingCost: number;
 
     @Expose()
