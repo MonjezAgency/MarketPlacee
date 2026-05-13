@@ -22,9 +22,11 @@ import * as React from 'react';
 import Link from 'next/link';
 import {
     Package, ShoppingCart, Truck, Check, XCircle, Search, Loader2, Box,
-    ChevronDown, ChevronRight, Plus, Minus, Layers,
+    ChevronDown, ChevronRight, Plus, Minus, Layers, X, Pencil, Tag, MapPin, Barcode,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -59,6 +61,7 @@ interface InventoryRow {
 }
 
 export default function SupplierInventoryPage() {
+    const router = useRouter();
     const [rows, setRows] = React.useState<InventoryRow[]>([]);
     const [isLoading, setIsLoading] = React.useState(true);
     const [search, setSearch] = React.useState('');
@@ -70,6 +73,10 @@ export default function SupplierInventoryPage() {
     // In-flight set for variant stock updates so we can dim the +/-
     // controls while the PATCH is pending. Keyed by `${productId}::${sig}`.
     const [savingVariants, setSavingVariants] = React.useState<Set<string>>(new Set());
+    // The product currently open in the review modal — clicking a
+    // product row triggers this, X / outside-click clears it, and
+    // Update sends the supplier to the dedicated edit route.
+    const [reviewProduct, setReviewProduct] = React.useState<InventoryRow | null>(null);
 
     React.useEffect(() => {
         (async () => {
@@ -283,12 +290,19 @@ export default function SupplierInventoryPage() {
                                                             )}
                                                         </div>
                                                         <div className="min-w-0">
-                                                            <Link
-                                                                href={`/supplier/products/${r.id}/edit`}
-                                                                className="text-[13px] font-bold text-slate-900 hover:text-[#2EC4B6] line-clamp-1 transition-colors"
+                                                            {/* Click the product name → open the Review
+                                                                modal with the X / Update buttons. The
+                                                                modal is purely a preview; Update
+                                                                navigates to /supplier/products/:id/edit
+                                                                where the full form lives. */}
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setReviewProduct(r)}
+                                                                className="text-[13px] font-bold text-slate-900 hover:text-[#2EC4B6] line-clamp-1 transition-colors text-start"
+                                                                title="Review product"
                                                             >
                                                                 {r.name}
-                                                            </Link>
+                                                            </button>
                                                             <p className="text-[10px] text-slate-500 mt-0.5 font-mono flex items-center gap-2">
                                                                 <span>{r.ean || '—'}{r.exwLocation ? ` · EXW ${r.exwLocation}` : ''}</span>
                                                                 {r.hasVariants && (
@@ -428,6 +442,174 @@ export default function SupplierInventoryPage() {
                     </div>
                 </div>
             )}
+
+            {/* ─── Review modal ─────────────────────────────────────────
+                Opens when the supplier clicks a product name in the table.
+                Pure preview — every editable field lives on the dedicated
+                edit page. Two actions only:
+                  • X   → close the modal, stay on this page
+                  • Update → navigate to /supplier/products/:id/edit
+                Closing via X / outside-click does NOT save anything.
+            */}
+            <AnimatePresence>
+                {reviewProduct && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setReviewProduct(null)}
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+                            animate={{ scale: 1, opacity: 1, y: 0 }}
+                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+                            transition={{ type: 'spring', stiffness: 320, damping: 28 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col"
+                        >
+                            {/* Header */}
+                            <div className="flex items-start justify-between p-6 border-b border-slate-100 bg-gradient-to-br from-slate-50 to-white">
+                                <div className="flex items-center gap-4 min-w-0 flex-1">
+                                    <div className="w-16 h-16 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                                        {reviewProduct.image ? (
+                                            <img
+                                                src={reviewProduct.image}
+                                                alt={reviewProduct.name}
+                                                referrerPolicy="no-referrer"
+                                                className="w-full h-full object-contain"
+                                                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                                            />
+                                        ) : (
+                                            <Package size={22} className="text-slate-300" />
+                                        )}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#2EC4B6]">Review product</p>
+                                        <h2 className="text-[18px] font-black text-slate-900 line-clamp-2 mt-0.5">{reviewProduct.name}</h2>
+                                        <p className="text-[11px] text-slate-500 mt-1">
+                                            <span className={cn(
+                                                'inline-block h-4 px-1.5 rounded text-[9px] font-bold uppercase tracking-wider me-2',
+                                                reviewProduct.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                                reviewProduct.status === 'PENDING'  ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                                reviewProduct.status === 'REJECTED' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                                                                                       'bg-slate-100 text-slate-600',
+                                            )}>{reviewProduct.status}</span>
+                                            <span className="font-mono">ID {reviewProduct.id.slice(0, 8)}</span>
+                                        </p>
+                                    </div>
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={() => setReviewProduct(null)}
+                                    className="w-9 h-9 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors flex-shrink-0 ms-3"
+                                    title="Close"
+                                    aria-label="Close"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            {/* Body — scrollable */}
+                            <div className="px-6 py-5 overflow-y-auto flex-1 space-y-5">
+                                {/* Quick facts */}
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                    <ReviewField icon={Tag}     label="Category"   value={reviewProduct.category || '—'} />
+                                    <ReviewField icon={Barcode} label="EAN"        value={reviewProduct.ean || '—'} mono />
+                                    <ReviewField icon={MapPin}  label="EXW"        value={reviewProduct.exwLocation || '—'} />
+                                    <ReviewField icon={Package} label="Unit"       value={reviewProduct.unit || '—'} />
+                                    <ReviewField icon={Box}     label="Units/case" value={reviewProduct.unitsPerCase ? String(reviewProduct.unitsPerCase) : '—'} />
+                                    <ReviewField icon={Layers}  label="Cases/pallet" value={reviewProduct.casesPerPallet ? String(reviewProduct.casesPerPallet) : '—'} />
+                                </div>
+
+                                {/* Price + Stock */}
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Price (per case · raw)</p>
+                                        <p className="text-[22px] font-black text-slate-900 mt-1 tabular-nums">€{reviewProduct.price?.toFixed?.(2) ?? reviewProduct.price ?? '—'}</p>
+                                    </div>
+                                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Current stock</p>
+                                        <p className="text-[22px] font-black text-slate-900 mt-1 tabular-nums">{reviewProduct.stock}</p>
+                                        <p className="text-[10px] text-slate-500 mt-0.5">
+                                            {reviewProduct.stockPallets} pallets · {reviewProduct.stockTrucks} trucks
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {/* Order activity */}
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-center">
+                                        <p className="text-[10px] font-black uppercase tracking-wider text-amber-700">Reserved</p>
+                                        <p className="text-[18px] font-black text-amber-900 mt-0.5 tabular-nums">{reviewProduct.reserved}</p>
+                                    </div>
+                                    <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-center">
+                                        <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Delivered</p>
+                                        <p className="text-[18px] font-black text-emerald-900 mt-0.5 tabular-nums">{reviewProduct.sold}</p>
+                                    </div>
+                                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-center">
+                                        <p className="text-[10px] font-black uppercase tracking-wider text-rose-700">Cancelled</p>
+                                        <p className="text-[18px] font-black text-rose-900 mt-0.5 tabular-nums">{reviewProduct.cancelled}</p>
+                                    </div>
+                                </div>
+
+                                {reviewProduct.hasVariants && reviewProduct.variantBreakdown.length > 0 && (
+                                    <div>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 mb-2">Variants ({reviewProduct.variantBreakdown.length})</p>
+                                        <div className="space-y-1.5">
+                                            {reviewProduct.variantBreakdown.slice(0, 5).map(v => (
+                                                <div key={v.signature} className="flex items-center justify-between p-2.5 rounded-lg bg-violet-50/40 border border-violet-100">
+                                                    <span className="text-[11px] text-slate-700 font-medium">
+                                                        {Object.entries(v.picks).map(([k, vv]) => `${k}: ${vv}`).join(' · ')}
+                                                    </span>
+                                                    <span className="text-[11px] font-bold text-violet-700 tabular-nums">{v.stock} in stock</span>
+                                                </div>
+                                            ))}
+                                            {reviewProduct.variantBreakdown.length > 5 && (
+                                                <p className="text-[10px] text-slate-400 text-center">+{reviewProduct.variantBreakdown.length - 5} more — open Update to see all</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Footer actions */}
+                            <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-end gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setReviewProduct(null)}
+                                    className="h-11 px-5 rounded-xl border border-slate-300 bg-white text-slate-700 text-[13px] font-bold hover:bg-slate-100 transition-colors inline-flex items-center gap-2"
+                                >
+                                    <X size={15} /> Close
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const id = reviewProduct.id;
+                                        setReviewProduct(null);
+                                        router.push(`/supplier/products/${id}/edit`);
+                                    }}
+                                    className="h-11 px-5 rounded-xl bg-[#2EC4B6] hover:bg-[#23a89c] text-white text-[13px] font-black transition-colors inline-flex items-center gap-2 shadow-sm"
+                                >
+                                    <Pencil size={15} /> Update product
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+        </div>
+    );
+}
+
+function ReviewField({ icon: Icon, label, value, mono = false }: { icon: any; label: string; value: string; mono?: boolean }) {
+    return (
+        <div className="p-3 rounded-xl bg-white border border-slate-200">
+            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-slate-500 mb-1">
+                <Icon size={11} />
+                {label}
+            </div>
+            <p className={cn('text-[13px] font-bold text-slate-900 line-clamp-1', mono && 'font-mono')}>{value}</p>
         </div>
     );
 }
