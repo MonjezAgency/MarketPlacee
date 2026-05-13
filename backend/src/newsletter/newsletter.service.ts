@@ -220,6 +220,7 @@ export class NewsletterService {
         content: string | undefined,
         opts: {
             html?: string;
+            blocks?: any[];
             audience?: 'PLATFORM' | 'NEWSLETTER';
             sentBy?: string;
         } = {},
@@ -227,8 +228,9 @@ export class NewsletterService {
         if (!subject || !subject.trim()) {
             throw new BadRequestException('Subject is required');
         }
-        if ((!opts.html || !opts.html.trim()) && (!content || !content.trim())) {
-            throw new BadRequestException('Email body (html or content) is required');
+        const hasBlocks = Array.isArray(opts.blocks) && opts.blocks.length > 0;
+        if (!hasBlocks && (!opts.html || !opts.html.trim()) && (!content || !content.trim())) {
+            throw new BadRequestException('Email body (blocks, html or content) is required');
         }
         const audience: 'PLATFORM' | 'NEWSLETTER' =
             opts.audience === 'PLATFORM' ? 'PLATFORM' : 'NEWSLETTER';
@@ -337,11 +339,190 @@ export class NewsletterService {
 </body>
 </html>`;
 
+        // ─── Offers-style render from blocks (the operator's preferred look)
+        //
+        // When the frontend sends a `blocks` array (the new path), we render
+        // the email in the exact same style as the /offers approved blast:
+        //   - Navy header + teal curved divider + ATLANTIS logo
+        //   - Two-column intro: heading/paragraphs on the left, product
+        //     image on the right
+        //   - "PRODUCT INFORMATION" card with spec rows + Quality/Global/
+        //     Secure features panel on the right
+        //   - "Interested in this product?" CTA strip with Contact Us button
+        //   - Dark footer with Bridging Markets / Building Opportunities
+        //
+        // This matches the KitKat-Chunky screenshot the operator confirmed
+        // as the gold-standard template. The simpler `extractBody` path
+        // stays as the fallback for legacy/manual HTML sends.
+        const esc = (s: any) => String(s ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+        const renderFromBlocks = (blocks: any[]): string => {
+            const productBlock = blocks.find((b: any) => b?.type === 'product');
+            // Intro: collect every text-ish block BEFORE the product card.
+            const headIdx = productBlock ? blocks.indexOf(productBlock) : blocks.length;
+            const introBlocks = blocks.slice(0, headIdx);
+            // Tail: anything AFTER the product card (signature, extra
+            // paragraphs, custom button text) gets rendered inline at the
+            // bottom of the body section.
+            const tailBlocks = productBlock ? blocks.slice(headIdx + 1) : [];
+
+            const introHtml = introBlocks.map((b: any) => {
+                if (b.type === 'h1') return `<h1 style="color:#0F172A;font-size:30px;font-weight:900;margin:0 0 14px;">${esc(b.text)}</h1>`;
+                if (b.type === 'h2') return `<h1 style="color:#0F172A;font-size:30px;font-weight:900;margin:0 0 14px;">${esc(b.text)}</h1>`;
+                if (b.type === 'h3') return `<h3 style="color:#0F172A;font-size:18px;font-weight:800;margin:0 0 10px;">${esc(b.text)}</h3>`;
+                if (b.type === 'p')  return `<p style="color:#475569;font-size:15px;line-height:1.7;margin:0 0 14px;">${esc(b.text).replace(/\n/g, '<br/>')}</p>`;
+                if (b.type === 'quote') return `<p style="color:#0F172A;font-size:15px;line-height:1.7;margin:0 0 14px;font-style:italic;border-left:4px solid #2EC4B6;padding:6px 16px;background:#F0FDFA;">${esc(b.text)}</p>`;
+                return '';
+            }).join('\n');
+
+            // Tail body — any blocks after the product card.
+            const tailHtml = tailBlocks.map((b: any) => {
+                if (b.type === 'h1' || b.type === 'h2') return `<h2 style="color:#0F172A;font-size:22px;font-weight:800;margin:18px 0 12px;">${esc(b.text)}</h2>`;
+                if (b.type === 'h3') return `<h3 style="color:#0F172A;font-size:16px;font-weight:700;margin:14px 0 8px;">${esc(b.text)}</h3>`;
+                if (b.type === 'p')  return `<p style="color:#475569;font-size:14px;line-height:1.7;margin:0 0 12px;">${esc(b.text).replace(/\n/g, '<br/>')}</p>`;
+                if (b.type === 'button') return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 14px;"><tr><td style="background:#0B1F3A;border-radius:14px;"><a href="${esc(b.url || '#')}" style="display:inline-block;padding:12px 26px;color:#ffffff;font-weight:800;font-size:13px;text-decoration:none;">${esc(b.text)}</a></td></tr></table>`;
+                if (b.type === 'quote') return `<p style="color:#0F172A;font-size:14px;line-height:1.7;margin:0 0 12px;font-style:italic;border-left:4px solid #2EC4B6;padding:6px 16px;background:#F0FDFA;">${esc(b.text)}</p>`;
+                if (b.type === 'image' && b.url) return `<img src="${esc(b.url)}" alt="${esc(b.alt || '')}" style="max-width:100%;height:auto;display:block;margin:0 0 12px;" />`;
+                return '';
+            }).join('\n');
+
+            // Product card (offers-style spec rows). Each row is a teal
+            // pill icon + label + value, exactly like the offers blast.
+            const baseUrl = (process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '');
+            const logoUrl = `${baseUrl}/icon.png`;
+
+            const specRow = (icon: string, label: string, value: string) => `
+                <tr><td style="padding:14px 0;border-bottom:1px solid #E2E8F0;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                        <tr>
+                            <td width="44" style="vertical-align:middle;">
+                                <div style="width:36px;height:36px;border-radius:50%;background:#2EC4B6;color:#ffffff;text-align:center;line-height:36px;font-size:16px;">${icon}</div>
+                            </td>
+                            <td style="vertical-align:middle;padding-left:14px;color:#0F172A;font-weight:800;font-size:14px;">${esc(label)}</td>
+                            <td style="vertical-align:middle;text-align:right;color:#2EC4B6;font-weight:800;font-size:14px;">${esc(value)}</td>
+                        </tr>
+                    </table>
+                </td></tr>`;
+
+            let productCardHtml = '';
+            let heroImg = '';
+            if (productBlock) {
+                const pName = productBlock.name || 'Product';
+                heroImg = productBlock.image || '';
+                const exw = productBlock.exwLocation || '';
+                const tradeTerms = exw ? `EXW ${exw}` : (productBlock.origin || '—');
+                const rows: string[] = [];
+                rows.push(specRow('📍', 'Trade Terms', tradeTerms));
+                if (productBlock.origin && productBlock.origin !== exw)
+                    rows.push(specRow('🏭', 'Country of Origin', productBlock.origin));
+                if (productBlock.ean)            rows.push(specRow('▏▏▎', 'EAN', String(productBlock.ean)));
+                if (productBlock.unitsPerCase)   rows.push(specRow('📦', 'Units per case', String(productBlock.unitsPerCase)));
+                if (productBlock.casesPerPallet) rows.push(specRow('🏗', 'Cases per pallet', String(productBlock.casesPerPallet)));
+                if (productBlock.bbd)            rows.push(specRow('⏳', 'Best-Before', String(productBlock.bbd)));
+                if (productBlock.family)         rows.push(specRow('🏷', 'Family', String(productBlock.family)));
+
+                productCardHtml = `
+                <tr><td style="padding:8px 0 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-radius:18px;overflow:hidden;border:1px solid #E2E8F0;">
+                        <tr><td style="background:#0B1F3A;padding:18px 24px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="vertical-align:middle;color:#ffffff;font-size:13px;font-weight:800;letter-spacing:0.18em;text-transform:uppercase;">
+                                        <span style="display:inline-block;width:26px;height:26px;border-radius:7px;background:#2EC4B6;color:#0B1F3A;text-align:center;line-height:26px;margin-right:10px;font-size:14px;vertical-align:middle;">📦</span>
+                                        <span style="vertical-align:middle;">Product Information</span>
+                                    </td>
+                                    <td align="right" style="vertical-align:middle;color:#ffffff;font-size:11px;font-weight:900;letter-spacing:0.04em;border-left:1px solid rgba(255,255,255,0.15);padding-left:14px;">
+                                        ATLANTIS <span style="color:#2EC4B6;font-size:9px;letter-spacing:0.4em;">FMCG</span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td></tr>
+                        <tr><td style="background:#ffffff;padding:24px 24px 28px;">
+                            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td style="vertical-align:top;width:60%;padding-right:18px;">
+                                        <h2 style="color:#0F172A;font-size:22px;font-weight:900;margin:0 0 16px;">${esc(pName)}</h2>
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows.join('')}</table>
+                                    </td>
+                                    <td style="vertical-align:top;width:40%;padding-left:18px;border-left:1px solid #F1F5F9;">
+                                        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:14px;">
+                                            <tr><td style="padding:16px;">
+                                                <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🛡 Verified Suppliers</p>
+                                                <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 12px;">All our sellers are verified for your peace of mind.</p>
+                                                <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🌐 Global Marketplace</p>
+                                                <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0 0 12px;">Access a wide range of FMCG products from trusted sellers.</p>
+                                                <p style="color:#0F172A;font-size:13px;font-weight:900;margin:0 0 6px;">🤝 Secure Transactions</p>
+                                                <p style="color:#64748B;font-size:11px;line-height:1.5;margin:0;">Safe and transparent trading experience from inquiry to delivery.</p>
+                                            </td></tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td></tr>
+                    </table>
+                </td></tr>
+
+                <!-- CTA strip -->
+                <tr><td style="padding:0 0 24px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#F0FDFA;border:1px solid #99F6E4;border-radius:16px;">
+                        <tr>
+                            <td style="padding:18px 22px;vertical-align:middle;">
+                                <table role="presentation" cellpadding="0" cellspacing="0">
+                                    <tr>
+                                        <td style="vertical-align:middle;padding-right:14px;">
+                                            <div style="width:40px;height:40px;border-radius:50%;background:#2EC4B6;color:#ffffff;text-align:center;line-height:40px;font-size:18px;">✉</div>
+                                        </td>
+                                        <td style="vertical-align:middle;">
+                                            <p style="color:#0F172A;font-size:14px;font-weight:900;margin:0 0 2px;">Interested in this product?</p>
+                                            <p style="color:#64748B;font-size:11px;margin:0;">Contact us today for price, availability, and more information.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                            <td align="right" style="padding:18px 22px;vertical-align:middle;">
+                                <a href="${baseUrl}/contact" style="display:inline-block;padding:14px 30px;background:#0B1F3A;color:#ffffff;text-decoration:none;border-radius:14px;font-weight:800;font-size:13px;letter-spacing:0.02em;">Contact Us</a>
+                            </td>
+                        </tr>
+                    </table>
+                </td></tr>`;
+            }
+
+            // ── Two-column intro: text on left, product image on right ──
+            const introSection = `
+            <tr><td style="padding:0 0 16px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="vertical-align:top;width:${heroImg ? '60%' : '100%'};${heroImg ? 'padding-right:20px;' : ''}">
+                            ${introHtml || '<p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">Hello,</p>'}
+                        </td>
+                        ${heroImg ? `<td style="vertical-align:middle;width:40%;text-align:center;">
+                            <img src="${esc(heroImg)}" alt="${esc(productBlock?.name || '')}" style="max-width:100%;max-height:220px;display:inline-block;" />
+                        </td>` : ''}
+                    </tr>
+                </table>
+            </td></tr>`;
+
+            const tailSection = tailHtml ? `<tr><td style="padding:0 0 8px;">${tailHtml}</td></tr>` : '';
+
+            // Wrap everything in a single root table the canonical shell
+            // will inject into its main <td>.
+            return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                ${introSection}
+                ${productCardHtml}
+                ${tailSection}
+            </table>`;
+        };
+
         // Decide what content to wrap:
-        //   - opts.html  → take its body content (or whole string if no body)
-        //   - content    → plain-text-ish; wrap in a <p> so the shell renders it
+        //   - opts.blocks → render in offers-style (preferred path)
+        //   - opts.html   → take its body content (or whole string if no body)
+        //   - content     → plain-text-ish; wrap in a <p> so the shell renders it
         let innerBody: string;
-        if (opts.html && opts.html.trim()) {
+        if (hasBlocks) {
+            innerBody = renderFromBlocks(opts.blocks!);
+        } else if (opts.html && opts.html.trim()) {
             innerBody = extractBody(opts.html);
         } else {
             innerBody = `<p style="color:#475569;font-size:15px;line-height:1.7;margin:0;">${(content || '').replace(/\n/g, '<br/>')}</p>`;

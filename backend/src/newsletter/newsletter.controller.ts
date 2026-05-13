@@ -79,11 +79,18 @@ export class NewsletterController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN', 'OWNER')
     async sendCampaign(
-        @Body() body: { subject: string; content?: string; html?: string; audience?: 'PLATFORM' | 'NEWSLETTER' },
+        @Body() body: {
+            subject: string;
+            content?: string;
+            html?: string;
+            blocks?: any[];
+            audience?: 'PLATFORM' | 'NEWSLETTER';
+        },
         @Req() req: any,
     ) {
         return this.newsletterService.sendCampaign(body.subject, body.content, {
             html: body.html,
+            blocks: body.blocks,
             audience: body.audience,
             sentBy: req.user?.sub,
         });

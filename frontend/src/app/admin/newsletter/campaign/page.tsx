@@ -393,9 +393,16 @@ export default function CampaignBuilderPage() {
         if (blocks.length === 0) return toast.error('Add at least one block');
         setIsSending(true);
         try {
+            // Operator wants the offers-style template (the KitKat
+            // Chunky screenshot). Send the raw `blocks` array — the
+            // backend renders it using the same canonical layout as
+            // the /offers blast (header → two-column intro with
+            // product image → PRODUCT INFORMATION card with feature
+            // panel → "Interested?" CTA → dark footer). Keeps the
+            // iframe-preview HTML around as a fallback.
             const res = await apiFetch('/newsletter/send-campaign', {
                 method: 'POST',
-                body: JSON.stringify({ subject, html: bodyHtml, audience }),
+                body: JSON.stringify({ subject, blocks, html: bodyHtml, audience }),
             });
             if (res.ok) {
                 const r = await res.json();
