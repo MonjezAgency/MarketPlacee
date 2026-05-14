@@ -448,9 +448,29 @@ export default function ProductDetailClient() {
             | undefined;
         if (!meta) return parentImageList;
         const keys = Object.keys(selectedVariants).sort();
-        if (keys.length === 0) return parentImageList;
+        if (keys.length === 0) {
+            // No variant picked yet — but if ANY variant carries its
+            // own images, surface them alongside parent so the buyer
+            // sees what's available before clicking. Operator request:
+            // "if supplier uploaded photos for specific varieties, show
+            // them in the thumbnail strip even before selection".
+            const extras = Object.values(meta)
+                .filter(e => e && !e.useParentImages)
+                .flatMap(e => (Array.isArray(e!.images) ? e!.images : e!.image ? [e!.image] : []))
+                .filter(Boolean) as string[];
+            const merged = [...parentImageList, ...extras];
+            return Array.from(new Set(merged));
+        }
         const sig = keys.map(k => `${k}=${selectedVariants[k]}`).join('|');
-        const entry = meta[sig];
+        // Exact match first, then case-insensitive fallback —
+        // supplier may have saved 'Flavour=Diet' while PDP key is
+        // 'FLAVOUR=Diet' depending on how the variant group was named.
+        let entry = meta[sig];
+        if (!entry) {
+            const lower = sig.toLowerCase();
+            const match = Object.entries(meta).find(([k]) => k.toLowerCase() === lower);
+            if (match) entry = match[1];
+        }
         if (!entry || entry.useParentImages) return parentImageList;
         const variantImages: string[] = Array.isArray(entry.images)
             ? entry.images
@@ -1119,26 +1139,41 @@ export default function ProductDetailClient() {
                                                     />
                                                 </div>
 
-                                                {/* Variant cards */}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                {/* Variant cards.
+
+                                                    Operator feedback: with 13+ flavours the previous
+                                                    2-column layout truncated the label to "Fla…" so
+                                                    buyers couldn't tell variants apart. Switched to
+                                                    a column count that adapts to count (≤6 → 1col,
+                                                    ≤12 → 2col, more → 3col on xl) and removed the
+                                                    `truncate` clamp so the label wraps onto a
+                                                    second line. */}
+                                                <div
+                                                    className={cn(
+                                                        'grid gap-3',
+                                                        mixData.variants.length <= 6
+                                                            ? 'grid-cols-1 sm:grid-cols-2'
+                                                            : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3',
+                                                    )}
+                                                >
                                                     {mixData.variants.map(v => {
                                                         const qty = Math.max(0, Number(mixQuantities[v.signature] || 0));
                                                         const unitPrice = mixCapacity.perVariantPrice === 'palletPrice' ? v.palletPrice : v.casePrice;
                                                         const remaining = (mixCapacity.total || 0) - (mixSummary?.filled || 0);
                                                         const canIncrement = remaining > 0;
                                                         return (
-                                                            <div key={v.signature} className="bg-white rounded-xl border border-orange-100 p-3 flex items-center gap-3">
-                                                                <div className="w-14 h-14 rounded-lg bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center">
+                                                            <div key={v.signature} className="bg-white rounded-xl border border-orange-100 p-3 flex items-center gap-3 min-h-[88px]">
+                                                                <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center">
                                                                     {v.image ? (
                                                                         // eslint-disable-next-line @next/next/no-img-element
                                                                         <img src={v.image} alt={v.label} className="w-full h-full object-cover" />
                                                                     ) : (
-                                                                        <Package size={18} className="text-slate-300" />
+                                                                        <Package size={20} className="text-slate-300" />
                                                                     )}
                                                                 </div>
                                                                 <div className="flex-1 min-w-0">
-                                                                    <p className="text-[12px] font-black text-slate-900 truncate">{v.label}</p>
-                                                                    <p className="text-[11px] text-slate-500 font-mono">
+                                                                    <p className="text-[12px] font-black text-slate-900 leading-tight line-clamp-2 break-words">{v.label}</p>
+                                                                    <p className="text-[11px] text-slate-500 font-mono mt-1">
                                                                         {formatPrice(unitPrice)} / {mixCapacity.unit}
                                                                     </p>
                                                                 </div>
