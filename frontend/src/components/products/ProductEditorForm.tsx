@@ -425,6 +425,14 @@ function VariantPricingEditor({
     const signatures = React.useMemo(() => buildSignatures(groups), [groups]);
     const uploadingRef = React.useRef<Record<string, boolean>>({});
     const [tick, setTick] = React.useState(0); // forces re-render after uploadingRef mutates
+    // Per-signature URL-input draft so two variant cards can accept
+    // pasted URLs in parallel without colliding. Declared HERE (above
+    // the `signatures.length === 0` early return) to keep React's
+    // hook-count stable on every render — placing it below the
+    // return triggered "Rendered more hooks than during the previous
+    // render" (React error #310) the moment a supplier opened a
+    // product with no variants.
+    const [urlDrafts, setUrlDrafts] = React.useState<Record<string, string>>({});
 
     const setPrice = (sig: string, val: number | '') => {
         const next = { ...prices };
@@ -439,40 +447,65 @@ function VariantPricingEditor({
         onMetaChange(next);
     };
 
-    const handleImagePick = async (sig: string, file: File) => {
-        if (!file.type.startsWith('image/')) {
-            toast.error('Only image files are allowed.');
-            return;
+    /**
+     * Upload one OR many image files for a single variant in one go.
+     * Operator request: "يرفع الصور كلها مرة واحدة، مش لازم صورة صورة."
+     * Filters non-image / oversized files up front, uploads the rest
+     * in parallel, then appends every returned URL to the variant's
+     * image array in a single setMeta() call so we don't fight a
+     * stream of mid-render state updates.
+     */
+    const handleImagePick = async (sig: string, files: FileList | File[]) => {
+        const list = Array.from(files);
+        if (list.length === 0) return;
+        const valid: File[] = [];
+        for (const f of list) {
+            if (!f.type.startsWith('image/')) {
+                toast.error(`Skipped: "${f.name}" is not an image`);
+                continue;
+            }
+            if (f.size > 5 * 1024 * 1024) {
+                toast.error(`Skipped: "${f.name}" is larger than 5 MB`);
+                continue;
+            }
+            valid.push(f);
         }
-        if (file.size > 5 * 1024 * 1024) {
-            toast.error('Image too large (max 5 MB).');
-            return;
-        }
+        if (valid.length === 0) return;
+
         uploadingRef.current[sig] = true;
         setTick(t => t + 1);
+
+        const uploaded: string[] = [];
         try {
-            const fd = new FormData();
-            fd.append('file', file);
-            const res = await apiFetch('/products/upload-image', { method: 'POST', body: fd });
-            if (!res.ok) {
-                const err = await res.json().catch(() => null);
-                throw new Error(err?.message || `Upload failed (HTTP ${res.status})`);
+            await Promise.all(
+                valid.map(async (file) => {
+                    try {
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        const res = await apiFetch('/products/upload-image', { method: 'POST', body: fd });
+                        if (!res.ok) {
+                            const err = await res.json().catch(() => null);
+                            throw new Error(err?.message || `Upload failed (HTTP ${res.status})`);
+                        }
+                        const data = await res.json();
+                        if (data?.url) uploaded.push(data.url);
+                    } catch (e: any) {
+                        toast.error(`"${file.name}": ${e?.message || 'upload failed'}`);
+                    }
+                }),
+            );
+
+            if (uploaded.length > 0) {
+                const current = meta[sig] || {};
+                const existing: string[] = Array.isArray(current.images)
+                    ? current.images
+                    : current.image
+                      ? [current.image]
+                      : [];
+                const merged = [...existing, ...uploaded];
+                setMeta(sig, { images: merged, image: existing[0] || uploaded[0] });
+                toast.success(`${uploaded.length} image${uploaded.length === 1 ? '' : 's'} uploaded`);
             }
-            const data = await res.json();
-            if (!data?.url) throw new Error('Upload returned no URL');
-            // Append to the variant's image array. Legacy single
-            // `image` is preserved for back-compat as the first slot
-            // when migrating an existing entry.
-            const current = meta[sig] || {};
-            const existing: string[] = Array.isArray(current.images)
-                ? current.images
-                : current.image
-                  ? [current.image]
-                  : [];
-            setMeta(sig, { images: [...existing, data.url], image: existing[0] || data.url });
-            toast.success('Variant image uploaded');
-        } catch (e: any) {
-            toast.error(e?.message || 'Upload failed');
         } finally {
             uploadingRef.current[sig] = false;
             setTick(t => t + 1);
@@ -491,38 +524,49 @@ function VariantPricingEditor({
     };
 
     /**
-     * Append an externally-hosted image URL to the variant's image
-     * array. Lets the supplier paste a CDN / Dropbox / WeTransfer
-     * direct link without re-uploading to our Supabase bucket. We
-     * do a light shape check ("starts with http" + "looks like an
-     * image extension OR a known CDN host") and trust the rest —
-     * the PDP renders with native <img>, so a broken URL just
-     * shows the standard image-failed icon, not a crash.
+     * Append one OR many externally-hosted image URLs to the variant's
+     * image array. Accepts comma-, newline-, or whitespace-separated
+     * URLs so the supplier can paste a list in one shot
+     * ("يرفع كل الـ URLs مرة واحدة، مش URL URL URL").
+     * Invalid / duplicate entries are filtered out with a per-URL
+     * toast so the supplier sees exactly which ones failed.
      */
-    const addImageUrl = (sig: string, raw: string) => {
-        const url = raw.trim();
-        if (!url) return;
-        if (!/^https?:\/\//i.test(url)) {
-            toast.error('URL must start with http:// or https://');
-            return;
-        }
+    const addImageUrls = (sig: string, raw: string) => {
+        const candidates = raw
+            .split(/[\s,;\n]+/)
+            .map(s => s.trim())
+            .filter(Boolean);
+        if (candidates.length === 0) return;
         const current = meta[sig] || {};
         const existing: string[] = Array.isArray(current.images)
             ? current.images
             : current.image
               ? [current.image]
               : [];
-        if (existing.includes(url)) {
-            toast.error('That image is already in the list.');
+        const accepted: string[] = [];
+        const seenInBatch = new Set<string>();
+        for (const url of candidates) {
+            if (!/^https?:\/\//i.test(url)) {
+                toast.error(`Skipped: "${url.slice(0, 40)}…" — must start with http(s)://`);
+                continue;
+            }
+            if (existing.includes(url) || seenInBatch.has(url)) {
+                continue; // silent skip on duplicates
+            }
+            seenInBatch.add(url);
+            accepted.push(url);
+        }
+        if (accepted.length === 0) {
+            toast.error('No new URLs to add — all were invalid or already in the list.');
             return;
         }
-        setMeta(sig, { images: [...existing, url], image: existing[0] || url });
-        toast.success('Image link added');
+        const merged = [...existing, ...accepted];
+        setMeta(sig, { images: merged, image: existing[0] || accepted[0] });
+        toast.success(`${accepted.length} image link${accepted.length === 1 ? '' : 's'} added`);
     };
 
-    // Per-signature draft of the URL-input field (so each variant
-    // card has its own typing state without colliding).
-    const [urlDrafts, setUrlDrafts] = React.useState<Record<string, string>>({});
+    // (urlDrafts state is declared above the early return — moving it
+    // here would re-introduce the hook-count violation.)
 
     if (signatures.length === 0) {
         return null; // Nothing to price — VariantsEditor handles the empty state.
@@ -664,7 +708,7 @@ function VariantPricingEditor({
                                     {!useParentImages && (
                                         <label
                                             className="shrink-0 w-16 h-16 rounded-lg border border-dashed border-slate-300 dark:border-white/[0.10] bg-slate-50 dark:bg-[#0F0F12] flex items-center justify-center cursor-pointer hover:border-orange-300"
-                                            title="Upload variant image"
+                                            title="Upload one or many images"
                                         >
                                             {isUploading
                                                 ? <Loader2 className="animate-spin text-slate-500" size={16} />
@@ -672,10 +716,12 @@ function VariantPricingEditor({
                                             <input
                                                 type="file"
                                                 accept="image/*"
+                                                multiple
                                                 className="hidden"
                                                 onChange={e => {
-                                                    const f = e.target.files?.[0];
-                                                    if (f) handleImagePick(sig, f);
+                                                    if (e.target.files && e.target.files.length > 0) {
+                                                        handleImagePick(sig, e.target.files);
+                                                    }
                                                     e.target.value = '';
                                                 }}
                                             />
@@ -683,40 +729,45 @@ function VariantPricingEditor({
                                     )}
                                 </div>
 
-                                {/* OR paste a URL — handy when the supplier
-                                    already hosts the image elsewhere (Shopify
-                                    CDN, Dropbox direct link, etc.) and just
-                                    wants to point at it instead of re-uploading. */}
+                                {/* OR paste URL(s) — operator: "يرفع كل الـ URL
+                                    مرة واحدة، مش URL URL URL". Accepts a list
+                                    separated by newlines, commas, or whitespace
+                                    in a single paste. Each line gets validated
+                                    individually and invalid entries are
+                                    reported back with a toast. */}
                                 {!useParentImages && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 shrink-0">
-                                            or paste URL
-                                        </span>
-                                        <input
-                                            type="url"
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500">
+                                                or paste URL(s) — one per line / comma-separated
+                                            </span>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    addImageUrls(sig, urlDrafts[sig] || '');
+                                                    setUrlDrafts(d => ({ ...d, [sig]: '' }));
+                                                }}
+                                                disabled={!urlDrafts[sig]?.trim()}
+                                                className="h-7 px-3 rounded-md bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[10px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                            >
+                                                Add all
+                                            </button>
+                                        </div>
+                                        <textarea
                                             value={urlDrafts[sig] || ''}
                                             onChange={e => setUrlDrafts(d => ({ ...d, [sig]: e.target.value }))}
                                             onKeyDown={e => {
-                                                if (e.key === 'Enter') {
+                                                // ⌘/Ctrl+Enter to fire — plain Enter inserts a newline
+                                                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                                                     e.preventDefault();
-                                                    addImageUrl(sig, urlDrafts[sig] || '');
+                                                    addImageUrls(sig, urlDrafts[sig] || '');
                                                     setUrlDrafts(d => ({ ...d, [sig]: '' }));
                                                 }
                                             }}
-                                            placeholder="https://cdn.example.com/photo.jpg"
-                                            className="flex-1 h-8 px-3 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] font-mono focus:border-orange-400 focus:outline-none"
+                                            placeholder={'https://cdn.example.com/photo-1.jpg\nhttps://cdn.example.com/photo-2.jpg\nhttps://cdn.example.com/photo-3.jpg'}
+                                            rows={3}
+                                            className="w-full min-h-[72px] px-3 py-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] font-mono focus:border-orange-400 focus:outline-none resize-y"
                                         />
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                addImageUrl(sig, urlDrafts[sig] || '');
-                                                setUrlDrafts(d => ({ ...d, [sig]: '' }));
-                                            }}
-                                            disabled={!urlDrafts[sig]?.trim()}
-                                            className="h-8 px-3 rounded-md bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[11px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
-                                        >
-                                            Add
-                                        </button>
                                     </div>
                                 )}
                             </div>
