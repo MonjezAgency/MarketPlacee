@@ -33,6 +33,11 @@ export default function ProductDetailClient() {
     const { addItem, items: cartItems } = useCart();
     const [quantity, setQuantity] = useState(1);
     const [isAdded, setIsAdded] = useState(false);
+    // Mix composer post-add prompt: after a buyer fills a truck/pallet
+    // and adds it to cart, ask whether they want to build another of
+    // the same tier. If yes, we keep them on the page with a fresh
+    // empty composer; if no, we route to /cart.
+    const [showAddAnotherPrompt, setShowAddAnotherPrompt] = useState(false);
     // Variant picks the buyer makes on this PDP — e.g.
     //   { "Size": "Large", "Flavour": "Vanilla" }
     // Mandatory before Add to Cart: every group with values must have
@@ -552,6 +557,11 @@ export default function ProductDetailClient() {
             } as any, 1);
             setIsAdded(true);
             setTimeout(() => setIsAdded(false), 2500);
+            // Operator request: after the buyer adds a mixed truck/pallet,
+            // pop a prompt asking "add another?" so volume orders are one
+            // click away. They reset the composer to a fresh empty grid
+            // and stay on the page; "no" routes them to /cart.
+            setShowAddAnotherPrompt(true);
             return;
         }
 
@@ -836,7 +846,29 @@ export default function ProductDetailClient() {
                                 // perUnitTotal  = price of ONE chosen unit (one truck / one pallet / one
                                 //                 case) — used for the per-unit subtitle and the cart.
                                 // customTotal   = grand total = perUnitTotal × qty.
-                                const perCasePrice = active.perCasePrice ?? 0;
+                                const fullPerCasePrice = active.perCasePrice ?? 0;
+                                // Active wholesale-offer discount surfaces here.
+                                // backend attaches { discountPercent, variantDiscounts }
+                                // on `product.activeOffer` when an APPROVED offer is
+                                // live for this product. If the buyer has selected
+                                // a specific variant and there's a per-variant
+                                // override, we use that — otherwise the headline %.
+                                const offerVariantKey = Object.keys(selectedVariants).sort()
+                                    .map(k => `${k}=${selectedVariants[k]}`).join('|');
+                                const activeOffer = (product as any).activeOffer as
+                                    | { discountPercent?: number; variantDiscounts?: Record<string, number>; validUntil?: string | null }
+                                    | undefined;
+                                const offerDiscountPct = activeOffer
+                                    ? Number(
+                                          (activeOffer.variantDiscounts && offerVariantKey
+                                              ? activeOffer.variantDiscounts[offerVariantKey]
+                                              : undefined) ?? activeOffer.discountPercent ?? 0,
+                                      )
+                                    : 0;
+                                const safeDiscountPct = Math.max(0, Math.min(100, offerDiscountPct));
+                                const perCasePrice = safeDiscountPct > 0
+                                    ? +(fullPerCasePrice * (1 - safeDiscountPct / 100)).toFixed(2)
+                                    : fullPerCasePrice;
                                 const perUnitTotal = perCasePrice * active.casesInUnit;
                                 const customTotal  = perUnitTotal * quantity;
 
@@ -907,12 +939,27 @@ export default function ProductDetailClient() {
                                                 <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1">
                                                     Per case · {active.label} pricing
                                                 </p>
-                                                <div className="flex items-baseline gap-2">
+                                                <div className="flex items-baseline gap-2 flex-wrap">
                                                     <span className="text-[40px] font-black text-[#111827] tracking-tighter leading-none">
                                                         {formatPrice(perCasePrice)}
                                                     </span>
                                                     <span className="text-[15px] font-medium text-[#6B7280]">/ case</span>
+                                                    {safeDiscountPct > 0 && (
+                                                        <>
+                                                            <span className="text-[15px] font-medium text-slate-400 line-through tabular-nums">
+                                                                {formatPrice(fullPerCasePrice)}
+                                                            </span>
+                                                            <span className="inline-flex items-center h-6 px-2 rounded-md bg-rose-100 text-rose-700 text-[11px] font-black uppercase tracking-widest">
+                                                                -{safeDiscountPct}% promo
+                                                            </span>
+                                                        </>
+                                                    )}
                                                 </div>
+                                                {safeDiscountPct > 0 && activeOffer?.validUntil && (
+                                                    <p className="text-[11px] text-rose-700 font-bold mt-1">
+                                                        Valid until {new Date(activeOffer.validUntil).toLocaleDateString()}
+                                                    </p>
+                                                )}
                                                 {active.casesInUnit > 1 && (
                                                     <p className="text-[12px] text-[#6B7280] mt-1">
                                                         = <strong className="text-[#111827]">{formatPrice(perUnitTotal)}</strong> per {active.label.toLowerCase()} ({active.casesInUnit} cases)
@@ -1592,6 +1639,53 @@ export default function ProductDetailClient() {
                 onClose={() => setLightboxIndex(null)}
                 alt={product.name}
             />
+
+            {/* Mix composer "add another?" prompt — fires after a mixed
+                truck/pallet is added so the buyer doesn't have to re-find
+                the product to repeat the order. "Yes" empties the
+                composer and keeps them on this page; "No, go to cart"
+                routes to /cart. */}
+            {showAddAnotherPrompt && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
+                    <div
+                        className="absolute inset-0 bg-[#0F172A]/70 backdrop-blur-sm"
+                        onClick={() => setShowAddAnotherPrompt(false)}
+                    />
+                    <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-7 space-y-5">
+                        <div className="text-center">
+                            <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
+                                <Check size={26} />
+                            </div>
+                            <h3 className="text-[18px] font-black text-[#0F172A]">
+                                Mixed {tierData.activeLabel.toLowerCase()} added to your cart
+                            </h3>
+                            <p className="text-[13px] text-slate-500 mt-1.5">
+                                Want to build another {tierData.activeLabel.toLowerCase()} with a different mix?
+                            </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button
+                                onClick={() => {
+                                    setMixQuantities({});
+                                    setShowAddAnotherPrompt(false);
+                                }}
+                                className="h-12 rounded-xl bg-[#0F172A] hover:bg-[#2EC4B6] text-white font-black uppercase text-[12px] tracking-widest transition-colors"
+                            >
+                                Yes, add another
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowAddAnotherPrompt(false);
+                                    router.push('/cart');
+                                }}
+                                className="h-12 rounded-xl bg-white border-2 border-slate-200 hover:border-[#2EC4B6] text-slate-700 font-black uppercase text-[12px] tracking-widest transition-colors"
+                            >
+                                Go to cart
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

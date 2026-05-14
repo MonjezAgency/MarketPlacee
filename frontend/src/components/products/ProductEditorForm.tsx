@@ -205,11 +205,14 @@ function VariantsEditor({
             {groups.map((g, idx) => (
                 <div
                     key={idx}
-                    className="rounded-xl border border-slate-200 dark:border-white/[0.06] bg-slate-50/60 dark:bg-white/[0.02] p-4 space-y-3"
+                    className="rounded-2xl border border-violet-100 dark:border-violet-500/20 bg-gradient-to-br from-violet-50/40 to-white dark:from-violet-500/[0.04] dark:to-transparent p-5 space-y-4 shadow-sm"
                 >
                     <div className="flex items-center gap-3">
+                        <div className="w-7 h-7 rounded-full bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 flex items-center justify-center text-[12px] font-black shrink-0">
+                            {idx + 1}
+                        </div>
                         <div className="flex-1">
-                            <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
+                            <label className="block text-[11px] font-black text-violet-700 dark:text-violet-300 uppercase tracking-widest mb-1.5">
                                 Option name
                             </label>
                             <input
@@ -217,50 +220,50 @@ function VariantsEditor({
                                 placeholder="e.g. Size, Flavour, Pack, Colour"
                                 value={g.name}
                                 onChange={(e) => update(idx, { name: e.target.value })}
-                                className="w-full h-10 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05]"
+                                className="w-full h-11 rounded-xl border-2 border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-bold text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-violet-400 dark:focus:border-violet-500/40 focus:ring-4 focus:ring-violet-100 dark:focus:ring-violet-500/10"
                             />
                         </div>
                         <button
                             type="button"
                             onClick={() => removeGroup(idx)}
-                            className="self-end h-10 w-10 rounded-lg text-slate-500 dark:text-zinc-400 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 flex items-center justify-center transition-colors"
+                            className="self-end h-11 w-11 rounded-xl text-slate-400 dark:text-zinc-500 hover:bg-red-50 dark:hover:bg-red-500/15 hover:text-red-600 dark:hover:text-red-400 flex items-center justify-center transition-colors"
                             title="Remove this option"
                         >
-                            <Trash2 size={14} />
+                            <Trash2 size={15} />
                         </button>
                     </div>
 
                     <div>
-                        <label className="block text-[11px] font-medium text-slate-500 dark:text-zinc-500 uppercase tracking-wider mb-1.5">
-                            Values
+                        <label className="block text-[11px] font-black text-violet-700 dark:text-violet-300 uppercase tracking-widest mb-2">
+                            Values <span className="text-slate-400 normal-case font-medium tracking-normal">— what buyers can pick from</span>
                         </label>
-                        <div className="flex flex-wrap gap-1.5 mb-2 min-h-[26px]">
+                        <div className="flex flex-wrap gap-2 mb-3 min-h-[32px]">
                             {g.values.map((v, vIdx) => (
                                 <span
                                     key={vIdx}
-                                    className="inline-flex items-center gap-1 h-7 pl-3 pr-1 rounded-full bg-white dark:bg-white/[0.06] border border-slate-200 dark:border-white/[0.08] text-slate-700 dark:text-zinc-200 text-[12px] font-medium"
+                                    className="inline-flex items-center gap-1.5 h-9 pl-3.5 pr-1.5 rounded-full bg-white dark:bg-white/[0.06] border-2 border-violet-200 dark:border-violet-500/30 text-violet-900 dark:text-violet-200 text-[13px] font-bold shadow-sm hover:shadow-md hover:border-violet-400 transition-all"
                                 >
                                     {v}
                                     <button
                                         type="button"
                                         onClick={() => removeValue(idx, vIdx)}
-                                        className="w-5 h-5 rounded-full hover:bg-red-50 dark:hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-400 text-slate-400 dark:text-zinc-500 flex items-center justify-center transition-colors"
+                                        className="w-6 h-6 rounded-full hover:bg-red-50 dark:hover:bg-red-500/20 hover:text-red-600 dark:hover:text-red-400 text-slate-400 dark:text-zinc-500 flex items-center justify-center transition-colors"
                                         title={`Remove "${v}"`}
                                     >
-                                        <X size={11} />
+                                        <X size={12} />
                                     </button>
                                 </span>
                             ))}
                             {g.values.length === 0 && (
-                                <span className="text-[11px] text-slate-400 dark:text-zinc-600 italic py-1.5">
-                                    No values yet — add one below.
+                                <span className="text-[12px] text-slate-400 dark:text-zinc-600 italic py-2">
+                                    No values yet — type one below and press Enter.
                                 </span>
                             )}
                         </div>
                         <div className="flex gap-2">
                             <input
                                 type="text"
-                                placeholder="Type a value (comma to add multiple) and press Enter"
+                                placeholder='e.g. "Red, Blue, Green" — comma adds multiple at once'
                                 value={drafts[idx] || ''}
                                 onChange={(e) => setDrafts((d) => ({ ...d, [idx]: e.target.value }))}
                                 onKeyDown={(e) => {
@@ -269,15 +272,15 @@ function VariantsEditor({
                                         addValue(idx);
                                     }
                                 }}
-                                className="flex-1 h-10 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3 text-xs text-slate-700 dark:text-zinc-200 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05]"
+                                className="flex-1 h-11 rounded-xl border-2 border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-[13px] font-medium text-slate-700 dark:text-zinc-200 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-violet-400 dark:focus:border-violet-500/40 focus:ring-4 focus:ring-violet-100 dark:focus:ring-violet-500/10"
                             />
                             <button
                                 type="button"
                                 onClick={() => addValue(idx)}
                                 disabled={!(drafts[idx] || '').trim()}
-                                className="h-10 px-4 rounded-lg bg-slate-900 hover:bg-slate-800 dark:bg-zinc-100 dark:hover:bg-white text-white dark:text-zinc-900 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0"
+                                className="h-11 px-5 rounded-xl bg-violet-600 hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-400 text-white text-[12px] font-black uppercase tracking-widest disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex-shrink-0 inline-flex items-center gap-1.5 shadow-sm"
                             >
-                                Add
+                                <Plus size={14} /> Add
                             </button>
                         </div>
                     </div>
@@ -2488,6 +2491,7 @@ export default function ProductEditorForm({
                                                     type="text"
                                                     inputMode="decimal"
                                                     placeholder="e.g. 0.330"
+                                                    required
                                                     value={numPart}
                                                     onChange={(e) => {
                                                         const cleaned = e.target.value.replace(/[^0-9.,]/g, '');
@@ -2537,6 +2541,7 @@ export default function ProductEditorForm({
                                     <input
                                         type="text"
                                         placeholder="YYYY-MM-DD"
+                                        required
                                         value={formData.shelfLife || ''}
                                         onChange={(e) =>
                                             setFormData({ ...formData, shelfLife: e.target.value })
@@ -2571,6 +2576,7 @@ export default function ProductEditorForm({
                                         Country of Origin <span className="text-red-500">*</span>
                                     </label>
                                     <select
+                                        required
                                         value={formData.origin || ''}
                                         onChange={(e) =>
                                             setFormData({ ...formData, origin: e.target.value })
@@ -2669,6 +2675,7 @@ export default function ProductEditorForm({
                                     <input
                                         type="text"
                                         placeholder="e.g. Netherlands warehouse"
+                                        required
                                         value={formData.exwLocation || ''}
                                         onChange={(e) =>
                                             setFormData({ ...formData, exwLocation: e.target.value })

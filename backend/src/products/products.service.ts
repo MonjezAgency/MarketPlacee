@@ -1056,7 +1056,39 @@ export class ProductsService {
     }
 
     async findOne(id: string) {
-        return this.prisma.product.findUnique({ where: { id } });
+        const product = await this.prisma.product.findUnique({ where: { id } });
+        if (!product) return null;
+        // Surface any APPROVED active wholesale offer with a promo
+        // discount so the PDP can paint a "-15% OFF" badge and apply
+        // the reduced price. Picks the deepest discount and only the
+        // ones that haven't expired. Adds `activeOffer` to the product
+        // object — read-only, never persisted back.
+        try {
+            const now = new Date();
+            const offers = await this.prisma.offer.findMany({
+                where: {
+                    productId: id,
+                    status: 'APPROVED' as any,
+                    discountPercent: { not: null },
+                    OR: [{ validUntil: null }, { validUntil: { gte: now } }],
+                },
+                orderBy: { discountPercent: 'desc' },
+                take: 1,
+            });
+            const top = offers[0];
+            if (top && Number(top.discountPercent || 0) > 0) {
+                (product as any).activeOffer = {
+                    id: top.id,
+                    discountPercent: top.discountPercent,
+                    variantDiscounts: top.variantDiscounts,
+                    validUntil: top.validUntil,
+                };
+            }
+        } catch {
+            // Non-fatal — if the offers table is missing or query fails,
+            // PDP simply shows the product without a discount badge.
+        }
+        return product;
     }
 
     async findBySupplier(supplierId: string) {

@@ -32,6 +32,11 @@ function CategoriesContent() {
     const [sortBy, setSortBy] = useState('featured');
     const [showFilters, setShowFilters] = useState(false);
     const [localQuery, setLocalQuery] = useState('');
+    // EXW (Currently In) filter — buyer-facing free-text input,
+    // matched case-insensitively against product.exwLocation client-side
+    // so the supplier can write "Hamburg, Germany" and a buyer searching
+    // "germany" or "hamburg" still hits.
+    const [exwQuery, setExwQuery] = useState('');
     const [products, setProducts] = useState<Product[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [sponsoredBrand, setSponsoredBrand] = useState<any>(null);
@@ -42,9 +47,11 @@ function CategoriesContent() {
         const query = searchParams.get('q');
         const brand = searchParams.get('brand');
         const category = searchParams.get('category');
+        const exw = searchParams.get('exw');
         if (query) setLocalQuery(query);
         if (brand) setSelectedBrands(brand.split(','));
         if (category) setSelectedCategories(category.split(','));
+        if (exw) setExwQuery(exw);
     }, [searchParams]);
 
     // Re-fetch whenever filters change (debounced 400ms for text search)
@@ -117,8 +124,15 @@ function CategoriesContent() {
             });
         }
 
+        if (exwQuery.trim()) {
+            const q = exwQuery.trim().toLowerCase();
+            result = result.filter((p: any) =>
+                String(p.exwLocation || '').toLowerCase().includes(q),
+            );
+        }
+
         return result;
-    }, [products, selectedBrands, selectedCategories, selectedAudience]);
+    }, [products, selectedBrands, selectedCategories, selectedAudience, exwQuery]);
 
     const activeFilters = [...selectedBrands, ...selectedCategories, ...selectedAudience];
 
@@ -147,6 +161,16 @@ function CategoriesContent() {
                                 value={localQuery}
                                 onChange={(e) => setLocalQuery(e.target.value)}
                                 className="w-full h-10 bg-background border border-border/80 rounded-md ps-10 pe-4 text-sm focus:border-primary outline-none transition-colors"
+/>
+                        </div>
+                        <div className="relative flex-1 min-w-[200px] max-w-xs">
+                            <span className="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground text-[11px] font-black tracking-widest">EXW</span>
+                            <input
+                                type="text"
+                                placeholder="Filter by EXW location (e.g. Hamburg)"
+                                value={exwQuery}
+                                onChange={(e) => setExwQuery(e.target.value)}
+                                className="w-full h-10 bg-background border border-border/80 rounded-md ps-14 pe-4 text-sm focus:border-primary outline-none transition-colors"
                             />
                         </div>
                         <select
