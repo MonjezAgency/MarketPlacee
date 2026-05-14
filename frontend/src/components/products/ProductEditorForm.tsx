@@ -43,6 +43,7 @@ import {
     X,
     Video,
     Play,
+    DollarSign,
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -292,6 +293,210 @@ function VariantsEditor({
                     <Plus size={14} /> Add another option
                 </button>
             )}
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Mix-composer pricing editor — lets the supplier set a distinct
+// image / label / price-per-case for every variant signature, so the
+// PDP's "Mix this truck" composer has real data to show. The signatures
+// are derived from the VariantsEditor's groups (Cartesian product) so
+// the supplier doesn't have to keep two lists in sync.
+// ────────────────────────────────────────────────────────────────────
+type VariantMetaEntry = { image?: string; label?: string };
+type VariantPricesMap = Record<string, number>;
+type VariantMetaMap = Record<string, VariantMetaEntry>;
+
+function buildSignatures(groups: VariantGroup[]): string[] {
+    const valid = groups.filter(g => g.name && g.values.length > 0);
+    if (valid.length === 0) return [];
+    // Cartesian product of value lists. Each leaf becomes a signature
+    // like "Flavour=Diet|Size=Large" — group names sorted A→Z so the
+    // signature is stable regardless of input order.
+    const sorted = [...valid].sort((a, b) => a.name.localeCompare(b.name));
+    const combos: Array<Record<string, string>> = [{}];
+    for (const g of sorted) {
+        const next: Array<Record<string, string>> = [];
+        for (const c of combos) {
+            for (const v of g.values) {
+                next.push({ ...c, [g.name]: v });
+            }
+        }
+        combos.splice(0, combos.length, ...next);
+    }
+    return combos.map(c =>
+        Object.keys(c)
+            .sort()
+            .map(k => `${k}=${c[k]}`)
+            .join('|'),
+    );
+}
+
+function VariantPricingEditor({
+    groups,
+    prices,
+    meta,
+    parentImage,
+    parentPrice,
+    onPricesChange,
+    onMetaChange,
+}: {
+    groups: VariantGroup[];
+    prices: VariantPricesMap;
+    meta: VariantMetaMap;
+    parentImage?: string;
+    parentPrice?: number;
+    onPricesChange: (next: VariantPricesMap) => void;
+    onMetaChange: (next: VariantMetaMap) => void;
+}) {
+    const signatures = React.useMemo(() => buildSignatures(groups), [groups]);
+    const uploadingRef = React.useRef<Record<string, boolean>>({});
+    const [tick, setTick] = React.useState(0); // forces re-render after uploadingRef mutates
+
+    const setPrice = (sig: string, val: number | '') => {
+        const next = { ...prices };
+        if (val === '' || isNaN(val as number)) delete next[sig];
+        else next[sig] = Number(val);
+        onPricesChange(next);
+    };
+
+    const setMeta = (sig: string, patch: Partial<VariantMetaEntry>) => {
+        const next = { ...meta };
+        next[sig] = { ...(next[sig] || {}), ...patch };
+        onMetaChange(next);
+    };
+
+    const handleImagePick = async (sig: string, file: File) => {
+        if (!file.type.startsWith('image/')) {
+            toast.error('Only image files are allowed.');
+            return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+            toast.error('Image too large (max 5 MB).');
+            return;
+        }
+        uploadingRef.current[sig] = true;
+        setTick(t => t + 1);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await apiFetch('/products/upload-image', { method: 'POST', body: fd });
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                throw new Error(err?.message || `Upload failed (HTTP ${res.status})`);
+            }
+            const data = await res.json();
+            if (!data?.url) throw new Error('Upload returned no URL');
+            setMeta(sig, { image: data.url });
+            toast.success('Variant image uploaded');
+        } catch (e: any) {
+            toast.error(e?.message || 'Upload failed');
+        } finally {
+            uploadingRef.current[sig] = false;
+            setTick(t => t + 1);
+        }
+    };
+
+    if (signatures.length === 0) {
+        return null; // Nothing to price — VariantsEditor handles the empty state.
+    }
+
+    return (
+        <div className="bg-white dark:bg-[#131316] rounded-2xl border border-slate-200 dark:border-white/[0.05] shadow-sm dark:shadow-xl dark:shadow-black/40 p-6 space-y-5">
+            <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 ring-1 ring-orange-100 dark:ring-orange-500/20 flex items-center justify-center">
+                        <DollarSign size={16} />
+                    </div>
+                    <div>
+                        <h3 className="text-[15px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">
+                            Variant pricing &amp; images
+                        </h3>
+                        <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1 max-w-md leading-relaxed">
+                            Each variant gets its own per-case price + (optional) image.
+                            Used when the buyer mixes variants inside one truck/pallet
+                            at checkout. Blank price falls back to the main product price.
+                        </p>
+                    </div>
+                </div>
+                <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-300 text-[11px] font-medium ring-1 ring-orange-100 dark:ring-orange-500/20">
+                    {signatures.length} variant{signatures.length === 1 ? '' : 's'}
+                </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {signatures.map(sig => {
+                    const m = meta[sig] || {};
+                    const price = prices[sig];
+                    const isUploading = !!uploadingRef.current[sig];
+                    const fallbackImg = m.image || parentImage || '';
+                    return (
+                        <div
+                            key={sig}
+                            className="rounded-xl border border-slate-200 dark:border-white/[0.06] bg-slate-50/60 dark:bg-white/[0.02] p-3 flex gap-3"
+                        >
+                            {/* Image slot */}
+                            <label
+                                className="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-dashed border-slate-300 dark:border-white/[0.10] bg-white dark:bg-[#0F0F12] cursor-pointer flex items-center justify-center group"
+                                title="Click to upload"
+                            >
+                                {fallbackImg ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={fallbackImg} alt={sig} className="w-full h-full object-cover" />
+                                ) : (
+                                    <div className="text-slate-400 dark:text-zinc-500 text-[10px] font-bold text-center px-1">
+                                        Upload<br />image
+                                    </div>
+                                )}
+                                {isUploading && (
+                                    <div className="absolute inset-0 bg-white/80 dark:bg-black/60 flex items-center justify-center">
+                                        <Loader2 className="animate-spin text-slate-700 dark:text-zinc-300" size={18} />
+                                    </div>
+                                )}
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={e => {
+                                        const f = e.target.files?.[0];
+                                        if (f) handleImagePick(sig, f);
+                                        e.target.value = '';
+                                    }}
+                                />
+                            </label>
+
+                            {/* Fields */}
+                            <div className="flex-1 min-w-0 space-y-2">
+                                <div>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-zinc-500 truncate">
+                                        {sig}
+                                    </p>
+                                    <input
+                                        type="text"
+                                        value={m.label || ''}
+                                        onChange={e => setMeta(sig, { label: e.target.value })}
+                                        placeholder="Display name (optional)"
+                                        className="mt-1 w-full h-8 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] focus:border-orange-400 focus:outline-none"
+                                    />
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px] text-slate-400">€</span>
+                                    <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={price ?? ''}
+                                        onChange={e => setPrice(sig, e.target.value === '' ? '' : Number(e.target.value))}
+                                        placeholder={parentPrice != null ? `${parentPrice.toFixed(2)} (fallback)` : 'Price per case'}
+                                        className="w-full h-8 ps-6 pe-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] font-mono focus:border-orange-400 focus:outline-none"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }
@@ -808,6 +1013,11 @@ export default function ProductEditorForm({
                           return cleanName.length > 0 && cleanValues.length > 0;
                       })
                     : [],
+                // Variant pricing + metadata for the mix composer. Sent
+                // as-is; backend stores in Product.variantPrices /
+                // Product.variantMeta JSON columns.
+                variantPrices: (formData as any).variantPrices || {},
+                variantMeta: (formData as any).variantMeta || {},
             };
 
             if (basePriceChanged) {
@@ -2164,6 +2374,23 @@ export default function ProductEditorForm({
                         <VariantsEditor
                             value={(formData.variants as any) || []}
                             onChange={(v) => setFormData({ ...formData, variants: v as any })}
+                        />
+
+                        {/* Mix-composer pricing — per-variant price + image.
+                            Only meaningful once VariantsEditor has groups
+                            defined; the component renders nothing otherwise. */}
+                        <VariantPricingEditor
+                            groups={(formData.variants as any) || []}
+                            prices={((formData as any).variantPrices as Record<string, number>) || {}}
+                            meta={((formData as any).variantMeta as Record<string, { image?: string; label?: string }>) || {}}
+                            parentImage={Array.isArray((formData as any).images) ? (formData as any).images[0] : undefined}
+                            parentPrice={typeof (formData as any).basePrice === 'number'
+                                ? (formData as any).basePrice
+                                : typeof (formData as any).price === 'number'
+                                    ? (formData as any).price
+                                    : undefined}
+                            onPricesChange={next => setFormData({ ...formData, variantPrices: next as any })}
+                            onMetaChange={next => setFormData({ ...formData, variantMeta: next as any })}
                         />
 
                         {/* Delete (admin only — footer of right col) */}

@@ -67,6 +67,19 @@ export interface Product {
     exwLocation?: string;
     basePrice?: number | null;
     variants?: ProductVariant[];
+    /**
+     * Mix-composer pricing — { "Flavour=Diet": 14.5, "Flavour=Regular": 13.2 }.
+     * Used when the buyer mixes multiple variants inside one truck/pallet
+     * at checkout. Empty / missing keys fall back to the parent price.
+     */
+    variantPrices?: Record<string, number>;
+    /**
+     * Mix-composer display metadata —
+     * { "Flavour=Diet": { image: "…", label: "Pepsi Diet" } }.
+     * Empty / missing keys fall back to the parent product image + the
+     * raw signature as the label.
+     */
+    variantMeta?: Record<string, { image?: string; label?: string }>;
     adminNotes?: string;
     rating?: number;
     reviews?: any; // Can be a count or an array depending on context
