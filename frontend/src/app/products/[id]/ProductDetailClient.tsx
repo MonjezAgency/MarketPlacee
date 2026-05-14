@@ -425,6 +425,52 @@ export default function ProductDetailClient() {
         }
     }, [locale, currentProduct]);
 
+    // ── Image carousel resolution (must run on EVERY render to keep
+    //    the hook count stable; React error #310 was firing because
+    //    these were declared after the `if (isLoading) return …`
+    //    early return below). When the buyer has picked a variant
+    //    AND that variant ships with its own images (useParentImages
+    //    OFF), swap to the variant carousel; otherwise fall back to
+    //    parent product images. Reads safely against currentProduct
+    //    being null during the initial fetch.
+    const parentImageList = React.useMemo<string[]>(() => {
+        if (!currentProduct) return [];
+        if (Array.isArray(currentProduct.images) && currentProduct.images.length > 0) {
+            return currentProduct.images;
+        }
+        return currentProduct.image ? [currentProduct.image] : [];
+    }, [currentProduct]);
+
+    const allImages = useMemo<string[]>(() => {
+        if (!currentProduct) return parentImageList;
+        const meta = (currentProduct as any).variantMeta as
+            | Record<string, { images?: string[]; image?: string; useParentImages?: boolean }>
+            | undefined;
+        if (!meta) return parentImageList;
+        const keys = Object.keys(selectedVariants).sort();
+        if (keys.length === 0) return parentImageList;
+        const sig = keys.map(k => `${k}=${selectedVariants[k]}`).join('|');
+        const entry = meta[sig];
+        if (!entry || entry.useParentImages) return parentImageList;
+        const variantImages: string[] = Array.isArray(entry.images)
+            ? entry.images
+            : entry.image
+              ? [entry.image]
+              : [];
+        return variantImages.length > 0 ? variantImages : parentImageList;
+    }, [currentProduct, selectedVariants, parentImageList]);
+
+    // Keep selectedImage in sync when the carousel array changes
+    // (variant swap). Falls through silently while the array is
+    // empty (during loading).
+    useEffect(() => {
+        if (allImages.length === 0) return;
+        if (!selectedImage || !allImages.includes(selectedImage)) {
+            setSelectedImage(allImages[0]);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allImages.join('|')]);
+
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center p-6 pt-20 bg-[#F8FAFC]">
@@ -525,41 +571,12 @@ export default function ProductDetailClient() {
     // variant's images instead of the parent's. Otherwise fall back
     // to the parent product images. This is the "show me Red Bull
     // Sugar-Free pictures when I pick Sugar-Free" behaviour the
-    // operator asked for.
-    const parentImageList = product.images && product.images.length > 0
-        ? product.images
-        : [product.image].filter(Boolean) as string[];
-
-    const allImages = useMemo(() => {
-        const meta = (product as any).variantMeta as
-            | Record<string, { images?: string[]; image?: string; useParentImages?: boolean }>
-            | undefined;
-        if (!meta) return parentImageList;
-        // Resolve the variant signature the buyer is currently looking at.
-        // Single-pick → "Flavour=Diet". Multi-pick → "Flavour=Diet|Size=Large".
-        const keys = Object.keys(selectedVariants).sort();
-        if (keys.length === 0) return parentImageList;
-        const sig = keys.map(k => `${k}=${selectedVariants[k]}`).join('|');
-        const entry = meta[sig];
-        if (!entry || entry.useParentImages) return parentImageList;
-        const variantImages: string[] = Array.isArray(entry.images)
-            ? entry.images
-            : entry.image
-              ? [entry.image]
-              : [];
-        return variantImages.length > 0 ? variantImages : parentImageList;
-    }, [product, selectedVariants, parentImageList]);
-
-    // Keep the selectedImage in sync when the variant carousel changes —
-    // otherwise the main slot keeps pointing at a parent image after the
-    // buyer picks a different variant.
-    useEffect(() => {
-        if (allImages.length === 0) return;
-        if (!selectedImage || !allImages.includes(selectedImage)) {
-            setSelectedImage(allImages[0]);
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [allImages.join('|')]);
+    // (allImages + selectedImage-sync useEffect were originally
+    // declared here — moved above the `if (isLoading) return …`
+    // early return to keep the hook count stable. React error #310
+    // was triggered because the useMemo + useEffect ran on the
+    // post-load render but not on the loading render. See block
+    // near the top of the component for the canonical declaration.)
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-inter text-[#111827] pt-12 pb-16">
