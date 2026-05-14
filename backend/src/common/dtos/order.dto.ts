@@ -20,6 +20,9 @@ export class OrderDto {
     shippingCost: number;
 
     @Expose()
+    supplierInvoiceUrl: string;
+
+    @Expose()
     @Transform(({ value, obj }) => {
         // Basic email masking: user@example.com -> u***@example.com
         if (!value) return value;

@@ -76,6 +76,8 @@ type AdminOrder = {
     carrier?: string | null;
     expectedDelivery?: string | null;
     shippingCompany?: string | null;
+    /** Supplier-uploaded invoice / receipt scan for this order. */
+    supplierInvoiceUrl?: string | null;
     // Snapshot of the carrier the buyer chose at checkout. Stays
     // pinned even if admin re-assigns shippingCompany later.
     customerShippingCompany?: string | null;
@@ -734,6 +736,39 @@ export default function AdminOrderDetailPage() {
                                 </button>
                             </div>
                         </div>
+
+                        {/* ── Supplier invoice attachment ─────────────────
+                            When the supplier (or admin) uploaded a receipt
+                            from /supplier/orders, it shows here so admin
+                            can audit the paperwork. PDF renders as a
+                            link, image renders inline. */}
+                        {order.supplierInvoiceUrl && (
+                            <div className="mt-5 p-4 rounded-2xl border border-slate-200 bg-white">
+                                <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-2">
+                                    Supplier invoice attachment
+                                </p>
+                                {(/\.pdf(\?|$)/i.test(order.supplierInvoiceUrl)) ? (
+                                    <a
+                                        href={order.supplierInvoiceUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-slate-900 text-white text-[12px] font-bold hover:bg-slate-800"
+                                    >
+                                        Open invoice PDF
+                                    </a>
+                                ) : (
+                                    <a
+                                        href={order.supplierInvoiceUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block rounded-xl overflow-hidden border border-slate-200 max-w-sm"
+                                    >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={order.supplierInvoiceUrl} alt="Supplier invoice" className="w-full h-auto" />
+                                    </a>
+                                )}
+                            </div>
+                        )}
 
                         {/* Status actions */}
                         <div className="flex flex-wrap items-center gap-2 mt-5">

@@ -25,6 +25,8 @@ interface OrderDetail {
     carrier?: string | null;
     expectedDelivery?: string | null;
     invoiceNumber?: string | null;
+    /** Supplier-uploaded invoice / receipt scan attached to the order. */
+    supplierInvoiceUrl?: string | null;
     createdAt: string;
     deliveredAt?: string | null;
     shippedAt?: string | null;
@@ -41,6 +43,10 @@ interface OrderDetail {
             id: string; name: string; images: string[];
             brand?: string | null; category?: string | null;
             ean?: string | null; shelfLife?: string | null;
+            /** EXW (Ex Works) — origin warehouse / country surfaced
+                to the buyer so they know where the goods leave from. */
+            exwLocation?: string | null;
+            origin?: string | null;
             supplier: { name: string };
             unit?: string;
             unitsPerCase?: number; casesPerPallet?: number;
@@ -587,6 +593,69 @@ export default function OrderTrackingPage() {
                             <div className="pt-4 border-t border-border/50 flex items-center gap-2 text-sm text-muted-foreground">
                                 <MapPin size={14} className="text-primary shrink-0" />
                                 <span className="font-bold">{order.shippingCompany}</span>
+                            </div>
+                        )}
+
+                        {/* EXW — Ex Works locations for the items in this
+                            order. Surfaced to the buyer so they know which
+                            country / warehouse the goods leave from. The
+                            supplier sees the same list on their side; admin
+                            sees it too. */}
+                        {(() => {
+                            const exwSet = Array.from(
+                                new Set(
+                                    order.items
+                                        .map(i => i.product?.exwLocation)
+                                        .filter((v): v is string => !!v),
+                                ),
+                            );
+                            if (exwSet.length === 0) return null;
+                            return (
+                                <div className="pt-4 border-t border-border/50">
+                                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">
+                                        EXW (Ex Works origin)
+                                    </p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {exwSet.map(loc => (
+                                            <span key={loc} className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-bold">
+                                                <MapPin size={11} /> EXW {loc}
+                                            </span>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Supplier invoice / receipt — when the supplier
+                            attaches a file from /supplier/orders, it shows
+                            here so the buyer can preview the paperwork
+                            directly. PDFs render as a clickable link, images
+                            render inline. */}
+                        {order.supplierInvoiceUrl && (
+                            <div className="pt-4 border-t border-border/50 space-y-2">
+                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                                    Invoice from supplier
+                                </p>
+                                {(/\.pdf(\?|$)/i.test(order.supplierInvoiceUrl)) ? (
+                                    <a
+                                        href={order.supplierInvoiceUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[12px] font-black"
+                                    >
+                                        <Download size={13} /> Open invoice PDF
+                                    </a>
+                                ) : (
+                                    <a
+                                        href={order.supplierInvoiceUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="block rounded-xl overflow-hidden border border-border/50 max-w-sm"
+                                    >
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={order.supplierInvoiceUrl} alt="Supplier invoice" className="w-full h-auto" />
+                                    </a>
+                                )}
                             </div>
                         )}
                     </motion.div>

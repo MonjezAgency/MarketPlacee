@@ -304,6 +304,11 @@ model Order {
   // so the admin order detail page can always show "this is what the
   // customer chose" even after operations re-routes the shipment.
   customerShippingCompany String?
+  // Supplier-uploaded invoice / receipt image (or PDF) for this order.
+  // Customer sees it on /dashboard/customer/orders/[id]; admin sees it
+  // on /admin/orders/[id]. Optional — populated when the supplier
+  // attaches paperwork via the supplier orders page.
+  supplierInvoiceUrl String?
 
   customerId String
   customer   User   @relation("CustomerOrders", fields: [customerId], references: [id])

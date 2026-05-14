@@ -4,7 +4,7 @@ import * as React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     ShoppingBag, Search, Truck, Package, Eye,
-    ShieldCheck, Loader2, RefreshCw, CheckCircle2,
+    ShieldCheck, Loader2, RefreshCw, CheckCircle2, FileText, Upload, X, MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
@@ -20,7 +20,8 @@ interface SupplierOrder {
     shippingCompany: string | null;
     createdAt: string;
     buyer: { name: string; email: string };
-    items: { id: string; name: string; image: string | null; quantity: number; price: number }[];
+    items: { id: string; name: string; image: string | null; quantity: number; price: number; exwLocation?: string | null }[];
+    supplierInvoiceUrl?: string | null;
 }
 
 const STATUS_STYLES: Record<OrderStatus, string> = {
@@ -307,6 +308,36 @@ export default function SupplierOrdersPage() {
                                                         </div>
                                                     )}
                                                 </div>
+
+                                                {/* ── EXW summary (operator-requested) ─
+                                                    Suppliers see the EXW location for
+                                                    every item — same field the customer
+                                                    + admin see, kept in sync. */}
+                                                {order.items.some(i => i.exwLocation) && (
+                                                    <div className="p-4 bg-card rounded-2xl border border-border/50 space-y-2">
+                                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">EXW (Origin)</p>
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {Array.from(new Set(order.items.map(i => i.exwLocation).filter(Boolean))).map(loc => (
+                                                                <span key={String(loc)} className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-bold">
+                                                                    <MapPin size={11} /> EXW {String(loc)}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* ── Supplier invoice attachment ───
+                                                    Lets the supplier attach a receipt /
+                                                    invoice scan that the customer sees
+                                                    on their order detail page. */}
+                                                <SupplierInvoiceBlock
+                                                    order={order}
+                                                    onUpdate={(url) =>
+                                                        setOrders(prev =>
+                                                            prev.map(o => o.id === order.id ? { ...o, supplierInvoiceUrl: url } : o),
+                                                        )
+                                                    }
+                                                />
                                             </div>
                                         </motion.div>
                                     )}
@@ -315,6 +346,137 @@ export default function SupplierOrdersPage() {
                         ))}
                     </AnimatePresence>
                 </div>
+            )}
+        </div>
+    );
+}
+
+// ────────────────────────────────────────────────────────────────────
+// Supplier invoice attachment block — sits inside the expanded order
+// row. Supplier picks a file (image OR PDF, ≤ 10 MB), it uploads to
+// /orders/:id/supplier-invoice, and the URL is stored on the order
+// so the customer + admin can view it. Existing attachment renders
+// as an inline preview with a "Replace" / "Remove" toolbar.
+// ────────────────────────────────────────────────────────────────────
+function SupplierInvoiceBlock({
+    order,
+    onUpdate,
+}: {
+    order: SupplierOrder;
+    onUpdate: (url: string | null) => void;
+}) {
+    const inputRef = React.useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = React.useState(false);
+    const url = order.supplierInvoiceUrl;
+    const isPdf = !!url && /\.pdf(\?|$)/i.test(url);
+
+    const handlePick = async (file: File) => {
+        const okMime = file.type.startsWith('image/') || file.type === 'application/pdf';
+        if (!okMime) {
+            toast.error('Invoice must be an image or PDF.');
+            return;
+        }
+        if (file.size > 10 * 1024 * 1024) {
+            toast.error(`File is ${(file.size / 1024 / 1024).toFixed(1)} MB — max is 10 MB.`);
+            return;
+        }
+        setUploading(true);
+        try {
+            const fd = new FormData();
+            fd.append('file', file);
+            const res = await apiFetch(`/orders/${order.id}/supplier-invoice`, { method: 'POST', body: fd });
+            if (!res.ok) {
+                const err = await res.json().catch(() => null);
+                throw new Error(err?.message || `Upload failed (HTTP ${res.status})`);
+            }
+            const data = await res.json();
+            onUpdate(data?.url || null);
+            toast.success('Invoice uploaded — the customer can now see it.');
+        } catch (e: any) {
+            toast.error(e?.message || 'Could not upload invoice');
+        } finally {
+            setUploading(false);
+            if (inputRef.current) inputRef.current.value = '';
+        }
+    };
+
+    const handleRemove = async () => {
+        if (!confirm('Remove this invoice from the order?')) return;
+        try {
+            const res = await apiFetch(`/orders/${order.id}/supplier-invoice`, { method: 'DELETE' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            onUpdate(null);
+            toast.success('Invoice removed.');
+        } catch (e: any) {
+            toast.error(e?.message || 'Could not remove invoice');
+        }
+    };
+
+    return (
+        <div className="p-4 bg-card rounded-2xl border border-border/50 space-y-3">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                        Invoice / Receipt
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                        {url
+                            ? 'Customer can see this attachment from their order detail.'
+                            : 'Attach a receipt / invoice scan so the customer can see it.'}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => inputRef.current?.click()}
+                        disabled={uploading}
+                        className="h-9 px-4 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[11px] font-black inline-flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {uploading ? <Loader2 className="animate-spin" size={13} /> : <Upload size={13} />}
+                        {url ? 'Replace' : 'Upload invoice'}
+                    </button>
+                    {url && (
+                        <button
+                            type="button"
+                            onClick={handleRemove}
+                            className="h-9 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-black inline-flex items-center gap-1.5"
+                        >
+                            <X size={13} /> Remove
+                        </button>
+                    )}
+                </div>
+                <input
+                    ref={inputRef}
+                    type="file"
+                    accept="image/*,application/pdf"
+                    className="hidden"
+                    onChange={e => {
+                        const f = e.target.files?.[0];
+                        if (f) handlePick(f);
+                    }}
+                />
+            </div>
+            {url && (
+                isPdf ? (
+                    <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block rounded-xl border border-border/50 bg-muted/30 px-4 py-3 text-[12px] font-bold text-primary hover:underline inline-flex items-center gap-2"
+                    >
+                        <FileText size={14} /> Open invoice PDF
+                    </a>
+                ) : (
+                    <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="block w-full max-w-sm rounded-xl overflow-hidden border border-border/50"
+                    >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt="Supplier invoice" className="w-full h-auto" />
+                    </a>
+                )
             )}
         </div>
     );

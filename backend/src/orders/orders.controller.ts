@@ -13,7 +13,11 @@ import {
     Res,
     StreamableFile,
     ForbiddenException,
+    UploadedFile,
+    UseInterceptors,
+    BadRequestException,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { OrdersService } from './orders.service';
 import { ExcelService } from '../admin/excel.service';
@@ -25,6 +29,8 @@ import { CheckOwnership } from '../auth/check-ownership.decorator';
 import { Role, OrderStatus } from '@prisma/client';
 import { OrderDto } from '../common/dtos/order.dto';
 import { plainToInstance } from 'class-transformer';
+import { SupabaseStorageService } from '../storage/supabase-storage.service';
+import { PrismaService } from '../common/prisma.service';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -32,7 +38,62 @@ export class OrdersController {
     constructor(
         private readonly ordersService: OrdersService,
         private readonly excelService: ExcelService,
+        private readonly storageService: SupabaseStorageService,
+        private readonly prisma: PrismaService,
     ) { }
+
+    /**
+     * Supplier (or admin) attaches an invoice / receipt image to this
+     * order. Stored on Order.supplierInvoiceUrl so the customer order
+     * detail and the admin order detail can both surface it. Uses the
+     * existing product-image storage path (Supabase) for simplicity —
+     * no new bucket needed and it works for both image and PDF
+     * uploads since the bucket accepts any mime type.
+     */
+    @Post(':id/supplier-invoice')
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS)
+    @UseGuards(PolicyGuard)
+    @CheckOwnership('ORDER')
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+    async uploadSupplierInvoice(
+        @Param('id') id: string,
+        @UploadedFile() file: any,
+    ) {
+        if (!file) throw new BadRequestException('No file uploaded');
+        const okMime =
+            file.mimetype?.startsWith('image/') ||
+            file.mimetype === 'application/pdf';
+        if (!okMime) {
+            throw new BadRequestException('Invoice must be an image or PDF');
+        }
+        try {
+            const url = await this.storageService.uploadProductImage(
+                file.buffer,
+                file.originalname || `invoice-${id}.${file.mimetype === 'application/pdf' ? 'pdf' : 'jpg'}`,
+                file.mimetype,
+            );
+            await this.prisma.order.update({
+                where: { id },
+                data: { supplierInvoiceUrl: url },
+            });
+            return { url };
+        } catch (e: any) {
+            throw new BadRequestException(e?.message || 'Invoice upload failed');
+        }
+    }
+
+    /** Remove the attached invoice from the order. */
+    @Delete(':id/supplier-invoice')
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS)
+    @UseGuards(PolicyGuard)
+    @CheckOwnership('ORDER')
+    async removeSupplierInvoice(@Param('id') id: string) {
+        await this.prisma.order.update({
+            where: { id },
+            data: { supplierInvoiceUrl: null },
+        });
+        return { ok: true };
+    }
 
     @Post()
     @Roles(Role.CUSTOMER, Role.ADMIN, Role.OWNER, Role.SUPPLIER)
