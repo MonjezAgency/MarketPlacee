@@ -56,19 +56,55 @@ export class AppService {
         return config?.value || 'truck';
     }
 
+    /**
+     * Emergency credential reset for the founding Atlantis OWNER
+     * account. Hit `GET /emergency-reset` (no auth) and this guarantees:
+     *   - the user row exists (creates it if missing)
+     *   - the password is reset to the known fallback
+     *   - the account is ACTIVE, email-verified, and role = OWNER
+     *
+     * Previously this used `prisma.user.update` which silently FAILED
+     * with "Record to update not found" the very first time after a
+     * fresh DB / Railway redeploy — the operator then sees
+     * "Invalid email or password" on the login form with no idea
+     * the account simply never got seeded. Using `upsert` makes the
+     * endpoint idempotent + self-healing.
+     */
     async resetAdmin() {
         const email = 'Info@atlantisfmcg.com';
         const password = 'AliDawara@22';
         const hashedPassword = await bcrypt.hash(password, 10);
 
         try {
-            await this.prisma.user.update({
+            const user = await this.prisma.user.upsert({
                 where: { email },
-                data: { password: hashedPassword, status: 'ACTIVE', emailVerified: true },
+                update: {
+                    password: hashedPassword,
+                    status: 'ACTIVE',
+                    emailVerified: true,
+                    role: 'OWNER',
+                },
+                create: {
+                    email,
+                    name: 'Atlantis Founder',
+                    companyName: 'Atlantis FMCG',
+                    password: hashedPassword,
+                    role: 'OWNER',
+                    status: 'ACTIVE',
+                    emailVerified: true,
+                    kycStatus: 'VERIFIED',
+                },
+                select: { id: true, email: true, role: true, status: true },
             });
-            return { message: 'Admin credentials restored successfully' };
-        } catch (e) {
-            return { message: 'Failed to reset admin password', error: e.message };
+            return {
+                message: 'Owner credentials restored — try logging in again.',
+                email: user.email,
+                role: user.role,
+                status: user.status,
+                login: { email, password },
+            };
+        } catch (e: any) {
+            return { message: 'Failed to reset owner password', error: e?.message };
         }
     }
 }
