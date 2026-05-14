@@ -305,8 +305,11 @@ function VariantsEditor({
 // the supplier doesn't have to keep two lists in sync.
 // ────────────────────────────────────────────────────────────────────
 type VariantMetaEntry = {
-    image?: string;
+    image?: string;       // legacy single image (back-compat)
+    images?: string[];    // new multi-image array (preferred)
     label?: string;
+    useParentImages?: boolean; // true → carousel falls back to parent product images
+    sameAsParentPacking?: boolean; // true → packs fall back to parent (hides inputs)
     // Per-variant pack sizes — each falls back to the parent product
     // value when missing. Lets the supplier model the case where Diet
     // ships in 12-packs while Regular ships in 24-packs.
@@ -317,8 +320,62 @@ type VariantMetaEntry = {
 type VariantPricesMap = Record<string, number>;
 type VariantMetaMap = Record<string, VariantMetaEntry>;
 
+/** "Flavour=Diet|Size=L" → "Flavour: Diet · Size: L" */
+function prettifySignature(sig: string): string {
+    return sig
+        .split('|')
+        .map(pair => {
+            const [k, ...rest] = pair.split('=');
+            return `${k}: ${rest.join('=')}`;
+        })
+        .join(' · ');
+}
+
+/** Small reusable on/off pill toggle used inside the variant pricing card. */
+function ToggleSwitch({
+    label,
+    checked,
+    onChange,
+}: {
+    label: string;
+    checked: boolean;
+    onChange: (next: boolean) => void;
+}) {
+    return (
+        <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+            <span className="text-[11px] font-bold text-slate-700 dark:text-zinc-300">{label}</span>
+            <button
+                type="button"
+                role="switch"
+                aria-checked={checked}
+                onClick={() => onChange(!checked)}
+                className={`relative h-5 w-9 rounded-full transition-colors ${
+                    checked
+                        ? 'bg-orange-500'
+                        : 'bg-slate-300 dark:bg-white/10'
+                }`}
+            >
+                <span
+                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                        checked ? 'translate-x-4' : 'translate-x-0'
+                    }`}
+                />
+            </button>
+        </label>
+    );
+}
+
 function buildSignatures(groups: VariantGroup[]): string[] {
-    const valid = groups.filter(g => g.name && g.values.length > 0);
+    const valid = groups.filter(
+        g =>
+            g.name &&
+            // Skip the `__translations` / other internal meta entries
+            // that occasionally live inside Product.variants. Without
+            // this they showed up in the pricing editor as bizarre
+            // "__TRANSLATIONS={'AR':{'NAME':…}" rows.
+            !String(g.name).startsWith('__') &&
+            g.values.length > 0,
+    );
     if (valid.length === 0) return [];
     // Cartesian product of value lists. Each leaf becomes a signature
     // like "Flavour=Diet|Size=Large" — group names sorted A→Z so the
@@ -346,7 +403,7 @@ function VariantPricingEditor({
     groups,
     prices,
     meta,
-    parentImage,
+    parentImages,
     parentPrice,
     parentUnitsPerCase,
     parentCasesPerPallet,
@@ -357,7 +414,7 @@ function VariantPricingEditor({
     groups: VariantGroup[];
     prices: VariantPricesMap;
     meta: VariantMetaMap;
-    parentImage?: string;
+    parentImages: string[];
     parentPrice?: number;
     parentUnitsPerCase?: number;
     parentCasesPerPallet?: number;
@@ -403,7 +460,16 @@ function VariantPricingEditor({
             }
             const data = await res.json();
             if (!data?.url) throw new Error('Upload returned no URL');
-            setMeta(sig, { image: data.url });
+            // Append to the variant's image array. Legacy single
+            // `image` is preserved for back-compat as the first slot
+            // when migrating an existing entry.
+            const current = meta[sig] || {};
+            const existing: string[] = Array.isArray(current.images)
+                ? current.images
+                : current.image
+                  ? [current.image]
+                  : [];
+            setMeta(sig, { images: [...existing, data.url], image: existing[0] || data.url });
             toast.success('Variant image uploaded');
         } catch (e: any) {
             toast.error(e?.message || 'Upload failed');
@@ -411,6 +477,17 @@ function VariantPricingEditor({
             uploadingRef.current[sig] = false;
             setTick(t => t + 1);
         }
+    };
+
+    const removeImage = (sig: string, index: number) => {
+        const current = meta[sig] || {};
+        const existing: string[] = Array.isArray(current.images)
+            ? current.images
+            : current.image
+              ? [current.image]
+              : [];
+        const next = existing.filter((_, i) => i !== index);
+        setMeta(sig, { images: next, image: next[0] });
     };
 
     if (signatures.length === 0) {
@@ -428,10 +505,11 @@ function VariantPricingEditor({
                         <h3 className="text-[15px] font-semibold text-slate-900 dark:text-zinc-50 tracking-tight">
                             Variant pricing &amp; images
                         </h3>
-                        <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1 max-w-md leading-relaxed">
-                            Each variant gets its own per-case price + (optional) image.
-                            Used when the buyer mixes variants inside one truck/pallet
-                            at checkout. Blank price falls back to the main product price.
+                        <p className="text-xs text-slate-500 dark:text-zinc-500 mt-1 max-w-2xl leading-relaxed">
+                            Each variant gets its own per-case price + (optional) image set.
+                            Used when the buyer mixes variants inside one truck/pallet at
+                            checkout. Use the toggles to inherit packing / images from the
+                            main product when a variant ships identically.
                         </p>
                     </div>
                 </div>
@@ -440,107 +518,200 @@ function VariantPricingEditor({
                 </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* One card per variant signature — full width, generous spacing. */}
+            <div className="space-y-3">
                 {signatures.map(sig => {
                     const m = meta[sig] || {};
                     const price = prices[sig];
                     const isUploading = !!uploadingRef.current[sig];
-                    const fallbackImg = m.image || parentImage || '';
+                    const variantImages: string[] = Array.isArray(m.images)
+                        ? m.images
+                        : m.image
+                          ? [m.image]
+                          : [];
+                    // Default to "use parent" for a brand-new variant —
+                    // less friction. The supplier can flip off if this
+                    // variant has distinct packs / artwork.
+                    const useParentImages = m.useParentImages !== false && variantImages.length === 0;
+                    const sameAsParentPacking =
+                        m.sameAsParentPacking !== false &&
+                        m.unitsPerCase == null &&
+                        m.casesPerPallet == null &&
+                        m.palletsPerShipment == null;
+                    const carouselSrc = useParentImages ? parentImages : variantImages;
                     return (
                         <div
                             key={sig}
-                            className="rounded-xl border border-slate-200 dark:border-white/[0.06] bg-slate-50/60 dark:bg-white/[0.02] p-3 flex gap-3"
+                            className="rounded-2xl border border-slate-200 dark:border-white/[0.06] bg-slate-50/40 dark:bg-white/[0.02] p-4 space-y-4"
                         >
-                            {/* Image slot */}
-                            <label
-                                className="relative shrink-0 w-20 h-20 rounded-lg overflow-hidden border border-dashed border-slate-300 dark:border-white/[0.10] bg-white dark:bg-[#0F0F12] cursor-pointer flex items-center justify-center group"
-                                title="Click to upload"
-                            >
-                                {fallbackImg ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img src={fallbackImg} alt={sig} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="text-slate-400 dark:text-zinc-500 text-[10px] font-bold text-center px-1">
-                                        Upload<br />image
-                                    </div>
-                                )}
-                                {isUploading && (
-                                    <div className="absolute inset-0 bg-white/80 dark:bg-black/60 flex items-center justify-center">
-                                        <Loader2 className="animate-spin text-slate-700 dark:text-zinc-300" size={18} />
-                                    </div>
-                                )}
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="hidden"
-                                    onChange={e => {
-                                        const f = e.target.files?.[0];
-                                        if (f) handleImagePick(sig, f);
-                                        e.target.value = '';
-                                    }}
-                                />
-                            </label>
-
-                            {/* Fields */}
-                            <div className="flex-1 min-w-0 space-y-2">
-                                <div>
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-zinc-500 truncate">
-                                        {sig}
+                            {/* Header row — signature label + display name + price */}
+                            <div className="flex flex-col md:flex-row md:items-center gap-3">
+                                <div className="md:w-1/3">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-500 dark:text-zinc-500">
+                                        Variant
                                     </p>
+                                    <p className="text-[14px] font-black text-slate-900 dark:text-zinc-50 mt-0.5">
+                                        {prettifySignature(sig)}
+                                    </p>
+                                </div>
+                                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
                                     <input
                                         type="text"
                                         value={m.label || ''}
                                         onChange={e => setMeta(sig, { label: e.target.value })}
                                         placeholder="Display name (optional)"
-                                        className="mt-1 w-full h-8 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] focus:border-orange-400 focus:outline-none"
+                                        className="h-9 px-3 rounded-lg border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[13px] focus:border-orange-400 focus:outline-none"
                                     />
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[13px] text-slate-400">€</span>
+                                        <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={price ?? ''}
+                                            onChange={e => setPrice(sig, e.target.value === '' ? '' : Number(e.target.value))}
+                                            placeholder={parentPrice != null ? `${parentPrice.toFixed(2)} (fallback)` : 'Price per case'}
+                                            className="w-full h-9 ps-7 pe-3 rounded-lg border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[13px] font-mono focus:border-orange-400 focus:outline-none"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="relative">
-                                    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[12px] text-slate-400">€</span>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={price ?? ''}
-                                        onChange={e => setPrice(sig, e.target.value === '' ? '' : Number(e.target.value))}
-                                        placeholder={parentPrice != null ? `${parentPrice.toFixed(2)} (fallback)` : 'Price per case'}
-                                        className="w-full h-8 ps-6 pe-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] font-mono focus:border-orange-400 focus:outline-none"
+                            </div>
+
+                            {/* Images section — "use parent" toggle + carousel + uploader */}
+                            <div className="rounded-xl border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-[#0F0F12] p-3 space-y-3">
+                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <div>
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-700 dark:text-zinc-300">
+                                            Images
+                                        </p>
+                                        <p className="text-[10px] text-slate-500 dark:text-zinc-500">
+                                            {useParentImages
+                                                ? 'Showing main product images. Toggle off to upload variant-specific photos.'
+                                                : `${variantImages.length} variant photo${variantImages.length === 1 ? '' : 's'} — buyer sees these when they pick this variant on the PDP.`}
+                                        </p>
+                                    </div>
+                                    <ToggleSwitch
+                                        label="Use main product images"
+                                        checked={useParentImages}
+                                        onChange={(on) =>
+                                            setMeta(sig, on
+                                                ? { useParentImages: true, images: [], image: undefined }
+                                                : { useParentImages: false },
+                                            )
+                                        }
                                     />
                                 </div>
 
-                                {/* Per-variant pack sizes. Blank = inherit
-                                    the parent product's value (shown as the
-                                    placeholder). Useful when one flavour
-                                    ships in a different pack than the rest. */}
-                                <div className="grid grid-cols-3 gap-1.5">
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={m.unitsPerCase ?? ''}
-                                        onChange={e => setMeta(sig, { unitsPerCase: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-                                        placeholder={parentUnitsPerCase != null ? `${parentUnitsPerCase}/case` : 'pcs/case'}
-                                        className="h-7 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[11px] font-mono focus:border-orange-400 focus:outline-none"
-                                        title="Pieces per case for this variant"
-                                    />
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={m.casesPerPallet ?? ''}
-                                        onChange={e => setMeta(sig, { casesPerPallet: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-                                        placeholder={parentCasesPerPallet != null ? `${parentCasesPerPallet}/pallet` : 'cs/pallet'}
-                                        className="h-7 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[11px] font-mono focus:border-orange-400 focus:outline-none"
-                                        title="Cases per pallet for this variant"
-                                    />
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={m.palletsPerShipment ?? ''}
-                                        onChange={e => setMeta(sig, { palletsPerShipment: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-                                        placeholder={parentPalletsPerShipment != null ? `${parentPalletsPerShipment}/truck` : 'pl/truck'}
-                                        className="h-7 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[11px] font-mono focus:border-orange-400 focus:outline-none"
-                                        title="Pallets per truck for this variant"
+                                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                                    {carouselSrc.length > 0 ? (
+                                        carouselSrc.map((url, i) => (
+                                            <div key={`${url}-${i}`} className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-200 dark:border-white/[0.08] bg-slate-100 dark:bg-[#0F0F12] shrink-0 group">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img src={url} alt={sig} className="w-full h-full object-cover" />
+                                                {!useParentImages && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removeImage(sig, i)}
+                                                        className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-white/95 text-rose-600 flex items-center justify-center opacity-0 group-hover:opacity-100 transition"
+                                                        title="Remove"
+                                                    >
+                                                        <X size={11} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-[11px] text-slate-400 italic">
+                                            {useParentImages
+                                                ? 'Main product has no images yet.'
+                                                : 'No variant images yet — upload one below.'}
+                                        </p>
+                                    )}
+                                    {!useParentImages && (
+                                        <label
+                                            className="shrink-0 w-16 h-16 rounded-lg border border-dashed border-slate-300 dark:border-white/[0.10] bg-slate-50 dark:bg-[#0F0F12] flex items-center justify-center cursor-pointer hover:border-orange-300"
+                                            title="Add variant image"
+                                        >
+                                            {isUploading
+                                                ? <Loader2 className="animate-spin text-slate-500" size={16} />
+                                                : <Plus className="text-slate-500" size={16} />}
+                                            <input
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={e => {
+                                                    const f = e.target.files?.[0];
+                                                    if (f) handleImagePick(sig, f);
+                                                    e.target.value = '';
+                                                }}
+                                            />
+                                        </label>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Packing section — "same as parent" toggle + pack inputs */}
+                            <div className="rounded-xl border border-slate-200 dark:border-white/[0.06] bg-white dark:bg-[#0F0F12] p-3 space-y-3">
+                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                    <div>
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-slate-700 dark:text-zinc-300">
+                                            Packing
+                                        </p>
+                                        <p className="text-[10px] text-slate-500 dark:text-zinc-500">
+                                            {sameAsParentPacking
+                                                ? `Inherits from main product: ${parentUnitsPerCase ?? '—'}/case · ${parentCasesPerPallet ?? '—'}/pallet · ${parentPalletsPerShipment ?? '—'}/truck.`
+                                                : 'Custom packs below — only override what differs from the main product.'}
+                                        </p>
+                                    </div>
+                                    <ToggleSwitch
+                                        label="Same as main product"
+                                        checked={sameAsParentPacking}
+                                        onChange={(on) =>
+                                            setMeta(sig, on
+                                                ? { sameAsParentPacking: true, unitsPerCase: undefined, casesPerPallet: undefined, palletsPerShipment: undefined }
+                                                : { sameAsParentPacking: false },
+                                            )
+                                        }
                                     />
                                 </div>
+
+                                {!sameAsParentPacking && (
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-zinc-500">
+                                            Pieces / case
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={m.unitsPerCase ?? ''}
+                                                onChange={e => setMeta(sig, { unitsPerCase: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)), sameAsParentPacking: false })}
+                                                placeholder={parentUnitsPerCase != null ? `${parentUnitsPerCase} (parent)` : '—'}
+                                                className="mt-1 w-full h-8 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] font-mono focus:border-orange-400 focus:outline-none"
+                                            />
+                                        </label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-zinc-500">
+                                            Cases / pallet
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={m.casesPerPallet ?? ''}
+                                                onChange={e => setMeta(sig, { casesPerPallet: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)), sameAsParentPacking: false })}
+                                                placeholder={parentCasesPerPallet != null ? `${parentCasesPerPallet} (parent)` : '—'}
+                                                className="mt-1 w-full h-8 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] font-mono focus:border-orange-400 focus:outline-none"
+                                            />
+                                        </label>
+                                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 dark:text-zinc-500">
+                                            Pallets / truck
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                value={m.palletsPerShipment ?? ''}
+                                                onChange={e => setMeta(sig, { palletsPerShipment: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)), sameAsParentPacking: false })}
+                                                placeholder={parentPalletsPerShipment != null ? `${parentPalletsPerShipment} (parent)` : '—'}
+                                                className="mt-1 w-full h-8 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] font-mono focus:border-orange-400 focus:outline-none"
+                                            />
+                                        </label>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     );
@@ -2431,26 +2602,6 @@ export default function ProductEditorForm({
                             onChange={(v) => setFormData({ ...formData, variants: v as any })}
                         />
 
-                        {/* Mix-composer pricing — per-variant price + image.
-                            Only meaningful once VariantsEditor has groups
-                            defined; the component renders nothing otherwise. */}
-                        <VariantPricingEditor
-                            groups={(formData.variants as any) || []}
-                            prices={((formData as any).variantPrices as Record<string, number>) || {}}
-                            meta={((formData as any).variantMeta as VariantMetaMap) || {}}
-                            parentImage={Array.isArray((formData as any).images) ? (formData as any).images[0] : undefined}
-                            parentPrice={typeof (formData as any).basePrice === 'number'
-                                ? (formData as any).basePrice
-                                : typeof (formData as any).price === 'number'
-                                    ? (formData as any).price
-                                    : undefined}
-                            parentUnitsPerCase={typeof (formData as any).unitsPerCase === 'number' ? (formData as any).unitsPerCase : undefined}
-                            parentCasesPerPallet={typeof (formData as any).casesPerPallet === 'number' ? (formData as any).casesPerPallet : undefined}
-                            parentPalletsPerShipment={typeof (formData as any).palletsPerShipment === 'number' ? (formData as any).palletsPerShipment : undefined}
-                            onPricesChange={next => setFormData({ ...formData, variantPrices: next as any })}
-                            onMetaChange={next => setFormData({ ...formData, variantMeta: next as any })}
-                        />
-
                         {/* Delete (admin only — footer of right col) */}
                         {mode === 'admin' && (
                             <div className="flex justify-start">
@@ -2464,6 +2615,31 @@ export default function ProductEditorForm({
                             </div>
                         )}
                     </div>
+                </div>
+
+                {/* ── Full-width Variant pricing & images section ─────────
+                    The variant pricing editor lived inside the right
+                    column before — narrow + cramped. Moved out to span
+                    the FULL form width so per-variant cards aren't
+                    squeezed and the multi-image upload slot has room
+                    to breathe. */}
+                <div className="max-w-[1320px] mx-auto mt-6">
+                    <VariantPricingEditor
+                        groups={(formData.variants as any) || []}
+                        prices={((formData as any).variantPrices as Record<string, number>) || {}}
+                        meta={((formData as any).variantMeta as VariantMetaMap) || {}}
+                        parentImages={Array.isArray((formData as any).images) ? (formData as any).images : []}
+                        parentPrice={typeof (formData as any).basePrice === 'number'
+                            ? (formData as any).basePrice
+                            : typeof (formData as any).price === 'number'
+                                ? (formData as any).price
+                                : undefined}
+                        parentUnitsPerCase={typeof (formData as any).unitsPerCase === 'number' ? (formData as any).unitsPerCase : undefined}
+                        parentCasesPerPallet={typeof (formData as any).casesPerPallet === 'number' ? (formData as any).casesPerPallet : undefined}
+                        parentPalletsPerShipment={typeof (formData as any).palletsPerShipment === 'number' ? (formData as any).palletsPerShipment : undefined}
+                        onPricesChange={next => setFormData({ ...formData, variantPrices: next as any })}
+                        onMetaChange={next => setFormData({ ...formData, variantMeta: next as any })}
+                    />
                 </div>
             </div>
         </div>

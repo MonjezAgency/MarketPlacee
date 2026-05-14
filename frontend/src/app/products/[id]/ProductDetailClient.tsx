@@ -519,7 +519,47 @@ export default function ProductDetailClient() {
         { label: product.name, href: '#' },
     ];
 
-    const allImages = product.images && product.images.length > 0 ? product.images : [product.image].filter(Boolean) as string[];
+    // Image carousel — when the buyer has picked one or more variants
+    // AND those variants ship with their own images (useParentImages
+    // toggled OFF on the editor), swap the carousel to show the
+    // variant's images instead of the parent's. Otherwise fall back
+    // to the parent product images. This is the "show me Red Bull
+    // Sugar-Free pictures when I pick Sugar-Free" behaviour the
+    // operator asked for.
+    const parentImageList = product.images && product.images.length > 0
+        ? product.images
+        : [product.image].filter(Boolean) as string[];
+
+    const allImages = useMemo(() => {
+        const meta = (product as any).variantMeta as
+            | Record<string, { images?: string[]; image?: string; useParentImages?: boolean }>
+            | undefined;
+        if (!meta) return parentImageList;
+        // Resolve the variant signature the buyer is currently looking at.
+        // Single-pick → "Flavour=Diet". Multi-pick → "Flavour=Diet|Size=Large".
+        const keys = Object.keys(selectedVariants).sort();
+        if (keys.length === 0) return parentImageList;
+        const sig = keys.map(k => `${k}=${selectedVariants[k]}`).join('|');
+        const entry = meta[sig];
+        if (!entry || entry.useParentImages) return parentImageList;
+        const variantImages: string[] = Array.isArray(entry.images)
+            ? entry.images
+            : entry.image
+              ? [entry.image]
+              : [];
+        return variantImages.length > 0 ? variantImages : parentImageList;
+    }, [product, selectedVariants, parentImageList]);
+
+    // Keep the selectedImage in sync when the variant carousel changes —
+    // otherwise the main slot keeps pointing at a parent image after the
+    // buyer picks a different variant.
+    useEffect(() => {
+        if (allImages.length === 0) return;
+        if (!selectedImage || !allImages.includes(selectedImage)) {
+            setSelectedImage(allImages[0]);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allImages.join('|')]);
 
     return (
         <div className="min-h-screen bg-[#F8FAFC] font-inter text-[#111827] pt-12 pb-16">
