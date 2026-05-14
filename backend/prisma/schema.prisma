@@ -176,6 +176,20 @@ model Product {
   brand       String?
   unit        String        @default("carton")
   variants    Json?
+  // Per-variant pricing for mixed-tier orders. Shape:
+  //   { "Flavour=Diet": 14.50, "Flavour=Regular": 13.20, ... }
+  // The KEY is the variant signature (same convention used by
+  // variantStock). The VALUE is the price-per-case the supplier
+  // wants for that specific variant — used when the customer
+  // mixes multiple variants inside one truck/pallet at checkout.
+  // When missing, mix-composer falls back to Product.basePrice.
+  variantPrices Json?
+  // Per-variant display metadata for the mix composer. Shape:
+  //   { "Flavour=Diet": { "image": "https://…", "label": "Pepsi Diet" }, ... }
+  // Lets the supplier upload a distinct image + a cleaner label for
+  // each variant — otherwise the composer falls back to the parent
+  // product image + the raw signature.
+  variantMeta Json?
   // Per-variant stock map for configurable products. Shape:
   //   { "Size=Large|Flavour=Vanilla": 12, "Size=Small": 0, ... }
   // The KEY is the variant signature (groups sorted alphabetically,
@@ -361,6 +375,15 @@ model OrderItem {
   // alongside the variants so the admin order page can show the
   // exact basket configuration without inferring it from price math.
   selectedTier String?
+  // Mixed-tier composition. When the buyer used the "mix this truck"
+  // composer, this holds the per-variant breakdown:
+  //   [ { signature: "Flavour=Diet",    quantity: 5,  unitPrice: 14.50 },
+  //     { signature: "Flavour=Regular", quantity: 10, unitPrice: 13.20 },
+  //     ... ]
+  // The row's own `quantity` is the SUM of these quantities (= the
+  // tier capacity), and `price` is the marked-up total line price.
+  // Null for single-variant order lines.
+  mixComposition Json?
 }
 
 model AdminActionLog {

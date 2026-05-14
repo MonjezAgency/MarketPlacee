@@ -31,20 +31,23 @@ export class AppService {
         return { currency: config?.value || null };
     }
 
-    async getPublicMarkup(): Promise<{ piece: number; pallet: number; container: number }> {
+    async getPublicMarkup(): Promise<{ piece: number; pallet: number; container: number; mix: number }> {
         const pieceConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PIECE' } });
         const legacyConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE' } });
         const palletConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PALLET' } });
         const containerConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_CONTAINER' } });
+        const mixConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_MIX' } });
 
         const piece = pieceConfig ? parseFloat(pieceConfig.value) : (legacyConfig ? parseFloat(legacyConfig.value) : 1.10);
         const pallet = palletConfig ? parseFloat(palletConfig.value) : 1.05;
         const container = containerConfig ? parseFloat(containerConfig.value) : 1.02;
+        const mix = mixConfig ? parseFloat(mixConfig.value) : 1.15;
 
         return {
             piece: isNaN(piece) ? 1.10 : piece,
             pallet: isNaN(pallet) ? 1.05 : pallet,
             container: isNaN(container) ? 1.02 : container,
+            mix: isNaN(mix) ? 1.15 : mix,
         };
     }
 

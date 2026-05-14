@@ -21,12 +21,12 @@ import { useAuth } from '@/lib/auth';
 import { apiFetch } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
 
-type MarkupData = { pallet: number; container: number };
+type MarkupData = { pallet: number; container: number; mix: number };
 
 export default function AdminPricingPage() {
     const { user } = useAuth();
-    const [currentMarkup, setCurrentMarkup] = React.useState<MarkupData>({ pallet: 1.05, container: 1.02 });
-    const [newMarkup, setNewMarkup] = React.useState<MarkupData>({ pallet: 1.05, container: 1.02 });
+    const [currentMarkup, setCurrentMarkup] = React.useState<MarkupData>({ pallet: 1.05, container: 1.02, mix: 1.15 });
+    const [newMarkup, setNewMarkup] = React.useState<MarkupData>({ pallet: 1.05, container: 1.02, mix: 1.15 });
     const [isLoading, setIsLoading] = React.useState(true);
     const [isSaving, setIsSaving] = React.useState(false);
     const [toast, setToast] = React.useState<{ type: 'success' | 'error'; msg: string } | null>(null);
@@ -44,13 +44,16 @@ export default function AdminPricingPage() {
             if (res.ok) {
                 const data = await res.json();
                 if (data.markup && typeof data.markup === 'object') {
-                    // Filter out piece if it exists in the data from backend
-                    const { piece, ...filtered } = data.markup as MarkupData & { piece?: number };
-                    setCurrentMarkup(filtered);
-                    setNewMarkup(filtered);
+                    const raw = data.markup as MarkupData & { piece?: number };
+                    const next: MarkupData = {
+                        pallet: raw.pallet ?? 1.05,
+                        container: raw.container ?? 1.02,
+                        mix: (raw as any).mix ?? 1.15,
+                    };
+                    setCurrentMarkup(next);
+                    setNewMarkup(next);
                 } else if (typeof data.markup === 'number') {
-                    // Legacy fallback
-                    const legacy = { pallet: 1.05, container: 1.02 };
+                    const legacy = { pallet: 1.05, container: 1.02, mix: 1.15 };
                     setCurrentMarkup(legacy);
                     setNewMarkup(legacy);
                 }
@@ -89,7 +92,8 @@ export default function AdminPricingPage() {
 
     const hasChanges =
         newMarkup.pallet !== currentMarkup.pallet ||
-        newMarkup.container !== currentMarkup.container;
+        newMarkup.container !== currentMarkup.container ||
+        newMarkup.mix !== currentMarkup.mix;
 
     const exampleVendorPrice = 100;
 
@@ -193,6 +197,45 @@ export default function AdminPricingPage() {
                             <div className="space-y-6">
                                 {renderSlider('pallet', 'Pallet Markup', <Layers size={20} />, "text-emerald-500")}
                                 {renderSlider('container', 'Container / Truck Markup', <Truck size={20} />, "text-purple-500")}
+                                {renderSlider('mix', 'Mixed Truck / Pallet Markup', <Package size={20} />, "text-orange-500")}
+
+                                {/* ── Mixed-tier formula card ─────────────────
+                                    Visualises exactly how mix prices are
+                                    computed at checkout so the operator can
+                                    sanity-check before saving. Pulls the
+                                    live `mix` value from `newMarkup` so the
+                                    preview moves as the slider moves. */}
+                                <div className="rounded-2xl border border-orange-200 bg-orange-50/40 dark:bg-orange-500/5 p-5 space-y-3">
+                                    <div className="flex items-center justify-between">
+                                        <p className="text-[11px] font-black uppercase tracking-widest text-orange-700">
+                                            Mixed-tier formula
+                                        </p>
+                                        <span className="text-[10px] font-mono text-orange-500">
+                                            mix = +{((newMarkup.mix - 1) * 100).toFixed(1)}%
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-slate-600 dark:text-white/70 leading-relaxed">
+                                        When a customer mixes variants inside one truck/pallet at checkout, the line price is computed as:
+                                    </p>
+                                    <div className="rounded-xl bg-white dark:bg-[#131921] border border-orange-200/60 p-4 font-mono text-[12px] text-slate-800 dark:text-white/90 leading-relaxed">
+                                        Mixed price = Σ <span className="text-orange-600">(variant price × variant qty)</span> × <span className="text-orange-600">(1 + mix markup)</span>
+                                    </div>
+                                    {/* Concrete example with the current slider value */}
+                                    <div className="rounded-xl bg-white/60 dark:bg-white/5 border border-orange-100 p-4 text-[11px] leading-relaxed">
+                                        <p className="font-black text-slate-700 dark:text-white/80 mb-2">Example — 1 truck = 24 pallets:</p>
+                                        <ul className="space-y-1 font-mono text-slate-600 dark:text-white/70">
+                                            <li>5 × Pepsi Diet     @ €14.50 = €72.50</li>
+                                            <li>10 × Pepsi Regular  @ €13.20 = €132.00</li>
+                                            <li>9 × Pepsi Black    @ €15.00 = €135.00</li>
+                                            <li className="border-t border-dashed border-orange-200 pt-1 mt-1">
+                                                Subtotal = €339.50
+                                            </li>
+                                            <li className="text-orange-700 font-bold">
+                                                × {newMarkup.mix.toFixed(3)} → €{(339.5 * newMarkup.mix).toFixed(2)}
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
 
                                 {/* Save Button */}
                                 <div className="pt-4 border-t border-[#EAEDED] dark:border-white/10 flex items-center justify-between">

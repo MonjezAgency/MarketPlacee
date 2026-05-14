@@ -6,24 +6,26 @@ import { PrismaService } from '../common/prisma.service';
 export class AppConfigService {
     constructor(private prisma: PrismaService) { }
 
-    async getMarkupPercentage(): Promise<{ piece: number; pallet: number; container: number; platformFee: number; shippingMarkup: number }> {
+    async getMarkupPercentage(): Promise<{ piece: number; pallet: number; container: number; mix: number; platformFee: number; shippingMarkup: number }> {
         const pieceConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PIECE' } });
         const legacyConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE' } });
         const palletConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_PALLET' } });
         const containerConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_CONTAINER' } });
+        const mixConfig = await this.prisma.appConfig.findUnique({ where: { key: 'MARKUP_PERCENTAGE_MIX' } });
         const feeConfig = await this.prisma.appConfig.findUnique({ where: { key: 'PLATFORM_FEE_PERCENT' } });
         const shipConfig = await this.prisma.appConfig.findUnique({ where: { key: 'SHIPPING_MARKUP' } });
 
         const piece = pieceConfig ? parseFloat(pieceConfig.value) : (legacyConfig ? parseFloat(legacyConfig.value) : 1.10);
         const pallet = palletConfig ? parseFloat(palletConfig.value) : 1.05;
         const container = containerConfig ? parseFloat(containerConfig.value) : 1.02;
+        // Mix-tier markup — used when an order line is composed of multiple
+        // variants inside one truck/pallet. Default 1.15 (+15%) reflecting
+        // the operator's note that mixed orders carry handling overhead
+        // (more SKUs per pick, more chance of repack at the warehouse).
+        const mix = mixConfig ? parseFloat(mixConfig.value) : 1.15;
         const platformFee = feeConfig ? parseFloat(feeConfig.value) : (Number(process.env.PLATFORM_FEE_PERCENT) || 5);
         const shippingMarkup = shipConfig ? parseFloat(shipConfig.value) : 1.10; // Default 10% on shipping
 
-        // Sanity-clamp markup multipliers to >= 1.0. The DB occasionally
-        // ends up with bogus values (an exchange rate "0.019" written into
-        // MARKUP_PERCENTAGE_PIECE, or a percentage "5" instead of "1.05").
-        // Values below 1.0 would shrink prices, which is never what we want.
         const safe = (v: number, fallback: number) =>
             !isFinite(v) || isNaN(v) || v < 1.0 ? fallback : v;
 
@@ -31,12 +33,13 @@ export class AppConfigService {
             piece: safe(piece, 1.10),
             pallet: safe(pallet, 1.05),
             container: safe(container, 1.02),
+            mix: safe(mix, 1.15),
             platformFee: isNaN(platformFee) ? 5 : platformFee,
             shippingMarkup: safe(shippingMarkup, 1.10),
         };
     }
 
-    async setMarkupPercentage(data: { piece: number; pallet: number; container: number; platformFee?: number; shippingMarkup?: number }): Promise<any> {
+    async setMarkupPercentage(data: { piece: number; pallet: number; container: number; mix?: number; platformFee?: number; shippingMarkup?: number }): Promise<any> {
         // Reject obviously-broken markup values at write time so the DB
         // can't re-acquire the "0.019 markup" corruption that broke the
         // catalog earlier. A markup multiplier MUST be >= 1.0.
@@ -73,6 +76,14 @@ export class AppConfigService {
             create: { key: 'MARKUP_PERCENTAGE_CONTAINER', value: data.container.toString() },
             update: { value: data.container.toString() }
         });
+        if (data.mix !== undefined) {
+            guard('mix', data.mix);
+            await this.prisma.appConfig.upsert({
+                where: { key: 'MARKUP_PERCENTAGE_MIX' },
+                create: { key: 'MARKUP_PERCENTAGE_MIX', value: data.mix.toString() },
+                update: { value: data.mix.toString() },
+            });
+        }
         if (data.platformFee !== undefined) {
             await this.prisma.appConfig.upsert({
                 where: { key: 'PLATFORM_FEE_PERCENT' },

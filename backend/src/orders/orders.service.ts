@@ -161,18 +161,20 @@ export class OrdersService {
                         quantity: item.quantity,
                         price: item.price,
                         productNameSnapshot: item.name || nameById.get(item.productId) || null,
-                        // Shopify-style variant snapshot + tier — captured at
-                        // order time so the admin order page (and any
-                        // downstream invoice / shipping label) can show
-                        // exactly what the buyer ordered, e.g.
-                        //   "Glucerna Shake · Vanilla · 12-pack · Pallet tier"
-                        // Both fields are optional in the schema, so plain
-                        // (non-configurable, no-tier) products write null.
                         selectedVariants:
                             item.selectedVariants && typeof item.selectedVariants === 'object'
                                 ? item.selectedVariants
                                 : undefined,
                         selectedTier: item.tier || null,
+                        // Mixed-tier composition — when the buyer used the
+                        // mix composer at checkout, this carries the
+                        // per-variant breakdown so the admin order detail
+                        // can render the exact split. Validated upstream
+                        // (sum of qty = item.quantity = tier capacity).
+                        mixComposition:
+                            Array.isArray(item.mixComposition) && item.mixComposition.length > 0
+                                ? item.mixComposition
+                                : undefined,
                     })),
                 },
                 history: {

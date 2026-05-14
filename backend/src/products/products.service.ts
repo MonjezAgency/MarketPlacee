@@ -943,6 +943,11 @@ export class ProductsService {
         }
         if (data.ean !== undefined) updateData.ean = data.ean;
         if (data.variants !== undefined) updateData.variants = data.variants;
+        // Mix-composer pricing + metadata. Both are JSON maps keyed by
+        // variant signature; we accept them verbatim and let the
+        // schema enforce shape. Setting null clears the map.
+        if (data.variantPrices !== undefined) updateData.variantPrices = data.variantPrices;
+        if (data.variantMeta !== undefined) updateData.variantMeta = data.variantMeta;
         if (data.unit !== undefined) updateData.unit = data.unit;
         if (data.moq !== undefined) updateData.moq = data.moq;
         if (data.moqUnit !== undefined) {
