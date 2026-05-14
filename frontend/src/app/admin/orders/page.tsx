@@ -282,6 +282,16 @@ export default function AdminOrdersPage() {
         loadOrders();
     }, []);
 
+    // Auto-refresh every 30s while the tab is visible so new orders
+    // appear without an explicit reload. Cheap polling, pauses when
+    // backgrounded. Operator-required.
+    React.useEffect(() => {
+        const tick = () => { if (!document.hidden) loadOrders(); };
+        const id = setInterval(tick, 30000);
+        return () => clearInterval(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const filteredOrders = orders
         .filter(o => filterStatus === 'ALL' || o.status === filterStatus)
         .filter(o =>

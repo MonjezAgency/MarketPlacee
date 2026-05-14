@@ -13,6 +13,16 @@ import { useTheme } from 'next-themes';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { CATEGORIES_LIST } from '@/lib/products';
+
+// Common EXW countries — surfaced as picker options in the navbar's
+// "All" dropdown so a buyer can scope the search to one origin.
+// Hardcoded short list (most-shipped countries on Atlantis) — could
+// later be sourced from /products distinct exwLocation.
+const EXW_COUNTRIES = [
+    'Germany', 'Netherlands', 'Poland', 'Romania', 'Italy', 'France',
+    'Spain', 'Austria', 'Czech Republic', 'Belgium', 'Turkey', 'UAE',
+    'Egypt', 'Saudi Arabia',
+];
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Locale } from '@/locales';
@@ -74,8 +84,18 @@ export default function AmazonNavbar() {
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
         setShowSuggestions(false);
-        if (searchTerm.trim()) {
-            router.push(`/categories?q=${encodeURIComponent(searchTerm)}`);
+        // Build query: ?q=<term> always when term is set; add &exw=<country>
+        // when the buyer picked a specific country in the dropdown. Picking
+        // a country WITHOUT a term still navigates so the buyer can browse
+        // everything that ships from there — operator-requested.
+        const isCountryPick =
+            searchCategory && searchCategory !== 'All' && !CATEGORIES_LIST.includes(searchCategory);
+        const params = new URLSearchParams();
+        if (searchTerm.trim()) params.set('q', searchTerm.trim());
+        if (isCountryPick) params.set('exw', searchCategory);
+        else if (searchCategory && searchCategory !== 'All') params.set('category', searchCategory);
+        if (params.toString()) {
+            router.push(`/categories?${params.toString()}`);
             setIsMobileMenuOpen(false);
         }
     };
@@ -120,10 +140,17 @@ export default function AmazonNavbar() {
                                     onChange={(e) => setSearchCategory(e.target.value)}
                                     className="appearance-none h-full bg-transparent text-gray-600 text-xs font-semibold ps-3 pe-7 outline-none cursor-pointer"
                                 >
-                                    <option value="All">{t('navbar', 'allCategories') || 'All Categories'}</option>
-                                    {CATEGORIES_LIST.map((cat) => (
-                                        <option key={cat} value={cat}>{cat}</option>
-                                    ))}
+                                    <option value="All">{t('navbar', 'allCategories') || 'All'}</option>
+                                    <optgroup label="By country (EXW)">
+                                        {EXW_COUNTRIES.map((c) => (
+                                            <option key={`exw-${c}`} value={c}>📍 {c}</option>
+                                        ))}
+                                    </optgroup>
+                                    <optgroup label="By category">
+                                        {CATEGORIES_LIST.map((cat) => (
+                                            <option key={cat} value={cat}>{cat}</option>
+                                        ))}
+                                    </optgroup>
                                 </select>
                                 <ChevronDown size={12} className="absolute end-2 text-gray-400 pointer-events-none" />
                             </div>
@@ -132,7 +159,11 @@ export default function AmazonNavbar() {
                                 value={searchTerm}
                                 onChange={handleSearchInput}
                                 onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
-                                placeholder={t('navbar', 'searchPlaceholder') || 'Search products, brands, categories...'}
+                                placeholder={
+                                    searchCategory && searchCategory !== 'All' && !CATEGORIES_LIST.includes(searchCategory)
+                                        ? `Search products shipping from ${searchCategory}…`
+                                        : (t('navbar', 'searchPlaceholder') || 'Search products, brands, categories...')
+                                }
                                 className="flex-1 h-full px-4 text-sm text-gray-800 placeholder:text-gray-400 outline-none bg-white"
                                 autoComplete="off"
                             />

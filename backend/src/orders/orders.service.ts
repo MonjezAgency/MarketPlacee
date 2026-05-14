@@ -515,6 +515,11 @@ export class OrdersService {
                 // who configured the product.
                 selectedTier: (item as any).selectedTier ?? null,
                 selectedVariants: (item as any).selectedVariants ?? null,
+                // Forward the mix breakdown so the supplier sees exactly
+                // which variants the customer bundled into the mixed
+                // truck/pallet (operator-required so they can pack
+                // 5 × Diet + 3 × Red etc.).
+                mixComposition: (item as any).mixComposition ?? null,
             })),
             };
         });

@@ -6,7 +6,7 @@ import {
     ShoppingBag, Search, Truck, Package, Eye,
     ShieldCheck, Loader2, RefreshCw, CheckCircle2, FileText, Upload, X, MapPin,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, prettifyVariantSignature } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
 import toast from 'react-hot-toast';
@@ -64,6 +64,16 @@ export default function SupplierOrdersPage() {
     }, []);
 
     React.useEffect(() => { fetchOrders(); }, [fetchOrders]);
+
+    // Operator request: orders should appear without a manual refresh.
+    // We poll every 30s — cheap, reliable, no WebSocket plumbing here
+    // because the page already has the fetcher. Pauses when the tab
+    // is hidden to avoid burning quota.
+    React.useEffect(() => {
+        const tick = () => { if (!document.hidden) fetchOrders(); };
+        const id = setInterval(tick, 30000);
+        return () => clearInterval(id);
+    }, [fetchOrders]);
 
     const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
         setUpdatingId(orderId);
@@ -247,16 +257,30 @@ export default function SupplierOrdersPage() {
                                                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Line Items</p>
                                                 <div className="space-y-2">
                                                     {order.items.map(item => (
-                                                        <div key={item.id} className="flex items-center justify-between p-4 bg-card rounded-2xl border border-border/50">
-                                                            <div className="flex items-center gap-3">
+                                                        <div key={item.id} className="flex flex-col gap-3 p-4 bg-card rounded-2xl border border-border/50">
+                                                          <div className="flex items-start justify-between gap-4 flex-wrap">
+                                                            <div className="flex items-start gap-3 min-w-0">
                                                                 {item.image ? (
-                                                                    <img src={item.image} alt="" className="w-10 h-10 rounded-xl object-cover border border-border/50" />
+                                                                    <img src={item.image} alt="" className="w-12 h-12 rounded-xl object-cover border border-border/50 shrink-0" />
                                                                 ) : (
-                                                                    <div className="w-10 h-10 bg-muted rounded-xl flex items-center justify-center">
+                                                                    <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center shrink-0">
                                                                         <Package size={16} className="text-muted-foreground" />
                                                                     </div>
                                                                 )}
-                                                                <p className="font-bold text-sm">{item.name}</p>
+                                                                <div className="min-w-0">
+                                                                    <p className="font-bold text-sm">{item.name}</p>
+                                                                    {(item as any).selectedVariants && Object.keys((item as any).selectedVariants).length > 0 && (
+                                                                        <div className="flex flex-wrap gap-1 mt-1">
+                                                                            {Object.entries((item as any).selectedVariants as Record<string, string>)
+                                                                                .filter(([k]) => !k.startsWith('__'))
+                                                                                .map(([k, v]) => (
+                                                                                    <span key={k} className="inline-flex items-center h-5 px-2 rounded-md bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-bold">
+                                                                                        {k}: <span className="ml-1">{String(v)}</span>
+                                                                                    </span>
+                                                                                ))}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             <div className="flex items-center gap-8 text-end">
                                                                 <div>
@@ -277,6 +301,19 @@ export default function SupplierOrdersPage() {
                                                                     <p className="font-black">{formatPrice(item.price * item.quantity)}</p>
                                                                 </div>
                                                             </div>
+                                                          </div>
+                                                          {Array.isArray((item as any).mixComposition) && (item as any).mixComposition.length > 0 && (
+                                                                <div className="rounded-lg border border-orange-200 bg-orange-50/50 px-3 py-2 text-[11px]">
+                                                                    <p className="font-black text-orange-700 uppercase tracking-widest text-[9px] mb-1">Mixed composition — exactly what the customer ordered</p>
+                                                                    <ul className="space-y-0.5 text-slate-700">
+                                                                        {((item as any).mixComposition as Array<{ signature: string; quantity: number }>).map((c) => (
+                                                                            <li key={c.signature} className="break-all">
+                                                                                {c.quantity} × {prettifyVariantSignature(c.signature) || 'Variant'}
+                                                                            </li>
+                                                                        ))}
+                                                                    </ul>
+                                                                </div>
+                                                          )}
                                                         </div>
                                                     ))}
                                                 </div>

@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { io, Socket } from 'socket.io-client';
+import toast from 'react-hot-toast';
 
 export interface AppNotification {
     id: string;
@@ -55,6 +56,43 @@ export function useNotifications() {
         socket.on('new_notification', (notification: AppNotification) => {
             setNotifications(prev => [notification, ...prev]);
             setUnreadCount(prev => prev + 1);
+            // Operator request: when a new notification arrives while
+            // the user is in the app, surface a rectangular toast in
+            // the corner so they don't have to refresh / open the bell
+            // to know an order / approval / etc. just happened.
+            toast.custom(
+                (t) => (
+                    React.createElement(
+                        'div',
+                        {
+                            className:
+                                'pointer-events-auto max-w-sm w-full bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 flex items-start gap-3 ring-1 ring-black/5 ' +
+                                (t.visible ? 'animate-in slide-in-from-right' : 'animate-out slide-out-to-right'),
+                            onClick: () => toast.dismiss(t.id),
+                        },
+                        React.createElement(
+                            'div',
+                            { className: 'w-9 h-9 rounded-full bg-[#2EC4B6]/15 text-[#2EC4B6] flex items-center justify-center text-[16px] font-black shrink-0' },
+                            '🔔',
+                        ),
+                        React.createElement(
+                            'div',
+                            { className: 'flex-1 min-w-0' },
+                            React.createElement(
+                                'p',
+                                { className: 'text-[13px] font-black text-[#0F172A] truncate' },
+                                notification.title || 'New notification',
+                            ),
+                            React.createElement(
+                                'p',
+                                { className: 'text-[12px] text-slate-500 mt-0.5 line-clamp-2' },
+                                notification.message || '',
+                            ),
+                        ),
+                    )
+                ),
+                { duration: 6000, position: 'top-right' },
+            );
         });
 
         fetchNotifications();

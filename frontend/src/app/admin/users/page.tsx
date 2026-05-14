@@ -62,6 +62,15 @@ export default function UserManagementPage() {
         loadUsers();
     }, []);
 
+    // Auto-refresh while tab is visible so new registrations / KYC
+    // approvals appear without manual reload. 30s cadence.
+    React.useEffect(() => {
+        const tick = () => { if (!document.hidden) loadUsers(); };
+        const id = setInterval(tick, 30000);
+        return () => clearInterval(id);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const filteredUsers = users.filter(u => {
         const name = (u.name || '').toLowerCase();
         const company = (u.companyName || '').toLowerCase();
