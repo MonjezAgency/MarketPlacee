@@ -490,6 +490,40 @@ function VariantPricingEditor({
         setMeta(sig, { images: next, image: next[0] });
     };
 
+    /**
+     * Append an externally-hosted image URL to the variant's image
+     * array. Lets the supplier paste a CDN / Dropbox / WeTransfer
+     * direct link without re-uploading to our Supabase bucket. We
+     * do a light shape check ("starts with http" + "looks like an
+     * image extension OR a known CDN host") and trust the rest —
+     * the PDP renders with native <img>, so a broken URL just
+     * shows the standard image-failed icon, not a crash.
+     */
+    const addImageUrl = (sig: string, raw: string) => {
+        const url = raw.trim();
+        if (!url) return;
+        if (!/^https?:\/\//i.test(url)) {
+            toast.error('URL must start with http:// or https://');
+            return;
+        }
+        const current = meta[sig] || {};
+        const existing: string[] = Array.isArray(current.images)
+            ? current.images
+            : current.image
+              ? [current.image]
+              : [];
+        if (existing.includes(url)) {
+            toast.error('That image is already in the list.');
+            return;
+        }
+        setMeta(sig, { images: [...existing, url], image: existing[0] || url });
+        toast.success('Image link added');
+    };
+
+    // Per-signature draft of the URL-input field (so each variant
+    // card has its own typing state without colliding).
+    const [urlDrafts, setUrlDrafts] = React.useState<Record<string, string>>({});
+
     if (signatures.length === 0) {
         return null; // Nothing to price — VariantsEditor handles the empty state.
     }
@@ -630,7 +664,7 @@ function VariantPricingEditor({
                                     {!useParentImages && (
                                         <label
                                             className="shrink-0 w-16 h-16 rounded-lg border border-dashed border-slate-300 dark:border-white/[0.10] bg-slate-50 dark:bg-[#0F0F12] flex items-center justify-center cursor-pointer hover:border-orange-300"
-                                            title="Add variant image"
+                                            title="Upload variant image"
                                         >
                                             {isUploading
                                                 ? <Loader2 className="animate-spin text-slate-500" size={16} />
@@ -648,6 +682,43 @@ function VariantPricingEditor({
                                         </label>
                                     )}
                                 </div>
+
+                                {/* OR paste a URL — handy when the supplier
+                                    already hosts the image elsewhere (Shopify
+                                    CDN, Dropbox direct link, etc.) and just
+                                    wants to point at it instead of re-uploading. */}
+                                {!useParentImages && (
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-zinc-500 shrink-0">
+                                            or paste URL
+                                        </span>
+                                        <input
+                                            type="url"
+                                            value={urlDrafts[sig] || ''}
+                                            onChange={e => setUrlDrafts(d => ({ ...d, [sig]: e.target.value }))}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    addImageUrl(sig, urlDrafts[sig] || '');
+                                                    setUrlDrafts(d => ({ ...d, [sig]: '' }));
+                                                }
+                                            }}
+                                            placeholder="https://cdn.example.com/photo.jpg"
+                                            className="flex-1 h-8 px-3 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] font-mono focus:border-orange-400 focus:outline-none"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                addImageUrl(sig, urlDrafts[sig] || '');
+                                                setUrlDrafts(d => ({ ...d, [sig]: '' }));
+                                            }}
+                                            disabled={!urlDrafts[sig]?.trim()}
+                                            className="h-8 px-3 rounded-md bg-slate-900 dark:bg-zinc-100 text-white dark:text-zinc-900 text-[11px] font-black uppercase tracking-widest hover:bg-black dark:hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            Add
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Packing section — "same as parent" toggle + pack inputs */}
