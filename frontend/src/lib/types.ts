@@ -74,12 +74,27 @@ export interface Product {
      */
     variantPrices?: Record<string, number>;
     /**
-     * Mix-composer display metadata —
-     * { "Flavour=Diet": { image: "…", label: "Pepsi Diet" } }.
-     * Empty / missing keys fall back to the parent product image + the
-     * raw signature as the label.
+     * Mix-composer display metadata + per-variant pack sizes.
+     * Shape per signature:
+     *   {
+     *     image?: string,
+     *     label?: string,
+     *     unitsPerCase?: number,       // pieces in ONE case of this variant
+     *     casesPerPallet?: number,     // cases in ONE pallet of this variant
+     *     palletsPerShipment?: number, // pallets in ONE truck of this variant
+     *   }
+     * Each numeric field falls back to the parent product value when
+     * missing, so the supplier only has to override when a variant's
+     * packing actually differs (e.g. Pepsi 1L cases are 12-pack, while
+     * Pepsi 330ml cases are 24-pack).
      */
-    variantMeta?: Record<string, { image?: string; label?: string }>;
+    variantMeta?: Record<string, {
+        image?: string;
+        label?: string;
+        unitsPerCase?: number;
+        casesPerPallet?: number;
+        palletsPerShipment?: number;
+    }>;
     adminNotes?: string;
     rating?: number;
     reviews?: any; // Can be a count or an array depending on context

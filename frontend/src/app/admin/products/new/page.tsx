@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/Button';
+import BulkUploadSchemaPreview from '@/components/products/BulkUploadSchemaPreview';
 import { cn } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -897,8 +898,16 @@ export default function AdminAddProductWorkspace() {
                             </div>
                         )}
 
+                        {/* ── Spreadsheet schema preview ─────────────────
+                            Operator-requested: show the admin a visual map
+                            of what columns the importer expects, with
+                            REQUIRED / OPTIONAL clearly marked, BEFORE they
+                            drop a file. Collapsed by default; click to
+                            expand into a mini-spreadsheet preview. */}
+                        <BulkUploadSchemaPreview />
+
                         {/* UPLOAD ZONE */}
-                        <div 
+                        <div
                             className={`h-[300px] bg-white border-4 border-dashed rounded-[40px] flex flex-col items-center justify-center cursor-pointer hover:border-[#14B8A6] hover:bg-[#14B8A6]/5 transition-all group ${isBulkUploading ? 'border-[#14B8A6] bg-[#14B8A6]/5 pointer-events-none' : 'border-[#F1F5F9]'}`}
                             onClick={() => !isBulkUploading && bulkInputRef.current?.click()}
                         >

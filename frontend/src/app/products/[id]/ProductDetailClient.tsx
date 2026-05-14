@@ -214,25 +214,44 @@ export default function ProductDetailClient() {
         );
 
         const prices: Record<string, number> = (p.variantPrices as Record<string, number>) || {};
-        const meta: Record<string, { image?: string; label?: string }> = (p.variantMeta as any) || {};
+        const meta: Record<string, {
+            image?: string;
+            label?: string;
+            unitsPerCase?: number;
+            casesPerPallet?: number;
+            palletsPerShipment?: number;
+        }> = (p.variantMeta as any) || {};
 
         // Fallback price = parent basePrice (per case).
         const fallbackCasePrice = Number(p.basePrice ?? p.price ?? 0);
-        const cpp = Number(p.casesPerPallet) || 0;
+        const parentCpp = Number(p.casesPerPallet) || 0;
+        const parentPpt = Number(p.palletsPerShipment) || 0;
+        const parentUpc = Number(p.unitsPerCase) || 0;
 
         const variants = signatures.map(sig => {
+            const m = meta[sig] || {};
             const casePrice = prices[sig] != null ? Number(prices[sig]) : fallbackCasePrice;
+            // Per-variant pack sizes — fall back to parent values when blank.
+            const upc = Number(m.unitsPerCase) || parentUpc;
+            const cpp = Number(m.casesPerPallet) || parentCpp;
+            const ppt = Number(m.palletsPerShipment) || parentPpt;
+            // Derived prices using THIS variant's pack-size if defined.
             const palletPrice = casePrice * cpp;
+            const truckPrice = casePrice * cpp * ppt;
             return {
                 signature: sig,
-                label: meta[sig]?.label || sig,
-                image: meta[sig]?.image || (p.images?.[0] || ''),
+                label: m.label || sig,
+                image: m.image || (p.images?.[0] || ''),
                 casePrice,
                 palletPrice,
+                truckPrice,
+                unitsPerCase: upc,
+                casesPerPallet: cpp,
+                palletsPerShipment: ppt,
             };
         });
 
-        return { variants, casesPerPallet: cpp };
+        return { variants, casesPerPallet: parentCpp, palletsPerShipment: parentPpt };
     }, [currentProduct]);
 
     // Capacity + unit-label for the active tier in the composer.

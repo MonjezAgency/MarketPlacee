@@ -304,7 +304,16 @@ function VariantsEditor({
 // are derived from the VariantsEditor's groups (Cartesian product) so
 // the supplier doesn't have to keep two lists in sync.
 // ────────────────────────────────────────────────────────────────────
-type VariantMetaEntry = { image?: string; label?: string };
+type VariantMetaEntry = {
+    image?: string;
+    label?: string;
+    // Per-variant pack sizes — each falls back to the parent product
+    // value when missing. Lets the supplier model the case where Diet
+    // ships in 12-packs while Regular ships in 24-packs.
+    unitsPerCase?: number;
+    casesPerPallet?: number;
+    palletsPerShipment?: number;
+};
 type VariantPricesMap = Record<string, number>;
 type VariantMetaMap = Record<string, VariantMetaEntry>;
 
@@ -339,6 +348,9 @@ function VariantPricingEditor({
     meta,
     parentImage,
     parentPrice,
+    parentUnitsPerCase,
+    parentCasesPerPallet,
+    parentPalletsPerShipment,
     onPricesChange,
     onMetaChange,
 }: {
@@ -347,6 +359,9 @@ function VariantPricingEditor({
     meta: VariantMetaMap;
     parentImage?: string;
     parentPrice?: number;
+    parentUnitsPerCase?: number;
+    parentCasesPerPallet?: number;
+    parentPalletsPerShipment?: number;
     onPricesChange: (next: VariantPricesMap) => void;
     onMetaChange: (next: VariantMetaMap) => void;
 }) {
@@ -492,11 +507,51 @@ function VariantPricingEditor({
                                         className="w-full h-8 ps-6 pe-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[12px] font-mono focus:border-orange-400 focus:outline-none"
                                     />
                                 </div>
+
+                                {/* Per-variant pack sizes. Blank = inherit
+                                    the parent product's value (shown as the
+                                    placeholder). Useful when one flavour
+                                    ships in a different pack than the rest. */}
+                                <div className="grid grid-cols-3 gap-1.5">
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={m.unitsPerCase ?? ''}
+                                        onChange={e => setMeta(sig, { unitsPerCase: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                                        placeholder={parentUnitsPerCase != null ? `${parentUnitsPerCase}/case` : 'pcs/case'}
+                                        className="h-7 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[11px] font-mono focus:border-orange-400 focus:outline-none"
+                                        title="Pieces per case for this variant"
+                                    />
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={m.casesPerPallet ?? ''}
+                                        onChange={e => setMeta(sig, { casesPerPallet: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                                        placeholder={parentCasesPerPallet != null ? `${parentCasesPerPallet}/pallet` : 'cs/pallet'}
+                                        className="h-7 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[11px] font-mono focus:border-orange-400 focus:outline-none"
+                                        title="Cases per pallet for this variant"
+                                    />
+                                    <input
+                                        type="number"
+                                        min={0}
+                                        value={m.palletsPerShipment ?? ''}
+                                        onChange={e => setMeta(sig, { palletsPerShipment: e.target.value === '' ? undefined : Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                                        placeholder={parentPalletsPerShipment != null ? `${parentPalletsPerShipment}/truck` : 'pl/truck'}
+                                        className="h-7 px-2 rounded-md border border-slate-200 dark:border-white/[0.08] bg-white dark:bg-[#0F0F12] text-[11px] font-mono focus:border-orange-400 focus:outline-none"
+                                        title="Pallets per truck for this variant"
+                                    />
+                                </div>
                             </div>
                         </div>
                     );
                 })}
             </div>
+
+            <p className="text-[11px] text-slate-500 dark:text-zinc-400 leading-relaxed bg-slate-50 dark:bg-white/[0.02] rounded-lg px-3 py-2 border border-slate-100 dark:border-white/[0.04]">
+                💡 Leave fields blank to inherit from the main product. Override only when a
+                variant ships differently (e.g. <code className="font-mono text-orange-600">Pepsi 1L</code> = 12/case,
+                <code className="font-mono text-orange-600 ms-1">Pepsi 330ml</code> = 24/case).
+            </p>
         </div>
     );
 }
@@ -2382,13 +2437,16 @@ export default function ProductEditorForm({
                         <VariantPricingEditor
                             groups={(formData.variants as any) || []}
                             prices={((formData as any).variantPrices as Record<string, number>) || {}}
-                            meta={((formData as any).variantMeta as Record<string, { image?: string; label?: string }>) || {}}
+                            meta={((formData as any).variantMeta as VariantMetaMap) || {}}
                             parentImage={Array.isArray((formData as any).images) ? (formData as any).images[0] : undefined}
                             parentPrice={typeof (formData as any).basePrice === 'number'
                                 ? (formData as any).basePrice
                                 : typeof (formData as any).price === 'number'
                                     ? (formData as any).price
                                     : undefined}
+                            parentUnitsPerCase={typeof (formData as any).unitsPerCase === 'number' ? (formData as any).unitsPerCase : undefined}
+                            parentCasesPerPallet={typeof (formData as any).casesPerPallet === 'number' ? (formData as any).casesPerPallet : undefined}
+                            parentPalletsPerShipment={typeof (formData as any).palletsPerShipment === 'number' ? (formData as any).palletsPerShipment : undefined}
                             onPricesChange={next => setFormData({ ...formData, variantPrices: next as any })}
                             onMetaChange={next => setFormData({ ...formData, variantMeta: next as any })}
                         />

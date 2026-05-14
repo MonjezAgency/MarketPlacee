@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { getActiveCurrency } from '@/lib/currency';
 import AddProductDrawer from '@/components/product/AddProductDrawer';
+import BulkUploadSchemaPreview from '@/components/products/BulkUploadSchemaPreview';
 
 export default function SupplierProductsPage() {
     const { t, locale } = useLanguage();
@@ -855,6 +856,12 @@ export default function SupplierProductsPage() {
                                 </div>
 
                                 <div className="p-8 space-y-6 overflow-y-auto flex-1">
+                                    {/* Operator-requested: visual schema map so the
+                                        supplier sees what columns are required vs
+                                        optional BEFORE picking a file. Collapsed by
+                                        default — clicking expands the mini-sheet. */}
+                                    {!bulkResults && <BulkUploadSchemaPreview />}
+
                                     {!bulkResults ? (
                                         <div className="border-2 border-dashed border-border/50 rounded-3xl p-12 flex flex-col items-center justify-center text-center relative group hover:border-primary/50 hover:bg-primary/5 transition-all">
                                             <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
