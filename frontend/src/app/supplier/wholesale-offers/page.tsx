@@ -93,6 +93,12 @@ export default function SupplierOffersPage() {
     const [isUploadingOfferImg, setIsUploadingOfferImg] = React.useState(false);
     const offerImgRef = React.useRef<HTMLInputElement | null>(null);
 
+    // Per-variant discount overrides — used when the product has
+    // variants and the supplier wants different % per variant.
+    // Keyed by variant signature (e.g. "Flavour=Diet|Size=Large").
+    const [perVariantMode, setPerVariantMode] = React.useState<'same' | 'different'>('same');
+    const [variantDiscounts, setVariantDiscounts] = React.useState<Record<string, number>>({});
+
     // When the supplier picks a product, prefill batch fields from
     // its values so they only have to type the deltas (BBD, lead
     // time, batch photo). Each input is still editable per offer.
@@ -100,6 +106,26 @@ export default function SupplierOffersPage() {
         () => products.find(p => p.id === pickedProductId),
         [pickedProductId, products],
     );
+
+    // List of variant signatures for the picked product. Pulled
+    // from variantMeta (preferred) or variants[]. Empty array if
+    // the product is single-SKU.
+    const variantSignatures = React.useMemo<string[]>(() => {
+        if (!pickedProduct) return [];
+        const meta = Array.isArray(pickedProduct.variantMeta) ? pickedProduct.variantMeta : [];
+        const sigs = meta
+            .map((v: any) => v?.signature || v?.sig || '')
+            .filter((s: string) => s && !s.startsWith('__'));
+        if (sigs.length > 0) return sigs;
+        const vs = Array.isArray(pickedProduct.variants) ? pickedProduct.variants : [];
+        return vs.map((v: any) => v?.signature || v?.name || '').filter(Boolean);
+    }, [pickedProduct]);
+
+    // Reset per-variant state whenever the picked product changes.
+    React.useEffect(() => {
+        setPerVariantMode('same');
+        setVariantDiscounts({});
+    }, [pickedProductId]);
 
     const handleOfferImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -149,6 +175,17 @@ export default function SupplierOffersPage() {
             leadTime:        String(fd.get('leadTime') || '').trim(),
             origin:          String(fd.get('origin') || '').trim(),
             offerImageUrl:   offerImageUrl || pickedProduct?.images?.[0] || '',
+            // Discount fields — backend clamps 0–100 and persists
+            // both the headline % and any per-variant overrides.
+            discountPercent: discountPct > 0 ? discountPct : undefined,
+            variantDiscounts:
+                variantSignatures.length > 0 && perVariantMode === 'different'
+                    ? Object.fromEntries(
+                          variantSignatures
+                              .map((sig) => [sig, variantDiscounts[sig] ?? discountPct])
+                              .filter(([, v]) => Number(v) > 0),
+                      )
+                    : undefined,
         };
         if (!payload.productId) return toast.error('Pick a product from the catalog');
         if (!(payload.pricePerUnit > 0)) return toast.error('Enter a valid price');
@@ -578,6 +615,79 @@ export default function SupplierOffersPage() {
                                         )}
                                     </div>
                                 </div>
+
+                                {/* Per-variant discount overrides — only when
+                                    the picked product actually has variants.
+                                    Operator request: ask the supplier whether
+                                    the headline % applies to every variant
+                                    or whether each variant has its own. */}
+                                {variantSignatures.length > 0 && discountPct > 0 && (
+                                    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
+                                        <div>
+                                            <p className="text-[12px] font-black text-[#0F172A]">
+                                                This product has {variantSignatures.length} variants
+                                            </p>
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                                Should the -{discountPct}% apply to all of them, or do you want a different discount per variant?
+                                            </p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <button
+                                                type="button"
+                                                onClick={() => setPerVariantMode('same')}
+                                                className={cn(
+                                                    'h-11 rounded-xl text-[12px] font-black border-2 transition-all',
+                                                    perVariantMode === 'same'
+                                                        ? 'bg-[#2EC4B6] border-[#2EC4B6] text-white shadow-sm'
+                                                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300',
+                                                )}
+                                            >
+                                                Same -{discountPct}% for all variants
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setPerVariantMode('different')}
+                                                className={cn(
+                                                    'h-11 rounded-xl text-[12px] font-black border-2 transition-all',
+                                                    perVariantMode === 'different'
+                                                        ? 'bg-[#2EC4B6] border-[#2EC4B6] text-white shadow-sm'
+                                                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300',
+                                                )}
+                                            >
+                                                Different % per variant
+                                            </button>
+                                        </div>
+                                        {perVariantMode === 'different' && (
+                                            <div className="space-y-2 pt-1">
+                                                {variantSignatures.map((sig) => {
+                                                    const pretty = sig.replace(/\|/g, ' · ').replace(/=/g, ': ');
+                                                    const val = variantDiscounts[sig] ?? discountPct;
+                                                    return (
+                                                        <div key={sig} className="flex items-center gap-3 bg-white rounded-lg border border-slate-200 px-3 py-2">
+                                                            <span className="flex-1 text-[12px] font-bold text-slate-700 truncate">{pretty}</span>
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                max={90}
+                                                                step={1}
+                                                                value={val}
+                                                                onChange={(e) => {
+                                                                    const v = parseInt(e.target.value);
+                                                                    setVariantDiscounts((prev) => ({
+                                                                        ...prev,
+                                                                        [sig]: isNaN(v) ? 0 : Math.max(0, Math.min(90, v)),
+                                                                    }));
+                                                                }}
+                                                                className="w-20 h-9 px-2 bg-slate-50 border border-slate-200 rounded-lg text-[13px] font-bold text-center outline-none focus:border-[#2EC4B6]"
+                                                            />
+                                                            <span className="text-[11px] font-bold text-slate-400">%</span>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
 
                                 {/* Quantity */}
                                 <div className="grid grid-cols-3 gap-3">

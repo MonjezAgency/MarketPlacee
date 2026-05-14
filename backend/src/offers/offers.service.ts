@@ -28,6 +28,12 @@ interface OfferInput {
     leadTime?: string;
     origin?: string;
     offerImageUrl?: string;
+
+    // Promo discount on the offer. discountPercent applies to every
+    // unit (0–100). variantDiscounts overrides per variant signature
+    // when the supplier wants different cuts per flavour / size.
+    discountPercent?: number;
+    variantDiscounts?: Record<string, number>;
 }
 
 @Injectable()
@@ -177,6 +183,18 @@ export class OffersService {
                 leadTime:       leadTime || null,
                 origin:         origin || null,
                 offerImageUrl:  offerImageUrl || null,
+                // Discount fields — both optional. Sanitise into the
+                // valid 0–100 range; >100 / negatives get clamped.
+                discountPercent: input.discountPercent != null
+                    ? Math.max(0, Math.min(100, Number(input.discountPercent)))
+                    : null,
+                variantDiscounts: input.variantDiscounts && typeof input.variantDiscounts === 'object'
+                    ? Object.fromEntries(
+                        Object.entries(input.variantDiscounts)
+                            .filter(([, v]) => v != null && !isNaN(Number(v)))
+                            .map(([k, v]) => [k, Math.max(0, Math.min(100, Number(v)))]),
+                    )
+                    : null,
                 status: initialStatus,
                 approvedAt: isAdmin ? new Date() : null,
                 approvedBy: isAdmin ? supplierId : null, // admin acting as the approver
@@ -687,6 +705,9 @@ export class OffersService {
                                 ${cpp ? specRow('🏗', 'Cases per pallet', String(cpp)) : ''}
                                 ${lead ? specRow('⏱', 'Lead time',   lead) : ''}
                                 ${tierLabel ? specRow('🎯', 'Tier',  tierLabel) : ''}
+                                ${offer.discountPercent
+                                    ? specRow('🏷', 'Promo discount', `${offer.discountPercent}% OFF`)
+                                    : ''}
                             </table>
                         </td>
                         <td style="vertical-align:top;width:40%;padding-left:18px;border-left:1px solid #F1F5F9;">

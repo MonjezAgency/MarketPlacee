@@ -818,6 +818,17 @@ model Offer {
   origin            String?   // country of origin for this batch
   offerImageUrl     String?   // batch-specific photo of the product
 
+  // Discount applied to this offer (operator-requested promo flow).
+  //   discountPercent: a single percentage applied to every unit
+  //     in the offer (e.g. 15 → 15 % off pricePerUnit).
+  //   variantDiscounts: per-variant overrides keyed by variant
+  //     signature, e.g. { "Flavour=Diet": 20, "Flavour=Regular": 10 }.
+  //     When set, the supplier wanted DIFFERENT discounts per variant;
+  //     otherwise discountPercent applies to all variants uniformly.
+  // Both are optional — a 0/missing value means "no discount".
+  discountPercent  Float?
+  variantDiscounts Json?
+
   status       String   @default("PENDING") // PENDING | APPROVED | REJECTED | EXPIRED
   adminNotes   String?
   approvedAt   DateTime?
