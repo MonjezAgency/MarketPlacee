@@ -24,7 +24,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
-import { cn } from '@/lib/utils';
+import { cn, prettifyVariantSignature } from '@/lib/utils';
 import OrderChatModal from '@/components/chat/OrderChatModal';
 
 type AdminOrderItem = {
@@ -400,15 +400,29 @@ export default function AdminOrderDetailPage() {
                                                                         </span>
                                                                     )}
                                                                     {(it as any).selectedVariants &&
-                                                                        Object.entries((it as any).selectedVariants).map(([k, v]) => (
-                                                                            <span
-                                                                                key={k}
-                                                                                className="inline-flex items-center h-5 px-2 rounded-md bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-semibold"
-                                                                            >
-                                                                                <span className="text-violet-400 font-normal">{k}:</span>
-                                                                                <span className="ms-1">{String(v)}</span>
-                                                                            </span>
+                                                                        Object.entries((it as any).selectedVariants)
+                                                                            .filter(([k]) => !k.startsWith('__'))
+                                                                            .map(([k, v]) => (
+                                                                                <span
+                                                                                    key={k}
+                                                                                    className="inline-flex items-center h-5 px-2 rounded-md bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-semibold"
+                                                                                >
+                                                                                    <span className="text-violet-400 font-normal">{k}:</span>
+                                                                                    <span className="ms-1">{String(v)}</span>
+                                                                                </span>
+                                                                            ))}
+                                                                </div>
+                                                            )}
+                                                            {Array.isArray((it as any).mixComposition) && (it as any).mixComposition.length > 0 && (
+                                                                <div className="mt-2 rounded-lg border border-orange-200 bg-orange-50/40 px-2.5 py-1.5 text-[11px]">
+                                                                    <p className="font-black text-orange-700 uppercase tracking-widest text-[9px] mb-1">Mixed composition</p>
+                                                                    <ul className="space-y-0.5 text-slate-700">
+                                                                        {((it as any).mixComposition as Array<{ signature: string; quantity: number }>).map((c) => (
+                                                                            <li key={c.signature} className="break-all">
+                                                                                {c.quantity} × {prettifyVariantSignature(c.signature) || 'Variant'}
+                                                                            </li>
                                                                         ))}
+                                                                    </ul>
                                                                 </div>
                                                             )}
                                                         </div>

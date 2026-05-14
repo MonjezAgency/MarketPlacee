@@ -9,7 +9,7 @@ import {
     ArrowLeft, Loader2, MapPin, RefreshCw,
     Download, AlertTriangle, ChevronDown, ChevronUp, Send,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, prettifyVariantSignature } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
 
@@ -493,16 +493,9 @@ export default function OrderTrackingPage() {
                                                     <p className="font-black text-orange-700 uppercase tracking-widest text-[9px] mb-1">Mixed composition</p>
                                                     <ul className="space-y-0.5 text-slate-700">
                                                         {((item as any).mixComposition as Array<{ signature: string; quantity: number }>).map((c) => {
-                                                            const pretty = c.signature
-                                                                .split('|')
-                                                                .filter((p: string) => p && !p.startsWith('__'))
-                                                                .map((p: string) => {
-                                                                    const eq = p.indexOf('=');
-                                                                    return eq > 0 ? `${p.slice(0, eq)}: ${p.slice(eq + 1)}` : p;
-                                                                })
-                                                                .join(' · ');
+                                                            const pretty = prettifyVariantSignature(c.signature) || 'Variant';
                                                             return (
-                                                                <li key={c.signature}>{c.quantity} × {pretty || c.signature}</li>
+                                                                <li key={c.signature} className="break-all">{c.quantity} × {pretty}</li>
                                                             );
                                                         })}
                                                     </ul>

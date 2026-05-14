@@ -130,12 +130,15 @@ export default function CartPage() {
                                                     Mixed composition
                                                 </p>
                                                 <ul className="space-y-0.5 text-slate-700">
-                                                    {((item as any).mixComposition as Array<{ signature: string; quantity: number; unitPrice: number }>).map(c => (
-                                                        <li key={c.signature} className="flex items-center justify-between gap-3">
-                                                            <span className="truncate">{c.quantity} × {prettifyVariantSignature(c.signature) || c.signature}</span>
-                                                            <span className="font-mono tabular-nums shrink-0">{formatPrice(c.unitPrice * c.quantity, currency)}</span>
-                                                        </li>
-                                                    ))}
+                                                    {((item as any).mixComposition as Array<{ signature: string; quantity: number; unitPrice: number }>).map(c => {
+                                                        const label = prettifyVariantSignature(c.signature) || 'Variant';
+                                                        return (
+                                                            <li key={c.signature} className="flex items-center justify-between gap-3 min-w-0">
+                                                                <span className="truncate break-all">{c.quantity} × {label}</span>
+                                                                <span className="font-mono tabular-nums shrink-0">{formatPrice(c.unitPrice * c.quantity, currency)}</span>
+                                                            </li>
+                                                        );
+                                                    })}
                                                 </ul>
                                             </div>
                                         )}
