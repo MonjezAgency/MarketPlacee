@@ -202,7 +202,18 @@ export default function ProductDetailClient() {
         const p = currentProduct as any;
         const variantsConfig: Array<{ name: string; values: string[] }> =
             Array.isArray(p.variants)
-                ? (p.variants as any[]).filter(v => v && v.name && Array.isArray(v.values) && v.values.length > 0)
+                ? (p.variants as any[]).filter(
+                      v =>
+                          v &&
+                          v.name &&
+                          // Strip internal/translation rows so signatures
+                          // don't end up containing JSON blobs like
+                          // "__translations={\"ar\":…}" — those then
+                          // surface as garbage on the cart page.
+                          !String(v.name).startsWith('__') &&
+                          Array.isArray(v.values) &&
+                          v.values.length > 0,
+                  )
                 : [];
         if (variantsConfig.length === 0) return null;
 

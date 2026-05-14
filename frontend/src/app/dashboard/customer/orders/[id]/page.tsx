@@ -477,6 +477,37 @@ export default function OrderTrackingPage() {
                                                 {p.category && <span>· {p.category}</span>}
                                                 <span>· Sold by <span className="font-bold text-foreground">Atlantis</span></span>
                                             </div>
+                                            {(item as any).selectedVariants && Object.keys((item as any).selectedVariants).length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                                    {Object.entries((item as any).selectedVariants as Record<string, string>)
+                                                        .filter(([k]) => !k.startsWith('__'))
+                                                        .map(([k, v]) => (
+                                                            <span key={k} className="inline-flex items-center h-5 px-2 rounded-md bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-bold">
+                                                                {k}: <span className="ml-1">{v}</span>
+                                                            </span>
+                                                        ))}
+                                                </div>
+                                            )}
+                                            {Array.isArray((item as any).mixComposition) && (item as any).mixComposition.length > 0 && (
+                                                <div className="mt-2 rounded-xl border border-orange-200 bg-orange-50/40 px-3 py-2 text-[11px]">
+                                                    <p className="font-black text-orange-700 uppercase tracking-widest text-[9px] mb-1">Mixed composition</p>
+                                                    <ul className="space-y-0.5 text-slate-700">
+                                                        {((item as any).mixComposition as Array<{ signature: string; quantity: number }>).map((c) => {
+                                                            const pretty = c.signature
+                                                                .split('|')
+                                                                .filter((p: string) => p && !p.startsWith('__'))
+                                                                .map((p: string) => {
+                                                                    const eq = p.indexOf('=');
+                                                                    return eq > 0 ? `${p.slice(0, eq)}: ${p.slice(eq + 1)}` : p;
+                                                                })
+                                                                .join(' · ');
+                                                            return (
+                                                                <li key={c.signature}>{c.quantity} × {pretty || c.signature}</li>
+                                                            );
+                                                        })}
+                                                    </ul>
+                                                </div>
+                                            )}
                                         </div>
                                         <div className="text-end shrink-0">
                                             <p className="text-base font-black text-primary">{formatPrice(item.price * item.quantity)}</p>

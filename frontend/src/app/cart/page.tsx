@@ -10,7 +10,7 @@ import RecommendationsSidebar from '@/components/cart/RecommendationsSidebar';
 import { formatPrice } from '@/lib/currency';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { cn } from '@/lib/utils';
+import { cn, prettifyVariantSignature } from '@/lib/utils';
 
 export default function CartPage() {
     const { items, removeItem, updateQuantity, total, clearCart } = useCart();
@@ -100,6 +100,17 @@ export default function CartPage() {
                                             )}
                                         </div>
                                         <h3 className="font-heading font-bold text-lg leading-tight mt-1 mb-2">{item.name}</h3>
+                                        {(item as any).selectedVariants && Object.keys((item as any).selectedVariants).length > 0 && (
+                                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                                {Object.entries((item as any).selectedVariants as Record<string, string>)
+                                                    .filter(([k]) => !k.startsWith('__'))
+                                                    .map(([k, v]) => (
+                                                        <span key={k} className="inline-flex items-center h-6 px-2.5 rounded-full bg-violet-50 border border-violet-200 text-violet-800 text-[11px] font-bold">
+                                                            {k}: <span className="ml-1">{v}</span>
+                                                        </span>
+                                                    ))}
+                                            </div>
+                                        )}
                                         <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
                                             <div className="flex items-center gap-1.5 text-xs text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-xl">
                                                 <ShieldCheck size={14} className="text-accent" />
@@ -121,7 +132,7 @@ export default function CartPage() {
                                                 <ul className="space-y-0.5 text-slate-700">
                                                     {((item as any).mixComposition as Array<{ signature: string; quantity: number; unitPrice: number }>).map(c => (
                                                         <li key={c.signature} className="flex items-center justify-between gap-3">
-                                                            <span className="font-mono truncate">{c.quantity} × {c.signature}</span>
+                                                            <span className="truncate">{c.quantity} × {prettifyVariantSignature(c.signature) || c.signature}</span>
                                                             <span className="font-mono tabular-nums shrink-0">{formatPrice(c.unitPrice * c.quantity, currency)}</span>
                                                         </li>
                                                     ))}
