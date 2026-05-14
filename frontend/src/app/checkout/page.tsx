@@ -172,6 +172,11 @@ export default function CheckoutPage() {
                         name: i.name,
                         tier: i.tier,
                         selectedVariants: (i as any).selectedVariants,
+                        // Mix-composer breakdown — when the buyer built a
+                        // mixed truck/pallet from the PDP, it lands on the
+                        // OrderItem as `mixComposition` so the admin order
+                        // detail can show the exact per-variant split.
+                        mixComposition: (i as any).mixComposition,
                     })),
                     totalAmount: grandTotal,
                     shippingCompany: selectedShipping?.name,

@@ -56,7 +56,14 @@ export default function ProductDetailClient() {
     const [currentProduct, setCurrentProduct] = useState<Product | null>(null);
     const [selectedUnit, setSelectedUnit] = useState<'truck' | 'pallet' | 'carton' | undefined>(undefined);
     const [adminDefaultUnit, setAdminDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
-    const [markups, setMarkups] = useState<{ piece: number; pallet: number; container: number }>({ piece: 1.10, pallet: 1.05, container: 1.02 });
+    const [markups, setMarkups] = useState<{ piece: number; pallet: number; container: number; mix: number }>({ piece: 1.10, pallet: 1.05, container: 1.02, mix: 1.15 });
+    // Mix composer state — when on, the buyer fills the active tier
+    // (truck/pallet) with a custom split of variants instead of a
+    // single-variant quantity. mixQuantities is keyed by variant
+    // signature and counts in the tier's sub-unit (pallets-per-truck
+    // or cases-per-pallet).
+    const [isMixing, setIsMixing] = useState(false);
+    const [mixQuantities, setMixQuantities] = useState<Record<string, number>>({});
     const [activeTab, setActiveTab] = useState('Description');
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
@@ -177,6 +184,115 @@ export default function ProductDetailClient() {
         }
     };
 
+    // ── Mix composer derived data ─────────────────────────────────────────
+    //   variantPrices + variantMeta come from /products/:id; we resolve
+    //   each variant signature into { image, label, casePrice, palletPrice }
+    //   so the composer cards can render uniformly. The capacity depends
+    //   on the active tier:
+    //     truck  → palletsPerShipment (mix in pallets)
+    //     pallet → casesPerPallet     (mix in cases)
+    //     case   → no mixing — composer hidden
+    const mixData = useMemo(() => {
+        if (!currentProduct) return null;
+        const p = currentProduct as any;
+        const variantsConfig: Array<{ name: string; values: string[] }> =
+            Array.isArray(p.variants)
+                ? (p.variants as any[]).filter(v => v && v.name && Array.isArray(v.values) && v.values.length > 0)
+                : [];
+        if (variantsConfig.length === 0) return null;
+
+        // Cartesian product of group values → list of signatures.
+        const sorted = [...variantsConfig].sort((a, b) => a.name.localeCompare(b.name));
+        let combos: Array<Record<string, string>> = [{}];
+        for (const g of sorted) {
+            const next: Array<Record<string, string>> = [];
+            for (const c of combos) for (const v of g.values) next.push({ ...c, [g.name]: v });
+            combos = next;
+        }
+        const signatures = combos.map(c =>
+            Object.keys(c).sort().map(k => `${k}=${c[k]}`).join('|'),
+        );
+
+        const prices: Record<string, number> = (p.variantPrices as Record<string, number>) || {};
+        const meta: Record<string, { image?: string; label?: string }> = (p.variantMeta as any) || {};
+
+        // Fallback price = parent basePrice (per case).
+        const fallbackCasePrice = Number(p.basePrice ?? p.price ?? 0);
+        const cpp = Number(p.casesPerPallet) || 0;
+
+        const variants = signatures.map(sig => {
+            const casePrice = prices[sig] != null ? Number(prices[sig]) : fallbackCasePrice;
+            const palletPrice = casePrice * cpp;
+            return {
+                signature: sig,
+                label: meta[sig]?.label || sig,
+                image: meta[sig]?.image || (p.images?.[0] || ''),
+                casePrice,
+                palletPrice,
+            };
+        });
+
+        return { variants, casesPerPallet: cpp };
+    }, [currentProduct]);
+
+    // Capacity + unit-label for the active tier in the composer.
+    // Mixing happens at the SUB-UNIT level (pallets-in-truck, cases-in-pallet).
+    const mixCapacity = useMemo(() => {
+        if (!currentProduct) return { unit: 'unit', perVariantPrice: 'casePrice' as 'casePrice' | 'palletPrice', total: 0 };
+        const p = currentProduct as any;
+        if (tierData.activeKey === 'truck') {
+            return {
+                unit: 'pallet',
+                perVariantPrice: 'palletPrice' as const,
+                total: Number(p.palletsPerShipment) || 0,
+            };
+        }
+        if (tierData.activeKey === 'pallet') {
+            return {
+                unit: 'case',
+                perVariantPrice: 'casePrice' as const,
+                total: Number(p.casesPerPallet) || 0,
+            };
+        }
+        return { unit: 'unit', perVariantPrice: 'casePrice' as const, total: 0 };
+    }, [currentProduct, tierData.activeKey]);
+
+    const mixSummary = useMemo(() => {
+        if (!mixData) return null;
+        let filled = 0;
+        let subtotal = 0;
+        const composition: Array<{ signature: string; quantity: number; unitPrice: number }> = [];
+        for (const v of mixData.variants) {
+            const qty = Math.max(0, Number(mixQuantities[v.signature] || 0));
+            if (qty <= 0) continue;
+            const unitPrice = mixCapacity.perVariantPrice === 'palletPrice' ? v.palletPrice : v.casePrice;
+            filled += qty;
+            subtotal += unitPrice * qty;
+            composition.push({ signature: v.signature, quantity: qty, unitPrice });
+        }
+        const totalWithMarkup = subtotal * markups.mix;
+        return {
+            filled,
+            capacity: mixCapacity.total,
+            subtotal,
+            totalWithMarkup,
+            composition,
+        };
+    }, [mixData, mixQuantities, mixCapacity, markups.mix]);
+
+    // Reset mix when tier changes — capacity changes too.
+    useEffect(() => {
+        setMixQuantities({});
+        setIsMixing(false);
+    }, [tierData.activeKey]);
+
+    // Whether the mix composer should be available on this product.
+    const mixSupported =
+        !!mixData &&
+        mixData.variants.length > 1 &&
+        (tierData.activeKey === 'truck' || tierData.activeKey === 'pallet') &&
+        mixCapacity.total > 0;
+
     // ── Cart-driven tier lock ─────────────────────────────────────────────────
     // If this exact product is already in the cart, the buyer locked in a tier
     // (Truck / Pallet / Carton) when they added it. The PDP must enforce that
@@ -214,6 +330,7 @@ export default function ProductDetailClient() {
                     piece: Number(markupData.piece) || 1.10,
                     pallet: Number(markupData.pallet) || 1.05,
                     container: Number(markupData.container) || 1.02,
+                    mix: Number(markupData.mix) || 1.15,
                 });
             }
         });
@@ -326,10 +443,34 @@ export default function ProductDetailClient() {
             router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname));
             return;
         }
-        // Cart-line key has to include the variant signature, otherwise
-        // adding "Size: Large" then "Size: Small" of the same product
-        // would merge into one line instead of staying as two distinct
-        // configurations. We append a deterministic suffix.
+
+        // ── Mix-composer path ────────────────────────────────────────
+        // When the buyer used "Mix this <tier>", build a single cart
+        // line representing ONE tier-unit (one truck / one pallet)
+        // composed of the variant breakdown. The cart treats this as
+        // a quantity-1 line with `mixComposition` so checkout can ship
+        // the per-variant qty + price snapshot to the order API.
+        if (isMixing && mixSummary && mixSummary.filled === mixSummary.capacity) {
+            const cartLineId = `${product.id}::mix:${tierData.activeKey}:${Date.now()}`;
+            addItem({
+                id: cartLineId,
+                productId: product.id,
+                name: `${product.name} (Mixed ${tierData.activeLabel})`,
+                brand: product.brand || 'Atlantis Premium',
+                price: mixSummary.totalWithMarkup,
+                image: product.image || '',
+                unit: tierData.activeLabel,
+                category: product.category || 'Uncategorized',
+                tier: tierData.activeKey,
+                mixComposition: mixSummary.composition as any,
+                selectedVariants: undefined,
+            } as any, 1);
+            setIsAdded(true);
+            setTimeout(() => setIsAdded(false), 2500);
+            return;
+        }
+
+        // ── Single-variant path (legacy) ─────────────────────────────
         const variantKeys = Object.keys(selectedVariants).sort();
         const variantSig = variantKeys.length
             ? variantKeys.map((k) => `${k}=${selectedVariants[k]}`).join('|')
@@ -341,18 +482,11 @@ export default function ProductDetailClient() {
             productId: product.id,
             name: product.name,
             brand: product.brand || 'Atlantis Premium',
-            // Cart math: line total = price × quantity. We store the FULL
-            // per-unit price (one truck / one pallet / one case) here so
-            // the cart can render `formatPrice(price * quantity)` directly.
-            // perUnitTotal already has the chosen tier's markup baked in.
             price: tierData.perUnitTotal,
             image: product.image || '',
             unit: tierData.activeLabel,
             category: product.category || 'Uncategorized',
-            // Lock the buyer to this tier for any future PDP visit on the
-            // same product. To switch tier they have to remove the line.
             tier: tierData.activeKey,
-            // Shopify-style variant picks — travel with the order line.
             selectedVariants: variantKeys.length ? selectedVariants : undefined,
         }, quantity);
         setIsAdded(true);
@@ -856,19 +990,151 @@ export default function ProductDetailClient() {
                             })()}
 
                             <div className="flex flex-col gap-5 pt-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="flex items-center h-14 bg-white border border-[#E5E7EB] rounded-2xl p-1 shrink-0 shadow-sm">
-                                        <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-12 h-full flex items-center justify-center hover:bg-slate-50 rounded-xl text-slate-400 transition-colors">
-                                            <Minus size={18} />
-                                        </button>
-                                        <span className="w-14 text-center font-bold text-lg">{quantity}</span>
-                                        <button onClick={() => setQuantity(quantity + 1)} className="w-12 h-full flex items-center justify-center hover:bg-slate-50 rounded-xl text-slate-400 transition-colors">
-                                            <Plus size={18} />
-                                        </button>
+                                {/* ── Mix-this-<tier> toggle ─────────────────
+                                    Only appears when:
+                                    - the product has 2+ variants defined
+                                    - the active tier is truck or pallet
+                                    Clicking the toggle expands a composer
+                                    below the qty/Add-to-Cart row. */}
+                                {mixSupported && (
+                                    <div className="rounded-2xl border border-orange-200 bg-orange-50/40 p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="text-[11px] font-black uppercase tracking-widest text-orange-700">
+                                                    Build-your-own {tierData.activeLabel.toLowerCase()}
+                                                </p>
+                                                <p className="text-[12px] text-slate-600 mt-1">
+                                                    Mix multiple variants inside ONE {tierData.activeLabel.toLowerCase()} (e.g. 5 Diet + 10 Regular + 9 Black). Each variant carries its own price; admin's mix markup is applied to the subtotal.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setIsMixing(v => !v)}
+                                                className={cn(
+                                                    'h-9 px-4 rounded-xl text-[12px] font-black uppercase tracking-widest shrink-0 transition-colors',
+                                                    isMixing
+                                                        ? 'bg-orange-600 text-white hover:bg-orange-700'
+                                                        : 'bg-white text-orange-700 border border-orange-300 hover:bg-orange-50',
+                                                )}
+                                            >
+                                                {isMixing ? 'Stop mixing' : `Mix this ${tierData.activeLabel.toLowerCase()}`}
+                                            </button>
+                                        </div>
+
+                                        {isMixing && mixData && (
+                                            <div className="mt-4 space-y-3">
+                                                {/* Capacity meter */}
+                                                <div className="flex items-center justify-between gap-3 text-[12px]">
+                                                    <span className="font-black text-slate-700">
+                                                        Filled: <span className="text-orange-700 tabular-nums">{mixSummary?.filled ?? 0}</span> / <span className="tabular-nums">{mixCapacity.total}</span> {mixCapacity.unit}s
+                                                    </span>
+                                                    <span className="font-mono text-slate-700">
+                                                        Subtotal <span className="text-orange-700 font-bold">{formatPrice(mixSummary?.subtotal || 0)}</span>
+                                                        {' × '}
+                                                        <span className="text-slate-500">{markups.mix.toFixed(3)}</span>
+                                                        {' = '}
+                                                        <span className="text-slate-900 font-black">{formatPrice(mixSummary?.totalWithMarkup || 0)}</span>
+                                                    </span>
+                                                </div>
+                                                <div className="h-2 bg-orange-100 rounded-full overflow-hidden">
+                                                    <div
+                                                        className="h-full bg-orange-500 transition-all"
+                                                        style={{ width: `${Math.min(100, ((mixSummary?.filled || 0) / Math.max(1, mixCapacity.total)) * 100)}%` }}
+                                                    />
+                                                </div>
+
+                                                {/* Variant cards */}
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                    {mixData.variants.map(v => {
+                                                        const qty = Math.max(0, Number(mixQuantities[v.signature] || 0));
+                                                        const unitPrice = mixCapacity.perVariantPrice === 'palletPrice' ? v.palletPrice : v.casePrice;
+                                                        const remaining = (mixCapacity.total || 0) - (mixSummary?.filled || 0);
+                                                        const canIncrement = remaining > 0;
+                                                        return (
+                                                            <div key={v.signature} className="bg-white rounded-xl border border-orange-100 p-3 flex items-center gap-3">
+                                                                <div className="w-14 h-14 rounded-lg bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center">
+                                                                    {v.image ? (
+                                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                                        <img src={v.image} alt={v.label} className="w-full h-full object-cover" />
+                                                                    ) : (
+                                                                        <Package size={18} className="text-slate-300" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[12px] font-black text-slate-900 truncate">{v.label}</p>
+                                                                    <p className="text-[11px] text-slate-500 font-mono">
+                                                                        {formatPrice(unitPrice)} / {mixCapacity.unit}
+                                                                    </p>
+                                                                </div>
+                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setMixQuantities(q => ({ ...q, [v.signature]: Math.max(0, (q[v.signature] || 0) - 1) }))}
+                                                                        className="w-7 h-7 rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center disabled:opacity-30"
+                                                                        disabled={qty <= 0}
+                                                                    >
+                                                                        <Minus size={12} />
+                                                                    </button>
+                                                                    <input
+                                                                        type="number"
+                                                                        min={0}
+                                                                        max={mixCapacity.total}
+                                                                        value={qty}
+                                                                        onChange={e => {
+                                                                            const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                                                                            // Clamp so this variant + all others ≤ capacity
+                                                                            const others = Object.entries(mixQuantities)
+                                                                                .filter(([k]) => k !== v.signature)
+                                                                                .reduce((acc, [, qty]) => acc + Number(qty || 0), 0);
+                                                                            const clamped = Math.min(n, Math.max(0, mixCapacity.total - others));
+                                                                            setMixQuantities(q => ({ ...q, [v.signature]: clamped }));
+                                                                        }}
+                                                                        className="w-12 h-7 text-center text-[12px] font-black tabular-nums border border-slate-200 rounded-md"
+                                                                    />
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setMixQuantities(q => ({ ...q, [v.signature]: (q[v.signature] || 0) + 1 }))}
+                                                                        disabled={!canIncrement}
+                                                                        className="w-7 h-7 rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                    >
+                                                                        <Plus size={12} />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                {mixSummary && mixSummary.filled !== mixCapacity.total && (
+                                                    <p className="text-[11px] text-amber-700 font-bold">
+                                                        ⚠ Add {Math.max(0, mixCapacity.total - mixSummary.filled)} more {mixCapacity.unit}s to fill the {tierData.activeLabel.toLowerCase()} before checkout.
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
+                                )}
+
+                                <div className="flex items-center gap-4">
+                                    {!isMixing && (
+                                        <div className="flex items-center h-14 bg-white border border-[#E5E7EB] rounded-2xl p-1 shrink-0 shadow-sm">
+                                            <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-12 h-full flex items-center justify-center hover:bg-slate-50 rounded-xl text-slate-400 transition-colors">
+                                                <Minus size={18} />
+                                            </button>
+                                            <span className="w-14 text-center font-bold text-lg">{quantity}</span>
+                                            <button onClick={() => setQuantity(quantity + 1)} className="w-12 h-full flex items-center justify-center hover:bg-slate-50 rounded-xl text-slate-400 transition-colors">
+                                                <Plus size={18} />
+                                            </button>
+                                        </div>
+                                    )}
                                     <Button
                                         onClick={handleAdd}
                                         disabled={(() => {
+                                            // Mix path: require the buyer to fill the tier exactly.
+                                            if (isMixing) {
+                                                return !mixSummary || mixSummary.filled !== mixCapacity.total;
+                                            }
+                                            // Single-variant path: require all variant groups to be picked.
                                             const rawVariants = (product.variants as any[]) || [];
                                             const required = rawVariants
                                                 .filter((v) => v && typeof v === 'object' && !String(v.name || '').startsWith('__'))
@@ -878,7 +1144,11 @@ export default function ProductDetailClient() {
                                         })()}
                                         className="h-14 flex-1 bg-[#14B8A6] hover:bg-[#0D9488] text-white font-bold text-md rounded-2xl transition-all shadow-xl shadow-[#14B8A6]/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#14B8A6]"
                                     >
-                                        {isAdded ? <><Check size={20} /> Added to Order</> : <><ShoppingCart size={20} /> {isLoggedIn ? 'Add to Procurement List' : 'Login to Order'}</>}
+                                        {isAdded
+                                            ? <><Check size={20} /> Added to Order</>
+                                            : isMixing
+                                                ? <><ShoppingCart size={20} /> Add mixed {tierData.activeLabel.toLowerCase()} to cart</>
+                                                : <><ShoppingCart size={20} /> {isLoggedIn ? 'Add to Procurement List' : 'Login to Order'}</>}
                                     </Button>
                                 </div>
 

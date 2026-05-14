@@ -44,6 +44,17 @@ export interface CartItem {
      * see the exact configuration the buyer ordered.
      */
     selectedVariants?: Record<string, string>;
+    /**
+     * Mixed-tier composition. When the buyer used the PDP's
+     * "Mix this <tier>" composer, this holds the per-variant
+     * breakdown:
+     *   [ { signature: "Flavour=Diet",    quantity: 5,  unitPrice: 290.00 },
+     *     { signature: "Flavour=Regular", quantity: 10, unitPrice: 264.00 } ]
+     * The line's `quantity` stays 1 (= one mixed tier-unit), and
+     * `price` is the full marked-up total. Survives the round-trip
+     * to the order API where it lands on OrderItem.mixComposition.
+     */
+    mixComposition?: Array<{ signature: string; quantity: number; unitPrice: number }>;
 }
 
 interface CartContextType {

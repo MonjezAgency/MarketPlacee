@@ -107,6 +107,27 @@ export default function CartPage() {
                                             </div>
                                             <p className="font-heading font-bold text-xl text-secondary">{formatPrice(item.price, currency)}<span className="text-muted-foreground text-xs font-medium ms-1">/ {item.unit}</span></p>
                                         </div>
+
+                                        {/* Mixed-tier composition — when the line was
+                                            built via the PDP mix composer, show the
+                                            per-variant breakdown so the buyer can
+                                            see what's actually in their truck/pallet
+                                            before checkout. */}
+                                        {Array.isArray((item as any).mixComposition) && (item as any).mixComposition.length > 0 && (
+                                            <div className="mt-3 rounded-xl border border-orange-200 bg-orange-50/40 px-3 py-2 text-xs">
+                                                <p className="font-black text-orange-700 uppercase tracking-widest text-[9px] mb-1.5">
+                                                    Mixed composition
+                                                </p>
+                                                <ul className="space-y-0.5 text-slate-700">
+                                                    {((item as any).mixComposition as Array<{ signature: string; quantity: number; unitPrice: number }>).map(c => (
+                                                        <li key={c.signature} className="flex items-center justify-between gap-3">
+                                                            <span className="font-mono truncate">{c.quantity} × {c.signature}</span>
+                                                            <span className="font-mono tabular-nums shrink-0">{formatPrice(c.unitPrice * c.quantity, currency)}</span>
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Quantity & Actions */}
