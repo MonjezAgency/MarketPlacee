@@ -1177,25 +1177,61 @@ export default function ProductDetailClient() {
 
                                         {isMixing && mixData && (
                                             <div className="mt-4 space-y-3">
-                                                {/* Capacity meter */}
-                                                <div className="flex items-center justify-between gap-3 text-[12px]">
-                                                    <span className="font-black text-slate-700">
-                                                        Filled: <span className="text-orange-700 tabular-nums">{mixSummary?.filled ?? 0}</span> / <span className="tabular-nums">{mixCapacity.total}</span> {mixCapacity.unit}s
-                                                    </span>
-                                                    <span className="font-mono text-slate-700">
-                                                        Subtotal <span className="text-orange-700 font-bold">{formatPrice(mixSummary?.subtotal || 0)}</span>
-                                                        {' × '}
-                                                        <span className="text-slate-500">{markups.mix.toFixed(3)}</span>
-                                                        {' = '}
-                                                        <span className="text-slate-900 font-black">{formatPrice(mixSummary?.totalWithMarkup || 0)}</span>
-                                                    </span>
-                                                </div>
-                                                <div className="h-2 bg-orange-100 rounded-full overflow-hidden">
-                                                    <div
-                                                        className="h-full bg-orange-500 transition-all"
-                                                        style={{ width: `${Math.min(100, ((mixSummary?.filled || 0) / Math.max(1, mixCapacity.total)) * 100)}%` }}
-                                                    />
-                                                </div>
+                                                {/* ── "Your Truck Builder" summary card ──
+                                                    Reshaped per operator's reference design:
+                                                    a builder header with capacity %, two KPI
+                                                    tiles (Filled / Remaining), the progress
+                                                    bar, then a Summary block (Subtotal × mix
+                                                    markup = Total). Same data — mixSummary,
+                                                    mixCapacity, markups.mix — just the
+                                                    Atlantis-coloured card treatment. */}
+                                                {(() => {
+                                                    const filled = mixSummary?.filled ?? 0;
+                                                    const cap = Math.max(1, mixCapacity.total);
+                                                    const pct = Math.min(100, Math.round((filled / cap) * 100));
+                                                    const remaining = Math.max(0, mixCapacity.total - filled);
+                                                    return (
+                                                        <div className="rounded-2xl border border-[#14B8A6]/20 bg-white p-4 space-y-3">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-11 h-11 rounded-xl bg-[#0B1F3A] text-white flex items-center justify-center text-[20px]">🚛</div>
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-[12px] font-black text-[#0B1F3A]">Your {tierData.activeLabel} Builder</p>
+                                                                    <p className="text-[12px] text-slate-500">
+                                                                        <span className="font-black text-[#14B8A6] tabular-nums">{filled}</span>
+                                                                        <span className="tabular-nums"> / {mixCapacity.total}</span> {mixCapacity.unit}s · {pct}% filled
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+                                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Filled</p>
+                                                                    <p className="text-[15px] font-black text-[#0B1F3A] tabular-nums mt-0.5">{filled} {mixCapacity.unit}s</p>
+                                                                </div>
+                                                                <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
+                                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Remaining</p>
+                                                                    <p className="text-[15px] font-black text-amber-600 tabular-nums mt-0.5">{remaining} {mixCapacity.unit}s</p>
+                                                                </div>
+                                                            </div>
+                                                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                                <div className="h-full bg-[#14B8A6] transition-all" style={{ width: `${pct}%` }} />
+                                                            </div>
+                                                            <div className="space-y-1.5 pt-1 text-[12px]">
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-slate-500">Subtotal ({filled} {mixCapacity.unit}s)</span>
+                                                                    <span className="font-mono font-bold text-slate-700">{formatPrice(mixSummary?.subtotal || 0)}</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between">
+                                                                    <span className="text-slate-500">Mixing markup (×{markups.mix.toFixed(3)})</span>
+                                                                    <span className="font-mono text-slate-500">{formatPrice((mixSummary?.totalWithMarkup || 0) - (mixSummary?.subtotal || 0))}</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
+                                                                    <span className="font-black text-[#0B1F3A]">Total</span>
+                                                                    <span className="font-black text-[#14B8A6] text-[15px]">{formatPrice(mixSummary?.totalWithMarkup || 0)}</span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
 
                                                 {/* Variant cards.
 
@@ -1219,30 +1255,46 @@ export default function ProductDetailClient() {
                                                         const unitPrice = mixCapacity.perVariantPrice === 'palletPrice' ? v.palletPrice : v.casePrice;
                                                         const remaining = (mixCapacity.total || 0) - (mixSummary?.filled || 0);
                                                         const canIncrement = remaining > 0;
+                                                        const isActive = qty > 0;
                                                         return (
-                                                            <div key={v.signature} className="bg-white rounded-xl border border-orange-100 p-3 flex items-center gap-3 min-h-[88px]">
-                                                                <div className="w-16 h-16 rounded-lg bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center">
-                                                                    {v.image ? (
-                                                                        // eslint-disable-next-line @next/next/no-img-element
-                                                                        <img src={v.image} alt={v.label} className="w-full h-full object-cover" />
-                                                                    ) : (
-                                                                        <Package size={20} className="text-slate-300" />
-                                                                    )}
+                                                            <div
+                                                                key={v.signature}
+                                                                className={cn(
+                                                                    'bg-white rounded-2xl border-2 p-3 flex flex-col gap-2 transition-all',
+                                                                    isActive
+                                                                        ? 'border-[#14B8A6] ring-2 ring-[#14B8A6]/15 shadow-sm'
+                                                                        : 'border-slate-100 hover:border-slate-200',
+                                                                )}
+                                                            >
+                                                                <div className="flex items-start gap-3">
+                                                                    <div className="w-14 h-14 rounded-xl bg-slate-100 overflow-hidden shrink-0 flex items-center justify-center relative">
+                                                                        {v.image ? (
+                                                                            // eslint-disable-next-line @next/next/no-img-element
+                                                                            <img src={v.image} alt={v.label} className="w-full h-full object-cover" />
+                                                                        ) : (
+                                                                            <Package size={20} className="text-slate-300" />
+                                                                        )}
+                                                                        {isActive && (
+                                                                            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#14B8A6] text-white flex items-center justify-center">
+                                                                                <Check size={10} />
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="flex-1 min-w-0">
+                                                                        <p className="text-[12px] font-black text-[#0B1F3A] leading-tight line-clamp-2 break-words">{v.label}</p>
+                                                                        <p className="text-[12px] text-[#14B8A6] font-bold mt-1">
+                                                                            {formatPrice(unitPrice)} <span className="text-slate-400 font-medium">/ {mixCapacity.unit}</span>
+                                                                        </p>
+                                                                    </div>
                                                                 </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <p className="text-[12px] font-black text-slate-900 leading-tight line-clamp-2 break-words">{v.label}</p>
-                                                                    <p className="text-[11px] text-slate-500 font-mono mt-1">
-                                                                        {formatPrice(unitPrice)} / {mixCapacity.unit}
-                                                                    </p>
-                                                                </div>
-                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                <div className="flex items-center justify-between gap-1">
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => setMixQuantities(q => ({ ...q, [v.signature]: Math.max(0, (q[v.signature] || 0) - 1) }))}
-                                                                        className="w-7 h-7 rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center disabled:opacity-30"
+                                                                        className="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center disabled:opacity-30"
                                                                         disabled={qty <= 0}
                                                                     >
-                                                                        <Minus size={12} />
+                                                                        <Minus size={13} />
                                                                     </button>
                                                                     <input
                                                                         type="number"
@@ -1251,24 +1303,26 @@ export default function ProductDetailClient() {
                                                                         value={qty}
                                                                         onChange={e => {
                                                                             const n = Math.max(0, Math.floor(Number(e.target.value) || 0));
-                                                                            // Clamp so this variant + all others ≤ capacity
                                                                             const others = Object.entries(mixQuantities)
                                                                                 .filter(([k]) => k !== v.signature)
                                                                                 .reduce((acc, [, qty]) => acc + Number(qty || 0), 0);
                                                                             const clamped = Math.min(n, Math.max(0, mixCapacity.total - others));
                                                                             setMixQuantities(q => ({ ...q, [v.signature]: clamped }));
                                                                         }}
-                                                                        className="w-12 h-7 text-center text-[12px] font-black tabular-nums border border-slate-200 rounded-md"
+                                                                        className="flex-1 mx-1 h-8 text-center text-[13px] font-black tabular-nums border border-slate-200 rounded-lg"
                                                                     />
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => setMixQuantities(q => ({ ...q, [v.signature]: (q[v.signature] || 0) + 1 }))}
                                                                         disabled={!canIncrement}
-                                                                        className="w-7 h-7 rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed"
+                                                                        className="w-8 h-8 rounded-lg bg-[#0B1F3A] text-white hover:bg-[#14B8A6] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                                                     >
-                                                                        <Plus size={12} />
+                                                                        <Plus size={13} />
                                                                     </button>
                                                                 </div>
+                                                                <p className="text-[10px] text-slate-400 text-center">
+                                                                    {qty} {mixCapacity.unit}{qty === 1 ? '' : 's'} · {formatPrice(unitPrice * qty)}
+                                                                </p>
                                                             </div>
                                                         );
                                                     })}
