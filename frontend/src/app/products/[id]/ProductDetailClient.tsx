@@ -1177,61 +1177,18 @@ export default function ProductDetailClient() {
 
                                         {isMixing && mixData && (
                                             <div className="mt-4 space-y-3">
-                                                {/* ── "Your Truck Builder" summary card ──
-                                                    Reshaped per operator's reference design:
-                                                    a builder header with capacity %, two KPI
-                                                    tiles (Filled / Remaining), the progress
-                                                    bar, then a Summary block (Subtotal × mix
-                                                    markup = Total). Same data — mixSummary,
-                                                    mixCapacity, markups.mix — just the
-                                                    Atlantis-coloured card treatment. */}
-                                                {(() => {
-                                                    const filled = mixSummary?.filled ?? 0;
-                                                    const cap = Math.max(1, mixCapacity.total);
-                                                    const pct = Math.min(100, Math.round((filled / cap) * 100));
-                                                    const remaining = Math.max(0, mixCapacity.total - filled);
-                                                    return (
-                                                        <div className="rounded-2xl border border-[#14B8A6]/20 bg-white p-4 space-y-3">
-                                                            <div className="flex items-center gap-3">
-                                                                <div className="w-11 h-11 rounded-xl bg-[#0B1F3A] text-white flex items-center justify-center text-[20px]">🚛</div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <p className="text-[12px] font-black text-[#0B1F3A]">Your {tierData.activeLabel} Builder</p>
-                                                                    <p className="text-[12px] text-slate-500">
-                                                                        <span className="font-black text-[#14B8A6] tabular-nums">{filled}</span>
-                                                                        <span className="tabular-nums"> / {mixCapacity.total}</span> {mixCapacity.unit}s · {pct}% filled
-                                                                    </p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
-                                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Filled</p>
-                                                                    <p className="text-[15px] font-black text-[#0B1F3A] tabular-nums mt-0.5">{filled} {mixCapacity.unit}s</p>
-                                                                </div>
-                                                                <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2">
-                                                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Remaining</p>
-                                                                    <p className="text-[15px] font-black text-amber-600 tabular-nums mt-0.5">{remaining} {mixCapacity.unit}s</p>
-                                                                </div>
-                                                            </div>
-                                                            <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                                                                <div className="h-full bg-[#14B8A6] transition-all" style={{ width: `${pct}%` }} />
-                                                            </div>
-                                                            <div className="space-y-1.5 pt-1 text-[12px]">
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="text-slate-500">Subtotal ({filled} {mixCapacity.unit}s)</span>
-                                                                    <span className="font-mono font-bold text-slate-700">{formatPrice(mixSummary?.subtotal || 0)}</span>
-                                                                </div>
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="text-slate-500">Mixing markup (×{markups.mix.toFixed(3)})</span>
-                                                                    <span className="font-mono text-slate-500">{formatPrice((mixSummary?.totalWithMarkup || 0) - (mixSummary?.subtotal || 0))}</span>
-                                                                </div>
-                                                                <div className="flex items-center justify-between pt-1.5 border-t border-slate-100">
-                                                                    <span className="font-black text-[#0B1F3A]">Total</span>
-                                                                    <span className="font-black text-[#14B8A6] text-[15px]">{formatPrice(mixSummary?.totalWithMarkup || 0)}</span>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })()}
+                                                {/* Mobile-only condensed progress (the full
+                                                    "Your Truck Builder" panel lives in the
+                                                    sticky right rail on desktop). */}
+                                                <div className="lg:hidden flex items-center justify-between gap-3 text-[12px]">
+                                                    <span className="font-black text-[#0B1F3A]">
+                                                        {mixSummary?.filled ?? 0} / {mixCapacity.total} {mixCapacity.unit}s
+                                                    </span>
+                                                    <span className="font-black text-[#14B8A6]">{formatPrice(mixSummary?.totalWithMarkup || 0)}</span>
+                                                </div>
+                                                <div className="lg:hidden h-2 bg-slate-100 rounded-full overflow-hidden">
+                                                    <div className="h-full bg-[#14B8A6] transition-all" style={{ width: `${Math.min(100, ((mixSummary?.filled || 0) / Math.max(1, mixCapacity.total)) * 100)}%` }} />
+                                                </div>
 
                                                 {/* Variant cards.
 
@@ -1412,6 +1369,106 @@ export default function ProductDetailClient() {
 
                     {/* RIGHT: Stacked Cards */}
                     <div className="lg:col-span-3 space-y-4">
+                        {/* ── "Your Truck Builder" sticky rail ──────────────
+                            Appears only while the buyer is mixing a tier.
+                            Mirrors the operator's reference layout (capacity
+                            tiles + Summary + Checkout) in Atlantis colours.
+                            All numbers come straight from mixSummary /
+                            mixCapacity — no logic duplicated, presentation
+                            only. The Checkout button shares the SAME enable
+                            rule as the main Add-to-Cart (tier must be full).*/}
+                        {isMixing && mixData && mixSummary && (() => {
+                            const filled = mixSummary.filled;
+                            const cap = Math.max(1, mixCapacity.total);
+                            const pct = Math.min(100, Math.round((filled / cap) * 100));
+                            const remaining = Math.max(0, mixCapacity.total - filled);
+                            const isFull = filled === mixCapacity.total && filled > 0;
+                            const markupDelta = (mixSummary.totalWithMarkup || 0) - (mixSummary.subtotal || 0);
+                            return (
+                                <div className="bg-white border border-[#E5E7EB] rounded-[24px] p-6 shadow-sm lg:sticky lg:top-24 space-y-4">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-[15px] font-black text-[#0B1F3A] flex-1">Your {tierData.activeLabel} Builder</h3>
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-[#14B8A6] bg-[#14B8A6]/10 px-2 py-1 rounded-md">{pct}% filled</span>
+                                    </div>
+                                    <div className="rounded-2xl bg-slate-50 border border-slate-100 h-24 flex items-center justify-center text-[44px]">🚛</div>
+                                    <p className="text-center text-[12px] text-slate-500">
+                                        <span className="font-black text-[#0B1F3A] tabular-nums">{filled}</span> / <span className="tabular-nums">{mixCapacity.total}</span> {mixCapacity.unit}s
+                                    </p>
+                                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-[#14B8A6] transition-all" style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Filled</p>
+                                            <p className="text-[15px] font-black text-[#0B1F3A] tabular-nums mt-0.5">{filled} {mixCapacity.unit}s</p>
+                                        </div>
+                                        <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
+                                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Remaining</p>
+                                            <p className="text-[15px] font-black text-amber-600 tabular-nums mt-0.5">{remaining} {mixCapacity.unit}s</p>
+                                        </div>
+                                    </div>
+                                    <div className="pt-2 border-t border-slate-100 space-y-1.5 text-[12px]">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">Summary</p>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-500">Subtotal ({filled} {mixCapacity.unit}s)</span>
+                                            <span className="font-mono font-bold text-slate-700">{formatPrice(mixSummary.subtotal || 0)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-500">Mixing markup (×{markups.mix.toFixed(3)})</span>
+                                            <span className="font-mono text-slate-500">{formatPrice(markupDelta)}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-500">Delivery fee</span>
+                                            <span className="font-mono text-slate-400">Calculated at checkout</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-slate-500">VAT</span>
+                                            <span className="font-mono text-slate-400">0%</span>
+                                        </div>
+                                        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                            <span className="font-black text-[#0B1F3A] text-[14px]">Total</span>
+                                            <span className="font-black text-[#14B8A6] text-[18px]">{formatPrice(mixSummary.totalWithMarkup || 0)}</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2 pt-1">
+                                        <button
+                                            type="button"
+                                            onClick={() => { if (isFull) { handleAdd(); router.push('/cart'); } }}
+                                            disabled={!isFull}
+                                            className="w-full h-12 rounded-xl bg-[#0B1F3A] hover:bg-[#14B8A6] text-white font-black uppercase text-[12px] tracking-widest transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#0B1F3A]"
+                                        >
+                                            <ShoppingCart size={16} /> Checkout {tierData.activeLabel}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { if (isFull) handleAdd(); }}
+                                            disabled={!isFull}
+                                            className="w-full h-11 rounded-xl bg-white border-2 border-slate-200 hover:border-[#14B8A6] text-slate-700 font-black uppercase text-[11px] tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        >
+                                            Save Mix for Later
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => router.push('/categories')}
+                                            className="w-full h-11 rounded-xl bg-[#14B8A6]/10 hover:bg-[#14B8A6]/20 text-[#0B7C70] font-black uppercase text-[11px] tracking-widest transition-colors flex items-center justify-center gap-1.5"
+                                        >
+                                            <Plus size={14} /> Add Another Supplier
+                                        </button>
+                                    </div>
+                                    {!isFull && (
+                                        <p className="text-[11px] text-amber-700 font-bold text-center">
+                                            ⚠ Add {remaining} more {mixCapacity.unit}{remaining === 1 ? '' : 's'} to fill the {tierData.activeLabel.toLowerCase()}.
+                                        </p>
+                                    )}
+                                    {isFull && (
+                                        <div className="flex items-center justify-center gap-2 text-emerald-600 bg-emerald-50 rounded-xl py-2">
+                                            <CheckCircle2 size={14} />
+                                            <span className="text-[11px] font-black uppercase tracking-widest">You're saving by mixing products</span>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
                         <div className="bg-white border border-[#E5E7EB] rounded-[24px] p-8 shadow-sm">
                             <h3 className="text-[15px] font-bold text-[#111827] flex items-center gap-2 mb-6">
                                 <ShieldCheck size={20} className="text-[#14B8A6]" />
