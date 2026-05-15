@@ -22,7 +22,7 @@ import ReviewSection from '@/components/product/ReviewSection';
 // out so a future re-enable doesn't have to re-locate the path.
 // import PricingAssistant from '@/components/product/PricingAssistant';
 import { Button } from '@/components/ui/Button';
-import { cn } from '@/lib/utils';
+import { cn, prettifyVariantSignature } from '@/lib/utils';
 import { useWishlist } from '@/hooks/useWishlist';
 import { getDisplayCategory } from '@/lib/product-utils';
 import ImageLightbox from '@/components/ImageLightbox';
@@ -232,6 +232,8 @@ export default function ProductDetailClient() {
         const prices: Record<string, number> = (p.variantPrices as Record<string, number>) || {};
         const meta: Record<string, {
             image?: string;
+            images?: string[];
+            useParentImages?: boolean;
             label?: string;
             unitsPerCase?: number;
             casesPerPallet?: number;
@@ -254,10 +256,25 @@ export default function ProductDetailClient() {
             // Derived prices using THIS variant's pack-size if defined.
             const palletPrice = casePrice * cpp;
             const truckPrice = casePrice * cpp * ppt;
+            // Variant image priority:
+            //  1. variant's own uploaded image(s) (unless the supplier
+            //     explicitly ticked "use parent images")
+            //  2. legacy single m.image
+            //  3. parent product image (fallback)
+            // Operator bug: a blue-edition card was showing the plain
+            // Red Bull because we only looked at legacy m.image and
+            // never the new m.images[] array.
+            const variantImg =
+                !m.useParentImages && Array.isArray(m.images) && m.images.length > 0
+                    ? m.images[0]
+                    : m.image || (p.images?.[0] || '');
             return {
                 signature: sig,
-                label: m.label || sig,
-                image: m.image || (p.images?.[0] || ''),
+                // Human-readable label — strip Name= / __ noise so the
+                // card shows "Red Edition — Watermelon" not
+                // "Flavour=Red Edition …".
+                label: m.label || prettifyVariantSignature(sig) || sig,
+                image: variantImg,
                 casePrice,
                 palletPrice,
                 truckPrice,
@@ -644,7 +661,11 @@ export default function ProductDetailClient() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-12">
                     
                     {/* LEFT: Product Media */}
-                    <div className="lg:col-span-4">
+                    {/* Image column collapses while mixing so the
+                        variant table can use the freed-up left space
+                        (operator: "use the empty area, widen the table").
+                        On mobile it always shows. */}
+                    <div className={cn('lg:col-span-4', isMixing && 'hidden lg:hidden')}>
                         <div
                             onClick={() => {
                                 const i = allImages.findIndex(u => u === selectedImage);
@@ -727,7 +748,7 @@ export default function ProductDetailClient() {
                     </div>
 
                     {/* MIDDLE: Product Information */}
-                    <div className="lg:col-span-5 flex flex-col">
+                    <div className={cn('flex flex-col', isMixing ? 'lg:col-span-9' : 'lg:col-span-5')}>
                         <div className="flex flex-col gap-6">
                             {/* ── "Your listing" banner ────────────────────
                                 Only renders when the visitor is the supplier
@@ -1202,9 +1223,11 @@ export default function ProductDetailClient() {
                                                 <div
                                                     className={cn(
                                                         'grid gap-3',
-                                                        mixData.variants.length <= 6
-                                                            ? 'grid-cols-1 sm:grid-cols-2'
-                                                            : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3',
+                                                        mixData.variants.length <= 4
+                                                            ? 'grid-cols-2'
+                                                            : mixData.variants.length <= 9
+                                                                ? 'grid-cols-2 sm:grid-cols-3'
+                                                                : 'grid-cols-2 sm:grid-cols-3 2xl:grid-cols-4',
                                                     )}
                                                 >
                                                     {mixData.variants.map(v => {
@@ -1390,7 +1413,38 @@ export default function ProductDetailClient() {
                                         <h3 className="text-[15px] font-black text-[#0B1F3A] flex-1">Your {tierData.activeLabel} Builder</h3>
                                         <span className="text-[10px] font-black uppercase tracking-widest text-[#14B8A6] bg-[#14B8A6]/10 px-2 py-1 rounded-md">{pct}% filled</span>
                                     </div>
-                                    <div className="rounded-2xl bg-slate-50 border border-slate-100 h-24 flex items-center justify-center text-[44px]">🚛</div>
+                                    {/* Truck that visually fills as pallets are
+                                        added — the cargo box fills teal from the
+                                        bottom up proportional to % filled so the
+                                        buyer feels the truck loading. */}
+                                    <div className="rounded-2xl bg-slate-50 border border-slate-100 h-28 flex items-center justify-center px-4">
+                                        <svg viewBox="0 0 120 64" className="w-full h-20" aria-label={`${pct}% loaded`}>
+                                            {/* cargo box outline */}
+                                            <rect x="4" y="10" width="74" height="36" rx="3" fill="#fff" stroke="#0B1F3A" strokeWidth="2.5" />
+                                            {/* fill (clipped to cargo box) */}
+                                            <clipPath id="cargoClip">
+                                                <rect x="6" y="12" width="70" height="32" rx="2" />
+                                            </clipPath>
+                                            <g clipPath="url(#cargoClip)">
+                                                <rect
+                                                    x="6"
+                                                    y={12 + 32 * (1 - pct / 100)}
+                                                    width="70"
+                                                    height={32 * (pct / 100)}
+                                                    fill="#14B8A6"
+                                                    className="transition-all duration-500"
+                                                />
+                                            </g>
+                                            {/* cab */}
+                                            <path d="M80 20 h16 l10 12 v14 h-26 z" fill="#0B1F3A" />
+                                            <rect x="84" y="24" width="12" height="9" rx="1.5" fill="#9FB4C7" />
+                                            {/* wheels */}
+                                            <circle cx="26" cy="50" r="7" fill="#0B1F3A" />
+                                            <circle cx="26" cy="50" r="3" fill="#9FB4C7" />
+                                            <circle cx="92" cy="50" r="7" fill="#0B1F3A" />
+                                            <circle cx="92" cy="50" r="3" fill="#9FB4C7" />
+                                        </svg>
+                                    </div>
                                     <p className="text-center text-[12px] text-slate-500">
                                         <span className="font-black text-[#0B1F3A] tabular-nums">{filled}</span> / <span className="tabular-nums">{mixCapacity.total}</span> {mixCapacity.unit}s
                                     </p>
