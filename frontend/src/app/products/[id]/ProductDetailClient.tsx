@@ -661,11 +661,10 @@ export default function ProductDetailClient() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-12">
                     
                     {/* LEFT: Product Media */}
-                    {/* Image column collapses while mixing so the
-                        variant table can use the freed-up left space
-                        (operator: "use the empty area, widen the table").
-                        On mobile it always shows. */}
-                    <div className={cn('lg:col-span-4', isMixing && 'hidden lg:hidden')}>
+                    {/* Product image stays visible at all times — operator
+                        explicitly wants the hero image to remain while
+                        mixing (do NOT collapse this column). */}
+                    <div className="lg:col-span-4">
                         <div
                             onClick={() => {
                                 const i = allImages.findIndex(u => u === selectedImage);
@@ -748,7 +747,7 @@ export default function ProductDetailClient() {
                     </div>
 
                     {/* MIDDLE: Product Information */}
-                    <div className={cn('flex flex-col', isMixing ? 'lg:col-span-9' : 'lg:col-span-5')}>
+                    <div className="lg:col-span-5 flex flex-col">
                         <div className="flex flex-col gap-6">
                             {/* ── "Your listing" banner ────────────────────
                                 Only renders when the visitor is the supplier
