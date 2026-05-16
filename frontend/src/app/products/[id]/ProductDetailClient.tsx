@@ -661,10 +661,13 @@ export default function ProductDetailClient() {
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-12">
                     
                     {/* LEFT: Product Media */}
-                    {/* Product image stays visible at all times — operator
-                        explicitly wants the hero image to remain while
-                        mixing (do NOT collapse this column). */}
-                    <div className="lg:col-span-4">
+                    {/* While mixing: this full media column collapses on
+                        desktop; a compact hero image is re-rendered at the
+                        top of the (now-wide) middle column so the image
+                        stays ABOVE the table and the table spans the full
+                        left+middle width. On mobile the column always
+                        shows. */}
+                    <div className={cn('lg:col-span-4', isMixing && 'lg:hidden')}>
                         <div
                             onClick={() => {
                                 const i = allImages.findIndex(u => u === selectedImage);
@@ -747,7 +750,25 @@ export default function ProductDetailClient() {
                     </div>
 
                     {/* MIDDLE: Product Information */}
-                    <div className="lg:col-span-5 flex flex-col">
+                    <div className={cn('flex flex-col', isMixing ? 'lg:col-span-9' : 'lg:col-span-5')}>
+                        {/* Compact hero image — only on desktop while mixing,
+                            since the full media column is hidden then. Keeps
+                            the product picture pinned at the top with the
+                            wide variant table flowing right below it. */}
+                        {isMixing && (
+                            <div className="hidden lg:block mb-6">
+                                <div className="w-full max-w-[420px] aspect-square rounded-[24px] overflow-hidden bg-white border border-[#E5E7EB] shadow-sm">
+                                    {selectedImage ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img src={selectedImage} alt={product.name} className="w-full h-full object-contain" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <Package size={48} className="text-slate-200" />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         <div className="flex flex-col gap-6">
                             {/* ── "Your listing" banner ────────────────────
                                 Only renders when the visitor is the supplier
