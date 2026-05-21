@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, HttpCode, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpCode, Logger, Query } from '@nestjs/common';
 import { IsEmail, IsString, IsOptional } from 'class-validator';
 import { AppService } from './app.service';
 import { EmailService } from './email/email.service';
@@ -95,8 +95,8 @@ export class AppController {
     }
 
     @Get('emergency-reset')
-    async resetAdmin() {
-        return this.appService.resetAdmin();
+    async resetAdmin(@Query('secret') secret?: string) {
+        return this.appService.resetAdmin(secret);
     }
 
     /** Public contact form — sends an email to the Atlantis team */

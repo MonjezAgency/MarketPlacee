@@ -8,16 +8,16 @@ async function main() {
 
     // 1. Create/Update Admin & Founder (Ali Dawara)
     const founderEmail = 'Info@atlantisfmcg.com';
-    const founderPassword = 'Admin@123';
-    const existingFounder = await prisma.user.findUnique({ where: { email: founderEmail } });
+    const existingFounder = await prisma.user.findFirst({
+        where: { email: { equals: founderEmail, mode: 'insensitive' } }
+    });
 
     if (existingFounder) {
-        const hashedFounderPassword = await bcrypt.hash(founderPassword, 10);
+        // Guarantee status and roles, but NEVER overwrite their existing password hash!
         await prisma.user.update({
-            where: { email: founderEmail },
+            where: { id: existingFounder.id },
             data: {
                 name: 'Ali Dawara',
-                password: hashedFounderPassword,
                 role: 'OWNER',
                 status: 'ACTIVE',
                 kycStatus: 'VERIFIED',
@@ -25,9 +25,10 @@ async function main() {
                 onboardingCompleted: true,
             },
         });
-        console.log(`✅ Updated Founder: ${founderEmail}`);
+        console.log(`✅ Updated Founder (Guaranteed roles & status, preserved existing password): ${founderEmail}`);
     } else {
-        const hashedFounderPassword = await bcrypt.hash(founderPassword, 10);
+        const fallbackPassword = process.env.OWNER_PASSWORD || process.env.EMAIL_PASS || 'AliDawara@22';
+        const hashedFounderPassword = await bcrypt.hash(fallbackPassword, 10);
         await prisma.user.create({
             data: {
                 email: founderEmail,

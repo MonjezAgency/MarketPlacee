@@ -3,8 +3,8 @@ const bcrypt = require('bcrypt');
 const prisma = new PrismaClient();
 
 async function main() {
-    const email = 'info@atlantisfmcg.com';
-    const password = 'AliDawara@22';
+    const email = (process.env.EMAIL_USER || 'info@atlantisfmcg.com').trim();
+    const password = process.env.OWNER_PASSWORD || process.env.EMAIL_PASS || 'AliDawara@22';
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const user = await prisma.user.upsert({
@@ -16,7 +16,7 @@ async function main() {
             emailVerified: true
         },
         create: {
-            name: 'Atlantis Founder',
+            name: 'Ali Dawara',
             email,
             password: hashedPassword,
             role: 'OWNER',

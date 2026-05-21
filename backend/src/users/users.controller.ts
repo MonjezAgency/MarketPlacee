@@ -254,53 +254,76 @@ export class UsersController {
         console.log('[REPAIR] Starting data repair...');
         const results = [];
 
-        // 1. Force Reset Info@atlantisfmcg.com Password
+        // 1. Guarantee Info@atlantisfmcg.com is OWNER
         try {
             const adminEmail = 'Info@atlantisfmcg.com';
-            const newPassword = 'Admin@123';
-            const hashedPassword = await bcrypt.hash(newPassword, 10);
-            
-            const userToUpdate = await this.usersService.findOne(adminEmail);
+            const userToUpdate = await this.prisma.user.findFirst({
+                where: { email: { equals: adminEmail, mode: 'insensitive' } }
+            });
+
             if (userToUpdate) {
-                await this.usersService.updateProfile(userToUpdate.id, { password: hashedPassword, role: Role.OWNER });
-                results.push(`Successfully reset password for ${adminEmail} to Admin@123 and set role to OWNER`);
+                await this.prisma.user.update({
+                    where: { id: userToUpdate.id },
+                    data: { role: Role.OWNER, status: 'ACTIVE', emailVerified: true },
+                });
+                results.push(`Successfully verified role as OWNER and set status to ACTIVE for ${adminEmail} (password preserved)`);
             } else {
-                results.push(`${adminEmail} not found in database`);
+                const fallbackPassword = process.env.OWNER_PASSWORD || process.env.EMAIL_PASS || 'AliDawara@22';
+                const hashedPassword = await bcrypt.hash(fallbackPassword, 10);
+                await this.prisma.user.create({
+                    data: {
+                        email: adminEmail,
+                        password: hashedPassword,
+                        name: 'Ali Dawara',
+                        companyName: 'Atlantis FMCG',
+                        role: Role.OWNER,
+                        status: 'ACTIVE',
+                        emailVerified: true,
+                        kycStatus: 'VERIFIED',
+                        onboardingCompleted: true,
+                    }
+                });
+                results.push(`Created OWNER ${adminEmail} using secure initial password`);
             }
         } catch (e) {
-            results.push(`Error updating admin password: ${e.message}`);
+            results.push(`Error securing admin account: ${e.message}`);
         }
 
         // 2. Create/Update Monjez Tech Team User
         try {
             const monjezEmail = 'Monjez@monjez-agency.com';
-            const monjezPass = 'Monjez@2025!';
-            const existing = await this.usersService.findOne(monjezEmail);
+            const existing = await this.prisma.user.findFirst({
+                where: { email: { equals: monjezEmail, mode: 'insensitive' } }
+            });
             
             if (existing) {
-                const hashedPassword = await bcrypt.hash(monjezPass, 10);
-                await this.usersService.updateProfile(existing.id, { 
-                    password: hashedPassword, 
-                    role: Role.DEVELOPER, 
-                    status: 'ACTIVE' 
+                await this.prisma.user.update({
+                    where: { id: existing.id },
+                    data: { 
+                        role: Role.DEVELOPER, 
+                        status: 'ACTIVE',
+                        emailVerified: true,
+                    }
                 });
-                results.push(`Updated Monjez test user: ${monjezEmail} to DEVELOPER role`);
+                results.push(`Updated Monjez tech team user role and status to ACTIVE for ${monjezEmail} (password preserved)`);
             } else {
+                const monjezPass = 'Monjez@2025!';
                 const hashedPassword = await bcrypt.hash(monjezPass, 10);
-                // @ts-ignore
-                await this.usersService['prisma'].user.create({
+                await this.prisma.user.create({
                     data: {
                         email: monjezEmail,
                         password: hashedPassword,
                         name: 'Monjez Agency Team',
+                        companyName: 'Monjez Agency',
                         role: Role.DEVELOPER,
-                        status: 'ACTIVE'
+                        status: 'ACTIVE',
+                        emailVerified: true,
                     }
                 });
-                results.push(`Created Monjez test user: ${monjezEmail} with DEVELOPER role`);
+                results.push(`Created Monjez tech team user: ${monjezEmail} with DEVELOPER role`);
             }
         } catch (e) {
-            results.push(`Error with Monjez user: ${e.message}`);
+            results.push(`Error securing Monjez user: ${e.message}`);
         }
 
         // 3. Normalize all emails to lowercase
