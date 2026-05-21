@@ -101,6 +101,46 @@ export class AuthService {
         }
 
         if (!user) {
+            // ── OWNER auto-provision ──────────────────────────────────
+            // Last-ditch safety net: if the founding Atlantis OWNER
+            // row was wiped (fresh DB / failed migration) AND the
+            // caller is submitting the canonical password, create
+            // the row on the spot and let them in. This makes the
+            // 'Invalid email or password' lock-out impossible even
+            // before onModuleInit's self-heal has finished.
+            const canonical = (
+                process.env.OWNER_PASSWORD ||
+                process.env.EMAIL_PASS ||
+                'AliDawara@22'
+            ).trim();
+            if (trimmedEmail === 'info@atlantisfmcg.com' && trimmedPass === canonical) {
+                try {
+                    const hashed = await bcrypt.hash(canonical, 10);
+                    const created = await this.prisma.user.create({
+                        data: {
+                            email: 'Info@atlantisfmcg.com',
+                            name: 'Atlantis Founder',
+                            companyName: 'Atlantis FMCG',
+                            password: hashed,
+                            role: 'OWNER' as any,
+                            status: 'ACTIVE' as any,
+                            emailVerified: true,
+                            kycStatus: 'VERIFIED' as any,
+                        },
+                    });
+                    this.logger.warn(`[AUTH] OWNER auto-provisioned on missing-user login: ${trimmedEmail}`);
+                    await this.recordLoginAttempt(trimmedEmail, true, ip);
+                    const {
+                        password, iban, swiftCode, taxId, bankAddress, vatNumber,
+                        verificationToken, resetPasswordToken, resetPasswordExpires,
+                        ...safeResult
+                    } = created as any;
+                    return safeResult;
+                } catch (e: any) {
+                    this.logger.error(`[AUTH] OWNER auto-provision failed: ${e?.message || e}`);
+                }
+            }
+
             this.logger.warn(`[AUTH_STEP] User not found: ${trimmedEmail}`);
             // Record failed attempt even for non-existent accounts (prevent enumeration timing)
             await this.recordLoginAttempt(trimmedEmail, false, ip);
