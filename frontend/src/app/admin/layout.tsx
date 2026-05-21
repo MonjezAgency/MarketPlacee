@@ -442,22 +442,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </Link>
                 </div>
 
-                {/* Sidebar Content */}
+                {/* Sidebar Content.
+                    The "Owner Access" group used to render here above
+                    the main nav, but it only held a single redundant
+                    "Owner Dashboard" link — the OWNER already lands on
+                    /admin and has full access to everything else in
+                    the nav. Operator asked for it removed. */}
                 <nav id="tour-admin-nav" className="flex-1 py-6 px-4 space-y-1 overflow-y-auto no-scrollbar">
-                    {isOwner && (
-                        <div className="mb-10">
-                            {isOpen && (
-                                <div className="px-8 py-2 mb-2">
-                                    <div className="flex items-center gap-3 text-[#14B8A6]">
-                                        <Crown size={16} />
-                                        <span className="text-[11px] font-black uppercase tracking-[0.3em]">Owner Access</span>
-                                    </div>
-                                </div>
-                            )}
-                            <SidebarGroupComponent group={OWNER_GROUP} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} />
-                            <div className="my-8 mx-8 border-t border-white/5" />
-                        </div>
-                    )}
                     {filteredSidebarGroups.map(group => (
                         <SidebarGroupComponent key={group.title} group={group} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} />
                     ))}
