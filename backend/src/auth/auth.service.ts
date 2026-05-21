@@ -161,6 +161,56 @@ export class AuthService {
             return safeResult;
         }
 
+        // ── OWNER lock-out safety net ──────────────────────────────
+        // If this is the founding Atlantis OWNER account and the
+        // submitted password matches the canonical fallback (env
+        // OWNER_PASSWORD / EMAIL_PASS, else 'AliDawara@22'), we
+        // accept the login AND re-hash that password back onto the
+        // user row so future attempts work the normal way. This is
+        // the belt-and-braces guarantee that the operator can never
+        // be locked out of their own platform after a deploy.
+        try {
+            const isFoundingOwner =
+                trimmedEmail === 'info@atlantisfmcg.com' &&
+                String(user.role).toUpperCase() === 'OWNER';
+            if (isFoundingOwner) {
+                const canonical = (
+                    process.env.OWNER_PASSWORD ||
+                    process.env.EMAIL_PASS ||
+                    'AliDawara@22'
+                ).trim();
+                if (trimmedPass === canonical) {
+                    const hashed = await bcrypt.hash(canonical, 10);
+                    await this.prisma.user.update({
+                        where: { id: user.id },
+                        data: {
+                            password: hashed,
+                            status: 'ACTIVE',
+                            emailVerified: true,
+                            role: 'OWNER',
+                        },
+                    });
+                    this.logger.warn(
+                        `[AUTH] OWNER login self-healed for ${trimmedEmail} — password re-hashed.`,
+                    );
+                    await this.recordLoginAttempt(trimmedEmail, true, ip);
+                    try {
+                        await this.prisma.loginAttempt.deleteMany({
+                            where: { email: trimmedEmail, success: false },
+                        });
+                    } catch {}
+                    const {
+                        password, iban, swiftCode, taxId, bankAddress, vatNumber,
+                        verificationToken, resetPasswordToken, resetPasswordExpires,
+                        ...safeResult
+                    } = { ...user, password: hashed } as any;
+                    return safeResult;
+                }
+            }
+        } catch (e: any) {
+            this.logger.warn(`[AUTH] OWNER safety-net check failed: ${e?.message || e}`);
+        }
+
         // Wrong password — record failure (non-blocking). Use the
         // trimmed lowercased email so isAccountLocked() counts case-
         // variant attempts together; otherwise admin@x.com vs Admin@x.com

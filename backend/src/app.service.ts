@@ -24,8 +24,15 @@ export class AppService implements OnModuleInit {
      */
     async onModuleInit() {
         try {
-            await this.resetAdmin();
-            this.logger.log('OWNER credentials self-healed on boot');
+            // Pass the seed secret so the boot path is treated as an
+            // authorized reset — the OWNER password is force-set back
+            // to the canonical value (env OWNER_PASSWORD / EMAIL_PASS,
+            // else the documented fallback) on every cold start. This
+            // is what guarantees the 'Invalid email or password' lock
+            // never reappears after a Railway redeploy.
+            const secret = process.env.SEED_ADMIN_SECRET || 'atlantis_seed_2025_secure';
+            const result = await this.resetAdmin(secret);
+            this.logger.log(`OWNER credentials self-healed on boot — ${result?.message || 'ok'}`);
         } catch (err: any) {
             this.logger.warn(`OWNER self-heal skipped: ${err?.message || err}`);
         }
