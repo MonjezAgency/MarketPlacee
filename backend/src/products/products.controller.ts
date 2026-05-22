@@ -656,19 +656,32 @@ export class ProductsController {
 
     @Delete(':id')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.ADMIN)
-    async remove(@Param('id') id: string) {
+    // OWNER + MODERATOR were missing before, which is why the operator
+    // couldn't delete a supplier's product. Widened to cover every
+    // platform-staff role that needs the action.
+    @Roles(Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.SUPPLIER)
+    async remove(@Param('id') id: string, @Request() req) {
+        // Suppliers can only delete their own product; staff can delete any.
+        const role = String(req.user.role || '').toUpperCase();
+        const isStaff = ['ADMIN', 'OWNER', 'MODERATOR'].includes(role);
+        if (!isStaff) {
+            const owned = await this.productsService.findOne(id);
+            if (!owned || owned.supplierId !== req.user.sub) {
+                return { message: 'Forbidden' };
+            }
+        }
         await this.productsService.deleteProduct(id);
         return { message: 'Product deleted' };
     }
 
     @Post('bulk-delete')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.ADMIN, Role.SUPPLIER)
+    @Roles(Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.SUPPLIER)
     async removeBulk(@Body() body: { ids: string[] }, @Request() req) {
         if (!body.ids || !body.ids.length) return { message: 'No IDs provided' };
-        const isAdmin = req.user.role === Role.ADMIN;
-        const supplierId = isAdmin ? undefined : req.user.sub;
+        const role = String(req.user.role || '').toUpperCase();
+        const isStaff = ['ADMIN', 'OWNER', 'MODERATOR'].includes(role);
+        const supplierId = isStaff ? undefined : req.user.sub;
         await this.productsService.deleteProducts(body.ids, supplierId);
         return { message: 'Products deleted', count: body.ids.length };
     }

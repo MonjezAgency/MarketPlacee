@@ -690,11 +690,17 @@ export class ProductsService {
             });
         }
         // Clean dependent rows that DON'T have cascade set in the schema.
+        // Operator bug: deletion failed when an Offer referenced the
+        // product — Offer.productId has no onDelete rule so the FK
+        // restrict-by-default blocked the delete. We now wipe offers
+        // (and any other non-cascading dependants) in the same tx so
+        // the admin can delete regardless of state.
         await this.prisma.$transaction([
             this.prisma.productPlacement.deleteMany({ where: { productId: id } }),
             this.prisma.tieredPrice.deleteMany({ where: { productId: id } }),
             this.prisma.review.deleteMany({ where: { productId: id } }),
             this.prisma.wishlistItem.deleteMany({ where: { productId: id } }),
+            this.prisma.offer.deleteMany({ where: { productId: id } }),
         ]);
         return this.prisma.product.delete({ where: { id } });
     }
@@ -723,6 +729,10 @@ export class ProductsService {
             this.prisma.tieredPrice.deleteMany({ where: { productId: { in: idsToDelete } } }),
             this.prisma.review.deleteMany({ where: { productId: { in: idsToDelete } } }),
             this.prisma.wishlistItem.deleteMany({ where: { productId: { in: idsToDelete } } }),
+            // Same Offer-FK fix as deleteProduct() — wipe linked offers
+            // so the restrict-by-default constraint doesn't block bulk
+            // deletes when any product in the set has an offer.
+            this.prisma.offer.deleteMany({ where: { productId: { in: idsToDelete } } }),
             this.prisma.product.deleteMany({
                 where: {
                     id: { in: idsToDelete },

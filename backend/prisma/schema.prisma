@@ -794,7 +794,7 @@ model Offer {
   supplierId   String
   supplier     User     @relation(fields: [supplierId], references: [id])
   productId    String
-  product      Product  @relation(fields: [productId], references: [id])
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   pricePerUnit Float    // price in EUR for ONE unit at the chosen tier
   unit         String   // 'truck' | 'pallet' | 'carton'
