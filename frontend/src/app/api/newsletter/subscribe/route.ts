@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 const getBackendUrl = () =>
-    (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app')
+    (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '')
         .trim()
         .replace(/\/+$/, '');
 

@@ -15,7 +15,7 @@ interface Props {
     productName: string;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 export default function PricingAssistant({ productId, productName }: Props) {
     const [open, setOpen] = useState(false);

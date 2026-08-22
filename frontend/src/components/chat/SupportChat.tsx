@@ -120,7 +120,7 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
             // Railway URL fallback.
             let socketBase = process.env.NEXT_PUBLIC_API_URL || '';
             if (!socketBase || socketBase.startsWith('/')) {
-                socketBase = 'https://marketplace-backend-production-539c.up.railway.app';
+                socketBase = '';
             }
             socket = io(`${socketBase}/chat`, {
                 auth: { token },

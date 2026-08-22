@@ -369,7 +369,7 @@ export default function ProductDetailClient() {
 
     // Fetch admin-configured default display unit + tier markups once on mount
     useEffect(() => {
-        const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+        const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
         Promise.all([
             fetch(`${apiBase}/config/default-unit`).then(r => r.json()).catch(() => ({})),
             fetch(`${apiBase}/config/markup`).then(r => r.json()).catch(() => ({})),

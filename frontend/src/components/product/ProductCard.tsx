@@ -11,7 +11,7 @@ let _defaultUnitPromise: Promise<'truck' | 'pallet' | 'carton'> | null = null;
 function getAdminDefaultUnit(): Promise<'truck' | 'pallet' | 'carton'> {
     if (_defaultUnit) return Promise.resolve(_defaultUnit);
     if (!_defaultUnitPromise) {
-        const base = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+        const base = process.env.NEXT_PUBLIC_API_URL || '/api';
         _defaultUnitPromise = fetch(`${base}/config/default-unit`)
             .then(r => r.json())
             .then(d => {
@@ -30,7 +30,7 @@ let _markupsPromise: Promise<{ piece: number; pallet: number; container: number 
 function getAdminMarkups(): Promise<{ piece: number; pallet: number; container: number }> {
     if (_markups) return Promise.resolve(_markups);
     if (!_markupsPromise) {
-        const base = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+        const base = process.env.NEXT_PUBLIC_API_URL || '/api';
         _markupsPromise = fetch(`${base}/config/markup`)
             .then(r => r.json())
             .then(d => {
