@@ -245,6 +245,7 @@ export class ExcelService {
             'المنتج': 'name', 'اسمباحث': 'name',
             // ── description ───────────────────────────────────────────────────
             'description': 'description', 'desc': 'description', 'details': 'description',
+            'productdescription': 'description', 'productdetails': 'description', 'itemdescription': 'description',
             'info': 'description', 'note': 'description', 'notes': 'description',
             'الوصف': 'description', 'التفاصيل': 'description', 'وصف': 'description', 'ملاحظات': 'description',
             // ── price ─────────────────────────────────────────────────────────
@@ -378,6 +379,8 @@ export class ExcelService {
             // PIECE / CASE / PALLET / TRUCK (case-insensitive on input).
             'moqunit': 'moqUnit', 'minorderunit': 'moqUnit',
             'orderunit': 'moqUnit', 'unitofmoq': 'moqUnit',
+            'ordertype': 'moqUnit', 'sellby': 'moqUnit', 'sellingby': 'moqUnit',
+            'shipmenttype': 'moqUnit', 'loadtype': 'moqUnit', 'fulfillmentmode': 'moqUnit',
             // ── brand ─────────────────────────────────────────────────────────
             // NOTE: do NOT map "Brand Status" here. That's a verification
             // flag ("Verified by Atlantis" / "Unverified"), not the brand
@@ -397,6 +400,7 @@ export class ExcelService {
             // and the partial-match cutoff was raised to 6 chars below so
             // 4-char aliases like "unit" can only match exactly.
             'unit': 'unit', 'unittype': 'unit', 'producttype': 'unit',
+            'sellingunit': 'unit', 'salesunit': 'unit', 'packagingunit': 'unit', 'fulfillmentunit': 'unit',
             'measure': 'unit', 'packaging': 'unit', 'packtype': 'unit',
             'الوحدة': 'unit', 'التعبئة': 'unit', 'نوعالوحدة': 'unit',
             // ── shelfLife / expiry ────────────────────────────────────────────

@@ -293,6 +293,7 @@ export class ProductsService {
                 shelfLife: dto.shelfLife || null,
                 weight: dto.weight || null,         // stored as String? in schema
                 origin: dto.origin || null,         // stored as String? in schema
+                exwLocation: dto.exwLocation || null,
                 readyForDispatch: dto.readyForDispatch ?? true,
                 leadTime: dto.leadTime ?? 0,
                 warehouseId: dto.warehouseId || null,

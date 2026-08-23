@@ -82,6 +82,23 @@ export class ProductsController {
 
     private readonly logger = new Logger(ProductsController.name);
 
+    /**
+     * Keep an imported listing visible when no trustworthy catalog photo can
+     * be found by EAN. This is deliberately a neutral white-background
+     * placeholder, not a fabricated product photo; the supplier/admin can
+     * replace it later from the product editor.
+     */
+    private buildWhiteCatalogPlaceholder(name?: string, ean?: string): string {
+        const title = String(name || 'FMCG product').slice(0, 48);
+        const code = String(ean || '').slice(0, 20);
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200" viewBox="0 0 1200 1200"><rect width="1200" height="1200" fill="#ffffff"/><rect x="120" y="120" width="960" height="760" rx="32" fill="#f8fafc" stroke="#e2e8f0" stroke-width="6"/><text x="600" y="500" text-anchor="middle" fill="#0f172a" font-family="Arial,sans-serif" font-size="54" font-weight="700">${this.escapeSvg(title)}</text><text x="600" y="590" text-anchor="middle" fill="#64748b" font-family="Arial,sans-serif" font-size="30">${this.escapeSvg(code)}</text><text x="600" y="1010" text-anchor="middle" fill="#94a3b8" font-family="Arial,sans-serif" font-size="24">Atlantis FMCG catalog image</text></svg>`;
+        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+
+    private escapeSvg(value: string): string {
+        return value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[char] as string));
+    }
+
     @Get()
     async findAll(@Request() req) {
         const { status, category, brand, minPrice, maxPrice, sort, q, limit, page } = req.query;
@@ -478,10 +495,11 @@ export class ProductsController {
             const report = await this.excelService.processProductsExcel(file.buffer, CreateProductDto);
 
             // PRE-FETCH FOR PERFORMANCE
-            const [configs, categories, user] = await Promise.all([
+            const [configs, categories, user, platformSupplierId] = await Promise.all([
                 this.productsService.getAppConfigs(),
                 this.productsService.getDistinctCategories(),
-                isAdmin ? null : this.productsService.getUserKycStatus(req.user.sub)
+                isAdmin ? null : this.productsService.getUserKycStatus(req.user.sub),
+                isAdmin ? this.resolvePlatformSupplierId() : null,
             ]);
 
             const createdProducts: any[] = [];
@@ -526,7 +544,7 @@ export class ProductsController {
                 const batch = successResults.slice(batchStart, batchStart + BATCH_SIZE);
                 await Promise.all(batch.map(async (result) => {
                     const dto = result.data as CreateProductDto;
-                    const supplierId = isAdmin ? (dto.supplierId || req.user.sub) : req.user.sub;
+                    const supplierId = isAdmin ? (dto.supplierId || platformSupplierId || req.user.sub) : req.user.sub;
                     const priceInBase = dto.price ? (dto.price * rate) : 0;
 
                     // PER-ROW PRICE TRACE. The user reports prices being
@@ -558,7 +576,12 @@ export class ProductsController {
                                 (dto as any).name,
                             );
                             if (fetched.length > 0) (dto as any).images = fetched;
-                        } catch (_e) { /* non-fatal */ }
+                            else (dto as any).images = [this.buildWhiteCatalogPlaceholder((dto as any).name, (dto as any).ean)];
+                        } catch (_e) {
+                            (dto as any).images = [this.buildWhiteCatalogPlaceholder((dto as any).name, (dto as any).ean)];
+                        }
+                    } else if (!dto.images || dto.images.length === 0) {
+                        (dto as any).images = [this.buildWhiteCatalogPlaceholder((dto as any).name, (dto as any).ean)];
                     }
 
                     try {

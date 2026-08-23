@@ -51,6 +51,19 @@ describe('ExcelService product import', () => {
         expect(report.results[0].data.description).toContain('KitKat Mini 200g');
     });
 
+    it('maps mixed truck order mode and keeps all Parallel logistics fields', async () => {
+        const service = new ExcelService({ detectColumnMapping: async () => null } as any);
+        const report = await service.processProductsExcel(workbookBuffer([
+            ['UnitBarcode', 'Product Name', 'UnitPriceEUR', 'BBD', 'Units/Carton', 'Cartons/Pallet', 'MOQcartons', 'Order Type'],
+            ['4006381333931', 'Coca Cola 330ml', 0.4, '2027-12-31', 'C24', 60, 5, 'Mixed Truck'],
+        ]), CreateProductDto);
+        expect(report.successCount).toBe(1);
+        expect(report.results[0].data.name).toBe('Coca Cola 330ml');
+        expect(report.results[0].data.moqUnit).toBe('TRUCK');
+        expect(report.results[0].data.unitsPerCase).toBe(24);
+        expect(report.results[0].data.unitsPerPallet).toBe(1440);
+    });
+
     it('accepts standard supplier headers used by Parallel-style spreadsheets', async () => {
         const service = new ExcelService({ detectColumnMapping: async () => null } as any);
 
