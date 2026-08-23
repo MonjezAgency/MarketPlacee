@@ -479,8 +479,9 @@ export default function ProductsModerationPage() {
             });
             const data = await res.json();
             setEanSearchResult(data);
-            if (data.matched && data.images.length > 0) {
-                toast.success(`Found ${data.images.length} image${data.images.length > 1 ? 's' : ''} (conf ${(data.confidence_score * 100).toFixed(0)}%)`, { id: tid });
+            if (Array.isArray(data.images) && data.images.length > 0) {
+                const label = data.matched ? 'verified' : 'EAN-linked — review background';
+                toast.success(`Found ${data.images.length} ${label} image${data.images.length > 1 ? 's' : ''} (conf ${(data.confidence_score * 100).toFixed(0)}%)`, { id: tid });
             } else {
                 toast.error(data.reason || 'No matching images found', { id: tid });
             }

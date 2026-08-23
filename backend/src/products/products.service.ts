@@ -20,6 +20,13 @@ export class ProductsService {
         private emailService: EmailService,
     ) { }
 
+    private buildWhiteCatalogPlaceholder(name?: string, ean?: string): string {
+        const title = String(name || 'FMCG product').slice(0, 48).replace(/[&<>"']/g, '');
+        const code = String(ean || '').slice(0, 20).replace(/[&<>"']/g, '');
+        const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="1200"><rect width="1200" height="1200" fill="#fff"/><rect x="120" y="120" width="960" height="760" rx="32" fill="#f8fafc" stroke="#e2e8f0" stroke-width="6"/><text x="600" y="500" text-anchor="middle" fill="#0f172a" font-family="Arial" font-size="54" font-weight="700">${title}</text><text x="600" y="590" text-anchor="middle" fill="#64748b" font-family="Arial" font-size="30">${code}</text><text x="600" y="1010" text-anchor="middle" fill="#94a3b8" font-family="Arial" font-size="24">Atlantis FMCG catalog image</text></svg>`;
+        return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+    }
+
     private extractCategoryFromName(name: string, currentCategory?: string): string {
         const unitKeywords = ['CARTON', 'PALLET', 'UNIT', 'CASE', 'BOX', 'PACK', 'KG', 'GRAM', 'LITER', 'PCS', 'PIECES', 'PIECE'];
         const cat = currentCategory?.toUpperCase() || '';
@@ -209,7 +216,11 @@ export class ProductsService {
             );
             if (fetchedImages && fetchedImages.length > 0) {
                 productImages = fetchedImages;
+            } else {
+                productImages = [this.buildWhiteCatalogPlaceholder(createProductDto.name, createProductDto.ean)];
             }
+        } else if (productImages.length === 0) {
+            productImages = [this.buildWhiteCatalogPlaceholder(createProductDto.name, createProductDto.ean)];
         }
 
         const hasRealImage = productImages.some(img => img && img.trim() !== '');
