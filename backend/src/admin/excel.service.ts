@@ -99,6 +99,85 @@ export class ExcelService {
         return out;
     }
 
+    /**
+     * The AI mapper is useful for unusual supplier sheets, but it must not
+     * override an unambiguous Name/Description header pair. In particular,
+     * older prompts told the model that "Description" could be the product
+     * name; that caused a real `Product Name` column to be swapped or ignored.
+     * Keep both fields when the sheet exposes both explicitly. If the sheet
+     * has only Description, the normal row processor may still promote a
+     * product-label description to name.
+     */
+    private reconcileNameDescriptionMapping(
+        rows: any[][],
+        headerRowIndex: number,
+        mapping: Record<number, string | null>,
+    ): Record<number, string | null> {
+        const primaryHeader = rows[headerRowIndex] || [];
+        const continuationHeader = rows[headerRowIndex + 1] || [];
+        const header = primaryHeader.map((cell, index) =>
+            [cell, continuationHeader[index]]
+                .filter(value => value !== undefined && value !== null && String(value).trim() !== '')
+                .join(' '),
+        );
+        const normalizeHeader = (value: any) => String(value ?? '')
+            .toLowerCase()
+            .replace(/[^a-z0-9ء-ي]/g, '');
+        const isNameHeader = (value: any) => {
+            const h = normalizeHeader(value);
+            return /^(name|title|label|product|item|productname|itemname|producttitle|itemlabel|اسم|الاسم|اسمالمنتج|اسمبالمنتج|المنتج)$/.test(h)
+                || /(?:productname|itemname|producttitle|itemlabel|اسمالمنتج)/.test(h);
+        };
+        const isDescriptionHeader = (value: any) => {
+            const h = normalizeHeader(value);
+            return /^(description|desc|details|detail|info|note|notes|الوصف|التفاصيل|وصف|ملاحظات)$/.test(h)
+                || /(?:description|details|التفاصيل|الوصف)/.test(h);
+        };
+
+        const nameColumns = header
+            .map((cell, index) => ({ index, cell }))
+            .filter(({ cell }) => isNameHeader(cell))
+            .map(({ index }) => index);
+        const descriptionColumns = header
+            .map((cell, index) => ({ index, cell }))
+            .filter(({ cell }) => isDescriptionHeader(cell))
+            .map(({ index }) => index);
+
+        // Only force a correction when both semantic columns are explicitly
+        // present. This preserves the useful Description → Name promotion
+        // for legacy files that genuinely have no separate name column.
+        if (nameColumns.length === 0 || descriptionColumns.length === 0) return mapping;
+
+        const out: Record<number, string | null> = { ...mapping };
+        for (const [column, target] of Object.entries(out)) {
+            if (target === 'name' || target === 'description') out[Number(column)] = null;
+        }
+        out[nameColumns[0]] = 'name';
+        out[descriptionColumns[0]] = 'description';
+        this.logger.log(
+            `[ExcelService] Deterministic Name/Description correction: name=col ${nameColumns[0]}, description=col ${descriptionColumns[0]}`,
+        );
+        return out;
+    }
+
+    /**
+     * Make a valid listing from a row that has a name but no long marketing
+     * description. Supplier sheets commonly contain operational data only;
+     * rejecting every row forces the operator back to manual entry. The
+     * generated text is intentionally factual and short, and can be edited
+     * later from the product page.
+     */
+    private synthesizeDescription(row: Record<string, any>) {
+        if (String(row.description || '').trim().length >= 10) return;
+        const parts: string[] = [];
+        if (row.brand) parts.push(String(row.brand));
+        if (row.name) parts.push(String(row.name));
+        if (row.weight) parts.push(`(${row.weight})`);
+        if (row.shelfLife) parts.push(`— BBD ${row.shelfLife}`);
+        const generated = parts.join(' ').trim();
+        if (generated.length >= 10) row.description = generated;
+    }
+
     async processProductsExcel(buffer: Buffer, dtoClass: any): Promise<ExcelReport> {
         const workbook = XLSX.read(buffer, { type: 'buffer' });
         if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
@@ -138,12 +217,17 @@ export class ExcelService {
                 // "Available in PALLETS" (decimals like 0.06, 2.62) as price.
                 const priceCol = this.detectPriceColumnByCurrency(rowsFormatted, aiResult.headerRowIndex);
                 const finalMapping = this.overridePriceMapping(aiResult.mapping, priceCol);
+                const correctedMapping = this.reconcileNameDescriptionMapping(
+                    rows,
+                    aiResult.headerRowIndex,
+                    finalMapping,
+                );
                 return this.processWithMapping(
                     rows,
-                    finalMapping,
+                    correctedMapping,
                     aiResult.headerRowIndex,
                     dtoClass,
-                    await this.extractImagesFromZip(buffer, sheetName),
+                    imageMapping,
                 );
             }
             this.logger.log(`[ExcelService] AI unavailable or low-confidence \u2014 falling back to header heuristics.`);
@@ -174,6 +258,10 @@ export class ExcelService {
             // Per-case / per-carton variants
             'pricepercase': 'price', 'priceperpack': 'price', 'priceperpackusd': 'price',
             'pricepercaseusd': 'price', 'pricepercaseeur': 'price',
+            // Parallel Broker / standard supplier exports
+            'unitpriceeur': 'price', 'unitpriceusd': 'price',
+            'unitpricegbp': 'price', 'unitpriceexvat': 'price',
+            'priceexvat': 'price',
             'pricepercarton': 'price', 'pricepercartonusd': 'price',
             // Offer/wholesale variants — Tena offer file used "Price offer".
             'priceoffer': 'price', 'offerprice': 'price', 'wholesaleprice': 'price',
@@ -204,6 +292,7 @@ export class ExcelService {
             // by themselves only match exact now, so spell out the
             // common compound variants explicitly.
             'eancode': 'ean', 'eannumber': 'ean', 'ean13': 'ean', 'ean8': 'ean',
+            'unitbarcode': 'ean', 'unitgtin': 'ean', 'gtin': 'ean', 'gtin13': 'ean',
             'upccode': 'ean', 'upcnumber': 'ean',
             'barcodeean': 'ean', 'barcodenumber': 'ean', 'barcodeno': 'ean',
             'productbarcode': 'ean', 'productean': 'ean',
@@ -212,6 +301,8 @@ export class ExcelService {
             'الباركود': 'ean', 'كودالمنتج': 'ean', 'كود': 'ean', 'رقم': 'ean',
             // ── unitsPerCase (Pcs/case — values like "C24") ───────────────────
             'unitspercase': 'unitsPerCase', 'pcspercase': 'unitsPerCase',
+            // Parallel Broker uses the compact `Units/Carton` spelling.
+            'unitscarton': 'unitsPerCase', 'unitcarton': 'unitsPerCase',
             'pcscase': 'unitsPerCase', 'piecespercase': 'unitsPerCase',
             'itemspercase': 'unitsPerCase', 'qtypercase': 'unitsPerCase',
             'percase': 'unitsPerCase',
@@ -229,6 +320,9 @@ export class ExcelService {
             'القطعةفيالكرتون': 'unitsPerCase', 'قطعكرتون': 'unitsPerCase',
             // ── casesPerPallet ────────────────────────────────────────────────
             'casesperpallet': 'casesPerPallet', 'boxesperpallet': 'casesPerPallet',
+            // Parallel Broker uses `Cartons/Pallet`.
+            'cartonspallet': 'casesPerPallet',
+            'casesperpallets': 'casesPerPallet',
             'cartonsperpallets': 'casesPerPallet', 'caseperpallet': 'casesPerPallet',
             // After normalize() strips the slash, "case/pallet" → "casepallet"
             // — without this alias the column was silently dropped.
@@ -270,6 +364,9 @@ export class ExcelService {
             // ── moq / minOrder ────────────────────────────────────────────────
             // DTO field name is "moq". All common aliases point to it.
             'moq': 'moq', 'mqq': 'moq', 'minorder': 'moq',
+            // Parallel Broker expresses MOQ in cartons.
+            'moqcartons': 'moq', 'minimumordercartons': 'moq',
+            'minimumcartons': 'moq',
             'minimumorder': 'moq', 'minimumorderquantity': 'moq',
             'minqty': 'moq', 'minimumquantity': 'moq',
             'mimimumquantity': 'moq',  // common typo
@@ -818,6 +915,7 @@ export class ExcelService {
         const results: ValidationRow[] = [];
         let successCount = 0;
         let errorCount = 0;
+        const sheetLevelExw = this.detectSheetLevelExw(rows);
 
         for (let i = headerRowIndex + 1; i < rows.length; i++) {
             const row = rows[i];
@@ -835,6 +933,16 @@ export class ExcelService {
             });
 
             this.coerceTypes(normalizedRow);
+
+            if (this.isNoteRow(normalizedRow)) continue;
+            this.enrichFromName(normalizedRow);
+            this.synthesizeDescription(normalizedRow);
+            if (!normalizedRow.exwLocation) {
+                const inlineExw = this.extractExwFromCells(row);
+                if (inlineExw) normalizedRow.exwLocation = inlineExw;
+            }
+            if (!normalizedRow.exwLocation && sheetLevelExw) normalizedRow.exwLocation = sheetLevelExw;
+            if (!normalizedRow.unit) normalizedRow.unit = 'case';
 
             if (imageMapping[i]) {
                 normalizedRow.images = [imageMapping[i]];
@@ -1222,6 +1330,11 @@ export class ExcelService {
             }
 
             this.coerceTypes(normalizedRow);
+
+            if (this.isNoteRow(normalizedRow)) continue;
+            this.enrichFromName(normalizedRow);
+            this.synthesizeDescription(normalizedRow);
+            if (!normalizedRow.unit) normalizedRow.unit = 'case';
 
             if (i === 0) {
                 console.log('[ExcelService] First JSON row after coercion:', JSON.stringify(normalizedRow));
