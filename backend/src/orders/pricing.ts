@@ -19,10 +19,10 @@
  *    (casesPerPallet / palletsPerShipment), each line occupies
  *    quantity ÷ that product's capacity of the load. The load is orderable
  *    when the shares add up to the required fill (default 100%, the rule
- *    the single-product composer already enforced) and never above 100%.
- *    All lines must come from one supplier (and one EXW location when
- *    known) because a load ships as one consignment. Price = Σ case price
- *    × cases, then the admin mix markup.
+ *    an admin can require via MIX_MIN_FILL_PERCENT; none by default) and
+ *    never above 100% of the products' own stated capacity. No supplier /
+ *    location compatibility rule is applied (not yet defined by the
+ *    business). Price = Σ case price × cases, then the admin mix markup.
  */
 
 export type Tier = 'carton' | 'pallet' | 'truck';
@@ -44,6 +44,7 @@ export interface PricingProduct {
     supplierId?: string | null;
     exwLocation?: string | null;
     variantPrices?: unknown;
+    variants?: unknown;
 }
 
 export class PricingError extends Error {
@@ -179,11 +180,26 @@ export interface PricedLoad {
     issues: string[];
 }
 
+/** Sellable variant signatures ("Flavour=Grape|Size=500ml") from the product's own variant groups. */
+export function variantSignatures(p: PricingProduct): string[] {
+    const groups = (Array.isArray(p.variants) ? p.variants : [])
+        .filter((g: any) => g && g.name && !String(g.name).startsWith('__') && Array.isArray(g.values) && g.values.length)
+        .map((g: any) => ({ name: String(g.name), values: g.values.map((v: unknown) => String(v)) }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    if (!groups.length) return [];
+    let combos: Record<string, string>[] = [{}];
+    for (const g of groups) combos = combos.flatMap((c) => g.values.map((v: string) => ({ ...c, [g.name]: v })));
+    return combos.map((c) => Object.keys(c).sort().map((k) => `${k}=${c[k]}`).join('|'));
+}
+
 function variantCasePrice(p: PricingProduct, variant: string | null | undefined, m: Markups): number {
     if (variant) {
-        const vp = (p.variantPrices && typeof p.variantPrices === 'object' ? (p.variantPrices as Record<string, unknown>)[variant] : undefined);
-        if (vp === undefined) throw new PricingError('UNKNOWN_VARIANT', `${p.name}: variant "${variant}" doesn't exist.`, { productId: p.id, variant });
-        const n = Number(vp);
+        const priced = p.variantPrices && typeof p.variantPrices === 'object' ? (p.variantPrices as Record<string, unknown>) : {};
+        const known = variantSignatures(p);
+        if (!known.includes(variant) && priced[variant] === undefined) {
+            throw new PricingError('UNKNOWN_VARIANT', `${p.name}: variant "${variant}" doesn't exist.`, { productId: p.id, variant });
+        }
+        const n = Number(priced[variant]);
         if (Number.isFinite(n) && n > 0) return n;
     }
     return basePerCase(p, m);
@@ -198,7 +214,8 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
     if (kind !== 'PALLET' && kind !== 'TRUCK') throw new PricingError('INVALID_LOAD', 'Mixed loads are either a PALLET or a TRUCK.');
     if (!Array.isArray(lines)) throw new PricingError('INVALID_LOAD', 'Lines must be a list.');
     if (lines.length > MAX_LINES_PER_LOAD) throw new PricingError('INVALID_LOAD', `A mixed load can hold at most ${MAX_LINES_PER_LOAD} lines.`);
-    const requiredFill = opts.requiredFill && opts.requiredFill > 0 && opts.requiredFill <= 1 ? opts.requiredFill : 1;
+    // 0 = no minimum fill (default until the business defines one).
+    const requiredFill = typeof opts.requiredFill === 'number' && opts.requiredFill >= 0 && opts.requiredFill <= 1 ? opts.requiredFill : 1;
 
     // Merge duplicate product+variant lines.
     const merged = new Map<string, LoadLineInput>();
@@ -210,7 +227,7 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
         merged.set(key, { productId: l.productId, variant: l.variant || null, quantity: (prev?.quantity ?? 0) + qty });
     }
 
-    let supplierId: string | null = null, exw: string | null = null;
+    let supplierId: string | null = null, mixedSuppliers = false;
     const out: PricedLoadLine[] = [];
     for (const l of merged.values()) {
         const p = products.get(l.productId);
@@ -218,14 +235,10 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
         assertOrderable(p);
         const av = tierAvailability(p)[kind === 'PALLET' ? 'pallet' : 'truck'];
         if (!av.ok) throw new PricingError('NOT_MIXABLE', `${p.name} can't go in a mixed ${kind === 'PALLET' ? 'pallet' : 'truckload'}: the supplier hasn't provided ${av.missing.join(', ')}.`, { productId: p.id, missing: av.missing });
+        // Recorded for display only — no compatibility rule is enforced.
         const sup = p.supplierId ?? null;
         if (supplierId === null) supplierId = sup;
-        else if (sup !== supplierId) throw new PricingError('SUPPLIER_MISMATCH', `${p.name} ships from a different supplier — a mixed load must come from one supplier.`, { productId: p.id });
-        const loc = p.exwLocation ? String(p.exwLocation).trim().toLowerCase() : null;
-        if (loc) {
-            if (exw === null) exw = loc;
-            else if (loc !== exw) throw new PricingError('LOCATION_MISMATCH', `${p.name} is stocked at a different warehouse — a mixed load must ship from one location.`, { productId: p.id });
-        }
+        else if (sup !== supplierId) mixedSuppliers = true;
         const cpp = pos(p.casesPerPallet), ppt = pos(p.palletsPerShipment), upc = pos(p.unitsPerCase);
         const casePrice = round2(variantCasePrice(p, l.variant, m));
         const cases = kind === 'PALLET' ? l.quantity : l.quantity * cpp;
@@ -241,6 +254,6 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
     const total = round2(subtotal * m.mix);
     const issues: string[] = [];
     if (out.length === 0) issues.push('Add at least one product.');
-    else if (fill < requiredFill - EPS) issues.push(`${Math.round(fill * 100)}% full — fill to ${Math.round(requiredFill * 100)}% to order.`);
-    return { kind, supplierId, lines: out, fill, requiredFill, subtotal, markup: m.mix, total, ready: issues.length === 0, issues };
+    else if (requiredFill > 0 && fill < requiredFill - EPS) issues.push(`${Math.round(fill * 100)}% full — fill to ${Math.round(requiredFill * 100)}% to order.`);
+    return { kind, supplierId: mixedSuppliers ? null : supplierId, lines: out, fill, requiredFill, subtotal, markup: m.mix, total, ready: issues.length === 0, issues };
 }

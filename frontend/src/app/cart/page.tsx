@@ -221,7 +221,7 @@ export default function CartPage() {
     };
     const addSuggestion = async (load: MixedLoad, productId: string) => {
         setLoadBusy(load.id); setLoadError((m) => ({ ...m, [load.id]: '' }));
-        try { await addToLoad(load.kind, productId, 1); refreshLoads(); }
+        try { await addToLoad(load.kind, productId, 1, null, load.id); refreshLoads(); }
         catch (e) { setLoadError((m) => ({ ...m, [load.id]: e instanceof ApiError ? e.message : 'Could not add that product.' })); }
         finally { setLoadBusy(null); }
     };
@@ -351,7 +351,7 @@ export default function CartPage() {
                             // Real catalog products this load can accept: same supplier, pack data present, not already in it.
                             const inLoad = new Set(lines.map((l) => l.productId));
                             const candidates = q && !q.ready ? catalog.filter((p: any) =>
-                                !inLoad.has(p.id) && p.supplierId === load.supplierId && p.unitsPerCase && p.casesPerPallet && (load.kind === 'PALLET' || p.palletsPerShipment)
+                                !inLoad.has(p.id) && p.unitsPerCase && p.casesPerPallet && (load.kind === 'PALLET' || p.palletsPerShipment)
                             ).slice(0, 12) : [];
                             return (
                                 <OrderCard
@@ -360,11 +360,13 @@ export default function CartPage() {
                                     title={loadLabel(load.kind)}
                                     strip={dispatchStrip(lines.map((l) => load.products[l.productId]).filter(Boolean) as any)}
                                     destination={destination}
-                                    status={load.error ? { tone: 'err', label: 'Unavailable' } : q?.ready ? { tone: 'ok', label: 'Ready' } : { tone: 'warn', label: 'Below minimum' }}
+                                    status={load.error ? { tone: 'err', label: 'Unavailable' } : q?.ready ? { tone: 'ok', label: 'Ready' } : { tone: 'warn', label: q && q.requiredFill > 0 ? 'Below minimum' : 'Needs attention' }}
                                     progress={q ? {
-                                        label: <>Mixed load · <span className="font-semibold text-ink tabular-nums">{Math.round(q.fill * 100)}%</span> / {Math.round(q.requiredFill * 100)}% of the {load.kind === 'PALLET' ? 'pallet' : 'truck'}</>,
+                                        label: q.requiredFill > 0
+                                            ? <>Mixed load · <span className="font-semibold text-ink tabular-nums">{Math.round(q.fill * 100)}%</span> / {Math.round(q.requiredFill * 100)}% minimum of the {load.kind === 'PALLET' ? 'pallet' : 'truck'}</>
+                                            : <>Capacity used · <span className="font-semibold text-ink tabular-nums">{Math.round(q.fill * 100)}%</span> of the {load.kind === 'PALLET' ? 'pallet' : 'truck'}</>,
                                         right: q.ready ? undefined : `${Math.round(remaining * 100)}% to go`,
-                                        value: q.fill / q.requiredFill,
+                                        value: q.requiredFill > 0 ? q.fill / q.requiredFill : q.fill,
                                         ok: q.ready,
                                     } : undefined}
                                     error={loadError[load.id] || load.error?.message || null}

@@ -28,7 +28,8 @@ import { getDisplayCategory } from '@/lib/product-utils';
 import ImageLightbox from '@/components/ImageLightbox';
 import { brandLogo } from '@/lib/brand-logos';
 import { computeCardPrice } from '@/lib/card-pricing';
-import { round2, minUnitsFor as serverMinUnits, addToLoad, ApiError, loadLabel, type MixedLoad, type LoadKind } from '@/lib/wholesale';
+import { round2, minUnitsFor as serverMinUnits, type LoadKind } from '@/lib/wholesale';
+import MixBuilder from '@/components/product/MixBuilder';
 
 
 export default function ProductDetailClient() {
@@ -74,11 +75,8 @@ export default function ProductDetailClient() {
     const [mixQuantities, setMixQuantities] = useState<Record<string, number>>({});
     const [activeTab, setActiveTab] = useState('Description');
     // Cross-product mixed pallet / truckload (server-saved MixedLoad).
-    const [loadKind, setLoadKind] = useState<LoadKind | null>(null);
-    const [loadQty, setLoadQty] = useState(1);
-    const [loadBusy, setLoadBusy] = useState(false);
-    const [loadResult, setLoadResult] = useState<MixedLoad | null>(null);
-    const [loadError, setLoadError] = useState('');
+    // Which mix builder is open (null = closed). Nothing is added until the buyer confirms.
+    const [mixOpen, setMixOpen] = useState<LoadKind | null>(null);
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -1005,68 +1003,25 @@ export default function ProductDetailClient() {
                             </div>
                         </div>
 
-                        {/* Mix with other products — server-validated mixed pallet / truckload */}
-                        {(() => {
-                            const kinds: { kind: LoadKind; ok: boolean; unit: string; cap: number; capLabel: string }[] = [
-                                { kind: 'PALLET', ok: piecesPerCase > 0 && casesPerPallet > 0, unit: 'case', cap: casesPerPallet, capLabel: `${casesPerPallet} cases fill one pallet` },
-                                { kind: 'TRUCK', ok: piecesPerCase > 0 && casesPerPallet > 0 && palletsPerTruck > 0, unit: 'pallet', cap: palletsPerTruck, capLabel: `${palletsPerTruck} pallets fill one truckload` },
-                            ];
-                            const avail = kinds.filter((k) => k.ok);
-                            if (!avail.length || isSupplierOwner) return null;
-                            const sel = avail.find((k) => k.kind === loadKind) ?? avail[avail.length - 1];
-                            const submit = async () => {
-                                if (!isLoggedIn) { router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname)); return; }
-                                setLoadBusy(true); setLoadError(''); setLoadResult(null);
-                                try { setLoadResult(await addToLoad(sel.kind, product.id, loadQty)); }
-                                catch (e) { setLoadError(e instanceof ApiError ? e.message : 'Could not update your mixed load.'); }
-                                finally { setLoadBusy(false); }
-                            };
-                            const q = loadResult?.quote;
-                            return (
-                                <div className="mt-4 rounded-2xl ring-1 ring-line bg-surface p-4 sm:p-5">
-                                    <div className="flex items-start justify-between gap-3">
-                                        <div>
-                                            <h2 className="text-[13.5px] font-semibold text-ink">Mix with other products</h2>
-                                            <p className="mt-0.5 text-[12.5px] text-ink-3">Combine products from the same supplier into one {sel.kind === 'PALLET' ? 'pallet' : 'truckload'}. Each product fills its own share — {sel.capLabel}.</p>
-                                        </div>
-                                    </div>
-                                    {avail.length > 1 && (
-                                        <div role="radiogroup" aria-label="Mixed load type" className="mt-3 inline-flex p-1 rounded-lg bg-surface-3">
-                                            {avail.map((k) => (
-                                                <button key={k.kind} type="button" role="radio" aria-checked={sel.kind === k.kind} onClick={() => { setLoadKind(k.kind); setLoadQty(1); setLoadResult(null); setLoadError(''); }}
-                                                    className={cn('h-8 px-3 rounded-md text-[12.5px] font-medium', sel.kind === k.kind ? 'bg-surface text-ink shadow-sm ring-1 ring-line' : 'text-ink-3 hover:text-ink')}>
-                                                    {loadLabel(k.kind)}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                    <div className="mt-3 flex flex-wrap items-end gap-3">
-                                        <label className="block">
-                                            <span className="block text-[12px] text-ink-3 mb-1">Quantity ({sel.unit}s)</span>
-                                            <input type="number" min={1} max={sel.cap} step={1} value={loadQty}
-                                                onChange={(e) => setLoadQty(Math.max(1, Math.min(sel.cap, parseInt(e.target.value || '1', 10) || 1)))}
-                                                className="w-24 h-10 px-3 rounded-lg ring-1 ring-line bg-surface text-[14px] tabular-nums outline-none focus:ring-2 focus:ring-[#2EC4B6]" />
-                                        </label>
-                                        <p className="pb-2.5 text-[12.5px] text-ink-3">= {Math.round((loadQty / Math.max(1, sel.cap)) * 100)}% of the {sel.kind === 'PALLET' ? 'pallet' : 'truckload'}</p>
-                                        <button type="button" onClick={submit} disabled={loadBusy}
-                                            className="ms-auto h-10 px-4 rounded-xl ring-1 ring-line-strong hover:ring-ink text-[13.5px] font-semibold text-ink disabled:opacity-50">
-                                            {loadBusy ? 'Adding…' : isLoggedIn ? `Add to ${loadLabel(sel.kind).toLowerCase()}` : 'Sign in to mix'}
-                                        </button>
-                                    </div>
-                                    {loadError && <p className="mt-2 text-[12.5px] text-[#B91C1C]" role="alert">{loadError}</p>}
-                                    {q && (
-                                        <div className="mt-3 rounded-xl bg-surface-2 px-3.5 py-3" aria-live="polite">
-                                            <div className="flex items-center justify-between text-[12.5px]">
-                                                <span className="text-ink-2">{loadLabel(loadResult!.kind)} · {q.lines.length} product{q.lines.length === 1 ? '' : 's'}</span>
-                                                <span className={cn('font-semibold', q.ready ? 'text-[#047857]' : 'text-[#B45309]')}>{Math.round(q.fill * 100)}% full</span>
-                                            </div>
-                                            <div className="mt-1.5 h-1.5 rounded-full bg-surface-3 overflow-hidden"><div className="h-full bg-[#2EC4B6]" style={{ width: `${Math.min(100, q.fill * 100)}%` }} /></div>
-                                            <p className="mt-2 text-[12.5px] text-ink-3">{q.ready ? 'Ready to order.' : q.issues.join(' ')} <Link href="/cart" className="font-semibold text-teal hover:underline">Open in cart</Link></p>
-                                        </div>
-                                    )}
+                        {/* Mix with other products — opens the catalog picker; nothing is added automatically */}
+                        {!isSupplierOwner && (
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl ring-1 ring-line bg-surface px-4 py-3">
+                                <div className="min-w-0">
+                                    <p className="text-[13.5px] font-semibold text-ink">Mix with other products</p>
+                                    <p className="text-[12.5px] text-ink-3">Choose products and flavours from the catalog for one mixed pallet or truckload.</p>
                                 </div>
-                            );
-                        })()}
+                                <div className="flex gap-2">
+                                    {(['PALLET', 'TRUCK'] as LoadKind[]).map((k) => (
+                                        <button key={k} type="button"
+                                            onClick={() => isLoggedIn ? setMixOpen(k) : router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname))}
+                                            className="h-9 px-3.5 rounded-lg ring-1 ring-line-strong hover:ring-ink text-[13px] font-semibold text-ink">
+                                            {k === 'PALLET' ? 'Mixed pallet' : 'Mixed truckload'}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <MixBuilder open={!!mixOpen} initialKind={mixOpen ?? 'PALLET'} onClose={() => setMixOpen(null)} />
 
                         {/* Build-your-own pallet / truckload (mix variants) */}
                         {mixSupported && (

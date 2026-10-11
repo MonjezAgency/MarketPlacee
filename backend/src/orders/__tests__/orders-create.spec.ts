@@ -134,13 +134,21 @@ describe('Mixed loads in orders', () => {
         expect(o.items[0].mixComposition).toHaveLength(2);
         expect(db.state.loads.get('load-1').status).toBe('ORDERED');
     });
-    it('refuses an under-filled load and a load already ordered', async () => {
+    it('refuses an under-filled load (when a minimum is configured) and a load already ordered', async () => {
         const db = makeDb();
         db.state.loads.set('half', { ...fullTruck, id: 'half', lines: [{ productId: 'prime', quantity: 13 }] });
         db.state.loads.set('done', { ...fullTruck, id: 'done', status: 'ORDERED' });
+        // Only when an admin has configured a minimum fill.
+        db.appConfig.findUnique = jest.fn(async ({ where }: any) => (where.key === 'MIX_MIN_FILL_PERCENT' ? { value: '100' } : null));
         const svc = makeService(db);
         expect(await err(svc.create('buyer', undefined as any, [{ mixedLoadId: 'half' }]))).toBe('LOAD_NOT_READY');
         expect(await err(svc.create('buyer', undefined as any, [{ mixedLoadId: 'done' }]))).toBe('LOAD_ALREADY_ORDERED');
+    });
+    it('with no minimum configured, a partly filled load can be ordered', async () => {
+        const db = makeDb();
+        db.state.loads.set('half', { ...fullTruck, id: 'half', lines: [{ productId: 'prime', quantity: 13 }] });
+        const o: any = await makeService(db).create('buyer', undefined as any, [{ mixedLoadId: 'half' }]);
+        expect(o.items[0].mixedLoadId).toBe('half');
     });
     it('cannot order someone else\'s load', async () => {
         const db = makeDb(); db.state.loads.set('load-1', { ...fullTruck });

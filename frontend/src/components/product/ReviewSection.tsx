@@ -56,7 +56,8 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
     const load = useCallback(async () => {
         try {
             const res = await apiFetch(`/products/${productId}/reviews`);
-            if (res.ok) setReviews(await res.json());
+            // Only accept a list — any other payload must not crash the product page.
+            if (res.ok) { const data = await res.json().catch(() => null); setReviews(Array.isArray(data) ? data : []); }
         } finally {
             setLoading(false);
         }

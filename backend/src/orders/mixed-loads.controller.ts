@@ -18,6 +18,12 @@ export class MixedLoadsController {
         return this.loads.price(body?.kind, body?.lines || []);
     }
 
+    /** Create a new load from exactly the lines the buyer selected (nothing else is added). */
+    @Post()
+    create(@Request() req, @Body() body: { kind: 'PALLET' | 'TRUCK'; lines: { productId: string; variant?: string | null; quantity: number }[] }) {
+        return this.loads.create(req.user.sub, body?.kind, (body?.lines || []).map((l) => ({ productId: l?.productId, variant: l?.variant ?? null, quantity: Number(l?.quantity) })));
+    }
+
     @Get()
     list(@Request() req) {
         return this.loads.list(req.user.sub);

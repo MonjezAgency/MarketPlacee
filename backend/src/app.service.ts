@@ -8,33 +8,20 @@ export class AppService implements OnModuleInit {
     constructor(private prisma: PrismaService) { }
 
     /**
-     * Boot-time self-heal for the Atlantis OWNER credentials.
+     * Boot-time check for the founding Atlantis OWNER account.
      *
-     * Every time the backend starts (cold start, Railway redeploy,
-     * crash recovery, anything) we run `resetAdmin()` to guarantee
-     * the founding Info@atlantisfmcg.com OWNER account exists with
-     * the canonical password, ACTIVE status, and email verified.
-     * The "Invalid email or password" lock-out the operator hits
-     * after deploys is now impossible — there is no path that
-     * leaves the account missing or with stale credentials.
-     *
-     * Wrapped in try/catch so a transient DB outage during boot
-     * never prevents the app from starting; the next restart heals
-     * whatever was missed.
+     * Keeps the account's role / status / verification flags intact but
+     * NEVER changes its password. (It used to force-reset the password to
+     * an env value or a hardcoded default on every start, which meant the
+     * owner password was effectively public.) If the row is missing it is
+     * only created when OWNER_PASSWORD is configured — never from a default.
      */
     async onModuleInit() {
         try {
-            // Pass the seed secret so the boot path is treated as an
-            // authorized reset — the OWNER password is force-set back
-            // to the canonical value (env OWNER_PASSWORD / EMAIL_PASS,
-            // else the documented fallback) on every cold start. This
-            // is what guarantees the 'Invalid email or password' lock
-            // never reappears after a Railway redeploy.
-            const secret = process.env.SEED_ADMIN_SECRET || 'atlantis_seed_2025_secure';
-            const result = await this.resetAdmin(secret);
-            this.logger.log(`OWNER credentials self-healed on boot — ${result?.message || 'ok'}`);
+            const result = await this.resetAdmin();
+            this.logger.log(`OWNER account check on boot — ${result?.message || 'ok'}`);
         } catch (err: any) {
-            this.logger.warn(`OWNER self-heal skipped: ${err?.message || err}`);
+            this.logger.warn(`OWNER account check skipped: ${err?.message || err}`);
         }
     }
 
@@ -89,88 +76,43 @@ export class AppService implements OnModuleInit {
     }
 
     /**
-     * Secure credential self-healing and reset for the founding Atlantis OWNER account.
-     * 
-     * To protect user accounts and prevent resetting a changed password, this method:
-     *   1. Checks if the owner user exists in the database.
-     *   2. If the user exists: guarantees their status is ACTIVE, emailVerified is true, 
-     *      and role is OWNER, but NEVER overwrites their existing password unless a valid 
-     *      providedSecret is passed matching process.env.SEED_ADMIN_SECRET.
-     *   3. If the user does not exist: creates them using password from environment variable
-     *      (OWNER_PASSWORD or EMAIL_PASS) hashed securely.
+     * Ensure the founding OWNER account exists with its owner role and an
+     * active, verified status. Passwords are never reset here; password
+     * changes go through the normal authenticated / forgot-password flows.
      */
-    async resetAdmin(providedSecret?: string) {
+    async resetAdmin() {
         const email = 'Info@atlantisfmcg.com';
-        const envSecret = process.env.SEED_ADMIN_SECRET || 'atlantis_seed_2025_secure';
-        const isAuthorizedReset = providedSecret === envSecret;
-
         try {
             const existingUser = await this.prisma.user.findFirst({
-                where: { email: { equals: email, mode: 'insensitive' } }
+                where: { email: { equals: email, mode: 'insensitive' } },
             });
 
             if (existingUser) {
-                const updateData: any = {
-                    status: 'ACTIVE',
-                    emailVerified: true,
-                    role: 'OWNER',
-                    kycStatus: 'VERIFIED',
-                    onboardingCompleted: true,
-                };
-
-                let passwordWasReset = false;
-                if (isAuthorizedReset) {
-                    const fallbackPassword = process.env.OWNER_PASSWORD || process.env.EMAIL_PASS || 'AliDawara@22';
-                    const hashedPassword = await bcrypt.hash(fallbackPassword, 10);
-                    updateData.password = hashedPassword;
-                    passwordWasReset = true;
-                }
-
                 const user = await this.prisma.user.update({
                     where: { id: existingUser.id },
-                    data: updateData,
+                    data: { status: 'ACTIVE', emailVerified: true, role: 'OWNER', kycStatus: 'VERIFIED', onboardingCompleted: true },
                     select: { id: true, email: true, role: true, status: true },
                 });
-
-                return {
-                    message: passwordWasReset 
-                        ? 'Owner account exists. Password was successfully reset to default.'
-                        : 'Owner account exists. Account details verified and guaranteed without changing password.',
-                    email: user.email,
-                    role: user.role,
-                    status: user.status,
-                    passwordResetPerformed: passwordWasReset,
-                };
-            } else {
-                const fallbackPassword = process.env.OWNER_PASSWORD || process.env.EMAIL_PASS || 'AliDawara@22';
-                const hashedPassword = await bcrypt.hash(fallbackPassword, 10);
-
-                const user = await this.prisma.user.create({
-                    data: {
-                        email,
-                        name: 'Ali Dawara',
-                        companyName: 'Atlantis FMCG',
-                        password: hashedPassword,
-                        role: 'OWNER',
-                        status: 'ACTIVE',
-                        emailVerified: true,
-                        kycStatus: 'VERIFIED',
-                        onboardingCompleted: true,
-                    },
-                    select: { id: true, email: true, role: true, status: true },
-                });
-
-                return {
-                    message: 'Owner account did not exist. Successfully seeded secure OWNER account.',
-                    email: user.email,
-                    role: user.role,
-                    status: user.status,
-                    passwordResetPerformed: true,
-                };
+                return { message: 'Owner account verified (password unchanged).', email: user.email, role: user.role, status: user.status };
             }
+
+            const initial = process.env.OWNER_PASSWORD;
+            if (!initial || initial.length < 12) {
+                this.logger.warn('OWNER account missing and OWNER_PASSWORD (12+ chars) is not set — not creating it.');
+                return { message: 'Owner account missing; set OWNER_PASSWORD to provision it.' };
+            }
+            const user = await this.prisma.user.create({
+                data: {
+                    email, name: 'Ali Dawara', companyName: 'Atlantis FMCG',
+                    password: await bcrypt.hash(initial, 10),
+                    role: 'OWNER', status: 'ACTIVE', emailVerified: true, kycStatus: 'VERIFIED', onboardingCompleted: true,
+                },
+                select: { id: true, email: true, role: true, status: true },
+            });
+            return { message: 'Owner account provisioned from OWNER_PASSWORD.', email: user.email, role: user.role, status: user.status };
         } catch (e: any) {
-            this.logger.error(`Failed to self-heal owner: ${e?.message || e}`);
-            return { message: 'Failed to self-heal owner', error: e?.message };
+            this.logger.error(`Owner account check failed: ${e?.message || e}`);
+            return { message: 'Owner account check failed' };
         }
     }
 }

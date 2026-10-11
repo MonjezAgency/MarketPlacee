@@ -80,15 +80,27 @@ describe('priceLoad — mixed pallets and truckloads', () => {
     it('honours an admin minimum fill', () => {
         expect(priceLoad('PALLET', [{ productId: 'prime', quantity: 106 }], map(prime), M, { requiredFill: 0.8 }).ready).toBe(true);
     });
-    it('rejects over-capacity, mixed suppliers, missing pack data and unknown products', () => {
+    it('rejects over-capacity, missing pack data and unknown products', () => {
         expect(code(() => priceLoad('PALLET', [{ productId: 'prime', quantity: 133 }], map(prime), M))).toBe('OVER_CAPACITY');
-        expect(code(() => priceLoad('TRUCK', [{ productId: 'prime', quantity: 1 }, { productId: 'os', quantity: 1 }], map(prime, otherSupplier), M))).toBe('SUPPLIER_MISMATCH');
         expect(code(() => priceLoad('TRUCK', [{ productId: 'nt', quantity: 1 }], map(noTruck), M))).toBe('NOT_MIXABLE');
         expect(code(() => priceLoad('TRUCK', [{ productId: 'ghost', quantity: 1 }], map(prime), M))).toBe('PRODUCT_NOT_FOUND');
     });
-    it('rejects different EXW locations within one supplier', () => {
-        const a = { ...prime, id: 'a', exwLocation: 'Rotterdam' }, b = { ...prime, id: 'b', exwLocation: 'Bucharest' };
-        expect(code(() => priceLoad('TRUCK', [{ productId: 'a', quantity: 1 }, { productId: 'b', quantity: 1 }], map(a, b), M))).toBe('LOCATION_MISMATCH');
+    it('applies no supplier / location compatibility rule (not defined by the business yet)', () => {
+        const a = { ...prime, id: 'a', exwLocation: 'Rotterdam' }, b = { ...otherSupplier, id: 'b', exwLocation: 'Bucharest' };
+        const q = priceLoad('TRUCK', [{ productId: 'a', quantity: 1 }, { productId: 'b', quantity: 1 }], map(a, b), M, { requiredFill: 0 });
+        expect(q.lines).toHaveLength(2);
+        expect(q.supplierId).toBeNull();
+    });
+    it('with no minimum fill configured, any non-empty load is orderable', () => {
+        const q = priceLoad('PALLET', [{ productId: 'prime', quantity: 1 }], map(prime), M, { requiredFill: 0 });
+        expect(q.ready).toBe(true);
+        expect(priceLoad('PALLET', [], map(prime), M, { requiredFill: 0 }).ready).toBe(false);
+    });
+    it('accepts flavours from the product\'s own variant groups even without per-variant prices', () => {
+        const v = { ...prime, id: 'fl', variants: [{ name: 'Flavour', values: ['Grape', 'Ice Pop'] }, { name: '__translations', values: ['{}'] }] };
+        const q = priceLoad('PALLET', [{ productId: 'fl', variant: 'Flavour=Grape', quantity: 10 }, { productId: 'fl', variant: 'Flavour=Ice Pop', quantity: 5 }], map(v), M, { requiredFill: 0 });
+        expect(q.lines.map((l) => [l.variant, l.quantity])).toEqual([['Flavour=Grape', 10], ['Flavour=Ice Pop', 5]]);
+        expect(code(() => priceLoad('PALLET', [{ productId: 'fl', variant: 'Flavour=Lime', quantity: 1 }], map(v), M))).toBe('UNKNOWN_VARIANT');
     });
     it('merges duplicate lines', () => {
         const q = priceLoad('PALLET', [{ productId: 'prime', quantity: 60 }, { productId: 'prime', quantity: 72 }], map(prime), M);

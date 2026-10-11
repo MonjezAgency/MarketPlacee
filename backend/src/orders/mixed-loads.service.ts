@@ -6,7 +6,7 @@ import { LoadKind, LoadLineInput, Markups, PricingError, PricingProduct, priceLo
 const PRODUCT_PRICING_SELECT = {
     id: true, name: true, price: true, basePrice: true, unitsPerCase: true, casesPerPallet: true,
     palletsPerShipment: true, moq: true, moqUnit: true, status: true, supplierId: true, exwLocation: true,
-    variantPrices: true, images: true, ean: true, brand: true, shelfLife: true, leadTime: true, readyForDispatch: true, origin: true,
+    variantPrices: true, variants: true, images: true, ean: true, brand: true, shelfLife: true, leadTime: true, readyForDispatch: true, origin: true,
 } as const;
 
 /** Turn pricing rule violations into 400s the storefront can show verbatim. */
@@ -24,11 +24,11 @@ export class MixedLoadsService {
         return { piece: m.piece, pallet: m.pallet, container: m.container, mix: m.mix };
     }
 
-    /** Optional admin rule (AppConfig MIX_MIN_FILL_PERCENT, 1–100); default = full load. */
+    /** Optional admin rule (AppConfig MIX_MIN_FILL_PERCENT, 1–100). Not set = no minimum fill. */
     async requiredFill(): Promise<number> {
         const row = await this.prisma.appConfig.findUnique({ where: { key: 'MIX_MIN_FILL_PERCENT' } }).catch(() => null);
         const n = row ? parseFloat(row.value) : NaN;
-        return Number.isFinite(n) && n > 0 && n <= 100 ? n / 100 : 1;
+        return Number.isFinite(n) && n > 0 && n <= 100 ? n / 100 : 0;
     }
 
     async loadProducts(ids: string[], db: any = this.prisma): Promise<Map<string, PricingProduct & { images?: string[]; ean?: string | null; brand?: string | null }>> {
@@ -70,9 +70,14 @@ export class MixedLoadsService {
 
     async create(customerId: string, kind: LoadKind, lines: LoadLineInput[] = []) {
         if (kind !== 'PALLET' && kind !== 'TRUCK') throw new BadRequestException({ code: 'INVALID_LOAD', message: 'kind must be PALLET or TRUCK' });
+        if (!Array.isArray(lines) || lines.length === 0) throw new BadRequestException({ code: 'EMPTY_SELECTION', message: 'Select at least one product for the mix.' });
         const priced = await this.price(kind, lines);
+        const normalised = priced.lines.map(({ productId, variant, quantity }) => ({ productId, variant: variant ?? null, quantity }));
+        // Double-click / retry guard: an identical draft created moments ago is returned instead of a duplicate.
+        const recent = await this.prisma.mixedLoad.findFirst({ where: { customerId, kind, status: 'DRAFT', createdAt: { gte: new Date(Date.now() - 15_000) } }, orderBy: { createdAt: 'desc' } });
+        if (recent && JSON.stringify(recent.lines) === JSON.stringify(normalised)) return this.decorate(recent);
         const row = await this.prisma.mixedLoad.create({
-            data: { customerId, kind, supplierId: priced.supplierId, lines: priced.lines.map(({ productId, variant, quantity }) => ({ productId, variant: variant ?? null, quantity })) as any },
+            data: { customerId, kind, supplierId: priced.supplierId, lines: normalised as any },
         });
         return this.decorate(row);
     }
@@ -91,18 +96,13 @@ export class MixedLoadsService {
         return this.get(customerId, id);
     }
 
-    /** Add (or increase) one product line, creating a draft of that kind if needed. */
+    /** Add (or increase) one product line in a SPECIFIC load the buyer is looking at, or start a new one. */
     async addLine(customerId: string, kind: LoadKind, line: LoadLineInput, loadId?: string) {
         if (loadId) {
             const row = await this.prisma.mixedLoad.findFirst({ where: { id: loadId, customerId, status: 'DRAFT' } });
             if (!row) throw new NotFoundException('Mixed load not found');
             return this.replaceLines(customerId, row.id, [...((row.lines as any[]) || []), line], row.version);
         }
-        // Reuse the buyer's open draft of this kind from the same supplier, else start one.
-        const products = await this.loadProducts([line.productId]);
-        const sup = products.get(line.productId)?.supplierId ?? null;
-        const existing = await this.prisma.mixedLoad.findFirst({ where: { customerId, status: 'DRAFT', kind, supplierId: sup }, orderBy: { createdAt: 'desc' } });
-        if (existing) return this.replaceLines(customerId, existing.id, [...((existing.lines as any[]) || []), line], existing.version);
         return this.create(customerId, kind, [line]);
     }
 

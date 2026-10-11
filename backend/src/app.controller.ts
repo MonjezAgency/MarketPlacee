@@ -94,11 +94,6 @@ export class AppController {
         };
     }
 
-    @Get('emergency-reset')
-    async resetAdmin(@Query('secret') secret?: string) {
-        return this.appService.resetAdmin(secret);
-    }
-
     /** Public contact form — sends an email to the Atlantis team */
     @Post('contact')
     @HttpCode(200)

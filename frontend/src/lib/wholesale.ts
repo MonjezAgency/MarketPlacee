@@ -73,8 +73,24 @@ export interface MixedLoad {
 }
 
 export const listLoads = () => call<MixedLoad[]>('/mixed-loads');
-export const addToLoad = (kind: LoadKind, productId: string, quantity: number, variant?: string | null) =>
-    call<MixedLoad>('/mixed-loads/lines', { method: 'POST', body: JSON.stringify({ kind, productId, quantity, variant: variant ?? undefined }) });
+/** Add one product to a SPECIFIC load (loadId), or start a new load with just that product. */
+export const addToLoad = (kind: LoadKind, productId: string, quantity: number, variant?: string | null, loadId?: string) =>
+    call<MixedLoad>('/mixed-loads/lines', { method: 'POST', body: JSON.stringify({ kind, productId, quantity, variant: variant ?? undefined, loadId }) });
+/** Create a new mixed load from exactly the buyer's selected lines. */
+export const createLoad = (kind: LoadKind, lines: LoadLine[]) =>
+    call<MixedLoad>('/mixed-loads', { method: 'POST', body: JSON.stringify({ kind, lines }) });
+
+/** Variant signatures ("Flavour=Grape") — same construction as the server. */
+export function variantSignatures(variants: unknown): { sig: string; label: string }[] {
+    const groups = (Array.isArray(variants) ? variants : [])
+        .filter((g: any) => g && g.name && !String(g.name).startsWith('__') && Array.isArray(g.values) && g.values.length)
+        .map((g: any) => ({ name: String(g.name), values: g.values.map((v: unknown) => String(v)) }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    if (!groups.length) return [];
+    let combos: Record<string, string>[] = [{}];
+    for (const g of groups) combos = combos.flatMap((c) => g.values.map((v: string) => ({ ...c, [g.name]: v })));
+    return combos.map((c) => ({ sig: Object.keys(c).sort().map((k) => `${k}=${c[k]}`).join('|'), label: Object.keys(c).sort().map((k) => c[k]).join(' · ') }));
+}
 export const updateLoad = (id: string, lines: LoadLine[], version: number) =>
     call<MixedLoad>(`/mixed-loads/${id}`, { method: 'PUT', body: JSON.stringify({ lines, version }) });
 export const deleteLoad = (id: string) => call<{ ok: true }>(`/mixed-loads/${id}`, { method: 'DELETE' });

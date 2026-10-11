@@ -268,8 +268,9 @@ export class UsersController {
                 });
                 results.push(`Successfully verified role as OWNER and set status to ACTIVE for ${adminEmail} (password preserved)`);
             } else {
-                const fallbackPassword = process.env.OWNER_PASSWORD || process.env.EMAIL_PASS || 'AliDawara@22';
-                const hashedPassword = await bcrypt.hash(fallbackPassword, 10);
+                const initial = process.env.OWNER_PASSWORD;
+                if (!initial || initial.length < 12) throw new Error('OWNER_PASSWORD (12+ chars) is not set — owner not created');
+                const hashedPassword = await bcrypt.hash(initial, 10);
                 await this.prisma.user.create({
                     data: {
                         email: adminEmail,

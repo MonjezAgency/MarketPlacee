@@ -186,8 +186,9 @@ export class AuthController {
         @Body('name') name: string, 
         @Body('secret') secret: string
     ) {
-        const expectedSecret = process.env.SEED_ADMIN_SECRET || 'atlantis_seed_2025_secure';
-        if (secret !== expectedSecret) {
+        // No built-in default: the endpoint is disabled unless the server has a real secret.
+        const expectedSecret = process.env.SEED_ADMIN_SECRET;
+        if (!expectedSecret || expectedSecret.length < 16 || secret !== expectedSecret) {
             throw new ForbiddenException('Unauthorized seed attempt');
         }
         try {
