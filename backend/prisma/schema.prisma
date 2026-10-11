@@ -284,6 +284,8 @@ model ProductPlacementHistory {
 
 model Order {
   id          String      @id @default(uuid())
+  /// Client-generated per checkout attempt; a retried/double-clicked submit returns the same order.
+  idempotencyKey String? @unique
   totalAmount Float
   status      OrderStatus @default(PENDING)
 
@@ -389,6 +391,8 @@ model OrderItem {
   // tier capacity), and `price` is the marked-up total line price.
   // Null for single-variant order lines.
   mixComposition Json?
+  /// Set when this line is a server-validated mixed pallet/truckload (see MixedLoad).
+  mixedLoadId String?
 }
 
 model AdminActionLog {
@@ -940,3 +944,26 @@ model InviteToken {
   @@index([token])
   @@index([email])
 }
+
+/// A buyer's mixed pallet or truckload, built from several products of ONE
+/// supplier. Lines are validated and priced on the server (src/orders/pricing.ts);
+/// a DRAFT becomes ORDERED inside the order-creation transaction.
+model MixedLoad {
+  id         String   @id @default(uuid())
+  customerId String
+  /// PALLET (filled with cases) | TRUCK (filled with pallets)
+  kind       String
+  /// DRAFT | ORDERED
+  status     String   @default("DRAFT")
+  supplierId String?
+  /// [{ productId, variant?, quantity }]
+  lines      Json     @default("[]")
+  /// Optimistic-concurrency counter — every update must send the version it read.
+  version    Int      @default(0)
+  orderId    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([customerId, status])
+}
+

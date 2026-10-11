@@ -96,8 +96,8 @@
 @layer base {
     :root {
         /* Professional B2B - Glass & Classic Edition */
-        --background: 216 25% 96%; /* #F2F4F7 Cool Gray */
-        --foreground: 0 0% 18%;    /* #2E2E2E Dark Gray */
+        --background: 220 20% 97%; /* #F6F7F9 Light neutral canvas */
+        --foreground: 222 47% 11%; /* #0F172A Ink — high-contrast body text */
         --card: 0 0% 100%;
         --card-foreground: 222 47% 11%;
         --popover: 0 0% 100%;
@@ -119,11 +119,11 @@
         --accent: 32 100% 50%;
         --accent-foreground: 0 0% 100%;
 
-        --muted: 210 40% 96%;
-        --muted-foreground: 215 16% 47%;
+        --muted: 220 16% 95%;
+        --muted-foreground: 215 19% 35%; /* #475569 — AA on white and canvas */
 
-        --border: 214 32% 91%;
-        --input: 214 32% 91%;
+        --border: 220 13% 90%;
+        --input: 220 13% 88%;
         --ring: 214 65% 11%;
         --radius: 1rem;
 
@@ -320,8 +320,8 @@ input:-webkit-autofill:active {
    rewriting every admin page.
    ===================================================================== */
 html.dark body {
-    background-color: #0a0f1c;
-    color: #e2e8f0;
+    background-color: rgb(var(--atl-surface));
+    color: rgb(var(--atl-ink));
 }
 
 /* Backgrounds */
@@ -368,6 +368,11 @@ html.dark textarea {
 }
 html.dark input::placeholder,
 html.dark textarea::placeholder { color: #64748b !important; }
+/* Storefront fields style their own wrapper — let them keep it. */
+html.dark input.bg-transparent,
+html.dark textarea.bg-transparent { background-color: transparent !important; border-color: transparent !important; }
+html.dark input.bg-surface,
+html.dark textarea.bg-surface { background-color: rgb(var(--atl-surface)) !important; }
 
 /* Modal overlay tweak */
 html.dark .bg-slate-900\/60 { background-color: rgba(0,0,0,0.7) !important; }
@@ -388,3 +393,85 @@ html.dark .shadow-2xl { box-shadow: 0 25px 60px rgba(0,0,0,0.5) !important; }
 .animate-marquee-ltr:hover {
     animation-play-state: paused;
 }
+
+/* ── Homepage hero: slow, cinematic drift (Ken Burns) ───────────────────
+   Long duration + ease-in-out + alternate keeps the motion barely
+   perceptible frame-to-frame — it reads as depth, not animation. */
+@keyframes hero-drift {
+    from { transform: scale(1.06) translate3d(0, 0, 0); }
+    to   { transform: scale(1.14) translate3d(-1.6%, -1.2%, 0); }
+}
+.animate-hero-drift {
+    animation: hero-drift 36s ease-in-out infinite alternate;
+    will-change: transform;
+}
+
+/* ── Brand strip: seamless loop (track is rendered twice) ─────────────── */
+@keyframes brand-loop {
+    from { transform: translate3d(0, 0, 0); }
+    to   { transform: translate3d(-50%, 0, 0); }
+}
+.animate-brand-loop {
+    animation: brand-loop 60s linear infinite;
+    will-change: transform;
+}
+.brand-strip:hover .animate-brand-loop,
+.brand-strip:focus-within .animate-brand-loop {
+    animation-play-state: paused;
+}
+
+/* Hero copy settles in when the slide changes. */
+@keyframes hero-copy {
+    from { opacity: 0; transform: translate3d(0, 10px, 0); }
+    to   { opacity: 1; transform: none; }
+}
+.animate-hero-copy { animation: hero-copy 900ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+    .animate-hero-copy,
+    .animate-hero-drift,
+    .animate-brand-loop { animation: none; }
+}
+
+/* ── Storefront theme tokens ──────────────────────────────────────────────
+   RGB triplets so Tailwind opacity modifiers work (bg-surface/80).
+   Light is the brand default; .dark is applied by next-themes (System follows
+   the OS, Light/Dark override it). */
+:root {
+    --atl-ink: 15 23 42;          /* #0F172A body text */
+    --atl-ink-2: 51 65 85;        /* #334155 secondary */
+    --atl-ink-3: 100 116 139;     /* #64748B muted */
+    --atl-ink-4: 148 163 184;     /* #94A3B8 faint / icons */
+    --atl-heading: 11 31 58;      /* #0B1F3A navy headings */
+    --atl-surface: 255 255 255;
+    --atl-surface-2: 246 248 250;
+    --atl-surface-3: 238 241 244;
+    --atl-media: 255 255 255;     /* product image wells */
+    --atl-line: 230 232 236;
+    --atl-line-strong: 203 213 225;
+    --atl-cta: 11 31 58;          /* navy primary buttons */
+    --atl-cta-hover: 19 50 92;
+    --atl-cta-fg: 255 255 255;
+    --atl-teal: 14 124 116;       /* #0E7C74 text-safe teal */
+    --atl-teal-soft: 230 248 246;
+}
+.dark {
+    --atl-ink: 232 237 244;
+    --atl-ink-2: 196 206 219;
+    --atl-ink-3: 148 162 182;
+    --atl-ink-4: 106 121 143;
+    --atl-heading: 241 245 249;
+    --atl-surface: 11 20 33;
+    --atl-surface-2: 17 28 44;
+    --atl-surface-3: 25 38 57;
+    --atl-media: 241 244 247;     /* stays light so product shots read true */
+    --atl-line: 34 49 70;
+    --atl-line-strong: 52 70 95;
+    --atl-cta: 46 196 182;        /* teal primary on dark for contrast */
+    --atl-cta-hover: 79 214 201;
+    --atl-cta-fg: 6 21 32;
+    --atl-teal: 62 207 192;
+    --atl-teal-soft: 20 58 62;
+    color-scheme: dark;
+}
+

@@ -52,6 +52,8 @@ import {
     SUPPORTED_CURRENCIES,
     convertFromBase,
     convertToBase,
+    getActiveCurrency,
+    isCurrencyAvailable,
 } from '@/lib/currency';
 import { COUNTRIES } from '@/lib/countries';
 import { CATEGORIES_LIST } from '@/lib/products';
@@ -929,16 +931,15 @@ export default function ProductEditorForm({
     // active display currency — synced with the rest of the app
     const [activeCurrency, setActiveCurrency] = useState(() => {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('platform-currency');
-            if (saved) return saved;
+            // Effective currency: only one with a current exchange rate.
+            return getActiveCurrency();
         }
         return getCurrencyInfo().code;
     });
 
     useEffect(() => {
         const onCurrencyChanged = () => {
-            const saved = localStorage.getItem('platform-currency');
-            if (saved) setActiveCurrency(saved);
+            setActiveCurrency(getActiveCurrency());
         };
         window.addEventListener('currency-changed', onCurrencyChanged);
         return () => window.removeEventListener('currency-changed', onCurrencyChanged);
@@ -2146,7 +2147,7 @@ export default function ProductEditorForm({
                                             className="w-full h-11 rounded-lg border border-slate-200 dark:border-white/[0.07] bg-white dark:bg-[#1c1c20] px-3.5 text-sm font-medium text-slate-900 dark:text-zinc-100 placeholder:text-slate-400 dark:placeholder:text-zinc-600 outline-none transition-colors focus:border-slate-400 dark:focus:border-white/20 focus:ring-2 focus:ring-slate-100 dark:focus:ring-white/[0.05] hover:border-slate-300 dark:hover:border-white/[0.12] appearance-none"
                                         >
                                             {SUPPORTED_CURRENCIES.map((c) => (
-                                                <option key={c.code} value={c.code}>
+                                                <option key={c.code} value={c.code} disabled={!isCurrencyAvailable(c.code)}>
                                                     {c.code}
                                                 </option>
                                             ))}

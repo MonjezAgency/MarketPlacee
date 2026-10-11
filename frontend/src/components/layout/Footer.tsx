@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Facebook, Twitter, Instagram, Linkedin, Send, CheckCircle2 } from 'lucide-react';
+import { Send, CheckCircle2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { apiFetch } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -100,126 +100,109 @@ export default function Footer() {
         }
     };
 
+    const cols: { title: string; links: { href: string; label: string }[] }[] = [
+        { title: t('footer', 'sourcing'), links: [
+            { href: '/categories', label: t('footer', 'browseCategories') },
+            { href: '/requests', label: 'Request a quote' },
+            { href: '/wholesale', label: t('footer', 'bulkWholesale') },
+            { href: '/deals', label: t('footer', 'dailyDeals') },
+        ] },
+        { title: 'Sellers', links: [
+            // Supplier onboarding is invite-only — sellers apply via contact.
+            { href: '/contact', label: 'Become a seller' },
+            { href: '/targets', label: 'Contact buyers' },
+            { href: '/how-it-works', label: t('footer', 'howItWorks') },
+        ] },
+        { title: t('footer', 'support'), links: [
+            { href: '/help', label: t('footer', 'helpCenter') },
+            { href: '/shipping', label: t('footer', 'shippingPolicy') },
+            { href: '/returns', label: t('footer', 'returnsRefunds') },
+        ] },
+        { title: t('footer', 'aboutUs'), links: [
+            { href: '/about', label: t('footer', 'aboutUs') },
+            { href: '/contact', label: t('footer', 'contactUs') },
+        ] },
+    ];
+
     return (
-        <footer className="bg-[#0F172A] text-[#CBD5F5] pt-16 pb-8">
-            <div className="max-w-[1440px] mx-auto px-6">
-                <div className="flex flex-col md:flex-row justify-between items-center gap-8 mb-16 pb-12 border-b border-white/10">
-                    <div className="space-y-2 text-center md:text-left">
-                        <h4 className="text-white text-[22px] font-black tracking-tight flex items-center gap-2 justify-center md:justify-start">
-                            {locale === 'ar' ? 'انضم إلى مستقبل التجارة' : 'Join the Future of B2B'}
-                        </h4>
-                        <p className="text-[14px] opacity-70 font-medium">
-                            {locale === 'ar' ? 'اشترك للحصول على رؤى التجارة العالمية وعروض الجملة الحصرية.' : 'Subscribe for global trade insights and exclusive wholesale deals.'}
+        <footer className="bg-surface-2 text-ink-2 text-start border-t border-[#E6EAEE]">
+            <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Newsletter */}
+                <div className="py-12 sm:py-14 flex flex-col lg:flex-row lg:items-center justify-between gap-8 border-b border-line">
+                    <div className="max-w-xl">
+                        <h2 className="font-sans text-[24px] sm:text-[28px] font-bold tracking-tight text-heading leading-tight">
+                            {locale === 'ar' ? 'احصل على عروض الجملة الجديدة أولاً' : 'Get New Wholesale Deals First'}
+                        </h2>
+                        <p className="mt-2 text-[15px] text-ink-2 leading-relaxed">
+                            {locale === 'ar'
+                                ? 'اشترك لتصلك أحدث عروضنا إلى بريدك فور إطلاقها.'
+                                : 'Subscribe to receive our latest offers straight to your inbox as soon as they go live.'}
                         </p>
                     </div>
-                    <form onSubmit={handleSubscribe} className="flex w-full max-w-lg bg-white/5 rounded-[16px] p-1.5 border border-white/10 focus-within:border-[#2EC4B6] focus-within:bg-white/10 transition-all shadow-2xl">
-                        <input 
-                            type="email" 
+                    <form onSubmit={handleSubscribe} className="flex w-full lg:max-w-[480px] h-14 bg-surface rounded-2xl p-1.5 ring-1 ring-line focus-within:ring-2 focus-within:ring-[#2EC4B6] transition-shadow">
+                        <label htmlFor="newsletter-email" className="sr-only">Business email</label>
+                        <input
+                            id="newsletter-email"
+                            type="email"
                             required
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
-                            placeholder={locale === 'ar' ? 'أدخل بريدك الإلكتروني' : 'Enter your business email'}
-                            className="flex-1 bg-transparent border-none outline-none px-5 py-3 text-[14px] text-white placeholder:text-white/30"
+                            placeholder={locale === 'ar' ? 'أدخل بريدك الإلكتروني' : 'Your business email'}
+                            className="flex-1 min-w-0 bg-transparent outline-none px-4 text-[15px] text-ink placeholder:text-ink-4"
                         />
-                        <button 
+                        <button
                             disabled={loading || success}
                             className={cn(
-                                "px-8 py-3 rounded-[12px] text-[14px] font-bold transition-all flex items-center gap-2 active:scale-95 shadow-xl",
-                                success 
-                                    ? "bg-[#10B981] text-white" 
-                                    : "bg-[#2EC4B6] hover:brightness-110 text-white shadow-[#2EC4B6]/20"
+                                'px-5 sm:px-6 rounded-xl text-[14px] font-semibold transition-colors flex items-center gap-2 shrink-0',
+                                success ? 'bg-[#10B981] text-cta-fg' : 'bg-cta hover:bg-cta-hover text-cta-fg'
                             )}
                         >
                             {loading ? (
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : success ? (
-                                <>{locale === 'ar' ? 'تم الاشتراك' : 'Subscribed'} <CheckCircle2 size={18} /></>
+                                <>{locale === 'ar' ? 'تم الاشتراك' : 'Subscribed'} <CheckCircle2 size={17} /></>
                             ) : (
-                                <>{locale === 'ar' ? 'اشترك' : 'Subscribe'} <Send size={16} /></>
+                                <>{locale === 'ar' ? 'اشترك' : 'Subscribe'} <Send size={15} /></>
                             )}
                         </button>
                     </form>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-16">
-                    <div className="col-span-1 space-y-6">
-                        <Link href="/" className="flex items-center gap-3">
-                            <img src="/icon.png" alt="Atlantis" className="w-9 h-9 object-contain rounded-xl" />
-                            <span className="text-[22px] font-black tracking-tighter uppercase">
-                                <span className="text-white">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
+                {/* Columns */}
+                <div className="py-12 grid grid-cols-2 md:grid-cols-6 gap-x-8 gap-y-10">
+                    <div className="col-span-2">
+                        <Link href="/" className="inline-flex items-center gap-2.5">
+                            <img src="/brand/atlantis-mark.png" alt="" width={36} height={36} className="w-9 h-9 object-contain rounded-lg" />
+                            <span className="text-[21px] font-black tracking-tighter uppercase">
+                                <span className="text-heading">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
                             </span>
                         </Link>
-                        <p className="text-[13px] leading-relaxed max-w-xs opacity-70">
-                            {t('footer', 'description')}
-                        </p>
-                        <div className="flex gap-4">
-                            {[Linkedin, Facebook, Twitter, Instagram].map((Icon, i) => (
-                                <a key={i} href="#" className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-[#2EC4B6] hover:text-white transition-all border border-white/10 hover:border-[#2EC4B6]">
-                                    <Icon size={18} />
-                                </a>
-                            ))}
-                        </div>
+                        <p className="mt-4 text-[14px] leading-relaxed max-w-xs">{t('footer', 'description')}</p>
                     </div>
-
-                    <div className="col-span-1">
-                        <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'sourcing')}</h4>
-                        <ul className="space-y-4 text-[13px] opacity-70">
-                            <li><Link href="/how-it-works" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'howItWorks')}</Link></li>
-                            <li><Link href="/categories" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'browseCategories')}</Link></li>
-                            {/* "Register as Supplier" link removed — supplier
-                                onboarding is invite-only and intentionally NOT
-                                exposed in the public footer. */}
-                            <li><Link href="/wholesale" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'bulkWholesale')}</Link></li>
-                            <li><Link href="/deals" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'dailyDeals')}</Link></li>
-                        </ul>
-                    </div>
-
-                    <div className="col-span-1">
-                        <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'support')}</h4>
-                        <ul className="space-y-4 text-[13px] opacity-70">
-                            <li><Link href="/help" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'helpCenter')}</Link></li>
-                            <li><Link href="/shipping" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'shippingPolicy')}</Link></li>
-                            <li><Link href="/returns" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'returnsRefunds')}</Link></li>
-                            {/* "Trade Assurance" link removed — page does not
-                                exist and was producing a 404. Add the route
-                                back here once /app/trade-assurance/page.tsx
-                                ships. */}
-                        </ul>
-                    </div>
-
-                    <div className="col-span-1">
-                        <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'aboutUs')}</h4>
-                        <ul className="space-y-4 text-[13px] opacity-70">
-                            <li><Link href="/about" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'aboutUs')}</Link></li>
-                            {/* "/news" link removed — no News page exists. */}
-                            <li><Link href="/contact" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'contactUs')}</Link></li>
-                        </ul>
-                    </div>
-
-                    <div className="col-span-1">
-                        <h4 className="text-white text-[14px] font-bold mb-6">{t('footer', 'terms')}</h4>
-                        <ul className="space-y-4 text-[13px] opacity-70">
-                            <li><Link href="/terms" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'terms')}</Link></li>
-                            {/* The actual route folders are
-                                /privacy-policy and /cookie-policy — the
-                                old short-form links produced 404s. */}
-                            <li><Link href="/privacy-policy" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'privacy')}</Link></li>
-                            <li><Link href="/cookie-policy" className="hover:text-[#2EC4B6] hover:translate-x-1 transition-all inline-block">{t('footer', 'cookies')}</Link></li>
-                        </ul>
-                    </div>
+                    {cols.map((c) => (
+                        <nav key={c.title} aria-label={c.title}>
+                            <h3 className="font-sans text-[13px] font-semibold uppercase tracking-[0.12em] text-heading mb-4">{c.title}</h3>
+                            <ul className="space-y-3 text-[14px]">
+                                {c.links.map((l) => (
+                                    <li key={l.label}><Link href={l.href} className="hover:text-teal transition-colors">{l.label}</Link></li>
+                                ))}
+                            </ul>
+                        </nav>
+                    ))}
                 </div>
 
-                <div className="flex flex-col md:flex-row justify-between items-center gap-6 border-t border-white/10 pt-8">
-                    <div className="flex flex-col md:flex-row items-center gap-2 md:gap-4 text-[12px] opacity-60">
-                        <p>{t('footer', 'copyright')}</p>
-                        <span className="hidden md:block text-white/10">|</span>
-                        <p className="flex items-center gap-1">
-                            {t('footer', 'developedBy')}
-                        </p>
+                {/* Legal bar */}
+                <div className="py-6 border-t border-line flex flex-col md:flex-row md:items-center justify-between gap-3 text-[13px] text-ink-3">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span>{t('footer', 'copyright')}</span>
+                        <span>{t('footer', 'developedBy')}</span>
                     </div>
-                    <div className="flex items-center gap-6 text-[12px] opacity-60 uppercase font-black">
-                        <span>{locale}</span>
-                    </div>
+                    <nav aria-label="Legal" className="flex flex-wrap items-center gap-x-5 gap-y-1">
+                        <Link href="/terms" className="hover:text-teal">{t('footer', 'terms')}</Link>
+                        <Link href="/privacy-policy" className="hover:text-teal">{t('footer', 'privacy')}</Link>
+                        <Link href="/cookie-policy" className="hover:text-teal">{t('footer', 'cookies')}</Link>
+                        <span className="uppercase font-semibold text-ink-4">{locale}</span>
+                    </nav>
                 </div>
             </div>
         </footer>

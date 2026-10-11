@@ -1,6 +1,8 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
+import { MixedLoadsService } from './mixed-loads.service';
+import { MixedLoadsController } from './mixed-loads.controller';
 import { EmailModule } from '../email/email.module';
 import { PrismaModule } from '../common/prisma.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -12,8 +14,8 @@ import { StorageModule } from '../storage/storage.module';
 
 @Module({
     imports: [PrismaModule, EmailModule, NotificationsModule, InvoiceModule, StorageModule, forwardRef(() => PaymentsModule), forwardRef(() => AdminModule)],
-    providers: [OrdersService],
-    controllers: [OrdersController],
+    providers: [OrdersService, MixedLoadsService],
+    controllers: [OrdersController, MixedLoadsController],
     exports: [OrdersService],
 })
 export class OrdersModule { }

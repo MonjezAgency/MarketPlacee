@@ -9,6 +9,7 @@ import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import { SessionProvider } from 'next-auth/react';
 import { useEffect } from 'react';
 
+
 export function Providers({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // Only set the platform default currency if the user hasn't manually
@@ -39,7 +40,14 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }, []);
     return (
         <SessionProvider>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider
+            attribute="class"
+            // Light is the brand default; buyers can pick System (follows the
+            // OS live) or force Light/Dark from the account / locale menu.
+            defaultTheme="light"
+            enableSystem
+            disableTransitionOnChange
+        >
             <ToastProvider>
                 <AuthProvider>
                     <LanguageProvider>

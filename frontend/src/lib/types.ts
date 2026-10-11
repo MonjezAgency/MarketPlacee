@@ -137,6 +137,8 @@ export interface Filters {
     minPrice?: string;
     maxPrice?: string;
     sort?: string;
+    limit?: number;
+    page?: number;
 }
 
 export const NOTIFICATION_TYPES = {

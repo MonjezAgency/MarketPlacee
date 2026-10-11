@@ -7,7 +7,7 @@ import {
     Star, Plus, Minus, Check, Truck,
     ShieldCheck, RotateCcw, ChevronRight, Share2,
     Heart, Info, Package, Sparkles, ArrowLeft, ShoppingCart, X, ChevronLeft,
-    Shield, CheckCircle2, Download, FileText, FileBadge
+    Shield, CheckCircle2, Download, FileText, FileBadge, Barcode
 } from 'lucide-react';
 import { type Product, ProductStatus } from '@/lib/types';
 import { fetchProductById, apiFetch, fetchProductsWithFilters } from '@/lib/api';
@@ -26,6 +26,9 @@ import { cn, prettifyVariantSignature } from '@/lib/utils';
 import { useWishlist } from '@/hooks/useWishlist';
 import { getDisplayCategory } from '@/lib/product-utils';
 import ImageLightbox from '@/components/ImageLightbox';
+import { brandLogo } from '@/lib/brand-logos';
+import { computeCardPrice } from '@/lib/card-pricing';
+import { round2, minUnitsFor as serverMinUnits, addToLoad, ApiError, loadLabel, type MixedLoad, type LoadKind } from '@/lib/wholesale';
 
 
 export default function ProductDetailClient() {
@@ -70,6 +73,12 @@ export default function ProductDetailClient() {
     const [isMixing, setIsMixing] = useState(false);
     const [mixQuantities, setMixQuantities] = useState<Record<string, number>>({});
     const [activeTab, setActiveTab] = useState('Description');
+    // Cross-product mixed pallet / truckload (server-saved MixedLoad).
+    const [loadKind, setLoadKind] = useState<LoadKind | null>(null);
+    const [loadQty, setLoadQty] = useState(1);
+    const [loadBusy, setLoadBusy] = useState(false);
+    const [loadResult, setLoadResult] = useState<MixedLoad | null>(null);
+    const [loadError, setLoadError] = useState('');
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -526,7 +535,7 @@ export default function ProductDetailClient() {
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center p-6 pt-20 bg-[#F8FAFC]">
+            <div className="min-h-[60vh] flex items-center justify-center p-6 bg-surface">
                 <div className="flex flex-col items-center gap-4">
                     <div className="w-10 h-10 border-4 border-[#14B8A6] border-t-transparent rounded-full animate-spin" />
                     <p className="text-[12px] font-bold text-slate-400 uppercase tracking-widest">{t('common', 'loading')}</p>
@@ -538,19 +547,18 @@ export default function ProductDetailClient() {
     const product = currentProduct;
 
     if (!product) {
+        // The catalog proxy only serves signed-in members, so a signed-out
+        // visitor can't load any product — say that instead of "not found".
         return (
-            <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center p-6">
-                <div className="text-center max-w-md">
-                    <div className="w-20 h-20 bg-white border border-slate-200 rounded-[24px] flex items-center justify-center mx-auto mb-8 shadow-sm">
-                        <Package className="text-slate-300" size={32} />
+            <div className="min-h-[60vh] bg-surface flex items-center justify-center p-6 text-center">
+                <div className="max-w-md">
+                    <span className="mx-auto w-14 h-14 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><Package size={26} /></span>
+                    <h2 className="mt-5 text-[20px] font-bold text-heading">{isLoggedIn ? 'Product not found' : 'Sign in to view this product'}</h2>
+                    <p className="mt-2 text-[14px] text-ink-2">{isLoggedIn ? 'It may have been removed or is no longer available.' : 'Atlantis is a members-only wholesale marketplace. Sign in to see products, pack sizes and prices.'}</p>
+                    <div className="mt-6 flex justify-center gap-3">
+                        {!isLoggedIn && <Link href={`/auth/login?redirect=${encodeURIComponent(`/products/${id}`)}`} className="inline-flex items-center h-10 px-5 rounded-xl bg-cta text-cta-fg text-[13px] font-semibold">Sign in</Link>}
+                        <Link href="/categories" className="inline-flex items-center h-10 px-5 rounded-xl ring-1 ring-line text-[13px] font-semibold text-ink">Browse catalog</Link>
                     </div>
-                    <h2 className="text-2xl font-bold text-slate-900 mb-2">Product Not Found</h2>
-                    <p className="text-slate-500 mb-8 text-sm">The item you are looking for might have been moved or is no longer available.</p>
-                    <Link href="/categories">
-                        <Button className="rounded-xl h-11 px-8 bg-[#14B8A6] hover:bg-[#0D9488] font-bold text-xs uppercase tracking-wider">
-                            Browse Catalog
-                        </Button>
-                    </Link>
                 </div>
             </div>
         );
@@ -616,600 +624,472 @@ export default function ProductDetailClient() {
         setTimeout(() => setIsAdded(false), 2500);
     };
 
-    const breadcrumbs = [
-        { label: 'Home', href: '/' },
-        { label: 'Inventory', href: '/categories' },
-        { label: getDisplayCategory(product), href: `/categories?category=${encodeURIComponent(getDisplayCategory(product))}` },
-        { label: product.name, href: '#' },
-    ];
+    // ── Purchase model (all from real product data) ─────────────────────────
+    // Same pricing rules as before: basePrice is the canonical per-case price;
+    // each packaging tier applies its own admin markup; a supplier viewing
+    // their own listing sees raw prices. A tier is offered only when the pack
+    // sizes it depends on exist on the product.
+    const piecesPerCase = product.unitsPerCase || 0;
+    const casesPerPallet = product.casesPerPallet || 0;
+    const palletsPerTruck = product.palletsPerShipment || 0;
+    const basePerCase = product.basePrice != null ? product.basePrice : product.price / markups.piece;
+    const mTruck = isSupplierOwner ? 1 : markups.container;
+    const mPallet = isSupplierOwner ? 1 : markups.pallet;
+    const mCase = isSupplierOwner ? 1 : markups.piece;
+    type PackKey = 'truck' | 'pallet' | 'carton';
+    const packOptions: Array<{ key: PackKey; label: string; perCasePrice: number; casesInUnit: number; contents: string }> = [];
+    if (piecesPerCase > 0) packOptions.push({ key: 'carton', label: 'Case', perCasePrice: round2(basePerCase * mCase), casesInUnit: 1, contents: `${piecesPerCase.toLocaleString()} units per case` });
+    if (piecesPerCase > 0 && casesPerPallet > 0) packOptions.push({ key: 'pallet', label: 'Pallet', perCasePrice: round2(basePerCase * mPallet), casesInUnit: casesPerPallet, contents: `${casesPerPallet.toLocaleString()} cases · ${(casesPerPallet * piecesPerCase).toLocaleString()} units` });
+    if (piecesPerCase > 0 && casesPerPallet > 0 && palletsPerTruck > 0) packOptions.push({ key: 'truck', label: 'Truckload', perCasePrice: round2(basePerCase * mTruck), casesInUnit: casesPerPallet * palletsPerTruck, contents: `${palletsPerTruck.toLocaleString()} pallets · ${(casesPerPallet * palletsPerTruck).toLocaleString()} cases` });
+    if (packOptions.length === 0) packOptions.push({ key: 'carton', label: product.unit || 'Case', perCasePrice: product.price, casesInUnit: 1, contents: 'Pack size not specified' });
 
-    // Image carousel — when the buyer has picked one or more variants
-    // AND those variants ship with their own images (useParentImages
-    // toggled OFF on the editor), swap the carousel to show the
-    // variant's images instead of the parent's. Otherwise fall back
-    // to the parent product images. This is the "show me Red Bull
-    // Sugar-Free pictures when I pick Sugar-Free" behaviour the
-    // (allImages + selectedImage-sync useEffect were originally
-    // declared here — moved above the `if (isLoading) return …`
-    // early return to keep the hook count stable. React error #310
-    // was triggered because the useMemo + useEffect ran on the
-    // post-load render but not on the loading render. See block
-    // near the top of the component for the canonical declaration.)
+    const initialPack = packOptions.find((o) => o.key === adminDefaultUnit)?.key ?? packOptions[packOptions.length - 1].key;
+    if (selectedUnit === undefined) setTimeout(() => setSelectedUnit(initialPack), 0);
+    const activePack = packOptions.find((o) => o.key === (selectedUnit ?? initialPack)) || packOptions[0];
+
+    // MOQ (moq + moqUnit) in the selected packaging unit — identical to the server rule.
+    const minUnitsFor = (k: PackKey) => serverMinUnits(product, k);
+    const minUnits = minUnitsFor(activePack.key);
+
+    // Live wholesale offer (backend-attached), optionally per selected variant.
+    const offerVariantKey = Object.keys(selectedVariants).sort().map((k) => `${k}=${selectedVariants[k]}`).join('|');
+    const activeOffer = (product as any).activeOffer as { discountPercent?: number; variantDiscounts?: Record<string, number>; validUntil?: string | null } | undefined;
+    const offerPct = Math.max(0, Math.min(100, Number(activeOffer ? ((activeOffer.variantDiscounts && offerVariantKey ? activeOffer.variantDiscounts[offerVariantKey] : undefined) ?? activeOffer.discountPercent ?? 0) : 0)));
+    const listPerCase = activePack.perCasePrice;
+    const perCasePrice = offerPct > 0 ? +(listPerCase * (1 - offerPct / 100)).toFixed(2) : listPerCase;
+    const perPackPrice = round2(perCasePrice * activePack.casesInUnit);
+    const subtotal = round2(perPackPrice * quantity);
+    const perPiece = piecesPerCase > 0 ? perCasePrice / piecesPerCase : null;
+    const totalCases = activePack.casesInUnit * quantity;
+    const packWord = (n: number) => `${activePack.label.toLowerCase()}${n === 1 ? '' : 's'}`;
+
+    const variantGroups = ((product.variants as any[]) || [])
+        .filter((v) => v && typeof v === 'object' && !String(v.name || '').startsWith('__'))
+        .map((v) => ({ name: String(v.name || ''), values: Array.isArray(v.values) ? v.values.map((x: any) => String(x)) : v.value ? [String(v.value)] : [] }))
+        .filter((g) => g.name && g.values.length > 0);
+    const missingVariant = variantGroups.some((g) => !selectedVariants[g.name]);
+    const addDisabled = isMixing ? (!mixSummary || mixSummary.filled !== mixCapacity.total) : missingVariant;
+
+    const quoteUnit = activePack.key === 'truck' ? 'trucks' : activePack.key === 'pallet' ? 'pallets' : 'cartons';
+    const quoteHref = `/requests?product=${encodeURIComponent(product.id)}&qty=${quantity}&unit=${quoteUnit}`;
+
+    const formatBbd = (raw: unknown): string | null => {
+        if (raw === null || raw === undefined || raw === '') return null;
+        const s = String(raw).trim();
+        if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+        const num = parseFloat(s);
+        if (!isNaN(num) && num > 30000 && num < 70000 && !/-/.test(s)) {
+            const d = new Date((num - 25569) * 86400 * 1000);
+            if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+        }
+        if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
+        if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+        return s;
+    };
+    const weightLabel = product.weight ? (/[a-z]/i.test(String(product.weight)) ? String(product.weight) : `${product.weight} kg`) : null;
+    const moqLabel = (() => {
+        const qty = product.moq ?? product.minOrder;
+        if (!qty) return null;
+        const u = String(product.moqUnit || 'PIECE').toUpperCase();
+        const words: Record<string, [string, string]> = { PIECE: ['unit', 'units'], CASE: ['case', 'cases'], PALLET: ['pallet', 'pallets'], TRUCK: ['truckload', 'truckloads'] };
+        const [one, many] = words[u] || ['unit', 'units'];
+        return `${qty.toLocaleString()} ${qty === 1 ? one : many}`;
+    })();
+    const availability = product.readyForDispatch
+        ? { tone: 'ok' as const, text: 'Ready for dispatch' }
+        : product.leadTime
+            ? { tone: 'wait' as const, text: `Made to order · ${product.leadTime}-day lead time` }
+            : null;
+
+    const keyFacts: Array<[string, string]> = ([
+        ['Brand', product.brand],
+        ['EAN / Barcode', product.ean],
+        ['Country of origin', product.origin],
+        ['Goods located (EXW)', product.exwLocation],
+        ['Lead time', product.leadTime ? `${product.leadTime} days` : null],
+        ['Best before', formatBbd(product.shelfLife)],
+        ['Minimum order', moqLabel],
+    ] as Array<[string, string | null | undefined]>).filter((r): r is [string, string] => !!r[1]);
+
+    const packagingSpecs: Array<[string, string]> = ([
+        ['Units per case', piecesPerCase ? `${piecesPerCase.toLocaleString()}` : null],
+        ['Cases per pallet', casesPerPallet ? `${casesPerPallet.toLocaleString()}` : null],
+        ['Units per pallet', product.unitsPerPallet ? product.unitsPerPallet.toLocaleString() : (piecesPerCase && casesPerPallet ? (piecesPerCase * casesPerPallet).toLocaleString() : null)],
+        ['Pallets per truckload', palletsPerTruck ? `${palletsPerTruck.toLocaleString()}` : null],
+        ['Weight per unit', weightLabel],
+        ['Selling unit', product.unit ? product.unit.replace(/^./, (c: string) => c.toUpperCase()) : null],
+    ] as Array<[string, string | null]>).filter((r): r is [string, string] => !!r[1]);
+
+    const listingStatus = product.status === 'APPROVED' ? 'Approved by Atlantis' : product.status === 'PENDING' ? 'Under review' : product.status === 'REJECTED' ? 'Not approved' : null;
+    const hasReviews = localReviewsCount > 0;
+
+    const tabs = ['Overview', 'Specifications'];
+    const tabKey = (t: string) => t.split(' ')[0];
+
+    const goToReviews = () => {
+        document.getElementById('pdp-reviews')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
 
     return (
-        <div className="min-h-screen bg-[#F8FAFC] font-inter text-[#111827] pt-12 pb-16">
-            {/* Enterprise Layout - 1440px Grid */}
-            <div className="max-w-[1440px] mx-auto px-12 mb-6 flex items-center justify-between">
-                <nav className="flex items-center gap-2 text-[12px] font-medium text-[#6B7280]">
-                    {breadcrumbs.map((bc, i) => (
-                        <React.Fragment key={i}>
-                            {i > 0 && <ChevronRight size={12} className="opacity-30" />}
-                            <Link href={bc.href} className={cn("hover:text-[#14B8A6] transition-colors truncate max-w-[250px]", i === breadcrumbs.length - 1 && "text-[#111827] font-bold")}>
-                                {bc.label}
-                            </Link>
-                        </React.Fragment>
-                    ))}
-                </nav>
-                <div className="flex items-center gap-2 px-3 py-1 bg-[#14B8A6]/10 border border-[#14B8A6]/20 rounded-full">
-                    <Sparkles size={12} className="text-[#14B8A6]" />
-                    <span className="text-[10px] font-black text-[#14B8A6] uppercase tracking-widest">B2B Optimized Page v2</span>
-                </div>
-            </div>
-
-            <main className="max-w-[1440px] mx-auto px-12">
-                {/* 1. Hero Section Grid */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 mb-12">
-                    
-                    {/* LEFT: Product Media */}
-                    {/* While mixing: this full media column collapses on
-                        desktop; a compact hero image is re-rendered at the
-                        top of the (now-wide) middle column so the image
-                        stays ABOVE the table and the table spans the full
-                        left+middle width. On mobile the column always
-                        shows. */}
-                    <div className={cn('lg:col-span-4', isMixing && 'lg:hidden')}>
-                        <div
-                            onClick={() => {
-                                const i = allImages.findIndex(u => u === selectedImage);
-                                setLightboxIndex(i >= 0 ? i : 0);
+        <div className="min-h-screen bg-surface text-ink text-start pb-20">
+            <main className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+                {/* Breadcrumb + utilities */}
+                <div className="flex items-center justify-between gap-4 pt-4 pb-4">
+                    <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 min-w-0 text-[13px] text-ink-3">
+                        <Link href="/" className="hover:text-heading shrink-0">Home</Link>
+                        <ChevronRight size={13} className="shrink-0" />
+                        <Link href="/categories" className="hover:text-heading shrink-0">Catalog</Link>
+                        {product.category && (<>
+                            <ChevronRight size={13} className="shrink-0" />
+                            <Link href={`/categories?category=${encodeURIComponent(product.category)}`} className="hover:text-heading truncate max-w-[180px]">{getDisplayCategory(product)}</Link>
+                        </>)}
+                        <ChevronRight size={13} className="shrink-0 hidden sm:block" />
+                        <span className="text-ink font-medium truncate hidden sm:block">{product.name}</span>
+                    </nav>
+                    <div className="flex items-center gap-1 shrink-0">
+                        <button
+                            type="button"
+                            onClick={async () => {
+                                const url = window.location.href;
+                                try { if (navigator.share) await navigator.share({ title: product.name, url }); else await navigator.clipboard.writeText(url); } catch { /* cancelled */ }
                             }}
-                            className="w-full aspect-square bg-white border border-[#E5E7EB] rounded-[24px] flex items-center justify-center p-8 relative group overflow-hidden shadow-sm cursor-zoom-in"
-                            title="Click to zoom"
+                            aria-label="Share product"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-3 hover:text-ink"
+                        ><Share2 size={16} /></button>
+                        <button
+                            type="button"
+                            onClick={() => toggleWishlist(product.id)}
+                            aria-label={isSaved(product.id) ? 'Remove from saved' : 'Save product'}
+                            aria-pressed={isSaved(product.id)}
+                            className={cn('w-8 h-8 rounded-lg flex items-center justify-center hover:bg-surface-3', isSaved(product.id) ? 'text-[#E11D48]' : 'text-ink-2 hover:text-ink')}
+                        ><Heart size={16} fill={isSaved(product.id) ? 'currentColor' : 'none'} /></button>
+                    </div>
+                </div>
+
+                {isSupplierOwner && (
+                    <div className="mb-4 rounded-xl bg-cta text-cta-fg px-4 py-2.5 flex items-center justify-between gap-3">
+                        <p className="text-[12.5px]"><span className="font-semibold">Your listing</span><span className="text-white/60"> — prices shown without the Atlantis markup.</span></p>
+                        <Link href={`/supplier/products/${product.id}/edit`} className="inline-flex items-center h-7 px-3 rounded-md bg-white/10 hover:bg-white/20 text-[12px] font-semibold">Edit</Link>
+                    </div>
+                )}
+
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,480px)_minmax(0,1fr)] gap-8 lg:gap-10">
+                    {/* ── Gallery ─────────────────────────────────────────── */}
+                    <section aria-label="Product images" className="lg:sticky lg:top-[108px] self-start">
+                        <button
+                            type="button"
+                            onClick={() => { const i = allImages.findIndex((u) => u === selectedImage); setLightboxIndex(i >= 0 ? i : 0); }}
+                            className="relative w-full max-w-[480px] mx-auto aspect-square rounded-2xl bg-media ring-1 ring-line overflow-hidden cursor-zoom-in group"
+                            aria-label="Enlarge image"
                         >
-                            <AnimatePresence mode="wait">
-                                <motion.img
-                                    key={selectedImage}
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 1.05 }}
+                            {selectedImage ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
                                     src={selectedImage}
                                     alt={product.name}
-                                    className="w-full h-full object-contain drop-shadow-2xl select-none transition-transform duration-300 group-hover:scale-105"
+                                    // Low-res uploads (some are ~100px) are enlarged at most 3×
+                                    // so they stay legible without turning into a blurry smear.
+                                    onLoad={(e) => { const im = e.currentTarget; const cap = Math.max(im.naturalWidth, im.naturalHeight) * 3; im.style.width = im.style.height = `min(84%, ${cap}px)`; }}
+                                    className="absolute inset-0 m-auto w-[84%] h-[84%] object-contain mix-blend-multiply select-none transition-transform duration-300 group-hover:scale-[1.02]"
                                 />
-                            </AnimatePresence>
-                            
-                            <button
-                                onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
-                                className={cn(
-                                    "absolute top-6 right-6 w-12 h-12 rounded-full border flex items-center justify-center transition-all z-10 shadow-sm cursor-pointer",
-                                    isSaved(product.id) ? "bg-red-50 border-red-100 text-red-500" : "bg-white border-slate-100 text-slate-300 hover:text-red-500"
-                                )}
-                            >
-                                <Heart size={20} fill={isSaved(product.id) ? 'currentColor' : 'none'} />
-                            </button>
-                        </div>
-                        
+                            ) : (
+                                <span className="absolute inset-0 flex items-center justify-center text-ink-4"><Package size={56} strokeWidth={1.2} /></span>
+                            )}
+                        </button>
                         {allImages.length > 1 && (
-                            <div className="flex flex-wrap gap-3 mt-4">
+                            <div className="mt-3 flex gap-2 overflow-x-auto scrollbar-hide" role="list">
                                 {allImages.map((img, i) => (
                                     <button
-                                        key={i}
+                                        key={img + i}
+                                        type="button"
+                                        role="listitem"
                                         onClick={() => setSelectedImage(img)}
-                                        className={cn(
-                                            "w-20 h-20 rounded-[12px] border-2 bg-white flex items-center justify-center p-2 transition-all overflow-hidden shadow-sm",
-                                            selectedImage === img ? "border-[#14B8A6]" : "border-[#E5E7EB] hover:border-[#14B8A6]/50"
-                                        )}
+                                        aria-label={`Show image ${i + 1}`}
+                                        aria-current={selectedImage === img}
+                                        className={cn('w-16 h-16 shrink-0 rounded-lg bg-media flex items-center justify-center p-1.5 ring-1 transition-shadow', selectedImage === img ? 'ring-2 ring-[#2EC4B6]' : 'ring-line hover:ring-line-strong')}
                                     >
-                                        <img src={img} className="max-h-full object-contain" />
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={img} alt="" className="max-w-full max-h-full object-contain mix-blend-multiply" />
                                     </button>
                                 ))}
                             </div>
                         )}
-
-                        {/* ── Demo videos ──
-                            Short product demo clips. Rendered BELOW the
-                            image gallery so the lead photo stays the
-                            hero; videos sit as a stack of native <video>
-                            players that buyers can play inline. Each
-                            uses preload="metadata" so we only load the
-                            poster frame until the buyer presses play —
-                            keeps the PDP fast even with multiple clips.
-                            The track gets a small "VIDEO" badge so it
-                            visually separates from the photo thumbnails
-                            above. */}
+                        <p className="mt-2 text-[12px] text-ink-3">Pictures are for illustration only. Trust the barcode, not the image.</p>
                         {Array.isArray(product.videos) && product.videos.length > 0 && (
-                            <div className="mt-6 space-y-3">
-                                <div className="flex items-center gap-2 text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">
-                                    <span className="inline-flex items-center gap-1.5 h-5 px-2 rounded-md bg-rose-50 text-rose-600 border border-rose-100">
-                                        ▶ Video
-                                    </span>
-                                    <span>{product.videos.length} clip{product.videos.length === 1 ? '' : 's'}</span>
-                                </div>
+                            <div className="mt-4 space-y-2">
                                 {product.videos.map((vid, i) => (
-                                    <video
-                                        key={vid + i}
-                                        src={vid}
-                                        controls
-                                        preload="metadata"
-                                        playsInline
-                                        className="w-full rounded-xl border border-[#E5E7EB] bg-black aspect-video"
-                                    />
+                                    <video key={vid + i} src={vid} controls preload="metadata" playsInline className="w-full rounded-xl ring-1 ring-line bg-black aspect-video" />
                                 ))}
                             </div>
                         )}
-                    </div>
+                    </section>
 
-                    {/* MIDDLE: Product Information */}
-                    <div className={cn('flex flex-col', isMixing ? 'lg:col-span-9' : 'lg:col-span-5')}>
-                        {/* Compact hero image — only on desktop while mixing,
-                            since the full media column is hidden then. Keeps
-                            the product picture pinned at the top with the
-                            wide variant table flowing right below it. */}
-                        {isMixing && (
-                            <div className="hidden lg:block mb-6">
-                                <div className="w-full max-w-[420px] aspect-square rounded-[24px] overflow-hidden bg-white border border-[#E5E7EB] shadow-sm">
-                                    {selectedImage ? (
-                                        // eslint-disable-next-line @next/next/no-img-element
-                                        <img src={selectedImage} alt={product.name} className="w-full h-full object-contain" />
-                                    ) : (
-                                        <div className="w-full h-full flex items-center justify-center">
-                                            <Package size={48} className="text-slate-200" />
-                                        </div>
+                    {/* ── Product info + purchase panel ───────────────────── */}
+                    <section aria-label="Product details" className="min-w-0">
+                        {product.brand && (
+                            <Link href={`/categories?brand=${encodeURIComponent(product.brand)}`} className="inline-flex items-center gap-2 text-[13.5px] font-semibold text-ink hover:text-teal">
+                                {brandLogo(product.brand) && (
+                                    <span className="w-7 h-7 rounded-full bg-media ring-1 ring-line flex items-center justify-center overflow-hidden shrink-0">
+                                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                                        <img src={brandLogo(product.brand)!} alt="" className="max-w-[78%] max-h-[78%] object-contain" />
+                                    </span>
+                                )}
+                                {product.brand}
+                            </Link>
+                        )}
+                        <h1 className="mt-1 text-[22px] sm:text-[26px] font-bold leading-tight tracking-tight text-heading">{translatedName || product.name}</h1>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-ink-3">
+                            <span className="inline-flex items-center gap-1.5 tabular-nums">
+                                <Barcode size={14} className="text-ink-4" />
+                                <span className="text-ink-4">EAN / Barcode</span>
+                                {product.ean ? <span className="text-ink font-medium">{product.ean}</span> : <span className="text-ink-4 italic">not provided by supplier</span>}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5"><span className="text-ink-4">Ref.</span> <span className="font-mono text-[12.5px] text-ink-2">ATL-{product.id.slice(0, 8).toUpperCase()}</span></span>
+                            <button type="button" onClick={goToReviews} className="inline-flex items-center gap-1.5 hover:text-ink">
+                                {hasReviews ? (
+                                    <>
+                                        <span className="flex items-center gap-0.5" aria-hidden>
+                                            {[...Array(5)].map((_, i) => <Star key={i} size={13} className={i < Math.round(localRating) ? 'fill-[#F59E0B] text-[#F59E0B]' : 'text-[#E2E8F0]'} />)}
+                                        </span>
+                                        <span className="font-medium text-ink-2 tabular-nums">{localRating.toFixed(1)}</span>
+                                        <span>({localReviewsCount} {localReviewsCount === 1 ? 'review' : 'reviews'})</span>
+                                    </>
+                                ) : <span>No reviews yet</span>}
+                            </button>
+                        </div>
+
+                        {/* Purchase panel */}
+                        <div className="mt-5 rounded-2xl ring-1 ring-line bg-surface">
+                            <div className="p-4 sm:p-5">
+                                <div className="flex items-baseline justify-between gap-3">
+                                    <h2 className="text-[13px] font-semibold text-ink">Packaging</h2>
+                                    {availability && (
+                                        <span className={cn('inline-flex items-center gap-1.5 text-[12.5px] font-medium', availability.tone === 'ok' ? 'text-[#047857]' : 'text-[#B45309]')}>
+                                            <span className={cn('w-1.5 h-1.5 rounded-full', availability.tone === 'ok' ? 'bg-[#10B981]' : 'bg-[#F59E0B]')} />
+                                            {availability.text}
+                                        </span>
                                     )}
                                 </div>
-                            </div>
-                        )}
-                        <div className="flex flex-col gap-6">
-                            {/* ── "Your listing" banner ────────────────────
-                                Only renders when the visitor is the supplier
-                                who owns this product. Buyers / anonymous
-                                visitors / other suppliers see nothing — to
-                                them this is just an Atlantis product. The
-                                banner gives the owner an at-a-glance signal
-                                + a direct link to the edit page so they don't
-                                have to bounce back through /supplier/products. */}
-                            {user?.role?.toUpperCase() === 'SUPPLIER' &&
-                                (product as any).supplierId &&
-                                user?.id === (product as any).supplierId && (
-                                <div className="rounded-xl bg-[#0B1F3A] text-white px-4 py-3 flex items-center justify-between gap-3">
-                                    <div className="flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                        <span className="text-[12px] font-bold uppercase tracking-widest">
-                                            Your listing
-                                        </span>
-                                        <span className="text-[11px] text-white/60 font-medium">
-                                            — this is how the public catalog sees your product.
-                                        </span>
-                                    </div>
-                                    <Link
-                                        href={`/supplier/products/${product.id}/edit`}
-                                        className="inline-flex items-center h-7 px-3 rounded-md bg-white/10 hover:bg-white/20 text-[11px] font-bold transition-colors"
-                                    >
-                                        Edit
-                                    </Link>
-                                </div>
-                            )}
-                            <div className="flex">
-                                <span className="text-[12px] font-bold text-[#14B8A6] bg-[#14B8A6]/5 px-4 py-1.5 rounded-full uppercase tracking-widest border border-[#14B8A6]/10">
-                                    {getDisplayCategory(product)}
-                                </span>
-                            </div>
-
-                            <h1 className="text-[36px] font-bold text-[#111827] leading-[44px] tracking-tight">
-                                {translatedName || product.name}
-                            </h1>
-
-                            <div className="flex items-center gap-3">
-                                <div className="flex items-center gap-1">
-                                    {[...Array(5)].map((_, i) => (
-                                        <Star key={i} size={18} className={i < Math.floor(localRating) ? "fill-[#F59E0B] text-[#F59E0B]" : "text-[#E5E7EB]"} />
-                                    ))}
-                                </div>
-                                <span className="text-[15px] font-semibold text-[#6B7280]">
-                                    {localRating.toFixed(1)} <span className="opacity-50 mx-1">|</span> {localReviewsCount} verified reviews
-                                </span>
-                            </div>
-
-                            {/* Pricing block with unit toggle (Truck / Pallet / Case).
-                                Atlantis pricing model: the headline number on every tier
-                                button AND in the main pricing area is always a PER-CASE
-                                price. What changes between tiers is the markup applied to
-                                that per-case price (Truck → container markup ≈ +2%, Pallet
-                                → pallet markup ≈ +5%, Case → piece markup ≈ +10%). The
-                                buyer's quantity counter then counts in the chosen unit
-                                (1 truck, 2 pallets, 5 cases…) so the line total is
-                                perCasePrice × casesPerUnit × qty. */}
-                            {(() => {
-                                const piecesPerCase = product.unitsPerCase || 0;
-                                const casesPerPallet = product.casesPerPallet || 0;
-                                const piecesPerPallet = product.unitsPerPallet || (piecesPerCase * casesPerPallet) || 0;
-                                const palletsPerTruck = product.palletsPerShipment || 0;
-
-                                // basePrice is ALWAYS the per-case price (the
-                                // supplier form stores `pricePerPiece × unitsPerCase`).
-                                // The previous unit-aware reversal divided by
-                                // pallet/truck pack sizes when `unit` happened
-                                // to be "truck" — which is what reduced KitKat
-                                // €9.07/case to €0.03/case on the PDP. We now
-                                // treat basePrice as canonical per-case (same
-                                // logic as the tierData useMemo above).
-                                const rawBase = product.basePrice != null
-                                    ? product.basePrice
-                                    : product.price / markups.piece;
-                                const basePerCase = rawBase;
-
-                                // ── Role-aware markup ───────────────────────────
-                                // Customer / anonymous / admin → see prices WITH markup
-                                //   applied. Admin sees the same ladder customers see
-                                //   so they can audit the cart number without leaving
-                                //   the PDP; the admin formula panel below explains
-                                //   "base × (1 + %)" alongside.
-                                // Supplier viewing OWN product → raw prices, no markup,
-                                //   so they can't reverse-engineer the spread.
-                                const useRawPrices = isSupplierOwner;
-                                const mTruck   = useRawPrices ? 1 : markups.container;
-                                const mPallet  = useRawPrices ? 1 : markups.pallet;
-                                const mCase    = useRawPrices ? 1 : markups.piece;
-
-                                // Per-case price for each tier — same base, different markup.
-                                const truckAvailable  = piecesPerCase > 0 && casesPerPallet > 0 && palletsPerTruck > 0;
-                                const palletAvailable = piecesPerCase > 0 && casesPerPallet > 0;
-                                const caseAvailable   = piecesPerCase > 0;
-
-                                const perCaseTruck  = truckAvailable  ? basePerCase * mTruck  : null;
-                                const perCasePallet = palletAvailable ? basePerCase * mPallet : null;
-                                const perCaseCase   = caseAvailable   ? basePerCase * mCase   : null;
-
-                                // Each tier carries the per-case display price plus how many
-                                // cases sit inside one of its units (used for the line total).
-                                const options: Array<{ key: 'truck'|'pallet'|'carton'; label: string; emoji: string; perCasePrice: number | null; casesInUnit: number }> = [];
-                                if (perCaseTruck  !== null) options.push({ key: 'truck',  label: 'Truck',  emoji: '🚛', perCasePrice: perCaseTruck,  casesInUnit: casesPerPallet * palletsPerTruck });
-                                if (perCasePallet !== null) options.push({ key: 'pallet', label: 'Pallet', emoji: '📦', perCasePrice: perCasePallet, casesInUnit: casesPerPallet });
-                                if (perCaseCase   !== null) options.push({ key: 'carton', label: 'Case',   emoji: '🗃️', perCasePrice: perCaseCase,   casesInUnit: 1 });
-                                if (options.length === 0) options.push({ key: 'carton', label: product.unit || 'Case', emoji: '📦', perCasePrice: product.price, casesInUnit: 1 });
-
-                                // Default: admin-configured unit, fall back to the largest available
-                                const initialSelected = options.find(o => o.key === adminDefaultUnit)?.key ?? options[0].key;
-                                if (selectedUnit === undefined) {
-                                    setTimeout(() => setSelectedUnit(initialSelected), 0);
-                                }
-                                const active = options.find(o => o.key === (selectedUnit ?? initialSelected)) || options[0];
-
-                                // ── MOQ enforcement ──────────────────────────────────────────────────────
-                                // Convert MOQ (in pieces) to the selected unit. Minimum = 1 always.
-                                const moqPieces = product.moq || 1;
-                                const piecesPerActiveUnit =
-                                    active.key === 'carton' ? (piecesPerCase || 1)
-                                    : active.key === 'pallet' ? (piecesPerCase || 1) * (casesPerPallet || 1)
-                                    : (piecesPerCase || 1) * (casesPerPallet || 1) * (palletsPerTruck || 1);
-                                const minUnits = Math.max(1, Math.ceil(moqPieces / piecesPerActiveUnit));
-
-                                // perCasePrice  = headline number ("€7.20 / case") with active markup.
-                                // perUnitTotal  = price of ONE chosen unit (one truck / one pallet / one
-                                //                 case) — used for the per-unit subtitle and the cart.
-                                // customTotal   = grand total = perUnitTotal × qty.
-                                const fullPerCasePrice = active.perCasePrice ?? 0;
-                                // Active wholesale-offer discount surfaces here.
-                                // backend attaches { discountPercent, variantDiscounts }
-                                // on `product.activeOffer` when an APPROVED offer is
-                                // live for this product. If the buyer has selected
-                                // a specific variant and there's a per-variant
-                                // override, we use that — otherwise the headline %.
-                                const offerVariantKey = Object.keys(selectedVariants).sort()
-                                    .map(k => `${k}=${selectedVariants[k]}`).join('|');
-                                const activeOffer = (product as any).activeOffer as
-                                    | { discountPercent?: number; variantDiscounts?: Record<string, number>; validUntil?: string | null }
-                                    | undefined;
-                                const offerDiscountPct = activeOffer
-                                    ? Number(
-                                          (activeOffer.variantDiscounts && offerVariantKey
-                                              ? activeOffer.variantDiscounts[offerVariantKey]
-                                              : undefined) ?? activeOffer.discountPercent ?? 0,
-                                      )
-                                    : 0;
-                                const safeDiscountPct = Math.max(0, Math.min(100, offerDiscountPct));
-                                const perCasePrice = safeDiscountPct > 0
-                                    ? +(fullPerCasePrice * (1 - safeDiscountPct / 100)).toFixed(2)
-                                    : fullPerCasePrice;
-                                const perUnitTotal = perCasePrice * active.casesInUnit;
-                                const customTotal  = perUnitTotal * quantity;
-
-                                return (
-                                    <div className="flex flex-col gap-4 py-5 border-y border-[#E5E7EB]">
-
-                                        {/* Unit tabs — Truck / Pallet / Carton.
-                                            If the buyer already added this product to the cart at
-                                            a specific tier, the OTHER two tiers render as disabled
-                                            with a tooltip — Atlantis enforces one tier per SKU
-                                            per cart so prices can't be mixed across tiers. */}
-                                        <div className="grid grid-cols-3 gap-2">
-                                            {options.map((opt) => {
-                                                const isLockedOut = !!lockedTier && lockedTier !== opt.key;
-                                                return (
-                                                <button
-                                                    key={opt.key}
-                                                    disabled={isLockedOut}
-                                                    title={isLockedOut
-                                                        ? 'This product is already in your cart as ' +
-                                                          (lockedTier === 'truck' ? 'Truck' : lockedTier === 'pallet' ? 'Pallet' : 'Case') +
-                                                          '. Remove it from the cart first to switch tier.'
-                                                        : undefined}
-                                                    onClick={() => {
-                                                        if (isLockedOut) return;
-                                                        // Compute minUnits for the NEW unit type before switching
-                                                        const ppuNew =
-                                                            opt.key === 'carton' ? (piecesPerCase || 1)
-                                                            : opt.key === 'pallet' ? (piecesPerCase || 1) * (casesPerPallet || 1)
-                                                            : (piecesPerCase || 1) * (casesPerPallet || 1) * (palletsPerTruck || 1);
-                                                        const minNew = Math.max(1, Math.ceil(moqPieces / ppuNew));
-                                                        setSelectedUnit(opt.key);
-                                                        setQuantity(minNew);
-                                                    }}
-                                                    className={cn(
-                                                        'flex flex-col items-center py-3 px-2 rounded-2xl border-2 text-center transition-all',
-                                                        active.key === opt.key
-                                                            ? 'border-[#0F172A] bg-[#0F172A] text-white shadow-lg'
-                                                            : isLockedOut
-                                                                ? 'border-[#E5E7EB] bg-[#F8FAFC] text-[#CBD5E1] cursor-not-allowed opacity-60'
-                                                                : 'border-[#E5E7EB] bg-white text-[#475569] hover:border-[#0F172A]/40'
-                                                    )}
-                                                >
-                                                    <span className="text-[20px] mb-0.5">{opt.emoji}</span>
-                                                    <span className="text-[11px] font-black uppercase tracking-widest">{opt.label}</span>
-                                                    {opt.perCasePrice != null && (
-                                                        <span className={cn('text-[11px] font-semibold mt-0.5', active.key === opt.key ? 'text-white/70' : 'text-[#9CA3AF]')}>
-                                                            {formatPrice(opt.perCasePrice)} / case
-                                                        </span>
-                                                    )}
-                                                </button>
-                                                );
-                                            })}
-                                        </div>
-                                        {lockedTier && (
-                                            <div className="flex items-start gap-2 px-3 py-2 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 font-semibold">
-                                                <span className="text-[14px]">🔒</span>
-                                                <span>Locked to <strong>{lockedTier === 'truck' ? 'Truck' : lockedTier === 'pallet' ? 'Pallet' : 'Case'}</strong> — this product is already in your cart at that tier. Remove it from the cart to switch tier.</span>
-                                            </div>
-                                        )}
-
-                                        {/* Headline price = per-CASE price for the active tier.
-                                            Subtitle shows what one of the chosen unit costs
-                                            (perCasePrice × cases-in-unit). Grand total appears
-                                            only once the buyer scales qty above 1. */}
-                                        <div className="flex items-end justify-between gap-4">
-                                            <div>
-                                                <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest mb-1">
-                                                    Per case · {active.label} pricing
-                                                </p>
-                                                <div className="flex items-baseline gap-2 flex-wrap">
-                                                    <span className="text-[40px] font-black text-[#111827] tracking-tighter leading-none">
-                                                        {formatPrice(perCasePrice)}
+                                <div role="radiogroup" aria-label="Packaging" className={cn('mt-2.5 grid gap-2', packOptions.length === 3 ? 'grid-cols-1 sm:grid-cols-3' : packOptions.length === 2 ? 'grid-cols-2' : 'grid-cols-1')}>
+                                    {packOptions.map((opt) => {
+                                        const selected = activePack.key === opt.key;
+                                        const locked = !!lockedTier && lockedTier !== opt.key;
+                                        return (
+                                            <button
+                                                key={opt.key}
+                                                type="button"
+                                                role="radio"
+                                                aria-checked={selected}
+                                                disabled={locked || isMixing}
+                                                title={locked ? 'Already in your cart at another packaging tier — remove it from the cart to switch.' : undefined}
+                                                onClick={() => { setSelectedUnit(opt.key); setQuantity(minUnitsFor(opt.key)); }}
+                                                className={cn(
+                                                    'text-start rounded-xl px-3 py-2.5 ring-1 transition-shadow disabled:cursor-not-allowed',
+                                                    selected ? 'ring-2 ring-[#2EC4B6] bg-teal-soft' : 'ring-line hover:ring-line-strong disabled:opacity-50'
+                                                )}
+                                            >
+                                                <span className="flex items-center justify-between gap-2">
+                                                    <span className="text-[13.5px] font-semibold text-ink">{opt.label}</span>
+                                                    <span className={cn('w-3.5 h-3.5 rounded-full ring-1 flex items-center justify-center', selected ? 'ring-[#0E7C74] bg-[#0E7C74]' : 'ring-line-strong')}>
+                                                        {selected && <span className="w-1.5 h-1.5 rounded-full bg-surface" />}
                                                     </span>
-                                                    <span className="text-[15px] font-medium text-[#6B7280]">/ case</span>
-                                                    {safeDiscountPct > 0 && (
-                                                        <>
-                                                            <span className="text-[15px] font-medium text-slate-400 line-through tabular-nums">
-                                                                {formatPrice(fullPerCasePrice)}
-                                                            </span>
-                                                            <span className="inline-flex items-center h-6 px-2 rounded-md bg-rose-100 text-rose-700 text-[11px] font-black uppercase tracking-widest">
-                                                                -{safeDiscountPct}% promo
-                                                            </span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                {safeDiscountPct > 0 && activeOffer?.validUntil && (
-                                                    <p className="text-[11px] text-rose-700 font-bold mt-1">
-                                                        Valid until {new Date(activeOffer.validUntil).toLocaleDateString()}
-                                                    </p>
-                                                )}
-                                                {active.casesInUnit > 1 && (
-                                                    <p className="text-[12px] text-[#6B7280] mt-1">
-                                                        = <strong className="text-[#111827]">{formatPrice(perUnitTotal)}</strong> per {active.label.toLowerCase()} ({active.casesInUnit} cases)
-                                                    </p>
-                                                )}
-                                                {quantity > 1 && (
-                                                    <p className="text-[12px] text-[#9CA3AF] mt-0.5">
-                                                        {quantity} × {active.label.toLowerCase()}{quantity > 1 ? 's' : ''} total: <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
-                                                    </p>
-                                                )}
-                                            </div>
-
-                                            {/* Quantity selector */}
-                                            <div className="flex flex-col items-end gap-1 shrink-0">
-                                                <div className="flex items-center gap-1">
-                                                    <button
-                                                        onClick={() => setQuantity(q => Math.max(minUnits, q - 1))}
-                                                        disabled={quantity <= minUnits}
-                                                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center font-bold text-lg transition-all disabled:opacity-30 disabled:cursor-not-allowed text-[#475569] hover:border-[#0F172A] hover:text-[#0F172A]"
-                                                    >−</button>
-                                                    <span className="w-10 text-center text-[15px] font-black text-[#111827]">{quantity}</span>
-                                                    <button
-                                                        onClick={() => setQuantity(q => q + 1)}
-                                                        className="w-9 h-9 rounded-full border border-[#E5E7EB] flex items-center justify-center text-[#475569] hover:border-[#0F172A] hover:text-[#0F172A] font-bold text-lg transition-all"
-                                                    >+</button>
-                                                </div>
-                                                {minUnits > 1 && (
-                                                    <p className="text-[10px] text-amber-600 font-semibold">
-                                                        Min. {minUnits} {active.label.toLowerCase()}{minUnits > 1 ? 's' : ''}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        {/* Breakdown hint (multi-unit orders) */}
-                                        {quantity > 1 && (
-                                            <p className="text-[12px] text-[#6B7280] bg-[#F8FAFC] rounded-xl px-3 py-2 leading-relaxed">
-                                                {quantity} {active.label.toLowerCase()}{quantity > 1 ? 's' : ''} × {formatPrice(perUnitTotal)} = <strong className="text-[#111827]">{formatPrice(customTotal)}</strong>
-                                                {active.key === 'truck' && palletsPerTruck > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * (casesPerPallet * palletsPerTruck)} cases total)</span>}
-                                                {active.key === 'pallet' && casesPerPallet > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * casesPerPallet} cases total)</span>}
-                                                {active.key === 'carton' && piecesPerCase > 0 && <span className="ml-2 text-[#9CA3AF]">({quantity * piecesPerCase} pieces)</span>}
-                                            </p>
-                                        )}
-
-                                        <div className="flex items-center gap-2 text-emerald-600">
-                                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                                            <span className="text-[12px] font-bold uppercase tracking-widest">In Active Distribution</span>
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            <div className="grid grid-cols-2 gap-x-10 gap-y-8 py-2">
-                                <div className="space-y-1.5">
-                                    <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Min. Sourcing</p>
-                                    <p className="text-[18px] font-bold text-[#111827] capitalize">
-                                        {(() => {
-                                            const qty = product.moq ?? product.minOrder ?? 1;
-                                            const u = String(product.moqUnit || 'PIECE').toUpperCase();
-                                            const unitLabel: Record<string, string> = {
-                                                PIECE: qty === 1 ? 'piece' : 'pieces',
-                                                CASE: qty === 1 ? 'case' : 'cases',
-                                                PALLET: qty === 1 ? 'pallet' : 'pallets',
-                                                TRUCK: qty === 1 ? 'truck' : 'trucks',
-                                            };
-                                            return `${qty} ${unitLabel[u] || (qty === 1 ? 'unit' : 'units')}`;
-                                        })()}
+                                                </span>
+                                                <span className="block mt-0.5 text-[12px] text-ink-3">{opt.contents}</span>
+                                                <span className="block mt-1 text-[12.5px] text-ink-2 tabular-nums"><span className="font-semibold">{formatPrice(opt.perCasePrice)}</span> / case</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                                {!packOptions.some((o) => o.key === 'truck') && (
+                                    <p className="mt-2 text-[12px] text-ink-3">
+                                        Truckload isn’t offered for this product: the supplier hasn’t provided {[
+                                            !piecesPerCase && 'units per case', !casesPerPallet && 'cases per pallet', !palletsPerTruck && 'pallets per truckload',
+                                        ].filter(Boolean).join(', ')}. Request a quote for larger volumes.
                                     </p>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Unit Type</p>
-                                    <p className="text-[18px] font-bold text-[#111827] capitalize">
-                                        {(() => {
-                                            const u = selectedUnit ?? adminDefaultUnit;
-                                            if (u === 'truck')  return 'Truck';
-                                            if (u === 'pallet') return 'Pallet';
-                                            return 'Case';
-                                        })()}
-                                    </p>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Inventory Status</p>
-                                    <p className={cn("text-[18px] font-bold", product.readyForDispatch ? "text-[#14B8A6]" : "text-amber-500")}>
-                                        {product.readyForDispatch ? 'Immediate Availability' : 'Made to Order'}
-                                    </p>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">Reference SKU</p>
-                                    <p className="text-[18px] font-bold text-[#111827] font-mono">ATL-{product.id.slice(0, 8).toUpperCase()}</p>
-                                </div>
-                            </div>
+                                )}
+                                {lockedTier && (
+                                    <p className="mt-2 text-[12px] text-[#92400E]">Locked to <strong>{lockedTier === 'truck' ? 'Truckload' : lockedTier === 'pallet' ? 'Pallet' : 'Case'}</strong> — this product is already in your cart at that tier.</p>
+                                )}
 
-
-                            {/* ── Variant picker (Shopify-style) ──
-                                Renders one chip-group per option the supplier
-                                set on the product (Size, Flavour, Pack…). The
-                                buyer must pick one value per group before the
-                                Add to Cart button enables. Missing picks are
-                                highlighted in red so the buyer knows exactly
-                                which option still needs a choice.
-
-                                Storage: the picks ride along with the cart
-                                line in `selectedVariants`, and the cart line
-                                key is suffixed with a signature of the picks
-                                so two different configurations of the same
-                                product live as two separate cart lines.
-                            */}
-                            {(() => {
-                                const rawVariants = (product.variants as any[]) || [];
-                                const variantGroups = rawVariants
-                                    .filter((v) => v && typeof v === 'object' && !String(v.name || '').startsWith('__'))
-                                    .map((v) => ({
-                                        name: String(v.name || ''),
-                                        values: Array.isArray(v.values)
-                                            ? v.values.map((x: any) => String(x))
-                                            : v.value
-                                              ? [String(v.value)]
-                                              : [],
-                                    }))
-                                    .filter((g) => g.name && g.values.length > 0);
-
-                                if (variantGroups.length === 0) return null;
-
-                                return (
-                                    <div className="pt-6 space-y-4">
+                                {variantGroups.length > 0 && (
+                                    <div className="mt-4 space-y-3">
                                         {variantGroups.map((g) => {
                                             const picked = selectedVariants[g.name];
                                             return (
                                                 <div key={g.name}>
-                                                    <div className="flex items-center justify-between mb-2">
-                                                        <p className="text-[11px] font-bold text-[#9CA3AF] uppercase tracking-widest">
-                                                            {g.name}
-                                                        </p>
-                                                        {picked ? (
-                                                            <span className="text-[12px] font-semibold text-[#111827]">
-                                                                {picked}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-[11px] font-medium text-rose-500">
-                                                                Please choose
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-2">
-                                                        {g.values.map((v: string) => {
-                                                            const active = picked === v;
-                                                            return (
-                                                                <button
-                                                                    key={v}
-                                                                    type="button"
-                                                                    onClick={() =>
-                                                                        setSelectedVariants((prev) => ({ ...prev, [g.name]: v }))
-                                                                    }
-                                                                    className={cn(
-                                                                        'h-10 px-4 rounded-xl border text-[13px] font-semibold transition-all',
-                                                                        active
-                                                                            ? 'bg-[#111827] border-[#111827] text-white shadow-md'
-                                                                            : 'bg-white border-[#E5E7EB] text-[#374151] hover:border-[#111827]/40 hover:bg-slate-50',
-                                                                    )}
-                                                                >
-                                                                    {v}
-                                                                </button>
-                                                            );
-                                                        })}
+                                                    <p className="text-[13px] font-semibold text-ink">
+                                                        {g.name}: {picked ? <span className="font-normal text-ink-2">{picked}</span> : <span className="font-normal text-[#B91C1C]">choose one</span>}
+                                                    </p>
+                                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                        {g.values.map((v: string) => (
+                                                            <button key={v} type="button" aria-pressed={picked === v} onClick={() => setSelectedVariants((prev) => ({ ...prev, [g.name]: v }))}
+                                                                className={cn('h-8 px-3 rounded-lg text-[12.5px] ring-1 transition-shadow', picked === v ? 'ring-2 ring-[#2EC4B6] bg-teal-soft font-semibold text-ink' : 'ring-line text-ink-2 hover:ring-line-strong')}>
+                                                                {v}
+                                                            </button>
+                                                        ))}
                                                     </div>
                                                 </div>
                                             );
                                         })}
                                     </div>
-                                );
-                            })()}
+                                )}
+                            </div>
 
-                            <div className="flex flex-col gap-5 pt-6">
-                                {/* ── Mix-this-<tier> toggle ─────────────────
-                                    Only appears when:
-                                    - the product has 2+ variants defined
-                                    - the active tier is truck or pallet
-                                    Clicking the toggle expands a composer
-                                    below the qty/Add-to-Cart row. */}
-                                {mixSupported && (
-                                    <div className="rounded-2xl border border-orange-200 bg-orange-50/40 p-4">
+                            {!isMixing && (
+                                <div className="border-t border-line p-4 sm:p-5">
+                                    <div className="flex items-end justify-between gap-4">
+                                        <div className="min-w-0">
+                                            <p className="text-[12px] text-ink-3">Price per case · {activePack.label.toLowerCase()} rate</p>
+                                            <div className="mt-0.5 flex items-baseline flex-wrap gap-x-2">
+                                                <span className="text-[28px] font-bold tracking-tight tabular-nums text-heading leading-none">{formatPrice(perCasePrice)}</span>
+                                                {offerPct > 0 && (<>
+                                                    <span className="text-[14px] text-ink-4 line-through tabular-nums">{formatPrice(listPerCase)}</span>
+                                                    <span className="text-[12px] font-semibold text-[#B91C1C]">−{offerPct}% offer{activeOffer?.validUntil ? ` until ${new Date(activeOffer.validUntil).toLocaleDateString()}` : ''}</span>
+                                                </>)}
+                                            </div>
+                                            {perPiece != null && <p className="mt-1 text-[12.5px] text-ink-3 tabular-nums">{formatPrice(perPiece)} per unit</p>}
+                                        </div>
+                                        <div className="shrink-0">
+                                            <label htmlFor="pdp-qty" className="block text-[12px] text-ink-3 mb-1 text-end">Quantity ({packWord(2)})</label>
+                                            <div className="flex items-center h-10 rounded-lg ring-1 ring-line">
+                                                <button type="button" onClick={() => setQuantity((q) => Math.max(minUnits, q - 1))} disabled={quantity <= minUnits} aria-label="Decrease quantity" className="w-9 h-full flex items-center justify-center text-ink-2 disabled:opacity-30"><Minus size={15} /></button>
+                                                <input
+                                                    id="pdp-qty"
+                                                    inputMode="numeric"
+                                                    value={quantity}
+                                                    onChange={(e) => { const n = parseInt(e.target.value.replace(/\D/g, ''), 10); setQuantity(Number.isFinite(n) ? n : minUnits); }}
+                                                    onBlur={() => setQuantity((q) => Math.max(minUnits, q || minUnits))}
+                                                    className="w-12 h-full text-center bg-transparent outline-none text-[14px] font-semibold tabular-nums"
+                                                />
+                                                <button type="button" onClick={() => setQuantity((q) => q + 1)} aria-label="Increase quantity" className="w-9 h-full flex items-center justify-center text-ink-2"><Plus size={15} /></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {quantity < minUnits ? (
+                                        <p className="mt-2 text-[12px] text-[#B91C1C]" role="alert">Minimum order is {minUnits} {packWord(minUnits)}.</p>
+                                    ) : minUnits > 1 ? (
+                                        <p className="mt-2 text-[12px] text-ink-3">Minimum order: {minUnits} {packWord(minUnits)}{moqLabel ? ` (${moqLabel})` : ''}.</p>
+                                    ) : null}
+
+                                    <dl className="mt-4 rounded-xl bg-surface-2 px-3.5 py-3 space-y-1.5 text-[13px]">
+                                        {activePack.casesInUnit > 1 && (
+                                            <div className="flex justify-between gap-3"><dt className="text-ink-3">1 {activePack.label.toLowerCase()} = {activePack.casesInUnit.toLocaleString()} cases</dt><dd className="tabular-nums text-ink-2">{formatPrice(perPackPrice)}</dd></div>
+                                        )}
+                                        <div className="flex justify-between gap-3"><dt className="text-ink-3">{quantity.toLocaleString()} × {packWord(quantity)}{activePack.key !== 'carton' ? ` · ${totalCases.toLocaleString()} cases` : ''}{piecesPerCase ? ` · ${(totalCases * piecesPerCase).toLocaleString()} units` : ''}</dt><dd className="tabular-nums text-ink-2">{formatPrice(subtotal)}</dd></div>
+                                        <div className="flex justify-between gap-3"><dt className="text-ink-3">Delivery</dt><dd className="text-ink-3">Calculated at checkout</dd></div>
+                                        <div className="flex justify-between gap-3 pt-1.5 border-t border-line"><dt className="font-semibold text-ink">Subtotal</dt><dd className="font-bold tabular-nums text-heading">{formatPrice(subtotal)}</dd></div>
+                                    </dl>
+                                </div>
+                            )}
+
+                            <div className={cn('p-4 sm:p-5 pt-0 sm:pt-0', isMixing && 'pt-4 sm:pt-5 border-t border-line')}>
+                                <div className="flex flex-col sm:flex-row gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={handleAdd}
+                                        disabled={isLoggedIn && (addDisabled || (!isMixing && quantity < minUnits))}
+                                        className="w-full sm:flex-1 shrink-0 h-11 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14px] font-semibold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        {isAdded ? <><Check size={16} /> Added to cart</>
+                                            : !isLoggedIn ? <>Sign in to order</>
+                                            : isMixing ? <><ShoppingCart size={16} /> Add mixed {tierData.activeLabel.toLowerCase()} to cart</>
+                                            : <><ShoppingCart size={16} /> Add to cart</>}
+                                    </button>
+                                    <Link href={quoteHref} className="sm:w-auto h-11 px-5 rounded-xl ring-1 ring-line-strong hover:ring-ink text-[14px] font-semibold text-heading inline-flex items-center justify-center gap-2 transition-shadow">
+                                        <FileText size={16} /> Request a quote
+                                    </Link>
+                                </div>
+                                {isLoggedIn && missingVariant && !isMixing && <p className="mt-2 text-[12px] text-[#B91C1C]">Choose {variantGroups.filter((g) => !selectedVariants[g.name]).map((g) => g.name).join(', ')} to add to cart.</p>}
+                                <p className="mt-2 text-[11.5px] text-ink-4">Prices in EUR, excluding delivery. A quote request goes to the Atlantis sourcing desk for a negotiated price.</p>
+                            </div>
+                        </div>
+
+                        {/* Mix with other products — server-validated mixed pallet / truckload */}
+                        {(() => {
+                            const kinds: { kind: LoadKind; ok: boolean; unit: string; cap: number; capLabel: string }[] = [
+                                { kind: 'PALLET', ok: piecesPerCase > 0 && casesPerPallet > 0, unit: 'case', cap: casesPerPallet, capLabel: `${casesPerPallet} cases fill one pallet` },
+                                { kind: 'TRUCK', ok: piecesPerCase > 0 && casesPerPallet > 0 && palletsPerTruck > 0, unit: 'pallet', cap: palletsPerTruck, capLabel: `${palletsPerTruck} pallets fill one truckload` },
+                            ];
+                            const avail = kinds.filter((k) => k.ok);
+                            if (!avail.length || isSupplierOwner) return null;
+                            const sel = avail.find((k) => k.kind === loadKind) ?? avail[avail.length - 1];
+                            const submit = async () => {
+                                if (!isLoggedIn) { router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname)); return; }
+                                setLoadBusy(true); setLoadError(''); setLoadResult(null);
+                                try { setLoadResult(await addToLoad(sel.kind, product.id, loadQty)); }
+                                catch (e) { setLoadError(e instanceof ApiError ? e.message : 'Could not update your mixed load.'); }
+                                finally { setLoadBusy(false); }
+                            };
+                            const q = loadResult?.quote;
+                            return (
+                                <div className="mt-4 rounded-2xl ring-1 ring-line bg-surface p-4 sm:p-5">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <h2 className="text-[13.5px] font-semibold text-ink">Mix with other products</h2>
+                                            <p className="mt-0.5 text-[12.5px] text-ink-3">Combine products from the same supplier into one {sel.kind === 'PALLET' ? 'pallet' : 'truckload'}. Each product fills its own share — {sel.capLabel}.</p>
+                                        </div>
+                                    </div>
+                                    {avail.length > 1 && (
+                                        <div role="radiogroup" aria-label="Mixed load type" className="mt-3 inline-flex p-1 rounded-lg bg-surface-3">
+                                            {avail.map((k) => (
+                                                <button key={k.kind} type="button" role="radio" aria-checked={sel.kind === k.kind} onClick={() => { setLoadKind(k.kind); setLoadQty(1); setLoadResult(null); setLoadError(''); }}
+                                                    className={cn('h-8 px-3 rounded-md text-[12.5px] font-medium', sel.kind === k.kind ? 'bg-surface text-ink shadow-sm ring-1 ring-line' : 'text-ink-3 hover:text-ink')}>
+                                                    {loadLabel(k.kind)}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    )}
+                                    <div className="mt-3 flex flex-wrap items-end gap-3">
+                                        <label className="block">
+                                            <span className="block text-[12px] text-ink-3 mb-1">Quantity ({sel.unit}s)</span>
+                                            <input type="number" min={1} max={sel.cap} step={1} value={loadQty}
+                                                onChange={(e) => setLoadQty(Math.max(1, Math.min(sel.cap, parseInt(e.target.value || '1', 10) || 1)))}
+                                                className="w-24 h-10 px-3 rounded-lg ring-1 ring-line bg-surface text-[14px] tabular-nums outline-none focus:ring-2 focus:ring-[#2EC4B6]" />
+                                        </label>
+                                        <p className="pb-2.5 text-[12.5px] text-ink-3">= {Math.round((loadQty / Math.max(1, sel.cap)) * 100)}% of the {sel.kind === 'PALLET' ? 'pallet' : 'truckload'}</p>
+                                        <button type="button" onClick={submit} disabled={loadBusy}
+                                            className="ms-auto h-10 px-4 rounded-xl ring-1 ring-line-strong hover:ring-ink text-[13.5px] font-semibold text-ink disabled:opacity-50">
+                                            {loadBusy ? 'Adding…' : isLoggedIn ? `Add to ${loadLabel(sel.kind).toLowerCase()}` : 'Sign in to mix'}
+                                        </button>
+                                    </div>
+                                    {loadError && <p className="mt-2 text-[12.5px] text-[#B91C1C]" role="alert">{loadError}</p>}
+                                    {q && (
+                                        <div className="mt-3 rounded-xl bg-surface-2 px-3.5 py-3" aria-live="polite">
+                                            <div className="flex items-center justify-between text-[12.5px]">
+                                                <span className="text-ink-2">{loadLabel(loadResult!.kind)} · {q.lines.length} product{q.lines.length === 1 ? '' : 's'}</span>
+                                                <span className={cn('font-semibold', q.ready ? 'text-[#047857]' : 'text-[#B45309]')}>{Math.round(q.fill * 100)}% full</span>
+                                            </div>
+                                            <div className="mt-1.5 h-1.5 rounded-full bg-surface-3 overflow-hidden"><div className="h-full bg-[#2EC4B6]" style={{ width: `${Math.min(100, q.fill * 100)}%` }} /></div>
+                                            <p className="mt-2 text-[12.5px] text-ink-3">{q.ready ? 'Ready to order.' : q.issues.join(' ')} <Link href="/cart" className="font-semibold text-teal hover:underline">Open in cart</Link></p>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })()}
+
+                        {/* Build-your-own pallet / truckload (mix variants) */}
+                        {mixSupported && (
+                            <div className="mt-4">
+                                
+                                    <div className="rounded-2xl ring-1 ring-line bg-surface p-4">
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="min-w-0">
-                                                <p className="text-[11px] font-black uppercase tracking-widest text-orange-700">
+                                                <p className="text-[13px] font-semibold text-ink">
                                                     Build-your-own {tierData.activeLabel.toLowerCase()}
                                                 </p>
                                                 <p className="text-[12px] text-slate-600 mt-1">
-                                                    Mix multiple variants inside ONE {tierData.activeLabel.toLowerCase()} (e.g. 5 Diet + 10 Regular + 9 Black). Each variant carries its own price; admin's mix markup is applied to the subtotal.
+                                                    Mix multiple variants inside ONE {tierData.activeLabel.toLowerCase()} (e.g. 5 Diet + 10 Regular + 9 Black). Each variant keeps its own price; a mixing surcharge applies to the subtotal.
                                                 </p>
                                             </div>
                                             <button
                                                 type="button"
                                                 onClick={() => setIsMixing(v => !v)}
                                                 className={cn(
-                                                    'h-9 px-4 rounded-xl text-[12px] font-black uppercase tracking-widest shrink-0 transition-colors',
+                                                    'h-9 px-4 rounded-lg text-[13px] font-semibold shrink-0 transition-colors',
                                                     isMixing
-                                                        ? 'bg-orange-600 text-white hover:bg-orange-700'
-                                                        : 'bg-white text-orange-700 border border-orange-300 hover:bg-orange-50',
+                                                        ? 'bg-cta text-cta-fg hover:bg-cta-hover'
+                                                        : 'bg-surface text-heading ring-1 ring-line-strong hover:ring-ink',
                                                 )}
                                             >
                                                 {isMixing ? 'Stop mixing' : `Mix this ${tierData.activeLabel.toLowerCase()}`}
@@ -1222,7 +1102,7 @@ export default function ProductDetailClient() {
                                                     "Your Truck Builder" panel lives in the
                                                     sticky right rail on desktop). */}
                                                 <div className="lg:hidden flex items-center justify-between gap-3 text-[12px]">
-                                                    <span className="font-black text-[#0B1F3A]">
+                                                    <span className="font-black text-heading">
                                                         {mixSummary?.filled ?? 0} / {mixCapacity.total} {mixCapacity.unit}s
                                                     </span>
                                                     <span className="font-black text-[#14B8A6]">{formatPrice(mixSummary?.totalWithMarkup || 0)}</span>
@@ -1260,7 +1140,7 @@ export default function ProductDetailClient() {
                                                             <div
                                                                 key={v.signature}
                                                                 className={cn(
-                                                                    'bg-white rounded-2xl border-2 p-3 flex flex-col gap-2 transition-all',
+                                                                    'bg-surface rounded-2xl border-2 p-3 flex flex-col gap-2 transition-all',
                                                                     isActive
                                                                         ? 'border-[#14B8A6] ring-2 ring-[#14B8A6]/15 shadow-sm'
                                                                         : 'border-slate-100 hover:border-slate-200',
@@ -1281,7 +1161,7 @@ export default function ProductDetailClient() {
                                                                         )}
                                                                     </div>
                                                                     <div className="flex-1 min-w-0">
-                                                                        <p className="text-[12px] font-black text-[#0B1F3A] leading-tight line-clamp-2 break-words">{v.label}</p>
+                                                                        <p className="text-[12px] font-black text-heading leading-tight line-clamp-2 break-words">{v.label}</p>
                                                                         <p className="text-[12px] text-[#14B8A6] font-bold mt-1">
                                                                             {formatPrice(unitPrice)} <span className="text-slate-400 font-medium">/ {mixCapacity.unit}</span>
                                                                         </p>
@@ -1291,7 +1171,7 @@ export default function ProductDetailClient() {
                                                                     <button
                                                                         type="button"
                                                                         onClick={() => setMixQuantities(q => ({ ...q, [v.signature]: Math.max(0, (q[v.signature] || 0) - 1) }))}
-                                                                        className="w-8 h-8 rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 flex items-center justify-center disabled:opacity-30"
+                                                                        className="w-8 h-8 rounded-lg border border-slate-200 bg-surface text-slate-500 hover:bg-slate-50 flex items-center justify-center disabled:opacity-30"
                                                                         disabled={qty <= 0}
                                                                     >
                                                                         <Minus size={13} />
@@ -1315,7 +1195,7 @@ export default function ProductDetailClient() {
                                                                         type="button"
                                                                         onClick={() => setMixQuantities(q => ({ ...q, [v.signature]: (q[v.signature] || 0) + 1 }))}
                                                                         disabled={!canIncrement}
-                                                                        className="w-8 h-8 rounded-lg bg-[#0B1F3A] text-white hover:bg-[#14B8A6] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                                                        className="w-8 h-8 rounded-lg bg-cta text-cta-fg hover:bg-[#14B8A6] flex items-center justify-center disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                                                                     >
                                                                         <Plus size={13} />
                                                                     </button>
@@ -1336,91 +1216,12 @@ export default function ProductDetailClient() {
                                             </div>
                                         )}
                                     </div>
-                                )}
-
-                                <div className="flex items-center gap-4">
-                                    {!isMixing && (
-                                        <div className="flex items-center h-14 bg-white border border-[#E5E7EB] rounded-2xl p-1 shrink-0 shadow-sm">
-                                            <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="w-12 h-full flex items-center justify-center hover:bg-slate-50 rounded-xl text-slate-400 transition-colors">
-                                                <Minus size={18} />
-                                            </button>
-                                            <span className="w-14 text-center font-bold text-lg">{quantity}</span>
-                                            <button onClick={() => setQuantity(quantity + 1)} className="w-12 h-full flex items-center justify-center hover:bg-slate-50 rounded-xl text-slate-400 transition-colors">
-                                                <Plus size={18} />
-                                            </button>
-                                        </div>
-                                    )}
-                                    <Button
-                                        onClick={handleAdd}
-                                        disabled={(() => {
-                                            // Mix path: require the buyer to fill the tier exactly.
-                                            if (isMixing) {
-                                                return !mixSummary || mixSummary.filled !== mixCapacity.total;
-                                            }
-                                            // Single-variant path: require all variant groups to be picked.
-                                            const rawVariants = (product.variants as any[]) || [];
-                                            const required = rawVariants
-                                                .filter((v) => v && typeof v === 'object' && !String(v.name || '').startsWith('__'))
-                                                .map((v) => String(v.name || ''))
-                                                .filter(Boolean);
-                                            return required.some((name) => !selectedVariants[name]);
-                                        })()}
-                                        className="h-14 flex-1 bg-[#14B8A6] hover:bg-[#0D9488] text-white font-bold text-md rounded-2xl transition-all shadow-xl shadow-[#14B8A6]/20 flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#14B8A6]"
-                                    >
-                                        {isAdded
-                                            ? <><Check size={20} /> Added to Order</>
-                                            : isMixing
-                                                ? <><ShoppingCart size={20} /> Add mixed {tierData.activeLabel.toLowerCase()} to cart</>
-                                                : <><ShoppingCart size={20} /> {isLoggedIn ? 'Add to Procurement List' : 'Login to Order'}</>}
-                                    </Button>
-                                </div>
-
-                                {/* AI Pricing Assistant — REMOVED from buyer-facing PDP.
-                                    Buyers shouldn't have a "why is this price?" tool —
-                                    that exposes markup math and invites haggling. The
-                                    component is still imported for the admin variants
-                                    if/when those are wired up. */}
-
-                                {/* The Admin Pricing Formula panel used to render
-                                    here when isAdminUser was true. Removed per
-                                    operator request: "أنا مش عايز ال-formula
-                                    عند ال-admin تظهر في ال-product page". The
-                                    formula UI now lives ONLY inside the admin
-                                    dashboard (/admin/products detail modal +
-                                    /admin/pricing). The public PDP — even when
-                                    visited by an admin account — stays clean
-                                    so what an admin sees on PDP matches what
-                                    a customer sees, full stop. */}
+                                
                             </div>
-
-                            <div className="pt-8 border-t border-[#E5E7EB] space-y-4">
-                                <div className="flex items-start gap-3 p-4 bg-[#14B8A6]/5 border border-[#14B8A6]/10 rounded-2xl">
-                                    <ShieldCheck size={20} className="text-[#14B8A6] shrink-0 mt-0.5" />
-                                    <p className="text-[13px] font-semibold text-[#0D9488] leading-relaxed">
-                                        {isAr 
-                                            ? 'إصدار احترافي مُحسّن لعمليات التوريد B2B. يتميز بوثائق توزيع معتمدة ومعايير امتثال للمؤسسات.'
-                                            : 'Professional-grade variant natively optimized for B2B procurement. Features verified distribution documentation and enterprise compliance standards.'
-                                        }
-                                    </p>
-                                </div>
-                                <p className="text-[15px] text-[#4B5563] leading-[24px]">
-                                    {translatedDesc || product.description || (isAr ? 'لا يوجد وصف متاح حالياً لهذا المنتج.' : 'No detailed description provided for this variant yet.')}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* RIGHT: Stacked Cards */}
-                    <div className="lg:col-span-3 space-y-4">
-                        {/* ── "Your Truck Builder" sticky rail ──────────────
-                            Appears only while the buyer is mixing a tier.
-                            Mirrors the operator's reference layout (capacity
-                            tiles + Summary + Checkout) in Atlantis colours.
-                            All numbers come straight from mixSummary /
-                            mixCapacity — no logic duplicated, presentation
-                            only. The Checkout button shares the SAME enable
-                            rule as the main Add-to-Cart (tier must be full).*/}
-                        {isMixing && mixData && mixSummary && (() => {
+                        )}
+                        {isMixing && (
+                            <div className="mt-4">
+                                {isMixing && mixData && mixSummary && (() => {
                             const filled = mixSummary.filled;
                             const cap = Math.max(1, mixCapacity.total);
                             const pct = Math.min(100, Math.round((filled / cap) * 100));
@@ -1428,9 +1229,9 @@ export default function ProductDetailClient() {
                             const isFull = filled === mixCapacity.total && filled > 0;
                             const markupDelta = (mixSummary.totalWithMarkup || 0) - (mixSummary.subtotal || 0);
                             return (
-                                <div className="bg-white border border-[#E5E7EB] rounded-[24px] p-6 shadow-sm lg:sticky lg:top-24 space-y-4">
+                                <div className="bg-surface border border-line rounded-2xl p-5 space-y-4">
                                     <div className="flex items-center gap-2">
-                                        <h3 className="text-[15px] font-black text-[#0B1F3A] flex-1">Your {tierData.activeLabel} Builder</h3>
+                                        <h3 className="text-[15px] font-black text-heading flex-1">Your {tierData.activeLabel} Builder</h3>
                                         <span className="text-[10px] font-black uppercase tracking-widest text-[#14B8A6] bg-[#14B8A6]/10 px-2 py-1 rounded-md">{pct}% filled</span>
                                     </div>
                                     {/* Truck that visually fills as pallets are
@@ -1466,7 +1267,7 @@ export default function ProductDetailClient() {
                                         </svg>
                                     </div>
                                     <p className="text-center text-[12px] text-slate-500">
-                                        <span className="font-black text-[#0B1F3A] tabular-nums">{filled}</span> / <span className="tabular-nums">{mixCapacity.total}</span> {mixCapacity.unit}s
+                                        <span className="font-black text-heading tabular-nums">{filled}</span> / <span className="tabular-nums">{mixCapacity.total}</span> {mixCapacity.unit}s
                                     </p>
                                     <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
                                         <div className="h-full bg-[#14B8A6] transition-all" style={{ width: `${pct}%` }} />
@@ -1474,7 +1275,7 @@ export default function ProductDetailClient() {
                                     <div className="grid grid-cols-2 gap-2">
                                         <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
                                             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Filled</p>
-                                            <p className="text-[15px] font-black text-[#0B1F3A] tabular-nums mt-0.5">{filled} {mixCapacity.unit}s</p>
+                                            <p className="text-[15px] font-black text-heading tabular-nums mt-0.5">{filled} {mixCapacity.unit}s</p>
                                         </div>
                                         <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5">
                                             <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Remaining</p>
@@ -1495,12 +1296,9 @@ export default function ProductDetailClient() {
                                             <span className="text-slate-500">Delivery fee</span>
                                             <span className="font-mono text-slate-400">Calculated at checkout</span>
                                         </div>
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-slate-500">VAT</span>
-                                            <span className="font-mono text-slate-400">0%</span>
-                                        </div>
+                                        
                                         <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-                                            <span className="font-black text-[#0B1F3A] text-[14px]">Total</span>
+                                            <span className="font-black text-heading text-[14px]">Total</span>
                                             <span className="font-black text-[#14B8A6] text-[18px]">{formatPrice(mixSummary.totalWithMarkup || 0)}</span>
                                         </div>
                                     </div>
@@ -1509,324 +1307,127 @@ export default function ProductDetailClient() {
                                             type="button"
                                             onClick={() => { if (isFull) { handleAdd(); router.push('/cart'); } }}
                                             disabled={!isFull}
-                                            className="w-full h-12 rounded-xl bg-[#0B1F3A] hover:bg-[#14B8A6] text-white font-black uppercase text-[12px] tracking-widest transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-[#0B1F3A]"
+                                            className="w-full h-12 rounded-xl bg-cta hover:bg-[#14B8A6] text-cta-fg font-black uppercase text-[12px] tracking-widest transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-cta"
                                         >
                                             <ShoppingCart size={16} /> Checkout {tierData.activeLabel}
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => { if (isFull) handleAdd(); }}
-                                            disabled={!isFull}
-                                            className="w-full h-11 rounded-xl bg-white border-2 border-slate-200 hover:border-[#14B8A6] text-slate-700 font-black uppercase text-[11px] tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                                        >
-                                            Save Mix for Later
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => router.push('/categories')}
-                                            className="w-full h-11 rounded-xl bg-[#14B8A6]/10 hover:bg-[#14B8A6]/20 text-[#0B7C70] font-black uppercase text-[11px] tracking-widest transition-colors flex items-center justify-center gap-1.5"
-                                        >
-                                            <Plus size={14} /> Add Another Supplier
-                                        </button>
+                                        
                                     </div>
                                     {!isFull && (
                                         <p className="text-[11px] text-amber-700 font-bold text-center">
                                             ⚠ Add {remaining} more {mixCapacity.unit}{remaining === 1 ? '' : 's'} to fill the {tierData.activeLabel.toLowerCase()}.
                                         </p>
                                     )}
-                                    {isFull && (
-                                        <div className="flex items-center justify-center gap-2 text-emerald-600 bg-emerald-50 rounded-xl py-2">
-                                            <CheckCircle2 size={14} />
-                                            <span className="text-[11px] font-black uppercase tracking-widest">You're saving by mixing products</span>
-                                        </div>
-                                    )}
+                                    
                                 </div>
                             );
                         })()}
-                        <div className="bg-white border border-[#E5E7EB] rounded-[24px] p-8 shadow-sm">
-                            <h3 className="text-[15px] font-bold text-[#111827] flex items-center gap-2 mb-6">
-                                <ShieldCheck size={20} className="text-[#14B8A6]" />
-                                Platform Assurance
-                            </h3>
-                            <ul className="space-y-4">
-                                {[
-                                    'Atlantis Verified Product',
-                                    'Quality Checked',
-                                    'Secure Payment',
-                                    'Certified Distribution'
-                                ].map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3 text-[14px] font-medium text-[#4B5563]">
-                                        <CheckCircle2 size={16} className="text-[#14B8A6]" />
-                                        {item}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-
-                        <div className="bg-white border border-[#E5E7EB] rounded-[24px] p-8 shadow-sm">
-                            <h3 className="text-[15px] font-bold text-[#111827] flex items-center gap-2 mb-6">
-                                <Truck size={20} className="text-[#14B8A6]" />
-                                Logistics & Delivery
-                            </h3>
-                            <div className="space-y-6">
-                                {(() => {
-                                    // EU country list — used to gate the 30-day returns + standard transit time
-                                    const EU_COUNTRIES = new Set([
-                                        'AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE','GB','UK','UNITED KINGDOM','EU','EUROPE'
-                                    ]);
-                                    const country = (user?.country || '').toUpperCase().trim();
-                                    const isEU = country && EU_COUNTRIES.has(country);
-                                    const returnsLabel = isEU ? 'Returns: 30 Days' : 'Returns: 5–10 Days';
-                                    const returnsSub = isEU ? 'Hassle-free corporate returns (EU)' : 'Standard returns window for non-EU shipments';
-                                    return (
-                                        <>
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
-                                                    <Package size={18} className="text-slate-400" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[13px] font-bold text-[#111827]">Delivery: calculated at checkout</p>
-                                                    <p className="text-[11px] text-[#6B7280]">
-                                                        {product.readyForDispatch ? 'Ready to ship' : `Made to order (${product.leadTime || 7}d lead time)`}
-                                                        {user?.country ? ` • Shipping to ${user.country}` : ''}
-                                                        {' • Transit depends on carrier, weight, route'}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center shrink-0">
-                                                    <RotateCcw size={18} className="text-slate-400" />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[13px] font-bold text-[#111827]">{returnsLabel}</p>
-                                                    <p className="text-[11px] text-[#6B7280]">{returnsSub}</p>
-                                                </div>
-                                            </div>
-                                        </>
-                                    );
-                                })()}
                             </div>
-                        </div>
-                    </div>
+                        )}
+
+                        {/* Key facts — only fields the product actually has */}
+                        {(keyFacts.length > 0 || listingStatus) && (
+                            <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-8 text-[13px]">
+                                {keyFacts.map(([k, v]) => (
+                                    <div key={k} className="flex justify-between gap-4 py-2 border-b border-line">
+                                        <dt className="text-ink-3">{k}</dt>
+                                        <dd className="text-ink font-medium text-end tabular-nums">{v}</dd>
+                                    </div>
+                                ))}
+                                {listingStatus && (
+                                    <div className="flex justify-between gap-4 py-2 border-b border-line">
+                                        <dt className="text-ink-3">Listing</dt>
+                                        <dd className={cn('font-medium text-end inline-flex items-center gap-1.5', product.status === 'APPROVED' ? 'text-[#047857]' : 'text-[#B45309]')}>
+                                            {product.status === 'APPROVED' && <ShieldCheck size={14} />} {listingStatus}
+                                        </dd>
+                                    </div>
+                                )}
+                            </dl>
+                        )}
+                    </section>
                 </div>
 
-                {/* 2. Bottom Section: Tabs */}
-                <div className="mt-12 bg-white border border-[#E5E7EB] rounded-[24px] shadow-sm overflow-hidden">
-                    <div className="flex border-b border-[#E5E7EB] px-8">
-                        {['Description', 'Specifications', 'Reviews'].map((tab) => (
-                            <button
-                                key={tab}
-                                onClick={() => setActiveTab(tab)}
-                                className={cn(
-                                    "h-16 px-8 text-[12px] font-bold uppercase tracking-widest transition-all border-b-2",
-                                    activeTab === tab ? "border-[#14B8A6] text-[#14B8A6]" : "border-transparent text-slate-400 hover:text-slate-600"
-                                )}
-                            >
-                                {tab}
+                {/* ── Details tabs ─────────────────────────────────────────── */}
+                <section id="pdp-details" className="mt-12 scroll-mt-[112px]">
+                    <div role="tablist" aria-label="Product information" className="flex gap-6 border-b border-line overflow-x-auto scrollbar-hide">
+                        {tabs.map((t) => (
+                            <button key={t} role="tab" type="button" aria-selected={activeTab === tabKey(t)} onClick={() => setActiveTab(tabKey(t))}
+                                className={cn('h-11 -mb-px border-b-2 text-[14px] font-medium whitespace-nowrap transition-colors', activeTab === tabKey(t) ? 'border-[#0E7C74] text-ink' : 'border-transparent text-ink-3 hover:text-ink')}>
+                                {t}
                             </button>
                         ))}
                     </div>
-
-                    <div className="p-10">
-                        {activeTab === 'Description' && (
-                                <div className="space-y-6">
-                                    <h3 className="text-xl font-bold text-[#111827]">Product Overview</h3>
-                                    <p className="text-[15px] text-[#4B5563] leading-relaxed">
-                                        {translatedDesc || product.description || 'This product is curated and verified by Atlantis for enterprise-scale distribution.'}
-                                    </p>
-                                    <ul className="space-y-4 pt-4">
-                                        {[
-                                            'Official Product of Atlantis',
-                                            'Full Export Documentation Pack',
-                                            'Premium Quality Manufacturing',
-                                            'Quality & Safety Certified'
-                                        ].map((li, i) => (
-                                            <li key={i} className="flex items-center gap-3 text-[14px] font-medium text-[#4B5563]">
-                                                <CheckCircle2 size={18} className="text-[#14B8A6]" />
-                                                {li}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
+                    <div className="py-6">
+                        {(activeTab === 'Overview' || activeTab === 'Description') && (
+                            (translatedDesc || product.description) ? (
+                                <div className="max-w-3xl text-[14.5px] leading-relaxed text-ink-2 whitespace-pre-line">{translatedDesc || product.description}</div>
+                            ) : (
+                                <p className="text-[14px] text-ink-3">The supplier hasn’t added a description yet. See Specifications for packaging and trade details.</p>
+                            )
                         )}
-
-                        {activeTab === 'Specifications' && (() => {
-                            // ── Defensive renderers ──────────────────────────
-                            // BBD: legacy products were uploaded before the
-                            // parser converted Excel-serial dates, so the DB
-                            // still holds raw numbers like "46477". Normalise
-                            // here as a safety net — three accepted shapes:
-                            //   • Excel serial (30000-70000)  → 2027-03-31
-                            //   • ISO timestamp                → 2027-03-31
-                            //   • YYYYMMDD compact             → 2027-03-31
-                            // Anything else falls through untouched.
-                            const formatBbd = (raw: unknown): string => {
-                                if (raw === null || raw === undefined || raw === '') return 'N/A';
-                                const s = String(raw).trim();
-                                if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-                                const num = parseFloat(s);
-                                if (!isNaN(num) && num > 30000 && num < 70000 && !/-/.test(s)) {
-                                    const ms = (num - 25569) * 86400 * 1000;
-                                    const d = new Date(ms);
-                                    if (!isNaN(d.getTime())) return d.toISOString().slice(0, 10);
-                                }
-                                if (/^\d{4}-\d{2}-\d{2}T/.test(s)) return s.slice(0, 10);
-                                if (/^\d{8}$/.test(s)) return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-                                return s;
-                            };
-
-                            // Brand verification — only show "Verified by
-                            // Atlantis" when the product was actually approved
-                            // by an admin. Pending products get a softer
-                            // "Under review" label so buyers don't see a
-                            // false trust signal on an unreviewed listing.
-                            const verifBadge =
-                                product.status === 'APPROVED'
-                                    ? 'Verified by Atlantis'
-                                    : product.status === 'PENDING'
-                                      ? 'Under review'
-                                      : product.status === 'REJECTED'
-                                        ? 'Not approved'
-                                        : 'Listing in progress';
-
-                            return (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div className="bg-slate-50 rounded-2xl p-8 border border-slate-100">
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Logistics & Physical</h4>
-                                    <div className="space-y-4">
-                                        {[
-                                            // Don't append "kg" if the weight already contains a unit (g, kg, ml, etc).
-                                            // Suppliers commonly type "100g" or "1.5kg" directly.
-                                            { label: 'Weight per Unit', value: product.weight ? (/[a-z]/i.test(String(product.weight)) ? String(product.weight) : `${product.weight} kg`) : 'N/A' },
-                                            { label: 'Pieces per Case', value: product.unitsPerCase ? `${product.unitsPerCase} pcs` : 'N/A' },
-                                            { label: 'Cases per Pallet', value: product.casesPerPallet ? `${product.casesPerPallet} cases` : 'N/A' },
-                                            { label: 'Units per Pallet', value: product.unitsPerPallet ? `${product.unitsPerPallet} pcs` : 'N/A' },
-                                            // Renamed from "Pallet per Truck" — the field on the
-                                            // product model is `palletsPerShipment`, which is the
-                                            // actual pallet count in one shipment (not the truck
-                                            // capacity). Old label was misleading buyers.
-                                            { label: 'Pallets per Shipment', value: product.palletsPerShipment ? `${product.palletsPerShipment} pallets` : 'N/A' },
-                                            { label: 'Unit Type', value: (product.unit || 'Case').replace(/^./, (c: string) => c.toUpperCase()) },
-                                        ].map((item, i) => (
-                                            <div key={i} className="flex justify-between py-3 border-b border-slate-200 last:border-0">
-                                                <span className="text-[13px] font-medium text-slate-500">{item.label}</span>
-                                                <span className="text-[13px] font-bold text-[#111827]">{item.value}</span>
-                                            </div>
-                                        ))}
+                        {activeTab === 'Specifications' && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-6">
+                                {[['Packaging', packagingSpecs], ['Trade details', keyFacts]].map(([title, rows]) => (
+                                    <div key={title as string}>
+                                        <h3 className="text-[13px] font-semibold text-ink mb-1">{title as string}</h3>
+                                        {(rows as Array<[string, string]>).length ? (
+                                            <dl className="text-[13px]">
+                                                {(rows as Array<[string, string]>).map(([k, v]) => (
+                                                    <div key={k} className="flex justify-between gap-4 py-2 border-b border-line">
+                                                        <dt className="text-ink-3">{k}</dt><dd className="text-ink font-medium text-end">{v}</dd>
+                                                    </div>
+                                                ))}
+                                            </dl>
+                                        ) : <p className="text-[13px] text-ink-4 py-2">Not provided by the supplier.</p>}
                                     </div>
-                                </div>
-                                <div className="bg-slate-50 rounded-2xl p-8 border border-slate-100">
-                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-6">Trade & Quality</h4>
-                                    <div className="space-y-4">
-                                        {[
-                                            // Brand row — was hidden before; buyers couldn't
-                                            // see who actually makes the product. Falls back to
-                                            // the verifBadge when the supplier left it blank.
-                                            { label: 'Brand', value: product.brand || '—' },
-                                            { label: 'Country of Origin', value: product.origin || 'N/A' },
-                                            // EXW (Ex Works) — where the goods physically sit today.
-                                            // Buyers use this to estimate the transport leg from this
-                                            // location to their delivery address, before the Atlantis
-                                            // logistics team confirms the carrier-negotiated price.
-                                            { label: 'EXW · Currently In', value: product.exwLocation || 'Pending supplier confirmation' },
-                                            { label: 'Lead Time', value: product.leadTime ? `${product.leadTime} days` : 'N/A' },
-                                            { label: 'BBD', value: formatBbd(product.shelfLife) },
-                                            { label: 'Barcode (EAN)', value: product.ean || 'N/A' },
-                                            { label: 'Brand Status', value: verifBadge },
-                                        ].map((item, i) => (
-                                            <div key={i} className="flex justify-between py-3 border-b border-slate-200 last:border-0">
-                                                <span className="text-[13px] font-medium text-slate-500">{item.label}</span>
-                                                <span className="text-[13px] font-bold text-[#111827]">{item.value}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                                ))}
                             </div>
-                            );
-                        })()}
-                        
-                        {activeTab === 'Reviews' && (
-                            <ReviewSection
-                                productId={product.id}
-                                onReviewSubmitted={(newRating, newCount) => {
-                                    setLocalRating(newRating);
-                                    setLocalReviewsCount(newCount);
-                                }}
-                            />
                         )}
                     </div>
+                </section>
+
+                {/* ── Reviews (always visible, below the details) ─────────── */}
+                <div id="pdp-reviews" className="mt-2 pt-8 border-t border-line scroll-mt-[112px]">
+                    <ReviewSection
+                        productId={product.id}
+                        onReviewSubmitted={(newRating, newCount) => { setLocalRating(newRating); setLocalReviewsCount(newCount); }}
+                    />
                 </div>
 
-                {/* 3. Recommended Products - Amazon Style */}
+                {/* ── Related products (same category, real catalog) ───────── */}
                 {relatedProducts.length > 0 && (
-                    <div className="mt-20 pt-10 border-t border-[#E5E7EB]">
-                        <div className="flex items-center justify-between mb-8">
-                            <div>
-                                <h2 className="text-[24px] font-bold text-[#111827]">Products related to this item</h2>
-                                <p className="text-[13px] text-[#6B7280] font-medium uppercase tracking-widest mt-1">Discover more from the collection</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <button 
-                                        onClick={() => scroll('left')}
-                                        className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-all shadow-sm"
-                                    >
-                                        <ChevronLeft size={20} />
-                                    </button>
-                                    <button 
-                                        onClick={() => scroll('right')}
-                                        className="w-10 h-10 rounded-full border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-all shadow-sm"
-                                    >
-                                        <ChevronRight size={20} />
-                                    </button>
-                                </div>
-                                <div className="w-px h-6 bg-slate-200 mx-2" />
-                                <Link href={`/categories?category=${product.category || ''}`} className="text-[13px] font-bold text-[#14B8A6] hover:underline uppercase tracking-widest">
-                                    View All
-                                </Link>
-                            </div>
+                    <section className="mt-6 pt-8 border-t border-line">
+                        <div className="flex items-end justify-between gap-4 mb-5">
+                            <h2 className="text-[18px] font-bold text-heading">More in {getDisplayCategory(product)}</h2>
+                            <Link href={product.category ? `/categories?category=${encodeURIComponent(product.category)}` : '/categories'} className="inline-flex items-center gap-1 text-[13px] font-semibold text-heading hover:text-teal">View all <ChevronRight size={14} /></Link>
                         </div>
-
-                        <div 
-                            ref={scrollContainerRef}
-                            className="flex overflow-x-auto gap-6 no-scrollbar snap-x snap-mandatory"
-                            style={{ scrollBehavior: 'smooth' }}
-                        >
-                            {relatedProducts.map((p) => (
-                                <Link 
-                                    key={p.id} 
-                                    href={`/products/${p.id}`} 
-                                    className="group bg-white border border-[#E5E7EB] rounded-[20px] p-4 hover:shadow-xl transition-all flex flex-col shrink-0 w-[240px] snap-start"
-                                >
-                                    <div className="aspect-square rounded-xl overflow-hidden mb-4 bg-slate-50 flex items-center justify-center p-4">
-                                        <img src={p.image} alt={p.name} className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500" />
-                                    </div>
-                                    <div className="flex-1 space-y-2">
-                                        {(user?.role === 'ADMIN' || (user?.role === 'SUPPLIER' && p.supplierId === user?.id)) ? (
-                                            <p className="text-[10px] font-bold text-[#14B8A6] uppercase tracking-widest truncate">{p.brand}</p>
-                                        ) : (
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">Sold by Atlantis</p>
-                                        )}
-                                        <h3 className="text-[13px] font-bold text-[#111827] line-clamp-2 leading-snug group-hover:text-[#14B8A6] transition-colors">{p.name}</h3>
-                                        <div className="flex items-center gap-1">
-                                            {[...Array(5)].map((_, i) => (
-                                                <Star key={i} size={10} className={i < Math.floor(p.rating || 0) ? "fill-[#F59E0B] text-[#F59E0B]" : "text-[#E5E7EB]"} />
-                                            ))}
-                                            <span className="text-[10px] text-[#6B7280] font-medium ml-1">({p.reviewsCount || 0})</span>
-                                        </div>
-                                    </div>
-                                    <div className="pt-4 mt-auto border-t border-slate-100 flex items-center justify-between">
-                                        <span className="text-[15px] font-bold text-[#111827]">{formatPrice(p.price)}</span>
-                                        <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-[#14B8A6] group-hover:text-white transition-all">
-                                            <ShoppingCart size={14} />
-                                        </div>
-                                    </div>
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
+                        <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                            {relatedProducts.slice(0, 5).map((p) => {
+                                const own = user?.role?.toUpperCase() === 'SUPPLIER' && (p as any).supplierId === user?.id;
+                                const price = computeCardPrice(p, markups, !!own);
+                                const img = p.images?.[0] || p.image;
+                                return (
+                                    <li key={p.id}>
+                                        <Link href={`/products/${p.id}`} className="group flex flex-col h-full rounded-xl ring-1 ring-line hover:ring-line-strong bg-surface p-2.5 transition-shadow">
+                                            <span className="relative block aspect-square rounded-lg bg-media overflow-hidden">
+                                                {img
+                                                    // eslint-disable-next-line @next/next/no-img-element
+                                                    ? <img src={img} alt={p.name} loading="lazy" className="absolute inset-0 m-auto max-w-[80%] max-h-[80%] object-contain mix-blend-multiply" />
+                                                    : <span className="absolute inset-0 flex items-center justify-center text-ink-4"><Package size={28} strokeWidth={1.3} /></span>}
+                                            </span>
+                                            {p.brand && <span className="mt-2 text-[12px] font-semibold text-ink-2 truncate">{p.brand}</span>}
+                                            <span className="text-[13px] leading-snug text-ink line-clamp-2 min-h-[2.5em] group-hover:text-teal">{p.name}</span>
+                                            {p.ean && <span className="mt-0.5 text-[11.5px] text-ink-4 tabular-nums">{p.ean}</span>}
+                                            <span className="mt-auto pt-1.5 text-[13px] text-ink-3">{price > 0 ? <><span className="font-semibold text-ink tabular-nums">{formatPrice(price)}</span> / case</> : 'Price on request'}</span>
+                                        </Link>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </section>
                 )}
             </main>
+
 
             {/* Image lightbox — click any product image to open */}
             <ImageLightbox
@@ -1847,12 +1448,12 @@ export default function ProductDetailClient() {
                         className="absolute inset-0 bg-[#0F172A]/70 backdrop-blur-sm"
                         onClick={() => setShowAddAnotherPrompt(false)}
                     />
-                    <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-7 space-y-5">
+                    <div className="relative w-full max-w-md bg-surface rounded-3xl shadow-2xl p-7 space-y-5">
                         <div className="text-center">
                             <div className="w-14 h-14 mx-auto rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mb-3">
                                 <Check size={26} />
                             </div>
-                            <h3 className="text-[18px] font-black text-[#0F172A]">
+                            <h3 className="text-[18px] font-black text-ink">
                                 Mixed {tierData.activeLabel.toLowerCase()} added to your cart
                             </h3>
                             <p className="text-[13px] text-slate-500 mt-1.5">
@@ -1874,7 +1475,7 @@ export default function ProductDetailClient() {
                                     setShowAddAnotherPrompt(false);
                                     router.push('/cart');
                                 }}
-                                className="h-12 rounded-xl bg-white border-2 border-slate-200 hover:border-[#2EC4B6] text-slate-700 font-black uppercase text-[12px] tracking-widest transition-colors"
+                                className="h-12 rounded-xl bg-surface border-2 border-slate-200 hover:border-[#2EC4B6] text-slate-700 font-black uppercase text-[12px] tracking-widest transition-colors"
                             >
                                 Go to cart
                             </button>

@@ -131,6 +131,8 @@ export async function fetchProductsWithFilters(filters: Filters): Promise<Produc
         if (filters.minPrice) params.set('minPrice', filters.minPrice);
         if (filters.maxPrice) params.set('maxPrice', filters.maxPrice);
         if (filters.sort) params.set('sort', filters.sort);
+        if (filters.limit) params.set('limit', String(filters.limit));
+        if (filters.page) params.set('page', String(filters.page));
 
         const res = await apiFetch(`/products?${params.toString()}`, { cache: 'no-store' });
         if (!res.ok) return [];
@@ -141,6 +143,41 @@ export async function fetchProductsWithFilters(filters: Filters): Promise<Produc
         console.error('Error fetching products with filters:', error);
         return [];
     }
+}
+
+export interface ProductPage {
+    items: Product[];
+    total: number;
+    page: number;
+    totalPages: number;
+    /** Present only when the backend supports origin facets (else null). */
+    origins: { value: string; count: number }[] | null;
+    /** Brands present in the catalog (backend facet) — null on older backends. */
+    brands: { value: string; count: number }[] | null;
+    /** Min/max list price (EUR) under current non-price filters — null on older backends. */
+    priceRange: { min: number; max: number } | null;
+    /** Server-side filters this backend supports (e.g. 'brands', 'categoryAny'). */
+    capabilities: string[];
+}
+
+/** One server-side page of products with the real total count. */
+export async function fetchProductPage(filters: Filters & { origin?: string; brands?: string; categoryAny?: string; categoryNone?: string }, signal?: AbortSignal): Promise<ProductPage> {
+    const params = new URLSearchParams({ status: 'APPROVED' });
+    for (const [k, v] of Object.entries(filters)) if (v !== undefined && v !== '') params.set(k, String(v));
+    const res = await apiFetch(`/products?${params.toString()}`, { cache: 'no-store', signal });
+    if (!res.ok) throw Object.assign(new Error(`products ${res.status}`), { status: res.status });
+    const json = await res.json();
+    const items = (Array.isArray(json) ? json : json.data || []).map(mapProduct);
+    return {
+        items,
+        total: typeof json.total === 'number' ? json.total : items.length,
+        page: typeof json.page === 'number' ? json.page : 1,
+        totalPages: typeof json.totalPages === 'number' ? json.totalPages : 1,
+        origins: Array.isArray(json?.facets?.origins) ? json.facets.origins : null,
+        brands: Array.isArray(json?.facets?.brands) ? json.facets.brands : null,
+        priceRange: json?.facets?.priceRange && typeof json.facets.priceRange.max === 'number' ? json.facets.priceRange : null,
+        capabilities: Array.isArray(json?.facets?.capabilities) ? json.facets.capabilities : [],
+    };
 }
 
 export async function fetchSearchSuggestions(query: string): Promise<Product[]> {

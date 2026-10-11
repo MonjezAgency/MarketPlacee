@@ -342,7 +342,7 @@ export class ProductsService {
         }
     }
 
-    async findAll(status?: ProductStatus, filters?: { category?: string; brand?: string; minPrice?: string; maxPrice?: string; sort?: string; q?: string; page?: string; limit?: string }) {
+    async findAll(status?: ProductStatus, filters?: { category?: string; brand?: string; brands?: string; categoryAny?: string; categoryNone?: string; minPrice?: string; maxPrice?: string; sort?: string; q?: string; page?: string; limit?: string; origin?: string }) {
         const where: any = {};
         if (status) {
             // Robust case-insensitive status handling
@@ -371,6 +371,26 @@ export class ProductsService {
 
         // Brand filter
         if (filters?.brand) where.brand = { contains: filters.brand, mode: 'insensitive' };
+        // Multi-brand (comma-separated, exact match, case-insensitive).
+        const brandList = String(filters?.brands || '').split(',').map((b) => b.trim()).filter(Boolean).slice(0, 50);
+        if (brandList.length) where.brand = { in: brandList, mode: 'insensitive' };
+
+        // Department = category keyword groups: any include matches, no exclude matches.
+        const csv = (v?: string) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 40);
+        const catAny = csv(filters?.categoryAny), catNone = csv(filters?.categoryNone);
+        if (catAny.length || catNone.length) {
+            where.AND = [
+                ...(where.AND || []),
+                ...(catAny.length ? [{ OR: catAny.map((k) => ({ category: { contains: k, mode: 'insensitive' } })) }] : []),
+                ...catNone.map((k) => ({ NOT: { category: { contains: k, mode: 'insensitive' } } })),
+            ];
+        }
+
+        // Country of origin (exact, case-insensitive). Facets below are
+        // computed WITHOUT this filter so the list of origins stays stable.
+        const whereNoOrigin = () => ({ ...where });
+        let originFilter: any = null;
+        if (filters?.origin) originFilter = { equals: filters.origin, mode: 'insensitive' };
 
         // Price range
         if (filters?.minPrice || filters?.maxPrice) {
@@ -400,20 +420,65 @@ export class ProductsService {
         const limit = Math.min(100, Math.max(1, parseInt(filters?.limit || '24', 10)));
         const skip = (page - 1) * limit;
 
-        const [products, total] = await Promise.all([
-            this.prisma.product.findMany({
-                where,
-                include: {
-                    supplier: {
-                        select: { id: true, name: true, email: true, companyName: true, role: true }
-                    }
-                },
-                orderBy,
-                skip,
-                take: limit,
-            }),
-            this.prisma.product.count({ where }),
+        // Origins available under the current filters (minus origin itself).
+        const baseWhere = whereNoOrigin();
+        if (originFilter) where.origin = originFilter;
+        // Price bounds for the listing's range slider: computed without the
+        // price filter itself so the slider keeps its full span.
+        const { price: _ignoredPrice, ...wherePriceFree } = { ...baseWhere, ...(originFilter ? { origin: originFilter } : {}) } as any;
+        const [originGroups, brandGroups, priceAgg] = await Promise.all([
+            this.prisma.product.groupBy({
+                by: ['origin'],
+                where: { ...baseWhere, origin: { not: null } },
+                _count: { origin: true },
+            }).catch(() => [] as any[]),
+            // Brands present for the current search/status (ignores the brand
+            // filter itself so the list doesn't collapse to one entry).
+            this.prisma.product.groupBy({
+                by: ['brand'],
+                where: { ...baseWhere, brand: { not: null } },
+                _count: { brand: true },
+            }).catch(() => [] as any[]),
+            this.prisma.product.aggregate({ where: wherePriceFree, _min: { price: true }, _max: { price: true } }).catch(() => null),
         ]);
+
+        const include = { supplier: { select: { id: true, name: true, email: true, companyName: true, role: true } } };
+        let products: any[];
+        let total: number;
+        const qTerm = String(filters?.q || '').trim().toLowerCase();
+        if (filters?.sort === 'relevance' && qTerm) {
+            // Relevance for a search: rank the (bounded) match set in memory —
+            // exact EAN, then name starts-with, whole query in name, brand,
+            // then other matches; ties newest first. Only the page is loaded in full.
+            const candidates = await this.prisma.product.findMany({
+                where, select: { id: true, name: true, brand: true, ean: true, createdAt: true },
+                orderBy: { createdAt: 'desc' }, take: 2000,
+            });
+            const score = (p: any) => {
+                const name = String(p.name || '').toLowerCase(), brand = String(p.brand || '').toLowerCase();
+                if (p.ean && String(p.ean) === qTerm) return 100;
+                if (name === qTerm) return 90;
+                if (name.startsWith(qTerm)) return 70;
+                if (name.includes(qTerm)) return 50;
+                if (brand === qTerm || brand.startsWith(qTerm)) return 40;
+                if (p.ean && String(p.ean).includes(qTerm)) return 30;
+                return 0;
+            };
+            const ranked = candidates
+                .map((p, i) => ({ id: p.id, s: score(p), i }))
+                .sort((a, b) => b.s - a.s || a.i - b.i);
+            total = await this.prisma.product.count({ where });
+            const pageIds = ranked.slice(skip, skip + limit).map((x) => x.id);
+            const rows = await this.prisma.product.findMany({ where: { id: { in: pageIds } }, include });
+            const byId = new Map(rows.map((r: any) => [r.id, r]));
+            products = pageIds.map((id) => byId.get(id)).filter(Boolean);
+        } else {
+            // 'relevance' without a search term = default catalog order (newest).
+            [products, total] = await Promise.all([
+                this.prisma.product.findMany({ where, include, orderBy, skip, take: limit }),
+                this.prisma.product.count({ where }),
+            ]);
+        }
 
         return {
             data: products,
@@ -421,6 +486,21 @@ export class ProductsService {
             page,
             limit,
             totalPages: Math.ceil(total / limit),
+            facets: {
+                // Lets the storefront know it can page these filters server-side.
+                capabilities: ['brands', 'categoryAny', 'relevance'],
+                origins: originGroups
+                    .filter((g: any) => g.origin && String(g.origin).trim())
+                    .map((g: any) => ({ value: g.origin, count: g._count.origin }))
+                    .sort((a: any, b: any) => b.count - a.count),
+                priceRange: priceAgg && priceAgg._min.price != null && priceAgg._max.price != null
+                    ? { min: priceAgg._min.price, max: priceAgg._max.price }
+                    : null,
+                brands: brandGroups
+                    .filter((g: any) => g.brand && String(g.brand).trim())
+                    .map((g: any) => ({ value: g.brand, count: g._count.brand }))
+                    .sort((a: any, b: any) => b.count - a.count || String(a.value).localeCompare(String(b.value))),
+            },
         };
     }
 
@@ -441,6 +521,49 @@ export class ProductsService {
      * previous price (EGP base), and the delta. The frontend converts to the
      * user's display currency.
      */
+    /**
+     * Buyer demand ("Targets"): approved products that buyers have saved to
+     * their watchlist, ranked by how many distinct buyers saved them, with
+     * the number of approved supplier offers on each. Aggregates only — no
+     * buyer or supplier identities leave the server.
+     */
+    async findBuyerTargets(limit: number = 24) {
+        const take = Math.min(60, Math.max(1, limit));
+        const saved = await this.prisma.wishlistItem.groupBy({
+            by: ['productId'],
+            _count: { productId: true },
+            orderBy: { _count: { productId: 'desc' } },
+            take: take * 2,
+        });
+        if (saved.length === 0) return [];
+        const ids = saved.map((s) => s.productId);
+        const [products, offerCounts] = await Promise.all([
+            this.prisma.product.findMany({
+                where: { id: { in: ids }, status: 'APPROVED' as any },
+                select: {
+                    id: true, name: true, brand: true, ean: true, category: true, images: true,
+                    price: true, basePrice: true, unitsPerCase: true, casesPerPallet: true, unitsPerPallet: true,
+                    palletsPerShipment: true,
+                },
+            }),
+            this.prisma.offer.groupBy({
+                by: ['productId'],
+                where: { productId: { in: ids }, status: 'APPROVED' },
+                _count: { productId: true },
+            }),
+        ]);
+        const byId = new Map(products.map((p) => [p.id, p]));
+        const offers = new Map(offerCounts.map((o) => [o.productId, o._count.productId]));
+        return saved
+            .filter((s) => byId.has(s.productId))
+            .slice(0, take)
+            .map((s) => ({
+                product: byId.get(s.productId),
+                buyersWatching: s._count.productId,
+                approvedOffers: offers.get(s.productId) ?? 0,
+            }));
+    }
+
     async findRecentPriceChanges(limit: number = 30) {
         const products = await this.prisma.product.findMany({
             where: {

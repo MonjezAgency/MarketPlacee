@@ -55,6 +55,11 @@ export interface CartItem {
      * to the order API where it lands on OrderItem.mixComposition.
      */
     mixComposition?: Array<{ signature: string; quantity: number; unitPrice: number }>;
+    /**
+     * Server-saved mixed pallet / truckload (several products, one supplier).
+     * The server prices and validates it at checkout; quantity stays 1.
+     */
+    mixedLoadId?: string;
 }
 
 interface CartContextType {
@@ -90,6 +95,9 @@ function getCartKey(): string {
 export function CartProvider({ children }: { children: ReactNode }) {
     const [items, setItems] = useState<CartItem[]>([]);
     const [cartKey, setCartKey] = useState<string>('bev-cart-guest');
+    // Key whose saved cart has been read — nothing is persisted before that,
+    // otherwise the initial empty state overwrites the saved cart.
+    const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
     // Detect user-id changes (login / logout) and reload the correct cart
     useEffect(() => {
@@ -104,6 +112,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
                 localStorage.removeItem(key);
                 setItems([]);
             }
+            setLoadedKey(key);
         };
         syncKey();
         window.addEventListener('bev-auth-changed', syncKey);
@@ -112,10 +121,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     // Persist to the current user's cart key
     useEffect(() => {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && loadedKey === cartKey) {
             localStorage.setItem(cartKey, JSON.stringify(items));
         }
-    }, [items, cartKey]);
+    }, [items, cartKey, loadedKey]);
 
     const addItem = (item: Omit<CartItem, 'quantity'>, qty = 1) => {
         setItems(prev => {
@@ -133,7 +142,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
     const updateQuantity = (id: string, qty: number) => {
         if (qty <= 0) return removeItem(id);
-        setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: qty } : i));
+        // A mixed pallet/truckload line is one composed unit — never multiplied.
+        setItems(prev => prev.map(i => i.id === id ? { ...i, quantity: (i.mixedLoadId || i.mixComposition?.length) ? 1 : qty } : i));
     };
 
     const clearCart = () => {

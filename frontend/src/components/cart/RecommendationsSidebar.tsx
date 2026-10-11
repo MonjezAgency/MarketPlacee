@@ -172,7 +172,8 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
                                                 image: product.images?.[0] || '',
                                                 supplierId: product.supplierId,
                                                 brand: product.brand || 'Premium',
-                                                unit: 'box',
+                                                unit: 'Case',
+                                                tier: 'carton',
                                                 category: product.category
                                             }, 1)}
                                             className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-primary shadow-xl hover:scale-110 active:scale-95 transition-all"
@@ -203,7 +204,8 @@ export default function RecommendationsSidebar({ items }: { items: CartItem[] })
                                                 image: product.images?.[0] || '',
                                                 supplierId: product.supplierId,
                                                 brand: product.brand || 'Premium',
-                                                unit: 'box',
+                                                unit: 'Case',
+                                                tier: 'carton',
                                                 category: product.category
                                             }, 1)}
                                             className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover/item:text-primary transition-colors"

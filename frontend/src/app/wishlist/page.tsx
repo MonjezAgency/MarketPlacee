@@ -67,7 +67,8 @@ export default function WishlistPage() {
             brand: item.brand || 'Premium', 
             price: item.price, 
             image: item.images?.[0] || '', 
-            unit: 'unit' 
+            unit: 'Case',
+            tier: 'carton',
         }, 1);
         setAddedToCart(item.id);
         setTimeout(() => setAddedToCart(null), 2000);

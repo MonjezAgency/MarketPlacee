@@ -73,9 +73,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!isMounted) return;
             
             try {
-                // Add a small initial delay to ensure cookies are ready (esp. on Safari/Mac)
-                if (retryCount === 0) await new Promise(r => setTimeout(r, 300));
-
                 const fetchPromise = apiFetch('/auth/me');
                 const timeoutPromise = new Promise((_, reject) =>
                     setTimeout(() => reject(new Error('Timeout')), 8000)
@@ -92,10 +89,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             window.dispatchEvent(new Event('bev-auth-changed'));
                         }
                     }
-                } else if (res.status === 401 && retryCount < 2) {
-                    // One-time retry for 401s right after boot (potential race condition)
-                    console.warn(`[AUTH] Retrying auth check (${retryCount + 1}/2)...`);
-                    await new Promise(r => setTimeout(r, 800));
+                } else if (
+                    res.status === 401 && retryCount < 1 &&
+                    typeof window !== 'undefined' && sessionStorage.getItem('bev-uid')
+                ) {
+                    // Perf: the old flow always waited 300ms up front and retried every
+                    // 401 twice (800ms each) — ~2s before isAuthReady for every logged-out
+                    // visitor. Now: no pre-delay, and a single short retry only when this
+                    // tab previously had a session (the cookie-race case it was meant for).
+                    await new Promise(r => setTimeout(r, 400));
                     return checkAuth(retryCount + 1);
                 } else {
                     if (isMounted) setUser(null);

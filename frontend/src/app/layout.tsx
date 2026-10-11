@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Cairo, Poppins } from "next/font/google";
+import { Cairo, Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { Providers } from './providers';
 import ClientLayout from "@/components/layout/ClientLayout";
@@ -10,6 +10,13 @@ import { cn } from "@/lib/utils";
 const cairo = Cairo({
     subsets: ["arabic", "latin"],
     variable: "--font-cairo",
+    display: "swap",
+});
+
+// Inter for Latin text (compact metrics); Cairo still renders Arabic glyphs.
+const inter = Inter({
+    subsets: ["latin"],
+    variable: "--font-inter",
     display: "swap",
 });
 
@@ -192,18 +199,29 @@ export default function RootLayout({
                         }),
                     }}
                 />
+                {/* Service worker: production only. In dev it would cache
+                    hot-reloaded assets, so we unregister any leftover worker
+                    instead. Registration failures are non-fatal — always
+                    catch them so they never surface as unhandled rejections. */}
                 <script dangerouslySetInnerHTML={{
-                    __html: `
+                    __html: process.env.NODE_ENV === 'production' ? `
                         if ('serviceWorker' in navigator) {
                             window.addEventListener('load', function() {
-                                navigator.serviceWorker.register('/sw.js');
+                                navigator.serviceWorker.register('/sw.js').catch(function() {});
                             });
+                        }
+                    ` : `
+                        if ('serviceWorker' in navigator) {
+                            navigator.serviceWorker.getRegistrations()
+                                .then(function(regs) { regs.forEach(function(r) { r.unregister(); }); })
+                                .catch(function() {});
                         }
                     `
                 }} />
             </head>
             <body className={cn(
-                'min-h-screen bg-background font-sans antialiased text-end',
+                'min-h-screen bg-surface text-ink font-sans antialiased text-end',
+                inter.variable,
                 cairo.variable,
                 poppins.variable // Keep poppins variable if it's still needed for other elements
             )}>

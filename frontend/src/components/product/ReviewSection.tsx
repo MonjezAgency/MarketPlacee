@@ -174,170 +174,110 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
     const avgRating = reviews.length > 0 ? reviews.reduce((s, r) => s + r.rating, 0) / reviews.length : 0;
     const dist = [5, 4, 3, 2, 1].map(s => ({ star: s, count: reviews.filter(r => r.rating === s).length }));
 
-    return (
-        <div className="mt-12 border-t border-slate-100 pt-10">
-            <h2 className="text-2xl font-black text-[#0A1A2F] dark:text-white mb-8">{t('reviews', 'title')}</h2>
+    const [visible, setVisible] = useState(1);
+    const [showForm, setShowForm] = useState(false);
+    const mine = reviews.find(r => r.user.id === user?.id);
 
-            {/* Summary */}
-            {reviews.length > 0 && (
-                <div className="flex gap-10 mb-10 p-6 bg-slate-50 rounded-2xl">
-                    <div className="text-center">
-                        <div className="text-5xl font-black text-[#0A1A2F] dark:text-white">{avgRating.toFixed(1)}</div>
-                        <StarRating value={Math.round(avgRating)} size={16} />
-                        <div className="text-xs text-slate-400 mt-1">{reviews.length} {reviews.length === 1 ? t('reviews', 'review') : t('reviews', 'reviews')}</div>
+    return (
+        <section aria-labelledby="reviews-title">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+                <div>
+                    <h2 id="reviews-title" className="text-[18px] font-bold text-heading">{t('reviews', 'title')}</h2>
+                    {reviews.length > 0 ? (
+                        <div className="mt-1 flex items-center gap-2 text-[13px] text-ink-3">
+                            <StarRating value={Math.round(avgRating)} size={14} />
+                            <span className="font-semibold text-ink tabular-nums">{avgRating.toFixed(1)}</span>
+                            <span>· {reviews.length} {reviews.length === 1 ? t('reviews', 'review') : t('reviews', 'reviews')}</span>
+                        </div>
+                    ) : !loading && <p className="mt-1 text-[13px] text-ink-3">No reviews yet — reviews come from verified buyers on Atlantis.</p>}
+                </div>
+                {isLoggedIn ? (
+                    <button type="button" onClick={() => setShowForm(v => !v)} className="h-9 px-4 rounded-lg ring-1 ring-line-strong hover:ring-ink text-[13px] font-semibold text-ink">
+                        {showForm ? 'Cancel' : mine ? t('reviews', 'editReview') : t('reviews', 'writeReview')}
+                    </button>
+                ) : (
+                    <button type="button" onClick={() => window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname)} className="h-9 px-4 rounded-lg ring-1 ring-line-strong text-[13px] font-semibold text-ink">
+                        Sign in to review
+                    </button>
+                )}
+            </div>
+
+            {isLoggedIn && showForm && (
+                <form onSubmit={handleSubmit} className="mt-4 rounded-xl ring-1 ring-line bg-surface-2 p-4 space-y-4">
+                    {error && <p className="text-[#DC2626] text-[13px]">{error}</p>}
+                    <div>
+                        <label className="block text-[12px] font-medium text-ink-3 mb-1">{t('reviews', 'yourRating')}</label>
+                        <StarRating value={myRating} onChange={setMyRating} size={24} />
                     </div>
-                    <div className="flex-1 space-y-1.5">
-                        {dist.map(({ star, count }) => (
-                            <div key={star} className="flex items-center gap-2 text-xs">
-                                <span className="w-4 text-slate-500">{star}</span>
-                                <Star size={12} className="fill-amber-400 text-amber-400" />
-                                <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                    <div
-                                        className="h-full bg-amber-400 rounded-full transition-all"
-                                        style={{ width: reviews.length ? `${(count / reviews.length) * 100}%` : '0%' }}
-                                    />
-                                </div>
-                                <span className="w-4 text-slate-400">{count}</span>
+                    <div>
+                        <label htmlFor="review-comment" className="block text-[12px] font-medium text-ink-3 mb-1">{t('reviews', 'yourOpinion')}</label>
+                        <textarea id="review-comment" value={myComment} onChange={e => setMyComment(e.target.value)} placeholder={t('reviews', 'commentPlaceholder')} rows={3}
+                            className="w-full rounded-lg ring-1 ring-line bg-surface p-3 text-[14px] text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6] resize-none" />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {previews.map((preview, i) => (
+                            <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden ring-1 ring-line group">
+                                <img src={preview} alt="" className="w-full h-full object-cover" />
+                                <button type="button" onClick={() => removeImage(i)} aria-label="Remove photo" className="absolute top-1 right-1 bg-[#DC2626] text-white rounded-full p-0.5"><X size={11} /></button>
                             </div>
                         ))}
+                        <button type="button" onClick={() => document.getElementById('review-images')?.click()} className="w-16 h-16 flex flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-line-strong text-ink-3 hover:text-teal hover:border-[#2EC4B6]">
+                            <Camera size={16} /><span className="text-[10px]">{t('reviews', 'uploadPhoto')}</span>
+                        </button>
+                        <input id="review-images" type="file" multiple accept="image/*" className="hidden" onChange={handleFileChange} />
                     </div>
-                </div>
-            )}
-
-            {/* Write Review */}
-            {isLoggedIn ? (
-                <form onSubmit={handleSubmit} className="bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 rounded-2xl p-6 mb-8 shadow-sm">
-                    <h3 className="font-black text-[#0A1A2F] dark:text-white mb-4">
-                        {reviews.find(r => r.user.id === user?.id) ? t('reviews', 'editReview') : t('reviews', 'writeReview')}
-                    </h3>
-                    {error && <p className="text-red-500 text-sm mb-4 font-bold">{error}</p>}
-                    
-                    <div className="flex flex-col md:flex-row gap-6 mb-6">
-                        <div className="shrink-0">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block text-center">{t('reviews', 'yourRating')}</label>
-                            <StarRating value={myRating} onChange={setMyRating} size={32} />
-                        </div>
-                        
-                        <div className="flex-1">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block">{t('reviews', 'yourOpinion')}</label>
-                            <textarea
-                                value={myComment}
-                                onChange={e => setMyComment(e.target.value)}
-                                placeholder={t('reviews', 'commentPlaceholder')}
-                                rows={2}
-                                className="w-full bg-white dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl p-4 text-sm text-[#0A1A2F] dark:text-white outline-none focus:border-[#FF8A00]/40 transition resize-none"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Image Upload UI */}
-                    <div className="mb-6">
-                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-2 block">{t('reviews', 'addPhotos')}</label>
-                        <div className="flex flex-wrap gap-3">
-                            {previews.map((preview, i) => (
-                                <div key={i} className="relative w-20 h-20 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 group">
-                                    <img src={preview} alt="preview" className="w-full h-full object-cover" />
-                                    <button
-                                        type="button"
-                                        onClick={() => removeImage(i)}
-                                        className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    >
-                                        <X size={12} />
-                                    </button>
-                                </div>
-                            ))}
-                            <button
-                                type="button"
-                                onClick={() => document.getElementById('review-images')?.click()}
-                                className="w-20 h-20 flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-slate-200 dark:border-white/10 text-slate-400 hover:text-[#FF8A00] hover:border-[#FF8A00] transition-all"
-                            >
-                                <Camera size={20} />
-                                <span className="text-[9px] font-black uppercase tracking-tighter">{t('reviews', 'uploadPhoto')}</span>
-                            </button>
-                            <input
-                                id="review-images"
-                                type="file"
-                                multiple
-                                accept="image/*"
-                                className="hidden"
-                                onChange={handleFileChange}
-                            />
-                        </div>
-                    </div>
-
                     <div className="flex justify-end">
-                        <button
-                            type="submit"
-                            disabled={submitting}
-                            className="px-10 py-3.5 bg-[#0A1A2F] dark:bg-[#1BC7C9] text-white dark:text-[#0A1A2F] rounded-xl font-black text-xs uppercase tracking-widest transition-all hover:scale-105 active:scale-95 disabled:opacity-50 shadow-lg shadow-[#0A1A2F]/10 dark:shadow-none"
-                        >
+                        <button type="submit" disabled={submitting} className="h-10 px-5 rounded-lg bg-cta hover:bg-cta-hover text-cta-fg text-[13px] font-semibold disabled:opacity-50">
                             {submitting ? t('reviews', 'submitting') : t('reviews', 'submitReview')}
                         </button>
                     </div>
                 </form>
-            ) : (
-                <div className="bg-slate-50 dark:bg-white/5 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl p-8 mb-8 text-center">
-                    <p className="text-slate-600 dark:text-slate-400 font-bold mb-4">{t('reviews', 'loginToReview')}</p>
-                    <button
-                        onClick={() => window.location.href = '/auth/login?redirect=' + encodeURIComponent(window.location.pathname)}
-                        className="px-6 py-2 bg-[#0A1A2F] dark:bg-[#1BC7C9] text-white dark:text-[#0A1A2F] rounded-xl font-black text-xs uppercase tracking-widest hover:bg-[#FF8A00] transition-all"
-                    >
-                        {t('navbar', 'login')}
-                    </button>
-                </div>
             )}
 
-            {/* Reviews List */}
             {loading ? (
-                <div className="space-y-4">
-                    {[1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-100 rounded-2xl animate-pulse" />)}
-                </div>
-            ) : reviews.length === 0 ? (
-                <div className="text-center py-12 text-slate-400">
-                    <ThumbsUp size={40} className="mx-auto mb-3 opacity-30" />
-                    <p className="font-bold">{t('reviews', 'noReviews')}</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {reviews.map(review => (
-                        <div key={review.id} className="bg-card border border-border rounded-2xl p-5 shadow-sm">
-                            <div className="flex items-start justify-between gap-4">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-full bg-foreground/10 flex items-center justify-center font-black text-foreground text-sm shrink-0">
-                                        {review.user.name?.[0]?.toUpperCase() || '?'}
-                                    </div>
-                                    <div>
-                                        <p className="font-black text-foreground text-sm">{review.user.companyName || review.user.name}</p>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <StarRating value={review.rating} size={13} />
-                                            <span className="text-xs text-muted-foreground">
-                                                {new Date(review.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
-                                            </span>
+                <div className="mt-4 h-24 rounded-xl bg-surface-3 animate-pulse" />
+            ) : reviews.length > 0 && (
+                <>
+                    <ul className="mt-4 divide-y divide-line ring-1 ring-line rounded-xl">
+                        {reviews.slice(0, visible).map(review => (
+                            <li key={review.id} className="p-4">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex items-center gap-3 min-w-0">
+                                        <span className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center text-[13px] font-semibold text-ink-2 shrink-0">{review.user.name?.[0]?.toUpperCase() || '?'}</span>
+                                        <div className="min-w-0">
+                                            <p className="text-[13.5px] font-semibold text-ink truncate">{review.user.companyName || review.user.name}</p>
+                                            <div className="flex items-center gap-2">
+                                                <StarRating value={review.rating} size={12} />
+                                                <span className="text-[12px] text-ink-4">{new Date(review.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-GB', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                                            </div>
                                         </div>
                                     </div>
+                                    {user?.id === review.user.id && (
+                                        <button onClick={() => handleDelete(review.id)} aria-label="Delete your review" className="text-ink-4 hover:text-[#DC2626] shrink-0"><Trash2 size={15} /></button>
+                                    )}
                                 </div>
-                                {user?.id === review.user.id && (
-                                    <button onClick={() => handleDelete(review.id)} className="text-muted-foreground/50 hover:text-red-500 transition-colors shrink-0">
-                                        <Trash2 size={16} />
-                                    </button>
+                                {review.comment && <p className="mt-2.5 text-[14px] text-ink-2 leading-relaxed">{review.comment}</p>}
+                                {review.images && review.images.length > 0 && (
+                                    <div className="flex flex-wrap gap-2 mt-2.5">
+                                        {review.images.map((img, i) => (
+                                            <a key={i} href={img} target="_blank" rel="noreferrer" className="w-14 h-14 rounded-lg overflow-hidden ring-1 ring-line">
+                                                <img src={img} alt="Review photo" className="w-full h-full object-cover" />
+                                            </a>
+                                        ))}
+                                    </div>
                                 )}
-                            </div>
-                            {review.comment && (
-                                <p className="mt-3 text-sm text-foreground leading-relaxed ps-13">{review.comment}</p>
-                            )}
-                            {review.images && review.images.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mt-3 ps-13">
-                                    {review.images.map((img, i) => (
-                                        <a key={i} href={img} target="_blank" rel="noreferrer" className="w-16 h-16 rounded-lg overflow-hidden border border-slate-100 dark:border-white/5">
-                                            <img src={img} alt="review" className="w-full h-full object-cover hover:scale-110 transition-transform" />
-                                        </a>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
+                            </li>
+                        ))}
+                    </ul>
+                    {reviews.length > visible ? (
+                        <button type="button" onClick={() => setVisible(v => v + 5)} className="mt-3 text-[13px] font-semibold text-teal hover:underline">
+                            Show more reviews ({reviews.length - visible} more)
+                        </button>
+                    ) : visible > 1 && (
+                        <button type="button" onClick={() => setVisible(1)} className="mt-3 text-[13px] font-semibold text-ink-3 hover:text-ink">Show fewer</button>
+                    )}
+                </>
             )}
-        </div>
+        </section>
     );
 }

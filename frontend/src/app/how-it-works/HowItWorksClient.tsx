@@ -1,138 +1,176 @@
 'use client';
 
+import * as React from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import {
-    ShieldCheck, PackageSearch, CreditCard, Truck,
-    Users, BarChart3, CheckCircle2, ArrowRight, Star,
-    Lock,
-} from 'lucide-react';
+import { ArrowRight, UserCheck, Search, Layers, ListChecks, CreditCard, Truck, ShieldCheck, PackageCheck, FileText } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
-const BUYER_STEPS = [
-    { icon: Users, title: 'Create Your Account', desc: 'Register as a buyer. Our team reviews and activates your business account within 24 hours.', color: 'text-blue-500 bg-blue-500/10' },
-    { icon: PackageSearch, title: 'Browse & Search', desc: 'Explore thousands of products in the Atlantis catalog across Europe and the Gulf. Filter by category, MOQ, price, and brand.', color: 'text-purple-500 bg-purple-500/10' },
-    { icon: ShieldCheck, title: 'Quality You Can Trust', desc: 'Every product in the Atlantis catalog is sourced and quality-checked by our team before listing.', color: 'text-emerald-500 bg-emerald-500/10' },
-    { icon: CreditCard, title: 'Pay Securely', desc: 'Checkout with Stripe — card, Apple Pay, Google Pay. Your payment is held in escrow until delivery is confirmed.', color: 'text-primary bg-primary/10' },
-    { icon: Truck, title: 'Track Your Order', desc: 'Real-time status updates from placement to delivery. Download your invoice automatically once delivered.', color: 'text-orange-500 bg-orange-500/10' },
-    { icon: Star, title: 'Review & Repeat', desc: 'Rate your products and reorder with one click. Build a long-term wholesale relationship with Atlantis.', color: 'text-yellow-500 bg-yellow-500/10' },
+/**
+ * Buyer journey — every step maps to something Atlantis actually supports:
+ * account approval (PENDING_APPROVAL flow), catalog search incl. EAN,
+ * case/pallet/truck price tiers, cart + /requests, Stripe checkout in EUR
+ * with escrow (backend escrow.service), and order tracking + invoices.
+ */
+const STEPS = [
+    { icon: UserCheck, title: 'Create your account', desc: 'Register your business. Our team reviews and activates buyer accounts before trading starts.', href: '/auth/register?role=CUSTOMER', cta: 'Register' },
+    { icon: Search, title: 'Discover products', desc: 'Search FMCG products by name, brand, category or EAN barcode across the Atlantis catalog.', href: '/categories', cta: 'Browse catalog' },
+    { icon: Layers, title: 'Compare price tiers', desc: 'Every listing shows per-case pricing for case, pallet and truck volumes, so you see what volume unlocks.', href: '/categories?sort=newest', cta: 'See new offers' },
+    { icon: ListChecks, title: 'Build your buying list', desc: 'Add products at the tier you need, or list items, quantities and packaging in a sourcing request.', href: '/requests', cta: 'Start a list' },
+    { icon: CreditCard, title: 'Order or request a quote', desc: 'Check out securely with Stripe — payments are charged in EUR and held in escrow — or send your list to our desk for a quote.', href: '/requests', cta: 'Request a quote' },
+    { icon: Truck, title: 'Track your delivery', desc: 'Follow order status from your dashboard and download invoices for your records.', href: '/dashboard/track', cta: 'Track orders' },
 ];
 
-const FEATURES = [
-    { icon: Lock, title: 'Bank-Grade Security', desc: 'AES-256 encryption for all financial data. PCI DSS compliant payments via Stripe.' },
-    { icon: ShieldCheck, title: 'Curated Catalog', desc: 'Every product is sourced, quality-checked and listed by Atlantis before going live.' },
-    { icon: CreditCard, title: 'Escrow Payments', desc: 'Your payment is held securely until delivery is confirmed — zero risk for buyers.' },
-    { icon: Truck, title: 'Logistics Partners', desc: 'Integrated shipping rates from leading European and Gulf carriers.' },
-    { icon: Star, title: 'Verified Reviews', desc: 'Only buyers who purchased can leave reviews — trustworthy ratings guaranteed.' },
-    { icon: BarChart3, title: 'Business Analytics', desc: 'Real-time dashboards for buyers to track performance and spending.' },
+const ASSURANCES = [
+    { icon: PackageCheck, title: 'Sold & shipped by Atlantis', desc: 'Products are listed and sold by Atlantis directly — one counterparty for every order.' },
+    { icon: ShieldCheck, title: 'Escrow-protected payments', desc: 'Card payments are processed by Stripe and held in escrow until your order is fulfilled.' },
+    { icon: FileText, title: 'Clear paperwork', desc: 'Order history and invoices stay available in your dashboard.' },
 ];
+
+// Desktop roadmap geometry: markers alternate high/low along a gentle wave.
+const WAVE_Y = [24, 64, 24, 64, 24, 64];
 
 export default function HowItWorksPage() {
+    const [active, setActive] = React.useState(0);
+
+    // Smooth wave through the marker centres (x at column midpoints, 0–600).
+    const points = WAVE_Y.map((y, i) => ({ x: 50 + i * 100, y }));
+    const path = points.reduce((d, p, i) => {
+        if (i === 0) return `M ${p.x} ${p.y}`;
+        const prev = points[i - 1];
+        const mx = (prev.x + p.x) / 2;
+        return `${d} C ${mx} ${prev.y}, ${mx} ${p.y}, ${p.x} ${p.y}`;
+    }, '');
+
     return (
-        <main className="min-h-screen bg-muted/20 pt-20 pb-24">
-            <div className="container mx-auto px-6 max-w-5xl">
-                {/* Hero */}
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="py-16 text-center space-y-6">
-                    <div className="inline-flex items-center gap-2 bg-primary/10 border border-primary/20 px-4 py-1.5 rounded-full text-primary text-xs font-black uppercase tracking-widest">
-                        <CheckCircle2 size={12} /> Built for B2B
-                    </div>
-                    <h1 className="text-5xl font-heading font-black tracking-tight">
-                        How <span className="text-primary">Atlantis</span> Works
-                    </h1>
-                    <p className="text-muted-foreground max-w-2xl mx-auto text-lg leading-relaxed">
-                        Atlantis is a secure B2B wholesale marketplace selling FMCG, beverages and consumer goods to professional buyers across Europe and the Gulf region.
+        <main className="min-h-screen bg-surface text-start">
+            {/* Hero */}
+            <section className="relative overflow-hidden border-b border-line">
+                <div aria-hidden className="absolute inset-0 opacity-60" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, #DCE3EA 1px, transparent 0)', backgroundSize: '22px 22px', maskImage: 'radial-gradient(ellipse 55% 70% at 50% 40%, #000 30%, transparent 75%)', WebkitMaskImage: 'radial-gradient(ellipse 55% 70% at 50% 40%, #000 30%, transparent 75%)' }} />
+                <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-16 pb-14 sm:pt-24 sm:pb-20 text-center">
+                    <p className="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-teal-soft text-[12px] font-semibold text-teal">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6]" /> Buyer journey
                     </p>
-                    <div className="flex items-center justify-center gap-4 flex-wrap pt-2">
-                        <Link href="/auth/register?role=CUSTOMER"
-                            className="h-12 px-8 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm">
-                            Start Buying <ArrowRight size={16} />
+                    <h1 className="font-sans mt-5 text-[34px] sm:text-[46px] font-bold tracking-tight text-heading leading-[1.08]">
+                        How Atlantis works
+                    </h1>
+                    <p className="mt-4 text-[16px] sm:text-[18px] text-ink-2 leading-relaxed">
+                        A B2B marketplace for FMCG wholesale. Find products, buy at the volume you need, and track every order — from first search to delivery.
+                    </p>
+                    <div className="mt-8 flex flex-wrap justify-center gap-3">
+                        <Link href="/auth/register?role=CUSTOMER" className="inline-flex items-center gap-2 h-12 px-6 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[15px] font-semibold transition-colors">
+                            Start buying <ArrowRight size={16} />
                         </Link>
-                        <Link href="/contact"
-                            className="h-12 px-8 border border-border bg-card font-black rounded-2xl hover:bg-muted transition-colors text-sm">
-                            Talk to Sales
+                        <Link href="/contact" className="inline-flex items-center h-12 px-6 rounded-xl bg-surface ring-1 ring-[#DCE3EA] hover:ring-ink text-heading text-[15px] font-semibold transition-colors">
+                            Talk to sales
                         </Link>
                     </div>
-                </motion.div>
+                </div>
+            </section>
 
-                {/* For Buyers */}
-                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-20">
-                    <div className="flex items-center gap-3 mb-10">
-                        <div className="w-10 h-10 rounded-2xl bg-primary/10 flex items-center justify-center">
-                            <Users size={20} className="text-primary" />
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">For Buyers</p>
-                            <h2 className="text-2xl font-black">How to Purchase</h2>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {BUYER_STEPS.map((step, i) => {
-                            const Icon = step.icon;
-                            return (
-                                <motion.div key={step.title}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: 0.1 + i * 0.07 }}
-                                    className="bg-card border border-border/50 rounded-2xl p-6 space-y-4 hover:border-primary/30 transition-colors"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${step.color}`}>
-                                            <Icon size={18} />
-                                        </div>
-                                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Step {i + 1}</span>
-                                    </div>
-                                    <div>
-                                        <h3 className="font-black mb-1">{step.title}</h3>
-                                        <p className="text-sm text-muted-foreground leading-relaxed">{step.desc}</p>
-                                    </div>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                </motion.section>
+            {/* Roadmap */}
+            <section aria-labelledby="journey-heading" className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+                <div className="text-center max-w-2xl mx-auto">
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-teal">Six steps</p>
+                    <h2 id="journey-heading" className="font-sans mt-2 text-[26px] sm:text-[32px] font-bold tracking-tight text-heading">From first search to delivery</h2>
+                </div>
 
-                {/* "For Suppliers" section intentionally removed — Atlantis
-                    sells directly. Supplier onboarding is invite-only and
-                    handled privately by the Atlantis team, so we do not
-                    expose any "Start Selling" CTA on the public site. */}
-
-                {/* Platform Features */}
-                <motion.section initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mb-20">
-                    <h2 className="text-2xl font-black mb-10 text-center">Why Atlantis?</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                        {FEATURES.map((f, i) => {
-                            const Icon = f.icon;
-                            return (
-                                <div key={f.title} className="flex gap-4 p-5 bg-card border border-border/50 rounded-2xl">
-                                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-                                        <Icon size={18} className="text-primary" />
-                                    </div>
-                                    <div>
-                                        <h3 className="font-black text-sm mb-1">{f.title}</h3>
-                                        <p className="text-xs text-muted-foreground leading-relaxed">{f.desc}</p>
-                                    </div>
+                {/* Desktop: gentle dotted wave */}
+                <ol className="hidden lg:grid grid-cols-6 relative mt-16">
+                    <svg aria-hidden className="absolute left-0 right-0 top-0 w-full h-[88px] pointer-events-none" viewBox="0 0 600 88" preserveAspectRatio="none">
+                        <path d={path} fill="none" stroke="#C7D2DD" strokeWidth="2" strokeDasharray="2 7" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+                    </svg>
+                    {STEPS.map((s, i) => {
+                        const on = active === i;
+                        return (
+                            <li
+                                key={s.title}
+                                tabIndex={0}
+                                onMouseEnter={() => setActive(i)}
+                                onFocus={() => setActive(i)}
+                                className="relative px-3 text-center outline-none group"
+                                aria-current={on ? 'step' : undefined}
+                            >
+                                <div className="relative mx-auto w-14 h-14" style={{ marginTop: WAVE_Y[i] - 28 }}>
+                                    {/* soft glow rising from beneath the marker */}
+                                    <span aria-hidden className={cn('absolute -inset-3 rounded-full bg-[radial-gradient(circle_at_50%_70%,rgba(46,196,182,0.35),transparent_70%)] transition-all duration-500', on ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-2')} />
+                                    <span className={cn(
+                                        'relative w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ring-1 group-focus-visible:ring-2 group-focus-visible:ring-[#2EC4B6]',
+                                        on ? 'bg-cta text-[#7FE3D9] ring-ink shadow-[0_10px_30px_rgba(11,31,58,0.25)]' : 'bg-surface text-teal ring-[#DCE3EA]'
+                                    )}>
+                                        <s.icon size={22} />
+                                    </span>
+                                    <span className={cn('absolute -top-1 -right-1 w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center ring-2 ring-white transition-colors', on ? 'bg-[#2EC4B6] text-heading' : 'bg-[#EEF2F5] text-ink-2')}>
+                                        {i + 1}
+                                    </span>
                                 </div>
-                            );
-                        })}
-                    </div>
-                </motion.section>
+                                <div style={{ marginTop: 88 - WAVE_Y[i] + 4 }}>
+                                    <h3 className={cn('font-sans text-[16px] font-bold transition-colors', on ? 'text-heading' : 'text-ink-2')}>{s.title}</h3>
+                                    <p className={cn('mt-2 text-[14px] leading-relaxed transition-all duration-300', on ? 'text-ink-2 opacity-100' : 'text-ink-3 opacity-70')}>{s.desc}</p>
+                                    <Link href={s.href} tabIndex={on ? 0 : -1} className={cn('mt-3 inline-flex items-center gap-1 text-[13px] font-semibold text-teal transition-all duration-300', on ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-1 pointer-events-none')}>
+                                        {s.cta} <ArrowRight size={13} />
+                                    </Link>
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ol>
 
-                {/* CTA */}
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }}
-                    className="bg-card border border-border/50 rounded-3xl p-12 text-center space-y-6">
-                    <h2 className="text-3xl font-black">Ready to get started?</h2>
-                    <p className="text-muted-foreground max-w-md mx-auto">Join thousands of businesses sourcing smarter with Atlantis.</p>
-                    <div className="flex items-center justify-center gap-4 flex-wrap">
-                        <Link href="/auth/register"
-                            className="h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm">
-                            Create Free Account <ArrowRight size={16} />
-                        </Link>
-                        <Link href="/categories"
-                            className="h-12 px-10 border border-border bg-card font-black rounded-2xl hover:bg-muted transition-colors text-sm">
-                            Browse Products
-                        </Link>
+                {/* Mobile / tablet: vertical timeline */}
+                <ol className="lg:hidden relative mt-12 max-w-xl mx-auto">
+                    <span aria-hidden className="absolute left-[27px] top-4 bottom-4 border-l-2 border-dotted border-[#C7D2DD]" />
+                    {STEPS.map((s, i) => {
+                        const on = active === i;
+                        return (
+                            <li key={s.title} tabIndex={0} onFocus={() => setActive(i)} onClick={() => setActive(i)} className="relative flex gap-5 pb-10 last:pb-0 outline-none group">
+                                <span className={cn(
+                                    'relative z-10 w-14 h-14 rounded-full shrink-0 flex items-center justify-center ring-1 transition-all duration-300 group-focus-visible:ring-2 group-focus-visible:ring-[#2EC4B6]',
+                                    on ? 'bg-cta text-[#7FE3D9] ring-ink shadow-[0_8px_24px_rgba(46,196,182,0.35)]' : 'bg-surface text-teal ring-[#DCE3EA]'
+                                )}>
+                                    <s.icon size={22} />
+                                </span>
+                                <div className="pt-1.5">
+                                    <p className="text-[12px] font-semibold text-teal tabular-nums">Step {i + 1}</p>
+                                    <h3 className="font-sans text-[17px] font-bold text-heading">{s.title}</h3>
+                                    <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed">{s.desc}</p>
+                                    <Link href={s.href} className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-teal">
+                                        {s.cta} <ArrowRight size={13} />
+                                    </Link>
+                                </div>
+                            </li>
+                        );
+                    })}
+                </ol>
+            </section>
+
+            {/* Assurances */}
+            <section className="bg-[#F6F8FA]">
+                <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-20">
+                    <h2 className="font-sans text-center text-[24px] sm:text-[28px] font-bold tracking-tight text-heading">Built for serious wholesale</h2>
+                    <div className="mt-10 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+                        {ASSURANCES.map((a) => (
+                            <div key={a.title} className="text-center">
+                                <span className="mx-auto w-12 h-12 rounded-2xl bg-surface ring-1 ring-[#E2E8EE] text-teal flex items-center justify-center"><a.icon size={22} /></span>
+                                <h3 className="font-sans mt-4 text-[16px] font-bold text-ink">{a.title}</h3>
+                                <p className="mt-1.5 text-[14px] text-ink-3 leading-relaxed">{a.desc}</p>
+                            </div>
+                        ))}
                     </div>
-                </motion.div>
-            </div>
+                </div>
+            </section>
+
+            {/* CTA */}
+            <section className="max-w-3xl mx-auto px-4 sm:px-6 py-16 sm:py-20 text-center">
+                <h2 className="font-sans text-[26px] sm:text-[32px] font-bold tracking-tight text-heading">Ready to source your range?</h2>
+                <p className="mt-3 text-[16px] text-ink-2">Open a buyer account, or tell us what you need and we&apos;ll quote it.</p>
+                <div className="mt-7 flex flex-wrap justify-center gap-3">
+                    <Link href="/auth/register?role=CUSTOMER" className="inline-flex items-center gap-2 h-12 px-6 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[15px] font-semibold transition-colors">
+                        Create account <ArrowRight size={16} />
+                    </Link>
+                    <Link href="/requests" className="inline-flex items-center h-12 px-6 rounded-xl bg-surface ring-1 ring-[#DCE3EA] hover:ring-ink text-heading text-[15px] font-semibold transition-colors">
+                        Request a quote
+                    </Link>
+                </div>
+            </section>
         </main>
     );
 }

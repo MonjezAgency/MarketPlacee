@@ -47,6 +47,8 @@ import {
     SUPPORTED_CURRENCIES,
     convertFromBase,
     convertToBase,
+    getActiveCurrency,
+    isCurrencyAvailable,
 } from '@/lib/currency';
 import { COUNTRIES } from '@/lib/countries';
 import { CATEGORIES_LIST } from '@/lib/products';
@@ -98,16 +100,15 @@ export default function ProductEditorModal({
     // active display currency — synced with the rest of the app
     const [activeCurrency, setActiveCurrency] = useState(() => {
         if (typeof window !== 'undefined') {
-            const saved = localStorage.getItem('platform-currency');
-            if (saved) return saved;
+            // Effective currency: only one with a current exchange rate.
+            return getActiveCurrency();
         }
         return getCurrencyInfo().code;
     });
 
     useEffect(() => {
         const onCurrencyChanged = () => {
-            const saved = localStorage.getItem('platform-currency');
-            if (saved) setActiveCurrency(saved);
+            setActiveCurrency(getActiveCurrency());
         };
         window.addEventListener('currency-changed', onCurrencyChanged);
         window.addEventListener('storage', onCurrencyChanged);
@@ -451,7 +452,7 @@ export default function ProductEditorModal({
                                                         className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
                                                     >
                                                         {SUPPORTED_CURRENCIES.map((c) => (
-                                                            <option key={c.code} value={c.code}>
+                                                            <option key={c.code} value={c.code} disabled={!isCurrencyAvailable(c.code)}>
                                                                 {c.code}
                                                             </option>
                                                         ))}

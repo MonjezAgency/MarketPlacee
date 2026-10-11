@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import { formatPrice } from '@/lib/currency';
+import { formatPrice, formatEUR } from '@/lib/currency';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
+import { quoteCart, toServerItem, type CartQuote } from '@/lib/wholesale';
 
 
 const ADDR_KEY = 'bev-checkout-address';
@@ -28,7 +29,26 @@ export default function CheckoutPage() {
     const [step, setStep] = useState(1);
     const [isProcessing, setIsProcessing] = useState(false);
     const [createdOrderId, setCreatedOrderId] = useState<string | null>(null);
-    const { items, total, clearCart } = useCart();
+    const { items: cartItems, total: cartTotalAll, removeItem } = useCart();
+    // ?scope=standard | load:<id> | loads — checkout one order from the cart.
+    const [scope, setScope] = useState<string | null>(null);
+    React.useEffect(() => { setScope(new URLSearchParams(window.location.search).get('scope')); }, []);
+    const items = React.useMemo(() => cartItems.filter((i) =>
+        scope === 'standard' ? !i.mixedLoadId
+        : scope === 'loads' ? !!i.mixedLoadId
+        : scope?.startsWith('load:') ? i.mixedLoadId === scope.slice(5)
+        : true), [cartItems, scope]);
+    const cartTotal = scope ? items.reduce((s, i) => s + i.price * i.quantity, 0) : cartTotalAll;
+    // Only the checked-out order leaves the cart.
+    const clearCart = () => items.forEach((i) => removeItem(i.id));
+    // Server quote — prices, promo and total come from the backend, never the browser.
+    const [quote, setQuote] = useState<CartQuote | null>(null);
+    const [quoteError, setQuoteError] = useState('');
+    // Older backend without /orders/quote: fall back to cart prices (server still records the order).
+    const [legacyPricing, setLegacyPricing] = useState(false);
+    // One key per checkout attempt: a retried or double-clicked submit returns the same order.
+    const idempotencyKey = React.useRef(`co_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`);
+    const total = quote?.subtotal ?? cartTotal;
     const { user } = useAuth();
     const { currency } = useCurrency();
     const { t } = useLanguage();
@@ -143,8 +163,15 @@ export default function CheckoutPage() {
 
     const removeCoupon = () => { setCouponDiscount(0); setCouponApplied(''); setCouponError(''); };
 
-    const discountAmount = total * (couponDiscount / 100);
-    const grandTotal = total - discountAmount; // Shipping is TBD and handled manually now
+    React.useEffect(() => {
+        if (!items.length) return;
+        quoteCart(items, couponApplied || undefined)
+            .then((q) => { setQuote(q); setQuoteError(q.ready ? '' : 'Some cart lines need attention — return to the cart to fix them.'); })
+            .catch((e) => { if (e?.code === 'NOT_DEPLOYED') setLegacyPricing(true); else setQuoteError(e?.message || 'Could not price your order.'); });
+    }, [items, couponApplied]);
+
+    const discountAmount = quote ? quote.discount : total * (couponDiscount / 100);
+    const grandTotal = quote ? quote.total : total - discountAmount; // Shipping is TBD and handled manually now
 
     const handlePlaceOrder = async () => {
         if (!items || items.length === 0) {
@@ -155,6 +182,11 @@ export default function CheckoutPage() {
             alert('Please select a shipping method.');
             return;
         }
+        if (!legacyPricing && (!quote || !quote.ready)) {
+            setQuoteError(quoteError || 'Your order is still being priced.');
+            return;
+        }
+        if (isProcessing) return;
         setIsProcessing(true);
         try {
             const res = await apiFetch('/orders', {
@@ -165,19 +197,10 @@ export default function CheckoutPage() {
                     // so prefer the explicit `productId` field when present.
                     // selectedVariants + tier ride along so the order item
                     // captures the exact buyer-chosen configuration.
-                    items: items.map(i => ({
-                        productId: (i as any).productId || i.id.split('::')[0],
-                        quantity: i.quantity,
-                        price: i.price,
-                        name: i.name,
-                        tier: i.tier,
-                        selectedVariants: (i as any).selectedVariants,
-                        // Mix-composer breakdown — when the buyer built a
-                        // mixed truck/pallet from the PDP, it lands on the
-                        // OrderItem as `mixComposition` so the admin order
-                        // detail can show the exact per-variant split.
-                        mixComposition: (i as any).mixComposition,
-                    })),
+                    // Server reprices every line; prices here are informational only.
+                    items: items.map((i) => ({ ...toServerItem(i), price: i.price, name: i.name })),
+                    couponCode: couponApplied || undefined,
+                    idempotencyKey: idempotencyKey.current,
                     totalAmount: grandTotal,
                     shippingCompany: selectedShipping?.name,
                     shippingCost: selectedShipping?.cost,
@@ -199,7 +222,14 @@ export default function CheckoutPage() {
                 setStep(3);
             } else {
                 const err = await res.json().catch(() => ({}));
-                alert(err?.message || 'Failed to place order. Please try again.');
+                if (err?.code === 'PRICE_CHANGED') {
+                    // Show the server figures and let the buyer confirm again.
+                    const q = await quoteCart(items, couponApplied || undefined).catch(() => null);
+                    if (q) setQuote(q);
+                    setQuoteError(err.message);
+                } else {
+                    setQuoteError(typeof err?.message === 'string' ? err.message : 'Failed to place order. Please try again.');
+                }
             }
         } catch (error) {
             alert('Connection error. Please check your connection and try again.');
@@ -506,6 +536,7 @@ export default function CheckoutPage() {
                                             </div>
                                         </div>
 
+                                        {quoteError && <p role="alert" className="mb-3 text-[13px] text-[#B91C1C]">{quoteError}</p>}
                                         <div className="flex gap-4">
                                             <Button variant="outline" size="xl" onClick={handleBack} className="flex-1" disabled={isProcessing}>
                                                 Modify
@@ -587,6 +618,11 @@ export default function CheckoutPage() {
                                         <div className="space-y-1">
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Grand Total</span>
                                             <p className="font-heading font-black text-3xl text-primary">{formatPrice(grandTotal, currency)}</p>
+                                            {currency !== 'EUR' && (
+                                                <p className="text-[12px] text-muted-foreground">
+                                                    Charged in EUR: <span className="font-bold text-foreground">{formatEUR(grandTotal)}</span>. {currency} amount is an estimate at today&apos;s rate.
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

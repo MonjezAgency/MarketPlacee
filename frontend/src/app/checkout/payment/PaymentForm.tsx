@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { useStripe, useElements, PaymentElement } from '@stripe/react-stripe-js';
 import { useRouter } from 'next/navigation';
 import { ShieldCheck, Lock, AlertCircle, CreditCard } from 'lucide-react';
-import { formatPrice } from '@/lib/currency';
+import { formatEUR as formatPrice } from '@/lib/currency'; // pay button = exact EUR charge
 
 interface Props {
   orderId: string;

@@ -5,165 +5,171 @@ import Link from 'next/link';
 import {
     ChevronRight,
     ChevronLeft,
-    CheckCircle2,
     ArrowRight,
+    ArrowUpRight,
     ShieldCheck,
     Truck,
     CircleDollarSign,
     Headphones,
-    Monitor,
-    Factory,
-    Box,
-    Home as HomeIcon,
-    Stethoscope,
-    Shirt,
-    Car,
-    TrendingUp,
     Package,
-    LayoutList,
-    Store,
-    ShoppingCart,
-    User,
-    FileText,
-    Zap,
-    Wrench,
-    Sparkles,
+    Layers,
+    Boxes,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import ProductCard from '@/components/product/ProductCard';
-import { useLanguage } from '@/contexts/LanguageContext';
+import { cn } from '@/lib/utils';
 
 // =====================================================================
-// SPEC TOKENS (mirrors screenshot)
-// Primary Teal: #14B8A6  | Navy Dark: #0B1F3A | Bg: #F8FAFC
-// Border: #E5E7EB        | Muted: #64748B    | Heading: #0F172A
+// Atlantis homepage — FMCG wholesale first.
+// Tokens: Navy #0B1F3A · Teal #2EC4B6 (text-safe teal #0E7C74)
+//         Ink #0F172A · Muted #475569/#64748B · Hairline #E6E8EC
+//         Canvas white with #F7F8FA bands.
 // =====================================================================
 
-const TOP_FEATURES = [
-    'Verified Global Suppliers',
-    'Competitive Wholesale Prices',
-    'Bulk Order Discounts',
-    'Global Shipping Solutions',
-    'Dedicated B2B Support',
-];
+const unsplash = (id: string, w: number) =>
+    `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&q=75&w=${w}`;
 
-const HERO_HIGHLIGHTS = [
-    { icon: ShieldCheck, title: 'Sold by Atlantis', sub: 'Direct, no middlemen' },
-    { icon: CircleDollarSign, title: 'Bulk Pricing', sub: 'Lower costs' },
-    { icon: Truck, title: 'Global Shipping', sub: 'Fast & reliable' },
-    { icon: ShieldCheck, title: 'Secure Payments', sub: 'Safe transactions' },
-];
-
-const QUOTE_STEPS = [
-    { icon: FileText, title: 'Fill Requirements', sub: 'Add products & quantities' },
-    { icon: Headphones, title: 'Get Quotes', sub: 'Receive best offers' },
-    { icon: ShoppingCart, title: 'Compare & Order', sub: 'Choose and place order' },
-];
-
-const BUSINESS_CATEGORIES = [
-    { name: 'Electronics & Accessories', icon: Monitor, slug: 'electronics-accessories' },
-    { name: 'Industrial & Machinery', icon: Factory, slug: 'industrial-machinery' },
-    { name: 'Packaging & Materials', icon: Box, slug: 'packaging-materials' },
-    { name: 'Office & Stationery', icon: FileText, slug: 'office-stationery' },
-    { name: 'Home & Kitchen Supplies', icon: HomeIcon, slug: 'home-kitchen' },
-    { name: 'Health & Personal Care', icon: Stethoscope, slug: 'health-personal-care' },
-    { name: 'Fashion & Textiles', icon: Shirt, slug: 'fashion-textiles' },
-    { name: 'Automotive & Parts', icon: Car, slug: 'automotive-parts' },
-];
-
-const BRANDS = [
-    { name: 'Siemens', logo: 'https://cdn.worldvectorlogo.com/logos/siemens-2.svg' },
-    { name: 'Bosch', logo: 'https://cdn.worldvectorlogo.com/logos/bosch.svg' },
-    { name: 'Philips', logo: 'https://cdn.worldvectorlogo.com/logos/philips.svg' },
-    { name: 'DHL', logo: 'https://cdn.worldvectorlogo.com/logos/dhl-1.svg' },
-    { name: 'Unilever', logo: 'https://cdn.worldvectorlogo.com/logos/unilever-2.svg' },
-    { name: 'P&G', logo: 'https://cdn.worldvectorlogo.com/logos/p-g.svg' },
-    { name: 'Nestle', logo: 'https://cdn.worldvectorlogo.com/logos/nestle-2.svg' },
-    { name: 'Caterpillar', logo: 'https://cdn.worldvectorlogo.com/logos/caterpillar.svg' },
-    { name: 'Schneider', logo: 'https://cdn.worldvectorlogo.com/logos/schneider-electric-2.svg' },
-    { name: '3M', logo: 'https://cdn.worldvectorlogo.com/logos/3m.svg' },
-    { name: 'Coca-Cola', logo: 'https://cdn.worldvectorlogo.com/logos/coca-cola-2021.svg' },
-    { name: 'PepsiCo', logo: 'https://cdn.worldvectorlogo.com/logos/pepsico-2.svg' },
-    { name: 'Heinz', logo: 'https://cdn.worldvectorlogo.com/logos/heinz-1.svg' },
-    { name: 'Kellogg\'s', logo: 'https://cdn.worldvectorlogo.com/logos/kelloggs-2.svg' },
-    { name: 'Mondelez', logo: 'https://cdn.worldvectorlogo.com/logos/mondelez-international-1.svg' },
-    { name: 'Danone', logo: 'https://cdn.worldvectorlogo.com/logos/danone.svg' },
-];
-
-const TOP_BUSINESS_CATEGORIES = [
-    {
-        title: 'Electronics & Accessories',
-        sub: 'Devices, audio, peripherals',
-        image: 'https://images.unsplash.com/photo-1593642632559-0c6d3fc62b89?auto=format&fit=crop&q=80&w=900',
-    },
-    {
-        title: 'Industrial & Machinery',
-        sub: 'Equipment, tools, automation',
-        image: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&q=80&w=900',
-    },
-    {
-        title: 'Packaging & Materials',
-        sub: 'Boxes, films, raw inputs',
-        image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&q=80&w=900',
-    },
-    {
-        title: 'Office & Janitorial',
-        sub: 'Stationery, cleaning, supplies',
-        image: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=900',
-    },
-    {
-        title: 'Home & Kitchen Supplies',
-        sub: 'Cookware, appliances, decor',
-        image: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?auto=format&fit=crop&q=80&w=900',
-    },
-];
-
-const WHY_ATLANTIS = [
-    { title: 'B2B Wholesale Focus', sub: 'Built specifically for business buyers and bulk purchasing.', icon: Package },
-    { title: 'Competitive Pricing', sub: 'Lower wholesale prices with volume-based discounts.', icon: CircleDollarSign },
-    { title: 'Reliable Global Shipping', sub: 'Fast and secure delivery to your business anywhere.', icon: Truck },
-    { title: 'Dedicated Account Support', sub: 'Personal account managers and 24/7 business support.', icon: Headphones },
-    { title: 'Secure & Flexible Payments', sub: 'Multiple payment options with trade assurance.', icon: ShieldCheck },
-];
-
-// Hero rotating slides
+// Hero copy rotates through three stories; imagery rotates independently
+// through ten professional FMCG-wholesale photographs (Unsplash licence),
+// cross-fading slowly with a gentle drift.
 const HERO_SLIDES = [
     {
-        title: 'Your B2B Partner for',
-        accent: 'Global Wholesale',
-        desc: 'Source quality products in bulk directly from Atlantis. Better prices, reliable shipping, and business growth—together.',
-        image: 'https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&q=80&w=1400',
+        title: 'Wholesale FMCG,',
+        accent: 'sourced at scale',
+        desc: 'Beverages, snacks, confectionery, personal care and household brands — priced per case, pallet or truck, and shipped by Atlantis.',
     },
     {
-        title: 'Direct Sourcing',
-        accent: 'No Middlemen',
-        desc: 'Skip the markups. Connect with manufacturers directly and unlock bulk-tier pricing for your business.',
-        image: 'https://images.unsplash.com/photo-1601584115197-04ecc0da31d7?auto=format&fit=crop&q=80&w=1400',
+        title: 'Every shelf category,',
+        accent: 'one trusted partner',
+        desc: 'Source the brands your stores and distributors move every week, from a single supplier with transparent per-case pricing.',
     },
     {
-        title: 'Seamless Logistics',
-        accent: 'Worldwide Delivery',
-        desc: 'Expert handling from factory to your warehouse. Live tracking, customs clearance, and on-time delivery guaranteed.',
-        image: 'https://images.unsplash.com/photo-1494412519320-aa613dfb7738?auto=format&fit=crop&q=80&w=1400',
+        title: 'From factory to warehouse,',
+        accent: 'across borders',
+        desc: 'Consolidated logistics across Europe, with escrow-protected payments and documentation handled for you.',
     },
 ];
 
+const HERO_IMAGES = [
+    '1586528116311-ad8dd3c8310d', // distribution warehouse
+    '1665359045452-bfa257a2a6bf', // beverage cans on shelf
+    '1578916171728-46686eac8d58', // grocery aisle
+    '1689942010216-dc412bb1e7a9', // pallet racking
+    '1621939514649-280e2ee25f60', // confectionery case
+    '1494412519320-aa613dfb7738', // container port
+    '1688217170693-e821c6e18d72', // snacks wall
+    '1645736315000-6f788915923b', // forklift in warehouse
+    '1661781224922-a45d5ccc1639', // chilled drinks
+    '1601584115197-04ecc0da31d7', // long-haul truck
+].map((id) => unsplash(id, 2000));
+
+const HERO_HIGHLIGHTS = [
+    { icon: ShieldCheck, title: 'Sold & shipped by Atlantis' },
+    { icon: Layers, title: 'Case, pallet & truck pricing' },
+    { icon: CircleDollarSign, title: 'Escrow-protected payments' },
+    { icon: Truck, title: 'Delivery across Europe' },
+];
+
+// FMCG departments — slugs match lib/departments.ts (catalog ?dept=…).
+const TOP_CATEGORIES = [
+    { title: 'Beverages', sub: 'Soft drinks, energy, coffee & tea', dept: 'beverages', image: unsplash('1661781224922-a45d5ccc1639', 900) },
+    { title: 'Confectionery', sub: 'Chocolate bars, sweets & gum', dept: 'confectionery', image: unsplash('1621939514649-280e2ee25f60', 900) },
+    { title: 'Snacks', sub: 'Crisps, biscuits & savoury snacks', dept: 'snacks', image: unsplash('1688217170693-e821c6e18d72', 900) },
+    { title: 'Packaged Food', sub: 'Pantry, dairy, frozen & cereals', dept: 'food', image: unsplash('1534723452862-4c874018d66d', 900) },
+    { title: 'Personal Care', sub: 'Hair, skin, oral care & hygiene', dept: 'personal-care', image: unsplash('1749137315928-bc96451fa4c0', 900) },
+    { title: 'Household', sub: 'Cleaning, laundry & home essentials', dept: 'household', image: unsplash('1626379481874-3dc5678fa8ca', 900) },
+];
+
+// Brand marks: vector (SVG) where an official vector exists, otherwise the
+// trimmed local raster from public/Logos. w/h = intrinsic size (viewBox for
+// SVG). Rasters are never shown larger than their pixels allow on a 2x
+// screen (incl. hover zoom), so nothing is upscaled or pixelated.
+type Brand = { name: string; src: string; w: number; h: number; vector?: boolean };
+const BRANDS: Brand[] = [
+    { name: 'Coca-Cola', src: '/brands/coca-cola.svg', w: 615, h: 193, vector: true },
+    { name: 'Nescafé', src: '/brands/nescafe.webp', w: 296, h: 88 },
+    { name: 'Ferrero Rocher', src: '/brands/ferrero-rocher.webp', w: 318, h: 141 },
+    { name: 'Nivea', src: '/brands/nivea.svg', w: 50, h: 50, vector: true },
+    { name: 'Red Bull', src: '/brands/red-bull.webp', w: 224, h: 160 },
+    { name: 'Nutella', src: '/brands/nutella.svg', w: 338, h: 88, vector: true },
+    { name: 'Persil', src: '/brands/persil.webp', w: 172, h: 63 },
+    { name: 'Pepsi', src: '/brands/pepsi.svg', w: 212, h: 212, vector: true },
+    { name: 'Lavazza', src: '/brands/lavazza.webp', w: 213, h: 90 },
+    { name: 'Snickers', src: '/brands/snickers.svg', w: 1207, h: 306, vector: true },
+    { name: 'Dove', src: '/brands/dove.webp', w: 161, h: 115 },
+    { name: 'Kinder', src: '/brands/kinder.webp', w: 191, h: 60 },
+    { name: 'Domestos', src: '/brands/domestos.webp', w: 181, h: 160 },
+    { name: "M&M's", src: '/brands/mms.svg', w: 100, h: 42, vector: true },
+    { name: 'Oreo', src: '/brands/oreo.webp', w: 308, h: 119 },
+    { name: 'Sprite', src: '/brands/sprite.webp', w: 191, h: 160 },
+    { name: 'Jacobs', src: '/brands/jacobs.webp', w: 272, h: 128 },
+    { name: 'Comfort', src: '/brands/comfort.webp', w: 201, h: 98 },
+    { name: 'Twix', src: '/brands/twix.webp', w: 208, h: 150 },
+    { name: 'Starbucks', src: '/brands/starbucks.webp', w: 132, h: 118 },
+    { name: 'Tchibo', src: '/brands/tchibo.webp', w: 160, h: 160 },
+    { name: 'Dr Pepper', src: '/brands/dr-pepper.webp', w: 269, h: 160 },
+    { name: 'Cif', src: '/brands/cif.webp', w: 100, h: 100 },
+    { name: "Wall's", src: '/brands/walls.webp', w: 126, h: 108 },
+    { name: 'Wonka', src: '/brands/wonka.webp', w: 281, h: 160 },
+];
+
+const HOVER_ZOOM = 1.12;
+
+/** Equal optical area; rasters capped at native/(2x DPR × hover zoom). */
+function logoBox(b: Brand) {
+    const ratio = b.w / b.h;
+    const area = 2600; // px² at 1x
+    let height = Math.sqrt(area / ratio);
+    let width = height * ratio;
+    if (height > 50) { height = 50; width = height * ratio; }
+    if (width > 136) { width = 136; height = width / ratio; }
+    if (!b.vector) {
+        const maxH = b.h / (2 * HOVER_ZOOM);
+        if (height > maxH) { height = maxH; width = height * ratio; }
+    }
+    return { width: Math.round(width), height: Math.round(height) };
+}
+
+const WHY_ATLANTIS = [
+    { title: 'Built for FMCG wholesale', sub: 'Case, pallet and truck tiers on every listing — buy the way your business moves stock.', icon: Boxes },
+    { title: 'Transparent pricing', sub: 'Per-case prices in your currency, with volume tiers shown before you commit.', icon: CircleDollarSign },
+    { title: 'Reliable logistics', sub: 'Consolidated shipping across Europe, tracked from warehouse to your door.', icon: Truck },
+    { title: 'Dedicated account support', sub: 'A team that knows FMCG sourcing, from first quote to repeat orders.', icon: Headphones },
+    { title: 'Secure transactions', sub: 'Escrow-protected payments — funds released only when goods arrive.', icon: ShieldCheck },
+];
+
+/** Shared section header for consistent rhythm across the page. */
+function SectionHeader({ eyebrow, title, link }: { eyebrow?: string; title: string; link?: { href: string; label: string } }) {
+    return (
+        <div className="flex items-end justify-between gap-4 mb-6 sm:mb-8">
+            <div>
+                {eyebrow && <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-teal mb-2">{eyebrow}</p>}
+                <h2 className="font-sans text-[24px] sm:text-[28px] font-bold tracking-tight text-heading leading-tight">{title}</h2>
+            </div>
+            {link && (
+                <Link href={link.href} className="hidden sm:inline-flex items-center gap-1.5 text-[14px] font-semibold text-heading hover:text-teal transition-colors whitespace-nowrap no-underline">
+                    {link.label} <ArrowRight size={15} />
+                </Link>
+            )}
+        </div>
+    );
+}
+
 export default function HomePage() {
-    const { t } = useLanguage();
     const [slide, setSlide] = React.useState(0);
     const [products, setProducts] = React.useState<any[]>([]);
     const [loading, setLoading] = React.useState(true);
     const productsRef = React.useRef<HTMLDivElement | null>(null);
     // True pagination on the Popular Wholesale Products carousel —
-    // arrows now fetch the next/previous PAGE of products from the API
-    // instead of just scrolling the same set. User reported clicking
-    // "next" and seeing the same products as before — this fixes that.
+    // arrows fetch the next/previous PAGE of products from the API.
     const [productsPage, setProductsPage] = React.useState(1);
     const [productsTotalPages, setProductsTotalPages] = React.useState(1);
     const PRODUCTS_PER_PAGE = 12; // 2 rows × 6 columns on desktop
 
+    // Slow, calm rotation; paused for users who prefer reduced motion.
     React.useEffect(() => {
-        const id = setInterval(() => setSlide((s) => (s + 1) % HERO_SLIDES.length), 6000);
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+        const id = setInterval(() => setSlide((s) => (s + 1) % HERO_IMAGES.length), 10000);
         return () => clearInterval(id);
     }, []);
 
@@ -186,364 +192,257 @@ export default function HomePage() {
     }, [productsPage]);
 
     const scrollProducts = (dir: 'left' | 'right') => {
-        // Page-based navigation: each arrow click advances a true page.
-        // Stays within bounds [1, totalPages].
         setProductsPage(p => {
             if (dir === 'right') return Math.min(p + 1, productsTotalPages);
             return Math.max(p - 1, 1);
         });
-        // Scroll back to the start so the new page renders from the left.
         if (productsRef.current) productsRef.current.scrollLeft = 0;
     };
 
+    const current = HERO_SLIDES[slide % HERO_SLIDES.length];
+    // Only fetch photos as they come up (current + next), then keep them.
+    const [seen, setSeen] = React.useState<Set<number>>(() => new Set([0, 1]));
+    React.useEffect(() => {
+        setSeen((prev) => {
+            const next = (slide + 1) % HERO_IMAGES.length;
+            if (prev.has(slide) && prev.has(next)) return prev;
+            const out = new Set(prev); out.add(slide); out.add(next); return out;
+        });
+    }, [slide]);
+
     return (
-        <div className="bg-[#F8FAFC] font-sans text-[#111827]">
+        <div className="bg-surface font-sans text-ink text-start">
             {/* ============================================================
-                 1. TOP FEATURE STRIP
+                 HERO — cross-fading FMCG imagery with a slow drift
             ============================================================ */}
-            <div className="bg-white border-b border-[#E5E7EB] hidden md:block">
-                <div className="max-w-[1440px] mx-auto px-4 lg:px-6 py-3 flex items-center justify-between gap-4 overflow-x-auto">
-                    {TOP_FEATURES.map((f) => (
-                        <div key={f} className="flex items-center gap-2 whitespace-nowrap">
-                            <CheckCircle2 size={14} className="text-[#14B8A6] shrink-0" />
-                            <span className="text-[12px] font-medium text-[#475569]">{f}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
+            <section className="relative w-full min-h-[600px] sm:min-h-0 sm:h-[560px] lg:h-[600px] overflow-hidden bg-cta isolate flex">
+                {HERO_IMAGES.map((src, i) => (
+                    <div
+                        key={src}
+                        aria-hidden
+                        className={cn(
+                            'absolute inset-0 transition-opacity duration-[2500ms] ease-in-out',
+                            i === slide ? 'opacity-100' : 'opacity-0'
+                        )}
+                    >
+                        {seen.has(i) && (
+                            <img
+                                src={src}
+                                alt=""
+                                loading={i === 0 ? 'eager' : 'lazy'}
+                                decoding="async"
+                                className="absolute inset-0 w-full h-full object-cover animate-hero-drift"
+                                style={{ animationDelay: `${-i * 6}s` }}
+                            />
+                        )}
+                    </div>
+                ))}
+                {/* Readability: navy wash strongest behind the copy, fading right */}
+                <div className="absolute inset-0 bg-[#0B1F3A]/20" />
+                <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F3A]/95 via-[#0B1F3A]/75 to-[#0B1F3A]/10" />
+                <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0B1F3A]/50 to-transparent" />
 
-            {/* ============================================================
-                 2. HERO — FULL WIDTH (edge-to-edge), generous height
-            ============================================================ */}
-            <section className="relative w-full h-[440px] sm:h-[500px] md:h-[540px] lg:h-[580px] xl:h-[620px] overflow-hidden bg-[#0B1F3A]">
-                {/* Background image */}
-                <img
-                    src={HERO_SLIDES[slide].image}
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
-                />
-                {/* Gradient over image */}
-                <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F3A] via-[#0B1F3A]/80 to-[#0B1F3A]/20" />
-
-                {/* Content — content stays centered to layout but section spans full width */}
-                <div className="relative z-10 h-full max-w-[1600px] mx-auto px-6 sm:px-10 md:px-14 lg:px-20 flex flex-col justify-center pb-10">
-                    {/* Stable, canonical H1 for SEO. Visually hidden so the
-                        animated hero retains its current design. The audit
-                        flagged the rotating "Seamless Logistics / Worldwide
-                        Delivery" wording as a misleading H1 for a wholesale
-                        marketplace homepage. */}
+                <div className="relative z-10 w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-20 sm:py-0 flex flex-col justify-center">
                     <h1 className="sr-only">
-                        Atlantis — B2B Wholesale Marketplace selling FMCG, beverages and consumer goods across Europe and the Gulf
+                        Atlantis — B2B FMCG wholesale marketplace for beverages, snacks, confectionery, personal care and household brands across Europe
                     </h1>
-                    <div className="max-w-full sm:max-w-[560px] lg:max-w-[640px] space-y-6">
-                        {/* Rotating hero heading. role/aria-level keeps it a
-                            heading semantically (h2-equivalent) for a11y, but
-                            it's no longer the page's <h1> so Google receives
-                            a stable, on-topic primary heading. */}
+                    <div className="max-w-[620px]">
+                        <p className="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-white/10 border border-white/15 text-[12px] font-semibold tracking-wide text-[#9BE7DF] backdrop-blur-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6]" /> FMCG wholesale · Europe
+                        </p>
+                        {/* Rotating heading — h2-equivalent; the stable h1 is above. */}
                         <div
+                            key={slide % HERO_SLIDES.length}
                             role="heading"
                             aria-level={2}
-                            className="text-white font-bold leading-[1.08] tracking-tight text-[32px] sm:text-[40px] md:text-[48px] lg:text-[56px] xl:text-[60px]"
+                            className="mt-5 text-white font-bold leading-[1.06] tracking-tight text-[34px] sm:text-[44px] lg:text-[54px] animate-hero-copy"
                         >
-                            {HERO_SLIDES[slide].title}{' '}
-                            <span className="text-[#14B8A6]">{HERO_SLIDES[slide].accent}</span>
+                            {current.title}{' '}
+                            <span className="text-[#2EC4B6]">{current.accent}</span>
                         </div>
-                        <p className="text-[#CBD5F5] text-[14px] sm:text-[15px] md:text-[16px] lg:text-[17px] leading-relaxed max-w-[540px]">
-                            {HERO_SLIDES[slide].desc}
+                        <p key={`d-${slide % HERO_SLIDES.length}`} className="mt-5 text-[#D3DCEB] text-[15px] sm:text-[17px] leading-relaxed max-w-[540px] animate-hero-copy [animation-delay:120ms]">
+                            {current.desc}
                         </p>
 
-                        {/* Inline highlights — always 2 columns, fixed grid */}
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-3 max-w-[520px]">
+                        <ul className="mt-7 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 max-w-[520px]">
                             {HERO_HIGHLIGHTS.map((h) => (
-                                <div key={h.title} className="flex items-center gap-2.5">
-                                    <div className="w-8 h-8 rounded-full bg-[#14B8A6]/15 flex items-center justify-center text-[#14B8A6] shrink-0">
-                                        <CheckCircle2 size={15} />
-                                    </div>
-                                    <div className="leading-tight min-w-0">
-                                        <div className="text-[12px] sm:text-[13px] font-semibold text-white truncate">{h.title}</div>
-                                        <div className="text-[11px] sm:text-[12px] text-[#94A3B8] truncate">{h.sub}</div>
-                                    </div>
-                                </div>
+                                <li key={h.title} className="flex items-center gap-2.5 text-[14px] font-medium text-white/90">
+                                    <span className="w-7 h-7 rounded-lg bg-[#2EC4B6]/15 text-[#2EC4B6] flex items-center justify-center shrink-0">
+                                        <h.icon size={15} />
+                                    </span>
+                                    {h.title}
+                                </li>
                             ))}
-                        </div>
+                        </ul>
 
-                        <div className="pt-1 flex items-center gap-3">
+                        <div className="mt-9 flex flex-wrap items-center gap-3">
                             <Link
                                 href="/categories"
-                                className="inline-flex items-center gap-2 h-[50px] sm:h-[52px] px-7 sm:px-8 bg-[#14B8A6] hover:bg-[#0EA89A] text-white rounded-xl text-[14px] sm:text-[15px] font-semibold shadow-lg shadow-[#14B8A6]/25 transition-all active:scale-95 no-underline"
+                                className="inline-flex items-center gap-2 h-12 px-7 bg-[#2EC4B6] hover:bg-[#25AFA2] text-heading rounded-xl text-[15px] font-bold transition-colors no-underline"
                             >
-                                Start Sourcing Now <ArrowRight size={16} />
+                                Start sourcing <ArrowRight size={17} />
                             </Link>
                             <Link
-                                href="/about"
-                                className="inline-flex items-center gap-2 h-[50px] sm:h-[52px] px-6 sm:px-7 bg-white/10 hover:bg-white/15 backdrop-blur-sm text-white border border-white/20 rounded-xl text-[14px] sm:text-[15px] font-semibold transition-all no-underline"
+                                href="/requests"
+                                className="inline-flex items-center gap-2 h-12 px-6 bg-white/10 hover:bg-white/15 text-white border border-white/20 rounded-xl text-[15px] font-semibold backdrop-blur-sm transition-colors no-underline"
                             >
-                                Learn More
+                                Request a quote
                             </Link>
                         </div>
                     </div>
                 </div>
 
-                {/* dots — bottom center for full-width hero */}
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 flex gap-2">
-                    {HERO_SLIDES.map((_, i) => (
+                {/* Slide indicators */}
+                <div className="absolute bottom-7 left-1/2 -translate-x-1/2 z-20 flex gap-2">
+                    {HERO_IMAGES.map((_, i) => (
                         <button
                             key={i}
                             onClick={() => setSlide(i)}
-                            aria-label={`Slide ${i + 1}`}
-                            className={`h-1.5 rounded-full transition-all ${slide === i ? 'w-10 bg-[#14B8A6]' : 'w-2 bg-white/40 hover:bg-white/70'}`}
+                            aria-label={`Show slide ${i + 1}`}
+                            aria-current={slide === i}
+                            className={cn('h-1.5 rounded-full transition-all duration-500', slide === i ? 'w-8 bg-[#2EC4B6]' : 'w-1.5 bg-white/40 hover:bg-white/70')}
                         />
                     ))}
                 </div>
             </section>
 
-            {/* MAIN CONTAINER */}
-            <main className="flex-1 max-w-[1440px] mx-auto w-full px-3 sm:px-4 lg:px-6 py-5 sm:py-7 space-y-7 sm:space-y-9">
-
-
-                {/* ============================================================
-                     3. CUSTOM QUOTE BAR
-                ============================================================ */}
-                <section className="bg-white border border-[#E5E7EB] rounded-2xl px-5 sm:px-6 py-5 sm:py-5 shadow-sm">
-                    <div className="flex flex-col lg:flex-row lg:items-center gap-5 lg:gap-6">
-                        {/* Title */}
-                        <div className="lg:pr-6 lg:border-r lg:border-[#E5E7EB] lg:min-w-[230px]">
-                            <h3 className="text-[15px] sm:text-[16px] font-bold text-[#0F172A]">Need a custom quote?</h3>
-                            <p className="text-[12px] text-[#64748B] mt-1">
-                                Tell us what you need and our team will send you a competitive Atlantis quote.
-                            </p>
-                        </div>
-
-                        {/* Steps */}
-                        <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 lg:px-2">
-                            {QUOTE_STEPS.map((s) => (
-                                <div key={s.title} className="flex items-center gap-3">
-                                    <div className="w-10 h-10 rounded-lg bg-[#F1F5F9] flex items-center justify-center text-[#14B8A6] shrink-0">
-                                        <s.icon size={18} />
-                                    </div>
-                                    <div className="leading-tight">
-                                        <div className="text-[13px] font-semibold text-[#0F172A]">{s.title}</div>
-                                        <div className="text-[11px] text-[#64748B] mt-0.5">{s.sub}</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* CTA */}
-                        <Link
-                            href="/contact"
-                            className="shrink-0 inline-flex items-center justify-center h-[44px] px-6 border border-[#14B8A6] text-[#14B8A6] hover:bg-[#14B8A6] hover:text-white rounded-xl text-[13px] font-semibold transition-all no-underline"
-                        >
-                            Request a Quote
-                        </Link>
-                    </div>
-                </section>
-
-                {/* ============================================================
-                     4. BROWSE BY BUSINESS CATEGORY
-                ============================================================ */}
-                <section className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-[16px] sm:text-[18px] font-bold text-[#0F172A]">Browse by Business Category</h2>
-                        <Link
-                            href="/categories"
-                            className="text-[12px] sm:text-[13px] font-semibold text-[#14B8A6] hover:underline flex items-center gap-1 no-underline"
-                        >
-                            View all categories <ArrowRight size={13} />
-                        </Link>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-3">
-                        {BUSINESS_CATEGORIES.map((c) => (
-                            <Link
-                                key={c.slug}
-                                // BUG FIX: previous href `/categories/<slug>` 404'd
-                                // because there's no `[slug]` route — only the
-                                // `/categories` page with a `?category=` query
-                                // param. We now route to the filterable page
-                                // and pass the category NAME (the same value
-                                // products are tagged with in the DB) so the
-                                // filter sidebar pre-selects it on arrival.
-                                href={`/categories?category=${encodeURIComponent(c.name)}`}
-                                className="bg-white border border-[#E5E7EB] rounded-xl p-3 sm:p-4 flex flex-col items-center text-center gap-2 hover:border-[#14B8A6] hover:shadow-sm transition-all no-underline group"
-                            >
-                                <div className="w-10 h-10 rounded-lg bg-[#F1F5F9] flex items-center justify-center text-[#14B8A6] group-hover:bg-[#14B8A6] group-hover:text-white transition-colors">
-                                    <c.icon size={18} />
-                                </div>
-                                <div className="space-y-0.5">
-                                    <div className="text-[11px] sm:text-[12px] font-semibold text-[#0F172A] leading-tight line-clamp-2">{c.name}</div>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                </section>
-
-                {/* ============================================================
-                     5. TRUSTED BY LEADING GLOBAL BRANDS (animated marquee)
-                ============================================================ */}
-                <section className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-[15px] sm:text-[17px] font-bold text-[#0F172A]">Trusted by Leading Global Brands</h2>
-                        <Link href="/brands" className="text-[12px] sm:text-[13px] font-semibold text-[#14B8A6] hover:underline flex items-center gap-1 no-underline">
-                            View all brands <ArrowRight size={13} />
-                        </Link>
-                    </div>
-                    <div className="bg-white border border-[#E5E7EB] rounded-xl py-5 relative overflow-hidden">
-                        {/* edge fades */}
-                        <div className="absolute inset-y-0 left-0 w-12 sm:w-20 bg-gradient-to-r from-white to-transparent z-10 pointer-events-none" />
-                        <div className="absolute inset-y-0 right-0 w-12 sm:w-20 bg-gradient-to-l from-white to-transparent z-10 pointer-events-none" />
-                        {/* row 1 — moves right→left */}
-                        <div className="flex w-max animate-marquee-ltr items-center">
-                            {[...BRANDS, ...BRANDS].map((b, i) => (
-                                <div
-                                    key={`r1-${i}`}
-                                    className="w-[140px] sm:w-[160px] h-[64px] sm:h-[72px] mx-1 sm:mx-2 flex items-center justify-center shrink-0"
-                                >
+            {/* ============================================================
+                 BRANDS — borderless, true colours, equal optical weight
+            ============================================================ */}
+            <section aria-labelledby="brands-heading" className="py-12 sm:py-14 border-b border-line">
+                <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+                    <p id="brands-heading" className="text-center text-[13px] font-semibold uppercase tracking-[0.14em] text-ink-3">
+                        Global FMCG brands we source
+                    </p>
+                </div>
+                <div className="brand-strip relative mt-8 overflow-hidden dark:bg-media dark:rounded-2xl motion-reduce:overflow-x-auto">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 w-16 sm:w-32 bg-gradient-to-r from-surface dark:from-media to-transparent z-10" />
+                    <div className="pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-32 bg-gradient-to-l from-surface dark:from-media to-transparent z-10" />
+                    <ul className="flex w-max items-center animate-brand-loop">
+                        {[...BRANDS, ...BRANDS].map((b, i) => {
+                            const box = logoBox(b);
+                            return (
+                                <li key={`${b.name}-${i}`} className="group/logo shrink-0 px-6 sm:px-8 flex items-center justify-center h-20" aria-hidden={i >= BRANDS.length}>
                                     <img
-                                        src={b.logo}
-                                        alt={b.name}
-                                        className="h-[32px] max-w-[120px] w-auto object-contain grayscale opacity-70 hover:opacity-100 hover:grayscale-0 transition-all"
-                                        onError={(e) => {
-                                            const el = e.currentTarget;
-                                            el.style.display = 'none';
-                                            const span = document.createElement('span');
-                                            span.className = 'text-[12px] font-bold text-[#94A3B8] uppercase tracking-wider whitespace-nowrap';
-                                            span.textContent = b.name;
-                                            el.parentElement?.appendChild(span);
-                                        }}
-                                    />
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-
-                {/* ============================================================
-                     6. TOP CATEGORIES FOR YOUR BUSINESS (large cards)
-                ============================================================ */}
-                <section className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-[16px] sm:text-[18px] font-bold text-[#0F172A]">Top Categories for Your Business</h2>
-                        <Link href="/categories" className="text-[12px] sm:text-[13px] font-semibold text-[#14B8A6] hover:underline flex items-center gap-1 no-underline">
-                            View all categories <ArrowRight size={13} />
-                        </Link>
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                        {TOP_BUSINESS_CATEGORIES.map((c) => (
-                            <Link
-                                key={c.title}
-                                href="/categories"
-                                className="bg-white border border-[#E5E7EB] rounded-xl overflow-hidden group hover:shadow-md hover:border-[#14B8A6]/40 transition-all no-underline"
-                            >
-                                <div className="aspect-[4/3] overflow-hidden bg-gradient-to-br from-[#F1F5F9] to-[#E2E8F0] relative">
-                                    <img
-                                        src={c.image}
-                                        alt={c.title}
+                                        src={b.src}
+                                        alt={i < BRANDS.length ? b.name : ''}
+                                        width={box.width}
+                                        height={box.height}
                                         loading="lazy"
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                                        onError={(e) => {
-                                            const el = e.currentTarget;
-                                            el.style.display = 'none';
-                                        }}
+                                        decoding="async"
+                                        className="object-contain mix-blend-multiply select-none transition-transform duration-300 ease-out group-hover/logo:scale-[1.12] motion-reduce:transition-none"
+                                        style={{ width: box.width, height: box.height }}
+                                        draggable={false}
                                     />
-                                </div>
-                                <div className="p-3 sm:p-4">
-                                    <div className="text-[12px] sm:text-[13px] font-bold text-[#0F172A] line-clamp-1">{c.title}</div>
-                                    <div className="text-[10px] sm:text-[11px] text-[#64748B] mt-1 line-clamp-1">{c.sub}</div>
-                                    <div className="mt-2 flex items-center gap-1 text-[11px] font-semibold text-[#14B8A6]">
-                                        Explore <ChevronRight size={12} />
+                                </li>
+                            );
+                        })}
+                    </ul>
+                </div>
+            </section>
+
+            {/* ============================================================
+                 TOP CATEGORIES — FMCG departments
+            ============================================================ */}
+            <section className="py-16 sm:py-20">
+                <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+                    <SectionHeader
+                        eyebrow="Shop by department"
+                        title="Top FMCG categories for your business"
+                        link={{ href: '/categories', label: 'View full catalog' }}
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                        {TOP_CATEGORIES.map((c) => (
+                            <Link
+                                key={c.dept}
+                                href={`/categories?dept=${c.dept}`}
+                                className="group relative block aspect-[16/10] rounded-2xl overflow-hidden bg-surface-3 no-underline outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] focus-visible:ring-offset-2"
+                            >
+                                <img
+                                    src={c.image}
+                                    alt=""
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-[900ms] ease-out group-hover:scale-[1.04]"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F3A]/85 via-[#0B1F3A]/25 to-transparent" />
+                                <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 flex items-end justify-between gap-4">
+                                    <div>
+                                        <h3 className="font-sans text-[20px] sm:text-[22px] font-bold text-white leading-tight">{c.title}</h3>
+                                        <p className="mt-1 text-[13px] sm:text-[14px] text-white/80">{c.sub}</p>
                                     </div>
+                                    <span className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 text-white flex items-center justify-center shrink-0 transition-colors group-hover:bg-[#2EC4B6] group-hover:border-[#2EC4B6] group-hover:text-heading">
+                                        <ArrowUpRight size={18} />
+                                    </span>
                                 </div>
                             </Link>
                         ))}
                     </div>
-                </section>
+                    <Link href="/categories" className="sm:hidden mt-6 inline-flex items-center gap-1.5 text-[14px] font-semibold text-heading no-underline">
+                        View full catalog <ArrowRight size={15} />
+                    </Link>
+                </div>
+            </section>
 
-                {/* ============================================================
-                     7. WHY BUSINESSES CHOOSE ATLANTIS
-                ============================================================ */}
-                <section className="space-y-6">
-                    <h2 className="text-center text-[16px] sm:text-[18px] font-bold text-[#0F172A]">
-                        Why Businesses Choose Atlantis
-                    </h2>
-                    <div className="bg-white border border-[#E5E7EB] rounded-xl px-5 sm:px-6 py-6">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 lg:gap-4">
-                            {WHY_ATLANTIS.map((w) => (
-                                <div key={w.title} className="flex items-start gap-3">
-                                    <div className="w-9 h-9 rounded-lg bg-[#14B8A6]/10 flex items-center justify-center text-[#14B8A6] shrink-0">
-                                        <w.icon size={18} />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="text-[12px] sm:text-[13px] font-bold text-[#0F172A]">{w.title}</div>
-                                        <div className="text-[11px] text-[#64748B] leading-snug">{w.sub}</div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </section>
-
-                {/* ============================================================
-                     8. POPULAR WHOLESALE PRODUCTS (carousel)
-                ============================================================ */}
-                <section className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <h2 className="text-[16px] sm:text-[18px] font-bold text-[#0F172A]">Popular Wholesale Products</h2>
-                        <Link href="/categories" className="text-[12px] sm:text-[13px] font-semibold text-[#14B8A6] hover:underline flex items-center gap-1 no-underline">
-                            View all products <ArrowRight size={13} />
-                        </Link>
-                    </div>
+            {/* ============================================================
+                 POPULAR WHOLESALE PRODUCTS (paged carousel)
+            ============================================================ */}
+            <section className="py-16 sm:py-20 bg-[#F7F8FA]">
+                <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+                    <SectionHeader
+                        eyebrow="In demand"
+                        title="Popular wholesale products"
+                        link={{ href: '/categories', label: 'View all products' }}
+                    />
 
                     <div className="relative">
-                        {/* Page indicator — bottom-right, only when there are
-                            multiple pages. Tells the user that the arrows
-                            actually advance through different products. */}
                         {productsTotalPages > 1 && (
-                            <div className="hidden lg:flex absolute -top-7 right-0 items-center gap-2 text-[11px] font-bold text-[#64748B]">
-                                Page {productsPage} of {productsTotalPages}
+                            <div className="hidden lg:flex absolute -top-14 right-0 items-center gap-2">
+                                <span className="text-[13px] text-ink-3 tabular-nums me-2">Page {productsPage} of {productsTotalPages}</span>
+                                <button
+                                    onClick={() => scrollProducts('left')}
+                                    aria-label="Previous page"
+                                    disabled={productsPage <= 1}
+                                    className="w-10 h-10 flex items-center justify-center bg-surface border border-line rounded-full hover:border-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronLeft size={18} />
+                                </button>
+                                <button
+                                    onClick={() => scrollProducts('right')}
+                                    aria-label="Next page"
+                                    disabled={productsPage >= productsTotalPages}
+                                    className="w-10 h-10 flex items-center justify-center bg-surface border border-line rounded-full hover:border-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                >
+                                    <ChevronRight size={18} />
+                                </button>
                             </div>
                         )}
-                        {/* Side arrows (hidden on small) — disabled at boundaries */}
-                        <button
-                            onClick={() => scrollProducts('left')}
-                            aria-label="Previous page"
-                            disabled={productsPage <= 1}
-                            className="hidden lg:flex absolute -left-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 items-center justify-center bg-white border border-[#E5E7EB] rounded-full shadow-sm hover:bg-[#F1F5F9] disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                            <ChevronLeft size={18} className="text-[#0F172A]" />
-                        </button>
-                        <button
-                            onClick={() => scrollProducts('right')}
-                            aria-label="Next page"
-                            disabled={productsPage >= productsTotalPages}
-                            className="hidden lg:flex absolute -right-4 top-1/2 -translate-y-1/2 z-10 w-9 h-9 items-center justify-center bg-white border border-[#E5E7EB] rounded-full shadow-sm hover:bg-[#F1F5F9] disabled:opacity-40 disabled:cursor-not-allowed"
-                        >
-                            <ChevronRight size={18} className="text-[#0F172A]" />
-                        </button>
 
                         {loading ? (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3 sm:gap-4">
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                                 {[...Array(6)].map((_, i) => (
-                                    <div key={i} className="animate-pulse space-y-3">
-                                        <div className="aspect-square bg-slate-200 rounded-xl" />
-                                        <div className="h-3 bg-slate-200 rounded w-3/4" />
-                                        <div className="h-3 bg-slate-200 rounded w-1/2" />
+                                    <div key={i} className="animate-pulse">
+                                        <div className="aspect-square bg-surface-3 rounded-2xl" />
+                                        <div className="h-3 bg-surface-3 rounded w-3/4 mt-4" />
+                                        <div className="h-3 bg-surface-3 rounded w-1/2 mt-2" />
                                     </div>
                                 ))}
                             </div>
                         ) : products.length === 0 ? (
-                            <div className="h-[260px] border-2 border-dashed border-[#E5E7EB] rounded-xl flex flex-col items-center justify-center gap-3 bg-white">
-                                <div className="w-14 h-14 rounded-full bg-[#F1F5F9] flex items-center justify-center text-[#94A3B8]">
-                                    <Package size={28} />
+                            <div className="py-16 rounded-2xl bg-surface flex flex-col items-center justify-center gap-3 text-center">
+                                <div className="w-14 h-14 rounded-2xl bg-teal-soft flex items-center justify-center text-teal">
+                                    <Package size={26} />
                                 </div>
-                                <div className="text-center">
-                                    <h3 className="text-[14px] font-bold text-[#0F172A]">No products yet</h3>
-                                    <p className="text-[12px] text-[#64748B]">We're onboarding suppliers — check back soon.</p>
-                                </div>
+                                <h3 className="font-sans text-[16px] font-bold text-ink">Products are on their way</h3>
+                                <p className="text-[14px] text-ink-3 max-w-sm">We&apos;re adding new FMCG listings — browse the catalog or tell us what you need.</p>
+                                <Link href="/requests" className="mt-2 inline-flex items-center gap-1.5 text-[14px] font-semibold text-teal no-underline">
+                                    Request a quote <ArrowRight size={14} />
+                                </Link>
                             </div>
                         ) : (
                             <div
                                 ref={productsRef}
-                                className="grid grid-flow-col auto-cols-[minmax(150px,1fr)] sm:auto-cols-[minmax(170px,1fr)] md:auto-cols-[minmax(180px,1fr)] lg:grid-flow-row lg:grid-cols-6 lg:auto-cols-auto gap-3 sm:gap-4 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-2 scroll-smooth scrollbar-hide"
+                                className="grid grid-flow-col auto-cols-[minmax(160px,1fr)] sm:auto-cols-[minmax(180px,1fr)] lg:grid-flow-row lg:grid-cols-6 lg:auto-cols-auto gap-4 gap-y-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-2 scroll-smooth scrollbar-hide"
                             >
                                 {products.slice(0, 12).map((p, i) => (
                                     <div key={p.id} className="snap-start">
@@ -553,44 +452,67 @@ export default function HomePage() {
                             </div>
                         )}
                     </div>
-                </section>
+                </div>
+            </section>
 
-                {/* ============================================================
-                     9. ORDER IN BULK BANNER
-                ============================================================ */}
-                <section className="bg-[#0B1F3A] rounded-2xl px-6 sm:px-8 lg:px-10 py-7 sm:py-8 relative overflow-hidden">
-                    <div className="absolute -right-20 -top-20 w-80 h-80 bg-[#14B8A6]/10 rounded-full blur-3xl pointer-events-none" />
-                    <div className="relative z-10 flex flex-col md:flex-row items-center md:justify-between gap-6">
-                        <div className="flex items-center gap-4 text-center md:text-left">
-                            <div className="w-14 h-14 rounded-xl bg-white/10 flex items-center justify-center text-[#14B8A6] shrink-0 hidden sm:flex">
-                                <Package size={26} />
+            {/* ============================================================
+                 WHY ATLANTIS
+            ============================================================ */}
+            <section className="py-16 sm:py-20">
+                <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+                    {/* Centered: five short pillars read as one balanced row. */}
+                    <div className="text-center mb-8 sm:mb-10">
+                        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-teal mb-2">Why Atlantis</p>
+                        <h2 className="font-sans text-[24px] sm:text-[28px] font-bold tracking-tight text-heading leading-tight">Wholesale infrastructure for FMCG trade</h2>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-x-8 gap-y-10">
+                        {WHY_ATLANTIS.map((w) => (
+                            <div key={w.title} className="text-center max-w-[260px] mx-auto">
+                                <div className="mx-auto w-11 h-11 rounded-xl bg-teal-soft flex items-center justify-center text-teal">
+                                    <w.icon size={20} />
+                                </div>
+                                <h3 className="font-sans mt-4 text-[16px] font-bold text-ink">{w.title}</h3>
+                                <p className="mt-1.5 text-[14px] text-ink-3 leading-relaxed">{w.sub}</p>
                             </div>
-                            <div>
-                                <h3 className="text-white text-[18px] sm:text-[20px] font-bold">Order in Bulk. Save More.</h3>
-                                <p className="text-[#CBD5F5] text-[12px] sm:text-[13px] mt-1 max-w-[520px]">
-                                    Unlock volume-tier pricing, dedicated account support and fast global shipping.
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* ============================================================
+                 BULK CTA — light, so it doesn't stack onto the dark footer
+            ============================================================ */}
+            <section className="pb-16 sm:pb-20">
+                <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#EAF8F6] via-[#F4FBFA] to-white dark:from-[#0F2E33] dark:via-[#0F2230] dark:to-surface px-6 sm:px-10 lg:px-14 py-10 sm:py-12">
+                        <div aria-hidden className="absolute -right-24 -top-24 w-80 h-80 rounded-full bg-[#2EC4B6]/15 blur-3xl" />
+                        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+                            <div className="max-w-[620px]">
+                                <h2 className="font-sans text-[24px] sm:text-[30px] font-bold tracking-tight text-heading leading-tight">
+                                    Order by the pallet. Save by the truck.
+                                </h2>
+                                <p className="mt-3 text-[15px] sm:text-[16px] text-ink-2 leading-relaxed">
+                                    Unlock volume-tier pricing, dedicated account support and consolidated shipping for your FMCG range.
                                 </p>
                             </div>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <Link
-                                href="/auth/register?role=customer"
-                                className="shrink-0 inline-flex items-center justify-center h-[44px] px-6 bg-[#14B8A6] hover:bg-[#0EA89A] text-white rounded-xl text-[13px] font-semibold transition-all shadow-lg shadow-[#14B8A6]/20 active:scale-95 no-underline"
-                            >
-                                Become a Buyer
-                            </Link>
-                            <Link
-                                href="/contact"
-                                className="shrink-0 inline-flex items-center justify-center h-[44px] px-6 border border-white/20 text-white hover:bg-white/5 rounded-xl text-[13px] font-semibold transition-all no-underline"
-                            >
-                                Contact Sales
-                            </Link>
+                            <div className="flex flex-wrap items-center gap-3 shrink-0">
+                                <Link
+                                    href="/auth/register?role=customer"
+                                    className="inline-flex items-center justify-center gap-2 h-12 px-7 bg-cta hover:bg-cta-hover text-cta-fg rounded-xl text-[15px] font-semibold transition-colors no-underline"
+                                >
+                                    Become a buyer <ArrowRight size={16} />
+                                </Link>
+                                <Link
+                                    href="/contact"
+                                    className="inline-flex items-center justify-center h-12 px-6 bg-surface border border-[#D7DEE7] hover:border-ink text-heading rounded-xl text-[15px] font-semibold transition-colors no-underline"
+                                >
+                                    Contact sales
+                                </Link>
+                            </div>
                         </div>
                     </div>
-                </section>
-
-            </main>
+                </div>
+            </section>
         </div>
     );
 }

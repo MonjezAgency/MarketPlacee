@@ -4,50 +4,10 @@ import Link from 'next/link';
 import { Star, Check, ShieldCheck, ShoppingCart, ArrowUpRight, Image as ImageIcon } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 
-// ── Module-level singletons: fetch admin config once across all card instances ─
-let _defaultUnit: 'truck' | 'pallet' | 'carton' | null = null;
-let _defaultUnitPromise: Promise<'truck' | 'pallet' | 'carton'> | null = null;
-
-function getAdminDefaultUnit(): Promise<'truck' | 'pallet' | 'carton'> {
-    if (_defaultUnit) return Promise.resolve(_defaultUnit);
-    if (!_defaultUnitPromise) {
-        const base = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
-        _defaultUnitPromise = fetch(`${base}/config/default-unit`)
-            .then(r => r.json())
-            .then(d => {
-                const u = d?.unit;
-                _defaultUnit = (['truck', 'pallet', 'carton'].includes(u) ? u : 'truck') as typeof _defaultUnit;
-                return _defaultUnit!;
-            })
-            .catch(() => { _defaultUnit = 'truck'; return _defaultUnit!; });
-    }
-    return _defaultUnitPromise;
-}
-
-let _markups: { piece: number; pallet: number; container: number } | null = null;
-let _markupsPromise: Promise<{ piece: number; pallet: number; container: number }> | null = null;
-
-function getAdminMarkups(): Promise<{ piece: number; pallet: number; container: number }> {
-    if (_markups) return Promise.resolve(_markups);
-    if (!_markupsPromise) {
-        const base = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
-        _markupsPromise = fetch(`${base}/config/markup`)
-            .then(r => r.json())
-            .then(d => {
-                _markups = {
-                    piece: Number(d?.piece) || 1.10,
-                    pallet: Number(d?.pallet) || 1.05,
-                    container: Number(d?.container) || 1.02,
-                };
-                return _markups!;
-            })
-            .catch(() => { _markups = { piece: 1.10, pallet: 1.05, container: 1.02 }; return _markups!; });
-    }
-    return _markupsPromise;
-}
+import { getAdminDefaultUnit, getAdminMarkups, computeCardPrice, DEFAULT_MARKUPS, type Markups } from '@/lib/card-pricing';
 import { useCart } from '@/lib/cart';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { type Product } from '@/lib/types';
 import { useAuth } from '@/lib/auth';
 import { formatPrice } from '@/lib/currency';
@@ -59,6 +19,7 @@ import { getDisplayCategory } from '@/lib/product-utils';
 export default function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
     const { currency } = useCurrency();
     const [isAdded, setIsAdded] = useState(false);
+    const reduceMotion = useReducedMotion();
     const { addItem } = useCart();
     const { user, isLoggedIn } = useAuth();
     const { locale } = useLanguage();
@@ -113,70 +74,22 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     }, [locale, product.name, product.variants]);
 
     // Suppliers see their own base price (no markup)
-    const isOwnProduct = user?.role?.toUpperCase() === 'SUPPLIER' && product.supplierId && user?.id === product.supplierId;
-    const displayPrice = isOwnProduct && product.basePrice ? product.basePrice : product.price;
+    const isOwnProduct = !!(user?.role?.toUpperCase() === 'SUPPLIER' && product.supplierId && user?.id === product.supplierId);
 
     // Admin-configured default display unit (truck / pallet / carton)
-    const [defaultUnit, setDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
-    const [markups, setMarkups] = useState<{ piece: number; pallet: number; container: number }>({ piece: 1.10, pallet: 1.05, container: 1.02 });
+    const [, setDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
+    const [markups, setMarkups] = useState<Markups>(DEFAULT_MARKUPS);
     useEffect(() => { getAdminDefaultUnit().then(setDefaultUnit); }, []);
     useEffect(() => { getAdminMarkups().then(setMarkups); }, []);
 
-    // Compute unit-tier price for the card
-    const piecesPerCase = product.unitsPerCase || 0;
-    const casesPerPallet = product.casesPerPallet || 0;
-    const piecesPerPallet = product.unitsPerPallet || (piecesPerCase * casesPerPallet) || 0;
-    const palletsPerTruck = product.palletsPerShipment || 0;
-
-    // ── Resolve per-piece BASE price (supplier raw, before markup) ────────────
-    // Operator bug: the admin table showed €8.64/case for a KitKat
-    // listing but the public card rendered €0.03/case. Trace:
-    //   • Supplier form stores basePrice = pricePerPiece × unitsPerCase
-    //     i.e. ALWAYS the per-case price.
-    //   • Legacy reversal code divided by piecesPerPallet × palletsPerTruck
-    //     when `unit` was set to "truck" — turning €8.64 into €0.0009/piece
-    //     then × unitsPerCase = €0.01.
-    // Fix: `basePrice` is ALWAYS per-case on this platform. We derive
-    // per-piece by dividing by `unitsPerCase` only (or fall back to
-    // rawBase when the supplier hasn't filled unitsPerCase). The
-    // `unit` field is for display only — it does NOT change the
-    // pricing granularity anymore.
-    const rawBase = isOwnProduct
-        ? displayPrice
-        : (product.basePrice != null ? product.basePrice : displayPrice / markups.piece);
-
-    const basePerPiece = piecesPerCase > 0 ? rawBase / piecesPerCase : rawBase;
-
-    // Tier-specific markup multipliers (suppliers see base prices, no markup)
-    const mPiece     = isOwnProduct ? 1 : markups.piece;
-    const mPallet    = isOwnProduct ? 1 : markups.pallet;
-    const mContainer = isOwnProduct ? 1 : markups.container;
-
-    // Atlantis listing card pricing rule:
-    //   The card always shows a PER-CASE price (not the full truck total).
-    //   The markup applied to that per-case price is the TRUCK markup —
-    //   i.e. the cheapest possible per-case price, which is what the buyer
-    //   would pay if they bought a full truck. This tells them "from this
-    //   price per case", and clicking through to the PDP lets them see
-    //   what the per-case price becomes at Pallet or Case tier.
-    const basePerCase = piecesPerCase > 0 ? basePerPiece * piecesPerCase : basePerPiece;
-    const truckTierAvailable  = piecesPerCase > 0 && piecesPerPallet > 0 && palletsPerTruck > 0;
-    const palletTierAvailable = piecesPerCase > 0 && piecesPerPallet > 0;
-    const caseTierAvailable   = piecesPerCase > 0;
-
-    // Pick the cheapest available tier markup — Truck if reachable,
-    // otherwise Pallet, otherwise Case. Cards still represent the best
-    // possible per-case price the buyer can unlock.
-    let cardPrice: number;
-    if (truckTierAvailable)       cardPrice = basePerCase * mContainer;
-    else if (palletTierAvailable) cardPrice = basePerCase * mPallet;
-    else if (caseTierAvailable)   cardPrice = basePerCase * mPiece;
-    else                           cardPrice = displayPrice;
+    // Per-case price at the cheapest reachable tier — see lib/card-pricing.
+    const cardPrice = computeCardPrice(product, markups, isOwnProduct);
     const cardUnit = 'case';
 
     const rating = product.rating || 0;
     const reviews = product.reviewsCount || 0;
-    const isBestSeller = index % 4 === 0;
+    // Only from real review data — never by grid position.
+    const isBestSeller = (product.rating ?? 0) >= 4.5 && (product.reviewsCount ?? 0) >= 5;
 
     const handleAddToCart = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -195,163 +108,154 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     };
 
     return (
-        // Card animation tuning:
-        //   • Mount: short fade-up. The previous `delay: index * 0.05`
-        //     stacked linearly with the row index, so a card at #20 was
-        //     waiting one full second before appearing. We cap at
-        //     ~0.18 s so any card past the first 6 lands together —
-        //     the customer sees the grid feel responsive on scroll.
-        //   • Mount duration trimmed to 0.18 s (was Framer default 0.5).
-        //   • Hover: a single transition-all duration-200 promotes
-        //     shadow + transform together so the card lifts smoothly
-        //     in one frame group instead of separate shadow/colour
-        //     animations colliding.
+        // Card animation tuning: short fade-up, delay capped at ~0.18 s so
+        // cards past the first row land together. Hover lifts only the
+        // image well (Parallel-style) so the grid stays calm.
         <motion.div
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
+            // Lift via framer-motion: its inline transform would override a CSS
+            // hover:-translate-y class, so the hover lift must live here.
+            whileHover={reduceMotion ? undefined : { y: -4, transition: { duration: 0.25, ease: 'easeOut' } }}
             transition={{ duration: 0.18, delay: Math.min(index * 0.03, 0.18) }}
-            className="group bg-card text-card-foreground rounded-lg border border-border/60 hover:shadow-md hover:border-border hover:-translate-y-0.5 transition-all duration-200 ease-out flex flex-col h-full overflow-hidden will-change-transform"
+            className="group relative flex flex-col h-full text-start rounded-[20px] p-2.5 -m-2.5 transition-[transform,box-shadow,background-color] duration-300 ease-out hover:bg-surface hover:shadow-[0_20px_44px_-14px_rgba(14,124,116,0.28),0_0_0_1px_rgba(46,196,182,0.18)] focus-within:bg-surface focus-within:shadow-[0_20px_44px_-14px_rgba(14,124,116,0.28),0_0_0_1px_rgba(46,196,182,0.18)] motion-reduce:transform-none"
         >
-            <div
-                className="relative p-4 flex justify-center items-center h-[200px] border-b border-border/30 bg-white"
+            {/* ── Image well — large, white, centred ─────────────────── */}
+            <Link
+                href={`/products/${product.id}`}
+                className="relative block aspect-square rounded-2xl bg-media border border-line overflow-hidden transition-colors duration-300 group-hover:border-line-strong"
                 onMouseEnter={() => setIsHoveringImg(true)}
                 onMouseLeave={() => setIsHoveringImg(false)}
             >
-                { (product.image || (product.images && product.images.length > 0)) ? (
+                {(product.image || (product.images && product.images.length > 0)) ? (
                     <img
                         src={allImages ? allImages[imgIndex] : (product.image || (product.images && product.images[0]) || '')}
                         alt={product.name}
                         referrerPolicy="no-referrer"
                         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                        className="max-h-[160px] max-w-full object-contain mix-blend-multiply transition-opacity duration-150 group-hover:scale-[1.02] transition-transform"
+                        className="absolute inset-0 m-auto w-auto h-auto max-w-[82%] max-h-[82%] object-contain mix-blend-multiply transition-transform duration-300 ease-out group-hover:scale-[1.03]"
                         loading="lazy"
                         decoding="async"
                     />
                 ) : (
-                    <div className="w-full h-[160px] flex items-center justify-center text-muted-foreground/30">
-                        {/* Empty layout as requested */}
+                    <div className="absolute inset-0 flex items-center justify-center text-ink-4">
+                        <ImageIcon size={40} strokeWidth={1.25} />
                     </div>
                 )}
+
+                <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0B1F3A]/[0.07] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 {/* Image index dots (when multiple images and hovering) */}
                 {allImages && isHoveringImg && (
-                    <div className="absolute bottom-2 left-0 right-0 flex justify-center gap-1 z-10">
+                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1 z-10">
                         {allImages.map((_, i) => (
-                            <div key={i} className={cn('w-1.5 h-1.5 rounded-full transition-all duration-300', i === imgIndex ? 'bg-primary scale-125' : 'bg-border')} />
+                            <div key={i} className={cn('w-1.5 h-1.5 rounded-full transition-all duration-300', i === imgIndex ? 'bg-cta scale-125' : 'bg-[#CBD5E1]')} />
                         ))}
                     </div>
                 )}
 
-                {/* Floating Badges */}
-                <div className="absolute top-2 start-2 flex flex-col gap-1.5">
+                {/* Floating badges */}
+                <div className="absolute top-3 start-3 flex flex-col items-start gap-1.5">
                     {isBestSeller && (
-                        <div className="bg-[#E47911] text-white px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">
-                            Top Rated
-                        </div>
+                        <span className="inline-flex items-center gap-1 bg-[#FFF4E5] text-[#B45309] border border-[#FDE3BF] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">
+                            <Star className="w-2.5 h-2.5 fill-current" /> Top Rated
+                        </span>
                     )}
                     {product.bulkSave && (
-                        <div className="bg-emerald-600 text-white px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wider">
+                        <span className="bg-[#ECFDF5] dark:bg-emerald-500/15 text-[#047857] border border-[#BBF7D0] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">
                             Bulk Save
-                        </div>
+                        </span>
                     )}
                 </div>
 
-                {/* ── "Your listing" badge ────────────────────────────────
-                    Only the supplier who owns this product sees this pill.
-                    Customers, anonymous visitors, and other suppliers
-                    never see it — to them the product looks exactly the
-                    same as any other Atlantis listing. Operator-requested
-                    so a supplier browsing the public catalog can tell
-                    "this row is mine" at a glance. Top-right corner so it
-                    doesn't collide with Top Rated / Bulk Save chips on
-                    the top-left. */}
+                {/* "Your listing" — only the owning supplier sees this pill. */}
                 {isOwnProduct && (
-                    <div className="absolute top-2 end-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-sm bg-[#0B1F3A] text-white text-[10px] font-bold uppercase tracking-wider shadow-md">
+                    <span className="absolute top-3 end-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cta text-cta-fg text-[10px] font-bold uppercase tracking-wide shadow-sm">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                         Your listing
-                    </div>
+                    </span>
                 )}
 
                 {isOutOfStock && (
-                    <div className="absolute inset-0 bg-white/70 backdrop-blur-[1px] flex items-center justify-center z-10">
-                        <span className="bg-[#0B1F3A] text-white px-3 py-1.5 rounded-sm text-xs font-bold uppercase tracking-widest">Out of Stock</span>
+                    <div className="absolute inset-0 bg-media/75 backdrop-blur-[1px] flex items-center justify-center z-10">
+                        <span className="bg-cta text-cta-fg px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest">Out of Stock</span>
                     </div>
                 )}
-            </div>
+            </Link>
 
-            <div className="flex flex-col flex-1 p-4">
-                {/* Brand & Stats */}
-                <div className="flex items-center justify-between mb-2">
+            {/* ── Details ───────────────────────────────────────────── */}
+            <div className="flex flex-col flex-1 pt-3 px-0.5">
+                {/* Seller / brand row */}
+                <div className="flex items-center justify-between gap-2 mb-1.5">
                     {(user?.role === 'ADMIN' || isOwnProduct) ? (
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-primary/80">{product.brand}</span>
+                        <span className="text-[12px] font-bold text-ink truncate">{product.brand}</span>
                     ) : (
-                        <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Sold by Atlantis</span>
+                        <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink-2">
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#2EC4B6]" /> Sold by Atlantis
+                        </span>
                     )}
-                    <div className="flex items-center gap-1">
-                        {rating > 0 ? (
-                            <>
-                                <Star className="w-3 h-3 fill-[#FFA41C] text-[#FFA41C]" />
-                                <span className="text-xs text-[#007185] cursor-pointer hover:underline hover:text-[#C45500]">{reviews > 0 ? reviews : ''}</span>
-                            </>
-                        ) : (
-                            <span className="text-xs text-muted-foreground/50"></span>
-                        )}
-                    </div>
+                    {rating > 0 && (
+                        <span className="inline-flex items-center gap-1 text-[12px] text-ink-2 shrink-0">
+                            <Star className="w-3 h-3 fill-[#F59E0B] text-[#F59E0B]" />
+                            {reviews > 0 ? reviews : ''}
+                        </span>
+                    )}
                 </div>
 
                 {/* Title */}
-                <Link href={`/products/${product.id}`} className="group/title">
-                    <h3 className="text-sm font-medium leading-snug line-clamp-2 mb-3 text-foreground hover:text-[#C45500] transition-colors">
+                <Link href={`/products/${product.id}`}>
+                    <h3 className="font-sans text-[14px] font-semibold leading-snug line-clamp-2 min-h-[2.6em] text-ink hover:text-teal transition-colors">
                         {translatedName}
                     </h3>
                 </Link>
 
+                {/* EAN — B2B buyers search by barcode */}
+                {product.ean && (
+                    <p className="mt-1 text-[12px] text-ink-3 tabular-nums tracking-wide">{product.ean}</p>
+                )}
+
                 {/* Price & Min Order */}
-                <div className="mt-auto space-y-3">
-                    <div className="flex items-baseline gap-1 flex-wrap">
-                        {/* Stable headline price — always the admin default
-                            tier (truck unless changed). No animation on the
-                            number itself: B2B buyers want a steady canonical
-                            price they can read at a glance. */}
-                        <span className="text-xl font-bold text-foreground">
-                            {formatPrice(cardPrice, currency)}
+                <div className="mt-auto pt-2.5">
+                    <div className="flex flex-wrap items-end justify-between gap-x-2 gap-y-0.5">
+                        {/* Stable headline price — the cheapest reachable
+                            per-case tier. No animation on the number: B2B
+                            buyers want a steady price they can read at a glance. */}
+                        {cardPrice > 0 ? (
+                            <div className="flex items-baseline gap-1 min-w-0">
+                                <span className="text-[17px] font-bold text-ink tabular-nums tracking-tight">
+                                    {formatPrice(cardPrice, currency)}
+                                </span>
+                                <span className="text-[12px] text-ink-3 font-medium">/ {cardUnit}</span>
+                            </div>
+                        ) : (
+                            // No list price on file — never show €0.00.
+                            <span className="text-[14px] font-semibold text-ink-2">Price on request</span>
+                        )}
+                        <span className="text-[11px] text-ink-3 shrink-0 pb-0.5">
+                            MOQ <span className="font-semibold text-ink">{product.minOrder} pcs</span>
                         </span>
-                        <span className="text-muted-foreground text-xs font-medium">
-                            / {cardUnit}
-                        </span>
-                        {/* "Your Price" badge intentionally removed — the
-                            "Your listing" pill in the image corner is enough
-                            to tell the supplier this is their product. The
-                            old "Your Price" label hinted that buyers see a
-                            DIFFERENT price (i.e. revealed the platform
-                            markup), which the operator wants kept private.
-                            Supplier just sees the price plainly now —
-                            no inside-baseball signal. */}
                     </div>
 
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex flex-col">
-                            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Min Order</span>
-                            <span className="text-xs font-bold">{product.minOrder} pcs</span>
-                        </div>
-
-                        <button
-                            onClick={handleAddToCart}
-                            disabled={isOutOfStock || isAdded}
-                            className={cn(
-                                "h-9 px-4 rounded-full flex items-center justify-center gap-2 transition-all duration-300 text-xs font-bold w-1/2",
-                                isAdded
-                                    ? "bg-accent text-accent-foreground"
-                                    : "bg-[#FFD814] text-black hover:bg-[#F7CA00] border border-[#FCD200]"
-                            )}
-                        >
-                            {isAdded ? (
-                                <Check size={14} className="animate-in zoom-in duration-300" />
-                            ) : (
-                                "Add to Cart"
-                            )}
-                        </button>
-                    </div>
+                    <button
+                        onClick={handleAddToCart}
+                        disabled={isOutOfStock || isAdded}
+                        className={cn(
+                            "mt-2.5 w-full h-9 rounded-lg flex items-center justify-center gap-1.5 text-[12.5px] font-semibold transition-colors duration-200 disabled:cursor-not-allowed",
+                            isAdded
+                                ? "bg-[#2EC4B6] text-white"
+                                : isOutOfStock
+                                    ? "bg-surface-3 text-ink-4"
+                                    : "bg-cta text-white hover:bg-cta-hover active:bg-cta"
+                        )}
+                    >
+                        {isAdded ? (
+                            <Check size={15} className="animate-in zoom-in duration-300" />
+                        ) : (
+                            <>
+                                <ShoppingCart size={15} /> Add to Cart
+                            </>
+                        )}
+                    </button>
                 </div>
             </div>
         </motion.div>

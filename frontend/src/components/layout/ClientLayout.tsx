@@ -1,7 +1,6 @@
 'use client';
 
 import Navbar from "./Navbar";
-import PriceTicker from "@/components/ui/PriceTicker";
 import Footer from "./Footer";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
@@ -63,9 +62,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
 
     return (
         <div className="flex flex-col min-h-screen">
-            {/* Single source of truth: Navbar + PriceTicker on all public pages */}
+            {/* Single source of truth: Navbar on all public pages */}
             {showNav && <Navbar />}
-            {showNav && <PriceTicker />}
             <main className="flex-grow">
                 {children}
             </main>

@@ -3,7 +3,9 @@
 import React from 'react';
 import { ShieldCheck, Truck, Package, CheckCircle2 } from 'lucide-react';
 import Image from 'next/image';
-import { formatPrice } from '@/lib/currency';
+import { formatEUR as formatPrice } from '@/lib/currency';
+// The payment step shows the exact settlement amount — always EUR, the
+// currency Stripe charges (backend DEFAULT_CURRENCY).
 
 interface OrderItem {
   id: string;

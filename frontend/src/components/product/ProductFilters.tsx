@@ -30,7 +30,7 @@ function FilterSection({ title, children, defaultOpen = true }: { title: string;
                 onClick={() => setIsOpen(!isOpen)}
                 className="flex items-center justify-between w-full text-start mb-3 group"
             >
-                <h3 className="text-xs font-bold text-foreground transition-colors">{title}</h3>
+                <h3 className="font-sans text-[13px] font-bold text-foreground tracking-tight transition-colors">{title}</h3>
                 <ChevronDown className={cn(
                     "w-4 h-4 text-muted-foreground transition-transform duration-200",
                     isOpen ? 'rotate-180' : ''
@@ -72,7 +72,7 @@ export default function ProductFilters(props: FilterProps) {
     };
 
     return (
-        <div className="bg-card px-2">
+        <div className="px-1">
             {/* Categories */}
             <FilterSection title={t('categories', 'department')}>
                 <div className="flex flex-col gap-1.5">
@@ -90,7 +90,14 @@ export default function ProductFilters(props: FilterProps) {
                                     "text-sm group-hover:text-primary transition-colors",
                                     isActive ? "font-bold text-foreground" : "text-muted-foreground"
                                 )}>
-                                    {t('categories', cat.replace(/\s+/g, '').replace(/&/g, 'And').charAt(0).toLowerCase() + cat.replace(/\s+/g, '').replace(/&/g, 'And').slice(1)) || cat}
+                                    {(() => {
+                                        // t() echoes the key back when a locale lacks it —
+                                        // fall back to the human label instead of "coffeeAndTea".
+                                        const compact = cat.replace(/\s+/g, '').replace(/&/g, 'And');
+                                        const key = compact.charAt(0).toLowerCase() + compact.slice(1);
+                                        const label = t('categories', key);
+                                        return label && label !== key ? label : cat;
+                                    })()}
                                 </span>
                             </label>
                         );

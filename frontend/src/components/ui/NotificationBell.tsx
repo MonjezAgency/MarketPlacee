@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Bell, CheckCheck, Package, ShoppingCart, Info, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Bell, CheckCheck, Package, ShoppingCart, Info, AlertCircle, CheckCircle, AlertTriangle, X, ArrowRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications, AppNotification } from '@/hooks/useNotifications';
 import { useAuth } from '@/lib/auth';
@@ -40,6 +40,20 @@ function NotificationIcon({ type }: { type: AppNotification['type'] }) {
     return <Info className="w-4 h-4 text-blue-500 shrink-0" />;
 }
 
+const TILE: Record<string, string> = {
+    SUCCESS: 'bg-[#ECFDF5] dark:bg-emerald-500/15 text-[#059669]',
+    ERROR: 'bg-[#FEF2F2] dark:bg-red-500/15 text-[#DC2626]',
+    WARNING: 'bg-[#FFF7ED] dark:bg-amber-500/15 text-[#D97706]',
+};
+function NotificationTile({ type }: { type: AppNotification['type'] }) {
+    const Icon = type === 'SUCCESS' ? CheckCircle : type === 'ERROR' ? AlertCircle : type === 'WARNING' ? AlertTriangle : Info;
+    return (
+        <span className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0', TILE[type] || 'bg-teal-soft text-teal')}>
+            <Icon className="w-[18px] h-[18px]" />
+        </span>
+    );
+}
+
 function timeAgo(date: string) {
     const diff = Date.now() - new Date(date).getTime();
     const mins = Math.floor(diff / 60000);
@@ -50,11 +64,25 @@ function timeAgo(date: string) {
     return `${Math.floor(hours / 24)}d ago`;
 }
 
-export default function NotificationBell({ isLight }: { isLight?: boolean }) {
+/** `compact` renders an icon-only 44px button that matches the storefront header controls. */
+export default function NotificationBell({ isLight, compact }: { isLight?: boolean; compact?: boolean }) {
     const { user } = useAuth();
-    const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+    const { notifications, unreadCount, markRead, markAllRead } = useNotifications(!!user);
     const router = useRouter();
     const [open, setOpen] = useState(false);
+    // "While you were away" — one summary card per session when unread items exist.
+    const [showAway, setShowAway] = useState(false);
+    useEffect(() => {
+        if (!compact || unreadCount === 0) return;
+        try {
+            if (sessionStorage.getItem('atl_away_card_seen')) return;
+            sessionStorage.setItem('atl_away_card_seen', '1');
+        } catch { /* noop */ }
+        setShowAway(true);
+        const t = setTimeout(() => setShowAway(false), 9000);
+        return () => clearTimeout(t);
+    }, [compact, unreadCount]);
+    const latestUnread = notifications.find((n) => !n.read);
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -73,24 +101,30 @@ export default function NotificationBell({ isLight }: { isLight?: boolean }) {
                 onClick={() => setOpen(prev => !prev)}
                 className={cn(
                     'relative flex flex-col items-center gap-0.5 group',
-                    isLight ? 'text-foreground' : 'text-white'
+                    compact && 'h-9 w-9 justify-center rounded-lg text-ink-2 hover:bg-surface-3 hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60',
+                    !compact && (isLight ? 'text-foreground' : 'text-white')
                 )}
                 aria-label="Notifications"
             >
                 <Bell className="w-5 h-5 group-hover:text-secondary transition-colors" />
-                <span className="text-[10px] font-bold">Alerts</span>
+                {!compact && <span className="text-[10px] font-bold">Alerts</span>}
                 {unreadCount > 0 && (
-                    <span className="absolute -top-1 -end-1 bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center animate-pulse">
+                    <span className={cn('absolute bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center', compact ? 'top-1.5 end-1.5 ring-2 ring-white' : '-top-1 -end-1 animate-pulse')}>
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
             </button>
 
             {open && (
-                <div className="absolute end-0 top-full mt-3 w-80 bg-card border border-border/50 rounded-2xl shadow-2xl z-[200] overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className={cn(
+                    'absolute end-0 top-full mt-3 z-[200] overflow-hidden',
+                    compact
+                        ? 'w-[380px] max-w-[calc(100vw-24px)] bg-surface rounded-2xl ring-1 ring-line shadow-[0_24px_60px_rgba(15,23,42,0.16)]'
+                        : 'w-80 bg-card border border-border/50 rounded-2xl shadow-2xl'
+                )}>
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-border/50">
-                        <span className="font-bold text-sm">Notifications</span>
+                    <div className={cn('flex items-center justify-between px-4 py-3 border-b', compact ? 'px-5 py-4 border-line' : 'border-border/50')}>
+                        <span className={cn('font-bold', compact ? 'text-[15px] text-ink' : 'text-sm')}>Notifications</span>
                         {unreadCount > 0 && (
                             <button
                                 onClick={markAllRead}
@@ -103,7 +137,7 @@ export default function NotificationBell({ isLight }: { isLight?: boolean }) {
                     </div>
 
                     {/* List */}
-                    <div className="max-h-96 overflow-y-auto divide-y divide-border/50">
+                    <div className={cn('max-h-[420px] overflow-y-auto divide-y', compact ? 'divide-[#F1F3F6]' : 'divide-border/50')}>
                         {notifications.length === 0 && (
                             <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
                                 <Bell className="w-8 h-8 opacity-30" />
@@ -122,20 +156,38 @@ export default function NotificationBell({ isLight }: { isLight?: boolean }) {
                                     }
                                 }}
                                 className={cn(
-                                    'w-full flex items-start gap-3 px-4 py-3 text-start hover:bg-muted/40 transition-colors',
-                                    !n.read && 'bg-primary/5'
+                                    'w-full flex items-start gap-3 text-start transition-colors',
+                                    compact ? 'px-5 py-4 hover:bg-surface-2' : 'px-4 py-3 hover:bg-muted/40',
+                                    !n.read && (compact ? 'bg-[#F4FBFA]' : 'bg-primary/5')
                                 )}
                             >
-                                <NotificationIcon type={n.type} />
+                                {compact ? <NotificationTile type={n.type} /> : <NotificationIcon type={n.type} />}
                                 <div className="flex-1 min-w-0">
-                                    <p className={cn('text-xs font-bold truncate', !n.read && 'text-foreground')}>{n.title}</p>
-                                    <p className="text-[11px] text-muted-foreground line-clamp-2 mt-0.5">{n.message}</p>
-                                    <p className="text-[10px] text-muted-foreground/60 mt-1">{timeAgo(n.createdAt)}</p>
+                                    <p className={cn(compact ? 'text-[14px] font-semibold text-ink truncate' : 'text-xs font-bold truncate', !n.read && !compact && 'text-foreground')}>{n.title}</p>
+                                    <p className={cn(compact ? 'text-[13px] text-ink-2 line-clamp-2 mt-0.5' : 'text-[11px] text-muted-foreground line-clamp-2 mt-0.5')}>{n.message}</p>
+                                    <p className={cn(compact ? 'text-[12px] text-ink-4 mt-1.5' : 'text-[10px] text-muted-foreground/60 mt-1')}>{timeAgo(n.createdAt)}</p>
                                 </div>
-                                {!n.read && <span className="w-2 h-2 rounded-full bg-primary shrink-0 mt-1" />}
+                                {!n.read && <span className={cn('w-2 h-2 rounded-full shrink-0 mt-1.5', compact ? 'bg-[#2EC4B6]' : 'bg-primary')} />}
                             </button>
                         ))}
                     </div>
+                </div>
+            )}
+
+            {compact && showAway && !open && latestUnread && (
+                <div role="status" className="absolute end-0 top-full mt-3 w-[340px] max-w-[calc(100vw-24px)] bg-surface rounded-2xl ring-1 ring-line shadow-[0_24px_60px_rgba(15,23,42,0.16)] p-4 z-[190] flex gap-3">
+                    <NotificationTile type={latestUnread.type} />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold uppercase tracking-wider text-teal">While you were away</p>
+                        <p className="mt-1 text-[14px] font-semibold text-ink">
+                            {unreadCount} new {unreadCount === 1 ? 'notification' : 'notifications'}
+                        </p>
+                        <p className="text-[13px] text-ink-2 truncate">{latestUnread.title}</p>
+                        <button onClick={() => { setShowAway(false); setOpen(true); }} className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-heading hover:text-teal">
+                            View notifications <ArrowRight size={14} />
+                        </button>
+                    </div>
+                    <button onClick={() => setShowAway(false)} aria-label="Dismiss" className="self-start text-ink-4 hover:text-ink"><X size={16} /></button>
                 </div>
             )}
         </div>

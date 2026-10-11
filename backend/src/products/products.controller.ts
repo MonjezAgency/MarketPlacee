@@ -84,9 +84,9 @@ export class ProductsController {
 
     @Get()
     async findAll(@Request() req) {
-        const { status, category, brand, minPrice, maxPrice, sort, q, limit, page } = req.query;
+        const { status, category, brand, brands, categoryAny, categoryNone, minPrice, maxPrice, sort, q, limit, page, origin } = req.query;
         const products = await this.productsService.findAll(status, { 
-            category, brand, minPrice, maxPrice, sort, q, limit, page 
+            category, brand, brands, categoryAny, categoryNone, minPrice, maxPrice, sort, q, limit, page, origin
         });
         return products;
     }
@@ -230,6 +230,12 @@ export class ProductsController {
                 ? { rejected_candidates: result.rejected_candidates }
                 : {}),
         };
+    }
+
+    /** Public: aggregated buyer demand for the Targets page (counts only). */
+    @Get('targets')
+    async getBuyerTargets(@Query('limit') limit?: string) {
+        return this.productsService.findBuyerTargets(limit ? parseInt(limit, 10) : 24);
     }
 
     /** Public endpoint — products that recently changed price, for the live header ticker */

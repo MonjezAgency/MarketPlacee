@@ -18,7 +18,8 @@ import { apiFetch, getToken } from '@/lib/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
-export function useNotifications() {
+/** `enabled=false` skips the socket and fetch entirely (e.g. logged-out visitors). */
+export function useNotifications(enabled: boolean = true) {
     const [notifications, setNotifications] = useState<AppNotification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const socketRef = useRef<Socket | null>(null);
@@ -45,6 +46,7 @@ export function useNotifications() {
     // 
     // Current workaround: read token via getToken() purely for WebSocket connection.
     useEffect(() => {
+        if (!enabled) return;
         const token = getToken();
 
         const socket = io(`${API_URL}/chat`, {
@@ -101,7 +103,7 @@ export function useNotifications() {
             socket.disconnect();
             socketRef.current = null;
         };
-    }, [fetchNotifications]);
+    }, [fetchNotifications, enabled]);
 
     const markRead = useCallback(async (id: string) => {
         await apiFetch(`/notifications/${id}/read`, { method: 'PATCH' });

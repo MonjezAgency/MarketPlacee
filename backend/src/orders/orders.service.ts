@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
@@ -6,6 +6,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { InvoiceService } from '../invoices/invoice.service';
 import { EscrowService } from '../payments/escrow.service';
 import { AppConfigService } from '../admin/app-config.service';
+import { MixedLoadsService, asHttp } from './mixed-loads.service';
+import { PricingError, normaliseTier, priceLine, priceLoad, round2 } from './pricing';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
     PENDING: 'Pending',
@@ -25,6 +27,7 @@ export class OrdersService {
         private invoiceService: InvoiceService,
         private escrowService: EscrowService,
         private appConfigService: AppConfigService,
+        private mixedLoads: MixedLoadsService,
     ) { }
 
     /**
@@ -107,114 +110,148 @@ export class OrdersService {
         };
     }
 
-    async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number) {
-        // Snapshot product names so the order keeps history if a product
-        // is deleted later. We pass `name` from the cart payload when
-        // available, otherwise look it up.
-        const productIds = items.map(i => i.productId).filter(Boolean);
-        const productRows = productIds.length > 0
-            ? await this.prisma.product.findMany({
-                where: { id: { in: productIds } },
-                select: { id: true, name: true, stock: true },
-            })
-            : [];
-        const nameById = new Map(productRows.map(p => [p.id, p.name]));
-        const stockById = new Map(productRows.map(p => [p.id, p.stock]));
-
-        // ── Stock reservation gate ───────────────────────────────
-        // Operator rule: every order line decrements the product's
-        // stock by the ordered quantity. Reject the order outright
-        // if any line would push stock negative — this prevents
-        // overselling on a race between two simultaneous customers.
-        // The decrement happens inside a transaction below alongside
-        // the order create so a failed write rolls everything back.
-        const insufficient: string[] = [];
-        for (const item of items) {
-            if (!item.productId) continue;
-            const have = stockById.get(item.productId) ?? 0;
-            const want = Number(item.quantity || 0);
-            if (want > have) {
-                insufficient.push(`${nameById.get(item.productId) || item.productId} (have ${have}, want ${want})`);
+    /**
+     * Price a cart on the server. Every line is recomputed from the database
+     * (pack sizes, markups, MOQ, mixed-load capacity) — client prices are
+     * never trusted. Used by POST /orders/quote and by create().
+     */
+    async priceCart(customerId: string, items: any[], couponCode?: string | null, db: any = this.prisma, opts: { lenient?: boolean } = {}) {
+        if (!Array.isArray(items) || items.length === 0) throw new BadRequestException({ code: 'EMPTY_CART', message: 'Your cart is empty.' });
+        if (items.length > 200) throw new BadRequestException({ code: 'TOO_MANY_LINES', message: 'Too many cart lines in one order.' });
+        const markups = await this.mixedLoads.markups();
+        const productIds = items.filter((i) => i && !i.mixedLoadId).map((i) => String(i.productId || '').split('::')[0]).filter(Boolean);
+        const products = await this.mixedLoads.loadProducts(productIds, db);
+        const lines: any[] = [];
+        for (const raw of items) {
+            if (!raw || typeof raw !== 'object') throw new BadRequestException({ code: 'INVALID_LINE', message: 'Invalid cart line.' });
+            try {
+                if (raw.mixedLoadId) {
+                    // Server-saved mixed pallet / truckload.
+                    const load = await db.mixedLoad.findFirst({ where: { id: String(raw.mixedLoadId), customerId } });
+                    if (!load) throw new PricingError('LOAD_NOT_FOUND', 'A mixed load in your cart no longer exists.');
+                    if (load.status !== 'DRAFT') throw new PricingError('LOAD_ALREADY_ORDERED', 'A mixed load in your cart has already been ordered.', { mixedLoadId: load.id });
+                    const q = await this.mixedLoads.price(load.kind, load.lines as any[], db);
+                    if (!q.ready) throw new PricingError('LOAD_NOT_READY', `Mixed ${load.kind === 'PALLET' ? 'pallet' : 'truckload'}: ${q.issues.join(' ')}`, { mixedLoadId: load.id });
+                    lines.push({
+                        productId: null, mixedLoadId: load.id, quantity: 1, price: q.total, lineTotal: q.total,
+                        tier: load.kind === 'PALLET' ? 'pallet' : 'truck',
+                        name: `Mixed ${load.kind === 'PALLET' ? 'pallet' : 'truckload'} (${q.lines.length} product${q.lines.length === 1 ? '' : 's'})`,
+                        mixComposition: q.lines.map((l) => ({ productId: l.productId, name: l.name, variant: l.variant ?? null, quantity: l.quantity, unit: l.unit, cases: l.cases, unitPrice: l.casePrice, lineSubtotal: l.lineSubtotal })),
+                        supplierId: q.supplierId,
+                    });
+                    continue;
+                }
+                const productId = String(raw.productId || '').split('::')[0];
+                const p = products.get(productId);
+                if (!p) throw new PricingError('PRODUCT_NOT_FOUND', 'A product in your cart is no longer available.', { productId });
+                const tier = normaliseTier(raw.tier) ?? 'carton';
+                if (Array.isArray(raw.mixComposition) && raw.mixComposition.length > 0) {
+                    // Legacy single-product variant mix (one truck/pallet of variants).
+                    if (tier === 'carton') throw new PricingError('INVALID_TIER', `${p.name}: variant mixes are by pallet or truckload.`);
+                    const kind = tier === 'pallet' ? 'PALLET' : 'TRUCK';
+                    const loadLines = raw.mixComposition.map((c: any) => ({ productId, variant: c.signature ?? c.variant ?? null, quantity: Number(c.quantity) }));
+                    const q = priceLoad(kind, loadLines, products, markups, { requiredFill: 1 });
+                    if (!q.ready) throw new PricingError('LOAD_NOT_READY', `${p.name}: ${q.issues.join(' ')}`);
+                    if (Number(raw.quantity ?? 1) !== 1) throw new PricingError('INVALID_QUANTITY', `${p.name}: a mixed ${tier} is ordered one at a time.`);
+                    lines.push({ productId, quantity: 1, price: q.total, lineTotal: q.total, tier, name: p.name, selectedVariants: raw.selectedVariants, mixComposition: q.lines.map((l) => ({ signature: l.variant, quantity: l.quantity, unitPrice: l.casePrice * (kind === 'TRUCK' ? Number(p.casesPerPallet) : 1) })), supplierId: p.supplierId });
+                    continue;
+                }
+                const priced = priceLine(p, tier, Number(raw.quantity), markups, { raw: !!p.supplierId && p.supplierId === customerId });
+                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null } });
+            } catch (e) {
+                // Cart view: flag the line and keep pricing the rest. Orders stay strict.
+                if (opts.lenient && e instanceof PricingError) {
+                    lines.push({ productId: raw.productId ? String(raw.productId).split('::')[0] : null, mixedLoadId: raw.mixedLoadId ?? null, quantity: Number(raw.quantity) || 0, price: 0, lineTotal: 0, error: { code: e.code, message: e.message, ...e.detail } });
+                    continue;
+                }
+                asHttp(e);
             }
         }
-        if (insufficient.length > 0) {
-            throw new BadRequestException(
-                `Not enough stock for: ${insufficient.join('; ')}. Reduce the quantity or contact the supplier.`,
-            );
+        const subtotal = round2(lines.reduce((s, l) => s + l.lineTotal, 0));
+        let discountPercent = 0, appliedCoupon: string | null = null;
+        if (couponCode && String(couponCode).trim()) {
+            const c = await db.coupon.findUnique({ where: { code: String(couponCode).trim() } }).catch(() => null);
+            if (!c || !c.isActive || (c.expirationDate && new Date(c.expirationDate).getTime() < Date.now())) {
+                throw new BadRequestException({ code: 'INVALID_COUPON', message: 'That promo code is not valid.' });
+            }
+            discountPercent = Math.max(0, Math.min(100, Number(c.discountPercent) || 0));
+            appliedCoupon = c.code;
+        }
+        const discount = round2(subtotal * discountPercent / 100);
+        return { lines, subtotal, discountPercent, discount, coupon: appliedCoupon, total: round2(subtotal - discount), markups };
+    }
+
+    async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number, opts: { idempotencyKey?: string; couponCode?: string } = {}) {
+        const key = typeof opts.idempotencyKey === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(opts.idempotencyKey) ? opts.idempotencyKey : null;
+        if (key) {
+            // A retried / double-clicked submit returns the order already created.
+            const existing = await this.prisma.order.findUnique({ where: { idempotencyKey: key }, include: { items: true, history: true, customer: { select: { email: true, name: true } } } });
+            if (existing) {
+                if (existing.customerId !== customerId) throw new ConflictException({ code: 'IDEMPOTENCY_CONFLICT', message: 'Duplicate request key.' });
+                return existing;
+            }
         }
 
-        const order = await this.prisma.order.create({
-            data: {
-                customerId,
-                totalAmount,
-                shippingCompany: shippingCompany ?? null,
-                // Snapshot the buyer's chosen carrier so the admin order
-                // detail can always surface "this is what the customer
-                // picked at checkout", even after operations re-routes
-                // the shipment via /admin/orders/[id] later.
-                customerShippingCompany: shippingCompany ?? null,
-                shippingCost: shippingCost ?? null,
-                status: OrderStatus.PENDING,
-                items: {
-                    create: items.map(item => ({
-                        productId: item.productId,
-                        quantity: item.quantity,
-                        price: item.price,
-                        productNameSnapshot: item.name || nameById.get(item.productId) || null,
-                        selectedVariants:
-                            item.selectedVariants && typeof item.selectedVariants === 'object'
-                                ? item.selectedVariants
-                                : undefined,
-                        selectedTier: item.tier || null,
-                        // Mixed-tier composition — when the buyer used the
-                        // mix composer at checkout, this carries the
-                        // per-variant breakdown so the admin order detail
-                        // can render the exact split. Validated upstream
-                        // (sum of qty = item.quantity = tier capacity).
-                        mixComposition:
-                            Array.isArray(item.mixComposition) && item.mixComposition.length > 0
-                                ? item.mixComposition
-                                : undefined,
-                    })),
-                },
-                history: {
-                    create: {
-                        newStatus: OrderStatus.PENDING,
-                        changedById: customerId,
-                        reason: 'Order created',
-                    },
-                },
-            },
-            include: {
-                items: true,
-                history: true,
-                customer: { select: { email: true, name: true } },
-            },
-        });
+        const quote = await this.priceCart(customerId, items, opts.couponCode);
+        // The buyer must have seen the server price. If the client total
+        // disagrees (prices / markups changed since the cart was built),
+        // refuse and return the server figures so the UI can refresh.
+        if (typeof totalAmount === 'number' && Number.isFinite(totalAmount) && Math.abs(totalAmount - quote.total) > 0.01) {
+            throw new ConflictException({ code: 'PRICE_CHANGED', message: `Prices were updated — your order total is now ${quote.total.toFixed(2)} EUR. Review and confirm again.`, serverTotal: quote.total, quote: { subtotal: quote.subtotal, discount: quote.discount, total: quote.total, lines: quote.lines.map((l) => ({ productId: l.productId, mixedLoadId: l.mixedLoadId ?? null, price: l.price, lineTotal: l.lineTotal })) } });
+        }
 
-        // ── Decrement stock for every line ───────────────────────
-        // Done AFTER the order row is committed so there's a single
-        // source of truth (the order id) tying each decrement back.
-        // We checked sufficiency above; here we just fire the
-        // decrements in parallel. If one fails the order still
-        // exists but the stock count will be off — the reconcile
-        // job (admin → inventory tools) catches drift.
-        await Promise.all(
-            items
-                .filter((i) => i.productId)
-                .map((i) =>
-                    this.prisma.product
-                        .update({
-                            where: { id: i.productId },
-                            data: { stock: { decrement: Number(i.quantity || 0) } },
-                        })
-                        .catch((err) =>
-                            console.error(
-                                `[STOCK_DECREMENT_FAIL] order=${order.id} product=${i.productId}: ${err?.message}`,
-                            ),
-                        ),
-                ),
-        );
+        let order: any;
+        try {
+            order = await this.prisma.$transaction(async (tx) => {
+                // Stock gate (single-product lines, same unit semantics as before):
+                // conditional decrement so two buyers can't oversell the same stock.
+                for (const l of quote.lines) {
+                    if (!l.productId || l.mixComposition) continue;
+                    const res = await tx.product.updateMany({ where: { id: l.productId, stock: { gte: l.quantity } }, data: { stock: { decrement: l.quantity } } });
+                    if (res.count === 0) throw new BadRequestException({ code: 'INSUFFICIENT_STOCK', message: `Not enough stock for ${l.name}. Reduce the quantity or contact the supplier.`, productId: l.productId });
+                }
+                const created = await tx.order.create({
+                    data: {
+                        customerId,
+                        idempotencyKey: key,
+                        totalAmount: quote.total,
+                        shippingCompany: shippingCompany ?? null,
+                        customerShippingCompany: shippingCompany ?? null,
+                        shippingCost: shippingCost ?? null,
+                        status: OrderStatus.PENDING,
+                        items: {
+                            create: quote.lines.map((l) => ({
+                                productId: l.productId,
+                                quantity: l.quantity,
+                                price: l.price,
+                                productNameSnapshot: l.name,
+                                selectedVariants: l.selectedVariants && typeof l.selectedVariants === 'object' ? l.selectedVariants : undefined,
+                                selectedTier: l.tier,
+                                mixComposition: l.mixComposition ?? undefined,
+                                mixedLoadId: l.mixedLoadId ?? null,
+                            })),
+                        },
+                        history: { create: { newStatus: OrderStatus.PENDING, changedById: customerId, reason: quote.coupon ? `Order created (promo ${quote.coupon} −${quote.discountPercent}%)` : 'Order created' } },
+                    },
+                    include: { items: true, history: true, customer: { select: { email: true, name: true } } },
+                });
+                // Lock each mixed load to this order; if another submit got there first, roll back.
+                for (const l of quote.lines) {
+                    if (!l.mixedLoadId) continue;
+                    const r = await tx.mixedLoad.updateMany({ where: { id: l.mixedLoadId, customerId, status: 'DRAFT' }, data: { status: 'ORDERED', orderId: created.id } });
+                    if (r.count === 0) throw new ConflictException({ code: 'LOAD_ALREADY_ORDERED', message: 'A mixed load in your cart has already been ordered.' });
+                }
+                return created;
+            });
+        } catch (e: any) {
+            // Concurrent duplicate submit with the same key → return the winner.
+            if (key && e?.code === 'P2002') {
+                const existing = await this.prisma.order.findUnique({ where: { idempotencyKey: key }, include: { items: true, history: true, customer: { select: { email: true, name: true } } } });
+                if (existing && existing.customerId === customerId) return existing;
+            }
+            throw e;
+        }
+        const supplierIdsFromQuote = [...new Set(quote.lines.map((l) => l.supplierId).filter(Boolean))] as string[];
 
         // Send Customer Confirmation Email (payment bypassed as per client request)
         if (order.customer?.email) {
@@ -227,11 +264,8 @@ export class OrdersService {
         }
 
         // Notify each supplier
-        const supplierIds = [...new Set(
-            order.items
-                .map((item: any) => item.product?.supplierId)
-                .filter(Boolean)
-        )];
+        // Suppliers come from the server-priced lines (order items don't include product).
+        const supplierIds = supplierIdsFromQuote;
         for (const supplierId of supplierIds) {
             this.notificationsService.create(
                 supplierId as string,
