@@ -28,6 +28,16 @@ const fmtDate = (s?: string | null) => {
     const d = new Date(s);
     return isNaN(d.getTime()) ? s : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 };
+/** Dispatch line from real product data only: ready stock, or the longest supplier lead time. */
+function dispatchStrip(rows: { leadTime?: number | null; readyForDispatch?: boolean; exwLocation?: string | null }[]) {
+    if (!rows.length) return undefined;
+    const lead = Math.max(0, ...rows.filter((r) => !r.readyForDispatch).map((r) => Number(r.leadTime) || 0));
+    const allReady = rows.every((r) => r.readyForDispatch);
+    const unknown = rows.some((r) => !r.readyForDispatch && !r.leadTime);
+    const left = allReady ? 'Ready for dispatch' : unknown ? null : `Dispatch lead time up to ${lead} days`;
+    const locs = Array.from(new Set(rows.map((r) => r.exwLocation).filter(Boolean))) as string[];
+    return { left, right: locs.length === 1 ? `Ships from ${locs[0]}` : null };
+}
 const UNAVAILABLE = new Set(['PRODUCT_NOT_FOUND', 'PRODUCT_NOT_AVAILABLE', 'LOAD_NOT_FOUND', 'LOAD_ALREADY_ORDERED']);
 
 function Stepper({ value, onChange, min = 1, max, unit, disabled }: { value: number; onChange: (n: number) => void; min?: number; max?: number; unit: string; disabled?: boolean }) {
@@ -101,14 +111,20 @@ function LineRow(props: {
 }
 
 /** Order card shell: header (type · destination · status), optional progress, lines, suggestions, footer. */
-function OrderCard({ icon, title, destination, status, progress, children, suggestions, total, totalNote, action, error }: {
-    icon: React.ReactNode; title: string; destination?: string | null;
+function OrderCard({ icon, title, destination, status, progress, children, suggestions, total, totalNote, action, error, strip }: {
+    icon: React.ReactNode; title: string; destination?: string | null; strip?: { left?: string | null; right?: string | null };
     status: { tone: 'ok' | 'warn' | 'err'; label: string };
     progress?: { label: React.ReactNode; right?: React.ReactNode; value: number; ok: boolean };
     children: React.ReactNode; suggestions?: React.ReactNode; total: string; totalNote?: string; action: React.ReactNode; error?: string | null;
 }) {
     return (
         <section className="rounded-2xl ring-1 ring-line bg-surface overflow-hidden">
+            {strip && (strip.left || strip.right) && (
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-5 py-2.5 bg-surface-2 border-b border-line text-[13.5px] text-ink-2">
+                    {strip.left && <span className="inline-flex items-center gap-2"><Truck size={15} className="text-ink-3" />{strip.left}</span>}
+                    {strip.right && <span className="inline-flex items-center gap-2"><MapPin size={14} className="text-ink-3" />{strip.right}</span>}
+                </div>
+            )}
             <div className="px-5 pt-4 pb-3.5 border-b border-line">
                 <div className="flex items-center gap-2 text-[14.5px]">
                     <span className="text-ink-3">{icon}</span>
@@ -277,6 +293,7 @@ export default function CartPage() {
                         {singles.length > 0 && (
                             <OrderCard
                                 icon={<Package size={16} />}
+                                strip={dispatchStrip(singles.map((i) => lineFor(i)?.info).filter(Boolean) as any)}
                                 title="Standard order"
                                 destination={destination}
                                 status={quoteState === 'auth' ? { tone: 'warn', label: 'Sign in to price' } : standardReady ? { tone: 'ok', label: 'Ready' } : quoteState === 'loading' ? { tone: 'warn', label: 'Pricing…' } : { tone: standardErrors.some((q) => UNAVAILABLE.has(q!.error!.code)) ? 'err' : 'warn', label: standardErrors.some((q) => q!.error!.code === 'BELOW_MOQ') ? 'Below minimum' : 'Needs attention' }}
@@ -341,6 +358,7 @@ export default function CartPage() {
                                     key={load.id}
                                     icon={load.kind === 'TRUCK' ? <Truck size={16} /> : <Layers size={16} />}
                                     title={loadLabel(load.kind)}
+                                    strip={dispatchStrip(lines.map((l) => load.products[l.productId]).filter(Boolean) as any)}
                                     destination={destination}
                                     status={load.error ? { tone: 'err', label: 'Unavailable' } : q?.ready ? { tone: 'ok', label: 'Ready' } : { tone: 'warn', label: 'Below minimum' }}
                                     progress={q ? {

@@ -157,7 +157,7 @@ export class OrdersService {
                     continue;
                 }
                 const priced = priceLine(p, tier, Number(raw.quantity), markups, { raw: !!p.supplierId && p.supplierId === customerId });
-                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null } });
+                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null, leadTime: (p as any).leadTime ?? null, readyForDispatch: !!(p as any).readyForDispatch, exwLocation: p.exwLocation ?? null } });
             } catch (e) {
                 // Cart view: flag the line and keep pricing the rest. Orders stay strict.
                 if (opts.lenient && e instanceof PricingError) {

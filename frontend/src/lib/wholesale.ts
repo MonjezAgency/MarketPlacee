@@ -51,7 +51,7 @@ export const toServerItem = (i: CartItem) => ({
 export interface QuoteLine {
     productId: string | null; mixedLoadId: string | null; tier: Tier; quantity: number; price: number; lineTotal: number;
     perCase: number | null; casesTotal: number | null; unitsTotal: number | null; minUnits: number | null;
-    info: { ean: string | null; unitsPerCase: number | null; shelfLife: string | null } | null;
+    info: { ean: string | null; unitsPerCase: number | null; shelfLife: string | null; leadTime?: number | null; readyForDispatch?: boolean; exwLocation?: string | null } | null;
     error: { code: string; message: string; minUnits?: number } | null;
 }
 export interface CartQuote { subtotal: number; discountPercent: number; discount: number; coupon: string | null; total: number; lines: QuoteLine[]; ready: boolean }
@@ -68,7 +68,7 @@ export interface MixedLoadQuote {
 }
 export interface MixedLoad {
     id: string; kind: LoadKind; status: string; version: number; supplierId: string | null;
-    products: Record<string, { id: string; name: string; brand: string | null; ean: string | null; image: string | null; unitsPerCase: number | null; casesPerPallet: number | null; palletsPerShipment: number | null }>;
+    products: Record<string, { id: string; name: string; brand: string | null; ean: string | null; image: string | null; unitsPerCase: number | null; casesPerPallet: number | null; palletsPerShipment: number | null; leadTime?: number | null; readyForDispatch?: boolean; exwLocation?: string | null }>;
     quote?: MixedLoadQuote; error?: { code?: string; message: string }; ready?: boolean;
 }
 
