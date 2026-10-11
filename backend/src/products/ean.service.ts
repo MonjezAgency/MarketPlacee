@@ -188,14 +188,39 @@ export class EanService {
             // confidently show the same product (brand + packaging + title).
             let images = candidates;
             let confidence = 0.7; // Default if AI is skipped
+            let imagesVerified = !!opts.skipAiValidation;
             if (!opts.skipAiValidation) {
                 const validation = await this.validator.validateImages(candidates, {
                     ean: cleanEan,
                     title: apiTitle || title,
                     brand: apiBrand || opts.brand,
                 });
-                images = validation.accepted.map(r => r.url);
+                // Put the highest-confidence catalog image first. Every image
+                // that survives validation already passed the white-background
+                // and product-match gate; preserve the rest for the gallery.
+                images = validation.accepted
+                    .sort((a, b) => b.confidence - a.confidence)
+                    .slice(0, count)
+                    .map(r => r.url);
+                imagesVerified = images.length > 0;
                 confidence = validation.aggregateConfidence;
+
+                // If the validator is unavailable (missing key, timeout, or
+                // malformed response), do not make a verified claim — but do
+                // keep the EAN-linked OFF front/packaging candidates available.
+                // OFF has already returned the requested EAN and matching title;
+                // Bing/scraped candidates remain blocked because they can be
+                // unrelated. This prevents the product from losing its image
+                // solely because the optional AI service is down.
+                const validatorUnavailable = validation.accepted.length === 0 &&
+                    validation.rejected.length > 0 &&
+                    validation.rejected.every(r => /disabled|error|failed|timeout/i.test(r.reason || ''));
+                if (images.length === 0 && validatorUnavailable && candidates.length > 0) {
+                    images = candidates.slice(0, count);
+                    imagesVerified = false;
+                    confidence = 0.6;
+                    this.logger.warn(`AI validator unavailable for EAN ${cleanEan}; using only EAN-linked OFF candidates as unverified catalog images`);
+                }
 
                 // If AI rejected everything from OFF, try the Bing fallback —
                 // OFF images are crowdsourced phone photos, often on real
@@ -263,10 +288,11 @@ export class EanService {
                 ean: cleanEan,
                 title: apiTitle || title || '',
                 images,
-                matched: true,
+                matched: imagesVerified,
                 source: 'openfoodfacts',
                 cached: false,
                 confidence_score: confidence,
+                reason: imagesVerified ? undefined : 'Image is linked to the requested EAN but was not AI-verified; review the background before publishing.',
             };
             this.cache.set(cleanEan, title, count, result);
             return result;

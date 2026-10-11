@@ -1,8 +1,13 @@
-/** Unit tests: `npm test` (ts-jest, no database needed). */
+/** @type {import('jest').Config} */
 module.exports = {
-    moduleFileExtensions: ['js', 'json', 'ts'],
-    rootDir: 'src',
-    testRegex: '.*\\.spec\\.ts$',
-    transform: { '^.+\\.(t|j)s$': 'ts-jest' },
-    testEnvironment: 'node',
+  rootDir: '.',
+  testEnvironment: 'node',
+  moduleFileExtensions: ['js', 'json', 'ts'],
+  testRegex: '.*\\.spec\\.ts$',
+  transform: {
+    '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
+  },
+  moduleNameMapper: {
+    '^src/(.*)$': '<rootDir>/src/$1',
+  },
 };

@@ -895,6 +895,36 @@ export default function AdminAddProductWorkspace() {
                                         ))}
                                     </div>
                                 )}
+                                {bulkReport.results?.filter((r: any) => r.success && r.data).length > 0 && (
+                                    <div className="space-y-2">
+                                        <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest">Imported Products — Name and details captured from Excel</p>
+                                        <div className="overflow-x-auto rounded-xl border border-emerald-100">
+                                            <table className="w-full text-left text-xs">
+                                                <thead className="bg-emerald-50 text-emerald-800">
+                                                    <tr>
+                                                        <th className="px-3 py-2 font-bold">Row</th>
+                                                        <th className="px-3 py-2 font-bold">Product Name</th>
+                                                        <th className="px-3 py-2 font-bold">Description</th>
+                                                        <th className="px-3 py-2 font-bold">Price</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {bulkReport.results.filter((r: any) => r.success && r.data).slice(0, 10).map((r: any, i: number) => (
+                                                        <tr key={i} className="border-t border-emerald-50 align-top">
+                                                            <td className="px-3 py-2 text-slate-500">{r.rowNumber}</td>
+                                                            <td className="px-3 py-2 font-bold text-slate-900 min-w-[180px]">{r.data.name || '—'}</td>
+                                                            <td className="px-3 py-2 text-slate-600 min-w-[260px]">{r.data.description || '—'}</td>
+                                                            <td className="px-3 py-2 font-semibold text-slate-900">{r.data.price ?? '—'}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        {bulkReport.successCount > 10 && (
+                                            <p className="text-[11px] text-slate-500">Showing the first 10 of {bulkReport.successCount} imported products. Open the catalog to view the full list.</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 

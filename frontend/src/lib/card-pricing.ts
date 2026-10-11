@@ -5,7 +5,7 @@ export type DefaultUnit = 'truck' | 'pallet' | 'carton';
 
 export const DEFAULT_MARKUPS: Markups = { piece: 1.10, pallet: 1.05, container: 1.02 };
 
-const apiBase = () => process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+const apiBase = () => process.env.NEXT_PUBLIC_API_URL || '/api';
 
 // ── Module-level singletons: fetch admin config once across all card instances ─
 let _defaultUnit: DefaultUnit | null = null;

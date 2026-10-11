@@ -18,7 +18,7 @@ export async function POST(req: Request) {
         const cookieStore = cookies();
         const token = cookieStore.get('token')?.value;
 
-        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app';
+        const rawApiUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '';
         const apiUrl = rawApiUrl.replace(/\/$/, '');
         const backendUrl = `${apiUrl}/payments/create-intent`;
 

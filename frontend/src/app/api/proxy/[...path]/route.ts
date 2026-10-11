@@ -18,7 +18,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth-options";
 
 const getBackendUrl = () =>
-  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-backend-production-539c.up.railway.app').trim().replace(/\/+$/, '');
+  (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '').trim().replace(/\/+$/, '');
 
 const PUBLIC_PATHS = [
   'auth/login',

@@ -57,7 +57,7 @@ export default function ContactPage() {
         e.preventDefault();
         setLoading(true);
         try {
-            const apiBase = process.env.NEXT_PUBLIC_API_URL || 'https://marketplace-production-a2b5.up.railway.app';
+            const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
             const res = await fetch(`${apiBase}/contact`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
