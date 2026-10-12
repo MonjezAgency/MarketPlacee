@@ -24,43 +24,50 @@ export function mixIneligibility(p: Product, kind: LoadKind): string | null {
     return miss.length ? `Missing ${miss.join(', ')}` : null;
 }
 
-/** Compact card matching the "More in …" related-product cards, plus an explicit Select toggle. */
-function MixCard({ p, variant, label, kind, sel, markups, badge }: {
-    p: Product; variant: string | null; label: string | null; kind: LoadKind; sel: MixSelection; markups: Markups; badge?: string;
+/**
+ * Compact selection row (same family as the flavour chips): round image,
+ * name, and a +/✓ toggle inside one rounded container. Nothing here links
+ * away — the whole row selects/deselects this exact product or variant.
+ */
+function MixRow({ p, variant, label, kind, sel, badge }: {
+    p: Product; variant: string | null; label: string | null; kind: LoadKind; sel: MixSelection; markups?: Markups; badge?: string;
 }) {
     const reason = mixIneligibility(p, kind);
     const on = sel.has(pickKey(p.id, variant));
     const img = p.images?.[0] || p.image;
-    const price = computeCardPrice(p, markups, false);
+    const toggle = () => { if (!reason) sel.toggle({ productId: p.id, variant, name: p.name, label, image: img }); };
     return (
-        <div className={cn('snap-start shrink-0 w-[172px] sm:w-[188px] flex flex-col rounded-xl ring-1 bg-surface p-2.5 transition-shadow', on ? 'ring-2 ring-[#2EC4B6]' : 'ring-line hover:ring-line-strong')}>
-            {/* Viewing = link to the product; selecting = the button below. */}
-            <Link href={`/products/${p.id}`} className="group block" draggable={false}>
-                <span className="relative block aspect-square rounded-lg bg-media overflow-hidden">
-                    {img
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={img} alt={p.name} loading="lazy" draggable={false} className="absolute inset-0 m-auto max-w-[80%] max-h-[80%] object-contain mix-blend-multiply" />
-                        : <span className="absolute inset-0 flex items-center justify-center text-ink-4"><Package size={26} strokeWidth={1.3} /></span>}
-                    {badge && <span className="absolute top-1.5 start-1.5 h-5 px-1.5 rounded-md bg-surface/90 ring-1 ring-line text-[10.5px] font-semibold text-ink-2 flex items-center">{badge}</span>}
-                    {on && <span className="absolute top-1.5 end-1.5 w-5 h-5 rounded-full bg-[#0E7C74] text-white flex items-center justify-center"><Check size={12} /></span>}
-                </span>
-                {p.brand && <span className="mt-2 block text-[12px] font-semibold text-ink-2 truncate">{p.brand}</span>}
-                <span className="block text-[13px] leading-snug text-ink line-clamp-2 min-h-[2.5em] group-hover:text-teal">{p.name}</span>
-                {label && <span className="block text-[12px] font-medium text-teal truncate">{label}</span>}
-                {p.ean && <span className="block mt-0.5 text-[11.5px] text-ink-4 tabular-nums">{p.ean}</span>}
-                <span className="block mt-1 text-[12.5px] text-ink-3">{price > 0 ? <><span className="font-semibold text-ink tabular-nums">{formatPrice(price)}</span> / case</> : 'Price on request'}</span>
-            </Link>
-            <button
-                type="button"
-                disabled={!!reason}
-                aria-pressed={on}
-                title={reason ?? undefined}
-                onClick={() => sel.toggle({ productId: p.id, variant, name: p.name, label, image: img })}
-                className={cn('mt-2 h-8 rounded-lg text-[12.5px] font-semibold inline-flex items-center justify-center gap-1.5 transition-colors disabled:opacity-45 disabled:cursor-not-allowed',
-                    on ? 'bg-teal-soft text-teal ring-1 ring-[#2EC4B6]' : 'ring-1 ring-line-strong text-ink hover:ring-ink')}
+        <div
+            role="button"
+            tabIndex={reason ? -1 : 0}
+            aria-pressed={on}
+            aria-disabled={!!reason}
+            title={reason ?? (on ? 'Selected — click to remove' : 'Click to add to your mix')}
+            onClick={toggle}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
+            className={cn(
+                'shrink-0 w-[248px] flex items-center gap-2.5 rounded-full ps-1.5 pe-1.5 py-1.5 ring-1 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]',
+                reason ? 'opacity-50 cursor-not-allowed ring-line' : 'cursor-pointer',
+                on ? 'ring-[#2EC4B6] bg-teal-soft/60' : !reason && 'ring-line hover:ring-line-strong hover:bg-surface-2',
+            )}
+        >
+            <span className="relative w-10 h-10 shrink-0 rounded-full bg-media ring-1 ring-line overflow-hidden">
+                {img
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={img} alt="" draggable={false} loading="lazy" className="absolute inset-0 m-auto max-w-[78%] max-h-[78%] object-contain mix-blend-multiply" />
+                    : <span className="absolute inset-0 flex items-center justify-center text-ink-4"><Package size={15} /></span>}
+            </span>
+            <span className="min-w-0 flex-1 leading-tight">
+                <span className="block text-[13px] font-medium text-ink truncate">{label ?? p.name}</span>
+                <span className="block text-[11.5px] text-ink-3 truncate">{badge ?? (label ? p.name : reason ?? p.brand ?? '')}</span>
+            </span>
+            <span
+                aria-hidden
+                className={cn('w-8 h-8 shrink-0 rounded-full flex items-center justify-center transition-colors',
+                    on ? 'bg-[#0E7C74] text-white' : 'ring-1 ring-line-strong text-ink-2')}
             >
-                {on ? <><Check size={13} /> Selected</> : reason ? 'Not available' : <><Plus size={13} /> Select</>}
-            </button>
+                {on ? <Check size={15} strokeWidth={2.5} /> : <Plus size={15} />}
+            </span>
         </div>
     );
 }
@@ -76,6 +83,10 @@ export default function MixDiscovery({ product, sel, markups, onViewAll }: {
     const kind = sel.kind!;
     const [family, setFamily] = React.useState<Product[] | null>(null);
     const [others, setOthers] = React.useState<Product[] | null>(null);
+    // What to browse is the buyer's explicit choice; switching never touches the selection.
+    const [browse, setBrowse] = React.useState<'flavours' | 'others' | 'both' | null>(null);
+    const showFlavours = browse === 'flavours' || browse === 'both';
+    const showOthers = browse === 'others' || browse === 'both';
 
     // Real catalog data: same brand (flavours sold as separate SKUs) and other products.
     React.useEffect(() => {
@@ -102,34 +113,49 @@ export default function MixDiscovery({ product, sel, markups, onViewAll }: {
 
     return (
         <div className="mt-4 rounded-2xl ring-1 ring-line bg-surface p-4 sm:p-5 space-y-6" aria-label={`${loadLabel(kind)} builder`}>
+            {/* Explicit choice of what to browse */}
+            <div>
+                <p className="text-[13px] font-semibold text-ink">What would you like to add?</p>
+                <div role="radiogroup" aria-label="Browse" className="mt-2 flex flex-wrap gap-2">
+                    {([['flavours', ownVariants.length ? 'Flavours / variants' : `Flavours${product.brand ? ` · ${product.brand}` : ''}`], ['others', 'Other products'], ['both', 'Both']] as const).map(([k, l]) => (
+                        <button key={k} type="button" role="radio" aria-checked={browse === k} onClick={() => setBrowse(k)}
+                            className={cn('h-9 px-4 rounded-full text-[13px] font-medium transition-colors',
+                                browse === k ? 'bg-[#0E7C74] text-white' : 'ring-1 ring-line-strong text-ink hover:ring-ink')}>
+                            {l}
+                        </button>
+                    ))}
+                </div>
+            </div>
+
             {/* Flavours / variants */}
-            <ProductRail
-                title={ownVariants.length ? 'Choose flavours' : product.brand ? `More from ${product.brand}` : 'This product'}
+            {showFlavours && <ProductRail arrows={false} snap={false}
+                title={ownVariants.length ? 'Flavours' : product.brand ? `More from ${product.brand}` : 'This product'}
                 subtitle={ownVariants.length ? 'Each flavour is a separate line in your mix.' : product.brand ? 'Other flavours and sizes in this range.' : undefined}
+                viewAll={{ label: 'View all', onClick: onViewAll }}
             >
                 {ownVariants.length
-                    ? ownVariants.map((v) => <MixCard key={v.sig} p={product} variant={v.sig} label={v.label} kind={kind} sel={sel} markups={markups} />)
-                    : <MixCard p={product} variant={null} label={null} kind={kind} sel={sel} markups={markups} badge="This product" />}
+                    ? ownVariants.map((v) => <MixRow key={v.sig} p={product} variant={v.sig} label={v.label} kind={kind} sel={sel} markups={markups} />)
+                    : <MixRow p={product} variant={null} label={null} kind={kind} sel={sel} markups={markups} badge="This product" />}
                 {(family ?? []).map((p) => {
                     const vs = variantSignatures(p.variants);
                     return vs.length
-                        ? vs.map((v) => <MixCard key={p.id + v.sig} p={p} variant={v.sig} label={v.label} kind={kind} sel={sel} markups={markups} />)
-                        : <MixCard key={p.id} p={p} variant={null} label={null} kind={kind} sel={sel} markups={markups} />;
+                        ? vs.map((v) => <MixRow key={p.id + v.sig} p={p} variant={v.sig} label={v.label} kind={kind} sel={sel} markups={markups} />)
+                        : <MixRow key={p.id} p={p} variant={null} label={null} kind={kind} sel={sel} markups={markups} />;
                 })}
-                {family === null && <p className="py-8 text-[13px] text-ink-4">Loading…</p>}
-            </ProductRail>
+                {family === null && <p className="py-3 text-[13px] text-ink-4">Loading…</p>}
+            </ProductRail>}
 
             {/* Other products */}
-            <ProductRail title="Add other products" subtitle="From across the catalog." viewAll={{ label: 'View all', onClick: onViewAll }}>
+            {showOthers && <ProductRail arrows={false} snap={false} title="Other products" subtitle="From across the catalog." viewAll={{ label: 'View all', onClick: onViewAll }}>
                 {otherList.map((p) => {
                     const vs = variantSignatures(p.variants);
                     return vs.length
-                        ? vs.map((v) => <MixCard key={p.id + v.sig} p={p} variant={v.sig} label={v.label} kind={kind} sel={sel} markups={markups} />)
-                        : <MixCard key={p.id} p={p} variant={null} label={null} kind={kind} sel={sel} markups={markups} />;
+                        ? vs.map((v) => <MixRow key={p.id + v.sig} p={p} variant={v.sig} label={v.label} kind={kind} sel={sel} markups={markups} />)
+                        : <MixRow key={p.id} p={p} variant={null} label={null} kind={kind} sel={sel} markups={markups} />;
                 })}
-                {others === null && <p className="py-8 text-[13px] text-ink-4">Loading…</p>}
-                {others !== null && otherList.length === 0 && <p className="py-8 text-[13px] text-ink-3">No other products yet — use View all to search the catalog.</p>}
-            </ProductRail>
+                {others === null && <p className="py-3 text-[13px] text-ink-4">Loading…</p>}
+                {others !== null && otherList.length === 0 && <p className="py-3 text-[13px] text-ink-3">No other products yet — use View all to search the catalog.</p>}
+            </ProductRail>}
 
             {/* Pending selection + confirm */}
             {sel.created ? (

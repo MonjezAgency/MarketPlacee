@@ -9,12 +9,17 @@ import { cn } from '@/lib/utils';
  * (disabled at each end), native trackpad / touch scrolling, mouse drag,
  * and an optional "View all" action. Vertical page scrolling is untouched.
  */
-export function ProductRail({ title, subtitle, viewAll, children, className }: {
+export function ProductRail({ title, subtitle, viewAll, children, className, arrows = true, snap = true, trackClassName }: {
     title: React.ReactNode;
     subtitle?: React.ReactNode;
     viewAll?: { label?: string; onClick?: () => void; href?: string };
     children: React.ReactNode;
     className?: string;
+    /** Show left/right buttons (default). Off = trackpad, touch and drag only. */
+    arrows?: boolean;
+    /** Snap cards into place (default). Off = free, smooth scrolling. */
+    snap?: boolean;
+    trackClassName?: string;
 }) {
     const ref = React.useRef<HTMLDivElement>(null);
     const [edges, setEdges] = React.useState({ start: true, end: true });
@@ -68,10 +73,15 @@ export function ProductRail({ title, subtitle, viewAll, children, className }: {
                     {viewAll && (viewAll.href
                         ? <a href={viewAll.href} className="text-[13px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? 'View all'}</a>
                         : <button type="button" onClick={viewAll.onClick} className="text-[13px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? 'View all'}</button>)}
-                    <button type="button" aria-label="Scroll left" onClick={() => page(-1)} disabled={edges.start} className={arrow}><ChevronLeft size={16} /></button>
-                    <button type="button" aria-label="Scroll right" onClick={() => page(1)} disabled={edges.end} className={arrow}><ChevronRight size={16} /></button>
+                    {arrows && <>
+                        <button type="button" aria-label="Scroll left" onClick={() => page(-1)} disabled={edges.start} className={arrow}><ChevronLeft size={16} /></button>
+                        <button type="button" aria-label="Scroll right" onClick={() => page(1)} disabled={edges.end} className={arrow}><ChevronRight size={16} /></button>
+                    </>}
                 </div>
             </div>
+            <div className="relative">
+            {!arrows && !edges.start && <span aria-hidden className="pointer-events-none absolute inset-y-0 start-0 w-8 bg-gradient-to-r from-surface to-transparent z-10" />}
+            {!arrows && !edges.end && <span aria-hidden className="pointer-events-none absolute inset-y-0 end-0 w-10 bg-gradient-to-l from-surface to-transparent z-10" />}
             <div
                 ref={ref}
                 onScroll={update}
@@ -80,10 +90,11 @@ export function ProductRail({ title, subtitle, viewAll, children, className }: {
                 onPointerUp={endDrag}
                 onPointerLeave={endDrag}
                 onClickCapture={onClickCapture}
-                className={cn('flex gap-3 overflow-x-auto scrollbar-hide snap-x snap-mandatory overscroll-x-contain select-none pb-1')}
+                className={cn('flex gap-3 overflow-x-auto overscroll-x-contain select-none pb-1', snap ? 'snap-x snap-mandatory scrollbar-hide' : 'mix-rail-scroll', trackClassName)}
                 style={{ scrollPaddingInline: 2 }}
             >
                 {children}
+            </div>
             </div>
         </section>
     );

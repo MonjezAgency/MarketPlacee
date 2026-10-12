@@ -475,3 +475,9 @@ html.dark .shadow-2xl { box-shadow: 0 25px 60px rgba(0,0,0,0.5) !important; }
     color-scheme: dark;
 }
 
+
+/* Free-scrolling discovery rails: a thin, quiet scrollbar keeps horizontal scrolling discoverable. */
+.mix-rail-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--atl-line-strong)) transparent; }
+.mix-rail-scroll::-webkit-scrollbar { height: 6px; }
+.mix-rail-scroll::-webkit-scrollbar-thumb { background: rgb(var(--atl-line-strong)); border-radius: 999px; }
+.mix-rail-scroll::-webkit-scrollbar-track { background: transparent; }
