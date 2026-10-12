@@ -8,22 +8,12 @@ import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { COUNTRIES } from '@/lib/countries';
 import { cn } from '@/lib/utils';
-import { AuthShell, authInput, authLabel, authPrimary, authSecondary, FieldError, FormAlert, PasswordChecklist, passwordOk } from '@/components/auth/AuthShell';
+import { BUSINESS_TYPES } from '@/lib/business-types';
+import { AuthShell, AuthSelect, authInput, authLabel, authPrimary, authSecondary, FieldError, FormAlert, PasswordChecklist, passwordOk } from '@/components/auth/AuthShell';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const STEPS = ['Account', 'Business', 'Review'] as const;
 
-/** Self-declared wholesale profile — informs the team's review, verifies nothing. */
-const BUSINESS_TYPES = [
-    'Wholesaler / distributor',
-    'Importer / exporter',
-    'Retail chain or supermarket group',
-    'Cash & carry',
-    'Food service / HoReCa supply',
-    'Brand owner / manufacturer',
-    'Trading company',
-    'Other',
-];
 
 type Form = {
     name: string; email: string; password: string; confirm: string;
@@ -103,12 +93,13 @@ function RegisterWizard() {
     const countryName = f.country;
     return (
         <AuthShell wide>
-            <div className="rounded-2xl bg-surface ring-1 ring-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-5 sm:p-8">
-                <h1 className="text-[22px] font-semibold text-heading">Create your business account</h1>
-                <p className="mt-1 text-[14px] text-ink-3">For wholesalers, distributors and high-volume buyers. Already registered? <Link href="/auth/login" className="font-semibold text-teal hover:underline">Sign in</Link></p>
+            <div className="rounded-2xl bg-surface ring-1 ring-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-5 sm:p-7">
+                <h1 className="text-[22px] leading-tight font-semibold text-heading">Create your business account</h1>
+                <p className="mt-1 text-[14px] text-ink-3">For wholesalers, distributors, importers and bulk traders.</p>
+                <p className="text-[13.5px] text-ink-3">Already registered? <Link href="/auth/login" className="font-semibold text-teal hover:underline">Sign in</Link></p>
 
                 {/* Progress: 1 → 2 → 3 */}
-                <ol className="mt-6 flex items-center" aria-label="Registration progress">
+                <ol className="mt-5 flex items-center" aria-label="Registration progress">
                     {STEPS.map((label, i) => {
                         const isDone = done.includes(i) && i < step || (i < step);
                         const current = i === step;
@@ -129,12 +120,12 @@ function RegisterWizard() {
                     })}
                 </ol>
 
-                <form className="mt-6" noValidate onSubmit={(e) => { e.preventDefault(); step < 2 ? next() : submit(); }}>
+                <form className="mt-5" noValidate onSubmit={(e) => { e.preventDefault(); step < 2 ? next() : submit(); }}>
                     <h2 ref={heading} tabIndex={-1} className="text-[16px] font-semibold text-heading outline-none">
                         {step === 0 ? 'Account basics' : step === 1 ? 'Business profile' : 'Review and create'}
                     </h2>
 
-                    <div key={step} className="mt-4 space-y-4 motion-safe:animate-[atl-toast-in_200ms_ease-out]">
+                    <div key={step} className="mt-3.5 space-y-3.5 motion-safe:animate-[atl-toast-in_200ms_ease-out]">
                         {step === 0 && (<>
                             <div>
                                 <label htmlFor="f-name" className={authLabel}>Full name</label>
@@ -168,7 +159,7 @@ function RegisterWizard() {
                             <fieldset>
                                 <legend className={authLabel}>Account type</legend>
                                 <div id="f-role" tabIndex={-1} role="radiogroup" aria-describedby="e-role" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 outline-none">
-                                    {([['customer', 'Buyer', 'Purchase by case, pallet or truckload', ShoppingCart], ['supplier', 'Supplier', 'List products and supply Atlantis', Warehouse]] as const).map(([v, t, d, Icon]) => (
+                                    {([['customer', 'Buyer', 'Source by the pallet or truckload', ShoppingCart], ['supplier', 'Supplier', 'List stock and offers for Atlantis', Warehouse]] as const).map(([v, t, d, Icon]) => (
                                         <label key={v} className={cn('flex items-start gap-3 rounded-xl px-3.5 py-3 ring-1 cursor-pointer transition-colors', f.role === v ? 'ring-2 ring-[#2EC4B6] bg-teal-soft/60' : 'ring-line hover:ring-line-strong')}>
                                             <input type="radio" name="role" value={v} checked={f.role === v} onChange={() => set('role', v)} aria-label={`${t} — ${d}`} className="sr-only" />
                                             <span className={cn('w-9 h-9 shrink-0 rounded-lg flex items-center justify-center', f.role === v ? 'bg-[#0E7C74] text-white' : 'bg-surface-2 text-ink-2')}><Icon size={17} /></span>
@@ -178,7 +169,7 @@ function RegisterWizard() {
                                 </div>
                                 <FieldError id="e-role">{errors.role}</FieldError>
                             </fieldset>
-                            <div className="grid sm:grid-cols-2 gap-4">
+                            <div className="grid sm:grid-cols-2 gap-x-4 gap-y-3.5">
                                 <div>
                                     <label htmlFor="f-companyName" className={authLabel}>Company name</label>
                                     <input id="f-companyName" value={f.companyName} onChange={(e) => set('companyName', e.target.value)} autoComplete="organization" className={authInput} aria-invalid={!!errors.companyName} aria-describedby="e-companyName" />
@@ -186,41 +177,39 @@ function RegisterWizard() {
                                 </div>
                                 <div>
                                     <label htmlFor="f-businessType" className={authLabel}>Business type</label>
-                                    <select id="f-businessType" value={f.businessType} onChange={(e) => set('businessType', e.target.value)} className={authInput} aria-invalid={!!errors.businessType} aria-describedby="e-businessType">
+                                    <AuthSelect id="f-businessType" value={f.businessType} onChange={(e) => set('businessType', e.target.value)} aria-invalid={!!errors.businessType} aria-describedby="e-businessType">
                                         <option value="">Select…</option>
                                         {BUSINESS_TYPES.map((b) => <option key={b} value={b}>{b}</option>)}
-                                    </select>
+                                    </AuthSelect>
                                     <FieldError id="e-businessType">{errors.businessType}</FieldError>
                                 </div>
-                            </div>
-                            <div>
-                                <label htmlFor="f-phone" className={authLabel}>Business phone</label>
-                                <div className="flex gap-2">
-                                    <select aria-label="Country code" value={f.phoneCode} onChange={(e) => set('phoneCode', e.target.value)} className={cn(authInput, 'w-[112px] shrink-0 px-2')}>
-                                        {COUNTRIES.map((c) => <option key={c.iso} value={c.dialCode}>{c.flag} {c.dialCode}</option>)}
-                                    </select>
-                                    <input id="f-phone" type="tel" inputMode="tel" value={f.phone} onChange={(e) => set('phone', e.target.value)} autoComplete="tel-national" placeholder="712 345 678" className={authInput} aria-invalid={!!errors.phone} aria-describedby="e-phone" />
-                                </div>
-                                <FieldError id="e-phone">{errors.phone}</FieldError>
-                            </div>
-                            <div className="grid sm:grid-cols-2 gap-4">
                                 <div>
                                     <label htmlFor="f-country" className={authLabel}>Country</label>
-                                    <select id="f-country" value={f.country} onChange={(e) => { const c = COUNTRIES.find((x) => x.name === e.target.value); set('country', e.target.value); if (c && !f.phone) set('phoneCode', c.dialCode); }} autoComplete="country-name" className={authInput} aria-invalid={!!errors.country} aria-describedby="e-country">
+                                    <AuthSelect id="f-country" value={f.country} onChange={(e) => { const c = COUNTRIES.find((x) => x.name === e.target.value); set('country', e.target.value); if (c && !f.phone) set('phoneCode', c.dialCode); }} autoComplete="country-name" aria-invalid={!!errors.country} aria-describedby="e-country">
                                         <option value="">Select…</option>
                                         {COUNTRIES.map((c) => <option key={c.iso} value={c.name}>{c.name}</option>)}
-                                    </select>
+                                    </AuthSelect>
                                     <FieldError id="e-country">{errors.country}</FieldError>
                                 </div>
                                 <div>
-                                    <label htmlFor="f-city" className={authLabel}>City / business location <span className="font-normal text-ink-4">(optional)</span></label>
-                                    <input id="f-city" value={f.city} onChange={(e) => set('city', e.target.value)} autoComplete="address-level2" className={authInput} />
+                                    <label htmlFor="f-city" className={authLabel}>City <span className="font-normal text-ink-4">(optional)</span></label>
+                                    <input id="f-city" value={f.city} onChange={(e) => set('city', e.target.value)} autoComplete="address-level2" placeholder="e.g. Rotterdam" className={authInput} />
                                 </div>
-                            </div>
-                            <div>
-                                <label htmlFor="f-website" className={authLabel}>Company website <span className="font-normal text-ink-4">(optional)</span></label>
-                                <input id="f-website" value={f.website} onChange={(e) => set('website', e.target.value)} autoComplete="url" placeholder="company.com" className={authInput} aria-invalid={!!errors.website} aria-describedby="e-website" />
-                                <FieldError id="e-website">{errors.website}</FieldError>
+                                <div>
+                                    <label htmlFor="f-phone" className={authLabel}>Business phone</label>
+                                    <div className="flex gap-2">
+                                        <AuthSelect aria-label="Country calling code" value={f.phoneCode} onChange={(e) => set('phoneCode', e.target.value)} className="w-[104px] shrink-0">
+                                            {Array.from(new Map(COUNTRIES.map((c) => [c.dialCode, c])).values()).map((c) => <option key={c.dialCode} value={c.dialCode}>{c.flag} {c.dialCode}</option>)}
+                                        </AuthSelect>
+                                        <input id="f-phone" type="tel" inputMode="tel" value={f.phone} onChange={(e) => set('phone', e.target.value)} autoComplete="tel-national" placeholder="712 345 678" className={cn(authInput, 'min-w-0')} aria-invalid={!!errors.phone} aria-describedby="e-phone" />
+                                    </div>
+                                    <FieldError id="e-phone">{errors.phone}</FieldError>
+                                </div>
+                                <div>
+                                    <label htmlFor="f-website" className={authLabel}>Website <span className="font-normal text-ink-4">(optional)</span></label>
+                                    <input id="f-website" value={f.website} onChange={(e) => set('website', e.target.value)} autoComplete="url" placeholder="company.com" className={authInput} aria-invalid={!!errors.website} aria-describedby="e-website" />
+                                    <FieldError id="e-website">{errors.website}</FieldError>
+                                </div>
                             </div>
                         </>)}
 

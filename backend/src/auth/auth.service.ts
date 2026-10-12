@@ -721,6 +721,11 @@ export class AuthService {
                 country: true,
                 emailVerified: true,
                 pendingEmail: true,
+                website: true,
+                businessType: true,
+                businessCity: true,
+                kycStatus: true,
+                createdAt: true,
             } as any,
         });
         if (!user) throw new UnauthorizedException('User not found');

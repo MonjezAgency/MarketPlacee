@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, Package, RotateCcw, Sparkles, AlertTriangle } from 'lucide-react';
 import ProductCard from '@/components/product/ProductCard';
 import { ProductRail } from '@/components/product/ProductRail';
-import { fetchProductPage } from '@/lib/api';
+import { fetchProductPage, apiFetch } from '@/lib/api';
 import type { Product } from '@/lib/types';
 import { formatPrice } from '@/lib/currency';
 import { fetchMyOrders, purchasedProducts, orderStatus, orderRef, supplierCount, TONE_CLASS, type BuyerOrder } from '@/lib/buyer-orders';
@@ -16,9 +16,11 @@ export default function BuyerOverview() {
     const [orders, setOrders] = React.useState<BuyerOrder[] | null>(null);
     const [ordersErr, setOrdersErr] = React.useState(false);
     const [catalog, setCatalog] = React.useState<Product[] | null>(null);
+    const [preferred, setPreferred] = React.useState<string[]>([]);
 
     React.useEffect(() => {
         fetchMyOrders(100).then((r) => setOrders(r.data ?? [])).catch(() => { setOrders([]); setOrdersErr(true); });
+        apiFetch('/users/me/brand-preferences').then((r) => (r.ok ? r.json() : null)).then((b) => setPreferred(b?.brands ?? [])).catch(() => undefined);
         fetchProductPage({ limit: 40, sort: 'newest' }).then((r) => setCatalog(r.items)).catch(() => setCatalog([]));
     }, []);
 
@@ -28,7 +30,12 @@ export default function BuyerOverview() {
     // "Bought before" uses the live catalog record when it is still listed, so prices are current.
     const boughtLive = bought.map((b) => byId.get(b.productId)).filter(Boolean) as Product[];
     const frequent = bought.filter((b) => b.orders >= 2);
-    const discover = (catalog ?? []).filter((p) => !boughtIds.has(p.id)).slice(0, 16);
+    // Newest first, with the buyer's preferred brands (Settings → Brand preferences) moved to the front.
+    const pref = new Set(preferred.map((b) => b.trim().toLowerCase()));
+    const discover = (catalog ?? []).filter((p) => !boughtIds.has(p.id))
+        .map((p, i) => ({ p, i, hit: pref.has(String(p.brand || '').trim().toLowerCase()) }))
+        .sort((a, b) => Number(b.hit) - Number(a.hit) || a.i - b.i)
+        .map((x) => x.p).slice(0, 16);
     const recent = (orders ?? []).slice(0, 4);
 
     return (
@@ -76,7 +83,7 @@ export default function BuyerOverview() {
             <section aria-labelledby="ov-new">
                 <div className="mb-3">
                     <h2 id="ov-new" className="text-[17px] font-semibold text-heading flex items-center gap-2"><Sparkles size={17} className="text-teal" /> New to you</h2>
-                    <p className="text-[13px] text-ink-3">Recently listed products you haven’t ordered yet.</p>
+                    <p className="text-[13px] text-ink-3">Recently listed products you haven’t ordered yet{preferred.length ? ' — your preferred brands first' : ''}.</p>
                 </div>
                 {catalog === null ? <SkeletonRow /> : discover.length === 0 ? (
                     <Empty icon={<Sparkles size={20} />} title="You’ve seen it all" text="Nothing new since your last order." action={<Link href="/categories?sort=newest" className="text-[13.5px] font-semibold text-teal hover:underline">See new offers</Link>} />

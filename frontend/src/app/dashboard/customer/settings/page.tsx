@@ -9,8 +9,8 @@ import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { ChangeEmailCard } from '@/components/account/ChangeEmailCard';
+import { CompanyDetailsCard, BrandPreferencesCard, VerificationCard } from '@/components/account/AccountCards';
 
-const PHONE_RE = /^\+?\d{8,15}$/;
 const STRONG_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
 
 const input = 'w-full h-11 px-3.5 rounded-xl ring-1 ring-line bg-surface text-[14px] text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6] placeholder:text-ink-4 disabled:bg-surface-2 disabled:text-ink-3';
@@ -42,25 +42,21 @@ export default function SettingsPage() {
 
     // ── Profile ────────────────────────────────────────────────
     const [name, setName] = React.useState('');
-    const [phone, setPhone] = React.useState('');
-    const [country, setCountry] = React.useState('');
     const [avatar, setAvatar] = React.useState<string | null>(null);
     const [saving, setSaving] = React.useState(false);
     const [uploading, setUploading] = React.useState(false);
     const [profileMsg, setProfileMsg] = React.useState<{ ok: boolean; text: string } | null>(null);
     const fileRef = React.useRef<HTMLInputElement>(null);
     React.useEffect(() => {
-        setName(user?.name || ''); setPhone(user?.phone || ''); setCountry(user?.country || ''); setAvatar(user?.avatar || null);
+        setName(user?.name || ''); setAvatar(user?.avatar || null);
     }, [user]);
 
     const saveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
-        const p = phone.replace(/[\s()-]/g, '');
-        if (p && !PHONE_RE.test(p)) { setProfileMsg({ ok: false, text: 'Phone must be 8–15 digits, optionally starting with +.' }); return; }
         if (!name.trim()) { setProfileMsg({ ok: false, text: 'Name is required.' }); return; }
         setSaving(true); setProfileMsg(null);
         try {
-            const res = await apiFetch('/users/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), phone: p || null, country: country.trim() || null }) });
+            const res = await apiFetch('/users/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim() }) });
             if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || 'Could not save your profile.');
             setProfileMsg({ ok: true, text: 'Profile saved.' });
             refreshUser?.();
@@ -121,7 +117,8 @@ export default function SettingsPage() {
 
     return (
         <div className="grid gap-5 lg:grid-cols-2 items-start">
-            <Card icon={<Building2 size={17} />} title="Profile" desc="How Atlantis and suppliers see your business.">
+          <div className="space-y-5 min-w-0">
+            <Card icon={<Building2 size={17} />} title="Profile" desc="Your name and photo.">
                 <form onSubmit={saveProfile} className="space-y-4">
                     <div className="flex items-center gap-4">
                         <span className="relative w-16 h-16 rounded-2xl bg-surface-2 ring-1 ring-line overflow-clip flex items-center justify-center text-[22px] font-semibold text-heading">
@@ -141,20 +138,19 @@ export default function SettingsPage() {
                     <div className="grid sm:grid-cols-2 gap-4">
                         <div><label htmlFor="s-name" className={label}>Name</label><input id="s-name" value={name} onChange={(e) => setName(e.target.value)} className={input} autoComplete="name" /></div>
                         <div><label htmlFor="s-email" className={label}>Email</label><input id="s-email" value={user?.email || ''} disabled className={input} title="Change it in the Sign-in email section" /></div>
-                        <div><label htmlFor="s-phone" className={label}>Phone</label><input id="s-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+40 712 345 678" className={input} autoComplete="tel" inputMode="tel" /></div>
-                        <div><label htmlFor="s-country" className={label}>Country</label><input id="s-country" value={country} onChange={(e) => setCountry(e.target.value)} maxLength={60} placeholder="e.g. Romania" className={input} autoComplete="country-name" /></div>
-                        <div><label htmlFor="s-company" className={label}>Company</label><input id="s-company" value={user?.companyName || ''} disabled className={input} /></div>
-                        <div><label htmlFor="s-vat" className={label}>VAT number</label><input id="s-vat" value={user?.vatNumber || ''} disabled placeholder="—" className={input} /></div>
                     </div>
-                    <p className="text-[12px] text-ink-3">Company and VAT details are verified, so changes go through Atlantis — <a className="text-teal font-semibold hover:underline" href="mailto:Info@atlantisfmcg.com?subject=Update%20company%20details">email us</a>.</p>
                     <div className="flex items-center justify-between gap-3 pt-1">
                         <Status s={profileMsg} />
                         <button type="submit" disabled={saving} className="ms-auto h-10 px-5 inline-flex items-center gap-2 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold disabled:opacity-50">{saving && <Loader2 size={14} className="animate-spin" />} Save profile</button>
                     </div>
                 </form>
             </Card>
+            <CompanyDetailsCard />
+            <BrandPreferencesCard role="buyer" />
+          </div>
 
-            <div className="space-y-5">
+            <div className="space-y-5 min-w-0">
+                <VerificationCard />
                 <ChangeEmailCard currentEmail={user?.email || ''} pendingEmail={user?.pendingEmail} onChanged={() => refreshUser?.()} />
 
                 <Card icon={<KeyRound size={17} />} title="Password">

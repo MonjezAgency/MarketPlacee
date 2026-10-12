@@ -91,7 +91,7 @@ function VerifyEmail() {
             <AuthShell>
                 <div className="rounded-2xl bg-surface ring-1 ring-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-6 sm:p-8 motion-safe:animate-[atl-toast-in_220ms_ease-out]">
                     <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><CheckCircle2 size={24} /></span>
-                    <h1 className="mt-5 text-[22px] font-semibold text-heading">Email verified</h1>
+                    <h1 className="mt-5 text-[22px] leading-tight font-semibold text-heading">Email verified</h1>
                     <p className="mt-2 text-[14.5px] text-ink-2">Thanks — your email is confirmed. Our team now reviews new {verified.role === 'SUPPLIER' ? 'supplier' : 'business'} accounts; we’ll email you once yours is approved.</p>
                     <p className="mt-2 text-[13.5px] text-ink-3">You can sign in now to check your status.</p>
                     <div className="mt-6 flex flex-col sm:flex-row gap-2">
@@ -107,7 +107,7 @@ function VerifyEmail() {
         <AuthShell>
             <div className="rounded-2xl bg-surface ring-1 ring-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-6 sm:p-8">
                 <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><MailCheck size={23} /></span>
-                <h1 className="mt-5 text-[22px] font-semibold text-heading">Check your inbox</h1>
+                <h1 className="mt-5 text-[22px] leading-tight font-semibold text-heading">Check your inbox</h1>
                 <p className="mt-1.5 text-[14px] text-ink-3">Enter the 6-digit code we emailed you. Can’t find it? Check spam or promotions.</p>
 
                 <form className="mt-6 space-y-4" onSubmit={submit} noValidate>

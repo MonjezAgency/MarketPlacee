@@ -1,4 +1,5 @@
-import { Controller, Get, UseGuards, Post, Patch, Param, Body, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Request, Res, StreamableFile, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Get, UseGuards, Post, Patch, Param, Body, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Request, Res, StreamableFile, UploadedFile, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { cleanProfile, cleanBrands, ProfileFieldError } from './profile-fields';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { PrismaService } from '../common/prisma.service';
@@ -34,36 +35,31 @@ export class UsersController {
      */
     @Patch('me')
     @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
-    async updateMe(
-        @Request() req,
-        @Body() body: { name?: string; phone?: string | null; companyDescription?: string | null; country?: string | null },
-    ) {
-        const data: any = {};
-        if (typeof body.name === 'string') data.name = body.name.trim();
-        if (body.phone !== undefined) {
-            if (body.phone === null || body.phone === '') {
-                data.phone = null;
-            } else {
-                const stripped = String(body.phone).replace(/[\s()-]/g, '');
-                if (!PHONE_RE.test(stripped)) {
-                    throw new BadRequestException('Invalid phone — must be 8-15 digits with optional + prefix');
-                }
-                data.phone = stripped;
-            }
-        }
-        if (body.companyDescription !== undefined) {
-            data.companyDescription = body.companyDescription || null;
-        }
-        if (body.country !== undefined) {
-            const c = String(body.country ?? '').trim().replace(/\s+/g, ' ');
-            if (c.length > 60) throw new BadRequestException('Country name is too long');
-            data.country = c || null;
-        }
-        const updated = await this.prisma.user.update({
-            where: { id: req.user.sub },
-            data,
-        });
+    async updateMe(@Request() req, @Body() body: Record<string, unknown>) {
+        const updated = await this.prisma.user.update({ where: { id: req.user.sub }, data: this.profileData(body) as any });
         return plainToInstance(UserDto, updated);
+    }
+
+    /** Whitelisted self-service fields only; turns validation problems into 400s. */
+    private profileData(body: Record<string, unknown>) {
+        try { return cleanProfile(body || {}); }
+        catch (e) { if (e instanceof ProfileFieldError) throw new BadRequestException(e.message); throw e; }
+    }
+
+    @Get('me/brand-preferences')
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
+    async getBrandPrefs(@Request() req) {
+        const u = await this.prisma.user.findUnique({ where: { id: req.user.sub }, select: { preferredBrands: true } as any });
+        return { brands: ((u as any)?.preferredBrands as string[]) ?? [] };
+    }
+
+    @Patch('me/brand-preferences')
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
+    async setBrandPrefs(@Request() req, @Body('brands') brands: unknown) {
+        let clean: string[];
+        try { clean = cleanBrands(brands); } catch (e) { if (e instanceof ProfileFieldError) throw new BadRequestException(e.message); throw e; }
+        await this.prisma.user.update({ where: { id: req.user.sub }, data: { preferredBrands: clean } as any });
+        return { brands: clean };
     }
 
     /**
@@ -200,10 +196,16 @@ export class UsersController {
         return { message: `Successfully deleted ${result.deleted} users`, ...result };
     }
 
+    /**
+     * Legacy self-update used by the settings pages. Previously accepted ANY
+     * user id and ANY field (role, status, email, password…). Now: own account
+     * only, whitelisted profile fields only.
+     */
     @Post(':id')
-    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER) // Everyone can update their profile
-    async updateProfile(@Param('id') id: string, @Body() data: any) {
-        const user = await this.usersService.updateProfile(id, data);
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.OWNER)
+    async updateProfile(@Param('id') id: string, @Body() data: Record<string, unknown>, @Request() req) {
+        if (id !== req.user.sub) throw new ForbiddenException('You can only update your own profile.');
+        const user = await this.prisma.user.update({ where: { id }, data: this.profileData(data) as any });
         return plainToInstance(UserDto, user);
     }
 

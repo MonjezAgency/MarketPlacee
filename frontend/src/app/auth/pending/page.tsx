@@ -12,7 +12,7 @@ export default function PendingPage() {
         <AuthShell>
             <div className="rounded-2xl bg-surface ring-1 ring-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-6 sm:p-8">
                 <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><Clock3 size={23} /></span>
-                <h1 className="mt-4 text-[22px] font-semibold text-heading">{rejected ? 'Account not active' : 'Your account is being reviewed'}</h1>
+                <h1 className="mt-4 text-[22px] leading-tight font-semibold text-heading">{rejected ? 'Account not active' : 'Your account is being reviewed'}</h1>
                 <p className="mt-2 text-[14.5px] text-ink-2">
                     {rejected
                         ? 'This account can’t trade on Atlantis right now. Contact us if you think this is a mistake.'

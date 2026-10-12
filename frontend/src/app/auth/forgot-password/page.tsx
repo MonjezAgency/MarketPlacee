@@ -34,12 +34,12 @@ export default function ForgotPasswordPage() {
                 <Link href="/auth/login" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-3 hover:text-ink"><ArrowLeft size={14} /> Back to sign in</Link>
                 {sent ? (<>
                     <span className="mt-4 w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><MailCheck size={23} /></span>
-                    <h1 className="mt-4 text-[22px] font-semibold text-heading">Check your email</h1>
+                    <h1 className="mt-4 text-[22px] leading-tight font-semibold text-heading">Check your email</h1>
                     <p className="mt-2 text-[14.5px] text-ink-2">If an Atlantis account uses <strong className="text-ink">{email.trim()}</strong>, we’ve sent a link to reset the password. It works once and expires in 60 minutes.</p>
                     <p className="mt-2 text-[13.5px] text-ink-3">Nothing arrived after a few minutes? Check spam, or <button type="button" onClick={() => setSent(false)} className="font-semibold text-teal hover:underline">try again</button>.</p>
                 </>) : (<>
                     <span className="mt-4 w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><KeyRound size={22} /></span>
-                    <h1 className="mt-4 text-[22px] font-semibold text-heading">Reset your password</h1>
+                    <h1 className="mt-4 text-[22px] leading-tight font-semibold text-heading">Reset your password</h1>
                     <p className="mt-1 text-[14px] text-ink-3">Enter your account email and we’ll send you a reset link.</p>
                     <form className="mt-6 space-y-4" onSubmit={submit} noValidate>
                         <div>

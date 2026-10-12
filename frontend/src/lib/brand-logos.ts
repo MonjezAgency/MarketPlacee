@@ -20,3 +20,6 @@ export function brandLogo(brand?: string | null): string | null {
     const k = brand.trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[’`]/g, "'");
     return LOGOS[k] ?? null;
 }
+
+/** Display names for brands that have a genuine logo in /public/brands. */
+export const LOGO_BRANDS = ['Coca-Cola', 'Nescafé', 'Ferrero Rocher', 'NIVEA', 'Red Bull', 'Nutella', 'Persil', 'Pepsi', 'Lavazza', 'Snickers', 'Dove', 'Kinder', 'Domestos', "M&M's", 'Oreo', 'Sprite', 'Jacobs', 'Comfort', 'Twix', 'Starbucks', 'Tchibo', 'Dr Pepper', 'Cif', "Wall's", 'Wonka'];

@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Boxes, ShieldCheck, Truck, Layers } from 'lucide-react';
+import { Boxes, ShieldCheck, Layers, Sparkles, ListChecks, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /** Atlantis wordmark exactly as the storefront header renders it. */
@@ -16,11 +16,13 @@ export function AtlantisMark({ className }: { className?: string }) {
     );
 }
 
+/** Only capabilities that exist in the marketplace today. */
 const POINTS = [
-    { icon: Layers, title: 'Case, pallet and truckload pricing', text: 'Wholesale tiers built for volume buyers.' },
-    { icon: Boxes, title: 'Mixed pallets and truckloads', text: 'Combine products that ship from the same site.' },
-    { icon: Truck, title: 'Sold and shipped by Atlantis', text: 'One counterparty across Europe and the Gulf.' },
-    { icon: ShieldCheck, title: 'Reviewed business accounts', text: 'Every new account is checked by our team before trading.' },
+    { icon: Layers, title: 'Priced by case, pallet and truckload', text: 'Each listing shows the tier price and the pack sizes behind it.' },
+    { icon: Boxes, title: 'Mixed pallets and truckloads', text: 'Combine lines into one load when they ship from the same site.' },
+    { icon: Sparkles, title: 'New supplier offers', text: 'Filter offers listed today, this week or this month.' },
+    { icon: ListChecks, title: 'Lists and reorders', text: 'Keep regular lines in lists and reorder at current prices.' },
+    { icon: ShieldCheck, title: 'Reviewed trading accounts', text: 'Our team reviews every account before it can trade.' },
 ];
 
 /**
@@ -38,8 +40,8 @@ export function AuthShell({ children, wide = false }: { children: React.ReactNod
                 </Link>
                 <div className="max-w-[420px]">
                     <p className="text-[13px] font-medium text-[#2EC4B6]">Wholesale FMCG · Europe &amp; Gulf</p>
-                    <h2 className="mt-2 text-[28px] xl:text-[32px] leading-tight font-semibold">Bulk buying, without the back-and-forth.</h2>
-                    <ul className="mt-8 space-y-5">
+                    <h2 className="mt-2 text-[26px] xl:text-[30px] leading-tight font-semibold">Wholesale sourcing for volume traders.</h2>
+                    <ul className="mt-7 space-y-4">
                         {POINTS.map(({ icon: Icon, title, text }) => (
                             <li key={title} className="flex gap-3">
                                 <span className="w-9 h-9 shrink-0 rounded-xl bg-white/10 text-[#2EC4B6] flex items-center justify-center"><Icon size={17} /></span>
@@ -63,6 +65,19 @@ export const authInput = 'w-full h-11 px-3.5 rounded-xl ring-1 ring-line bg-surf
 export const authLabel = 'block text-[13px] font-medium text-ink-2 mb-1.5';
 export const authPrimary = 'w-full h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14.5px] font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed';
 export const authSecondary = 'h-11 px-4 inline-flex items-center justify-center gap-2 rounded-xl ring-1 ring-line-strong text-[14.5px] font-semibold text-ink hover:bg-surface-2 transition-colors disabled:opacity-60';
+
+/**
+ * Native select with a consistent chevron, padding and height (the platform
+ * arrow differs per browser and clipped long options).
+ */
+export function AuthSelect({ className, children, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+    return (
+        <span className={cn('relative block', className)}>
+            <select {...props} className={cn(authInput, 'appearance-none pe-9 truncate cursor-pointer')}>{children}</select>
+            <ChevronDown aria-hidden size={16} className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-ink-3" />
+        </span>
+    );
+}
 
 export function FieldError({ id, children }: { id: string; children?: React.ReactNode }) {
     if (!children) return null;

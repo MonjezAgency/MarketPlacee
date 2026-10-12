@@ -74,7 +74,7 @@ function Login() {
         <AuthShell>
             <div className="rounded-2xl bg-surface ring-1 ring-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-6 sm:p-8">
                 {step === 1 ? (<>
-                    <h1 className="text-[22px] font-semibold text-heading">Sign in</h1>
+                    <h1 className="text-[22px] leading-tight font-semibold text-heading">Sign in</h1>
                     <p className="mt-1 text-[14px] text-ink-3">Welcome back. Sign in to see wholesale prices and order.</p>
                     <form className="mt-6 space-y-4" onSubmit={submit} noValidate>
                         <div>
@@ -105,7 +105,7 @@ function Login() {
                 </>) : (<>
                     <button type="button" onClick={() => { setStep(1); setError(''); setCode2fa(''); setPartialToken(''); setQrCodeUrl(null); }} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-3 hover:text-ink"><ArrowLeft size={14} /> Back</button>
                     <span className="mt-4 w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><KeyRound size={22} /></span>
-                    <h1 className="mt-4 text-[22px] font-semibold text-heading">Two-step verification</h1>
+                    <h1 className="mt-4 text-[22px] leading-tight font-semibold text-heading">Two-step verification</h1>
                     <p className="mt-1 text-[14px] text-ink-3">Enter the 6-digit code from your authenticator app.</p>
                     {qrCodeUrl && (
                         <div className="mt-4 flex flex-col items-center gap-2 rounded-xl ring-1 ring-line p-4">

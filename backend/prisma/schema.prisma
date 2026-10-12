@@ -119,6 +119,8 @@ model User {
   /// Wholesale profile collected at sign-up (optional, self-declared, not verified).
   businessType              String?
   businessCity              String?
+  /// Brands the account trades (buyer: buys, supplier: supplies). Self-declared.
+  preferredBrands           String[] @default([])
 
   // Business & Financial Fields
   vatNumber   String? @unique

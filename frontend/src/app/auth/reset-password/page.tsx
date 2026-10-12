@@ -48,19 +48,19 @@ function Reset() {
                 {state === 'checking' && <p className="flex items-center gap-2 text-[14px] text-ink-3"><Loader2 size={16} className="animate-spin" /> Checking your link…</p>}
                 {state === 'invalid' && (<>
                     <span className="w-12 h-12 rounded-2xl bg-[#FFFBEB] dark:bg-amber-500/10 text-[#B45309] flex items-center justify-center"><AlertTriangle size={22} /></span>
-                    <h1 className="mt-4 text-[22px] font-semibold text-heading">This link has expired or was already used</h1>
+                    <h1 className="mt-4 text-[22px] leading-tight font-semibold text-heading">This link has expired or was already used</h1>
                     <p className="mt-2 text-[14.5px] text-ink-2">Reset links work once and expire after 60 minutes. Request a new one to continue.</p>
                     <Link href="/auth/forgot-password" className={cn(authPrimary, 'mt-6')}>Request a new link</Link>
                 </>)}
                 {state === 'done' && (<>
                     <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><CheckCircle2 size={24} /></span>
-                    <h1 className="mt-4 text-[22px] font-semibold text-heading">Password updated</h1>
+                    <h1 className="mt-4 text-[22px] leading-tight font-semibold text-heading">Password updated</h1>
                     <p className="mt-2 text-[14.5px] text-ink-2">Sign in with your new password. For your security, other devices were signed out.</p>
                     <Link href="/auth/login" className={cn(authPrimary, 'mt-6')}>Sign in</Link>
                 </>)}
                 {state === 'form' && (<>
                     <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><LockKeyhole size={22} /></span>
-                    <h1 className="mt-4 text-[22px] font-semibold text-heading">Choose a new password</h1>
+                    <h1 className="mt-4 text-[22px] leading-tight font-semibold text-heading">Choose a new password</h1>
                     <form className="mt-6 space-y-4" onSubmit={submit} noValidate>
                         <div>
                             <label htmlFor="rp-pw" className={authLabel}>New password</label>

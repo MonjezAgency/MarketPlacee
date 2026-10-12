@@ -24,7 +24,7 @@ function ConfirmationContent() {
         <main className="min-h-[70vh] bg-surface flex items-center justify-center px-4 py-12 text-start">
             <div className="w-full max-w-[520px] rounded-2xl ring-1 ring-line bg-surface shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-6 sm:p-8">
                 <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><CheckCircle2 size={24} /></span>
-                <h1 className="mt-5 text-[22px] font-semibold text-heading">Order received</h1>
+                <h1 className="mt-5 text-[22px] leading-tight font-semibold text-heading">Order received</h1>
                 <p className="mt-1.5 text-[14px] text-ink-2">
                     Reference <span className="font-semibold text-ink tabular-nums">{orderRef(orderId)}</span>. Atlantis will confirm quantities and availability with the supplier before dispatch; you’ll see each update in Orders &amp; tracking.
                 </p>
