@@ -27,6 +27,7 @@ import { ChatModule } from './chat/chat.module';
 import { KycModule } from './kyc/kyc.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WishlistModule } from './wishlist/wishlist.module';
+import { ListsModule } from './lists/lists.module';
 import { PaymentsModule } from './payments/payments.module';
 import { DisputesModule } from './disputes/disputes.module';
 import { OwnerModule } from './owner/owner.module';
@@ -60,6 +61,7 @@ import { EmailTrackingModule } from './email-tracking/email-tracking.module';
         KycModule,
         NotificationsModule,
         WishlistModule,
+        ListsModule,
         PaymentsModule,
         DisputesModule,
         ShippingModule,

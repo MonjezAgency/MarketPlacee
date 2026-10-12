@@ -79,7 +79,7 @@ export default function WishlistPage() {
             <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-muted-foreground pt-20">
                 <Heart className="w-12 h-12 opacity-20" />
                 <p className="font-bold">{t('wishlist', 'signInRequired')}</p>
-                <Link href="/auth/login" className="text-primary font-black text-sm hover:underline">{t('wishlist', 'signIn')}</Link>
+                <Link href="/auth/login" className="text-primary font-bold text-sm hover:underline">{t('wishlist', 'signIn')}</Link>
             </div>
         );
     }
@@ -93,7 +93,7 @@ export default function WishlistPage() {
                         <ArrowLeft size={18} />
                     </Link>
                     <div>
-                        <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                        <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
                             <Heart size={22} className="text-primary" fill="currentColor" /> {t('wishlist', 'title')}
                         </h1>
                         <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
@@ -104,7 +104,7 @@ export default function WishlistPage() {
                 {items.length > 0 && (
                     <button
                         onClick={() => items.forEach(i => handleAddToCart(i))}
-                        className="h-10 px-5 bg-primary text-white font-black text-xs rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 uppercase tracking-wide"
+                        className="h-10 px-5 bg-primary text-white font-bold text-xs rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 uppercase tracking-wide"
                     >
                         <ShoppingCart size={14} />
                         {t('wishlist', 'addAllToCart')}
@@ -132,11 +132,11 @@ export default function WishlistPage() {
                     className="flex flex-col items-center gap-4 py-24 text-muted-foreground"
                 >
                     <Heart className="w-16 h-16 opacity-10" />
-                    <p className="font-black text-lg">{t('wishlist', 'empty')}</p>
+                    <p className="font-bold text-lg">{t('wishlist', 'empty')}</p>
                     <p className="text-sm">{t('wishlist', 'emptyDesc')}</p>
                     <Link
                         href="/categories"
-                        className="mt-4 h-11 px-6 bg-primary text-white font-black text-xs rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 uppercase tracking-widest"
+                        className="mt-4 h-11 px-6 bg-primary text-white font-bold text-xs rounded-xl hover:bg-primary/90 transition-all flex items-center gap-2 uppercase tracking-widest"
                     >
                         {t('wishlist', 'browseProducts')}
                     </Link>
@@ -171,20 +171,20 @@ export default function WishlistPage() {
                                 {/* Info */}
                                 <div className="p-5 space-y-3">
                                     <div>
-                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">{item.category}</p>
-                                        <Link href={`/products/${item.id}`} className="font-black text-sm hover:text-primary transition-colors line-clamp-2 mt-0.5">
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{item.category}</p>
+                                        <Link href={`/products/${item.id}`} className="font-bold text-sm hover:text-primary transition-colors line-clamp-2 mt-0.5">
                                             {item.name}
                                         </Link>
                                         <p className="text-[11px] text-muted-foreground mt-0.5">Atlantis</p>
                                     </div>
 
-                                    <p className="text-xl font-black text-primary">{formatPrice(item.price, currency)}</p>
+                                    <p className="text-xl font-bold text-primary">{formatPrice(item.price, currency)}</p>
 
                                     <div className="flex gap-2 pt-1">
                                         <button
                                             onClick={() => handleAddToCart(item)}
                                             className={cn(
-                                                'flex-1 h-9 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition-all',
+                                                'flex-1 h-9 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all',
                                                 addedToCart === item.id
                                                     ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                                     : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20'

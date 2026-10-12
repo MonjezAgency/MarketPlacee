@@ -7,6 +7,7 @@ const PRODUCT_PRICING_SELECT = {
     id: true, name: true, price: true, basePrice: true, unitsPerCase: true, casesPerPallet: true,
     palletsPerShipment: true, moq: true, moqUnit: true, status: true, supplierId: true, exwLocation: true,
     variantPrices: true, variants: true, images: true, ean: true, brand: true, shelfLife: true, leadTime: true, readyForDispatch: true, origin: true,
+    warehouse: { select: { id: true, city: true, country: true } },
 } as const;
 
 /** Turn pricing rule violations into 400s the storefront can show verbatim. */
@@ -52,6 +53,7 @@ export class MixedLoadsService {
                 id: p.id, name: p.name, brand: p.brand ?? null, ean: p.ean ?? null, image: p.images?.[0] ?? null,
                 unitsPerCase: p.unitsPerCase ?? null, casesPerPallet: p.casesPerPallet ?? null, palletsPerShipment: p.palletsPerShipment ?? null,
                 leadTime: (p as any).leadTime ?? null, readyForDispatch: !!(p as any).readyForDispatch, exwLocation: p.exwLocation ?? null,
+                dispatch: p.warehouse?.id ? [p.warehouse.city, p.warehouse.country].filter(Boolean).join(', ') || null : (p.exwLocation?.trim() || null),
             }])),
             ...(('error' in (priced as any)) ? { error: (priced as any).error, ready: false } : { quote: priced }),
         };

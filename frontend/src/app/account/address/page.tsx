@@ -148,7 +148,7 @@ export default function AddressPage() {
     return (
         <div className="min-h-screen bg-[#F8FAFC]">
             {/* Page header */}
-            <div className="bg-white border-b border-[#E5E7EB] px-4 sm:px-8 py-4 flex items-center gap-3">
+            <div className="bg-surface border-b border-[#E5E7EB] px-4 sm:px-8 py-4 flex items-center gap-3">
                 <button
                     onClick={() => router.back()}
                     className="w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F1F5F9] transition-colors text-[#64748B] hover:text-[#0F172A]"
@@ -156,7 +156,7 @@ export default function AddressPage() {
                     <ArrowLeft size={18} />
                 </button>
                 <div>
-                    <h1 className="text-[17px] font-black text-[#0F172A]">Delivery Address</h1>
+                    <h1 className="text-[17px] font-bold text-[#0F172A]">Delivery Address</h1>
                     <p className="text-[12px] text-[#64748B]">
                         {user?.name ? `Hi, ${user.name.split(' ')[0]}` : 'Your shipping location'}
                     </p>
@@ -169,7 +169,7 @@ export default function AddressPage() {
                 <button
                     onClick={handleGps}
                     disabled={isGpsLoading}
-                    className="w-full flex items-center gap-4 p-4 bg-white border-2 border-dashed border-[#2EC4B6]/40 hover:border-[#2EC4B6] rounded-2xl transition-all group disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="w-full flex items-center gap-4 p-4 bg-surface border-2 border-dashed border-[#2EC4B6]/40 hover:border-[#2EC4B6] rounded-2xl transition-all group disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                     <span className="w-12 h-12 rounded-full bg-[#CCFBF1] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                         {isGpsLoading
@@ -178,7 +178,7 @@ export default function AddressPage() {
                         }
                     </span>
                     <div className="text-left">
-                        <p className="text-[14px] font-black text-[#0F172A]">
+                        <p className="text-[14px] font-bold text-[#0F172A]">
                             {isGpsLoading ? 'Detecting your location…' : 'Use my current location'}
                         </p>
                         <p className="text-[12px] text-[#64748B] mt-0.5">
@@ -195,7 +195,7 @@ export default function AddressPage() {
                 </div>
 
                 {/* Address form */}
-                <div className="bg-white border border-[#E5E7EB] rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
+                <div className="bg-surface border border-[#E5E7EB] rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {/* Street / Road */}
@@ -269,7 +269,7 @@ export default function AddressPage() {
                 <button
                     onClick={handleSave}
                     disabled={!form.city.trim() || isSaved}
-                    className="w-full h-[52px] rounded-xl text-[14px] font-black uppercase tracking-wider transition-all flex items-center justify-center gap-2
+                    className="w-full h-[52px] rounded-xl text-[14px] font-bold uppercase tracking-wider transition-all flex items-center justify-center gap-2
                         bg-[#2EC4B6] hover:bg-[#0B1F3A] disabled:bg-[#94A3B8] text-white disabled:cursor-not-allowed
                         shadow-md hover:shadow-lg active:scale-[0.98]"
                 >

@@ -433,15 +433,16 @@ export class OrdersService {
                 include: {
                     items: {
                         include: {
-                            product: { select: { id: true, name: true, images: true } },
+                            product: { select: { id: true, name: true, images: true, brand: true, ean: true, supplierId: true } },
                         },
                     },
+                    shipment: { select: { trackingNumber: true, carrier: true, status: true, expectedDelivery: true } },
                 },
                 orderBy: { createdAt: 'desc' },
                 skip,
                 take: limit,
             }),
-            this.prisma.order.count({ where: { customerId } }),
+            this.prisma.order.count({ where: { customerId, deletedByCustomer: false } }),
         ]);
         return { data: orders, total, page, limit, totalPages: Math.ceil(total / limit) };
     }

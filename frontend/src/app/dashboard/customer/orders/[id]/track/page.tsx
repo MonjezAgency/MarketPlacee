@@ -68,15 +68,15 @@ export default function OrderTrackingPage() {
                         >
                             <ArrowLeft size={16} /> Back to Orders
                         </button>
-                        <h1 className="text-3xl font-black text-[#0F172A] tracking-tight">Order Tracking</h1>
+                        <h1 className="text-3xl font-bold text-[#0F172A] tracking-tight">Order Tracking</h1>
                         <p className="text-[#6B7280] text-sm">Track your shipment in real-time across regional hubs.</p>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="text-right hidden sm:block">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order ID</p>
-                            <p className="text-sm font-black text-[#0F172A]">{orderId}</p>
+                            <p className="text-[10px] font-bold text-ink-4 uppercase tracking-widest">Order ID</p>
+                            <p className="text-sm font-bold text-[#0F172A]">{orderId}</p>
                         </div>
-                        <div className="px-4 py-2 bg-[#00BFA6]/10 text-[#00BFA6] rounded-full text-xs font-black uppercase tracking-widest border border-[#00BFA6]/20">
+                        <div className="px-4 py-2 bg-[#00BFA6]/10 text-[#00BFA6] rounded-full text-xs font-bold uppercase tracking-widest border border-[#00BFA6]/20">
                             In Transit
                         </div>
                     </div>
@@ -88,11 +88,11 @@ export default function OrderTrackingPage() {
                     <div className="lg:col-span-8 space-y-8">
                         
                         {/* Status Card */}
-                        <div className="bg-white border border-[#E6EAF0] rounded-[24px] p-8 shadow-sm">
+                        <div className="bg-surface border border-line rounded-[24px] p-8 shadow-sm">
                             <div className="flex items-center justify-between mb-10">
                                 <div>
                                     <h2 className="text-xl font-bold text-[#0F172A]">Current Status</h2>
-                                    <p className="text-sm text-slate-500">Your delivery is on its way to the delivery hub.</p>
+                                    <p className="text-sm text-ink-3">Your delivery is on its way to the delivery hub.</p>
                                 </div>
                                 <div className="w-12 h-12 rounded-2xl bg-teal-50 flex items-center justify-center text-[#00BFA6]">
                                     <Truck size={24} />
@@ -101,7 +101,7 @@ export default function OrderTrackingPage() {
 
                             {/* Progress Bar */}
                             <div className="relative pt-2">
-                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden flex">
+                                <div className="h-2 w-full bg-surface-3 rounded-full overflow-hidden flex">
                                     <motion.div 
                                         initial={{ width: 0 }}
                                         animate={{ width: '60%' }}
@@ -115,8 +115,8 @@ export default function OrderTrackingPage() {
                                             <div className={cn(
                                                 "w-4 h-4 rounded-full border-4 transition-all duration-500",
                                                 step.status === 'completed' ? "bg-[#00BFA6] border-teal-50 scale-125" :
-                                                step.status === 'current' ? "bg-white border-[#00BFA6] scale-150 shadow-lg shadow-teal-500/20" :
-                                                "bg-white border-slate-200"
+                                                step.status === 'current' ? "bg-surface border-[#00BFA6] scale-150 shadow-lg shadow-teal-500/20" :
+                                                "bg-surface border-line"
                                             )} />
                                             <span className={cn(
                                                 "text-[10px] font-bold uppercase tracking-widest text-center max-w-[80px]",
@@ -131,14 +131,14 @@ export default function OrderTrackingPage() {
                         </div>
 
                         {/* Timeline Section */}
-                        <div className="bg-white border border-[#E6EAF0] rounded-[24px] p-8 shadow-sm space-y-8">
+                        <div className="bg-surface border border-line rounded-[24px] p-8 shadow-sm space-y-8">
                             <h2 className="text-lg font-bold text-[#0F172A] flex items-center gap-2">
-                                <Clock size={20} className="text-slate-400" />
+                                <Clock size={20} className="text-ink-4" />
                                 Delivery Timeline
                             </h2>
                             <div className="space-y-0 relative">
                                 {/* Vertical line */}
-                                <div className="absolute left-6 top-8 bottom-8 w-[2px] bg-slate-100" />
+                                <div className="absolute left-6 top-8 bottom-8 w-[2px] bg-surface-3" />
                                 
                                 {timeline.map((item, i) => (
                                     <motion.div 
@@ -150,16 +150,16 @@ export default function OrderTrackingPage() {
                                     >
                                         <div className={cn(
                                             "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 z-10 shadow-sm",
-                                            item.type === 'current' ? "bg-[#0F172A] text-white ring-8 ring-slate-50" : "bg-white border border-slate-100 text-slate-400"
+                                            item.type === 'current' ? "bg-[#0F172A] text-white ring-8 ring-slate-50" : "bg-surface border border-line text-ink-4"
                                         )}>
                                             <item.icon size={20} />
                                         </div>
                                         <div className="space-y-1 pt-1">
                                             <div className="flex items-center gap-3">
                                                 <h4 className="text-sm font-bold text-[#0F172A]">{item.title}</h4>
-                                                <span className="text-[11px] font-medium text-slate-400">{item.time}</span>
+                                                <span className="text-[11px] font-medium text-ink-4">{item.time}</span>
                                             </div>
-                                            <p className="text-sm text-slate-500 leading-relaxed max-w-xl">{item.desc}</p>
+                                            <p className="text-sm text-ink-3 leading-relaxed max-w-xl">{item.desc}</p>
                                         </div>
                                     </motion.div>
                                 ))}
@@ -167,8 +167,8 @@ export default function OrderTrackingPage() {
                         </div>
 
                         {/* Map Section */}
-                        <div className="bg-white border border-[#E6EAF0] rounded-[24px] overflow-hidden shadow-sm">
-                            <div className="h-[240px] bg-slate-100 relative group cursor-crosshair">
+                        <div className="bg-surface border border-line rounded-[24px] overflow-hidden shadow-sm">
+                            <div className="h-[240px] bg-surface-3 relative group cursor-crosshair">
                                 {/* Simulated Map Grid */}
                                 <div className="absolute inset-0 opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'radial-gradient(#000 1px, transparent 0)', backgroundSize: '24px 24px' }} />
                                 
@@ -181,7 +181,7 @@ export default function OrderTrackingPage() {
                                     >
                                         <div className="w-4 h-4 bg-[#00BFA6] rounded-full border-2 border-white shadow-lg" />
                                     </motion.div>
-                                    <div className="mt-2 bg-white px-3 py-1 rounded-lg shadow-xl border border-slate-100 text-[10px] font-bold text-[#0F172A] uppercase tracking-wider">
+                                    <div className="mt-2 bg-surface px-3 py-1 rounded-lg shadow-xl border border-line text-[10px] font-bold text-[#0F172A] uppercase tracking-wider">
                                         Cairo Distribution Hub
                                     </div>
                                 </div>
@@ -196,7 +196,7 @@ export default function OrderTrackingPage() {
                         <div className="bg-[#0F172A] text-white rounded-[24px] p-8 shadow-xl space-y-8 sticky top-8">
                             <div className="space-y-1">
                                 <h2 className="text-xl font-bold">Order Summary</h2>
-                                <p className="text-slate-400 text-sm">Delivery breakdown and details</p>
+                                <p className="text-ink-4 text-sm">Delivery breakdown and details</p>
                             </div>
 
                             <div className="space-y-4 pt-4 border-t border-white/10">
@@ -206,34 +206,34 @@ export default function OrderTrackingPage() {
                                     </div>
                                     <div>
                                         <p className="text-sm font-bold">Steel Reinforcement Bars</p>
-                                        <p className="text-xs text-slate-400">Qty: 250 Units • 12.5 Tons</p>
+                                        <p className="text-xs text-ink-4">Qty: 250 Units • 12.5 Tons</p>
                                     </div>
                                 </div>
                                 <div className="flex justify-between items-center pt-2">
-                                    <span className="text-xs text-slate-400 font-medium">Total Price</span>
-                                    <span className="text-lg font-black text-[#00BFA6]">$14,500.00</span>
+                                    <span className="text-xs text-ink-4 font-medium">Total Price</span>
+                                    <span className="text-lg font-bold text-[#00BFA6]">$14,500.00</span>
                                 </div>
                             </div>
 
                             <div className="space-y-6 pt-6 border-t border-white/10">
                                 <div className="flex items-start gap-3">
-                                    <Calendar size={18} className="text-slate-400 shrink-0 mt-0.5" />
+                                    <Calendar size={18} className="text-ink-4 shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Delivery ETA</p>
+                                        <p className="text-[10px] font-bold text-ink-4 uppercase tracking-widest">Delivery ETA</p>
                                         <p className="text-sm font-bold">28 April 2024 (by 5:00 PM)</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
-                                    <Truck size={18} className="text-slate-400 shrink-0 mt-0.5" />
+                                    <Truck size={18} className="text-ink-4 shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shipping Method</p>
+                                        <p className="text-[10px] font-bold text-ink-4 uppercase tracking-widest">Shipping Method</p>
                                         <p className="text-sm font-bold">Priority Sea-Freight + Trucking</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
-                                    <Building2 size={18} className="text-slate-400 shrink-0 mt-0.5" />
+                                    <Building2 size={18} className="text-ink-4 shrink-0 mt-0.5" />
                                     <div>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Warehouse Location</p>
+                                        <p className="text-[10px] font-bold text-ink-4 uppercase tracking-widest">Warehouse Location</p>
                                         <p className="text-sm font-bold">Sector 4, Alexandria Port Free Zone</p>
                                     </div>
                                 </div>

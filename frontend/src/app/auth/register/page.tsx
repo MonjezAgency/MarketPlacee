@@ -195,11 +195,11 @@ function RegisterForm() {
         eu => form.country.toLowerCase().includes(eu.toLowerCase())
     );
 
-    const inputClass = "w-full bg-slate-50 border-2 border-slate-50 rounded-[20px] px-6 py-4 text-[#0A1A2F] text-sm font-bold outline-none focus:bg-white focus:border-[#1BC7C9]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300";
-    const labelClass = "text-[10px] font-black uppercase tracking-[0.2em] text-[#0A1A2F]/40 ms-2";
+    const inputClass = "w-full bg-surface-2 border-2 border-slate-50 rounded-[20px] px-6 py-4 text-heading text-sm font-bold outline-none focus:bg-white focus:border-[#1BC7C9]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300";
+    const labelClass = "text-[10px] font-bold uppercase tracking-[0.2em] text-heading/40 ms-2";
 
     return (
-        <div className="force-light min-h-screen bg-white flex overflow-hidden font-sans" style={{ colorScheme: 'light' }}>
+        <div className="force-light min-h-screen bg-surface flex overflow-hidden font-sans" style={{ colorScheme: 'light' }}>
             {/* Left Side: Onboarding Content */}
             <motion.div
                 initial={{ x: -100, opacity: 0 }}
@@ -211,13 +211,13 @@ function RegisterForm() {
 
                 <div className="relative z-10 space-y-12">
                     <Link href="/" className="inline-block mb-12">
-                        <span className="font-heading font-black text-4xl tracking-tighter text-white">
+                        <span className="font-heading font-bold text-4xl tracking-tighter text-white">
                             Atlan<span className="text-[#1BC7C9]">tis</span>
                         </span>
                     </Link>
 
                     <div className="space-y-6">
-                        <h2 className="text-4xl font-black text-white leading-tight">Scale Your <span className="text-[#1BC7C9]">Distribution</span> Globally.</h2>
+                        <h2 className="text-4xl font-bold text-white leading-tight">Scale Your <span className="text-[#1BC7C9]">Distribution</span> Globally.</h2>
                         <p className="text-[#B0B0C8] text-lg font-medium leading-relaxed">Join 500+ verified enterprise partners sourcing premium inventory through our secure B2B framework.</p>
                     </div>
 
@@ -230,7 +230,7 @@ function RegisterForm() {
                             <div key={i} className="flex gap-4">
                                 <div className="w-1.5 h-1.5 rounded-full bg-[#1BC7C9] mt-2.5 shrink-0 shadow-[0_0_10px_#1BC7C9]" />
                                 <div>
-                                    <h4 className="text-white font-black text-xs uppercase tracking-widest mb-1">{item.title}</h4>
+                                    <h4 className="text-white font-bold text-xs uppercase tracking-widest mb-1">{item.title}</h4>
                                     <p className="text-[#6B6B8D] text-sm">{item.desc}</p>
                                 </div>
                             </div>
@@ -245,24 +245,24 @@ function RegisterForm() {
                     initial={{ opacity: 0, y: 40 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6 }}
-                    className="w-full max-w-2xl bg-white p-6 sm:p-0 sm:bg-transparent rounded-2xl sm:rounded-none shadow-sm sm:shadow-none"
+                    className="w-full max-w-2xl bg-surface p-6 sm:p-0 sm:bg-transparent rounded-2xl sm:rounded-none shadow-sm sm:shadow-none"
                 >
                     {isSuccess ? (
                         <div className="flex flex-col items-center text-center py-20 space-y-8">
-                            <div className="w-24 h-24 rounded-[32px] bg-emerald-500 flex items-center justify-center shadow-2xl shadow-emerald-500/20">
+                            <div className="w-24 h-24 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-2xl shadow-emerald-500/20">
                                 <CheckCircle2 size={48} className="text-white" />
                             </div>
                             <div className="space-y-3">
-                                <h1 className="text-4xl font-black text-[#0A1A2F] tracking-tight">Onboarding Initiated.</h1>
+                                <h1 className="text-4xl font-bold text-heading tracking-tight">Onboarding Initiated.</h1>
                                 <p className="text-[#64748B] text-lg font-medium">Your enterprise profile is now under priority review.</p>
                             </div>
-                            <div className="p-10 bg-white border border-slate-100 rounded-[40px] w-full text-start space-y-6 shadow-xl shadow-slate-200/50">
+                            <div className="p-10 bg-surface border border-line rounded-[40px] w-full text-start space-y-6 shadow-xl shadow-slate-200/50">
                                 <div className="flex items-start gap-6">
                                     <div className="w-12 h-12 rounded-2xl bg-[#0A1A2F]/5 flex items-center justify-center shrink-0">
-                                        <ShieldCheck size={24} className="text-[#0A1A2F]" />
+                                        <ShieldCheck size={24} className="text-heading" />
                                     </div>
                                     <div>
-                                        <h4 className="font-black text-xs uppercase tracking-[0.2em] text-[#0A1A2F]">Identity Validation</h4>
+                                        <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-heading">Identity Validation</h4>
                                         <p className="text-sm text-[#64748B] font-medium mt-2 leading-relaxed">Our compliance team is verifying your business credentials and tax documentation.</p>
                                     </div>
                                 </div>
@@ -271,12 +271,12 @@ function RegisterForm() {
                                         <Mail size={24} className="text-[#1BC7C9]" />
                                     </div>
                                     <div>
-                                        <h4 className="font-black text-xs uppercase tracking-[0.2em] text-[#1BC7C9]">Approval Protocol</h4>
+                                        <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-[#1BC7C9]">Approval Protocol</h4>
                                         <p className="text-sm text-[#64748B] font-medium mt-2 leading-relaxed">You will receive an activation encrypted link once the review phase is completed.</p>
                                     </div>
                                 </div>
                             </div>
-                            <Link href="/" className="h-16 px-12 bg-[#0A1A2F] text-white text-xs font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-[#162a44] transition-all flex items-center shadow-xl">
+                            <Link href="/" className="h-16 px-12 bg-[#0A1A2F] text-white text-xs font-bold uppercase tracking-[0.3em] rounded-2xl hover:bg-[#162a44] transition-all flex items-center shadow-xl">
                                 Return to Atlantis
                             </Link>
                         </div>
@@ -285,9 +285,9 @@ function RegisterForm() {
                             <div className="mb-8 md:mb-12">
                                 <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
                                     <div className="h-1 w-12 bg-[#1BC7C9] rounded-full" />
-                                    <span className="text-[10px] md:text-[11px] font-black uppercase tracking-[0.3em] text-[#1BC7C9]">Onboarding Flow</span>
+                                    <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.3em] text-[#1BC7C9]">Onboarding Flow</span>
                                 </div>
-                                <h1 className="text-3xl md:text-4xl font-black text-[#0A1A2F] tracking-tight text-center md:text-start">Register Business.</h1>
+                                <h1 className="text-3xl md:text-4xl font-bold text-heading tracking-tight text-center md:text-start">Register Business.</h1>
                                 <p className="text-[#64748B] text-sm md:text-base font-medium mt-2 text-center md:text-start">Professional onboarding for verified B2B partners.</p>
                             </div>
 
@@ -356,10 +356,10 @@ function RegisterForm() {
                                 </div>
 
                                 {/* Business Identity & Tax */}
-                                <div className="space-y-6 pt-6 border-t border-slate-100">
+                                <div className="space-y-6 pt-6 border-t border-line">
                                     <div className="flex items-center justify-between">
-                                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#0A1A2F]">Business Identity & Tax</h3>
-                                        <div className="flex items-center gap-2 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-100">
+                                        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-heading">Business Identity & Tax</h3>
+                                        <div className="flex items-center gap-2 bg-surface-2 px-3 py-1.5 rounded-full border border-line">
                                             <input
                                                 type="checkbox"
                                                 id="noTaxId"
@@ -376,7 +376,7 @@ function RegisterForm() {
                                                 }}
                                                 className="w-4 h-4 rounded border-slate-300 text-[#1BC7C9] focus:ring-[#1BC7C9]"
                                             />
-                                            <label htmlFor="noTaxId" className="text-[9px] font-black uppercase tracking-widest text-slate-400 cursor-pointer select-none">
+                                            <label htmlFor="noTaxId" className="text-[9px] font-bold uppercase tracking-widest text-ink-4 cursor-pointer select-none">
                                                 No Tax ID / VAT
                                             </label>
                                         </div>
@@ -435,20 +435,20 @@ function RegisterForm() {
                                                     Verified: {viesInfo.name}
                                                 </p>
                                             )}
-                                            <p className="text-[9px] text-slate-400 font-medium ms-2">
-                                                Real-time validation via <Link href="https://ec.europa.eu/taxation_customs/vies/#/vat-validation" target="_blank" className="underline hover:text-[#0A1A2F]">EU VIES</Link>
+                                            <p className="text-[9px] text-ink-4 font-medium ms-2">
+                                                Real-time validation via <Link href="https://ec.europa.eu/taxation_customs/vies/#/vat-validation" target="_blank" className="underline hover:text-heading">EU VIES</Link>
                                             </p>
                                         </div>
                                     )}
 
                                     {form.taxId === 'NOT_APPLICABLE' && (
-                                        <div className="p-6 bg-slate-50 border-2 border-dashed border-slate-100 rounded-[32px] flex items-center gap-4 animate-in fade-in zoom-in-95">
-                                            <div className="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center shrink-0 shadow-sm">
+                                        <div className="p-6 bg-surface-2 border-2 border-dashed border-line rounded-2xl flex items-center gap-4 animate-in fade-in zoom-in-95">
+                                            <div className="w-12 h-12 rounded-2xl bg-surface border border-line flex items-center justify-center shrink-0 shadow-sm">
                                                 <Tag className="text-[#1BC7C9] w-6 h-6" />
                                             </div>
                                             <div>
-                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-[#0A1A2F]">Personal Account Mode</h4>
-                                                <p className="text-xs text-slate-400 font-medium mt-1">Tax identification skipped. Suitable for individuals or non-VAT entities.</p>
+                                                <h4 className="text-[10px] font-bold uppercase tracking-widest text-heading">Personal Account Mode</h4>
+                                                <p className="text-xs text-ink-4 font-medium mt-1">Tax identification skipped. Suitable for individuals or non-VAT entities.</p>
                                             </div>
                                         </div>
                                     )}
@@ -456,8 +456,8 @@ function RegisterForm() {
 
                                 {/* Financial Details */}
                                 {form.taxId !== 'NOT_APPLICABLE' && (
-                                    <div className="space-y-6 pt-6 border-t border-slate-100 animate-in fade-in slide-in-from-bottom-4">
-                                        <h3 className="text-xs font-black uppercase tracking-[0.2em] text-[#0A1A2F]">Financial Details (Payouts)</h3>
+                                    <div className="space-y-6 pt-6 border-t border-line animate-in fade-in slide-in-from-bottom-4">
+                                        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-heading">Financial Details (Payouts)</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                             <div className="space-y-3">
                                                 <label className={labelClass}>IBAN</label>
@@ -493,7 +493,7 @@ function RegisterForm() {
                                                 value={form.password}
                                                 onChange={e => update('password', e.target.value)}
                                             />
-                                            <button type="button" onClick={() => setShowPass(!showPass)} className="absolute end-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-[#0A1A2F] transition-colors">
+                                            <button type="button" onClick={() => setShowPass(!showPass)} className="absolute end-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-heading transition-colors">
                                                 {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
                                             </button>
                                         </div>
@@ -520,7 +520,7 @@ function RegisterForm() {
                                         { label: 'Special Character', met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) },
                                         { label: 'Passwords Match', met: form.password && form.confirmPassword && form.password === form.confirmPassword }
                                     ].map((req, idx) => (
-                                        <span key={idx} className={`text-[9px] font-black uppercase tracking-wider px-4 py-2 rounded-full border transition-all ${req.met ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
+                                        <span key={idx} className={`text-[9px] font-bold uppercase tracking-wider px-4 py-2 rounded-full border transition-all ${req.met ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-surface-2 text-ink-4 border-line'}`}>
                                             {req.met && <CheckCircle2 size={10} className="inline me-1.5 -mt-0.5" />}
                                             {req.label}
                                         </span>
@@ -537,7 +537,7 @@ function RegisterForm() {
                                             <button
                                                 type="button"
                                                 onClick={() => update('role', 'customer')}
-                                                className={`h-24 rounded-[24px] text-xs font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 px-4 ${form.role === 'customer' ? 'bg-[#0A1A2F] border-[#0A1A2F] text-white shadow-xl shadow-[#0A1A2F]/20' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                                className={`h-24 rounded-[24px] text-xs font-bold uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 px-4 ${form.role === 'customer' ? 'bg-[#0A1A2F] border-[#0A1A2F] text-white shadow-xl shadow-[#0A1A2F]/20' : 'bg-surface border-line text-ink-4 hover:border-line'}`}
                                             >
                                                 <span className="text-2xl mb-0.5">📦</span>
                                                 <span>Business Buyer</span>
@@ -546,7 +546,7 @@ function RegisterForm() {
                                             <button
                                                 type="button"
                                                 onClick={() => update('role', 'supplier')}
-                                                className={`h-24 rounded-[24px] text-xs font-black uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 px-4 ${form.role === 'supplier' ? 'bg-[#1BC7C9] border-[#1BC7C9] text-white shadow-xl shadow-[#1BC7C9]/20' : 'bg-white border-slate-100 text-slate-400 hover:border-slate-200'}`}
+                                                className={`h-24 rounded-[24px] text-xs font-bold uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 px-4 ${form.role === 'supplier' ? 'bg-[#1BC7C9] border-[#1BC7C9] text-white shadow-xl shadow-[#1BC7C9]/20' : 'bg-surface border-line text-ink-4 hover:border-line'}`}
                                             >
                                                 <span className="text-2xl mb-0.5">🏭</span>
                                                 <span>Supplier / Brand</span>
@@ -566,7 +566,7 @@ function RegisterForm() {
                                     "p-5 rounded-[20px] border-2 transition-all",
                                     captchaError
                                         ? "border-red-200 bg-red-50/50"
-                                        : "border-slate-100 bg-slate-50"
+                                        : "border-line bg-surface-2"
                                 )}>
                                     <div className="flex items-center justify-between mb-3">
                                         <label className={labelClass}>Human Verification</label>
@@ -580,7 +580,7 @@ function RegisterForm() {
                                         </button>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <div className="flex-1 h-12 bg-white border-2 border-slate-100 rounded-[14px] flex items-center justify-center font-black text-[#0A1A2F] text-base tracking-widest select-none">
+                                        <div className="flex-1 h-12 bg-surface border-2 border-line rounded-[14px] flex items-center justify-center font-bold text-heading text-base tracking-widest select-none">
                                             {captcha.a} + {captcha.b} = ?
                                         </div>
                                         <input
@@ -590,10 +590,10 @@ function RegisterForm() {
                                             value={captchaAnswer}
                                             onChange={e => { setCaptchaAnswer(e.target.value); setCaptchaError(false); }}
                                             className={cn(
-                                                "w-28 h-12 bg-white border-2 rounded-[14px] px-4 text-center text-[#0A1A2F] font-black text-sm outline-none transition-all",
+                                                "w-28 h-12 bg-surface border-2 rounded-[14px] px-4 text-center text-heading font-bold text-sm outline-none transition-all",
                                                 captchaError
                                                     ? "border-red-300 focus:border-red-400"
-                                                    : "border-slate-100 focus:border-[#1BC7C9]/40"
+                                                    : "border-line focus:border-[#1BC7C9]/40"
                                             )}
                                         />
                                     </div>
@@ -605,7 +605,7 @@ function RegisterForm() {
                                 <button
                                     type="submit"
                                     disabled={loading || !isStrong}
-                                    className="w-full h-14 md:h-20 bg-[#0A1A2F] hover:bg-[#162a44] text-white rounded-xl md:rounded-[24px] font-black uppercase tracking-[0.4em] text-[10px] md:text-xs transition-all shadow-2xl shadow-[#0A1A2F]/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-4 mt-8 group/btn relative overflow-hidden"
+                                    className="w-full h-14 md:h-20 bg-[#0A1A2F] hover:bg-[#162a44] text-white rounded-xl md:rounded-[24px] font-bold uppercase tracking-[0.4em] text-[10px] md:text-xs transition-all shadow-2xl shadow-[#0A1A2F]/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-4 mt-8 group/btn relative overflow-hidden"
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
                                     {loading ? (
@@ -619,10 +619,10 @@ function RegisterForm() {
                                 </button>
                             </form>
 
-                            <div className="mt-16 pt-8 border-t border-slate-100 text-center">
+                            <div className="mt-16 pt-8 border-t border-line text-center">
                                 <p className="text-sm text-[#64748B] font-medium">
                                     Registered Partner?{' '}
-                                    <Link href="/auth/login" className="text-[#1BC7C9] font-black uppercase tracking-widest text-xs hover:underline ms-2">
+                                    <Link href="/auth/login" className="text-[#1BC7C9] font-bold uppercase tracking-widest text-xs hover:underline ms-2">
                                         Authenticate
                                     </Link>
                                 </p>
@@ -637,7 +637,7 @@ function RegisterForm() {
 
 export default function RegisterPage() {
     return (
-        <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex justify-center items-center text-[#0A1A2F] font-black uppercase tracking-[0.4em] text-xs">Synchronizing Atlantis Node...</div>}>
+        <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex justify-center items-center text-heading font-bold uppercase tracking-[0.4em] text-xs">Synchronizing Atlantis Node...</div>}>
             <RegisterForm />
         </Suspense>
     );

@@ -27,6 +27,8 @@ export interface Product {
     // Core Metadata
     ean?: string;
     brand?: string;
+    /** True when the API withheld prices (signed-out visitor). */
+    pricesHidden?: boolean;
     supplierId?: string;
     unit?: string;
     description?: string;

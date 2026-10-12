@@ -96,16 +96,17 @@ export default async function ProductPage({ params }: { params: { id: string } }
         ...(product.brand ? { brand: { '@type': 'Brand', name: product.brand } } : {}),
         ...(product.ean ? { gtin13: product.ean } : {}),
         ...(product.category ? { category: product.category } : {}),
-        offers: {
+        // Prices are for signed-in buyers only; the anonymous SSR fetch has none, so no Offer is published.
+        ...(typeof product.price === 'number' && product.price > 0 ? { offers: {
             '@type': 'Offer',
-            price: product.price ?? product.basePrice ?? 0,
+            price: product.price,
             priceCurrency: 'EUR',
             availability: (product.stock ?? 0) > 0
                 ? 'https://schema.org/InStock'
                 : 'https://schema.org/OutOfStock',
             url: `${SITE_URL}/products/${product.id}`,
             seller: { '@type': 'Organization', name: 'Atlantis Marketplace' },
-        },
+        } } : {}),
     } : null;
 
     const breadcrumb = product ? {

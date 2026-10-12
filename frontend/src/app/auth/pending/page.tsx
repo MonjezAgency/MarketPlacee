@@ -21,7 +21,7 @@ export default function PendingApprovalPage() {
                 </div>
 
                 <div className="space-y-2">
-                    <h1 className="text-2xl font-black text-white tracking-tight">Registration Pending</h1>
+                    <h1 className="text-2xl font-bold text-white tracking-tight">Registration Pending</h1>
                     <p className="text-white/60 text-sm">
                         Hello <span className="text-white font-bold">{user?.name}</span>, your account is currently being reviewed by our administration team.
                     </p>

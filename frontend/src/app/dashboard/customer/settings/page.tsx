@@ -1,352 +1,211 @@
 'use client';
 
 import * as React from 'react';
-import {
-    User, Shield, Bell, CreditCard, MapPin, ChevronRight,
-    Camera, Save, Loader2, Lock, AlertCircle, CheckCircle2,
-} from 'lucide-react';
+import Link from 'next/link';
+import { Camera, Loader2, Check, AlertCircle, ShieldCheck, KeyRound, MonitorSmartphone, Bell, MapPin, Building2, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { toast } from 'react-hot-toast';
 
-// Email = standard RFC pattern, Phone = 8-15 digits with optional + prefix
-// (covers EU, Gulf, etc; rejects letters and obviously-bogus inputs).
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const PHONE_RE = /^\+?\d{8,15}$/;
+const STRONG_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
 
-type TabId = 'profile' | 'security' | 'notifications' | 'payment' | 'shipping';
+const input = 'w-full h-11 px-3.5 rounded-xl ring-1 ring-line bg-surface text-[14px] text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6] placeholder:text-ink-4 disabled:bg-surface-2 disabled:text-ink-3';
+const label = 'block text-[13px] font-medium text-ink-2 mb-1.5';
+
+function Card({ icon, title, desc, children }: { icon: React.ReactNode; title: string; desc?: string; children: React.ReactNode }) {
+    return (
+        <section className="rounded-2xl ring-1 ring-line bg-surface">
+            <header className="flex items-start gap-3 px-5 pt-5">
+                <span className="w-9 h-9 shrink-0 rounded-xl bg-teal-soft text-teal flex items-center justify-center">{icon}</span>
+                <div>
+                    <h2 className="text-[16px] font-semibold text-heading">{title}</h2>
+                    {desc && <p className="text-[13px] text-ink-3">{desc}</p>}
+                </div>
+            </header>
+            <div className="p-5">{children}</div>
+        </section>
+    );
+}
+
+function Status({ s }: { s: { ok: boolean; text: string } | null }) {
+    if (!s) return null;
+    return <p role={s.ok ? 'status' : 'alert'} className={cn('text-[13px] flex items-center gap-1.5', s.ok ? 'text-teal' : 'text-[#B91C1C]')}>{s.ok ? <Check size={14} /> : <AlertCircle size={14} />}{s.text}</p>;
+}
 
 export default function SettingsPage() {
-    const { user, refreshUser } = useAuth() as any;
-    const { currency: currentCurrency, setCurrency } = useCurrency();
+    const { user, refreshUser, logout } = useAuth() as any;
+    const { currency, setCurrency } = useCurrency();
 
-    const [activeTab, setActiveTab] = React.useState<TabId>('profile');
-    const [isSaving, setIsSaving] = React.useState(false);
-    const [avatarUploading, setAvatarUploading] = React.useState(false);
-    const [avatarUrl, setAvatarUrl] = React.useState<string | null>(user?.avatar || null);
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-    // Form fields with controlled state so we can validate on blur and on save
-    const [name, setName] = React.useState(user?.name || '');
-    const [phone, setPhone] = React.useState(user?.phone || '');
-    const [description, setDescription] = React.useState(user?.companyDescription || '');
-    const [phoneError, setPhoneError] = React.useState<string | null>(null);
-
+    // ── Profile ────────────────────────────────────────────────
+    const [name, setName] = React.useState('');
+    const [phone, setPhone] = React.useState('');
+    const [country, setCountry] = React.useState('');
+    const [avatar, setAvatar] = React.useState<string | null>(null);
+    const [saving, setSaving] = React.useState(false);
+    const [uploading, setUploading] = React.useState(false);
+    const [profileMsg, setProfileMsg] = React.useState<{ ok: boolean; text: string } | null>(null);
+    const fileRef = React.useRef<HTMLInputElement>(null);
     React.useEffect(() => {
-        setName(user?.name || '');
-        setPhone(user?.phone || '');
-        setAvatarUrl(user?.avatar || null);
-        setDescription(user?.companyDescription || '');
+        setName(user?.name || ''); setPhone(user?.phone || ''); setCountry(user?.country || ''); setAvatar(user?.avatar || null);
     }, [user]);
 
-    const tabs: { id: TabId; label: string; icon: any; locked?: boolean }[] = [
-        { id: 'profile', label: 'Profile Information', icon: User },
-        { id: 'security', label: 'Login & Security', icon: Shield },
-        { id: 'notifications', label: 'Email Preferences', icon: Bell },
-        { id: 'payment', label: 'Payment Methods', icon: CreditCard, locked: true },
-        { id: 'shipping', label: 'Shipping Addresses', icon: MapPin },
-    ];
-
-    const handleAvatarPick = () => fileInputRef.current?.click();
-
-    const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        // Client-side guards BEFORE hitting the API so the customer
-        // gets an instant, specific reason — not a generic "Upload
-        // failed" from the server bouncing back.
-        if (!file.type.startsWith('image/')) {
-            toast.error('Only image files are allowed (JPG, PNG, WebP).');
-            if (fileInputRef.current) fileInputRef.current.value = '';
-            return;
-        }
-        if (file.size > 4 * 1024 * 1024) {
-            toast.error(`Image is ${(file.size / 1024 / 1024).toFixed(1)} MB — max is 4 MB. Try a smaller file.`);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-            return;
-        }
-        setAvatarUploading(true);
-        try {
-            const fd = new FormData();
-            fd.append('file', file);
-            const res = await apiFetch('/users/me/avatar', { method: 'POST', body: fd });
-            if (!res.ok) {
-                // Surface the REAL server message (e.g. "Supabase bucket
-                // does not exist", "service role key invalid", etc.)
-                // instead of swallowing it as a generic "Upload failed".
-                let detail = '';
-                try {
-                    const errJson = await res.json();
-                    detail = errJson?.message || '';
-                } catch {
-                    try { detail = await res.text(); } catch { /* noop */ }
-                }
-                throw new Error(detail || `Upload failed (HTTP ${res.status})`);
-            }
-            const data = await res.json();
-            setAvatarUrl(data.url);
-            toast.success('Profile picture updated');
-            if (refreshUser) refreshUser();
-        } catch (err: any) {
-            toast.error(err.message || 'Could not upload image');
-        } finally {
-            setAvatarUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-    };
-
-    const validatePhone = (v: string) => {
-        const stripped = v.replace(/[\s()-]/g, '');
-        if (!stripped) return null; // empty allowed at form level — required check happens on save
-        return PHONE_RE.test(stripped) ? null : 'Phone must be 8-15 digits with optional + prefix';
-    };
-
-    const handleSave = async (e: React.FormEvent) => {
+    const saveProfile = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (activeTab !== 'profile') return; // other tabs handle their own saves
-        const phoneStripped = phone.replace(/[\s()-]/g, '');
-        const phoneErr = phone ? validatePhone(phone) : null;
-        if (phoneErr) {
-            setPhoneError(phoneErr);
-            toast.error(phoneErr);
-            return;
-        }
-        setPhoneError(null);
-        setIsSaving(true);
+        const p = phone.replace(/[\s()-]/g, '');
+        if (p && !PHONE_RE.test(p)) { setProfileMsg({ ok: false, text: 'Phone must be 8–15 digits, optionally starting with +.' }); return; }
+        if (!name.trim()) { setProfileMsg({ ok: false, text: 'Name is required.' }); return; }
+        setSaving(true); setProfileMsg(null);
         try {
-            const res = await apiFetch('/users/me', {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    name,
-                    phone: phoneStripped || null,
-                    companyDescription: description || null,
-                }),
-            });
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data.message || 'Save failed');
-            }
-            toast.success('Settings saved');
-            if (refreshUser) refreshUser();
-        } catch (err: any) {
-            toast.error(err.message || 'Could not save changes');
-        } finally {
-            setIsSaving(false);
-        }
+            const res = await apiFetch('/users/me', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name.trim(), phone: p || null, country: country.trim() || null }) });
+            if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || 'Could not save your profile.');
+            setProfileMsg({ ok: true, text: 'Profile saved.' });
+            refreshUser?.();
+        } catch (err: any) { setProfileMsg({ ok: false, text: err?.message || 'Could not save your profile.' }); }
+        finally { setSaving(false); }
+    };
+
+    const pickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (fileRef.current) fileRef.current.value = '';
+        if (!file) return;
+        if (!file.type.startsWith('image/')) { setProfileMsg({ ok: false, text: 'Choose an image file (JPG, PNG or WebP).' }); return; }
+        if (file.size > 4 * 1024 * 1024) { setProfileMsg({ ok: false, text: 'Image must be 4 MB or smaller.' }); return; }
+        setUploading(true); setProfileMsg(null);
+        try {
+            const fd = new FormData(); fd.append('file', file);
+            const res = await apiFetch('/users/me/avatar', { method: 'POST', body: fd });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data?.message || 'Upload failed.');
+            setAvatar(data.url); setProfileMsg({ ok: true, text: 'Photo updated.' }); refreshUser?.();
+        } catch (err: any) { setProfileMsg({ ok: false, text: err?.message || 'Upload failed.' }); }
+        finally { setUploading(false); }
+    };
+
+    // ── Password ───────────────────────────────────────────────
+    const [cur, setCur] = React.useState('');
+    const [next, setNext] = React.useState('');
+    const [confirm, setConfirm] = React.useState('');
+    const [pwBusy, setPwBusy] = React.useState(false);
+    const [pwMsg, setPwMsg] = React.useState<{ ok: boolean; text: string } | null>(null);
+    const changePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!STRONG_RE.test(next)) { setPwMsg({ ok: false, text: 'Use at least 8 characters with upper- and lower-case letters, a number and a symbol (!@#$%^&*).' }); return; }
+        if (next !== confirm) { setPwMsg({ ok: false, text: 'The new passwords don’t match.' }); return; }
+        setPwBusy(true); setPwMsg(null);
+        try {
+            const res = await apiFetch('/auth/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: cur, newPassword: next }) });
+            if (!res.ok) throw new Error(res.status === 400 ? 'Your current password is incorrect.' : 'Could not change the password. Try again.');
+            setCur(''); setNext(''); setConfirm('');
+            setPwMsg({ ok: true, text: 'Password changed.' });
+        } catch (err: any) { setPwMsg({ ok: false, text: err?.message }); }
+        finally { setPwBusy(false); }
+    };
+
+    // ── Notifications (real per-user preferences) ──────────────
+    const [prefs, setPrefs] = React.useState<Record<string, boolean> | null>(null);
+    const [prefMsg, setPrefMsg] = React.useState<{ ok: boolean; text: string } | null>(null);
+    React.useEffect(() => {
+        apiFetch('/users/me/notification-prefs').then((r) => (r.ok ? r.json() : null)).then((d) => setPrefs(d?.prefs ?? d ?? null)).catch(() => setPrefs(null));
+    }, []);
+    const togglePref = async (k: string) => {
+        if (!prefs) return;
+        const nextPrefs = { ...prefs, [k]: !prefs[k] };
+        setPrefs(nextPrefs); setPrefMsg(null);
+        const res = await apiFetch('/users/me/notification-prefs', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ [k]: nextPrefs[k] }) }).catch(() => null);
+        if (!res?.ok) { setPrefs(prefs); setPrefMsg({ ok: false, text: 'Could not save that preference.' }); } else setPrefMsg({ ok: true, text: 'Saved.' });
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
-            <div>
-                <h1 className="text-3xl font-black text-[#0B1F3A] tracking-tight">Account Settings</h1>
-                <p className="text-sm text-slate-500 font-medium mt-1">Manage your global business identity and preferences.</p>
-            </div>
-
-            <main className="space-y-8">
-                <div className="flex flex-col lg:flex-row gap-8">
-                    {/* Sidebar Tabs */}
-                    <aside className="w-full lg:w-72 space-y-2">
-                        {tabs.map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => !tab.locked && setActiveTab(tab.id)}
-                                disabled={tab.locked}
-                                className={cn(
-                                    'w-full flex items-center justify-between px-5 h-14 rounded-2xl font-bold text-sm transition-all',
-                                    tab.locked
-                                        ? 'bg-slate-50 text-slate-400 border border-slate-200 cursor-not-allowed opacity-70'
-                                        : activeTab === tab.id
-                                            ? 'bg-[#0B1F3A] text-white shadow-xl shadow-[#0B1F3A]/20 scale-[1.02]'
-                                            : 'bg-white text-slate-500 hover:bg-slate-50 border border-[#E6EAF0]',
-                                )}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <tab.icon size={18} />
-                                    <span>{tab.label}</span>
-                                </div>
-                                {tab.locked
-                                    ? <Lock size={14} className="opacity-50" />
-                                    : activeTab === tab.id && <ChevronRight size={16} className="opacity-50" />}
+        <div className="grid gap-5 lg:grid-cols-2 items-start">
+            <Card icon={<Building2 size={17} />} title="Profile" desc="How Atlantis and suppliers see your business.">
+                <form onSubmit={saveProfile} className="space-y-4">
+                    <div className="flex items-center gap-4">
+                        <span className="relative w-16 h-16 rounded-2xl bg-surface-2 ring-1 ring-line overflow-clip flex items-center justify-center text-[22px] font-semibold text-heading">
+                            {avatar
+                                // eslint-disable-next-line @next/next/no-img-element
+                                ? <img src={avatar} alt="" className="w-full h-full object-cover" />
+                                : (user?.name?.[0] || 'A')}
+                        </span>
+                        <div>
+                            <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading} className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg ring-1 ring-line-strong text-[13px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50">
+                                {uploading ? <Loader2 size={14} className="animate-spin" /> : <Camera size={14} />} Change photo
                             </button>
-                        ))}
-                    </aside>
-
-                    {/* Main Settings Content */}
-                    <div className="flex-1">
-                        <div className="bg-white border border-[#E6EAF0] rounded-[32px] overflow-hidden shadow-sm">
-                            {/* Header — avatar + identity strip */}
-                            <div className="p-8 border-b border-slate-100 flex items-center gap-6">
-                                <div className="relative group">
-                                    <div className="w-24 h-24 rounded-3xl bg-slate-100 border-4 border-white shadow-xl overflow-hidden flex items-center justify-center text-[#0B1F3A] font-black text-3xl">
-                                        {avatarUrl
-                                            ? <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
-                                            : (user?.name?.[0] || 'A')}
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={handleAvatarPick}
-                                        disabled={avatarUploading}
-                                        className="absolute -bottom-2 -right-2 w-10 h-10 bg-[#1ABC9C] text-white rounded-xl flex items-center justify-center border-4 border-white shadow-lg hover:scale-110 transition-transform disabled:opacity-60"
-                                        aria-label="Change profile picture"
-                                    >
-                                        {avatarUploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={18} />}
-                                    </button>
-                                    <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={handleAvatarChange} />
-                                </div>
-                                <div className="space-y-1">
-                                    <h2 className="text-2xl font-black text-[#0B1F3A]">{user?.name || 'Partner Account'}</h2>
-                                    <p className="text-sm text-slate-500 font-medium">{user?.email || 'business@atlantis.com'}</p>
-                                    <div className="flex items-center gap-2 pt-1">
-                                        <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[10px] font-black uppercase tracking-widest rounded-md border border-green-100">Verified Entity</span>
-                                        <span className="px-2 py-0.5 bg-slate-100 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-md">ID: {user?.id?.slice(-8) || 'GLOBAL'}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Per-tab content */}
-                            {activeTab === 'profile' && (
-                                <form onSubmit={handleSave} className="p-8 space-y-8">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-2">
-                                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Full Business Name</label>
-                                            <input
-                                                value={name}
-                                                onChange={e => setName(e.target.value)}
-                                                className="w-full h-14 px-6 bg-[#F7F9FC] border-2 border-transparent rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-[#1ABC9C] transition-all"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Work Email Address</label>
-                                            <input
-                                                readOnly
-                                                value={user?.email || ''}
-                                                className="w-full h-14 px-6 bg-slate-50 border-2 border-transparent rounded-2xl text-sm font-bold text-slate-400 outline-none cursor-not-allowed"
-                                                title="Email cannot be changed — contact support"
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Phone Number (WhatsApp) <span className="text-red-500">*</span></label>
-                                            <input
-                                                value={phone}
-                                                onChange={e => { setPhone(e.target.value); setPhoneError(null); }}
-                                                onBlur={() => setPhoneError(validatePhone(phone))}
-                                                placeholder="+971 00 000 0000"
-                                                className={cn(
-                                                    'w-full h-14 px-6 bg-[#F7F9FC] border-2 rounded-2xl text-sm font-bold outline-none focus:bg-white transition-all',
-                                                    phoneError ? 'border-red-400 focus:border-red-500' : 'border-transparent focus:border-[#1ABC9C]',
-                                                )}
-                                            />
-                                            {phoneError && (
-                                                <p className="text-[11px] text-red-500 font-bold flex items-center gap-1.5"><AlertCircle size={11} /> {phoneError}</p>
-                                            )}
-                                            <p className="text-[10px] text-slate-400">We'll WhatsApp you about your orders. Required before checkout.</p>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Preferred Currency</label>
-                                            <select
-                                                value={currentCurrency}
-                                                onChange={e => setCurrency(e.target.value)}
-                                                className="w-full h-14 px-6 bg-[#F7F9FC] border-2 border-transparent rounded-2xl text-sm font-bold outline-none focus:bg-white focus:border-[#1ABC9C] transition-all appearance-none"
-                                            >
-                                                {SUPPORTED_CURRENCIES.map(c => (
-                                                    <option key={c.code} value={c.code}>{c.symbol} {c.code} - {c.name}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <label className="text-[11px] font-black text-slate-400 uppercase tracking-widest ml-1">Company Description</label>
-                                        <textarea
-                                            rows={4}
-                                            value={description}
-                                            onChange={e => setDescription(e.target.value)}
-                                            placeholder="Tell us more about your sourcing requirements..."
-                                            className="w-full p-6 bg-[#F7F9FC] border-2 border-transparent rounded-2xl text-sm font-medium outline-none focus:bg-white focus:border-[#1ABC9C] transition-all resize-none"
-                                        />
-                                    </div>
-
-                                    <div className="pt-4 flex items-center justify-end">
-                                        <button
-                                            type="submit"
-                                            disabled={isSaving}
-                                            className="h-14 px-10 bg-[#0B1F3A] text-white rounded-2xl text-sm font-black uppercase tracking-widest flex items-center gap-3 hover:bg-[#1ABC9C] transition-all shadow-xl shadow-black/10 active:scale-95 disabled:opacity-50"
-                                        >
-                                            {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                                            {isSaving ? 'Saving…' : 'Save Changes'}
-                                        </button>
-                                    </div>
-                                </form>
-                            )}
-
-                            {activeTab === 'security' && (
-                                <div className="p-8 space-y-6">
-                                    <div className="rounded-2xl border border-slate-100 p-6 flex items-start gap-4">
-                                        <Shield size={20} className="text-[#1ABC9C] mt-1 shrink-0" />
-                                        <div>
-                                            <h3 className="font-black text-[#0B1F3A] text-base">Password & Two-Factor</h3>
-                                            <p className="text-[13px] text-slate-500 mt-1">
-                                                Manage your password and 2FA setup from the dedicated security page.
-                                            </p>
-                                            <a href="/dashboard/security" className="inline-block mt-3 text-[12px] font-bold text-[#1ABC9C] hover:underline">
-                                                Go to Security Center →
-                                            </a>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {activeTab === 'notifications' && (
-                                <div className="p-8 space-y-4">
-                                    <h3 className="font-black text-[#0B1F3A] text-base">Email Notifications</h3>
-                                    {[
-                                        { id: 'order_updates', label: 'Order updates', desc: 'Status changes, shipping, delivery confirmation' },
-                                        { id: 'price_alerts', label: 'Price drops', desc: 'When products in your wishlist change price' },
-                                        { id: 'platform_news', label: 'Platform news', desc: 'New features, supplier announcements (max 1/month)' },
-                                    ].map(opt => (
-                                        <label key={opt.id} className="flex items-start gap-4 p-5 rounded-2xl border border-slate-100 cursor-pointer hover:border-slate-300">
-                                            <input type="checkbox" defaultChecked className="mt-1 w-5 h-5 accent-[#1ABC9C]" />
-                                            <div>
-                                                <p className="font-bold text-[#0B1F3A] text-sm">{opt.label}</p>
-                                                <p className="text-[12px] text-slate-500 mt-0.5">{opt.desc}</p>
-                                            </div>
-                                        </label>
-                                    ))}
-                                    <p className="text-[11px] text-slate-400 mt-2">Preference syncing coming soon — defaults apply for now.</p>
-                                </div>
-                            )}
-
-                            {activeTab === 'shipping' && (
-                                <div className="p-8 space-y-4">
-                                    <h3 className="font-black text-[#0B1F3A] text-base">Shipping Addresses</h3>
-                                    <p className="text-[13px] text-slate-500">
-                                        Manage delivery addresses from the dedicated address book.
-                                    </p>
-                                    <a href="/account/address" className="inline-block mt-2 text-[12px] font-bold text-[#1ABC9C] hover:underline">
-                                        Open address book →
-                                    </a>
-                                </div>
-                            )}
-
-                            {/* Payment Methods is locked at the tab level — this branch is unreachable but kept defensively */}
-                            {activeTab === 'payment' && (
-                                <div className="p-8">
-                                    <div className="rounded-3xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-12 text-center space-y-3">
-                                        <div className="w-16 h-16 mx-auto rounded-2xl bg-slate-100 flex items-center justify-center"><Lock size={28} className="text-slate-400" /></div>
-                                        <h3 className="font-black text-[#0B1F3A] text-lg">Payments Coming Soon</h3>
-                                        <p className="text-[13px] text-slate-500 max-w-md mx-auto">
-                                            Card and bank-transfer methods will appear here once Atlantis launches escrow checkout. For now, orders are negotiated through the support team.
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
+                            <p className="mt-1 text-[12px] text-ink-3">JPG, PNG or WebP, up to 4 MB.</p>
+                            <input ref={fileRef} type="file" accept="image/*" hidden onChange={pickAvatar} />
                         </div>
                     </div>
-                </div>
-            </main>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                        <div><label htmlFor="s-name" className={label}>Name</label><input id="s-name" value={name} onChange={(e) => setName(e.target.value)} className={input} autoComplete="name" /></div>
+                        <div><label htmlFor="s-email" className={label}>Email</label><input id="s-email" value={user?.email || ''} disabled className={input} title="Contact Atlantis to change your sign-in email" /></div>
+                        <div><label htmlFor="s-phone" className={label}>Phone</label><input id="s-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+40 712 345 678" className={input} autoComplete="tel" inputMode="tel" /></div>
+                        <div><label htmlFor="s-country" className={label}>Country</label><input id="s-country" value={country} onChange={(e) => setCountry(e.target.value)} maxLength={60} placeholder="e.g. Romania" className={input} autoComplete="country-name" /></div>
+                        <div><label htmlFor="s-company" className={label}>Company</label><input id="s-company" value={user?.companyName || ''} disabled className={input} /></div>
+                        <div><label htmlFor="s-vat" className={label}>VAT number</label><input id="s-vat" value={user?.vatNumber || ''} disabled placeholder="—" className={input} /></div>
+                    </div>
+                    <p className="text-[12px] text-ink-3">Company and VAT details are verified, so changes go through Atlantis — <a className="text-teal font-semibold hover:underline" href="mailto:Info@atlantisfmcg.com?subject=Update%20company%20details">email us</a>.</p>
+                    <div className="flex items-center justify-between gap-3 pt-1">
+                        <Status s={profileMsg} />
+                        <button type="submit" disabled={saving} className="ms-auto h-10 px-5 inline-flex items-center gap-2 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold disabled:opacity-50">{saving && <Loader2 size={14} className="animate-spin" />} Save profile</button>
+                    </div>
+                </form>
+            </Card>
+
+            <div className="space-y-5">
+                <Card icon={<KeyRound size={17} />} title="Password">
+                    <form onSubmit={changePassword} className="space-y-3">
+                        <div><label htmlFor="pw-cur" className={label}>Current password</label><input id="pw-cur" type="password" value={cur} onChange={(e) => setCur(e.target.value)} className={input} autoComplete="current-password" required /></div>
+                        <div className="grid sm:grid-cols-2 gap-3">
+                            <div><label htmlFor="pw-new" className={label}>New password</label><input id="pw-new" type="password" value={next} onChange={(e) => setNext(e.target.value)} className={input} autoComplete="new-password" required /></div>
+                            <div><label htmlFor="pw-conf" className={label}>Confirm new password</label><input id="pw-conf" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={input} autoComplete="new-password" required /></div>
+                        </div>
+                        <p className="text-[12px] text-ink-3">8+ characters, upper- and lower-case, a number and a symbol.</p>
+                        <div className="flex items-center justify-between gap-3">
+                            <Status s={pwMsg} />
+                            <button type="submit" disabled={pwBusy} className="ms-auto h-10 px-5 inline-flex items-center gap-2 rounded-xl ring-1 ring-line-strong text-[13.5px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50">{pwBusy && <Loader2 size={14} className="animate-spin" />} Change password</button>
+                        </div>
+                    </form>
+                </Card>
+
+                <Card icon={<ShieldCheck size={17} />} title="Two-step verification" desc="Add a code from an authenticator app or email when you sign in.">
+                    <Link href="/dashboard/security" className="text-[13.5px] font-semibold text-teal hover:underline">Manage two-step verification</Link>
+                </Card>
+
+                <Card icon={<MonitorSmartphone size={17} />} title="Sessions">
+                    <p className="text-[13.5px] text-ink-2">You’re signed in on this device.</p>
+                    <p className="mt-1 text-[12.5px] text-ink-3">A list of your other signed-in devices isn’t available yet — Atlantis doesn’t record device details for sign-ins. If you think someone else has access, change your password and contact Atlantis.</p>
+                    <button type="button" onClick={() => logout?.()} className="mt-3 h-9 px-3 inline-flex items-center gap-1.5 rounded-lg ring-1 ring-line-strong text-[13px] font-semibold text-ink hover:bg-surface-2"><LogOut size={14} /> Sign out of this device</button>
+                </Card>
+
+                <Card icon={<Bell size={17} />} title="Email notifications">
+                    {prefs === null ? <p className="text-[13px] text-ink-3">Preferences couldn’t be loaded.</p> : (
+                        <div className="space-y-2">
+                            {[['orderUpdates', 'Order updates', 'Confirmations, dispatch and delivery'], ['marketingEmails', 'News and offers', 'New products and promotions']].map(([k, t, d]) => (
+                                <label key={k} className="flex items-start gap-3 rounded-xl px-3 py-2.5 ring-1 ring-line cursor-pointer hover:ring-line-strong">
+                                    <input type="checkbox" checked={!!prefs[k]} onChange={() => togglePref(k)} className="mt-0.5 w-4 h-4 accent-[#0E7C74]" />
+                                    <span><span className="block text-[14px] font-medium text-ink">{t}</span><span className="block text-[12.5px] text-ink-3">{d}</span></span>
+                                </label>
+                            ))}
+                            <Status s={prefMsg} />
+                        </div>
+                    )}
+                </Card>
+
+                <Card icon={<MapPin size={17} />} title="Delivery & currency">
+                    <div className="space-y-3">
+                        <Link href="/account/address" className="text-[13.5px] font-semibold text-teal hover:underline">Delivery address</Link>
+                        <p className="text-[12px] text-ink-3">Saved in this browser only for now.</p>
+                        <div>
+                            <label htmlFor="s-cur" className={label}>Display currency</label>
+                            <select id="s-cur" value={currency} onChange={(e) => setCurrency(e.target.value)} className={input}>
+                                {SUPPORTED_CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.symbol} {c.code} — {c.name}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                </Card>
+            </div>
         </div>
     );
 }

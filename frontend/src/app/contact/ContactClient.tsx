@@ -32,7 +32,7 @@ const CONTACT_INFO = [
         label: 'Response Time',
         value: 'Within 24 business hours',
         href: null,
-        color: 'text-orange-500 bg-orange-500/10',
+        color: 'text-teal bg-teal-soft',
     },
 ];
 

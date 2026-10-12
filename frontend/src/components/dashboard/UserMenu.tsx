@@ -151,7 +151,7 @@ export function UserMenu({ role }: UserMenuProps) {
                                         onClick={() => setIsOpen(false)}
                                         className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-[#555] hover:text-[#0F1111] hover:bg-[#F3F3F3] transition-all group"
                                     >
-                                        <Icon size={18} className="group-hover:scale-110 group-hover:text-[#FF9900] transition-all" />
+                                        <Icon size={18} className="group-hover:scale-110 group-hover:text-teal transition-all" />
                                         <span className="text-sm font-bold">{item.label}</span>
                                     </Link>
                                 );

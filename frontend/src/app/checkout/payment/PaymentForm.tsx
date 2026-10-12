@@ -128,7 +128,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
 
         {/* Diagnostics Box when Stripe fails silently */}
         {showDiagnosticWarning && !isElementReady && (
-            <div className="mb-6 p-4 rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-400">
+            <div className="mb-6 p-4 rounded-xl border border-[#FCD34D] bg-[#FFFBEB] text-[#92400E] dark:bg-amber-500/10 dark:text-amber-300 dark:border-amber-500/30">
                 <div className="flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
                     <div className="text-sm">

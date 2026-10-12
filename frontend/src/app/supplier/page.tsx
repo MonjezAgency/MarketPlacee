@@ -76,7 +76,7 @@ export default function SupplierOverviewPage() {
         { label: 'Revenue (MTD)', value: dashboardStats?.totalRevenue ? formatPrice(dashboardStats.totalRevenue) : '€0.00', trend: '+0.0%', icon: BarChart3, color: 'text-[#10B981]' },
         { label: 'Active Products', value: dashboardStats?.activeProductsCount?.toString() || '0', trend: 'Stable', icon: Package, color: 'text-[#0EA5A4]' },
         { label: 'Total Orders', value: dashboardStats?.totalOrders?.toString() || '0', trend: '+0.0%', icon: ShoppingCart, color: 'text-blue-500' },
-        { label: 'Digital Impressions', value: dashboardStats?.impressions?.toString() || '0', trend: '+0.0%', icon: Eye, color: 'text-[#FF8A00]' },
+        { label: 'Digital Impressions', value: dashboardStats?.impressions?.toString() || '0', trend: '+0.0%', icon: Eye, color: 'text-teal' },
     ];
 
     return (

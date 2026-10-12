@@ -37,15 +37,15 @@ export function CookieConsent() {
                 >
                     <div className="bg-[#0A1A2F] text-white rounded-2xl shadow-2xl p-5 border border-white/10">
                         <div className="flex items-start gap-3 mb-4">
-                            <div className="w-9 h-9 rounded-xl bg-[#FF9900]/10 flex items-center justify-center shrink-0 mt-0.5">
-                                <Cookie size={18} className="text-[#FF9900]" />
+                            <div className="w-9 h-9 rounded-xl bg-teal-soft flex items-center justify-center shrink-0 mt-0.5">
+                                <Cookie size={18} className="text-teal" />
                             </div>
                             <div>
-                                <p className="font-black text-sm text-white mb-1.5">This website uses cookies</p>
+                                <p className="font-bold text-sm text-white mb-1.5">This website uses cookies</p>
                                 <p className="text-xs text-white/70 leading-relaxed">
                                     We use cookies to improve platform functionality and your in-app experiences.
                                     You may review our{' '}
-                                    <Link href="/cookie-policy" className="text-[#FF9900] hover:underline font-bold">
+                                    <Link href="/cookie-policy" className="text-teal hover:underline font-bold">
                                         Cookie Policy
                                     </Link>{' '}
                                     and accept the default settings.
@@ -68,7 +68,7 @@ export function CookieConsent() {
                             </button>
                             <button
                                 onClick={accept}
-                                className="flex-1 py-2.5 rounded-xl bg-[#FF9900] text-[#0A1A2F] text-xs font-black hover:bg-[#FF9900]/90 transition-colors"
+                                className="flex-1 py-2.5 rounded-xl bg-cta text-cta-fg text-xs font-bold hover:bg-cta-hover transition-colors"
                             >
                                 Accept All Cookies
                             </button>

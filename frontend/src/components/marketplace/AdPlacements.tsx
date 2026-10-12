@@ -83,7 +83,7 @@ export function AdPlacements() {
                         title: ad.product.name,
                         subtitle: ad.product.description,
                         image: ad.product.images?.[0] || 'https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800&fit=crop',
-                        color: '#FF9900',
+                        color: '#0E7C74',
                         link: `/products/${ad.product.id}`,
                         badge: 'Sponsored',
                         showSponsored: true

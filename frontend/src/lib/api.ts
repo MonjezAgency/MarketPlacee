@@ -72,7 +72,9 @@ function mapProduct(item: any): Product {
         id: item.id,
         name: item.name,
         brand: item.brandDisplay || item.brand || 'Atlantis',
-        price: item.price,
+        price: item.price ?? 0,
+        // Set by the API for signed-out visitors: prices were withheld server-side.
+        pricesHidden: !!item.pricesHidden,
         basePrice: item.basePrice ?? undefined,
         supplierId: item.supplierId || undefined,
         unit: item.unit || 'unit',

@@ -45,8 +45,8 @@ export default function CookiePolicyPage() {
                     </Link>
 
                     <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-2xl bg-[#FF9900]/10 flex items-center justify-center">
-                            <Cookie size={22} className="text-[#FF9900]" />
+                        <div className="w-12 h-12 rounded-2xl bg-teal-soft flex items-center justify-center">
+                            <Cookie size={22} className="text-teal" />
                         </div>
                         <div>
                             <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Legal</p>

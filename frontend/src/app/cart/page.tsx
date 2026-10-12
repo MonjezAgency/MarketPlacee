@@ -112,7 +112,7 @@ function LineRow(props: {
 
 /** Order card shell: header (type · destination · status), optional progress, lines, suggestions, footer. */
 function OrderCard({ icon, title, destination, status, progress, children, suggestions, total, totalNote, action, error, strip }: {
-    icon: React.ReactNode; title: string; destination?: string | null; strip?: { left?: string | null; right?: string | null };
+    icon: React.ReactNode; title: React.ReactNode; destination?: string | null; strip?: { left?: string | null; right?: string | null };
     status: { tone: 'ok' | 'warn' | 'err'; label: string };
     progress?: { label: React.ReactNode; right?: React.ReactNode; value: number; ok: boolean };
     children: React.ReactNode; suggestions?: React.ReactNode; total: string; totalNote?: string; action: React.ReactNode; error?: string | null;
@@ -357,7 +357,7 @@ export default function CartPage() {
                                 <OrderCard
                                     key={load.id}
                                     icon={load.kind === 'TRUCK' ? <Truck size={16} /> : <Layers size={16} />}
-                                    title={loadLabel(load.kind)}
+                                    title={<>{loadLabel(load.kind)}<span className="ms-2 text-[12.5px] font-medium text-ink-3">{q?.origin?.status === 'VERIFIED' && q.origin.label ? `Ships from ${q.origin.label}` : lines.length && new Set(lines.map((l) => l.productId)).size > 1 ? 'Dispatch location to be verified' : load.products[lines[0]?.productId]?.dispatch ? `Ships from ${load.products[lines[0].productId].dispatch}` : 'Dispatch location to be verified'}</span></>}
                                     strip={dispatchStrip(lines.map((l) => load.products[l.productId]).filter(Boolean) as any)}
                                     destination={destination}
                                     status={load.error ? { tone: 'err', label: 'Unavailable' } : q?.ready ? { tone: 'ok', label: 'Ready' } : { tone: 'warn', label: q && q.requiredFill > 0 ? 'Below minimum' : 'Needs attention' }}
@@ -369,7 +369,7 @@ export default function CartPage() {
                                         value: q.requiredFill > 0 ? q.fill / q.requiredFill : q.fill,
                                         ok: q.ready,
                                     } : undefined}
-                                    error={loadError[load.id] || load.error?.message || null}
+                                    error={loadError[load.id] || load.error?.message || (q && !q.ready ? q.issues.join(' ') : null) || null}
                                     total={q ? formatPrice(q.total) : '—'}
                                     totalNote={q ? `incl. ${Math.round((q.markup - 1) * 100)}% mixing surcharge` : undefined}
                                     suggestions={candidates.length > 0 ? (
@@ -409,6 +409,7 @@ export default function CartPage() {
                                                     load.kind === 'TRUCK' && p?.casesPerPallet ? `${p.casesPerPallet} ctn/pal.` : `${l.cases.toLocaleString()} ctn`,
                                                     p?.unitsPerCase ? `${formatPrice(l.casePrice / p.unitsPerCase)} per unit` : null,
                                                     `${Math.round(l.share * 100)}% of load`,
+                                                    p?.dispatch ? `Ships from ${p.dispatch}` : 'Dispatch location not verified',
                                                 ]}
                                                 stepper={<Stepper value={l.quantity} unit={load.kind === 'PALLET' ? 'cs' : 'pal.'} min={1} max={cap ?? undefined} disabled={busy} onChange={(n) => setLineQty(l.productId, l.variant, n)} />}
                                                 price={formatPrice(l.lineSubtotal)}

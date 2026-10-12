@@ -220,7 +220,12 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                         {/* Stable headline price — the cheapest reachable
                             per-case tier. No animation on the number: B2B
                             buyers want a steady price they can read at a glance. */}
-                        {cardPrice > 0 ? (
+                        {!isLoggedIn || product.pricesHidden ? (
+                            <Link href={`/auth/login?redirect=${encodeURIComponent(`/products/${product.id}`)}`} onClick={(e) => e.stopPropagation()}
+                                className="text-[13px] font-semibold text-teal hover:underline">
+                                Sign in for price
+                            </Link>
+                        ) : cardPrice > 0 ? (
                             <div className="flex items-baseline gap-1 min-w-0">
                                 <span className="text-[17px] font-bold text-ink tabular-nums tracking-tight">
                                     {formatPrice(cardPrice, currency)}

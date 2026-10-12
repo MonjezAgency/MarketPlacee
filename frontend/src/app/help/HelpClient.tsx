@@ -12,7 +12,7 @@ import { ArrowLeft, HelpCircle, ChevronDown, Search, Users, CreditCard, Package,
 const CATEGORIES = [
     { icon: Users, label: 'Buyer FAQs', color: 'text-blue-500 bg-blue-500/10' },
     { icon: CreditCard, label: 'Payments & Escrow', color: 'text-emerald-500 bg-emerald-500/10' },
-    { icon: Package, label: 'Orders & Shipping', color: 'text-orange-500 bg-orange-500/10' },
+    { icon: Package, label: 'Orders & Shipping', color: 'text-teal bg-teal-soft' },
     { icon: ShieldCheck, label: 'Security & KYC', color: 'text-primary bg-primary/10' },
 ];
 

@@ -22,8 +22,8 @@ export default function ShippingPage() {
                     </Link>
 
                     <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center">
-                            <Truck size={22} className="text-orange-500" />
+                        <div className="w-12 h-12 rounded-2xl bg-teal-soft flex items-center justify-center">
+                            <Truck size={22} className="text-teal" />
                         </div>
                         <div>
                             <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Policies</p>
@@ -32,7 +32,7 @@ export default function ShippingPage() {
                     </div>
                     <p className="text-muted-foreground mb-12">Last updated: April 2026</p>
 
-                    <div className="bg-orange-500/5 border border-orange-500/20 rounded-2xl p-6 mb-12">
+                    <div className="bg-teal-soft/60 border border-line rounded-2xl p-6 mb-12">
                         <p className="text-sm leading-relaxed">
                             <strong>Important:</strong> Atlantis is a B2B marketplace platform. Shipping is arranged and fulfilled by individual suppliers. The shipping terms below represent platform-wide guidelines — actual shipping times, costs, and carriers are determined by each supplier and displayed on their product listings.
                         </p>

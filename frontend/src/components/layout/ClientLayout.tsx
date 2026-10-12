@@ -14,8 +14,10 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const isAuthPage = pathname?.startsWith('/auth');
     const isPendingPage = pathname === '/auth/pending';
     const isDashboard = pathname?.startsWith('/dashboard') || pathname?.startsWith('/admin') || pathname?.startsWith('/supplier');
+    // The buyer dashboard lives inside the storefront chrome (header + footer).
+    const isBuyerDashboard = pathname?.startsWith('/dashboard/customer');
 
-    // Enforcement logic: Make the entire marketplace private
+    // Dashboards are private; the catalog is public (prices are withheld by the API).
     useEffect(() => {
         // 0. Wait for auth to hydrate from localStorage
         if (!isAuthReady) return;
@@ -30,21 +32,9 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             return;
         }
 
-        // 2. Not logged in? Protect dashboards strictly, redirect once for public pages.
+        // 2. Not logged in? Protect dashboards; public pages stay browsable.
         if (!isLoggedIn) {
-            if (isDashboard) {
-                router.push('/auth/login?session=expired');
-                return;
-            }
-
-            if (!isAuthPage) {
-                const hasRedirected = sessionStorage.getItem('has_redirected_to_login');
-                if (!hasRedirected) {
-                    sessionStorage.setItem('has_redirected_to_login', 'true');
-                    router.push('/auth/login?session=expired');
-                    return;
-                }
-            }
+            if (isDashboard) router.push('/auth/login?session=expired');
             return;
         }
 
@@ -58,7 +48,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         }
     }, [user, isLoggedIn, isAuthReady, pathname, isAuthPage, isPendingPage, router]);
 
-    const showNav = !isDashboard && !isAuthPage;
+    const showNav = (!isDashboard || isBuyerDashboard) && !isAuthPage;
 
     return (
         <div className="flex flex-col min-h-screen">
@@ -67,7 +57,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             <main className="flex-grow">
                 {children}
             </main>
-            {(!isDashboard) && <Footer />}
+            {(!isDashboard || isBuyerDashboard) && <Footer />}
         </div>
     );
 }

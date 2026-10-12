@@ -2,7 +2,7 @@ import { PricingError, priceLine, priceLoad, minUnits, tierAvailability, Pricing
 
 const M = { piece: 1.1, pallet: 1.05, container: 1.02, mix: 1.15 };
 // Real record: Prime Hydration UK Juventus DFA 500ml (production catalog).
-const prime: PricingProduct = { id: 'prime', name: 'Prime Juventus', price: 15.1953488372093, basePrice: 13.81395348837209, unitsPerCase: 12, casesPerPallet: 132, palletsPerShipment: 26, moq: 1, moqUnit: 'PIECE', status: 'APPROVED', supplierId: 'sup-a', exwLocation: null };
+const prime: PricingProduct = { id: 'prime', name: 'Prime Juventus', price: 15.1953488372093, basePrice: 13.81395348837209, unitsPerCase: 12, casesPerPallet: 132, palletsPerShipment: 26, moq: 1, moqUnit: 'PIECE', status: 'APPROVED', supplierId: 'sup-a', exwLocation: null, warehouse: { id: 'w-nl', city: 'Rotterdam', country: 'Netherlands' } };
 const noTruck: PricingProduct = { ...prime, id: 'nt', name: 'No truck data', palletsPerShipment: null };
 const otherSupplier: PricingProduct = { ...prime, id: 'os', name: 'Other supplier', supplierId: 'sup-b' };
 const map = (...ps: PricingProduct[]) => new Map(ps.map((p) => [p.id, p]));

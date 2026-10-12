@@ -9,7 +9,7 @@ const BENEFITS = [
     { icon: ShieldCheck, title: 'Curated by Atlantis', desc: 'Every product is sourced and quality-checked by the Atlantis team before listing. Buy in bulk with confidence.', color: 'text-emerald-500 bg-emerald-500/10' },
     { icon: Globe, title: 'Europe & Gulf Distribution', desc: 'FMCG, beverages, personal care and more — sold and shipped by Atlantis across Europe and the Gulf, all in one place.', color: 'text-blue-500 bg-blue-500/10' },
     { icon: ShieldCheck, title: 'Escrow Payment Protection', desc: 'Your wholesale payment is held in escrow until goods are confirmed delivered. No wire transfer risk, no trust required.', color: 'text-purple-500 bg-purple-500/10' },
-    { icon: BarChart3, title: 'Financial Reporting', desc: 'Download invoices automatically for every order. Full purchase history with exportable records for your accounting team.', color: 'text-orange-500 bg-orange-500/10' },
+    { icon: BarChart3, title: 'Financial Reporting', desc: 'Download invoices automatically for every order. Full purchase history with exportable records for your accounting team.', color: 'text-teal bg-teal-soft' },
     { icon: Zap, title: 'Fast Reordering', desc: 'Repeat your most common orders with a single click from your order history. Build a long-term wholesale relationship with Atlantis.', color: 'text-amber-500 bg-amber-500/10' },
 ];
 

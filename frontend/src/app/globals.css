@@ -115,8 +115,8 @@
         --secondary: 181 76% 45%;
         --secondary-foreground: 215 65% 11%;
 
-        /* Accent/Alert: Orange #FF8A00 (ATLANTIS Alerts/Offers) */
-        --accent: 32 100% 50%;
+        /* Accent: brand teal (legacy orange retired) */
+        --accent: 175 80% 27%; /* brand teal #0E7C74 (was legacy orange) */
         --accent-foreground: 0 0% 100%;
 
         --muted: 220 16% 95%;
@@ -153,8 +153,8 @@
         --secondary: 181 76% 45%;
         --secondary-foreground: 215 65% 11%;
 
-        /* Accent: Orange #FF8A00 (For Offers/Alerts) */
-        --accent: 32 100% 50%;
+        /* Accent: brand teal (legacy orange retired) */
+        --accent: 175 80% 27%; /* brand teal #0E7C74 (was legacy orange) */
         --accent-foreground: 0 0% 100%;
 
         --muted: 215 32% 12%;
@@ -181,7 +181,7 @@
         --primary-foreground: 0 0% 100%;
         --secondary: 181 76% 45%;
         --secondary-foreground: 214 65% 11%;
-        --accent: 32 100% 50%;
+        --accent: 175 80% 27%; /* brand teal #0E7C74 (was legacy orange) */
         --accent-foreground: 0 0% 100%;
         --muted: 216 10% 88%;
         --muted-foreground: 0 0% 40%;

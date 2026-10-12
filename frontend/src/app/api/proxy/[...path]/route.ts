@@ -57,7 +57,11 @@ async function handler(
   const session = await getServerSession(authOptions);
   const token = (session as any)?.backendToken || cookies().get('token')?.value;
 
-  if (!token && !isPublic) {
+  // The catalog is browsable before sign-up; the backend strips prices from
+  // anonymous responses (it decides — not this proxy).
+  const isPublicRead = req.method === 'GET' && /^(products|ads)(\/|$|\?)/.test(backendPath)
+    && !/^products\/(my-products|inventory|admin)(\/|$)/.test(backendPath);
+  if (!token && !isPublic && !isPublicRead) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
   }
   const search = req.nextUrl.search; // includes the '?' and query string

@@ -1,7 +1,7 @@
 import { MixedLoadsService } from '../mixed-loads.service';
 
 /** Explicit selection: a load contains exactly the lines the buyer chose. */
-const prime = { id: 'prime', name: 'Prime', price: 15.2, basePrice: 13.81, unitsPerCase: 12, casesPerPallet: 132, palletsPerShipment: 26, moq: 1, moqUnit: 'PIECE', status: 'APPROVED', supplierId: 'a', exwLocation: null, variantPrices: null, variants: [{ name: 'Flavour', values: ['Grape', 'Ice'] }], images: [], ean: null, brand: 'Prime' };
+const prime = { id: 'prime', name: 'Prime', price: 15.2, basePrice: 13.81, unitsPerCase: 12, casesPerPallet: 132, palletsPerShipment: 26, moq: 1, moqUnit: 'PIECE', status: 'APPROVED', supplierId: 'a', exwLocation: null, warehouse: { id: 'w-nl', city: 'Rotterdam', country: 'Netherlands' }, variantPrices: null, variants: [{ name: 'Flavour', values: ['Grape', 'Ice'] }], images: [], ean: null, brand: 'Prime' };
 const zero = { ...prime, id: 'zero', name: 'Zero', supplierId: 'b', variants: null };
 const draft = { ...prime, id: 'draft', status: 'PENDING' };
 

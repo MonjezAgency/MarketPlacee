@@ -22,28 +22,28 @@ export default function NotificationsPage() {
         <div className="space-y-8 animate-in fade-in duration-700">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-black text-[#0B1F3A] tracking-tight">Notifications</h1>
-                    <p className="text-sm text-slate-500 font-medium mt-1">Stay updated with your latest order activities and account alerts.</p>
+                    <h1 className="text-3xl font-bold text-heading tracking-tight">Notifications</h1>
+                    <p className="text-sm text-ink-3 font-medium mt-1">Stay updated with your latest order activities and account alerts.</p>
                 </div>
                 {unreadCount > 0 && (
                     <button 
                         onClick={markAllRead}
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black text-slate-600 hover:bg-slate-100 transition-all"
+                        className="flex items-center gap-2 px-4 py-2 bg-surface-2 border border-line rounded-xl text-xs font-bold text-ink-2 hover:bg-surface-3 transition-all"
                     >
                         <CheckCheck size={16} /> Mark all as read
                     </button>
                 )}
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-[32px] overflow-hidden shadow-xl shadow-slate-200/50">
+            <div className="bg-surface border border-line rounded-2xl overflow-hidden shadow-xl shadow-slate-200/50">
                 {notifications.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-32 space-y-6">
-                        <div className="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center text-slate-300">
+                        <div className="w-24 h-24 bg-surface-2 rounded-full flex items-center justify-center text-slate-300">
                             <Bell size={48} />
                         </div>
                         <div className="text-center space-y-1">
-                            <h3 className="text-lg font-black text-[#0B1F3A]">All clear!</h3>
-                            <p className="text-sm text-slate-500 font-medium">You don't have any notifications right now.</p>
+                            <h3 className="text-lg font-bold text-heading">All clear!</h3>
+                            <p className="text-sm text-ink-3 font-medium">You don't have any notifications right now.</p>
                         </div>
                     </div>
                 ) : (
@@ -60,27 +60,27 @@ export default function NotificationsPage() {
                             >
                                 <div className={cn(
                                     "w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all",
-                                    !n.read ? "bg-white border-slate-200 shadow-sm" : "bg-slate-50 border-slate-100"
+                                    !n.read ? "bg-surface border-line shadow-sm" : "bg-surface-2 border-line"
                                 )}>
                                     {getIcon(n.type)}
                                 </div>
                                 <div className="flex-1 space-y-1">
                                     <div className="flex items-center justify-between">
-                                        <h4 className={cn("text-sm font-black tracking-tight", !n.read ? "text-[#0B1F3A]" : "text-slate-600")}>
+                                        <h4 className={cn("text-sm font-bold tracking-tight", !n.read ? "text-heading" : "text-ink-2")}>
                                             {n.title}
                                         </h4>
-                                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                        <span className="text-[10px] font-bold text-ink-4 uppercase tracking-widest flex items-center gap-1.5">
                                             <Calendar size={12} />
                                             {new Date(n.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
-                                    <p className={cn("text-sm leading-relaxed", !n.read ? "text-slate-700 font-medium" : "text-slate-500")}>
+                                    <p className={cn("text-sm leading-relaxed", !n.read ? "text-ink-2 font-medium" : "text-ink-3")}>
                                         {n.message}
                                     </p>
                                     {!n.read && (
                                         <button 
                                             onClick={() => markRead(n.id)}
-                                            className="mt-3 text-[10px] font-black text-teal-600 uppercase tracking-widest hover:underline"
+                                            className="mt-3 text-[10px] font-bold text-teal-600 uppercase tracking-widest hover:underline"
                                         >
                                             Mark as read
                                         </button>

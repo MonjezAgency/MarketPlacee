@@ -3,113 +3,54 @@
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle2, ShoppingBag, ArrowRight, Phone, Mail } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+import { CheckCircle2, ListPlus, ArrowRight, Loader2 } from 'lucide-react';
 import { useCart } from '@/lib/cart';
+import { SaveToListDialog } from '@/components/account/SaveToListDialog';
+import { orderRef } from '@/lib/buyer-orders';
 
 function ConfirmationContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { clearCart } = useCart();
     const orderId = searchParams.get('orderId');
-    
-    const [countdown, setCountdown] = useState(15);
+    const [saveOpen, setSaveOpen] = useState(false);
 
-    // Clear the cart once order is confirmed
-    useEffect(() => {
-        if (orderId) {
-            clearCart();
-        }
-    }, [orderId]);
-
-    useEffect(() => {
-        if (!orderId) {
-            router.replace('/');
-            return;
-        }
-
-        const timer = setInterval(() => {
-            setCountdown((prev) => {
-                if (prev <= 1) {
-                    clearInterval(timer);
-                    router.push('/');
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        return () => clearInterval(timer);
-    }, [orderId, router]);
+    // Clear the cart once the order is confirmed.
+    useEffect(() => { if (orderId) clearCart(); }, [orderId]); // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { if (!orderId) router.replace('/'); }, [orderId, router]);
+    if (!orderId) return null;
 
     return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-            <div className="max-w-xl w-full">
-                {/* Success Card */}
-                <div className="bg-card border border-border rounded-[2rem] p-8 lg:p-12 text-center relative overflow-hidden">
-                    {/* Top Gradient Bar */}
-                    <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-emerald-500 via-primary to-secondary"></div>
-                    
-                    <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-8 animate-in zoom-in duration-500">
-                        <CheckCircle2 className="w-12 h-12 text-emerald-500" />
-                    </div>
+        <main className="min-h-[70vh] bg-surface flex items-center justify-center px-4 py-12 text-start">
+            <div className="w-full max-w-[520px] rounded-2xl ring-1 ring-line bg-surface shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-6 sm:p-8">
+                <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><CheckCircle2 size={24} /></span>
+                <h1 className="mt-5 text-[22px] font-semibold text-heading">Order received</h1>
+                <p className="mt-1.5 text-[14px] text-ink-2">
+                    Reference <span className="font-semibold text-ink tabular-nums">{orderRef(orderId)}</span>. Atlantis will confirm quantities and availability with the supplier before dispatch; you’ll see each update in Orders &amp; tracking.
+                </p>
 
-                    <h1 className="text-3xl lg:text-4xl font-black text-foreground mb-4 tracking-tight">
-                        Order <span className="text-emerald-500">Received!</span>
-                    </h1>
-                    
-                    <p className="text-muted-foreground mb-4 text-lg">
-                        Thank you for your order. We&apos;ve received it successfully.
-                    </p>
-
-                    <p className="text-muted-foreground mb-8 text-base leading-relaxed max-w-md mx-auto">
-                        A member of our Marketplace team will contact you shortly to confirm details and arrange fulfillment.
-                    </p>
-
-                    <div className="inline-flex flex-col items-center gap-2 mb-8 p-4 bg-muted/30 rounded-2xl border border-border w-full">
-                        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Order Reference</span>
-                        <code className="text-xl font-mono text-primary font-bold">{orderId}</code>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                        <Link href="/" className="w-full">
-                            <button className="w-full py-4 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl transition-all flex items-center justify-center gap-2">
-                                <ShoppingBag className="w-4 h-4" />
-                                <span>Continue Shopping</span>
-                            </button>
-                        </Link>
-                        <Link href="/contact" className="w-full">
-                            <button className="w-full py-4 bg-muted hover:bg-muted/80 text-foreground font-bold rounded-xl transition-all flex items-center justify-center gap-2">
-                                <Phone className="w-4 h-4" />
-                                <span>Contact Us</span>
-                            </button>
-                        </Link>
-                    </div>
-
-                    <div className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-500/5 border border-emerald-500/10 rounded-full mx-auto">
-                        <Mail className="w-4 h-4 text-emerald-500/50" />
-                        <span className="text-xs text-muted-foreground font-medium">We&apos;ll reach out via email or phone</span>
+                <div className="mt-6 rounded-xl ring-1 ring-line p-4 flex items-start gap-3">
+                    <ListPlus size={18} className="text-teal shrink-0 mt-0.5" />
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[14px] font-semibold text-ink">Save these items to a list for next time</p>
+                        <p className="text-[13px] text-ink-3">Reorder the same products in a few clicks — prices are refreshed when you do.</p>
+                        <button type="button" onClick={() => setSaveOpen(true)} className="mt-2 text-[13.5px] font-semibold text-teal hover:underline">Choose a list</button>
                     </div>
                 </div>
 
-                {/* Redirect Notice */}
-                <div className="mt-8 text-center">
-                    <p className="text-sm text-muted-foreground animate-pulse">
-                        Redirecting to homepage in <span className="text-foreground font-bold">{countdown}s</span>...
-                    </p>
+                <div className="mt-6 flex flex-col sm:flex-row gap-2">
+                    <Link href={`/dashboard/customer/orders/${orderId}`} className="flex-1 h-11 inline-flex items-center justify-center gap-2 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14px] font-semibold">View order <ArrowRight size={15} /></Link>
+                    <Link href="/categories" className="flex-1 h-11 inline-flex items-center justify-center rounded-xl ring-1 ring-line-strong text-[14px] font-semibold text-ink hover:bg-surface-2">Continue shopping</Link>
                 </div>
             </div>
-        </div>
+            <SaveToListDialog orderId={orderId} open={saveOpen} onClose={() => setSaveOpen(false)} />
+        </main>
     );
 }
 
 export default function ConfirmationPage() {
     return (
-        <Suspense fallback={
-            <div className="min-h-screen bg-background flex items-center justify-center">
-                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-            </div>
-        }>
+        <Suspense fallback={<div className="min-h-[70vh] flex items-center justify-center text-ink-3"><Loader2 className="animate-spin" /></div>}>
             <ConfirmationContent />
         </Suspense>
     );

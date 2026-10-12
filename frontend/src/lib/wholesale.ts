@@ -24,7 +24,7 @@ export function minUnitsFor(p: { moq?: number | null; moqUnit?: string | null; u
 export class ApiError extends Error {
     constructor(public status: number, public code: string, message: string, public body?: any) { super(message); }
 }
-async function call<T>(path: string, init?: RequestInit): Promise<T> {
+export async function call<T>(path: string, init?: RequestInit): Promise<T> {
     const res = await apiFetch(path, { ...init, headers: { 'Content-Type': 'application/json', ...(init?.headers || {}) } });
     const body = await res.json().catch(() => null);
     if (!res.ok) {
@@ -64,11 +64,12 @@ export type LoadKind = 'PALLET' | 'TRUCK';
 export interface LoadLine { productId: string; variant?: string | null; quantity: number }
 export interface MixedLoadQuote {
     kind: LoadKind; supplierId: string | null; fill: number; requiredFill: number; subtotal: number; markup: number; total: number; ready: boolean; issues: string[];
+    origin?: { status: 'VERIFIED' | 'UNVERIFIED'; label: string | null; country: string | null; unverified: string[] };
     lines: (LoadLine & { name: string; unit: 'case' | 'pallet'; casePrice: number; cases: number; units: number; share: number; lineSubtotal: number })[];
 }
 export interface MixedLoad {
     id: string; kind: LoadKind; status: string; version: number; supplierId: string | null;
-    products: Record<string, { id: string; name: string; brand: string | null; ean: string | null; image: string | null; unitsPerCase: number | null; casesPerPallet: number | null; palletsPerShipment: number | null; leadTime?: number | null; readyForDispatch?: boolean; exwLocation?: string | null }>;
+    products: Record<string, { id: string; name: string; brand: string | null; ean: string | null; image: string | null; unitsPerCase: number | null; casesPerPallet: number | null; palletsPerShipment: number | null; leadTime?: number | null; readyForDispatch?: boolean; exwLocation?: string | null; dispatch?: string | null }>;
     quote?: MixedLoadQuote; error?: { code?: string; message: string }; ready?: boolean;
 }
 

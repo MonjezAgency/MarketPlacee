@@ -77,7 +77,7 @@ function ResetPasswordContent() {
             >
                 <div className="text-center mb-10">
                     <Link href="/" className="inline-block group">
-                        <span className="font-black text-4xl tracking-tighter text-white">
+                        <span className="font-bold text-4xl tracking-tighter text-white">
                             Atlan<span className="text-[#1BC7C9]">tis</span>
                         </span>
                     </Link>
@@ -86,10 +86,10 @@ function ResetPasswordContent() {
                 <div className="bg-[#0F172A]/80 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] p-8 sm:p-10 shadow-2xl relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#1BC7C9] to-transparent opacity-50" />
                     
-                    <h1 className="text-3xl font-black text-white mb-2 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
                         New Password <Sparkles className="text-[#1BC7C9] w-6 h-6" />
                     </h1>
-                    <p className="text-slate-400 text-sm font-medium mb-8">
+                    <p className="text-ink-4 text-sm font-medium mb-8">
                         Please enter your new secure password below.
                     </p>
 
@@ -110,28 +110,28 @@ function ResetPasswordContent() {
                                 <CheckCircle2 className="w-10 h-10 text-emerald-500" />
                             </div>
                             <div className="space-y-2">
-                                <h3 className="text-2xl font-black text-white">Security Updated</h3>
-                                <p className="text-slate-400">Your password has been reset successfully. We're taking you to the login page...</p>
+                                <h3 className="text-2xl font-bold text-white">Security Updated</h3>
+                                <p className="text-ink-4">Your password has been reset successfully. We're taking you to the login page...</p>
                             </div>
                         </div>
                     ) : (
                         <form onSubmit={handleReset} className="space-y-6">
                             <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] ms-1">New Password</label>
+                                <label className="text-[11px] font-bold text-ink-3 uppercase tracking-[0.2em] ms-1">New Password</label>
                                 <div className="relative group">
-                                    <Lock className="absolute start-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-[#1BC7C9] transition-colors" />
+                                    <Lock className="absolute start-5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-3 group-focus-within:text-[#1BC7C9] transition-colors" />
                                     <input
                                         type={showPassword ? "text" : "password"}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full bg-slate-900/50 border border-white/5 rounded-2xl ps-14 pe-14 py-4 text-white outline-none focus:border-[#1BC7C9]/50 focus:bg-slate-900 transition-all text-base tracking-widest placeholder:tracking-normal placeholder:text-slate-600"
+                                        className="w-full bg-slate-900/50 border border-white/5 rounded-2xl ps-14 pe-14 py-4 text-white outline-none focus:border-[#1BC7C9]/50 focus:bg-slate-900 transition-all text-base tracking-widest placeholder:tracking-normal placeholder:text-ink-2"
                                         placeholder="••••••••"
                                         required
                                     />
                                     <button
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute end-5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition-colors"
+                                        className="absolute end-5 top-1/2 -translate-y-1/2 text-ink-3 hover:text-white transition-colors"
                                     >
                                         {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                                     </button>
@@ -152,7 +152,7 @@ function ResetPasswordContent() {
                                             )} />
                                             <span className={cn(
                                                 "text-[10px] font-bold uppercase tracking-tight",
-                                                req.met ? "text-emerald-400" : "text-slate-500"
+                                                req.met ? "text-emerald-400" : "text-ink-3"
                                             )}>
                                                 {req.label}
                                             </span>
@@ -162,14 +162,14 @@ function ResetPasswordContent() {
                             </div>
 
                             <div className="space-y-3">
-                                <label className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] ms-1">Confirm Identity</label>
+                                <label className="text-[11px] font-bold text-ink-3 uppercase tracking-[0.2em] ms-1">Confirm Identity</label>
                                 <div className="relative group">
-                                    <ShieldCheck className="absolute start-5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500 group-focus-within:text-[#1BC7C9] transition-colors" />
+                                    <ShieldCheck className="absolute start-5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-3 group-focus-within:text-[#1BC7C9] transition-colors" />
                                     <input
                                         type="password"
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="w-full bg-slate-900/50 border border-white/5 rounded-2xl ps-14 pe-6 py-4 text-white outline-none focus:border-[#1BC7C9]/50 focus:bg-slate-900 transition-all text-base tracking-widest placeholder:tracking-normal placeholder:text-slate-600"
+                                        className="w-full bg-slate-900/50 border border-white/5 rounded-2xl ps-14 pe-6 py-4 text-white outline-none focus:border-[#1BC7C9]/50 focus:bg-slate-900 transition-all text-base tracking-widest placeholder:tracking-normal placeholder:text-ink-2"
                                         placeholder="••••••••"
                                         required
                                     />
@@ -182,7 +182,7 @@ function ResetPasswordContent() {
                                 className="w-full relative group overflow-hidden rounded-2xl"
                             >
                                 <div className="absolute inset-0 bg-gradient-to-r from-[#1BC7C9] to-blue-500 opacity-100 group-hover:scale-105 transition-transform duration-500" />
-                                <div className="relative py-5 bg-transparent text-white font-black text-sm uppercase tracking-[0.3em] flex items-center justify-center gap-3 disabled:opacity-50">
+                                <div className="relative py-5 bg-transparent text-white font-bold text-sm uppercase tracking-[0.3em] flex items-center justify-center gap-3 disabled:opacity-50">
                                     {loading ? (
                                         <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                     ) : (
@@ -197,7 +197,7 @@ function ResetPasswordContent() {
                 </div>
 
                 <div className="mt-8 text-center">
-                    <Link href="/auth/login" className="text-[11px] font-black text-slate-500 uppercase tracking-[0.2em] hover:text-[#1BC7C9] transition-colors">
+                    <Link href="/auth/login" className="text-[11px] font-bold text-ink-3 uppercase tracking-[0.2em] hover:text-[#1BC7C9] transition-colors">
                         Back to Security Login
                     </Link>
                 </div>

@@ -70,7 +70,7 @@ export default function CustomerPaymentMethodsPage() {
                     <CreditCard className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-black">Payment Methods</h1>
+                    <h1 className="text-2xl font-bold">Payment Methods</h1>
                     <p className="text-sm text-muted-foreground">Manage your bank account for refunds and settlements</p>
                 </div>
             </div>
@@ -99,12 +99,12 @@ export default function CustomerPaymentMethodsPage() {
                             <Landmark size={20} className="text-primary" />
                         </div>
                         <div>
-                            <p className="font-black text-sm">Bank Account (Refunds)</p>
+                            <p className="font-bold text-sm">Bank Account (Refunds)</p>
                             <p className="text-xs text-muted-foreground">Used for order refunds and credits</p>
                         </div>
                     </div>
                     {hasBank && !editing && (
-                        <span className="text-[10px] font-black text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
+                        <span className="text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full uppercase tracking-wider flex items-center gap-1">
                             <CheckCircle2 size={10} /> Saved
                         </span>
                     )}
@@ -114,8 +114,8 @@ export default function CustomerPaymentMethodsPage() {
                     <div className="p-5 space-y-3">
                         <div className="flex items-center justify-between p-3 bg-muted/40 rounded-xl">
                             <div>
-                                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">IBAN</p>
-                                <p className="font-black text-sm font-mono mt-0.5">{savedIban}</p>
+                                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">IBAN</p>
+                                <p className="font-bold text-sm font-mono mt-0.5">{savedIban}</p>
                             </div>
                         </div>
                         <button onClick={() => setEditing(true)} className="w-full py-2.5 border border-border rounded-xl text-sm font-bold hover:bg-muted transition-colors">
@@ -125,7 +125,7 @@ export default function CustomerPaymentMethodsPage() {
                 ) : (
                     <form onSubmit={handleSave} className="p-5 space-y-4">
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">IBAN *</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">IBAN *</label>
                             <div className="relative">
                                 <input type={showIban ? 'text' : 'password'} value={iban}
                                     onChange={e => setIban(e.target.value.toUpperCase().replace(/\s/g, ''))}
@@ -138,7 +138,7 @@ export default function CustomerPaymentMethodsPage() {
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">SWIFT / BIC (optional)</label>
+                            <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">SWIFT / BIC (optional)</label>
                             <input type="text" value={swiftCode} onChange={e => setSwiftCode(e.target.value.toUpperCase())}
                                 placeholder="e.g. NBEGEGCX"
                                 className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm font-mono outline-none focus:border-primary/50" />
@@ -146,7 +146,7 @@ export default function CustomerPaymentMethodsPage() {
                         <div className="flex gap-2 pt-2">
                             {editing && <button type="button" onClick={() => setEditing(false)} className="flex-1 py-3 border border-border rounded-xl font-bold text-sm hover:bg-muted transition-colors">Cancel</button>}
                             <button type="submit" disabled={saving}
-                                className="flex-1 py-3 bg-primary text-primary-foreground rounded-xl font-black text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors">
+                                className="flex-1 py-3 bg-primary text-primary-foreground rounded-xl font-bold text-sm disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-primary/90 transition-colors">
                                 {saving ? <><Loader2 size={16} className="animate-spin" /> Saving...</> : <><Save size={16} /> Save Securely</>}
                             </button>
                         </div>
@@ -157,8 +157,8 @@ export default function CustomerPaymentMethodsPage() {
             <div className="bg-card border border-border rounded-2xl p-5 opacity-60">
                 <div className="flex items-center gap-3 mb-2">
                     <CreditCard size={20} className="text-muted-foreground" />
-                    <p className="font-black text-sm">Credit / Debit Card</p>
-                    <span className="ml-auto text-[10px] font-black text-muted-foreground bg-muted px-2.5 py-1 rounded-full uppercase">Coming Soon</span>
+                    <p className="font-bold text-sm">Credit / Debit Card</p>
+                    <span className="ml-auto text-[10px] font-bold text-muted-foreground bg-muted px-2.5 py-1 rounded-full uppercase">Coming Soon</span>
                 </div>
                 <p className="text-xs text-muted-foreground">Card tokenization via payment gateway — coming in the next release.</p>
             </div>

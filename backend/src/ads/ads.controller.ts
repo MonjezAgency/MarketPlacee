@@ -4,6 +4,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt.guard';
+import { stripPrices } from '../products/price-visibility';
 
 @Controller('ads')
 export class AdsController {
@@ -11,9 +13,11 @@ export class AdsController {
 
     // Public endpoint for fetching ads based on frontend placement
     @Get()
-    async getAds(@Query('placement') placement: string) {
+    @UseGuards(OptionalJwtAuthGuard)
+    async getAds(@Query('placement') placement: string, @Req() req: any) {
         if (!placement) return [];
-        return this.adsService.getAdsByPlacement(placement);
+        const ads = await this.adsService.getAdsByPlacement(placement);
+        return req.user ? ads : ads.map((a: any) => ({ ...a, product: stripPrices(a.product) }));
     }
 
     // --- Supplier Endpoints ---

@@ -35,7 +35,7 @@ export default function TrackOrderPage() {
         <div className="container mx-auto px-6 py-24">
             <div className="max-w-4xl mx-auto">
                 <div className="text-center mb-12">
-                    <h1 className="text-4xl font-black mb-4 uppercase tracking-tighter font-heading">Track Your Delivery</h1>
+                    <h1 className="text-4xl font-bold mb-4 uppercase tracking-tighter font-heading">Track Your Delivery</h1>
                     <p className="text-muted-foreground max-w-xl mx-auto">
                         Enter your tracking number below to see real-time updates on your B2B order delivery status.
                     </p>
@@ -54,7 +54,7 @@ export default function TrackOrderPage() {
                     <button 
                         onClick={() => handleTrack()}
                         disabled={loading}
-                        className="absolute end-2 top-2 bottom-2 bg-secondary text-secondary-foreground px-8 rounded-xl font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
+                        className="absolute end-2 top-2 bottom-2 bg-secondary text-secondary-foreground px-8 rounded-xl font-bold uppercase tracking-widest hover:scale-105 active:scale-95 transition-transform disabled:opacity-50"
                     >
                         {loading ? 'Searching...' : 'Track'}
                     </button>
@@ -81,38 +81,38 @@ export default function TrackOrderPage() {
                             {/* Summary Card */}
                             <div className="bg-card border border-border rounded-3xl p-8 shadow-xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                                 <div className="space-y-1">
-                                    <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Status</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Status</p>
                                     <div className="flex items-center gap-2">
                                         <Truck size={16} className="text-secondary" />
-                                        <span className="font-black text-sm uppercase">{shipment.status.replace(/_/g, ' ')}</span>
+                                        <span className="font-bold text-sm uppercase">{shipment.status.replace(/_/g, ' ')}</span>
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Carrier</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Carrier</p>
                                     <div className="flex items-center gap-2">
                                         <Package size={16} className="text-primary" />
-                                        <span className="font-black text-sm uppercase">{shipment.carrier || 'Standard Logistics'}</span>
+                                        <span className="font-bold text-sm uppercase">{shipment.carrier || 'Standard Logistics'}</span>
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Expected Delivery</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Expected Delivery</p>
                                     <div className="flex items-center gap-2">
                                         <Calendar size={16} className="text-blue-500" />
-                                        <span className="font-black text-sm">{shipment.expectedDelivery ? new Date(shipment.expectedDelivery).toLocaleDateString() : 'TBD'}</span>
+                                        <span className="font-bold text-sm">{shipment.expectedDelivery ? new Date(shipment.expectedDelivery).toLocaleDateString() : 'TBD'}</span>
                                     </div>
                                 </div>
                                 <div className="space-y-1">
-                                    <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest">Order Total</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Order Total</p>
                                     <div className="flex items-center gap-2">
                                         <DollarSign size={16} className="text-emerald-500" />
-                                        <span className="font-black text-sm">{formatPrice(shipment.order.totalAmount || 0)}</span>
+                                        <span className="font-bold text-sm">{formatPrice(shipment.order.totalAmount || 0)}</span>
                                     </div>
                                 </div>
                             </div>
 
                             {/* Timeline */}
                             <div className="bg-card/50 border border-border/50 rounded-3xl p-8">
-                                <h2 className="text-xl font-black mb-8 uppercase tracking-widest">Delivery Progress</h2>
+                                <h2 className="text-xl font-bold mb-8 uppercase tracking-widest">Delivery Progress</h2>
                                 <ShipmentTimeline shipment={shipment} />
                             </div>
                         </motion.div>

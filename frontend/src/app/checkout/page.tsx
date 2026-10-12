@@ -256,7 +256,7 @@ export default function CheckoutPage() {
                         {[1, 2].map(i => (
                             <div key={i} className="flex items-center">
                                 <div className={cn(
-                                    "w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black transition-all duration-500",
+                                    "w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold transition-all duration-500",
                                     step >= i
                                         ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-110"
                                         : "bg-muted text-muted-foreground"
@@ -284,7 +284,7 @@ export default function CheckoutPage() {
                         className="max-w-3xl mx-auto bg-card border border-border/50 p-16 rounded-[48px] text-center space-y-8 premium-shadow relative overflow-hidden"
                     >
                         <div className="absolute top-0 start-0 w-full h-2 bg-gradient-to-r from-emerald-500 via-primary to-secondary" />
-                        <div className="w-24 h-24 bg-emerald-500/10 rounded-[32px] flex items-center justify-center mx-auto text-emerald-500 mb-6">
+                        <div className="w-24 h-24 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto text-emerald-500 mb-6">
                             <motion.div
                                 initial={{ scale: 0 }}
                                 animate={{ scale: 1 }}
@@ -294,10 +294,10 @@ export default function CheckoutPage() {
                             </motion.div>
                         </div>
                         <div className="space-y-4">
-                            <h2 className="text-4xl md:text-5xl font-heading font-black tracking-tight">Order Received!</h2>
+                            <h2 className="text-4xl md:text-5xl font-heading font-bold tracking-tight">Order Received!</h2>
                             <p className="text-xl text-muted-foreground leading-relaxed max-w-xl mx-auto font-medium">
                                 Thank you for your order. Your reference number is{' '}
-                                <span className="text-foreground font-black">#{createdOrderId?.slice(-8).toUpperCase()}</span>.
+                                <span className="text-foreground font-bold">#{createdOrderId?.slice(-8).toUpperCase()}</span>.
                             </p>
                             <p className="text-lg text-muted-foreground leading-relaxed max-w-lg mx-auto">
                                 A member of our team will be in touch with you shortly to confirm details and arrange fulfillment.
@@ -311,7 +311,7 @@ export default function CheckoutPage() {
                         </div>
                         <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
                             <Link href="/">
-                                <Button size="xl" className="rounded-3xl px-12 font-black">Continue Shopping</Button>
+                                <Button size="xl" className="rounded-3xl px-12 font-bold">Continue Shopping</Button>
                             </Link>
                         </div>
                         <div className="absolute bottom-[-10%] right-[-5%] w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
@@ -358,8 +358,8 @@ export default function CheckoutPage() {
                                                             )}
                                                         >
                                                             <div className="flex items-center gap-6">
-                                                                <div className="w-16 h-16 bg-white rounded-xl border border-border flex items-center justify-center p-2 shadow-sm">
-                                                                    <span className="text-[10px] font-black text-center text-foreground uppercase tracking-tighter leading-tight">
+                                                                <div className="w-16 h-16 bg-surface rounded-xl border border-border flex items-center justify-center p-2 shadow-sm">
+                                                                    <span className="text-[10px] font-bold text-center text-foreground uppercase tracking-tighter leading-tight">
                                                                         {rate.name.split(' ').join('\n')}
                                                                     </span>
                                                                 </div>
@@ -384,7 +384,7 @@ export default function CheckoutPage() {
                                                                 </div>
                                                             </div>
                                                             <div className="text-end">
-                                                                <p className="font-heading font-black text-sm text-secondary uppercase tracking-widest">{t('cart', 'tbd')}</p>
+                                                                <p className="font-heading font-bold text-sm text-secondary uppercase tracking-widest">{t('cart', 'tbd')}</p>
                                                                 <div className="mt-2 w-6 h-6 rounded-full border-2 border-border mx-auto flex items-center justify-center">
                                                                     {selectedShipping?.id === rate.id && <div className="w-3 h-3 bg-secondary rounded-full animate-in zoom-in" />}
                                                                 </div>
@@ -516,7 +516,7 @@ export default function CheckoutPage() {
                                                         <p className="text-sm font-bold truncate">{item.name}</p>
                                                         <p className="text-xs text-muted-foreground">{item.brand} • Qty: {item.quantity}</p>
                                                     </div>
-                                                    <p className="text-sm font-black text-foreground shrink-0">{formatPrice(item.price * item.quantity, currency)}</p>
+                                                    <p className="text-sm font-bold text-foreground shrink-0">{formatPrice(item.price * item.quantity, currency)}</p>
                                                 </div>
                                             ))}
                                         </div>
@@ -530,7 +530,7 @@ export default function CheckoutPage() {
                                                 <span className="text-muted-foreground">Shipping cost</span>
                                                 <span className="font-bold text-secondary uppercase tracking-widest text-xs">{t('cart', 'manualQuote')}</span>
                                             </div>
-                                            <div className="flex justify-between text-base font-black pt-2 border-t border-border/50">
+                                            <div className="flex justify-between text-base font-bold pt-2 border-t border-border/50">
                                                 <span>Total Due</span>
                                                 <span className="text-secondary">{formatPrice(grandTotal, currency)}</span>
                                             </div>
@@ -559,12 +559,12 @@ export default function CheckoutPage() {
 
                                 {/* Coupon */}
                                 <div className="space-y-2">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Promo Code</p>
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Promo Code</p>
                                     {couponApplied ? (
                                         <div className="flex items-center justify-between p-3 bg-accent/10 border border-accent/20 rounded-xl">
                                             <div className="flex items-center gap-2">
                                                 <Tag size={14} className="text-accent" />
-                                                <span className="text-sm font-black text-accent">{couponApplied}</span>
+                                                <span className="text-sm font-bold text-accent">{couponApplied}</span>
                                                 <span className="text-xs text-accent/80">−{couponDiscount}%</span>
                                             </div>
                                             <button onClick={removeCoupon} className="text-muted-foreground hover:text-red-500 transition-colors">
@@ -584,7 +584,7 @@ export default function CheckoutPage() {
                                             <button
                                                 onClick={handleApplyCoupon}
                                                 disabled={isValidatingCoupon || !couponCode.trim()}
-                                                className="h-10 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-black text-xs rounded-xl border border-primary/20 transition-all disabled:opacity-50 flex items-center gap-1.5"
+                                                className="h-10 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs rounded-xl border border-primary/20 transition-all disabled:opacity-50 flex items-center gap-1.5"
                                             >
                                                 {isValidatingCoupon ? <Loader2 size={12} className="animate-spin" /> : 'Apply'}
                                             </button>
@@ -601,7 +601,7 @@ export default function CheckoutPage() {
                                     {couponDiscount > 0 && (
                                         <div className="flex justify-between items-center">
                                             <span className="text-accent font-medium">Coupon ({couponDiscount}% off)</span>
-                                            <span className="text-accent font-heading font-black">-{formatPrice(discountAmount, currency)}</span>
+                                            <span className="text-accent font-heading font-bold">-{formatPrice(discountAmount, currency)}</span>
                                         </div>
                                     )}
                                     <div className="flex justify-between items-center">
@@ -617,7 +617,7 @@ export default function CheckoutPage() {
                                     <div className="pt-8 border-t border-border flex justify-between items-end">
                                         <div className="space-y-1">
                                             <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Grand Total</span>
-                                            <p className="font-heading font-black text-3xl text-primary">{formatPrice(grandTotal, currency)}</p>
+                                            <p className="font-heading font-bold text-3xl text-primary">{formatPrice(grandTotal, currency)}</p>
                                             {currency !== 'EUR' && (
                                                 <p className="text-[12px] text-muted-foreground">
                                                     Charged in EUR: <span className="font-bold text-foreground">{formatEUR(grandTotal)}</span>. {currency} amount is an estimate at today&apos;s rate.

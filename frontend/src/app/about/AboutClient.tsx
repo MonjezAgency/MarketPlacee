@@ -34,7 +34,7 @@ const VALUES = [
         icon: Zap,
         title: 'Simplicity at Scale',
         desc: 'Managing thousands of SKUs, multi-warehouse stock, and cross-border shipping should not require a PhD. We make B2B commerce as simple as B2C.',
-        color: 'text-orange-500 bg-orange-500/10',
+        color: 'text-teal bg-teal-soft',
     },
     {
         icon: BarChart3,

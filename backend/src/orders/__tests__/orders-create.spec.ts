@@ -7,7 +7,7 @@ import { MixedLoadsService } from '../mixed-loads.service';
  * and mixed-load locking. No database or network needed.
  */
 const MARKUPS = { piece: 1.1, pallet: 1.05, container: 1.02, mix: 1.15, platformFee: 5, shippingMarkup: 1.1 };
-const prime = { id: 'prime', name: 'Prime Juventus', price: 15.1953488372093, basePrice: 13.81395348837209, unitsPerCase: 12, casesPerPallet: 132, palletsPerShipment: 26, moq: 1, moqUnit: 'PIECE', status: 'APPROVED', supplierId: 'sup-a', exwLocation: null, variantPrices: null, images: [], ean: null, brand: 'Prime' };
+const prime = { id: 'prime', name: 'Prime Juventus', price: 15.1953488372093, basePrice: 13.81395348837209, unitsPerCase: 12, casesPerPallet: 132, palletsPerShipment: 26, moq: 1, moqUnit: 'PIECE', status: 'APPROVED', supplierId: 'sup-a', exwLocation: null, warehouse: { id: 'w-nl', city: 'Rotterdam', country: 'Netherlands' }, variantPrices: null, images: [], ean: null, brand: 'Prime' };
 const zero = { ...prime, id: 'zero', name: 'Prime Zero', casesPerPallet: 120, palletsPerShipment: 24 };
 
 function makeDb() {

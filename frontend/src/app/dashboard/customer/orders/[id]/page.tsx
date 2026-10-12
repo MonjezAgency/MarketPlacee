@@ -12,6 +12,9 @@ import {
 import { cn, prettifyVariantSignature } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
+import { SaveToListDialog } from '@/components/account/SaveToListDialog';
+import { orderStatus, orderRef, TONE_CLASS } from '@/lib/buyer-orders';
+import { ListPlus } from 'lucide-react';
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -155,6 +158,7 @@ export default function OrderTrackingPage() {
     const [invoice, setInvoice] = React.useState<any>(null);
 
     const [isConfirming, setIsConfirming] = React.useState(false);
+    const [saveOpen, setSaveOpen] = React.useState(false);
 
     const fetchOrder = React.useCallback(async () => {
         setIsLoading(true);
@@ -256,24 +260,28 @@ export default function OrderTrackingPage() {
     const canDispute = (['SHIPPED', 'DELIVERED'] as OrderStatus[]).includes(order.status) && !existingDispute;
 
     return (
-        <div className="max-w-7xl mx-auto px-4 py-8 pt-24 pb-20 space-y-8">
+        <div className="space-y-8">
             {/* Header */}
             <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-4">
-                    <button onClick={() => router.back()} className="w-10 h-10 rounded-xl border border-border/50 bg-card flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-primary/30 transition-all">
+                <div className="flex items-center gap-3">
+                    <Link href="/dashboard/customer/orders" aria-label="Back to orders" className="w-10 h-10 rounded-xl ring-1 ring-line bg-surface flex items-center justify-center text-ink-3 hover:text-ink hover:ring-line-strong">
                         <ArrowLeft size={18} />
-                    </button>
+                    </Link>
                     <div>
-                        <h1 className="text-2xl font-black tracking-tight">Order Tracking</h1>
-                        <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest mt-0.5">
-                            #{order.id.slice(-8).toUpperCase()} • {new Date(order.createdAt).toLocaleDateString()}
-                        </p>
+                        <h1 className="text-[20px] font-semibold text-heading">Order {orderRef(order.id)}</h1>
+                        <p className="text-[13px] text-ink-3">Placed {new Date(order.createdAt).toLocaleDateString()} · {orderStatus(order as any).note}</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                    <span className={cn('px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border', STATUS_COLORS[order.status])}>
-                        {order.status}
+                    <span className={cn('px-2.5 py-1 rounded-full text-[12px] font-semibold', TONE_CLASS[orderStatus(order as any).tone])}>
+                        {orderStatus(order as any).label}
                     </span>
+                    {order.status !== 'CANCELLED' && (
+                        <button type="button" onClick={() => setSaveOpen(true)} className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-xl ring-1 ring-line-strong text-[13px] font-semibold text-ink hover:bg-surface-2">
+                            <ListPlus size={14} /> Save items to a list
+                        </button>
+                    )}
+                    <a href={`mailto:Info@atlantisfmcg.com?subject=${encodeURIComponent(`Order ${orderRef(order.id)} – question`)}`} className="h-9 px-3.5 inline-flex items-center rounded-xl text-[13px] font-semibold text-teal hover:underline">Email Atlantis about this order</a>
                     {order.status === 'SHIPPED' && (
                         <button 
                             onClick={async () => {
@@ -295,7 +303,7 @@ export default function OrderTrackingPage() {
                                 }
                             }}
                             disabled={isConfirming}
-                            className="h-9 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs rounded-xl border border-emerald-600 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
+                            className="h-9 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl border border-emerald-600 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
                         >
                             {isConfirming ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
                             Confirm Delivery
@@ -303,7 +311,7 @@ export default function OrderTrackingPage() {
                     )}
                     {order.status === 'DELIVERED' && (
                         <button onClick={handleDownloadInvoice} disabled={isDownloading}
-                            className="h-9 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-black text-xs rounded-xl border border-primary/20 transition-all flex items-center gap-1.5 disabled:opacity-50">
+                            className="h-9 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs rounded-xl border border-primary/20 transition-all flex items-center gap-1.5 disabled:opacity-50">
                             {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
                             Invoice
                         </button>
@@ -323,18 +331,18 @@ export default function OrderTrackingPage() {
                 >
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                         <div>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Order Reference</p>
-                            <p className="text-base font-black mt-1 font-mono">#AT-{order.id.slice(-8).toUpperCase()}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Order Reference</p>
+                            <p className="text-base font-bold mt-1 font-mono">#AT-{order.id.slice(-8).toUpperCase()}</p>
                         </div>
                         <div>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Invoice Number</p>
-                            <p className="text-base font-black mt-1 font-mono">
-                                {invoice?.invoiceNumber || (order.status === 'DELIVERED' ? 'Generating...' : 'After delivery')}
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Invoice Number</p>
+                            <p className="text-base font-bold mt-1 font-mono">
+                                {invoice?.invoiceNumber || 'Not issued yet'}
                             </p>
                         </div>
                         {order.trackingNumber && (
                             <div>
-                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Tracking #</p>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Tracking #</p>
                                 {/* Operator request: tracking number should
                                     be a deep link to the carrier's tracking
                                     page so the customer doesn't have to copy
@@ -359,7 +367,7 @@ export default function OrderTrackingPage() {
                                             href={url}
                                             target="_blank"
                                             rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 text-base font-black mt-1 font-mono text-primary hover:underline"
+                                            className="inline-flex items-center gap-1.5 text-base font-bold mt-1 font-mono text-primary hover:underline"
                                             title="Open tracking on the carrier's website"
                                         >
                                             {num}
@@ -371,8 +379,8 @@ export default function OrderTrackingPage() {
                             </div>
                         )}
                         <div>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total</p>
-                            <p className="text-base font-black mt-1 text-primary">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</p>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Total</p>
+                            <p className="text-base font-bold mt-1 text-primary">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</p>
                         </div>
                     </div>
                     {(order.status === 'DELIVERED' && invoice) && (
@@ -382,7 +390,7 @@ export default function OrderTrackingPage() {
                                 <span className="text-xs font-bold">Order delivered. Your invoice is ready.</span>
                             </div>
                             <button onClick={handleDownloadInvoice} disabled={isDownloading}
-                                className="h-9 px-4 bg-primary text-white font-black text-xs rounded-xl flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50">
+                                className="h-9 px-4 bg-primary text-white font-bold text-xs rounded-xl flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50">
                                 {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
                                 Download Invoice
                             </button>
@@ -394,7 +402,7 @@ export default function OrderTrackingPage() {
             {/* Progress Stepper */}
             {!isCancelled ? (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border/50 rounded-3xl p-8">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-8">Delivery Progress</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-8">Delivery Progress</p>
                     <div className="relative">
                         <div className="absolute top-6 start-6 end-6 h-0.5 bg-border/50" />
                         <div className="absolute top-6 start-6 h-0.5 bg-primary transition-all duration-700"
@@ -412,7 +420,7 @@ export default function OrderTrackingPage() {
                                             <Icon size={20} />
                                         </div>
                                         <div className="text-center">
-                                            <p className={cn('text-[10px] font-black uppercase tracking-wide', done ? 'text-foreground' : 'text-muted-foreground')}>{step.label}</p>
+                                            <p className={cn('text-[10px] font-bold uppercase tracking-wide', done ? 'text-foreground' : 'text-muted-foreground')}>{step.label}</p>
                                             <p className="text-[9px] text-muted-foreground font-medium mt-0.5 leading-tight hidden md:block">{step.desc}</p>
                                         </div>
                                     </div>
@@ -425,7 +433,7 @@ export default function OrderTrackingPage() {
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-red-500/5 border border-red-500/20 rounded-3xl p-8 flex items-center gap-4">
                     <XCircle className="text-red-400 w-10 h-10 shrink-0" />
                     <div>
-                        <p className="font-black text-red-400">Order Cancelled</p>
+                        <p className="font-bold text-red-400">Order Cancelled</p>
                         <p className="text-sm text-muted-foreground mt-1">This order has been cancelled. Contact support if you have questions.</p>
                     </div>
                 </motion.div>
@@ -434,7 +442,7 @@ export default function OrderTrackingPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Order Items — spans 2 cols on desktop */}
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="lg:col-span-2 bg-card border border-border/50 rounded-3xl p-6 space-y-4">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Items ({order.items.length})</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Items ({order.items.length})</p>
                     <div className="space-y-4">
                         {order.items.map(item => {
                             const p = item.product;
@@ -471,7 +479,7 @@ export default function OrderTrackingPage() {
                                             </div>
                                         )}
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-black text-base leading-tight">{p.name}</p>
+                                            <p className="font-bold text-base leading-tight">{p.name}</p>
                                             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] text-muted-foreground">
                                                 {p.brand && <span className="font-bold text-foreground/70">{p.brand}</span>}
                                                 {p.category && <span>· {p.category}</span>}
@@ -489,9 +497,9 @@ export default function OrderTrackingPage() {
                                                 </div>
                                             )}
                                             {Array.isArray((item as any).mixComposition) && (item as any).mixComposition.length > 0 && (
-                                                <div className="mt-2 rounded-xl border border-orange-200 bg-orange-50/40 px-3 py-2 text-[11px]">
-                                                    <p className="font-black text-orange-700 uppercase tracking-widest text-[9px] mb-1">Mixed composition</p>
-                                                    <ul className="space-y-0.5 text-slate-700">
+                                                <div className="mt-2 rounded-xl border border-line bg-teal-soft/50 px-3 py-2 text-[12px]">
+                                                    <p className="font-semibold text-teal text-[11.5px] mb-1">Mixed composition</p>
+                                                    <ul className="space-y-0.5 text-ink-2">
                                                         {((item as any).mixComposition as Array<{ signature: string; quantity: number }>).map((c) => {
                                                             const pretty = prettifyVariantSignature(c.signature) || 'Variant';
                                                             return (
@@ -503,55 +511,55 @@ export default function OrderTrackingPage() {
                                             )}
                                         </div>
                                         <div className="text-end shrink-0">
-                                            <p className="text-base font-black text-primary">{formatPrice(item.price * item.quantity)}</p>
+                                            <p className="text-base font-bold text-primary">{formatPrice(item.price * item.quantity)}</p>
                                             <p className="text-[10px] text-muted-foreground">{formatPrice(item.price)}/{u}</p>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-border/30">
                                         <div>
-                                            <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Qty</p>
-                                            <p className="text-sm font-black mt-0.5">{item.quantity} {u}{item.quantity > 1 ? 's' : ''}</p>
+                                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Qty</p>
+                                            <p className="text-sm font-bold mt-0.5">{item.quantity} {u}{item.quantity > 1 ? 's' : ''}</p>
                                         </div>
                                         {logistics && (
                                             <div>
-                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Total Pcs</p>
-                                                <p className="text-sm font-black text-primary mt-0.5">{totalPcs.toLocaleString()}</p>
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Total Pcs</p>
+                                                <p className="text-sm font-bold text-primary mt-0.5">{totalPcs.toLocaleString()}</p>
                                             </div>
                                         )}
                                         {ppc > 0 && (
                                             <div>
-                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Pcs / Case</p>
-                                                <p className="text-sm font-black mt-0.5">{ppc}</p>
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Pcs / Case</p>
+                                                <p className="text-sm font-bold mt-0.5">{ppc}</p>
                                             </div>
                                         )}
                                         {cpp > 0 && (
                                             <div>
-                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Cases / Pallet</p>
-                                                <p className="text-sm font-black mt-0.5">{cpp}</p>
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Cases / Pallet</p>
+                                                <p className="text-sm font-bold mt-0.5">{cpp}</p>
                                             </div>
                                         )}
                                         {ppp > 0 && (
                                             <div>
-                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Pcs / Pallet</p>
-                                                <p className="text-sm font-black mt-0.5">{ppp}</p>
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Pcs / Pallet</p>
+                                                <p className="text-sm font-bold mt-0.5">{ppp}</p>
                                             </div>
                                         )}
                                         {pps > 0 && (
                                             <div>
-                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">Pallets / Truck</p>
-                                                <p className="text-sm font-black mt-0.5">{pps}</p>
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Pallets / Truck</p>
+                                                <p className="text-sm font-bold mt-0.5">{pps}</p>
                                             </div>
                                         )}
                                         {p.ean && (
                                             <div>
-                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">EAN</p>
-                                                <p className="text-sm font-black mt-0.5 font-mono">{p.ean}</p>
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">EAN</p>
+                                                <p className="text-sm font-bold mt-0.5 font-mono">{p.ean}</p>
                                             </div>
                                         )}
                                         {p.shelfLife && (
                                             <div>
-                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-wider">BBD</p>
-                                                <p className="text-sm font-black mt-0.5">{p.shelfLife}</p>
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">BBD</p>
+                                                <p className="text-sm font-bold mt-0.5">{p.shelfLife}</p>
                                             </div>
                                         )}
                                     </div>
@@ -566,9 +574,9 @@ export default function OrderTrackingPage() {
                     {/* Buyer Info */}
                     {order.customer && (
                         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-3">
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Buyer</p>
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Buyer</p>
                             <div className="space-y-2 text-sm">
-                                <p className="font-black">{order.customer.name}</p>
+                                <p className="font-bold">{order.customer.name}</p>
                                 {order.customer.companyName && (
                                     <p className="text-xs text-muted-foreground">{order.customer.companyName}</p>
                                 )}
@@ -587,14 +595,14 @@ export default function OrderTrackingPage() {
                             </div>
                             <div className="pt-3 border-t border-border/30 text-[11px] text-muted-foreground">
                                 <span className="font-bold">Handled by:</span>{' '}
-                                <span className="font-black text-primary">Atlantis Marketplace</span>
+                                <span className="font-bold text-primary">Atlantis Marketplace</span>
                             </div>
                         </motion.div>
                     )}
 
                     {/* Financial Summary */}
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-4">
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Summary</p>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Summary</p>
                         <div className="space-y-3 text-sm">
                             <div className="flex justify-between">
                                 <span className="text-muted-foreground">Subtotal</span>
@@ -609,8 +617,8 @@ export default function OrderTrackingPage() {
                                 </div>
                             )}
                             <div className="flex justify-between pt-3 border-t border-border/50">
-                                <span className="font-black text-primary">Total</span>
-                                <span className="font-black text-primary text-lg">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</span>
+                                <span className="font-bold text-primary">Total</span>
+                                <span className="font-bold text-primary text-lg">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</span>
                             </div>
                         </div>
                         {order.shippingCompany && (
@@ -636,7 +644,7 @@ export default function OrderTrackingPage() {
                             if (exwSet.length === 0) return null;
                             return (
                                 <div className="pt-4 border-t border-border/50">
-                                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
                                         EXW (Ex Works origin)
                                     </p>
                                     <div className="flex flex-wrap gap-2">
@@ -657,7 +665,7 @@ export default function OrderTrackingPage() {
                             render inline. */}
                         {order.supplierInvoiceUrl && (
                             <div className="pt-4 border-t border-border/50 space-y-2">
-                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                                     Invoice from supplier
                                 </p>
                                 {(/\.pdf(\?|$)/i.test(order.supplierInvoiceUrl)) ? (
@@ -665,7 +673,7 @@ export default function OrderTrackingPage() {
                                         href={order.supplierInvoiceUrl}
                                         target="_blank"
                                         rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[12px] font-black"
+                                        className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[12px] font-bold"
                                     >
                                         <Download size={13} /> Open invoice PDF
                                     </a>
@@ -689,13 +697,13 @@ export default function OrderTrackingPage() {
             {/* History Timeline */}
             {order.history && order.history.length > 0 && (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-4">
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Status History</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status History</p>
                     <div className="space-y-3">
                         {order.history.map(entry => (
                             <div key={entry.id} className="flex items-start gap-3">
                                 <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
                                 <div className="flex-1">
-                                    <p className="text-xs font-black">{entry.newStatus}</p>
+                                    <p className="text-xs font-bold">{entry.newStatus}</p>
                                     {entry.reason && <p className="text-[11px] text-muted-foreground">{entry.reason}</p>}
                                     <p className="text-[10px] text-muted-foreground/60 mt-0.5">{new Date(entry.createdAt).toLocaleString()}</p>
                                 </div>
@@ -710,17 +718,17 @@ export default function OrderTrackingPage() {
                 <div className="p-6">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center">
-                                <AlertTriangle size={18} className="text-orange-500" />
+                            <div className="w-10 h-10 rounded-xl bg-[#FFFBEB] dark:bg-amber-500/10 flex items-center justify-center">
+                                <AlertTriangle size={18} className="text-[#B45309]" />
                             </div>
                             <div>
-                                <p className="font-black text-sm">Problem with this order?</p>
+                                <p className="font-bold text-sm">Problem with this order?</p>
                                 <p className="text-[11px] text-muted-foreground">Open a dispute and our support team will resolve it</p>
                             </div>
                         </div>
                         {canDispute && !disputeSuccess && (
                             <button onClick={() => setShowDisputeForm(v => !v)}
-                                className="flex items-center gap-1.5 h-9 px-4 bg-orange-500/10 hover:bg-orange-500/20 text-orange-500 font-black text-xs rounded-xl border border-orange-500/20 transition-all">
+                                className="flex items-center gap-1.5 h-9 px-4 ring-1 ring-line-strong hover:bg-surface-2 text-ink font-semibold text-xs rounded-xl  transition-all">
                                 {showDisputeForm ? <><ChevronUp size={12} /> Cancel</> : <><ChevronDown size={12} /> Open Dispute</>}
                             </button>
                         )}
@@ -734,10 +742,10 @@ export default function OrderTrackingPage() {
                             existingDispute.status === 'RESOLVED_REFUND' ? 'bg-emerald-500/5 border-emerald-500/20' :
                             'bg-muted/50 border-border/50'
                         )}>
-                            <p className="font-black">Dispute #{existingDispute.id.slice(-6).toUpperCase()}</p>
+                            <p className="font-bold">Dispute #{existingDispute.id.slice(-6).toUpperCase()}</p>
                             <p className="text-muted-foreground mt-1">Reason: {existingDispute.reason}</p>
                             <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <span className={cn('px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider',
+                                <span className={cn('px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider',
                                     existingDispute.status === 'OPEN' ? 'bg-yellow-500/20 text-yellow-500' :
                                     existingDispute.status === 'UNDER_REVIEW' ? 'bg-blue-500/20 text-blue-500' :
                                     existingDispute.status === 'RESOLVED_REFUND' ? 'bg-emerald-500/20 text-emerald-500' :
@@ -780,7 +788,7 @@ export default function OrderTrackingPage() {
                         >
                             <form onSubmit={handleSubmitDispute} className="p-6 space-y-4">
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                         Reason *
                                     </label>
                                     <select
@@ -793,7 +801,7 @@ export default function OrderTrackingPage() {
                                     </select>
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
                                         Description *
                                     </label>
                                     <textarea
@@ -810,7 +818,7 @@ export default function OrderTrackingPage() {
                                     </p>
                                 )}
                                 <button type="submit" disabled={isSubmittingDispute}
-                                    className="w-full py-3 bg-orange-500 hover:bg-orange-600 text-white font-black text-sm rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                                    className="w-full py-3 bg-cta hover:bg-cta-hover text-cta-fg font-semibold text-sm rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                                     {isSubmittingDispute
                                         ? <><Loader2 size={14} className="animate-spin" /> Submitting...</>
                                         : <><Send size={14} /> Submit Dispute</>}
@@ -825,6 +833,7 @@ export default function OrderTrackingPage() {
                 <ArrowLeft size={14} />
                 Back to Dashboard
             </Link>
+            <SaveToListDialog orderId={order.id} open={saveOpen} onClose={() => setSaveOpen(false)} />
         </div>
     );
 }

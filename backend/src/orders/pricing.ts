@@ -43,6 +43,8 @@ export interface PricingProduct {
     status?: string | null;
     supplierId?: string | null;
     exwLocation?: string | null;
+    /** Verified stock location (supplier warehouse), when the product is linked to one. */
+    warehouse?: { id: string; city?: string | null; country?: string | null } | null;
     variantPrices?: unknown;
     variants?: unknown;
 }
@@ -178,6 +180,42 @@ export interface PricedLoad {
     total: number;
     ready: boolean;
     issues: string[];
+    origin: LoadOrigin;
+}
+
+/**
+ * Where a mixed load would be dispatched from.
+ *  VERIFIED   — every product sits in the same verified warehouse (or the same stated EXW location).
+ *  UNVERIFIED — location missing, or same country but different/unknown sites: Atlantis must check first.
+ *  (Different countries are rejected outright with ORIGIN_MISMATCH.)
+ */
+export interface LoadOrigin { status: 'VERIFIED' | 'UNVERIFIED'; label: string | null; country: string | null; unverified: string[] }
+
+const normLoc = (s?: string | null) => String(s ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+export function loadOrigin(products: PricingProduct[]): LoadOrigin {
+    const unique = [...new Map(products.map((p) => [p.id, p])).values()];
+    const sites = unique.map((p) => {
+        const w = p.warehouse;
+        if (w && w.id) return { p, key: `wh:${w.id}`, country: normLoc(w.country) || null, label: [w.city, w.country].filter(Boolean).join(', ') || null };
+        if (normLoc(p.exwLocation)) return { p, key: `exw:${normLoc(p.exwLocation)}`, country: null, label: String(p.exwLocation).trim() };
+        return { p, key: null as string | null, country: null, label: null as string | null };
+    });
+    const countries = [...new Set(sites.map((s) => s.country).filter(Boolean))] as string[];
+    if (countries.length > 1) {
+        const a = sites.find((s) => s.country === countries[0])!, b = sites.find((s) => s.country === countries[1])!;
+        throw new PricingError('ORIGIN_MISMATCH',
+            `${a.p.name} ships from ${a.label} and ${b.p.name} from ${b.label}. Products dispatched from different countries can't share one mixed load.`,
+            { productIds: [a.p.id, b.p.id] });
+    }
+    const unknown = sites.filter((s) => !s.key).map((s) => s.p.name);
+    const keys = new Set(sites.map((s) => s.key).filter(Boolean));
+    const first = sites.find((s) => s.key);
+    if (unique.length <= 1 || (unknown.length === 0 && keys.size === 1)) {
+        return { status: unknown.length ? 'UNVERIFIED' : 'VERIFIED', label: first?.label ?? null, country: first?.country ?? null, unverified: unknown };
+    }
+    // Several products, and either a location is missing or they sit at different sites.
+    return { status: 'UNVERIFIED', label: keys.size === 1 ? first?.label ?? null : null, country: countries[0] ?? null, unverified: unknown.length ? unknown : sites.map((s) => s.p.name) };
 }
 
 /** Sellable variant signatures ("Flavour=Grape|Size=500ml") from the product's own variant groups. */
@@ -246,6 +284,7 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
         out.push({ ...l, name: p.name, unit: kind === 'PALLET' ? 'case' : 'pallet', casePrice, cases, units: cases * upc, share, lineSubtotal: round2(casePrice * cases) });
     }
 
+    const origin = loadOrigin(out.map((l) => products.get(l.productId)!));
     const fill = out.reduce((s, l) => s + l.share, 0);
     if (fill > 1 + EPS) {
         throw new PricingError('OVER_CAPACITY', `This mixed ${kind === 'PALLET' ? 'pallet' : 'truckload'} is ${Math.round(fill * 100)}% full — remove some quantity.`, { fill });
@@ -255,5 +294,9 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
     const issues: string[] = [];
     if (out.length === 0) issues.push('Add at least one product.');
     else if (requiredFill > 0 && fill < requiredFill - EPS) issues.push(`${Math.round(fill * 100)}% full — fill to ${Math.round(requiredFill * 100)}% to order.`);
-    return { kind, supplierId: mixedSuppliers ? null : supplierId, lines: out, fill, requiredFill, subtotal, markup: m.mix, total, ready: issues.length === 0, issues };
+    // Mixing several products needs one verified dispatch site; never assumed.
+    if (new Set(out.map((l) => l.productId)).size > 1 && origin.status !== 'VERIFIED') {
+        issues.push(`Dispatch location needs verification before these products can ship together (${origin.unverified.join(', ')}). Atlantis will confirm.`);
+    }
+    return { kind, supplierId: mixedSuppliers ? null : supplierId, lines: out, fill, requiredFill, subtotal, markup: m.mix, total, ready: issues.length === 0, issues, origin };
 }

@@ -135,7 +135,7 @@ export default function SecuritySettingsPage() {
                     <ShieldCheck className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                    <h1 className="text-2xl font-black">Security Settings</h1>
+                    <h1 className="text-2xl font-bold">Security Settings</h1>
                     <p className="text-sm text-muted-foreground">Two-factor authentication and login verification</p>
                 </div>
             </div>
@@ -161,12 +161,12 @@ export default function SecuritySettingsPage() {
                             <Smartphone size={20} className="text-primary" />
                         </div>
                         <div>
-                            <p className="font-black text-sm">Google Authenticator (TOTP)</p>
+                            <p className="font-bold text-sm">Google Authenticator (TOTP)</p>
                             <p className="text-xs text-muted-foreground">Time-based one-time passwords via any authenticator app</p>
                         </div>
                     </div>
                     <span className={cn(
-                        "text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider",
+                        "text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider",
                         twoFactorEnabled ? "text-emerald-500 bg-emerald-500/10" : "text-muted-foreground bg-muted"
                     )}>
                         {twoFactorEnabled ? '✓ Active' : 'Off'}
@@ -220,7 +220,7 @@ export default function SecuritySettingsPage() {
                             <p className="text-sm font-bold">Step 1: Scan this QR code with your authenticator app</p>
                             {qrCode && (
                                 <div className="flex justify-center">
-                                    <div className="p-4 bg-white rounded-2xl border border-border shadow-sm">
+                                    <div className="p-4 bg-surface rounded-2xl border border-border shadow-sm">
                                         <img src={qrCode} alt="QR Code" className="w-48 h-48" />
                                     </div>
                                 </div>
@@ -252,7 +252,7 @@ export default function SecuritySettingsPage() {
                                 <button onClick={() => { setTotpStep('idle'); setQrCode(''); setSecret(''); }}
                                     className="flex-1 py-3 border border-border rounded-xl text-sm font-bold hover:bg-muted transition-colors">Cancel</button>
                                 <button onClick={enableTotp} disabled={busy || totpToken.length !== 6}
-                                    className="flex-1 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-black disabled:opacity-50 hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
+                                    className="flex-1 py-3 bg-primary text-primary-foreground rounded-xl text-sm font-bold disabled:opacity-50 hover:bg-primary/90 transition-colors flex items-center justify-center gap-2">
                                     {busy ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />} Verify & Enable
                                 </button>
                             </div>
@@ -263,12 +263,12 @@ export default function SecuritySettingsPage() {
                         <div className="space-y-4">
                             <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 rounded-xl">
                                 <CheckCircle2 className="text-emerald-500 w-6 h-6 shrink-0" />
-                                <p className="text-sm font-black text-emerald-700 dark:text-emerald-400">2FA enabled successfully!</p>
+                                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">2FA enabled successfully!</p>
                             </div>
                             {backupCodes.length > 0 && (
                                 <div className="space-y-2">
                                     <div className="flex items-center justify-between">
-                                        <p className="text-sm font-black">Backup Codes — Save these!</p>
+                                        <p className="text-sm font-bold">Backup Codes — Save these!</p>
                                         <button onClick={() => copyToClipboard(backupCodes.join('\n'))}
                                             className="text-xs text-primary font-bold flex items-center gap-1 hover:underline">
                                             <Copy size={12} /> Copy All
@@ -295,12 +295,12 @@ export default function SecuritySettingsPage() {
                             <Mail size={20} className="text-blue-500" />
                         </div>
                         <div>
-                            <p className="font-black text-sm">Email Verification Code (OTP)</p>
+                            <p className="font-bold text-sm">Email Verification Code (OTP)</p>
                             <p className="text-xs text-muted-foreground">One-time code sent to your registered email</p>
                         </div>
                     </div>
                     <span className={cn(
-                        "text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider",
+                        "text-[10px] font-bold px-2.5 py-1 rounded-full uppercase tracking-wider",
                         emailOtpStep === 'verified' ? "text-emerald-500 bg-emerald-500/10" : "text-blue-500 bg-blue-500/10"
                     )}>
                         {emailOtpStep === 'verified' ? '✓ Verified' : 'Available'}
@@ -331,7 +331,7 @@ export default function SecuritySettingsPage() {
                                     Resend
                                 </button>
                                 <button onClick={verifyEmailOtp} disabled={emailOtpCode.length !== 6}
-                                    className="flex-1 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-black disabled:opacity-50 hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
+                                    className="flex-1 py-2.5 bg-blue-500 text-white rounded-xl text-sm font-bold disabled:opacity-50 hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
                                     <KeyRound size={14} /> Verify Code
                                 </button>
                             </div>
@@ -342,7 +342,7 @@ export default function SecuritySettingsPage() {
                         <div className="flex items-center gap-3 p-4 bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 rounded-xl">
                             <CheckCircle2 className="text-emerald-500 w-5 h-5 shrink-0" />
                             <div>
-                                <p className="text-sm font-black text-emerald-700 dark:text-emerald-400">Email verified!</p>
+                                <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">Email verified!</p>
                                 <p className="text-xs text-emerald-600 dark:text-emerald-500">Your email address is confirmed and active.</p>
                             </div>
                             <button onClick={() => { setEmailOtpStep('idle'); setEmailOtpCode(''); }}

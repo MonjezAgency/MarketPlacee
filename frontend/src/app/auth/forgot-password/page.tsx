@@ -61,7 +61,7 @@ export default function ForgotPasswordPage() {
                             initial={{ scale: 0.8 }}
                             animate={{ scale: 1 }}
                             whileHover={{ scale: 1.05 }}
-                            className="font-black text-4xl tracking-tighter text-white"
+                            className="font-bold text-4xl tracking-tighter text-white"
                         >
                             Market<span className="text-[#FF7A1A]">Place</span>
                         </motion.span>
@@ -70,10 +70,10 @@ export default function ForgotPasswordPage() {
                 </div>
 
                 {/* Form Card */}
-                <div className="bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2rem] p-10 shadow-2xl overflow-hidden relative group">
+                <div className="bg-white/5 backdrop-blur-3xl border border-white/10 rounded-2xl p-10 shadow-2xl overflow-hidden relative group">
                     <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent pointer-events-none" />
 
-                    <h1 className="text-3xl font-black text-white mb-2 flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
                         Reset Password <Sparkles className="text-[#FF7A1A] w-6 h-6" />
                     </h1>
                     <p className="text-gray-400 text-sm font-medium mb-8">
@@ -102,7 +102,7 @@ export default function ForgotPasswordPage() {
                             <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <CheckCircle2 className="w-8 h-8 text-green-500" />
                             </div>
-                            <h3 className="text-xl font-black text-white">Check Your Inbox</h3>
+                            <h3 className="text-xl font-bold text-white">Check Your Inbox</h3>
                             <p className="text-sm font-medium text-gray-400 leading-relaxed">
                                 We've sent a secure password reset link to <span className="text-white">{email}</span>. The link will expire in 15 minutes.
                             </p>
@@ -113,7 +113,7 @@ export default function ForgotPasswordPage() {
                     ) : (
                         <form onSubmit={handleReset} className="space-y-6">
                             <div className="space-y-2">
-                                <label className="text-sm font-black text-gray-300 uppercase tracking-widest ms-1">Work Email</label>
+                                <label className="text-sm font-bold text-gray-300 uppercase tracking-widest ms-1">Work Email</label>
                                 <div className="relative">
                                     <Mail className="absolute start-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
                                     <input
@@ -131,7 +131,7 @@ export default function ForgotPasswordPage() {
                                 whileTap={{ scale: 0.98 }}
                                 type="submit"
                                 disabled={loading}
-                                className="w-full bg-[#FF7A1A] hover:bg-[#e66c17] text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-[#FF7A1A]/20 flex items-center justify-center gap-3 disabled:opacity-50 transition-all"
+                                className="w-full bg-[#FF7A1A] hover:bg-[#e66c17] text-white py-5 rounded-2xl font-bold text-lg shadow-xl shadow-[#FF7A1A]/20 flex items-center justify-center gap-3 disabled:opacity-50 transition-all"
                             >
                                 {loading ? (
                                     <div className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin" />
@@ -151,7 +151,7 @@ export default function ForgotPasswordPage() {
                 {/* Footer Link */}
                 <p className="text-center mt-8 text-gray-500 font-medium tracking-tight">
                     Remember your password? {' '}
-                    <Link href="/auth/login" className="text-white font-black hover:text-[#FF7A1A] underline-offset-8 hover:underline transition-all">
+                    <Link href="/auth/login" className="text-white font-bold hover:text-[#FF7A1A] underline-offset-8 hover:underline transition-all">
                         Sign In Instead
                     </Link>
                 </p>

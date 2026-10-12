@@ -167,7 +167,8 @@ export default function MixDiscovery({ product, sel, markups, onViewAll }: {
                 <div className="rounded-xl bg-surface-2 px-4 py-3 flex flex-wrap items-center gap-3" aria-live="polite">
                     <CheckCircle2 size={18} className="text-[#10B981]" />
                     <p className="text-[13.5px] text-ink flex-1 min-w-0">
-                        {loadLabel(sel.created.kind)} created with {sel.created.quote?.lines.length ?? 0} {sel.created.quote?.lines.length === 1 ? 'product' : 'products'}.
+                        {loadLabel(sel.created.kind)} now has {sel.created.quote?.lines.length ?? 0} {sel.created.quote?.lines.length === 1 ? 'product' : 'products'}.
+                        {sel.note && <span className="block text-[12.5px] text-ink-3">{sel.note}</span>}
                     </p>
                     <button type="button" onClick={() => sel.setCreated(null)} className="h-9 px-3 rounded-lg ring-1 ring-line-strong text-[13px] font-medium text-ink">Build another</button>
                     <Link href="/cart" className="h-9 px-4 inline-flex items-center rounded-lg bg-cta hover:bg-cta-hover text-cta-fg text-[13px] font-semibold">View in cart</Link>

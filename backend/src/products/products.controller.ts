@@ -1,3 +1,5 @@
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt.guard';
+import { stripPrices, stripPriceList } from './price-visibility';
 import {
     Controller,
     Get,
@@ -100,18 +102,28 @@ export class ProductsController {
     }
 
     @Get()
+    @UseGuards(OptionalJwtAuthGuard)
     async findAll(@Request() req) {
-        const { status, category, brand, brands, categoryAny, categoryNone, minPrice, maxPrice, sort, q, limit, page, origin, listed } = req.query;
+        const { status, category, brand, brands, categoryAny, categoryNone, q, limit, page, origin, listed } = req.query;
+        // Price filters and price sorting would leak prices to anonymous callers.
+        const anon = !req.user;
+        const minPrice = anon ? undefined : req.query.minPrice;
+        const maxPrice = anon ? undefined : req.query.maxPrice;
+        const sort = anon && /price/.test(String(req.query.sort || '')) ? undefined : req.query.sort;
         const products = await this.productsService.findAll(status, { 
             category, brand, brands, categoryAny, categoryNone, minPrice, maxPrice, sort, q, limit, page, origin, listed
         });
-        return products;
+        if (req.user) return products;
+        // Anonymous: no prices, and no price-derived filters, sorts or facets.
+        return { ...products, data: stripPriceList(products.data), facets: { ...products.facets, priceRange: null } };
     }
 
     @Get('search')
-    async search(@Query('q') q: string) {
+    @UseGuards(OptionalJwtAuthGuard)
+    async search(@Query('q') q: string, @Request() req) {
         if (!q) return [];
-        return this.productsService.search(q);
+        const res = await this.productsService.search(q);
+        return req.user ? res : stripPriceList(res as any[]);
     }
 
     @Get('my-products')
@@ -184,6 +196,7 @@ export class ProductsController {
     }
 
     @Get('cart/recommendations')
+    @UseGuards(OptionalJwtAuthGuard)
     async getRecommendations(@Request() req) {
         const categories = req.query.categories ? req.query.categories.split(',').filter(Boolean) : [];
         const excludeIds = req.query.excludeIds ? req.query.excludeIds.split(',').filter(Boolean) : [];
@@ -201,7 +214,8 @@ export class ProductsController {
             limit,
             supplierIds,
         );
-        return plainToInstance(ProductDto, recommendations);
+        const out = plainToInstance(ProductDto, recommendations);
+        return req.user ? out : stripPriceList(out as any[]);
     }
 
     @Get('ean/:ean')
@@ -257,20 +271,25 @@ export class ProductsController {
 
     /** Public endpoint — products that recently changed price, for the live header ticker */
     @Get('price-ticker')
-    async getPriceTicker(@Query('limit') limit?: string) {
+    @UseGuards(OptionalJwtAuthGuard)
+    async getPriceTicker(@Query('limit') limit?: string, @Request() req?: any) {
+        if (!req?.user) return []; // price movements are commercial data
         return this.productsService.findRecentPriceChanges(limit ? parseInt(limit) : 30);
     }
 
     // ─── Parameterized :id routes ──────────────────────────────────────────
 
     @Get(':id')
-    async findOne(@Param('id') id: string) {
+    @UseGuards(OptionalJwtAuthGuard)
+    async findOne(@Param('id') id: string, @Request() req) {
         const product = await this.productsService.findOne(id);
-        return plainToInstance(ProductDto, product);
+        const out = plainToInstance(ProductDto, product);
+        return req.user ? out : stripPrices(out);
     }
 
     @Get(':id/similar')
-    async getSimilar(@Param('id') id: string) {
+    @UseGuards(OptionalJwtAuthGuard)
+    async getSimilar(@Param('id') id: string, @Request() req) {
         const product = await this.productsService.findOne(id);
         if (!product) return [];
         const recs = await this.productsService.findRecommendations(
@@ -278,7 +297,8 @@ export class ProductsController {
             [id],
             6,
         );
-        return plainToInstance(ProductDto, recs);
+        const out = plainToInstance(ProductDto, recs);
+        return req.user ? out : stripPriceList(out as any[]);
     }
 
     @Patch(':id/approve')

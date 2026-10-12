@@ -20,7 +20,7 @@ const badges = [
         icon: <DollarSign className="w-8 h-8" />,
         title: 'Bulk Pricing',
         description: 'Save up to 40% with wholesale pricing tiers. The more you buy, the more you save.',
-        color: '#FF6B00',
+        color: '#0E7C74',
     },
     {
         icon: <Headphones className="w-8 h-8" />,
@@ -54,7 +54,7 @@ export default function TrustBadges() {
                     viewport={{ once: true }}
                     transition={{ duration: 0.5 }}
                 >
-                    <h2 className="section-title">Why Choose <span className="text-[#FF8A00]">Atlantis</span>?</h2>
+                    <h2 className="section-title">Why Choose <span className="text-teal">Atlantis</span>?</h2>
                     <p className="section-subtitle">
                         Trusted by over 500+ businesses worldwide. We make B2B procurement simple, secure, and scalable.
                     </p>

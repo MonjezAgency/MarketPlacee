@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { createLoad, ApiError, type LoadKind, type MixedLoad } from '@/lib/wholesale';
+import { createLoad, listLoads, updateLoad, ApiError, type LoadKind, type MixedLoad } from '@/lib/wholesale';
 
 /** One explicitly selected sellable line (product, or product + flavour/variant). */
 export interface Picked { key: string; productId: string; variant: string | null; name: string; label: string | null; image?: string; quantity: number }
@@ -21,6 +21,7 @@ export function useMixSelection() {
     const [submitting, setSubmitting] = React.useState(false);
     const [error, setError] = React.useState('');
     const [created, setCreated] = React.useState<MixedLoad | null>(null);
+    const [note, setNote] = React.useState('');
 
     // Keep the pending mix for this browser tab, so viewing another product
     // page (or reloading) never silently drops what the buyer selected.
@@ -65,9 +66,25 @@ export function useMixSelection() {
     const submit = async () => {
         if (submitting || !kind) return;
         if (picked.size === 0) { setError('Select at least one product to create a mix.'); return; }
-        setSubmitting(true); setError('');
+        setSubmitting(true); setError(''); setNote('');
+        const lines = Array.from(picked.values()).map((p) => ({ productId: p.productId, variant: p.variant, quantity: p.quantity }));
         try {
-            const res = await createLoad(kind, Array.from(picked.values()).map((p) => ({ productId: p.productId, variant: p.variant, quantity: p.quantity })));
+            // One open draft per kind is ONE order: new picks join it instead of
+            // starting a separate card. The server re-checks capacity and origin.
+            const open = (await listLoads().catch(() => [] as MixedLoad[])).filter((l) => l.kind === kind && l.status === 'DRAFT').pop();
+            let res: MixedLoad;
+            if (open) {
+                const existing = (open.quote?.lines ?? []).map((l) => ({ productId: l.productId, variant: l.variant ?? null, quantity: l.quantity }));
+                try {
+                    res = await updateLoad(open.id, [...existing, ...lines], open.version);
+                    setNote('Added to your open order.');
+                } catch (e) {
+                    // A different dispatch country can't share that order: keep it separate.
+                    if (!(e instanceof ApiError && e.code === 'ORIGIN_MISMATCH')) throw e;
+                    res = await createLoad(kind, lines);
+                    setNote(`Started a separate order — ${e.message}`);
+                }
+            } else res = await createLoad(kind, lines);
             setCreated(res);       // confirmation shows the SERVER's saved load
             setPicked(new Map());  // cleared only after success
         } catch (e) {
@@ -75,6 +92,6 @@ export function useMixSelection() {
         } finally { setSubmitting(false); }
     };
 
-    return { kind, setKind, picked, selected: Array.from(picked.values()), has, toggle, setQty, remove, clear, submit, submitting, error, setError, created, setCreated };
+    return { kind, setKind, picked, selected: Array.from(picked.values()), has, toggle, setQty, remove, clear, submit, submitting, error, setError, created, setCreated, note };
 }
 export type MixSelection = ReturnType<typeof useMixSelection>;

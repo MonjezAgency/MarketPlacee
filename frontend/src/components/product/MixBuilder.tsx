@@ -109,8 +109,9 @@ export default function MixBuilder({ open, onClose, sel, kinds }: {
                 {created ? (
                     <div className="flex-1 flex flex-col items-center justify-center text-center px-8">
                         <CheckCircle2 size={40} className="text-[#10B981]" />
-                        <h3 className="mt-4 text-[18px] font-semibold text-heading">{loadLabel(created.kind)} created</h3>
+                        <h3 className="mt-4 text-[18px] font-semibold text-heading">{loadLabel(created.kind)} saved</h3>
                         <p className="mt-1.5 text-[14px] text-ink-3">{created.quote?.lines.length ?? 0} {created.quote?.lines.length === 1 ? 'product' : 'products'} saved{created.quote ? ` · ${Math.round(created.quote.fill * 100)}% of capacity` : ''}.</p>
+                        {sel.note && <p className="mt-1 text-[13px] text-ink-3">{sel.note}</p>}
                         <ul className="mt-4 w-full max-w-sm text-start text-[13.5px] text-ink-2 space-y-1">
                             {created.quote?.lines.map((l) => <li key={l.productId + (l.variant || '')} className="flex justify-between gap-3"><span className="truncate">{l.name}{l.variant ? ` — ${l.variant.split('|').map((x) => x.split('=')[1]).join(' · ')}` : ''}</span><span className="tabular-nums text-ink-3">{l.quantity} {l.unit}{l.quantity === 1 ? '' : 's'}</span></li>)}
                         </ul>

@@ -286,7 +286,7 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
                 <div className="p-4 bg-white/5 backdrop-blur-xl border-b border-white/10 flex items-center justify-between shrink-0 z-10">
                     <div className="flex items-center gap-3">
                         <div className="relative">
-                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center shadow-lg shadow-primary/20">
+                            <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-primary to-[#0E7C74] flex items-center justify-center shadow-lg shadow-primary/20">
                                 {isSupport ? <User size={20} className="text-white" /> : <Headphones size={20} className="text-white" />}
                             </div>
                             <div className={cn(
@@ -325,7 +325,7 @@ export function SupportChat({ isSupport = false, targetUserId = null, isLight = 
             {isLight && isSupport && (
                 <div className="px-6 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
                     <div className="flex items-center gap-2">
-                        <div className={cn("w-2 h-2 rounded-full animate-pulse", isBotActive ? "bg-teal-500" : "bg-orange-500")} />
+                        <div className={cn("w-2 h-2 rounded-full animate-pulse", isBotActive ? "bg-teal-500" : "bg-amber-500")} />
                         <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
                             {isBotActive ? 'AI Agent Active' : 'Human Mode'}
                         </span>

@@ -656,6 +656,8 @@ export default function ProductDetailClient() {
 
     // Live wholesale offer (backend-attached), optionally per selected variant.
     const offerVariantKey = Object.keys(selectedVariants).sort().map((k) => `${k}=${selectedVariants[k]}`).join('|');
+    // Prices are withheld by the API for signed-out visitors; never render a placeholder number.
+    const showPrices = isLoggedIn && !product.pricesHidden;
     const activeOffer = (product as any).activeOffer as { discountPercent?: number; variantDiscounts?: Record<string, number>; validUntil?: string | null } | undefined;
     const offerPct = Math.max(0, Math.min(100, Number(activeOffer ? ((activeOffer.variantDiscounts && offerVariantKey ? activeOffer.variantDiscounts[offerVariantKey] : undefined) ?? activeOffer.discountPercent ?? 0) : 0)));
     const listPerCase = activePack.perCasePrice;
@@ -899,7 +901,7 @@ export default function ProductDetailClient() {
                                                     </span>
                                                 </span>
                                                 <span className="block mt-0.5 text-[12px] text-ink-3">{opt.contents}</span>
-                                                <span className="block mt-1 text-[12.5px] text-ink-2 tabular-nums"><span className="font-semibold">{formatPrice(opt.perCasePrice)}</span> / case</span>
+                                                {showPrices && <span className="block mt-1 text-[12.5px] text-ink-2 tabular-nums"><span className="font-semibold">{formatPrice(opt.perCasePrice)}</span> / case</span>}
                                             </button>
                                         );
                                     })}
@@ -942,6 +944,13 @@ export default function ProductDetailClient() {
                             {!isMixing && (
                                 <div className="border-t border-line p-3.5 sm:p-4">
                                     <div className="flex items-end justify-between gap-4">
+                                        {!showPrices ? (
+                                            <div className="min-w-0">
+                                                <p className="text-[12px] text-ink-3">Wholesale price</p>
+                                                <Link href={`/auth/login?redirect=${encodeURIComponent(`/products/${product.id}`)}`} className="mt-1 inline-flex text-[15px] font-semibold text-teal hover:underline">Sign in to see prices</Link>
+                                                <p className="mt-0.5 text-[12px] text-ink-3">Prices are shown to registered business buyers.</p>
+                                            </div>
+                                        ) : (
                                         <div className="min-w-0">
                                             <p className="text-[12px] text-ink-3">Price per case · {activePack.label.toLowerCase()} rate</p>
                                             <div className="mt-0.5 flex items-baseline flex-wrap gap-x-2">
@@ -953,6 +962,7 @@ export default function ProductDetailClient() {
                                             </div>
                                             {perPiece != null && <p className="mt-1 text-[12.5px] text-ink-3 tabular-nums">{formatPrice(perPiece)} per unit</p>}
                                         </div>
+                                        )}
                                         <div className="shrink-0">
                                             <label htmlFor="pdp-qty" className="block text-[12px] text-ink-3 mb-1 text-end">Quantity ({packWord(2)})</label>
                                             <div className="flex items-center h-10 rounded-lg ring-1 ring-line">
@@ -975,14 +985,14 @@ export default function ProductDetailClient() {
                                         <p className="mt-2 text-[12px] text-ink-3">Minimum order: {minUnits} {packWord(minUnits)}{moqLabel ? ` (${moqLabel})` : ''}.</p>
                                     ) : null}
 
-                                    <dl className="mt-4 rounded-xl bg-surface-2 px-3.5 py-3 space-y-1.5 text-[13px]">
+                                    {showPrices && <dl className="mt-4 rounded-xl bg-surface-2 px-3.5 py-3 space-y-1.5 text-[13px]">
                                         {activePack.casesInUnit > 1 && (
                                             <div className="flex justify-between gap-3"><dt className="text-ink-3">1 {activePack.label.toLowerCase()} = {activePack.casesInUnit.toLocaleString()} cases</dt><dd className="tabular-nums text-ink-2">{formatPrice(perPackPrice)}</dd></div>
                                         )}
                                         <div className="flex justify-between gap-3"><dt className="text-ink-3">{quantity.toLocaleString()} × {packWord(quantity)}{activePack.key !== 'carton' ? ` · ${totalCases.toLocaleString()} cases` : ''}{piecesPerCase ? ` · ${(totalCases * piecesPerCase).toLocaleString()} units` : ''}</dt><dd className="tabular-nums text-ink-2">{formatPrice(subtotal)}</dd></div>
                                         <div className="flex justify-between gap-3"><dt className="text-ink-3">Delivery</dt><dd className="text-ink-3">Calculated at checkout</dd></div>
                                         <div className="flex justify-between gap-3 pt-1.5 border-t border-line"><dt className="font-semibold text-ink">Subtotal</dt><dd className="font-bold tabular-nums text-heading">{formatPrice(subtotal)}</dd></div>
-                                    </dl>
+                                    </dl>}
                                 </div>
                             )}
 
@@ -1390,7 +1400,7 @@ export default function ProductDetailClient() {
                                             {p.brand && <span className="mt-2 text-[12px] font-semibold text-ink-2 truncate">{p.brand}</span>}
                                             <span className="text-[13px] leading-snug text-ink line-clamp-2 min-h-[2.5em] group-hover:text-teal">{p.name}</span>
                                             {p.ean && <span className="mt-0.5 text-[11.5px] text-ink-4 tabular-nums">{p.ean}</span>}
-                                            <span className="mt-auto pt-1.5 text-[13px] text-ink-3">{price > 0 ? <><span className="font-semibold text-ink tabular-nums">{formatPrice(price)}</span> / case</> : 'Price on request'}</span>
+                                            <span className="mt-auto pt-1.5 text-[13px] text-ink-3">{!showPrices ? <span className="text-teal font-semibold">Sign in for price</span> : price > 0 ? <><span className="font-semibold text-ink tabular-nums">{formatPrice(price)}</span> / case</> : 'Price on request'}</span>
                                         </Link>
                                     </div>
                                 );

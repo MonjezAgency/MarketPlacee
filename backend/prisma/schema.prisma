@@ -967,3 +967,35 @@ model MixedLoad {
   @@index([customerId, status])
 }
 
+
+
+/// A buyer's saved shopping list ("Weekly drinks", "Store #2 restock").
+/// Prices are never stored: reordering always re-prices from the live catalog.
+model ShoppingList {
+  id        String             @id @default(uuid())
+  userId    String
+  name      String
+  items     ShoppingListItem[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+
+  @@index([userId])
+}
+
+model ShoppingListItem {
+  id               String       @id @default(uuid())
+  listId           String
+  list             ShoppingList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  /// Plain id (no FK) so deleting a product never deletes a buyer's list; shown as unavailable instead.
+  productId        String
+  /// "" for products without variants; otherwise "Group=Value|Group=Value" (sorted).
+  variantKey       String       @default("")
+  selectedVariants Json?
+  /// carton | pallet | truck
+  tier             String       @default("carton")
+  quantity         Int
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@unique([listId, productId, variantKey, tier])
+}

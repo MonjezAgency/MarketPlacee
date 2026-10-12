@@ -117,7 +117,7 @@ export default function AmazonHero() {
                     <motion.span
                         initial={{ opacity: 0, y: -10 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="inline-block px-3 py-1 bg-[#FF9900] text-white text-[10px] font-black uppercase tracking-widest rounded mb-3"
+                        className="inline-block px-3 py-1 bg-[#0E7C74] text-white text-[10px] font-black uppercase tracking-widest rounded mb-3"
                     >
                         ⚡ SPONSORED
                     </motion.span>

@@ -49,16 +49,16 @@ export default function BuyerSupportPage() {
 
     return (
         <div className="min-h-screen bg-[#F8FAFC]">
-            <header className="h-24 border-b border-slate-200 bg-white px-8 flex items-center justify-between sticky top-0 z-40">
+            <header className="h-24 border-b border-line bg-surface px-8 flex items-center justify-between sticky top-0 z-40">
                 <div className="max-w-5xl mx-auto w-full flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-black text-[#0B1F3A] tracking-tight">Support Center</h1>
-                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">Direct communication with Atlantis HQ</p>
+                        <h1 className="text-2xl font-bold text-heading tracking-tight">Support Center</h1>
+                        <p className="text-[10px] text-ink-4 font-bold uppercase tracking-[0.2em] mt-1">Direct communication with Atlantis HQ</p>
                     </div>
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2 px-4 py-2 bg-teal-50 rounded-xl border border-teal-100">
                             <div className="w-2 h-2 rounded-full bg-teal-500 animate-pulse" />
-                            <span className="text-[11px] font-black text-teal-700 uppercase tracking-wider">Agents Online</span>
+                            <span className="text-[11px] font-bold text-teal-700 uppercase tracking-wider">Agents Online</span>
                         </div>
                     </div>
                 </div>
@@ -73,7 +73,7 @@ export default function BuyerSupportPage() {
                             'flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-[13px] transition-all',
                             activeTab === 'general'
                                 ? 'bg-[#0B1F3A] text-white shadow-sm'
-                                : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300',
+                                : 'bg-surface border border-line text-ink-2 hover:border-slate-300',
                         )}
                     >
                         <Headphones size={15} />
@@ -85,7 +85,7 @@ export default function BuyerSupportPage() {
                             'flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-[13px] transition-all',
                             activeTab === 'orders'
                                 ? 'bg-[#0B1F3A] text-white shadow-sm'
-                                : 'bg-white border border-slate-200 text-slate-600 hover:border-slate-300',
+                                : 'bg-surface border border-line text-ink-2 hover:border-slate-300',
                         )}
                     >
                         <ShoppingBag size={15} />
@@ -104,18 +104,18 @@ export default function BuyerSupportPage() {
                         >
                             {/* Chat Area */}
                             <div className="lg:col-span-8">
-                                <div className="bg-white border border-slate-200 rounded-[32px] shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col h-[700px]">
-                                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                                <div className="bg-surface border border-line rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden flex flex-col h-[700px]">
+                                    <div className="px-6 py-4 border-b border-line bg-slate-50/50 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
                                             <div className="w-10 h-10 rounded-2xl bg-[#0B1F3A] flex items-center justify-center text-white">
                                                 <Headphones size={20} />
                                             </div>
                                             <div>
-                                                <p className="text-sm font-black text-slate-900">Atlantis Official Support</p>
-                                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Verified Corporate Account</p>
+                                                <p className="text-sm font-bold text-ink">Atlantis Official Support</p>
+                                                <p className="text-[10px] text-ink-4 font-bold uppercase tracking-tight">Verified Corporate Account</p>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-full text-[10px] font-black text-slate-500">
+                                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line rounded-full text-[10px] font-bold text-ink-3">
                                             <Clock size={12} />
                                             Avg. Response: 15m
                                         </div>
@@ -128,37 +128,37 @@ export default function BuyerSupportPage() {
 
                             {/* Sidebar Info */}
                             <div className="lg:col-span-4 space-y-6">
-                                <div className="bg-white border border-slate-200 rounded-[32px] p-8 space-y-6">
-                                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest border-b border-slate-100 pb-4">Support Protocol</h3>
+                                <div className="bg-surface border border-line rounded-2xl p-8 space-y-6">
+                                    <h3 className="text-xs font-bold text-ink uppercase tracking-widest border-b border-line pb-4">Support Protocol</h3>
                                     <div className="space-y-6">
                                         <div className="flex items-start gap-4">
                                             <div className="w-10 h-10 rounded-xl bg-teal-50 flex items-center justify-center text-teal-600 shrink-0">
                                                 <ShieldCheck size={20} />
                                             </div>
                                             <div>
-                                                <p className="text-sm font-black text-slate-900">Secure Channel</p>
-                                                <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
+                                                <p className="text-sm font-bold text-ink">Secure Channel</p>
+                                                <p className="text-[11px] text-ink-3 font-medium leading-relaxed mt-1">
                                                     All conversations are encrypted and monitored for quality assurance.
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="flex items-start gap-4">
-                                            <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600 shrink-0">
+                                            <div className="w-10 h-10 rounded-xl bg-teal-soft flex items-center justify-center text-teal shrink-0">
                                                 <Zap size={20} />
                                             </div>
                                             <div>
-                                                <p className="text-sm font-black text-slate-900">Instant Escalation</p>
-                                                <p className="text-[11px] text-slate-500 font-medium leading-relaxed mt-1">
+                                                <p className="text-sm font-bold text-ink">Instant Escalation</p>
+                                                <p className="text-[11px] text-ink-3 font-medium leading-relaxed mt-1">
                                                     Type "AGENT" at any time to bypass the AI and speak with a human.
                                                 </p>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="pt-6 border-t border-slate-100">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Common Topics</p>
+                                    <div className="pt-6 border-t border-line">
+                                        <p className="text-[10px] font-bold text-ink-4 uppercase tracking-widest mb-4">Common Topics</p>
                                         <div className="flex flex-wrap gap-2">
                                             {['Shipping Rates', 'Payment Terms', 'Bulk Orders', 'Product Sourcing'].map(tag => (
-                                                <span key={tag} className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600">
+                                                <span key={tag} className="px-3 py-1.5 bg-surface-2 border border-line rounded-lg text-[10px] font-bold text-ink-2">
                                                     {tag}
                                                 </span>
                                             ))}
@@ -169,20 +169,20 @@ export default function BuyerSupportPage() {
                                 <motion.div
                                     initial={{ opacity: 0, scale: 0.9 }}
                                     animate={{ opacity: 1, scale: 1 }}
-                                    className="bg-gradient-to-br from-[#0B1F3A] to-[#152D4F] rounded-[32px] p-8 text-white relative overflow-hidden"
+                                    className="bg-gradient-to-br from-[#0B1F3A] to-[#152D4F] rounded-2xl p-8 text-white relative overflow-hidden"
                                 >
                                     <div className="absolute top-0 right-0 p-8 opacity-10">
                                         <MessageCircle size={120} />
                                     </div>
                                     <div className="relative z-10">
-                                        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-teal-400 mb-4">Direct Access</p>
-                                        <h4 className="text-xl font-black tracking-tight leading-tight mb-4">
+                                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-teal-400 mb-4">Direct Access</p>
+                                        <h4 className="text-xl font-bold tracking-tight leading-tight mb-4">
                                             Need immediate business assistance?
                                         </h4>
                                         <p className="text-[11px] text-slate-300 font-medium leading-relaxed mb-6">
                                             Our logistics and procurement teams are standing by to assist with your wholesale needs.
                                         </p>
-                                        <button className="w-full py-4 bg-teal-500 hover:bg-teal-400 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shadow-xl shadow-teal-500/20">
+                                        <button className="w-full py-4 bg-teal-500 hover:bg-teal-400 text-white rounded-2xl text-[11px] font-bold uppercase tracking-widest transition-all shadow-xl shadow-teal-500/20">
                                             Speak to an Expert
                                         </button>
                                     </div>
@@ -196,14 +196,14 @@ export default function BuyerSupportPage() {
                             animate={{ opacity: 1, x: 0 }}
                             exit={{ opacity: 0, x: 10 }}
                         >
-                            <div className="bg-white border border-slate-200 rounded-[32px] shadow-xl shadow-slate-200/50 overflow-hidden">
-                                <div className="px-6 py-5 border-b border-slate-100 bg-slate-50/50 flex items-center gap-3">
+                            <div className="bg-surface border border-line rounded-2xl shadow-xl shadow-slate-200/50 overflow-hidden">
+                                <div className="px-6 py-5 border-b border-line bg-slate-50/50 flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-2xl bg-[#0B1F3A] flex items-center justify-center text-white">
                                         <ShoppingBag size={20} />
                                     </div>
                                     <div>
-                                        <p className="text-sm font-black text-slate-900">Order Conversations</p>
-                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">Messages from Atlantis team about your orders</p>
+                                        <p className="text-sm font-bold text-ink">Order Conversations</p>
+                                        <p className="text-[10px] text-ink-4 font-bold uppercase tracking-tight">Messages from Atlantis team about your orders</p>
                                     </div>
                                 </div>
 
@@ -214,8 +214,8 @@ export default function BuyerSupportPage() {
                                 ) : orderChats.length === 0 ? (
                                     <div className="py-20 flex flex-col items-center gap-3 text-center px-8">
                                         <ShoppingBag size={36} className="text-slate-200" />
-                                        <p className="text-[15px] font-bold text-slate-500">No order conversations yet</p>
-                                        <p className="text-[12px] text-slate-400 max-w-sm">
+                                        <p className="text-[15px] font-bold text-ink-3">No order conversations yet</p>
+                                        <p className="text-[12px] text-ink-4 max-w-sm">
                                             When Atlantis support contacts you about a specific order (shipping, delivery, documents), it will appear here — separate from general support.
                                         </p>
                                     </div>
@@ -225,22 +225,22 @@ export default function BuyerSupportPage() {
                                             <li key={chat.orderId}>
                                                 <button
                                                     onClick={() => setOpenOrderId(chat.orderId)}
-                                                    className="w-full flex items-center gap-4 px-6 py-4 hover:bg-slate-50 transition-colors text-left"
+                                                    className="w-full flex items-center gap-4 px-6 py-4 hover:bg-surface-2 transition-colors text-left"
                                                 >
                                                     {chat.firstImage ? (
                                                         <img
                                                             src={chat.firstImage}
                                                             alt=""
-                                                            className="w-12 h-12 rounded-xl object-contain bg-slate-100 shrink-0"
+                                                            className="w-12 h-12 rounded-xl object-contain bg-surface-3 shrink-0"
                                                         />
                                                     ) : (
-                                                        <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+                                                        <div className="w-12 h-12 rounded-xl bg-surface-3 flex items-center justify-center shrink-0">
                                                             <ShoppingBag size={20} className="text-slate-300" />
                                                         </div>
                                                     )}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 mb-0.5">
-                                                            <p className="text-[13px] font-bold text-slate-900 truncate">
+                                                            <p className="text-[13px] font-bold text-ink truncate">
                                                                 {chat.firstProduct ?? `Order #${chat.orderId.slice(-8).toUpperCase()}`}
                                                             </p>
                                                             <span className={cn(
@@ -252,12 +252,12 @@ export default function BuyerSupportPage() {
                                                                 {chat.status}
                                                             </span>
                                                         </div>
-                                                        <p className="text-[11px] text-slate-400 truncate">
+                                                        <p className="text-[11px] text-ink-4 truncate">
                                                             {chat.lastMessage ?? 'New conversation started'}
                                                         </p>
                                                     </div>
                                                     <div className="shrink-0 text-right">
-                                                        <p className="text-[11px] text-slate-400 mb-1">{fmtDate(chat.lastMessageAt)}</p>
+                                                        <p className="text-[11px] text-ink-4 mb-1">{fmtDate(chat.lastMessageAt)}</p>
                                                         <ChevronRight size={14} className="text-slate-300 ml-auto" />
                                                     </div>
                                                 </button>

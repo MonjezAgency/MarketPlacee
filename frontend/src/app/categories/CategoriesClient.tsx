@@ -402,9 +402,11 @@ function CategoriesContent() {
                     </ul>
                 </Section>
 
-                <Section title={`Price (${currency})`}>
-                    <PriceFilter min={p.min} max={p.max} bounds={priceBounds} symbol={symbol} onApply={(min, max) => setParams({ min, max })} />
-                </Section>
+                {user && (
+                    <Section title={`Price (${currency})`}>
+                        <PriceFilter min={p.min} max={p.max} bounds={priceBounds} symbol={symbol} onApply={(min, max) => setParams({ min, max })} />
+                    </Section>
+                )}
 
                 <Section title="Brand">
                     <div className="flex items-center h-9 rounded-lg ring-1 ring-line focus-within:ring-2 focus-within:ring-[#2EC4B6] mb-2">
@@ -479,9 +481,9 @@ function CategoriesContent() {
                             <button type="button" onClick={() => setShowFilters(true)} className="lg:hidden inline-flex items-center gap-1.5 h-8 px-2.5 rounded-md ring-1 ring-line text-[12.5px] font-semibold text-ink">
                                 <SlidersHorizontal size={15} /> Filters{chips.length ? ` (${chips.length})` : ''}
                             </button>
-                            <Dropdown inline label="Sort by" value={p.sort} options={SORTS.map((s) => ({ value: s.id, label: s.label }))} onChange={(v) => setParams({ sort: v })} />
+                            <Dropdown inline label="Sort by" value={p.sort} options={SORTS.filter((s) => user || !s.id.startsWith('price')).map((s) => ({ value: s.id, label: s.label }))} onChange={(v) => setParams({ sort: v })} />
                             <Dropdown label="Show" suffix="products per page" value={String(p.size)} options={PAGE_SIZES.map((n) => ({ value: String(n), label: String(n) }))} onChange={(v) => setParams({ size: v })} className="hidden sm:inline-flex" />
-                            <button type="button" onClick={downloadCatalog} disabled={loading || exporting || !items.length} className="hidden sm:inline-flex items-center gap-2 h-8 px-2 rounded-md text-[12.5px] font-medium text-ink-2 hover:text-ink disabled:opacity-40">
+                            <button type="button" onClick={downloadCatalog} disabled={loading || exporting || !items.length} className={cn(user ? 'hidden sm:inline-flex' : 'hidden', 'items-center gap-2 h-8 px-2 rounded-md text-[12.5px] font-medium text-ink-2 hover:text-ink disabled:opacity-40')}>
                                 <Download size={15} /> Download
                             </button>
                         </div>

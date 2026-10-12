@@ -36,7 +36,7 @@ export class UsersController {
     @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
     async updateMe(
         @Request() req,
-        @Body() body: { name?: string; phone?: string | null; companyDescription?: string | null },
+        @Body() body: { name?: string; phone?: string | null; companyDescription?: string | null; country?: string | null },
     ) {
         const data: any = {};
         if (typeof body.name === 'string') data.name = body.name.trim();
@@ -53,6 +53,11 @@ export class UsersController {
         }
         if (body.companyDescription !== undefined) {
             data.companyDescription = body.companyDescription || null;
+        }
+        if (body.country !== undefined) {
+            const c = String(body.country ?? '').trim().replace(/\s+/g, ' ');
+            if (c.length > 60) throw new BadRequestException('Country name is too long');
+            data.country = c || null;
         }
         const updated = await this.prisma.user.update({
             where: { id: req.user.sub },
