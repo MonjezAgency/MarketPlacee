@@ -64,11 +64,20 @@ export class SecurityExceptionFilter implements ExceptionFilter {
         }
 
         // Default Nest behavior for the response
+        // Keep the structured fields our own exceptions carry (e.g. { code:
+        // 'EMAIL_NOT_VERIFIED' }, { code: 'ORIGIN_MISMATCH', productIds })
+        // so clients can branch on a stable code.
+        const body = exception instanceof HttpException ? exception.getResponse() : null;
+        const extra = body && typeof body === 'object' ? { ...(body as Record<string, unknown>) } : {};
+        delete (extra as any).statusCode; delete (extra as any).error;
         response.status(status).json({
+            ...extra,
             statusCode: status,
             timestamp: new Date().toISOString(),
             path: request.url,
-            message: (exception as any).message || 'Internal server error',
+            message: exception instanceof HttpException
+                ? (typeof (extra as any).message === 'string' || Array.isArray((extra as any).message) ? (extra as any).message : (exception as any).message)
+                : ((exception as any)?.message || 'Internal server error'), // unchanged legacy behaviour
         });
     }
 }
