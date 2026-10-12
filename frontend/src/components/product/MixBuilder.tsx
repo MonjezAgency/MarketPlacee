@@ -7,12 +7,9 @@ import { fetchProductPage } from '@/lib/api';
 import type { Product } from '@/lib/types';
 import { DEPARTMENTS } from '@/lib/departments';
 import { cn } from '@/lib/utils';
-import { createLoad, variantSignatures, loadLabel, ApiError, type LoadKind, type MixedLoad } from '@/lib/wholesale';
+import { variantSignatures, loadLabel, type LoadKind } from '@/lib/wholesale';
+import { pickKey as keyOf, type MixSelection } from '@/lib/useMixSelection';
 
-/** One explicitly selected sellable line (product, or product + flavour/variant). */
-interface Picked { key: string; productId: string; variant: string | null; name: string; label: string | null; image?: string; quantity: number }
-
-const keyOf = (productId: string, variant: string | null) => `${productId}::${variant ?? ''}`;
 const unitOf = (k: LoadKind) => (k === 'PALLET' ? 'cases' : 'pallets');
 
 /** Which mix types a product's own pack data supports (no new capacity rules). */
@@ -25,15 +22,19 @@ function eligible(p: Product, kind: LoadKind): string | null {
     return miss.length ? `Missing ${miss.join(', ')}` : null;
 }
 
-export default function MixBuilder({ open, onClose, initialKind, kinds }: {
+/**
+ * Full catalog picker ("View all"). Uses the SAME pending selection as the
+ * product-page carousels (`sel`), so closing and reopening never loses it.
+ */
+export default function MixBuilder({ open, onClose, sel, kinds }: {
     open: boolean;
     onClose: () => void;
-    initialKind: LoadKind;
+    sel: MixSelection;
     /** Mix types to offer (both by default). */
     kinds?: LoadKind[];
 }) {
     const available = kinds?.length ? kinds : (['PALLET', 'TRUCK'] as LoadKind[]);
-    const [kind, setKind] = React.useState<LoadKind>(initialKind);
+    const kind: LoadKind = sel.kind ?? 'PALLET';
     const [pendingKind, setPendingKind] = React.useState<LoadKind | null>(null);
     const [q, setQ] = React.useState('');
     const [qDebounced, setQDebounced] = React.useState('');
@@ -45,21 +46,17 @@ export default function MixBuilder({ open, onClose, initialKind, kinds }: {
     const [page, setPage] = React.useState(1);
     const [loading, setLoading] = React.useState(false);
     const [listError, setListError] = React.useState('');
-    const [picked, setPicked] = React.useState<Map<string, Picked>>(new Map());
-    const [submitting, setSubmitting] = React.useState(false);
-    const [error, setError] = React.useState('');
-    const [created, setCreated] = React.useState<MixedLoad | null>(null);
+    const { picked, created, submitting, error } = sel;
 
-    // Each opening starts a fresh, empty mix of the chosen type (no stale selections).
     React.useEffect(() => {
         if (!open) return;
-        setKind(initialKind); setPicked(new Map()); setCreated(null); setError(''); setPendingKind(null);
+        setPendingKind(null);
         const prev = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
         const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
         window.addEventListener('keydown', onKey);
         return () => { document.body.style.overflow = prev; window.removeEventListener('keydown', onKey); };
-    }, [open, initialKind]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
 
     React.useEffect(() => { const t = setTimeout(() => setQDebounced(q.trim()), 300); return () => clearTimeout(t); }, [q]);
 
@@ -85,42 +82,16 @@ export default function MixBuilder({ open, onClose, initialKind, kinds }: {
     }, [open, qDebounced, brand, dept, page]); // eslint-disable-line react-hooks/exhaustive-deps
     React.useEffect(() => { setPage(1); }, [qDebounced, brand, dept]);
 
-    const toggle = (p: Product, variant: string | null, label: string | null) => {
-        setError('');
-        setPicked((prev) => {
-            const next = new Map(prev);
-            const k = keyOf(p.id, variant);
-            if (next.has(k)) next.delete(k);
-            else next.set(k, { key: k, productId: p.id, variant, name: p.name, label, image: p.images?.[0] || p.image, quantity: 1 });
-            return next;
-        });
-    };
-    const setQty = (k: string, n: number) => setPicked((prev) => {
-        const next = new Map(prev);
-        const it = next.get(k);
-        if (it) next.set(k, { ...it, quantity: Math.max(1, Math.min(10000, Math.floor(n) || 1)) });
-        return next;
-    });
-    const remove = (k: string) => setPicked((prev) => { const next = new Map(prev); next.delete(k); return next; });
-
+    const toggle = (p: Product, variant: string | null, label: string | null) =>
+        sel.toggle({ productId: p.id, variant, name: p.name, label, image: p.images?.[0] || p.image });
+    const setQty = sel.setQty;
+    const remove = sel.remove;
     const switchKind = (k: LoadKind) => {
         if (k === kind) return;
         if (picked.size) { setPendingKind(k); return; }
-        setKind(k);
+        sel.setKind(k);
     };
-
-    const submit = async () => {
-        if (submitting) return;
-        if (picked.size === 0) { setError('Select at least one product to create a mix.'); return; }
-        setSubmitting(true); setError('');
-        try {
-            const res = await createLoad(kind, Array.from(picked.values()).map((p) => ({ productId: p.productId, variant: p.variant, quantity: p.quantity })));
-            setCreated(res);               // confirmation reflects the SERVER's saved load
-            setPicked(new Map());          // cleared only after success
-        } catch (e) {
-            setError(e instanceof ApiError ? e.message : 'Could not create the mix. Your selection is kept — try again.');
-        } finally { setSubmitting(false); }
-    };
+    const submit = sel.submit;
 
     if (!open) return null;
     const selected = Array.from(picked.values());
@@ -132,7 +103,7 @@ export default function MixBuilder({ open, onClose, initialKind, kinds }: {
                 {/* Header */}
                 <div className="flex items-center justify-between gap-3 px-5 h-14 border-b border-line shrink-0">
                     <h2 className="text-[16px] font-semibold text-heading">Build a mix</h2>
-                    <button type="button" onClick={onClose} aria-label="Close" className="w-9 h-9 rounded-lg flex items-center justify-center text-ink-3 hover:bg-surface-3"><X size={18} /></button>
+                    <button type="button" onClick={onClose} aria-label="Close (selection is kept)" title="Close — your selection is kept" className="w-9 h-9 rounded-lg flex items-center justify-center text-ink-3 hover:bg-surface-3"><X size={18} /></button>
                 </div>
 
                 {created ? (
@@ -144,7 +115,7 @@ export default function MixBuilder({ open, onClose, initialKind, kinds }: {
                             {created.quote?.lines.map((l) => <li key={l.productId + (l.variant || '')} className="flex justify-between gap-3"><span className="truncate">{l.name}{l.variant ? ` — ${l.variant.split('|').map((x) => x.split('=')[1]).join(' · ')}` : ''}</span><span className="tabular-nums text-ink-3">{l.quantity} {l.unit}{l.quantity === 1 ? '' : 's'}</span></li>)}
                         </ul>
                         <div className="mt-6 flex gap-2">
-                            <button type="button" onClick={() => setCreated(null)} className="h-10 px-4 rounded-xl ring-1 ring-line-strong text-[14px] font-medium text-ink">Build another</button>
+                            <button type="button" onClick={() => sel.setCreated(null)} className="h-10 px-4 rounded-xl ring-1 ring-line-strong text-[14px] font-medium text-ink">Build another</button>
                             <Link href="/cart" className="h-10 px-5 inline-flex items-center rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14px] font-semibold">View in cart</Link>
                         </div>
                     </div>
@@ -166,7 +137,7 @@ export default function MixBuilder({ open, onClose, initialKind, kinds }: {
                                 <div className="rounded-lg ring-1 ring-[#FCD34D] bg-[#FFFBEB] dark:bg-amber-500/10 px-3 py-2.5 text-[13px] text-[#92400E] dark:text-amber-200">
                                     Switching to {loadLabel(pendingKind).toLowerCase()} clears your {picked.size} selected {picked.size === 1 ? 'item' : 'items'} (quantities are in {unitOf(pendingKind)} instead of {unitOf(kind)}).
                                     <div className="mt-2 flex gap-2">
-                                        <button type="button" onClick={() => { setPicked(new Map()); setKind(pendingKind); setPendingKind(null); }} className="h-8 px-3 rounded-md bg-[#F59E0B] text-white text-[12.5px] font-semibold">Clear and switch</button>
+                                        <button type="button" onClick={() => { sel.setKind(pendingKind); setPendingKind(null); }} className="h-8 px-3 rounded-md bg-[#F59E0B] text-white text-[12.5px] font-semibold">Clear and switch</button>
                                         <button type="button" onClick={() => setPendingKind(null)} className="h-8 px-3 rounded-md ring-1 ring-[#FCD34D] text-[12.5px] font-semibold">Keep {loadLabel(kind).toLowerCase()}</button>
                                     </div>
                                 </div>
@@ -244,7 +215,7 @@ export default function MixBuilder({ open, onClose, initialKind, kinds }: {
                         <div className="border-t border-line bg-surface-2 px-5 py-3 shrink-0">
                             <div className="flex items-center justify-between">
                                 <p className="text-[13.5px] font-semibold text-ink">{selected.length} selected</p>
-                                {selected.length > 0 && <button type="button" onClick={() => setPicked(new Map())} className="text-[12.5px] font-medium text-ink-3 hover:text-[#DC2626]">Clear all</button>}
+                                {selected.length > 0 && <button type="button" onClick={sel.clear} className="text-[12.5px] font-medium text-ink-3 hover:text-[#DC2626]">Clear all</button>}
                             </div>
                             {selected.length > 0 ? (
                                 <ul className="mt-2 max-h-[176px] overflow-y-auto space-y-1.5 pe-1">

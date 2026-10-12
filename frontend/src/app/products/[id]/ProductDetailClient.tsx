@@ -30,6 +30,9 @@ import { brandLogo } from '@/lib/brand-logos';
 import { computeCardPrice } from '@/lib/card-pricing';
 import { round2, minUnitsFor as serverMinUnits, type LoadKind } from '@/lib/wholesale';
 import MixBuilder from '@/components/product/MixBuilder';
+import MixDiscovery from '@/components/product/MixDiscovery';
+import { ProductRail } from '@/components/product/ProductRail';
+import { useMixSelection } from '@/lib/useMixSelection';
 
 
 export default function ProductDetailClient() {
@@ -75,8 +78,10 @@ export default function ProductDetailClient() {
     const [mixQuantities, setMixQuantities] = useState<Record<string, number>>({});
     const [activeTab, setActiveTab] = useState('Description');
     // Cross-product mixed pallet / truckload (server-saved MixedLoad).
-    // Which mix builder is open (null = closed). Nothing is added until the buyer confirms.
-    const [mixOpen, setMixOpen] = useState<LoadKind | null>(null);
+    // Mixed pallet / truckload: pending selection shared by the inline carousels
+    // and the full "View all" picker. Nothing is added until the buyer confirms.
+    const mix = useMixSelection();
+    const [mixPickerOpen, setMixPickerOpen] = useState(false);
     const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
     const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -1003,25 +1008,38 @@ export default function ProductDetailClient() {
                             </div>
                         </div>
 
-                        {/* Mix with other products — opens the catalog picker; nothing is added automatically */}
+                        {/* Mix with other products — inline discovery; nothing is added automatically */}
                         {!isSupplierOwner && (
                             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl ring-1 ring-line bg-surface px-4 py-3">
                                 <div className="min-w-0">
                                     <p className="text-[13.5px] font-semibold text-ink">Mix with other products</p>
-                                    <p className="text-[12.5px] text-ink-3">Choose products and flavours from the catalog for one mixed pallet or truckload.</p>
+                                    <p className="text-[12.5px] text-ink-3">{mix.kind ? `Building a ${mix.kind === 'PALLET' ? 'mixed pallet' : 'mixed truckload'} · ${mix.selected.length} selected` : 'Combine flavours and products into one mixed pallet or truckload.'}</p>
                                 </div>
-                                <div className="flex gap-2">
+                                <div role="radiogroup" aria-label="Mix type" className="flex gap-2">
                                     {(['PALLET', 'TRUCK'] as LoadKind[]).map((k) => (
-                                        <button key={k} type="button"
-                                            onClick={() => isLoggedIn ? setMixOpen(k) : router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname))}
-                                            className="h-9 px-3.5 rounded-lg ring-1 ring-line-strong hover:ring-ink text-[13px] font-semibold text-ink">
+                                        <button key={k} type="button" role="radio" aria-checked={mix.kind === k}
+                                            onClick={() => {
+                                                if (!isLoggedIn) { router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname)); return; }
+                                                if (mix.kind === k) return;
+                                                if (mix.selected.length && !window.confirm(`Switching to ${k === 'PALLET' ? 'a mixed pallet' : 'a mixed truckload'} clears your ${mix.selected.length} selected item(s), because quantities use a different unit. Continue?`)) return;
+                                                mix.setKind(k);
+                                            }}
+                                            className={cn('h-9 px-3.5 rounded-lg text-[13px] font-semibold transition-shadow', mix.kind === k ? 'ring-2 ring-[#2EC4B6] bg-teal-soft text-ink' : 'ring-1 ring-line-strong hover:ring-ink text-ink')}>
                                             {k === 'PALLET' ? 'Mixed pallet' : 'Mixed truckload'}
                                         </button>
                                     ))}
+                                    {mix.kind && (
+                                        <button type="button" aria-label="Close mix builder"
+                                            onClick={() => { if (mix.selected.length && !window.confirm(`Discard your ${mix.selected.length} selected item(s)?`)) return; mix.setKind(null); setMixPickerOpen(false); }}
+                                            className="h-9 w-9 rounded-lg ring-1 ring-line text-ink-3 hover:text-ink flex items-center justify-center"><X size={15} /></button>
+                                    )}
                                 </div>
                             </div>
                         )}
-                        <MixBuilder open={!!mixOpen} initialKind={mixOpen ?? 'PALLET'} onClose={() => setMixOpen(null)} />
+                        {mix.kind && !isSupplierOwner && (
+                            <MixDiscovery product={product} sel={mix} markups={markups} onViewAll={() => setMixPickerOpen(true)} />
+                        )}
+                        {mix.kind && <MixBuilder open={mixPickerOpen} sel={mix} onClose={() => setMixPickerOpen(false)} />}
 
                         {/* Build-your-own pallet / truckload (mix variants) */}
                         {mixSupported && (
@@ -1352,17 +1370,16 @@ export default function ProductDetailClient() {
                 {/* ── Related products (same category, real catalog) ───────── */}
                 {relatedProducts.length > 0 && (
                     <section className="mt-6 pt-8 border-t border-line">
-                        <div className="flex items-end justify-between gap-4 mb-5">
-                            <h2 className="text-[18px] font-bold text-heading">More in {getDisplayCategory(product)}</h2>
-                            <Link href={product.category ? `/categories?category=${encodeURIComponent(product.category)}` : '/categories'} className="inline-flex items-center gap-1 text-[13px] font-semibold text-heading hover:text-teal">View all <ChevronRight size={14} /></Link>
-                        </div>
-                        <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                            {relatedProducts.slice(0, 5).map((p) => {
+                        <ProductRail
+                            title={<span className="text-[18px] font-bold">More in {getDisplayCategory(product)}</span>}
+                            viewAll={{ label: 'View all', href: product.category ? `/categories?category=${encodeURIComponent(product.category)}` : '/categories' }}
+                        >
+                            {relatedProducts.slice(0, 16).map((p) => {
                                 const own = user?.role?.toUpperCase() === 'SUPPLIER' && (p as any).supplierId === user?.id;
                                 const price = computeCardPrice(p, markups, !!own);
                                 const img = p.images?.[0] || p.image;
                                 return (
-                                    <li key={p.id}>
+                                    <div key={p.id} className="snap-start shrink-0 w-[172px] sm:w-[200px]">
                                         <Link href={`/products/${p.id}`} className="group flex flex-col h-full rounded-xl ring-1 ring-line hover:ring-line-strong bg-surface p-2.5 transition-shadow">
                                             <span className="relative block aspect-square rounded-lg bg-media overflow-hidden">
                                                 {img
@@ -1375,10 +1392,10 @@ export default function ProductDetailClient() {
                                             {p.ean && <span className="mt-0.5 text-[11.5px] text-ink-4 tabular-nums">{p.ean}</span>}
                                             <span className="mt-auto pt-1.5 text-[13px] text-ink-3">{price > 0 ? <><span className="font-semibold text-ink tabular-nums">{formatPrice(price)}</span> / case</> : 'Price on request'}</span>
                                         </Link>
-                                    </li>
+                                    </div>
                                 );
                             })}
-                        </ul>
+                        </ProductRail>
                     </section>
                 )}
             </main>
