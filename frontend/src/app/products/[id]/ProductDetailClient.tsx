@@ -776,13 +776,13 @@ export default function ProductDetailClient() {
                     </div>
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,440px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,480px)_minmax(0,1fr)] gap-8 lg:gap-10">
+                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] gap-6 lg:gap-8">
                     {/* ── Gallery ─────────────────────────────────────────── */}
                     <section aria-label="Product images" className="lg:sticky lg:top-[108px] self-start">
                         <button
                             type="button"
                             onClick={() => { const i = allImages.findIndex((u) => u === selectedImage); setLightboxIndex(i >= 0 ? i : 0); }}
-                            className="relative w-full max-w-[480px] mx-auto aspect-square rounded-2xl bg-media ring-1 ring-line overflow-hidden cursor-zoom-in group"
+                            className="relative w-full max-w-[420px] mx-auto aspect-square rounded-2xl bg-media ring-1 ring-line overflow-hidden cursor-zoom-in group"
                             aria-label="Enlarge image"
                         >
                             {selectedImage ? (
@@ -840,7 +840,7 @@ export default function ProductDetailClient() {
                                 {product.brand}
                             </Link>
                         )}
-                        <h1 className="mt-1 text-[22px] sm:text-[26px] font-bold leading-tight tracking-tight text-heading">{translatedName || product.name}</h1>
+                        <h1 className="mt-1 text-[20px] sm:text-[22px] font-bold leading-tight tracking-tight text-heading">{translatedName || product.name}</h1>
 
                         <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[13px] text-ink-3">
                             <span className="inline-flex items-center gap-1.5 tabular-nums">
@@ -863,8 +863,8 @@ export default function ProductDetailClient() {
                         </div>
 
                         {/* Purchase panel */}
-                        <div className="mt-5 rounded-2xl ring-1 ring-line bg-surface">
-                            <div className="p-4 sm:p-5">
+                        <div className="mt-4 rounded-2xl ring-1 ring-line bg-surface">
+                            <div className="p-3.5 sm:p-4">
                                 <div className="flex items-baseline justify-between gap-3">
                                     <h2 className="text-[13px] font-semibold text-ink">Packaging</h2>
                                     {availability && (
@@ -940,12 +940,12 @@ export default function ProductDetailClient() {
                             </div>
 
                             {!isMixing && (
-                                <div className="border-t border-line p-4 sm:p-5">
+                                <div className="border-t border-line p-3.5 sm:p-4">
                                     <div className="flex items-end justify-between gap-4">
                                         <div className="min-w-0">
                                             <p className="text-[12px] text-ink-3">Price per case · {activePack.label.toLowerCase()} rate</p>
                                             <div className="mt-0.5 flex items-baseline flex-wrap gap-x-2">
-                                                <span className="text-[28px] font-bold tracking-tight tabular-nums text-heading leading-none">{formatPrice(perCasePrice)}</span>
+                                                <span className="text-[24px] font-bold tracking-tight tabular-nums text-heading leading-none">{formatPrice(perCasePrice)}</span>
                                                 {offerPct > 0 && (<>
                                                     <span className="text-[14px] text-ink-4 line-through tabular-nums">{formatPrice(listPerCase)}</span>
                                                     <span className="text-[12px] font-semibold text-[#B91C1C]">−{offerPct}% offer{activeOffer?.validUntil ? ` until ${new Date(activeOffer.validUntil).toLocaleDateString()}` : ''}</span>
@@ -986,20 +986,20 @@ export default function ProductDetailClient() {
                                 </div>
                             )}
 
-                            <div className={cn('p-4 sm:p-5 pt-0 sm:pt-0', isMixing && 'pt-4 sm:pt-5 border-t border-line')}>
+                            <div className={cn('p-3.5 sm:p-4 pt-0 sm:pt-0', isMixing && 'pt-3.5 sm:pt-4 border-t border-line')}>
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <button
                                         type="button"
                                         onClick={handleAdd}
                                         disabled={isLoggedIn && (addDisabled || (!isMixing && quantity < minUnits))}
-                                        className="w-full sm:flex-1 shrink-0 h-11 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14px] font-semibold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="w-full sm:flex-1 shrink-0 h-10 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold inline-flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                     >
                                         {isAdded ? <><Check size={16} /> Added to cart</>
                                             : !isLoggedIn ? <>Sign in to order</>
                                             : isMixing ? <><ShoppingCart size={16} /> Add mixed {tierData.activeLabel.toLowerCase()} to cart</>
                                             : <><ShoppingCart size={16} /> Add to cart</>}
                                     </button>
-                                    <Link href={quoteHref} className="sm:w-auto h-11 px-5 rounded-xl ring-1 ring-line-strong hover:ring-ink text-[14px] font-semibold text-heading inline-flex items-center justify-center gap-2 transition-shadow">
+                                    <Link href={quoteHref} className="sm:w-auto h-10 px-4 rounded-xl ring-1 ring-line-strong hover:ring-ink text-[13.5px] font-semibold text-heading inline-flex items-center justify-center gap-2 transition-shadow">
                                         <FileText size={16} /> Request a quote
                                     </Link>
                                 </div>
@@ -1300,7 +1300,7 @@ export default function ProductDetailClient() {
 
                         {/* Key facts — only fields the product actually has */}
                         {(keyFacts.length > 0 || listingStatus) && (
-                            <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-x-8 text-[13px]">
+                            <dl className="mt-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 text-[12.5px]">
                                 {keyFacts.map(([k, v]) => (
                                     <div key={k} className="flex justify-between gap-4 py-2 border-b border-line">
                                         <dt className="text-ink-3">{k}</dt>
@@ -1321,11 +1321,11 @@ export default function ProductDetailClient() {
                 </div>
 
                 {/* ── Details tabs ─────────────────────────────────────────── */}
-                <section id="pdp-details" className="mt-12 scroll-mt-[112px]">
+                <section id="pdp-details" className="mt-10 scroll-mt-[112px]">
                     <div role="tablist" aria-label="Product information" className="flex gap-6 border-b border-line overflow-x-auto scrollbar-hide">
                         {tabs.map((t) => (
                             <button key={t} role="tab" type="button" aria-selected={activeTab === tabKey(t)} onClick={() => setActiveTab(tabKey(t))}
-                                className={cn('h-11 -mb-px border-b-2 text-[14px] font-medium whitespace-nowrap transition-colors', activeTab === tabKey(t) ? 'border-[#0E7C74] text-ink' : 'border-transparent text-ink-3 hover:text-ink')}>
+                                className={cn('h-10 -mb-px border-b-2 text-[13.5px] font-medium whitespace-nowrap transition-colors', activeTab === tabKey(t) ? 'border-[#0E7C74] text-ink' : 'border-transparent text-ink-3 hover:text-ink')}>
                                 {t}
                             </button>
                         ))}
@@ -1333,7 +1333,7 @@ export default function ProductDetailClient() {
                     <div className="py-6">
                         {(activeTab === 'Overview' || activeTab === 'Description') && (
                             (translatedDesc || product.description) ? (
-                                <div className="max-w-3xl text-[14.5px] leading-relaxed text-ink-2 whitespace-pre-line">{translatedDesc || product.description}</div>
+                                <div className="max-w-3xl text-[14px] leading-relaxed text-ink-2 whitespace-pre-line">{translatedDesc || product.description}</div>
                             ) : (
                                 <p className="text-[14px] text-ink-3">The supplier hasn’t added a description yet. See Specifications for packaging and trade details.</p>
                             )
