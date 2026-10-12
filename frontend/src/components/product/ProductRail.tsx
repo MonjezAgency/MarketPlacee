@@ -5,6 +5,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
+ * Scrolling is native overflow-x: no wheel handlers, so trackpad and touch
+ * gestures go straight to the browser and vertical page scroll is untouched.
+ * Items inside must not create their own scroll containers (use
+ * overflow-clip, not overflow-hidden), so a gesture that starts over an
+ * image or name is never captured by a nested, non-scrollable box.
+ *
  * Horizontal product row with discoverable navigation: visible arrows
  * (disabled at each end), native trackpad / touch scrolling, mouse drag,
  * and an optional "View all" action. Vertical page scrolling is untouched.
@@ -89,8 +95,12 @@ export function ProductRail({ title, subtitle, viewAll, children, className, arr
                 onPointerMove={onPointerMove}
                 onPointerUp={endDrag}
                 onPointerLeave={endDrag}
+                onPointerCancel={endDrag}
+                // Links and images are natively draggable; a native drag would
+                // swallow the pointer stream and leave the rail stuck mid-drag.
+                onDragStart={(e) => e.preventDefault()}
                 onClickCapture={onClickCapture}
-                className={cn('flex overflow-x-auto overscroll-x-contain select-none pb-1', snap ? 'gap-3 snap-x snap-mandatory scrollbar-hide' : 'gap-2 mix-rail-scroll', trackClassName)}
+                className={cn('flex overflow-x-auto overscroll-x-contain select-none pb-1', snap ? 'gap-3 snap-x snap-proximity scrollbar-hide' : 'gap-2 mix-rail-scroll', trackClassName)}
                 style={{ scrollPaddingInline: 2 }}
             >
                 {children}

@@ -173,7 +173,7 @@ export default function MixBuilder({ open, onClose, sel, kinds }: {
                                     return (
                                         <li key={p.id} className={cn('px-5 py-3', reason && 'opacity-60')}>
                                             <div className="flex items-start gap-3">
-                                                <span className="relative w-12 h-12 shrink-0 rounded-lg bg-media ring-1 ring-line overflow-hidden">
+                                                <span className="relative w-12 h-12 shrink-0 rounded-lg bg-media ring-1 ring-line overflow-clip">
                                                     {(p.images?.[0] || p.image)
                                                         // eslint-disable-next-line @next/next/no-img-element
                                                         ? <img src={p.images?.[0] || p.image} alt="" className="absolute inset-0 m-auto max-w-[80%] max-h-[80%] object-contain mix-blend-multiply" />

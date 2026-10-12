@@ -4,6 +4,7 @@ import "./globals.css";
 import { Providers } from './providers';
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Toaster } from 'react-hot-toast';
+import { NotifyToasts } from '@/components/ui/NotifyToasts';
 import { CookieConsent } from '@/components/CookieConsent';
 import { cn } from "@/lib/utils";
 
@@ -227,6 +228,7 @@ export default function RootLayout({
             )}>
                 <Providers>
                     <Toaster position="top-right" />
+                    <NotifyToasts />
                     <ClientLayout>
                         {children}
                     </ClientLayout>

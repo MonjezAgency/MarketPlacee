@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Bell, CheckCheck, Package, ShoppingCart, Info, AlertCircle, CheckCircle, AlertTriangle, X, ArrowRight } from 'lucide-react';
+import { Bell, CheckCheck, Package, ShoppingCart, Info, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useNotifications, AppNotification } from '@/hooks/useNotifications';
 import { useAuth } from '@/lib/auth';
 import { NOTIFICATION_TYPES } from '@/lib/types';
 import { useRouter } from 'next/navigation';
+import { notifyToast, toneOf } from '@/components/ui/NotifyToasts';
 
 function getNotificationLink(n: AppNotification): string | null {
   switch (n.type) {
@@ -70,19 +71,32 @@ export default function NotificationBell({ isLight, compact }: { isLight?: boole
     const { notifications, unreadCount, markRead, markAllRead } = useNotifications(!!user);
     const router = useRouter();
     const [open, setOpen] = useState(false);
-    // "While you were away" — one summary card per session when unread items exist.
-    const [showAway, setShowAway] = useState(false);
+    // "While you were away": one summary toast, only for unread items that
+    // arrived after this browser last saw the list. (Previously this showed
+    // for ANY unread item on every new session, and a dependency change
+    // cancelled its auto-hide timer, so it popped up on entry and stayed.)
+    const awayChecked = useRef(false);
     useEffect(() => {
-        if (!compact || unreadCount === 0) return;
+        if (!compact || awayChecked.current || notifications.length === 0) return;
+        awayChecked.current = true;
+        let since: number | null = null;
         try {
-            if (sessionStorage.getItem('atl_away_card_seen')) return;
-            sessionStorage.setItem('atl_away_card_seen', '1');
-        } catch { /* noop */ }
-        setShowAway(true);
-        const t = setTimeout(() => setShowAway(false), 9000);
-        return () => clearTimeout(t);
-    }, [compact, unreadCount]);
-    const latestUnread = notifications.find((n) => !n.read);
+            const raw = localStorage.getItem('atl_notif_seen_at');
+            since = raw ? Number(raw) : null;
+            localStorage.setItem('atl_notif_seen_at', String(Date.now()));
+        } catch { /* storage blocked: skip the summary */ return; }
+        if (since == null) return; // first visit on this device: the bell's badge is enough
+        const fresh = notifications.filter((n) => !n.read && new Date(n.createdAt).getTime() > since!);
+        if (!fresh.length) return;
+        notifyToast({
+            id: `away:${fresh[0].id}`,
+            eyebrow: 'While you were away',
+            title: `${fresh.length} new ${fresh.length === 1 ? 'notification' : 'notifications'}`,
+            message: fresh[0].title,
+            tone: toneOf(fresh[0].type),
+            action: { label: 'View notifications', onClick: () => setOpen(true) },
+        });
+    }, [compact, notifications]);
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -174,22 +188,6 @@ export default function NotificationBell({ isLight, compact }: { isLight?: boole
                 </div>
             )}
 
-            {compact && showAway && !open && latestUnread && (
-                <div role="status" className="absolute end-0 top-full mt-3 w-[340px] max-w-[calc(100vw-24px)] bg-surface rounded-2xl ring-1 ring-line shadow-[0_24px_60px_rgba(15,23,42,0.16)] p-4 z-[190] flex gap-3">
-                    <NotificationTile type={latestUnread.type} />
-                    <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-semibold uppercase tracking-wider text-teal">While you were away</p>
-                        <p className="mt-1 text-[14px] font-semibold text-ink">
-                            {unreadCount} new {unreadCount === 1 ? 'notification' : 'notifications'}
-                        </p>
-                        <p className="text-[13px] text-ink-2 truncate">{latestUnread.title}</p>
-                        <button onClick={() => { setShowAway(false); setOpen(true); }} className="mt-2 inline-flex items-center gap-1 text-[13px] font-semibold text-heading hover:text-teal">
-                            View notifications <ArrowRight size={14} />
-                        </button>
-                    </div>
-                    <button onClick={() => setShowAway(false)} aria-label="Dismiss" className="self-start text-ink-4 hover:text-ink"><X size={16} /></button>
-                </div>
-            )}
         </div>
     );
 }

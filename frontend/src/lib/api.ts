@@ -71,7 +71,7 @@ function mapProduct(item: any): Product {
     return {
         id: item.id,
         name: item.name,
-        brand: item.brand || 'Atlantis',
+        brand: item.brandDisplay || item.brand || 'Atlantis',
         price: item.price,
         basePrice: item.basePrice ?? undefined,
         supplierId: item.supplierId || undefined,
@@ -161,7 +161,7 @@ export interface ProductPage {
 }
 
 /** One server-side page of products with the real total count. */
-export async function fetchProductPage(filters: Filters & { origin?: string; brands?: string; categoryAny?: string; categoryNone?: string }, signal?: AbortSignal): Promise<ProductPage> {
+export async function fetchProductPage(filters: Filters & { origin?: string; listed?: string; brands?: string; categoryAny?: string; categoryNone?: string }, signal?: AbortSignal): Promise<ProductPage> {
     const params = new URLSearchParams({ status: 'APPROVED' });
     for (const [k, v] of Object.entries(filters)) if (v !== undefined && v !== '') params.set(k, String(v));
     const res = await apiFetch(`/products?${params.toString()}`, { cache: 'no-store', signal });

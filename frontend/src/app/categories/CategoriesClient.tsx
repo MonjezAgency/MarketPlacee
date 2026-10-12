@@ -30,12 +30,21 @@ let serverCaps: boolean | null = null;
 // search term it is the default catalog order (newest first).
 const SORTS = [
     { id: 'relevance', label: 'Relevance', api: 'relevance' },
-    { id: 'newest', label: 'Newest', api: 'newest' },
+    { id: 'newest', label: 'Newest first', api: 'newest' },
     { id: 'price-low', label: 'Price: Low to High', api: 'price_asc' },
     { id: 'price-high', label: 'Price: High to Low', api: 'price_desc' },
     { id: 'name', label: 'Name: A–Z', api: 'name_asc' },
 ] as const;
 type SortId = (typeof SORTS)[number]['id'];
+
+/** "New offers" date windows (server-side, UTC day/week/month boundaries). */
+const LISTED = [
+    { id: '', label: 'All offers' },
+    { id: 'today', label: 'Today' },
+    { id: 'week', label: 'This week' },
+    { id: 'month', label: 'This month' },
+] as const;
+type ListedId = (typeof LISTED)[number]['id'];
 
 /** All listing state lives in the URL (shareable, back-button friendly). */
 function useListingParams() {
@@ -50,6 +59,7 @@ function useListingParams() {
         categories: list('category'),
         brands: list('brand'),
         origin: sp.get('origin') || '',
+        listed: (LISTED.some((l) => l.id === sp.get('listed')) ? sp.get('listed') : '') as ListedId,
         min: sp.get('min') || '',
         max: sp.get('max') || '',
         sort,
@@ -58,7 +68,7 @@ function useListingParams() {
     };
 }
 /** Query-string keys the listing reads/writes. */
-type UrlKey = 'q' | 'dept' | 'category' | 'brand' | 'origin' | 'min' | 'max' | 'sort' | 'size' | 'page';
+type UrlKey = 'q' | 'dept' | 'category' | 'brand' | 'origin' | 'listed' | 'min' | 'max' | 'sort' | 'size' | 'page';
 
 function Section({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
     const [open, setOpen] = React.useState(defaultOpen);
@@ -199,7 +209,7 @@ function CategoriesContent() {
             if (p.min) minEUR = String(convertToBase(Number(p.min), currency));
             if (p.max) maxEUR = String(convertToBase(Number(p.max), currency));
         } catch { /* no rate → effective currency is EUR already */ }
-        const base = { q: p.q || undefined, minPrice: minEUR, maxPrice: maxEUR, sort: sortApi, origin: p.origin || undefined };
+        const base = { q: p.q || undefined, minPrice: minEUR, maxPrice: maxEUR, sort: sortApi, origin: p.origin || undefined, listed: p.listed || undefined };
 
         // Department and multi-brand filters are paged server-side when the
         // backend supports them (facets.capabilities). Older backends ignore
@@ -299,11 +309,12 @@ function CategoriesContent() {
         ...(department ? [{ label: department.label, clear: () => setParams({ dept: '' }) }] : []),
         ...p.categories.map((c) => ({ label: c, clear: () => setParams({ category: p.categories.filter((x) => x !== c) }) })),
         ...p.brands.map((b) => ({ label: b, clear: () => setParams({ brand: p.brands.filter((x) => x !== b) }) })),
+        ...(p.listed ? [{ label: `Listed: ${LISTED.find((l) => l.id === p.listed)!.label.toLowerCase()}`, clear: () => setParams({ listed: '' }) }] : []),
         ...(p.origin ? [{ label: `Origin: ${p.origin}`, clear: () => setParams({ origin: '' }) }] : []),
         ...(p.min || p.max ? [{ label: `${p.min ? `${symbol}${p.min}` : 'Any'} – ${p.max ? `${symbol}${p.max}` : 'Any'}`, clear: () => setParams({ min: '', max: '' }) }] : []),
     ];
     // Clears filters only — the chosen sort and page size are view settings and stay.
-    const resetAll = () => setParams({ q: '', dept: '', category: [], brand: [], origin: '', min: '', max: '' });
+    const resetAll = () => setParams({ q: '', dept: '', category: [], brand: [], origin: '', listed: '', min: '', max: '' });
 
     // CSV export of the current view (same per-case price as the cards).
     const [exporting, setExporting] = React.useState(false);
@@ -475,6 +486,18 @@ function CategoriesContent() {
                             </button>
                         </div>
 
+                        {(p.sort === 'newest' || p.listed) && (
+                            <div role="radiogroup" aria-label="Listed" className="flex flex-wrap items-center gap-1.5 pb-3">
+                                {LISTED.map((l) => (
+                                    <button key={l.id || 'all'} type="button" role="radio" aria-checked={p.listed === l.id} onClick={() => setParams({ listed: l.id })}
+                                        className={cn('h-8 px-3 rounded-full text-[12.5px] font-semibold ring-1 transition-colors',
+                                            p.listed === l.id ? 'bg-heading text-surface ring-heading' : 'ring-line text-ink-2 hover:ring-line-strong')}>
+                                        {l.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
                         {chips.length > 0 && (
                             <div className="flex flex-wrap items-center gap-2 pb-5">
                                 {chips.map((c) => (
@@ -512,7 +535,7 @@ function CategoriesContent() {
                             <div className="flex flex-col items-center justify-center py-20 px-6 text-center rounded-2xl ring-1 ring-line">
                                 <span className="w-14 h-14 rounded-2xl bg-teal-soft flex items-center justify-center mb-5"><PackageSearch size={26} className="text-teal" /></span>
                                 <h2 className="font-sans text-[18px] font-bold text-ink">
-                                    {error === 'auth' ? 'Sign in to view the catalog' : error ? 'We couldn’t load products' : department && chips.length === 1 ? `No ${department.label} products yet` : 'No products match these filters'}
+                                    {error === 'auth' ? 'Sign in to view the catalog' : error ? 'We couldn’t load products' : p.listed && chips.length === 1 ? `No new offers ${LISTED.find((l) => l.id === p.listed)!.label.toLowerCase()}` : department && chips.length === 1 ? `No ${department.label} products yet` : 'No products match these filters'}
                                 </h2>
                                 <p className="text-[14px] text-ink-3 max-w-sm mt-1.5 mb-6">
                                     {error === 'auth' ? 'Atlantis is a members-only wholesale marketplace. Sign in or create a buyer account to see products and prices.' : error ? 'Please check your connection and try again.' : 'Try removing a filter, or tell us what you need and our desk will source it.'}

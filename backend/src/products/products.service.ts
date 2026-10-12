@@ -3,6 +3,8 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EanService } from './ean.service';
+import { listedSince } from './listed-since';
+import { buildBrandCanon, brandKey, canonicalBrand, type BrandCanon } from './brand-canon';
 import { translateProduct } from '../common/translator';
 
 import { AiAgentService } from '../ai-agent/ai-agent.service';
@@ -354,7 +356,17 @@ export class ProductsService {
         }
     }
 
-    async findAll(status?: ProductStatus, filters?: { category?: string; brand?: string; brands?: string; categoryAny?: string; categoryNone?: string; minPrice?: string; maxPrice?: string; sort?: string; q?: string; page?: string; limit?: string; origin?: string }) {
+    private brandCanonCache: { at: number; canon: BrandCanon } | null = null;
+    /** Canonical brand spellings across the whole catalog (cached for a minute). */
+    async brandCanon(): Promise<BrandCanon> {
+        if (this.brandCanonCache && Date.now() - this.brandCanonCache.at < 60_000) return this.brandCanonCache.canon;
+        const groups = await this.prisma.product.groupBy({ by: ['brand'], where: { brand: { not: null } }, _count: { brand: true } }).catch(() => [] as any[]);
+        const canon = buildBrandCanon(groups.map((g: any) => ({ brand: g.brand, count: g._count.brand })));
+        this.brandCanonCache = { at: Date.now(), canon };
+        return canon;
+    }
+
+    async findAll(status?: ProductStatus, filters?: { category?: string; brand?: string; brands?: string; categoryAny?: string; categoryNone?: string; minPrice?: string; maxPrice?: string; sort?: string; q?: string; page?: string; limit?: string; origin?: string; listed?: string }) {
         const where: any = {};
         if (status) {
             // Robust case-insensitive status handling
@@ -385,7 +397,12 @@ export class ProductsService {
         if (filters?.brand) where.brand = { contains: filters.brand, mode: 'insensitive' };
         // Multi-brand (comma-separated, exact match, case-insensitive).
         const brandList = String(filters?.brands || '').split(',').map((b) => b.trim()).filter(Boolean).slice(0, 50);
-        if (brandList.length) where.brand = { in: brandList, mode: 'insensitive' };
+        const canon = await this.brandCanon();
+        if (brandList.length) {
+            // Match every stored spelling of the chosen brands ("Prime", "PRIME", "Prime ").
+            const raw = brandList.flatMap((b) => canon.variants.get(brandKey(b)) ?? [b]);
+            where.brand = { in: raw, mode: 'insensitive' };
+        }
 
         // Department = category keyword groups: any include matches, no exclude matches.
         const csv = (v?: string) => String(v || '').split(',').map((x) => x.trim()).filter(Boolean).slice(0, 40);
@@ -396,6 +413,16 @@ export class ProductsService {
                 ...(catAny.length ? [{ OR: catAny.map((k) => ({ category: { contains: k, mode: 'insensitive' } })) }] : []),
                 ...catNone.map((k) => ({ NOT: { category: { contains: k, mode: 'insensitive' } } })),
             ];
+        }
+
+        // "New offers" window: listings created in the range, or listings that
+        // received a newly approved supplier offer in the range.
+        const since = listedSince(filters?.listed);
+        if (since) {
+            where.AND = [...(where.AND || []), { OR: [
+                { createdAt: { gte: since } },
+                { offers: { some: { status: 'APPROVED', createdAt: { gte: since } } } },
+            ] }];
         }
 
         // Country of origin (exact, case-insensitive). Facets below are
@@ -492,6 +519,13 @@ export class ProductsService {
             ]);
         }
 
+        for (const p of products) if (p) p.brandDisplay = canonicalBrand(canon, p.brand);
+        const brandFacet = new Map<string, number>();
+        for (const g of brandGroups as any[]) {
+            const name = canonicalBrand(canon, g.brand);
+            if (name && String(name).trim()) brandFacet.set(name, (brandFacet.get(name) ?? 0) + g._count.brand);
+        }
+
         return {
             data: products,
             total,
@@ -508,9 +542,7 @@ export class ProductsService {
                 priceRange: priceAgg && priceAgg._min.price != null && priceAgg._max.price != null
                     ? { min: priceAgg._min.price, max: priceAgg._max.price }
                     : null,
-                brands: brandGroups
-                    .filter((g: any) => g.brand && String(g.brand).trim())
-                    .map((g: any) => ({ value: g.brand, count: g._count.brand }))
+                brands: Array.from(brandFacet, ([value, count]) => ({ value, count }))
                     .sort((a: any, b: any) => b.count - a.count || String(a.value).localeCompare(String(b.value))),
             },
         };
@@ -1203,6 +1235,8 @@ export class ProductsService {
     async findOne(id: string) {
         const product = await this.prisma.product.findUnique({ where: { id } });
         if (!product) return null;
+        // Display-only canonical brand; the stored `brand` is left untouched.
+        (product as any).brandDisplay = canonicalBrand(await this.brandCanon(), product.brand);
         // Surface any APPROVED active wholesale offer with a promo
         // discount so the PDP can paint a "-15% OFF" badge and apply
         // the reduced price. Picks the deepest discount and only the

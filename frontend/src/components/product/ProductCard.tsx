@@ -124,7 +124,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
             {/* ── Image well — large, white, centred ─────────────────── */}
             <Link
                 href={`/products/${product.id}`}
-                className="relative block aspect-square rounded-2xl bg-media border border-line overflow-hidden transition-colors duration-300 group-hover:border-line-strong"
+                className="relative block aspect-square rounded-2xl bg-media border border-line overflow-clip transition-colors duration-300 group-hover:border-line-strong"
                 onMouseEnter={() => setIsHoveringImg(true)}
                 onMouseLeave={() => setIsHoveringImg(false)}
             >

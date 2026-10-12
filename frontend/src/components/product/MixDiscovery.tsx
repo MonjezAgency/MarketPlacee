@@ -11,6 +11,7 @@ import { variantSignatures, loadLabel, type LoadKind } from '@/lib/wholesale';
 import { pickKey, type MixSelection } from '@/lib/useMixSelection';
 import { ProductRail } from '@/components/product/ProductRail';
 import { cn } from '@/lib/utils';
+import { brandLogo } from '@/lib/brand-logos';
 
 const unitOf = (k: LoadKind) => (k === 'PALLET' ? 'cases' : 'pallets');
 
@@ -35,6 +36,10 @@ function MixRow({ p, variant, label, kind, sel, badge }: {
     const reason = mixIneligibility(p, kind);
     const on = sel.has(pickKey(p.id, variant));
     const img = p.images?.[0] || p.image;
+    const logo = img ? null : brandLogo(p.brand);
+    // Under the name: the supplier-entered EAN code, else the entered pack
+    // size. The product has no separate free-text label field.
+    const code = p.ean ? `EAN ${p.ean}` : p.weight ? String(p.weight) : '';
     const toggle = () => { if (!reason) sel.toggle({ productId: p.id, variant, name: p.name, label, image: img }); };
     return (
         <div
@@ -51,15 +56,15 @@ function MixRow({ p, variant, label, kind, sel, badge }: {
                 on ? 'ring-[#2EC4B6] bg-teal-soft/60' : !reason && 'ring-line hover:ring-line-strong hover:bg-surface-2',
             )}
         >
-            <span className="relative w-8 h-8 shrink-0 rounded-full bg-media ring-1 ring-line overflow-hidden">
-                {img
+            <span className="relative w-8 h-8 shrink-0 rounded-full bg-media ring-1 ring-line overflow-clip">
+                {img || logo
                     // eslint-disable-next-line @next/next/no-img-element
-                    ? <img src={img} alt="" draggable={false} loading="lazy" className="absolute inset-0 m-auto max-w-[78%] max-h-[78%] object-contain mix-blend-multiply" />
+                    ? <img src={(img || logo)!} alt="" draggable={false} loading="lazy" className="absolute inset-0 m-auto max-w-[78%] max-h-[78%] object-contain mix-blend-multiply" />
                     : <span className="absolute inset-0 flex items-center justify-center text-ink-4"><Package size={13} /></span>}
             </span>
             <span className="min-w-0 flex-1 leading-tight">
-                <span className="block text-[12.5px] font-medium text-ink truncate">{label ?? p.name}</span>
-                <span className="block text-[11px] text-ink-3 truncate">{badge ?? (label ? p.name : reason ?? p.brand ?? '')}</span>
+                <span className="block text-[12.5px] font-medium text-ink whitespace-nowrap text-ellipsis overflow-clip">{label ?? p.name}</span>
+                {(badge || label || reason || code) && <span className="block text-[11px] text-ink-3 whitespace-nowrap text-ellipsis overflow-clip">{badge ?? (label ? p.name : reason ?? code)}</span>}
             </span>
             <span
                 aria-hidden
