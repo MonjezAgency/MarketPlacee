@@ -1,5 +1,6 @@
 import { Controller, Get, UseGuards, Post, Patch, Param, Body, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Request, Res, StreamableFile, UploadedFile, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { cleanProfile, cleanBrands, ProfileFieldError } from './profile-fields';
+import { missingProfileFields, REQUIRED_PROFILE_FIELDS } from './profile-completion';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { PrismaService } from '../common/prisma.service';
@@ -37,7 +38,23 @@ export class UsersController {
     @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
     async updateMe(@Request() req, @Body() body: Record<string, unknown>) {
         const updated = await this.prisma.user.update({ where: { id: req.user.sub }, data: this.profileData(body) as any });
-        return plainToInstance(UserDto, updated);
+        return plainToInstance(UserDto, await this.settleOnboarding(updated));
+    }
+
+    /** Marks onboarding complete (and so stops reminders) as soon as every required field is saved. */
+    private async settleOnboarding(u: any) {
+        if (u && u.onboardingCompleted === false && missingProfileFields(u).length === 0) {
+            return this.prisma.user.update({ where: { id: u.id }, data: { onboardingCompleted: true, profileIncompleteSince: null } as any });
+        }
+        return u;
+    }
+
+    @Get('me/profile-status')
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
+    async profileStatus(@Request() req) {
+        const u: any = await this.prisma.user.findUnique({ where: { id: req.user.sub } });
+        const missing = missingProfileFields(u);
+        return { complete: u?.onboardingCompleted !== false || missing.length === 0, onboardingCompleted: u?.onboardingCompleted !== false, missing, required: REQUIRED_PROFILE_FIELDS };
     }
 
     /** Whitelisted self-service fields only; turns validation problems into 400s. */
@@ -81,6 +98,7 @@ export class UsersController {
             inboundOffers: true,
             marketingEmails: true,
             muteToasts: false,
+            onboardingReminders: true,
         };
         const saved = (user?.notificationPrefs as Record<string, boolean>) || {};
         return { ...DEFAULTS, ...saved };
@@ -94,7 +112,7 @@ export class UsersController {
         // can't stuff arbitrary JSON into the field.
         const ALLOWED = [
             'orderUpdates', 'productComments', 'lowStockAlerts',
-            'inboundOffers', 'marketingEmails', 'muteToasts',
+            'inboundOffers', 'marketingEmails', 'muteToasts', 'onboardingReminders',
         ];
         const clean: Record<string, boolean> = {};
         for (const k of ALLOWED) {
@@ -206,7 +224,7 @@ export class UsersController {
     async updateProfile(@Param('id') id: string, @Body() data: Record<string, unknown>, @Request() req) {
         if (id !== req.user.sub) throw new ForbiddenException('You can only update your own profile.');
         const user = await this.prisma.user.update({ where: { id }, data: this.profileData(data) as any });
-        return plainToInstance(UserDto, user);
+        return plainToInstance(UserDto, await this.settleOnboarding(user));
     }
 
     @Delete(':id')

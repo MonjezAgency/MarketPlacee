@@ -9,10 +9,13 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { COUNTRIES } from '@/lib/countries';
 import { cn } from '@/lib/utils';
 import { BUSINESS_TYPES } from '@/lib/business-types';
+import { GoogleButton } from '@/components/auth/GoogleButton';
 import { AuthShell, AuthSelect, authInput, authLabel, authPrimary, authSecondary, FieldError, FormAlert, PasswordChecklist, passwordOk } from '@/components/auth/AuthShell';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const STEPS = ['Account', 'Business', 'Review'] as const;
+/** Discourage copying the new password out of the field (paste and password managers still work). */
+const noCopy = (e: React.ClipboardEvent<HTMLInputElement>) => e.preventDefault();
 
 
 type Form = {
@@ -27,7 +30,7 @@ function validate(step: number, f: Form): Errors {
     if (step === 0) {
         if (!f.name.trim()) e.name = 'Enter your full name.';
         if (!EMAIL_RE.test(f.email.trim())) e.email = 'Enter a valid work email.';
-        if (!passwordOk(f.password)) e.password = 'Your password doesn’t meet all the requirements yet.';
+        if (!passwordOk(f.password, { email: f.email, name: f.name })) e.password = 'Your password doesn’t meet all the requirements yet.';
         if (!f.confirm) e.confirm = 'Confirm your password.';
         else if (f.confirm !== f.password) e.confirm = 'Passwords don’t match.';
     }
@@ -87,7 +90,7 @@ function RegisterWizard() {
         if (typeof res === 'string' || !res) { setServerError(typeof res === 'string' ? res : 'We couldn’t reach Atlantis. Check your connection and try again.'); setSubmitting(false); return; }
         // Only now — after the server has issued a code — move to the code screen.
         try { sessionStorage.setItem('atl_verify_email', res.email || f.email.trim().toLowerCase()); } catch { /* ignore */ }
-        router.push(`/auth/verify-email?email=${encodeURIComponent(res.email || f.email.trim().toLowerCase())}&sent=1`);
+        router.push(`/auth/verify-email?email=${encodeURIComponent(res.email || f.email.trim().toLowerCase())}&sent=${res.deliveryFailed ? 'failed' : '1'}`);
     };
 
     const countryName = f.country;
@@ -97,6 +100,10 @@ function RegisterWizard() {
                 <h1 className="text-[22px] leading-tight font-semibold text-heading">Create your business account</h1>
                 <p className="mt-1 text-[14px] text-ink-3">For wholesalers, distributors, importers and bulk traders.</p>
                 <p className="text-[13.5px] text-ink-3">Already registered? <Link href="/auth/login" className="font-semibold text-teal hover:underline">Sign in</Link></p>
+                {step === 0 && (<>
+                    <GoogleButton label="Sign up with Google" className="mt-5" />
+                    <div className="mt-5 flex items-center gap-3 text-[12px] text-ink-4" aria-hidden><span className="flex-1 h-px bg-line" />or with your work email<span className="flex-1 h-px bg-line" /></div>
+                </>)}
 
                 {/* Progress: 1 → 2 → 3 */}
                 <ol className="mt-5 flex items-center" aria-label="Registration progress">
@@ -141,17 +148,17 @@ function RegisterWizard() {
                                 <div>
                                     <label htmlFor="f-password" className={authLabel}>Password</label>
                                     <div className="relative">
-                                        <input id="f-password" type={showPw ? 'text' : 'password'} value={f.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" className={cn(authInput, 'pe-11')} aria-invalid={!!errors.password} aria-describedby="e-password pw-rules" />
+                                        <input id="f-password" type={showPw ? 'text' : 'password'} value={f.password} onChange={(e) => set('password', e.target.value)} onCopy={noCopy} onCut={noCopy} autoComplete="new-password" className={cn(authInput, 'pe-11')} aria-invalid={!!errors.password} aria-describedby="e-password pw-rules" />
                                         <button type="button" onClick={() => setShowPw((s) => !s)} aria-label={showPw ? 'Hide password' : 'Show password'} className="absolute inset-y-0 end-0 w-11 flex items-center justify-center text-ink-3 hover:text-ink">{showPw ? <EyeOff size={17} /> : <Eye size={17} />}</button>
                                     </div>
                                 </div>
                                 <div>
                                     <label htmlFor="f-confirm" className={authLabel}>Confirm password</label>
-                                    <input id="f-confirm" type={showPw ? 'text' : 'password'} value={f.confirm} onChange={(e) => set('confirm', e.target.value)} autoComplete="new-password" className={authInput} aria-invalid={!!errors.confirm} aria-describedby="e-confirm" />
+                                    <input id="f-confirm" type={showPw ? 'text' : 'password'} value={f.confirm} onChange={(e) => set('confirm', e.target.value)} onCopy={noCopy} onCut={noCopy} autoComplete="new-password" className={authInput} aria-invalid={!!errors.confirm} aria-describedby="e-confirm" />
                                     <FieldError id="e-confirm">{errors.confirm}</FieldError>
                                 </div>
                             </div>
-                            <div id="pw-rules"><PasswordChecklist value={f.password} /></div>
+                            <div id="pw-rules"><PasswordChecklist value={f.password} email={f.email} name={f.name} /></div>
                             <FieldError id="e-password">{errors.password}</FieldError>
                         </>)}
 

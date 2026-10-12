@@ -10,6 +10,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 import { PrismaService } from '../common/prisma.service';
 import { ForbiddenException, ConflictException } from '@nestjs/common';
+import { checkPassword } from './password-policy';
+import { verifyGoogleIdToken, type GoogleIdentity } from './google-token';
 import { newCode, hashSecret, checkCode, cooldownLeft, publicRole, normEmail, EMAIL_RE, STRONG_PASSWORD_RE, CODE_TTL_MS, MAX_ATTEMPTS } from './verification';
 
 interface AuthUser {
@@ -25,6 +27,10 @@ interface AuthUser {
     country?: string;
     emailVerified?: boolean;
 }
+
+/** Fields safe to send to the browser after sign-in (never secrets, hashes or banking data). */
+const PUBLIC_USER_FIELDS = ['id', 'email', 'name', 'role', 'status', 'avatar', 'companyName', 'phone', 'country', 'website', 'businessType', 'businessCity', 'onboardingCompleted', 'emailVerified', 'kycStatus', 'twoFactorEnabled', 'createdAt'] as const;
+export const publicUser = (u: any) => (u ? Object.fromEntries(PUBLIC_USER_FIELDS.filter((k) => k in u).map((k) => [k, u[k]])) : u);
 
 @Injectable()
 export class AuthService {
@@ -186,21 +192,32 @@ export class AuthService {
         const role = publicRole(data?.role);
         const name = String(data?.name ?? '').trim().slice(0, 120);
         if (!EMAIL_RE.test(email)) throw new BadRequestException({ code: 'INVALID_EMAIL', message: 'Enter a valid work email.' });
-        if (!STRONG_PASSWORD_RE.test(password)) throw new BadRequestException({ code: 'WEAK_PASSWORD', message: 'Password needs 8+ characters with upper- and lower-case letters, a number and a symbol (!@#$%^&*).' });
+        const pwCheck = checkPassword(password, { email, name: data?.name });
+        if (!pwCheck.ok) throw new BadRequestException({ code: 'WEAK_PASSWORD', message: pwCheck.problems.join(' '), problems: pwCheck.problems });
         if (!role) throw new BadRequestException({ code: 'INVALID_ROLE', message: 'Choose Buyer or Supplier.' });
         if (!name) throw new BadRequestException({ code: 'NAME_REQUIRED', message: 'Enter your full name.' });
         const companyName = String(data?.companyName ?? '').trim().slice(0, 160);
         if (!companyName) throw new BadRequestException({ code: 'COMPANY_REQUIRED', message: 'Enter your company name.' });
         this.logger.log(`[AUTH] Sign-up attempt (${role})`);
 
-        const generic = { verificationRequired: true, email, pendingApproval: true };
+        // Same shape for new and existing emails (no account discovery). deliveryFailed
+        // is true only when the email provider rejected a send made by THIS request.
+        const generic = { verificationRequired: true, email, pendingApproval: true, deliveryFailed: false };
         const existing = await this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
         if (existing) {
-            if (existing.emailVerificationRequired && !existing.emailVerified) {
-                // Unfinished sign-up: just (re)send a code, respecting the cooldown.
-                await this.sendSignupCode(existing.id).catch(() => undefined);
-            } else {
-                this.emailService.sendSignupExisting(existing.email, existing.name || '').catch(() => undefined);
+            if ((existing as any).emailVerificationRequired && !existing.emailVerified) {
+                // Unfinished sign-up: (re)send a code, respecting the cooldown.
+                const r = await this.sendSignupCode(existing.id).catch(() => ({ ok: false, retryAfter: 0, failed: true }));
+                return { ...generic, deliveryFailed: !!(r as any).failed };
+            }
+            // Registered owner gets a heads-up — at most one per 10 minutes, so
+            // repeated attempts can't flood their inbox.
+            const last = (existing as any).emailVerifySentAt as Date | null;
+            if (!last || Date.now() - new Date(last).getTime() > 10 * 60_000) {
+                await this.prisma.user.update({ where: { id: existing.id }, data: { emailVerifySentAt: new Date() } as any });
+                const r = await this.emailService.sendSignupExisting(existing.email, existing.name || '').catch((e) => ({ success: false, error: e?.message }));
+                if (!r.success) this.logger.warn(`[AUTH] Existing-account notice failed for ${existing.id}: ${(r as any).error || 'provider error'}`);
+                return { ...generic, deliveryFailed: !r.success };
             }
             return generic;
         }
@@ -236,11 +253,11 @@ export class AuthService {
         this.logger.log(`[AUTH] Sign-up created ${user.id}`);
         const sent = await this.sendSignupCode(user.id);
         // Admin alerts go out only after the email is verified (see verifySignupCode).
-        return { ...generic, emailSent: sent.ok };
+        return { ...generic, deliveryFailed: !!(sent as any).failed };
     }
 
     /** Issue + email a fresh sign-up code (cooldown enforced). The code itself is never stored. */
-    private async sendSignupCode(userId: string): Promise<{ ok: boolean; retryAfter: number }> {
+    private async sendSignupCode(userId: string): Promise<{ ok: boolean; retryAfter: number; failed?: boolean }> {
         const u = await this.prisma.user.findUnique({ where: { id: userId } });
         if (!u || u.emailVerified) return { ok: false, retryAfter: 0 };
         const wait = cooldownLeft((u as any).emailVerifySentAt);
@@ -251,8 +268,14 @@ export class AuthService {
             data: { emailVerifyCodeHash: hashSecret(code), emailVerifyExpiry: new Date(Date.now() + CODE_TTL_MS), emailVerifyAttempts: 0, emailVerifySentAt: new Date() } as any,
         });
         const res = await this.emailService.sendSignupCode(u.email, u.name || '', code, CODE_TTL_MS / 60000).catch((e) => ({ success: false, error: e?.message }));
-        if (!res.success) this.logger.error(`[AUTH] Verification email failed for ${userId}: ${res.error}`);
-        return { ok: !!res.success, retryAfter: 60 };
+        if (!res.success) {
+            // Safe diagnostics only: user id + provider error, never the code or address.
+            this.logger.error(`[AUTH] Verification email failed for ${userId}: ${res.error || 'provider error'}`);
+            // Let the user retry immediately rather than wait out a cooldown for an email that never left.
+            await this.prisma.user.update({ where: { id: userId }, data: { emailVerifySentAt: null } as any }).catch(() => undefined);
+            return { ok: false, retryAfter: 0, failed: true };
+        }
+        return { ok: true, retryAfter: 60 };
     }
 
     /** Resend: same answer for unknown, verified and unverified emails (no enumeration). */
@@ -261,9 +284,10 @@ export class AuthService {
         const u = EMAIL_RE.test(email) ? await this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } }) : null;
         if (u && (u as any).emailVerificationRequired && !u.emailVerified) {
             const r = await this.sendSignupCode(u.id);
-            if (!r.ok && r.retryAfter > 0) return { ok: true, retryAfter: r.retryAfter };
+            if (r.failed) return { ok: false, retryAfter: 0, deliveryFailed: true };
+            if (!r.ok && r.retryAfter > 0) return { ok: true, retryAfter: r.retryAfter, deliveryFailed: false };
         }
-        return { ok: true, retryAfter: 60 };
+        return { ok: true, retryAfter: 60, deliveryFailed: false };
     }
 
     async verifySignupCode(rawEmail: string, code: string) {
@@ -439,7 +463,7 @@ export class AuthService {
         const tokens = await this.generateTokens(user);
         return {
             ...tokens,
-            user,
+            user: publicUser(user),
         };
     }
 
@@ -494,52 +518,55 @@ export class AuthService {
         return this.login(safeUser);
     }
 
-    async googleLogin(data: { email: string; name: string; avatar?: string; googleId?: string }) {
-        let user = await this.prisma.user.findUnique({ where: { email: data.email } });
+    /**
+     * Google sign-in. Identity comes ONLY from a Google ID token verified on
+     * the server (verifyGoogleIdToken). Staff accounts and accounts with
+     * two-step verification must use their password flow. New users get a
+     * buyer account (never supplier/admin) with an incomplete business profile.
+     */
+    async googleLogin(idToken: string) {
+        let g: GoogleIdentity;
+        try { g = await verifyGoogleIdToken(idToken); }
+        catch (e: any) { throw new UnauthorizedException({ code: 'GOOGLE_TOKEN_INVALID', message: e?.message || 'Google sign-in failed.' }); }
 
+        let user = await this.prisma.user.findFirst({ where: { email: { equals: g.email, mode: 'insensitive' } } });
         if (!user) {
-            // New user via Google — activate immediately as requested
-            const randomPassword = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 10);
-            user = await this.prisma.user.create({
-                data: {
-                    email: data.email,
-                    name: data.name,
-                    password: randomPassword,
-                    avatar: data.avatar,
-                    role: 'CUSTOMER',
-                    status: 'ACTIVE',
-                    emailVerified: true, // Google verified the email
-                    onboardingCompleted: true, 
-                },
-            });
-
-            // Background notifications
-            this.emailService.sendWelcomeEmail(user.email, user.name, user.role).catch(() => {});
-            this.notificationsService.notifyAdmins(
-                'New Google Registration',
-                `${user.name} (${user.email}) signed up via Google and is now active.`,
-                'INFO',
-                { userId: user.id }
-            ).catch(() => {});
-
-            const { password, ...safeUser } = user;
-            return this.login(safeUser);
+            try {
+                user = await this.prisma.user.create({
+                    data: {
+                        email: g.email,
+                        name: g.name,
+                        password: await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12), // unusable random password
+                        avatar: g.picture,
+                        role: 'CUSTOMER',
+                        status: 'ACTIVE', // existing operator decision for Google buyers
+                        emailVerified: true, // proven by Google, not a company verification
+                        onboardingCompleted: false,
+                        profileIncompleteSince: new Date(),
+                    } as any,
+                });
+            } catch (e: any) {
+                if (e?.code !== 'P2002') throw e; // double callback: the other request created it
+                user = await this.prisma.user.findFirst({ where: { email: { equals: g.email, mode: 'insensitive' } } });
+            }
+            this.notificationsService.notifyAdmins('New Google sign-up', `${g.name} (${g.email}) signed up with Google and needs to complete a business profile.`, 'INFO', { userId: user!.id }).catch(() => {});
         }
-
-        if ((user.status as any) === 'BLOCKED' || (user.status as any) === 'REJECTED' || (user.status as any) === 'DELETED') {
-            throw new UnauthorizedException(`Your account has been ${user.status.toLowerCase()}`);
+        const u: any = user!;
+        if (['OWNER', 'ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'].includes(String(u.role).toUpperCase())) {
+            throw new UnauthorizedException({ code: 'GOOGLE_NOT_ALLOWED', message: 'Team accounts sign in with email and password.' });
         }
-
-        if (user.status === 'PENDING_APPROVAL') {
-            throw new UnauthorizedException('Your account is pending admin approval');
+        if (u.twoFactorEnabled) {
+            throw new UnauthorizedException({ code: 'GOOGLE_2FA', message: 'Two-step verification is on for this account — sign in with your email and password.' });
         }
-
-        const {
-            password, iban, swiftCode, taxId, bankAddress, vatNumber,
-            verificationToken, resetPasswordToken, resetPasswordExpires,
-            ...safeUser
-        } = user;
-
+        if (['BLOCKED', 'REJECTED', 'DELETED'].includes(String(u.status))) {
+            throw new UnauthorizedException(`Your account has been ${String(u.status).toLowerCase()}`);
+        }
+        // Google proves inbox ownership: an unfinished email sign-up becomes verified.
+        if (!u.emailVerified) await this.prisma.user.update({ where: { id: u.id }, data: { emailVerified: true, emailVerifyCodeHash: null } as any });
+        if (u.status === 'PENDING_APPROVAL') {
+            return { pendingApproval: true, email: u.email };
+        }
+        const { password, iban, swiftCode, taxId, bankAddress, vatNumber, verificationToken, resetPasswordToken, resetPasswordExpires, ...safeUser } = u;
         return this.login(safeUser);
     }
 
@@ -676,11 +703,9 @@ export class AuthService {
             throw new BadRequestException('Invalid or expired reset token.');
         }
 
-        // Validate new password strength on backend too
-        const isStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/.test(newPassword);
-        if (!isStrong) {
-            throw new BadRequestException('Password does not meet security requirements.');
-        }
+        // Same policy as sign-up for every new password.
+        const pwCheck = checkPassword(newPassword, { email: user.email, name: user.name || '' });
+        if (!pwCheck.ok) throw new BadRequestException({ code: 'WEAK_PASSWORD', message: pwCheck.problems.join(' '), problems: pwCheck.problems });
 
         const hashed = await bcrypt.hash(newPassword, 12);
 
@@ -737,12 +762,10 @@ export class AuthService {
         if (!user) throw new UnauthorizedException('User not found');
 
         const isMatch = await bcrypt.compare(currentPassword, user.password);
-        if (!isMatch) throw new BadRequestException('كلمة المرور الحالية غير صحيحة');
+        if (!isMatch) throw new BadRequestException({ code: 'WRONG_PASSWORD', message: 'Your current password is incorrect.' });
 
-        const isStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/.test(newPassword);
-        if (!isStrong) {
-            throw new BadRequestException('كلمة المرور الجديدة ضعيفة. يجب أن تحتوي على 8 أحرف على الأقل، حرف كبير، حرف صغير، رقم، ورمز خاص.');
-        }
+        const pwCheck = checkPassword(newPassword, { email: user.email, name: user.name || '' });
+        if (!pwCheck.ok) throw new BadRequestException({ code: 'WEAK_PASSWORD', message: pwCheck.problems.join(' '), problems: pwCheck.problems });
 
         const hashed = await bcrypt.hash(newPassword, 12);
         await this.prisma.user.update({

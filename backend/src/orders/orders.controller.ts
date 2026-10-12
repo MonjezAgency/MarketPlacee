@@ -98,6 +98,7 @@ export class OrdersController {
     @Post()
     @Roles(Role.CUSTOMER, Role.ADMIN, Role.OWNER, Role.SUPPLIER)
     async create(@Body() data: any, @Request() req) {
+        await this.ordersService.assertProfileComplete(req.user.sub);
         const order = await this.ordersService.create(
             req.user.sub,
             data.totalAmount,

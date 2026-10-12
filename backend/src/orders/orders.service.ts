@@ -1,3 +1,4 @@
+import { missingProfileFields } from '../users/profile-completion';
 import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
@@ -179,6 +180,14 @@ export class OrdersService {
         }
         const discount = round2(subtotal * discountPercent / 100);
         return { lines, subtotal, discountPercent, discount, coupon: appliedCoupon, total: round2(subtotal - discount), markups };
+    }
+
+    /** Accounts that started with an incomplete business profile (e.g. Google sign-up) must finish it before ordering. */
+    async assertProfileComplete(userId: string) {
+        const u: any = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (u && u.onboardingCompleted === false && missingProfileFields(u).length > 0) {
+            throw new ForbiddenException({ code: 'PROFILE_INCOMPLETE', message: 'Complete your business profile before placing an order.', missing: missingProfileFields(u) });
+        }
     }
 
     async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number, opts: { idempotencyKey?: string; couponCode?: string } = {}) {

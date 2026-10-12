@@ -8,10 +8,10 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { checkPassword } from '@/lib/password-policy';
 import { ChangeEmailCard } from '@/components/account/ChangeEmailCard';
 import { CompanyDetailsCard, BrandPreferencesCard, VerificationCard } from '@/components/account/AccountCards';
 
-const STRONG_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
 
 const input = 'w-full h-11 px-3.5 rounded-xl ring-1 ring-line bg-surface text-[14px] text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6] placeholder:text-ink-4 disabled:bg-surface-2 disabled:text-ink-3';
 const label = 'block text-[13px] font-medium text-ink-2 mb-1.5';
@@ -89,7 +89,8 @@ export default function SettingsPage() {
     const [pwMsg, setPwMsg] = React.useState<{ ok: boolean; text: string } | null>(null);
     const changePassword = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!STRONG_RE.test(next)) { setPwMsg({ ok: false, text: 'Use at least 8 characters with upper- and lower-case letters, a number and a symbol (!@#$%^&*).' }); return; }
+        const pc = checkPassword(next, { email: user?.email, name: user?.name });
+        if (!pc.ok) { setPwMsg({ ok: false, text: pc.problems.join(' ') }); return; }
         if (next !== confirm) { setPwMsg({ ok: false, text: 'The new passwords don’t match.' }); return; }
         setPwBusy(true); setPwMsg(null);
         try {
@@ -160,7 +161,7 @@ export default function SettingsPage() {
                             <div><label htmlFor="pw-new" className={label}>New password</label><input id="pw-new" type="password" value={next} onChange={(e) => setNext(e.target.value)} className={input} autoComplete="new-password" required /></div>
                             <div><label htmlFor="pw-conf" className={label}>Confirm new password</label><input id="pw-conf" type="password" value={confirm} onChange={(e) => setConfirm(e.target.value)} className={input} autoComplete="new-password" required /></div>
                         </div>
-                        <p className="text-[12px] text-ink-3">8+ characters, upper- and lower-case, a number and a symbol.</p>
+                        <p className="text-[12px] text-ink-3">12+ characters mixing at least three of: lower, upper, numbers, symbols. Avoid common passwords.</p>
                         <div className="flex items-center justify-between gap-3">
                             <Status s={pwMsg} />
                             <button type="submit" disabled={pwBusy} className="ms-auto h-10 px-5 inline-flex items-center gap-2 rounded-xl ring-1 ring-line-strong text-[13.5px] font-semibold text-ink hover:bg-surface-2 disabled:opacity-50">{pwBusy && <Loader2 size={14} className="animate-spin" />} Change password</button>
@@ -181,7 +182,7 @@ export default function SettingsPage() {
                 <Card icon={<Bell size={17} />} title="Email notifications">
                     {prefs === null ? <p className="text-[13px] text-ink-3">Preferences couldn’t be loaded.</p> : (
                         <div className="space-y-2">
-                            {[['orderUpdates', 'Order updates', 'Confirmations, dispatch and delivery'], ['marketingEmails', 'News and offers', 'New products and promotions']].map(([k, t, d]) => (
+                            {[['orderUpdates', 'Order updates', 'Confirmations, dispatch and delivery'], ['onboardingReminders', 'Profile reminders', 'Up to two reminders if your business profile is unfinished'], ['marketingEmails', 'News and offers', 'New products and promotions']].map(([k, t, d]) => (
                                 <label key={k} className="flex items-start gap-3 rounded-xl px-3 py-2.5 ring-1 ring-line cursor-pointer hover:ring-line-strong">
                                     <input type="checkbox" checked={!!prefs[k]} onChange={() => togglePref(k)} className="mt-0.5 w-4 h-4 accent-[#0E7C74]" />
                                     <span><span className="block text-[14px] font-medium text-ink">{t}</span><span className="block text-[12.5px] text-ink-3">{d}</span></span>

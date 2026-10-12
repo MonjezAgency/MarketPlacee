@@ -4,6 +4,7 @@ import * as React from 'react';
 import Link from 'next/link';
 import { Boxes, ShieldCheck, Layers, Sparkles, ListChecks, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { checkPassword } from '@/lib/password-policy';
 
 /** Atlantis wordmark exactly as the storefront header renders it. */
 export function AtlantisMark({ className }: { className?: string }) {
@@ -95,27 +96,47 @@ export function FormAlert({ tone = 'error', children }: { tone?: 'error' | 'info
     );
 }
 
-/** Password checklist shared by sign-up and reset (mirrors the backend rule). */
+/** Password rules shared by sign-up, reset and change (mirrors the server policy). */
 export const PASSWORD_RULES = [
-    { id: 'len', label: 'At least 8 characters', test: (p: string) => p.length >= 8 },
-    { id: 'case', label: 'Upper- and lower-case letters', test: (p: string) => /[a-z]/.test(p) && /[A-Z]/.test(p) },
-    { id: 'num', label: 'A number', test: (p: string) => /\d/.test(p) },
-    { id: 'sym', label: 'A symbol (!@#$%^&*)', test: (p: string) => /[!@#$%^&*]/.test(p) },
+    { id: 'len', label: 'At least 12 characters', test: (p: string) => p.length >= 12 },
+    { id: 'mix', label: '3 of: lower, upper, number, symbol', test: (p: string) => [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter((r) => r.test(p)).length >= 3 },
+    { id: 'common', label: 'Not common or predictable', test: (p: string) => p.length > 0 && !checkPassword(p).problems.some((x) => /common|predictable/i.test(x)) },
 ];
-export const passwordOk = (p: string) => PASSWORD_RULES.every((r) => r.test(p));
+export const passwordOk = (p: string, ctx?: { email?: string; name?: string }) => checkPassword(p, ctx).ok;
 
-export function PasswordChecklist({ value }: { value: string }) {
+const STRENGTH = [
+    { label: 'Weak', bar: 'bg-[#DC2626]', text: 'text-[#B91C1C]' },
+    { label: 'Weak', bar: 'bg-[#DC2626]', text: 'text-[#B91C1C]' },
+    { label: 'Fair', bar: 'bg-[#D97706]', text: 'text-[#B45309]' },
+    { label: 'Strong', bar: 'bg-[#0E7C74]', text: 'text-teal' },
+];
+
+/** Strength meter + checklist + the specific reasons the server would reject it. */
+export function PasswordChecklist({ value, email, name }: { value: string; email?: string; name?: string }) {
+    const res = checkPassword(value, { email, name });
+    const score = value ? res.score : 0;
+    const s = STRENGTH[score];
+    const extra = res.problems.filter((p) => /email|name|space/i.test(p));
     return (
-        <ul className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1" aria-label="Password requirements">
-            {PASSWORD_RULES.map((r) => {
-                const ok = r.test(value);
-                return (
-                    <li key={r.id} className={cn('flex items-center gap-1.5 text-[12px]', ok ? 'text-teal' : 'text-ink-3')}>
-                        <span aria-hidden className={cn('w-3.5 h-3.5 rounded-full flex items-center justify-center text-[9px] font-bold', ok ? 'bg-[#0E7C74] text-white' : 'ring-1 ring-line-strong')}>{ok ? '✓' : ''}</span>
-                        {r.label}<span className="sr-only">{ok ? ' — met' : ' — not met'}</span>
-                    </li>
-                );
-            })}
-        </ul>
+        <div className="mt-2">
+            <div className="flex items-center gap-2" aria-live="polite">
+                <span className="flex-1 grid grid-cols-3 gap-1" aria-hidden>
+                    {[1, 2, 3].map((n) => <span key={n} className={cn('h-1.5 rounded-full transition-colors', value && score >= n ? s.bar : 'bg-surface-3')} />)}
+                </span>
+                <span className={cn('w-14 text-end text-[12px] font-semibold', value ? s.text : 'text-ink-4')}>{value ? (res.ok ? (score === 3 ? 'Strong' : 'Fair') : 'Weak') : ''}<span className="sr-only">{value ? ' password strength' : ''}</span></span>
+            </div>
+            <ul className="mt-2 grid sm:grid-cols-3 gap-x-3 gap-y-1" aria-label="Password requirements">
+                {PASSWORD_RULES.map((r) => {
+                    const ok = r.test(value);
+                    return (
+                        <li key={r.id} className={cn('flex items-center gap-1.5 text-[12px]', ok ? 'text-teal' : 'text-ink-3')}>
+                            <span aria-hidden className={cn('w-3.5 h-3.5 shrink-0 rounded-full flex items-center justify-center text-[9px] font-bold', ok ? 'bg-[#0E7C74] text-white' : 'ring-1 ring-line-strong')}>{ok ? '✓' : ''}</span>
+                            {r.label}<span className="sr-only">{ok ? ' — met' : ' — not met'}</span>
+                        </li>
+                    );
+                })}
+            </ul>
+            {value && extra.map((p) => <p key={p} className="mt-1 text-[12px] text-[#B45309]">{p}</p>)}
+        </div>
     );
 }

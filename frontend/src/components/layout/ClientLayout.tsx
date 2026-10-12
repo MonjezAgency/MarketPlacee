@@ -2,6 +2,7 @@
 
 import Navbar from "./Navbar";
 import Footer from "./Footer";
+import { ProfileReminderBanner } from "@/components/account/ProfileReminderBanner";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth";
 import { useEffect } from "react";
@@ -12,7 +13,8 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
     const router = useRouter();
 
     const isAuthPage = pathname?.startsWith('/auth');
-    const isPendingPage = pathname === '/auth/pending';
+    // Pages a not-yet-approved or incomplete account may use.
+    const isPendingPage = pathname === '/auth/pending' || pathname === '/auth/complete-profile';
     const isDashboard = pathname?.startsWith('/dashboard') || pathname?.startsWith('/admin') || pathname?.startsWith('/supplier');
     // The buyer dashboard lives inside the storefront chrome (header + footer).
     const isBuyerDashboard = pathname?.startsWith('/dashboard/customer');
@@ -54,6 +56,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
         <div className="flex flex-col min-h-screen">
             {/* Single source of truth: Navbar on all public pages */}
             {showNav && <Navbar />}
+            {showNav && <ProfileReminderBanner />}
             <main className="flex-grow">
                 {children}
             </main>

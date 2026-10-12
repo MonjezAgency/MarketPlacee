@@ -18,15 +18,13 @@ export const authOptions: NextAuthOptions = {
                 try {
                     const res = await apiFetch(`/auth/google-login`, {
                         method: 'POST',
-                        body: JSON.stringify({
-                            email: profile.email,
-                            name: profile.name,
-                            avatar: profile.picture,
-                            googleId: profile.sub,
-                        }),
+                        // The backend verifies this Google-signed ID token itself;
+                        // it never trusts an email sent by the client.
+                        body: JSON.stringify({ idToken: account.id_token }),
                     });
                     if (res.ok) {
                         const data = await res.json();
+                        token.authError = undefined;
                         if (data.pendingApproval) {
                             token.pendingApproval = true;
                             token.pendingEmail = data.email;

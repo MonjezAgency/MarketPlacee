@@ -121,6 +121,11 @@ model User {
   businessCity              String?
   /// Brands the account trades (buyer: buys, supplier: supplies). Self-declared.
   preferredBrands           String[] @default([])
+  /// Onboarding reminders: set when an account starts with an incomplete business profile.
+  profileIncompleteSince    DateTime?
+  profileReminder1SentAt    DateTime?
+  profileReminder2SentAt    DateTime?
+  profileReminderFailures   Int      @default(0)
 
   // Business & Financial Fields
   vatNumber   String? @unique

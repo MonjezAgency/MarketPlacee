@@ -75,3 +75,24 @@ export function signupExistingAccountEmail(name: string, loginUrl: string, reset
             + button(loginUrl, 'Sign in') + p(`Forgot your password? <a href="${esc(resetUrl)}" style="color:#0E7C74;">Reset it here</a>.`), SECURITY),
     };
 }
+
+const FIELD_LABEL: Record<string, string> = { name: 'your name', companyName: 'company name', businessType: 'business type', country: 'country', phone: 'business phone' };
+
+/** Onboarding (account) emails — not marketing; the user can turn them off in Settings. */
+export function profileReminderEmail(name: string, step: 1 | 2, missing: string[], link: string, settingsUrl: string) {
+    const list = missing.map((m) => FIELD_LABEL[m] || m);
+    const left = list.length ? `Still needed: <strong>${esc(list.join(', '))}</strong>.` : '';
+    const optOut = `You’re receiving this because your Atlantis account was created and its business profile isn’t finished. Turn off onboarding reminders in <a href="${esc(settingsUrl)}" style="color:#0E7C74;">Settings</a>.`;
+    if (step === 1) {
+        return {
+            subject: 'Finish setting up your Atlantis business profile',
+            html: layout('You’re almost ready', p(`Hi ${esc(name) || 'there'}, you’re almost ready to use Atlantis. Complete your business profile so we can give your company the right wholesale marketplace experience.`)
+                + p(left) + button(link, 'Complete my profile') + p(`<span style="font-size:13px;color:#64748B;">It takes about a minute. You’ll need to sign in first.</span>`), optOut),
+        };
+    }
+    return {
+        subject: 'One step left before you can order on Atlantis',
+        html: layout('Your profile is the last step', p(`Hi ${esc(name) || 'there'}, ordering by the pallet or truckload needs a few business details, so we know who we’re trading with and where to deliver.`)
+            + p(left) + button(link, 'Finish my profile') + p(`<span style="font-size:13px;color:#64748B;">This is the last reminder we’ll send about it. Questions? Just reply to Info@atlantisfmcg.com.</span>`), optOut),
+    };
+}

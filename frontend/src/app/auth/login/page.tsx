@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Eye, EyeOff, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
+import { GoogleButton } from '@/components/auth/GoogleButton';
 import { AuthShell, authInput, authLabel, authPrimary, FormAlert } from '@/components/auth/AuthShell';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +28,10 @@ function Login() {
     const [partialToken, setPartialToken] = React.useState('');
     const [qrCodeUrl, setQrCodeUrl] = React.useState<string | null>(null);
     const [code2fa, setCode2fa] = React.useState('');
+
+    // NextAuth sends cancelled/failed Google sign-ins back here with ?error=.
+    const gErr = sp.get('error');
+    const googleError = gErr ? (gErr === 'OAuthCallback' || gErr === 'Callback' || gErr === 'AccessDenied' ? 'Google sign-in was cancelled or didn’t complete. Try again, or sign in with email.' : 'Google sign-in didn’t work. Try again, or sign in with email.') : '';
 
     const go = (role: string) => {
         const upper = role.toUpperCase();
@@ -76,7 +81,10 @@ function Login() {
                 {step === 1 ? (<>
                     <h1 className="text-[22px] leading-tight font-semibold text-heading">Sign in</h1>
                     <p className="mt-1 text-[14px] text-ink-3">Welcome back. Sign in to see wholesale prices and order.</p>
-                    <form className="mt-6 space-y-4" onSubmit={submit} noValidate>
+                    {googleError && <div className="mt-4"><FormAlert>{googleError}</FormAlert></div>}
+                    <GoogleButton className="mt-5" />
+                    <div className="mt-5 flex items-center gap-3 text-[12px] text-ink-4" aria-hidden><span className="flex-1 h-px bg-line" />or with email<span className="flex-1 h-px bg-line" /></div>
+                    <form className="mt-5 space-y-4" onSubmit={submit} noValidate>
                         <div>
                             <label htmlFor="l-email" className={authLabel}>Work email</label>
                             <input id="l-email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" className={authInput} autoFocus />

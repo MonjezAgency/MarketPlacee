@@ -29,7 +29,10 @@ function VerifyEmail() {
         let e = sp.get('email') || '';
         try { e = e || sessionStorage.getItem('atl_verify_email') || ''; } catch { /* ignore */ }
         setEmail(e);
-        if (sp.get('sent') === '1') { setInfo(`We sent a 6-digit code to ${e}. It expires in 15 minutes.`); setCooldown(60); }
+        // Honest + non-revealing: a new address gets a code; an address that already
+        // has an account gets a sign-in notice instead (no code).
+        if (sp.get('sent') === '1') { setInfo(`If ${e} is new to Atlantis, a 6-digit code is on its way (valid 15 minutes). If it already has an account, we emailed a sign-in reminder instead — no code is sent.`); setCooldown(60); }
+        if (sp.get('sent') === 'failed') setError(`We couldn’t send the email to ${e} just now. Check the address, then use “Resend code”.`);
         refs.current[0]?.focus();
     }, [sp]);
     React.useEffect(() => {
@@ -79,6 +82,7 @@ function VerifyEmail() {
             const res = await apiFetch('/auth/resend-verification', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim() }) });
             const body = await res.json().catch(() => ({}));
             if (res.status === 429) { setError('Too many requests. Wait a minute and try again.'); setCooldown(60); return; }
+            if (body?.deliveryFailed) { setError('We couldn’t send the email just now. Try again in a moment.'); setCooldown(0); return; }
             setCooldown(Number(body?.retryAfter) || 60);
             // Same message whether or not the address has an unverified account.
             setInfo(`If ${email.trim()} has an account waiting for verification, a new code is on its way. Codes expire after 15 minutes.`);

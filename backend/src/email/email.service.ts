@@ -247,6 +247,11 @@ export class EmailService {
     const t = authTpl.changeEmailNoticeEmail(name, newEmail, done);
     return this.sendMailDetailed(oldEmail, t.subject, t.html);
   }
+  sendProfileReminder(email: string, name: string, step: 1 | 2, missing: string[]) {
+    const base = this.getFrontendUrl();
+    const t = authTpl.profileReminderEmail(name, step, missing, `${base}/auth/complete-profile`, `${base}/dashboard/customer/settings`);
+    return this.sendMailDetailed(email, t.subject, t.html);
+  }
   sendSignupExisting(email: string, name: string) {
     const base = this.getFrontendUrl();
     const t = authTpl.signupExistingAccountEmail(name, `${base}/auth/login`, `${base}/auth/forgot-password`);

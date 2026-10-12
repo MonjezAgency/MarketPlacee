@@ -34,7 +34,7 @@ function setup() {
     const svc = new AuthService(prisma, {} as any, email, {} as any, {} as any, { notifyAdmins: async () => undefined } as any);
     return { svc, users, sent };
 }
-const good = { name: 'Dana Buyer', email: 'Dana@Wholesale.test', password: 'Strong#Pass1', role: 'customer', companyName: 'Dana Wholesale BV' };
+const good = { name: 'Dana Buyer', email: 'Dana@Wholesale.test', password: 'Pallet-Route-77', role: 'customer', companyName: 'Dana Wholesale BV' };
 
 describe('sign-up → verify → sign-in', () => {
     it('creates an unverified, pending buyer and emails a code (no session issued)', async () => {
@@ -54,7 +54,10 @@ describe('sign-up → verify → sign-in', () => {
         const { svc, users, sent } = setup();
         users.push({ id: 'old', email: 'dana@wholesale.test', name: 'Dana', emailVerified: true, emailVerificationRequired: false });
         const r = await svc.register(good);
-        expect(r).toEqual({ verificationRequired: true, email: 'dana@wholesale.test', pendingApproval: true });
+        expect(r).toEqual({ verificationRequired: true, email: 'dana@wholesale.test', pendingApproval: true, deliveryFailed: false });
+        // A second attempt within 10 minutes sends nothing more (no inbox flooding).
+        await svc.register(good);
+        expect(sent.filter((x) => x.kind === 'existing')).toHaveLength(1);
         expect(users).toHaveLength(1);
         expect(sent[0].kind).toBe('existing');
     });
@@ -76,7 +79,19 @@ describe('sign-up → verify → sign-in', () => {
         const r = await svc.resendSignupCode(good.email);
         expect(r.retryAfter).toBeGreaterThan(0);
         expect(sent.filter((s) => s.kind === 'code')).toHaveLength(1);
-        await expect(svc.resendSignupCode('nobody@x.test')).resolves.toEqual({ ok: true, retryAfter: 60 });
+        await expect(svc.resendSignupCode('nobody@x.test')).resolves.toEqual({ ok: true, retryAfter: 60, deliveryFailed: false });
+    });
+    it('reports a provider rejection honestly and allows an immediate retry', async () => {
+        const { svc, users } = setup();
+        (svc as any).emailService.sendSignupCode = async () => ({ success: false, error: 'domain not verified' });
+        const r: any = await svc.register(good);
+        expect(r.deliveryFailed).toBe(true);
+        expect(users[0].emailVerifySentAt).toBeNull();
+        expect(users[0].emailVerified).toBe(false);
+    });
+    it('rejects a weak password with the policy reasons', async () => {
+        const { svc } = setup();
+        await expect(svc.register({ ...good, password: 'Password1234' })).rejects.toMatchObject({ response: { code: 'WEAK_PASSWORD' } });
     });
     it('existing (pre-flow) users are not blocked', async () => {
         const { svc } = setup();

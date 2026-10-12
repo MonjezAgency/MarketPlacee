@@ -205,8 +205,9 @@ export class AuthController {
     }
 
     @Post('google-login')
-    async googleLogin(@Body('email') email: string, @Body('name') name: string, @Body('avatar') avatar: string, @Body('googleId') googleId: string, @Res({ passthrough: true }) res: any) {
-        const result = await this.authService.googleLogin({ email, name, avatar, googleId });
+    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    async googleLogin(@Body('idToken') idToken: string, @Res({ passthrough: true }) res: any) {
+        const result: any = await this.authService.googleLogin(idToken);
         if (result && 'access_token' in result) {
             // Persistent sessions, Facebook-style. The access cookie
             // matches the JWT expiry (30d), and the refresh cookie

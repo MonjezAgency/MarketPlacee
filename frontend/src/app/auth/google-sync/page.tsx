@@ -22,6 +22,7 @@ export default function GoogleSyncPage() {
             const s = session as any;
 
             if (s.authError) {
+                // e.g. team accounts or 2FA accounts must use email + password.
                 setErrorMsg(s.authError);
                 return;
             }
@@ -30,8 +31,9 @@ export default function GoogleSyncPage() {
                 
                 
 
-                if (!s.backendUser.companyName || !s.backendUser.phone) {
-                    router.replace('/auth/onboarding');
+                // Accounts that started without a business profile finish it first.
+                if (s.backendUser.onboardingCompleted === false) {
+                    router.replace('/auth/complete-profile');
                     return;
                 }
 
@@ -41,7 +43,7 @@ export default function GoogleSyncPage() {
                 }
 
                 const role = (s.backendUser.role || '').toUpperCase();
-                if (role === 'ADMIN' || role === 'MODERATOR' || role === 'SUPPORT' || role === 'EDITOR') {
+                if (['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'].includes(role)) {
                     router.push('/admin');
                 } else if (role === 'SUPPLIER') {
                     router.push('/supplier');
