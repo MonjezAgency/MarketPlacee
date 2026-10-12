@@ -64,15 +64,15 @@ export function ProductRail({ title, subtitle, viewAll, children, className, arr
 
     return (
         <section className={className}>
-            <div className="flex items-end justify-between gap-4 mb-3">
+            <div className="flex items-end justify-between gap-4 mb-2">
                 <div className="min-w-0">
-                    <h3 className="text-[15px] font-semibold text-heading">{title}</h3>
-                    {subtitle && <p className="text-[12.5px] text-ink-3">{subtitle}</p>}
+                    <h3 className="text-[14px] font-semibold text-heading">{title}</h3>
+                    {subtitle && <p className="text-[12px] text-ink-3">{subtitle}</p>}
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     {viewAll && (viewAll.href
-                        ? <a href={viewAll.href} className="text-[13px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? 'View all'}</a>
-                        : <button type="button" onClick={viewAll.onClick} className="text-[13px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? 'View all'}</button>)}
+                        ? <a href={viewAll.href} className="text-[12.5px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? 'View all'}</a>
+                        : <button type="button" onClick={viewAll.onClick} className="text-[12.5px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? 'View all'}</button>)}
                     {arrows && <>
                         <button type="button" aria-label="Scroll left" onClick={() => page(-1)} disabled={edges.start} className={arrow}><ChevronLeft size={16} /></button>
                         <button type="button" aria-label="Scroll right" onClick={() => page(1)} disabled={edges.end} className={arrow}><ChevronRight size={16} /></button>
@@ -90,7 +90,7 @@ export function ProductRail({ title, subtitle, viewAll, children, className, arr
                 onPointerUp={endDrag}
                 onPointerLeave={endDrag}
                 onClickCapture={onClickCapture}
-                className={cn('flex gap-3 overflow-x-auto overscroll-x-contain select-none pb-1', snap ? 'snap-x snap-mandatory scrollbar-hide' : 'mix-rail-scroll', trackClassName)}
+                className={cn('flex overflow-x-auto overscroll-x-contain select-none pb-1', snap ? 'gap-3 snap-x snap-mandatory scrollbar-hide' : 'gap-2 mix-rail-scroll', trackClassName)}
                 style={{ scrollPaddingInline: 2 }}
             >
                 {children}

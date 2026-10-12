@@ -46,27 +46,27 @@ function MixRow({ p, variant, label, kind, sel, badge }: {
             onClick={toggle}
             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } }}
             className={cn(
-                'shrink-0 w-[248px] flex items-center gap-2.5 rounded-full ps-1.5 pe-1.5 py-1.5 ring-1 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]',
+                'shrink-0 w-[208px] flex items-center gap-2 rounded-full ps-1 pe-1 py-1 ring-1 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]',
                 reason ? 'opacity-50 cursor-not-allowed ring-line' : 'cursor-pointer',
                 on ? 'ring-[#2EC4B6] bg-teal-soft/60' : !reason && 'ring-line hover:ring-line-strong hover:bg-surface-2',
             )}
         >
-            <span className="relative w-10 h-10 shrink-0 rounded-full bg-media ring-1 ring-line overflow-hidden">
+            <span className="relative w-8 h-8 shrink-0 rounded-full bg-media ring-1 ring-line overflow-hidden">
                 {img
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={img} alt="" draggable={false} loading="lazy" className="absolute inset-0 m-auto max-w-[78%] max-h-[78%] object-contain mix-blend-multiply" />
-                    : <span className="absolute inset-0 flex items-center justify-center text-ink-4"><Package size={15} /></span>}
+                    : <span className="absolute inset-0 flex items-center justify-center text-ink-4"><Package size={13} /></span>}
             </span>
             <span className="min-w-0 flex-1 leading-tight">
-                <span className="block text-[13px] font-medium text-ink truncate">{label ?? p.name}</span>
-                <span className="block text-[11.5px] text-ink-3 truncate">{badge ?? (label ? p.name : reason ?? p.brand ?? '')}</span>
+                <span className="block text-[12.5px] font-medium text-ink truncate">{label ?? p.name}</span>
+                <span className="block text-[11px] text-ink-3 truncate">{badge ?? (label ? p.name : reason ?? p.brand ?? '')}</span>
             </span>
             <span
                 aria-hidden
-                className={cn('w-8 h-8 shrink-0 rounded-full flex items-center justify-center transition-colors',
+                className={cn('w-7 h-7 shrink-0 rounded-full flex items-center justify-center transition-colors',
                     on ? 'bg-[#0E7C74] text-white' : 'ring-1 ring-line-strong text-ink-2')}
             >
-                {on ? <Check size={15} strokeWidth={2.5} /> : <Plus size={15} />}
+                {on ? <Check size={13} strokeWidth={2.5} /> : <Plus size={13} />}
             </span>
         </div>
     );
@@ -112,14 +112,14 @@ export default function MixDiscovery({ product, sel, markups, onViewAll }: {
     const selected = sel.selected;
 
     return (
-        <div className="mt-4 rounded-2xl ring-1 ring-line bg-surface p-4 sm:p-5 space-y-6" aria-label={`${loadLabel(kind)} builder`}>
+        <div className="mt-4 rounded-2xl ring-1 ring-line bg-surface p-4 space-y-4" aria-label={`${loadLabel(kind)} builder`}>
             {/* Explicit choice of what to browse */}
             <div>
-                <p className="text-[13px] font-semibold text-ink">What would you like to add?</p>
-                <div role="radiogroup" aria-label="Browse" className="mt-2 flex flex-wrap gap-2">
+                <p className="text-[12.5px] font-semibold text-ink">What would you like to add?</p>
+                <div role="radiogroup" aria-label="Browse" className="mt-1.5 flex flex-wrap gap-1.5">
                     {([['flavours', ownVariants.length ? 'Flavours / variants' : `Flavours${product.brand ? ` · ${product.brand}` : ''}`], ['others', 'Other products'], ['both', 'Both']] as const).map(([k, l]) => (
                         <button key={k} type="button" role="radio" aria-checked={browse === k} onClick={() => setBrowse(k)}
-                            className={cn('h-9 px-4 rounded-full text-[13px] font-medium transition-colors',
+                            className={cn('h-8 px-3.5 rounded-full text-[12.5px] font-medium transition-colors',
                                 browse === k ? 'bg-[#0E7C74] text-white' : 'ring-1 ring-line-strong text-ink hover:ring-ink')}>
                             {l}
                         </button>
@@ -168,30 +168,30 @@ export default function MixDiscovery({ product, sel, markups, onViewAll }: {
                     <Link href="/cart" className="h-9 px-4 inline-flex items-center rounded-lg bg-cta hover:bg-cta-hover text-cta-fg text-[13px] font-semibold">View in cart</Link>
                 </div>
             ) : (
-                <div className="rounded-xl bg-surface-2 px-4 py-3">
+                <div className="rounded-xl bg-surface-2 px-3 py-2.5">
                     <div className="flex items-center justify-between gap-3">
-                        <p className="text-[13.5px] font-semibold text-ink">{selected.length} selected <span className="font-normal text-ink-3">· quantities in {unitOf(kind)}</span></p>
+                        <p className="text-[12.5px] font-semibold text-ink">{selected.length} selected <span className="font-normal text-ink-3">· quantities in {unitOf(kind)}</span></p>
                         {selected.length > 0 && <button type="button" onClick={sel.clear} className="text-[12.5px] font-medium text-ink-3 hover:text-[#DC2626]">Clear all</button>}
                     </div>
                     {selected.length > 0 ? (
                         <ul className="mt-2 max-h-[168px] overflow-y-auto space-y-1.5 pe-1">
                             {selected.map((s) => (
-                                <li key={s.key} className="flex items-center gap-2 rounded-lg bg-surface ring-1 ring-line px-2.5 py-1.5">
-                                    <span className="min-w-0 flex-1 text-[13px] text-ink truncate">{s.name}{s.label ? <span className="text-teal"> — {s.label}</span> : null}</span>
-                                    <button type="button" aria-label="Decrease" onClick={() => sel.setQty(s.key, s.quantity - 1)} disabled={s.quantity <= 1} className="w-7 h-7 rounded-md ring-1 ring-line flex items-center justify-center text-ink-2 disabled:opacity-35"><Minus size={12} /></button>
+                                <li key={s.key} className="flex items-center gap-1.5 rounded-lg bg-surface ring-1 ring-line ps-2.5 pe-1 py-1">
+                                    <span className="min-w-0 flex-1 text-[12.5px] text-ink truncate">{s.name}{s.label ? <span className="text-teal"> — {s.label}</span> : null}</span>
+                                    <button type="button" aria-label="Decrease" onClick={() => sel.setQty(s.key, s.quantity - 1)} disabled={s.quantity <= 1} className="w-6 h-6 rounded-md ring-1 ring-line flex items-center justify-center text-ink-2 disabled:opacity-35"><Minus size={12} /></button>
                                     <input value={s.quantity} inputMode="numeric" aria-label={`Quantity in ${unitOf(kind)}`} onChange={(e) => sel.setQty(s.key, parseInt(e.target.value.replace(/\D/g, ''), 10))}
-                                        className="w-12 h-7 rounded-md ring-1 ring-line bg-surface text-center text-[13px] font-semibold tabular-nums text-ink outline-none" />
-                                    <button type="button" aria-label="Increase" onClick={() => sel.setQty(s.key, s.quantity + 1)} className="w-7 h-7 rounded-md ring-1 ring-line flex items-center justify-center text-ink-2"><Plus size={12} /></button>
-                                    <button type="button" onClick={() => sel.remove(s.key)} aria-label={`Remove ${s.name}`} className="w-7 h-7 rounded-md flex items-center justify-center text-ink-4 hover:text-[#DC2626]"><X size={14} /></button>
+                                        className="w-10 h-6 rounded-md ring-1 ring-line bg-surface text-center text-[12.5px] font-semibold tabular-nums text-ink outline-none" />
+                                    <button type="button" aria-label="Increase" onClick={() => sel.setQty(s.key, s.quantity + 1)} className="w-6 h-6 rounded-md ring-1 ring-line flex items-center justify-center text-ink-2"><Plus size={12} /></button>
+                                    <button type="button" onClick={() => sel.remove(s.key)} aria-label={`Remove ${s.name}`} className="w-6 h-6 rounded-md flex items-center justify-center text-ink-4 hover:text-[#DC2626]"><X size={13} /></button>
                                 </li>
                             ))}
                         </ul>
                     ) : <p className="mt-1 text-[12.5px] text-ink-3">Select products or flavours above — only what you select goes into the mix.</p>}
                     {sel.error && <p role="alert" className="mt-2 inline-flex items-start gap-1.5 text-[12.5px] text-[#DC2626]"><AlertTriangle size={13} className="mt-0.5 shrink-0" />{sel.error}</p>}
-                    <div className="mt-3 flex gap-2">
-                        <button type="button" onClick={onViewAll} className="h-10 px-4 rounded-xl ring-1 ring-line-strong text-[13.5px] font-semibold text-ink">Review &amp; search all</button>
+                    <div className="mt-2.5 flex gap-2">
+                        <button type="button" onClick={onViewAll} className="h-9 px-3.5 rounded-lg ring-1 ring-line-strong text-[12.5px] font-semibold text-ink">Review &amp; search all</button>
                         <button type="button" onClick={sel.submit} disabled={sel.submitting}
-                            className="flex-1 h-10 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60">
+                            className="flex-1 h-9 rounded-lg bg-cta hover:bg-cta-hover text-cta-fg text-[13px] font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-60">
                             {sel.submitting ? <><Loader2 size={15} className="animate-spin" /> Creating…</> : `Add mix${selected.length ? ` (${selected.length})` : ''}`}
                         </button>
                     </div>
