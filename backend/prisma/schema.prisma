@@ -104,6 +104,21 @@ model User {
   twoFactorSecret      String?   // Encrypted TOTP secret
   emailOtpCode         String?   // Temporary email OTP
   emailOtpExpiry       DateTime? // OTP expiration
+  /// Set for accounts created by the verified sign-up flow; sign-in is blocked until emailVerified.
+  emailVerificationRequired Boolean  @default(false)
+  emailVerifyCodeHash       String?  // SHA-256 of the 6-digit sign-up code (never the code itself)
+  emailVerifyExpiry         DateTime?
+  emailVerifyAttempts       Int      @default(0)
+  emailVerifySentAt         DateTime?
+  /// Change-email: the new address is applied only after its code is confirmed.
+  pendingEmail              String?
+  pendingEmailCodeHash      String?
+  pendingEmailExpiry        DateTime?
+  pendingEmailAttempts      Int      @default(0)
+  pendingEmailSentAt        DateTime?
+  /// Wholesale profile collected at sign-up (optional, self-declared, not verified).
+  businessType              String?
+  businessCity              String?
 
   // Business & Financial Fields
   vatNumber   String? @unique

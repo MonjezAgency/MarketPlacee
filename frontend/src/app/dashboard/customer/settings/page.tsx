@@ -8,6 +8,7 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { ChangeEmailCard } from '@/components/account/ChangeEmailCard';
 
 const PHONE_RE = /^\+?\d{8,15}$/;
 const STRONG_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
@@ -139,7 +140,7 @@ export default function SettingsPage() {
                     </div>
                     <div className="grid sm:grid-cols-2 gap-4">
                         <div><label htmlFor="s-name" className={label}>Name</label><input id="s-name" value={name} onChange={(e) => setName(e.target.value)} className={input} autoComplete="name" /></div>
-                        <div><label htmlFor="s-email" className={label}>Email</label><input id="s-email" value={user?.email || ''} disabled className={input} title="Contact Atlantis to change your sign-in email" /></div>
+                        <div><label htmlFor="s-email" className={label}>Email</label><input id="s-email" value={user?.email || ''} disabled className={input} title="Change it in the Sign-in email section" /></div>
                         <div><label htmlFor="s-phone" className={label}>Phone</label><input id="s-phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+40 712 345 678" className={input} autoComplete="tel" inputMode="tel" /></div>
                         <div><label htmlFor="s-country" className={label}>Country</label><input id="s-country" value={country} onChange={(e) => setCountry(e.target.value)} maxLength={60} placeholder="e.g. Romania" className={input} autoComplete="country-name" /></div>
                         <div><label htmlFor="s-company" className={label}>Company</label><input id="s-company" value={user?.companyName || ''} disabled className={input} /></div>
@@ -154,6 +155,8 @@ export default function SettingsPage() {
             </Card>
 
             <div className="space-y-5">
+                <ChangeEmailCard currentEmail={user?.email || ''} pendingEmail={user?.pendingEmail} onChanged={() => refreshUser?.()} />
+
                 <Card icon={<KeyRound size={17} />} title="Password">
                     <form onSubmit={changePassword} className="space-y-3">
                         <div><label htmlFor="pw-cur" className={label}>Current password</label><input id="pw-cur" type="password" value={cur} onChange={(e) => setCur(e.target.value)} className={input} autoComplete="current-password" required /></div>

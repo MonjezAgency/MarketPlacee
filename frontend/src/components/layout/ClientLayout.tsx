@@ -57,7 +57,7 @@ export default function ClientLayout({ children }: { children: React.ReactNode }
             <main className="flex-grow">
                 {children}
             </main>
-            {(!isDashboard || isBuyerDashboard) && <Footer />}
+            {(!isDashboard || isBuyerDashboard) && !isAuthPage && <Footer />}
         </div>
     );
 }

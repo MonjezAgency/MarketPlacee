@@ -43,6 +43,36 @@ export class UserDto {
     @Exclude()
     resetPasswordExpires?: Date;
 
+    @Exclude()
+    emailVerifyCodeHash?: any;
+
+    @Exclude()
+    emailVerifyExpiry?: any;
+
+    @Exclude()
+    emailVerifyAttempts?: any;
+
+    @Exclude()
+    emailVerifySentAt?: any;
+
+    @Exclude()
+    pendingEmailCodeHash?: any;
+
+    @Exclude()
+    pendingEmailExpiry?: any;
+
+    @Exclude()
+    pendingEmailAttempts?: any;
+
+    @Exclude()
+    pendingEmailSentAt?: any;
+
+    @Exclude()
+    emailOtpCode?: any;
+
+    @Exclude()
+    emailOtpExpiry?: any;
+
     // Strict scrubbing for billing data - NEVER expose to frontend
     @Exclude()
     vatNumber?: string;

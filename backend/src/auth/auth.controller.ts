@@ -1,6 +1,6 @@
-import { Controller, Post, Body, Req, Res, UseGuards, Get, UnauthorizedException, ForbiddenException, Request } from '@nestjs/common';
+import { Controller, Post, Body, Req, Res, UseGuards, Get, UnauthorizedException, ForbiddenException, Request, Delete } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
@@ -24,6 +24,7 @@ export class AuthController {
             loginDto.email,
             loginDto.password,
         );
+        if (user) this.authService.assertEmailVerified(user);
         if (!user) {
             // Security best-practice: don't reveal which of the two
             // failed (email-not-found vs password-mismatch). Add a
@@ -51,6 +52,7 @@ export class AuthController {
     }
 
     @Post('register')
+    @Throttle({ default: { limit: 5, ttl: 60_000 } })
     async register(@Body() registerDto: any, @Res({ passthrough: true }) res: any) {
         const result = await this.authService.register(registerDto);
         if (result && 'access_token' in result) {
@@ -66,7 +68,46 @@ export class AuthController {
         return result;
     }
 
+    @Post('verify-email')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async verifyEmail(@Body() body: { email: string; code: string }) {
+        return this.authService.verifySignupCode(body?.email, body?.code);
+    }
+
+    @Post('resend-verification')
+    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    async resendVerification(@Body('email') email: string) {
+        return this.authService.resendSignupCode(email);
+    }
+
+    @Post('reset-password/check')
+    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    async checkReset(@Body('token') token: string) {
+        return this.authService.checkResetToken(token);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('change-email')
+    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    async requestEmailChange(@Request() req: any, @Body() body: { newEmail: string; currentPassword: string }) {
+        return this.authService.requestEmailChange(req.user.sub, body?.newEmail, body?.currentPassword);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('change-email/confirm')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async confirmEmailChange(@Request() req: any, @Body('code') code: string) {
+        return this.authService.confirmEmailChange(req.user.sub, code);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Delete('change-email')
+    async cancelEmailChange(@Request() req: any) {
+        return this.authService.cancelEmailChange(req.user.sub);
+    }
+
     @Post('forgot-password')
+    @Throttle({ default: { limit: 5, ttl: 60_000 } })
     async forgotPassword(@Body('email') email: string) {
         return this.authService.forgotPassword(email);
     }

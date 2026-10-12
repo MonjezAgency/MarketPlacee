@@ -26,6 +26,7 @@ const PUBLIC_PATHS = [
   'auth/forgot-password',
   'auth/reset-password',
   'auth/verify-email',
+  'auth/resend-verification',
   'auth/google-login',
   'auth/refresh',
   'auth/emergency-reset',

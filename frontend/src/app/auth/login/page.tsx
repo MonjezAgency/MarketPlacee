@@ -1,333 +1,133 @@
 'use client';
 
-import { useState } from 'react';
+import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Lock, Mail, ArrowRight, ShieldCheck, KeyRound } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Eye, EyeOff, Loader2, KeyRound, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
-import { useLanguage } from '@/contexts/LanguageContext';
-import { signIn } from 'next-auth/react';
+import { AuthShell, authInput, authLabel, authPrimary, FormAlert } from '@/components/auth/AuthShell';
+import { cn } from '@/lib/utils';
 
-export default function LoginPage() {
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [showPass, setShowPass] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [loadingMsg, setLoadingMsg] = useState('Authenticating...');
-    const [error, setError] = useState('');
-    // 2FA step state
-    const [step, setStep] = useState<1 | 2>(1);
-    const [partialToken, setPartialToken] = useState('');
-    const [twoFACode, setTwoFACode] = useState('');
-    const [qrCodeUrl, setQrCodeUrl] = useState<string | null>(null);
+const TEAM = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
+/** Only same-site paths may be used as a post-login destination. */
+const safeRedirect = (r: string | null) => (r && r.startsWith('/') && !r.startsWith('//') && !r.startsWith('/auth') ? r : null);
+
+function Login() {
     const router = useRouter();
+    const sp = useSearchParams();
     const { login, verify2FALogin } = useAuth();
-    const { t } = useLanguage();
+    const [email, setEmail] = React.useState('');
+    const [password, setPassword] = React.useState('');
+    const [showPw, setShowPw] = React.useState(false);
+    const [busy, setBusy] = React.useState(false);
+    const [slow, setSlow] = React.useState(false);
+    const [error, setError] = React.useState('');
+    const [unverified, setUnverified] = React.useState<string | null>(null);
+    const [step, setStep] = React.useState<1 | 2>(1);
+    const [partialToken, setPartialToken] = React.useState('');
+    const [qrCodeUrl, setQrCodeUrl] = React.useState<string | null>(null);
+    const [code2fa, setCode2fa] = React.useState('');
 
-    const redirectByRole = (role: string) => {
+    const go = (role: string) => {
         const upper = role.toUpperCase();
-        const teamRoles = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
-        if (teamRoles.includes(upper)) window.location.href = '/admin';
-        else if (upper === 'SUPPLIER') window.location.href = '/supplier';
-        else window.location.href = '/';
+        const target = safeRedirect(sp.get('redirect'));
+        if (TEAM.includes(upper)) window.location.href = '/admin';
+        else if (target) window.location.href = target;
+        else window.location.href = upper === 'SUPPLIER' ? '/supplier' : '/';
     };
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const submit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
-        if (!email || !password) { setError(t('auth', 'errorFillFields')); return; }
-
-        setLoading(true);
-        setLoadingMsg('Authenticating...');
-        // Show "waking up" message after 6s so the user knows it's not frozen
-        const slowTimer = setTimeout(() => setLoadingMsg('Waking up the server… please wait'), 3000);
+        if (busy) return;
+        setError(''); setUnverified(null);
+        if (!email.trim() || !password) { setError('Enter your email and password.'); return; }
+        setBusy(true);
+        const slowTimer = setTimeout(() => setSlow(true), 3000);
         try {
-            const result = await login(email, password);
-            clearTimeout(slowTimer);
-
-            if (result.requiresTwoFactor && result.partialToken) {
-                setPartialToken(result.partialToken);
-                if (result.qrCodeUrl) setQrCodeUrl(result.qrCodeUrl);
-                setStep(2);
-                setLoading(false);
+            const r = await login(email.trim(), password);
+            if (r.requiresTwoFactor && r.partialToken) { setPartialToken(r.partialToken); setQrCodeUrl(r.qrCodeUrl ?? null); setStep(2); return; }
+            if (!r.success) {
+                if (r.code === 'EMAIL_NOT_VERIFIED') { setUnverified(r.email || email.trim()); return; }
+                setError(r.message || 'Invalid email or password.');
                 return;
             }
-
-            if (!result.success) {
-                setError(result.message || t('auth', 'errorInvalidCredentials'));
-                setLoading(false);
-                return;
-            }
-
-            if (!result.user?.role) {
-                setError(t('auth', 'errorUnexpected'));
-                setLoading(false);
-                return;
-            }
-
-            redirectByRole(result.user.role);
-        } catch (err: any) {
-            clearTimeout(slowTimer);
-            setError(err.message || t('auth', 'errorUnexpected'));
-            setLoading(false);
-        }
+            if (!r.user?.role) { setError('Something went wrong. Please try again.'); return; }
+            go(r.user.role);
+        } catch { setError('We couldn’t reach Atlantis. Check your connection and try again.'); }
+        finally { clearTimeout(slowTimer); setSlow(false); setBusy(false); }
     };
 
-    const handle2FAVerify = async (e: React.FormEvent) => {
+    const submit2fa = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
-        if (!twoFACode.trim()) { setError('يرجى إدخال رمز التحقق'); return; }
-
-        setLoading(true);
+        if (busy) return;
+        if (!/^\d{6}$/.test(code2fa)) { setError('Enter the 6-digit code from your authenticator app.'); return; }
+        setBusy(true); setError('');
         try {
-            const result = await verify2FALogin(partialToken, twoFACode.trim());
-            if (!result.success) {
-                setError(result.message || 'رمز التحقق غير صحيح');
-                setTwoFACode('');
-                setLoading(false);
-                return;
-            }
-            redirectByRole(result.user!.role);
-        } catch (err: any) {
-            setError(err.message || t('auth', 'errorUnexpected'));
-            setLoading(false);
-        }
+            const r = await verify2FALogin(partialToken, code2fa);
+            if (!r.success) { setError(r.message || 'That code isn’t right.'); setCode2fa(''); return; }
+            go(r.user!.role);
+        } catch { setError('We couldn’t reach Atlantis. Check your connection and try again.'); }
+        finally { setBusy(false); }
     };
 
     return (
-        <div className="force-light min-h-screen bg-surface flex overflow-hidden font-sans" style={{ colorScheme: 'light' }}>
-            {/* Left Side: Brand Visual Panel */}
-            <div className="hidden lg:flex lg:w-1/2 relative bg-cta items-center justify-center p-12 overflow-hidden">
-                {/* Decorative Elements */}
-                <div className="absolute top-0 end-0 w-[800px] h-[800px] bg-[#2EC4B6] opacity-[0.05] blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2" />
-                <div className="absolute bottom-0 start-0 w-[600px] h-[600px] bg-blue-500 opacity-[0.03] blur-[100px] rounded-full translate-y-1/2 -translate-x-1/2" />
-
-                <div className="relative z-10 max-w-lg">
-                    <div className="mb-12">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.4em] text-teal bg-teal-soft px-4 py-2 rounded-full">
-                            {t('auth', 'enterpriseB2B')}
-                        </span>
-                    </div>
-
-                    <h2 className="text-5xl font-bold text-white leading-tight mb-8">
-                        {t('auth', 'futureBeverageSourcing')}
-                    </h2>
-
-                    <div className="space-y-6 text-[#B0B0C8] text-lg leading-relaxed">
-                        <div className="flex items-start gap-4">
-                            <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0 mt-1">
-                                <ShieldCheck size={14} className="text-emerald-500" />
-                            </div>
-                            <p>{t('auth', 'militaryGradeSecurity')}</p>
+        <AuthShell>
+            <div className="rounded-2xl bg-surface ring-1 ring-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-6 sm:p-8">
+                {step === 1 ? (<>
+                    <h1 className="text-[22px] font-semibold text-heading">Sign in</h1>
+                    <p className="mt-1 text-[14px] text-ink-3">Welcome back. Sign in to see wholesale prices and order.</p>
+                    <form className="mt-6 space-y-4" onSubmit={submit} noValidate>
+                        <div>
+                            <label htmlFor="l-email" className={authLabel}>Work email</label>
+                            <input id="l-email" type="email" inputMode="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" className={authInput} autoFocus />
                         </div>
-                        <p>{t('auth', 'streamlineSupplyChain')}</p>
-                    </div>
-
-                    {/* Mini Dashboard Teaser */}
-                    <div className="mt-16 bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-[40px] p-8 shadow-2xl">
-                        <div className="flex items-center justify-between mb-8">
-                            <div className="flex gap-2">
-                                <div className="w-3 h-3 rounded-full bg-red-400/40" />
-                                <div className="w-3 h-3 rounded-full bg-yellow-400/40" />
-                                <div className="w-3 h-3 rounded-full bg-green-400/40" />
-                            </div>
-                            <div className="h-6 w-24 bg-white/5 rounded-full" />
-                        </div>
-                        <div className="space-y-4">
-                            <div className="h-4 w-full bg-white/5 rounded-full" />
-                            <div className="h-4 w-3/4 bg-white/5 rounded-full" />
-                            <div className="h-8 w-1/4 bg-teal-soft rounded-full mt-6" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Vertical Brand Label */}
-                <div className="absolute start-12 bottom-12 overflow-hidden">
-                    <span className="text-[100px] font-bold text-white/[0.02] select-none leading-none">ATLANTIS</span>
-                </div>
-            </div>
-
-            {/* Right Side: Form Panel */}
-            <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-8 md:p-12 lg:p-24 bg-[#F8FAFC]">
-                <div className="w-full max-w-md bg-surface p-6 sm:p-0 sm:bg-transparent rounded-2xl sm:rounded-none shadow-sm sm:shadow-none">
-                    {/* Logo Mobile */}
-                    <div className="lg:hidden mb-12 text-center">
-                        <Link href="/" className="inline-block group">
-                            <span className="font-heading font-bold text-4xl tracking-tighter text-heading">
-                                Atlan<span className="text-teal">tis</span>
-                            </span>
-                        </Link>
-                    </div>
-
-                    <div className="mb-8 md:mb-10 text-center sm:text-start">
-                        <h1 className="text-3xl md:text-4xl font-bold text-heading mb-2 md:mb-3 tracking-tight">{t('auth', 'loginTitle')}</h1>
-                        <p className="text-ink-3 text-sm md:text-lg font-medium">{t('auth', 'loginSubtitle')}</p>
-                    </div>
-
-                    {error && (
-                        <div className="bg-red-50 border border-red-100 rounded-2xl p-5 mb-8 flex items-start gap-4">
-                            <div className="w-6 h-6 rounded-full bg-red-500/10 flex items-center justify-center shrink-0 mt-0.5">
-                                <span className="text-red-600 font-bold text-xs">!</span>
-                            </div>
-                            <p className="text-red-700 text-sm font-bold leading-snug">{error}</p>
-                        </div>
-                    )}
-
-                    {/* ── Step 2: 2FA Verification ── */}
-                    {step === 2 && (
-                        <form onSubmit={handle2FAVerify} className="space-y-6">
-                            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-5 flex items-start gap-4 mb-2">
-                                <div className="w-8 h-8 rounded-full bg-amber-500/10 flex items-center justify-center shrink-0">
-                                    <KeyRound size={16} className="text-amber-600" />
-                                </div>
-                                <div>
-                                    <p className="text-amber-800 text-sm font-bold">التحقق بخطوتين مفعّل</p>
-                                    <p className="text-amber-700 text-xs mt-1 font-medium">أدخل الرمز المكوّن من 6 أرقام من تطبيق المصادقة الخاص بك</p>
-                                </div>
-                            </div>
-
-                            {qrCodeUrl && (
-                                <div className="flex flex-col items-center gap-3 p-5 bg-surface-2 border border-line rounded-2xl mb-2">
-                                    <p className="text-xs font-bold text-ink-3 uppercase tracking-widest">امسح رمز QR بتطبيق المصادقة</p>
-                                    <img src={qrCodeUrl} alt="QR Code" className="w-40 h-40 rounded-xl border border-line bg-surface p-2" />
-                                    <p className="text-[10px] text-ink-4 text-center">Google Authenticator · Authy · Microsoft Authenticator</p>
-                                </div>
-                            )}
-
-                            <div className="space-y-2">
-                                <label className="block text-[10px] font-bold text-ink-4 tracking-widest uppercase ms-1">رمز التحقق</label>
-                                <div className="relative">
-                                    <KeyRound className="absolute start-5 top-1/2 -translate-y-1/2 text-ink-4" size={20} />
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        maxLength={6}
-                                        autoFocus
-                                        value={twoFACode}
-                                        onChange={(e) => setTwoFACode(e.target.value.replace(/\D/g, ''))}
-                                        placeholder="000000"
-                                        className="w-full bg-surface-2 border-2 border-line rounded-xl ps-14 pe-6 py-5 text-2xl text-heading font-bold tracking-[0.5em] text-center outline-none focus:border-[#2EC4B6] focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-200 placeholder:tracking-normal"
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={loading || twoFACode.length < 6}
-                                className="group relative w-full h-12 bg-cta hover:bg-cta-hover text-white rounded-xl font-semibold text-[14px] overflow-hidden transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#FF8A00]/20"
-                            >
-                                <div className="flex items-center justify-center gap-3">
-                                    {loading ? (
-                                        <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        <>
-                                            <span>تأكيد</span>
-                                            <ArrowRight size={20} />
-                                        </>
-                                    )}
-                                </div>
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => { setStep(1); setError(''); setTwoFACode(''); setPartialToken(''); setQrCodeUrl(null); }}
-                                className="w-full text-center text-xs text-ink-4 hover:text-heading font-bold tracking-widest uppercase transition-colors"
-                            >
-                                ← رجوع
-                            </button>
-                        </form>
-                    )}
-
-                    {/* ── Step 1: Email + Password ── */}
-                    {step === 1 && <form onSubmit={handleLogin} className="space-y-8">
-                        <div className="space-y-2">
-                            <label className="block text-[10px] md:text-xs font-bold text-ink-4 tracking-widest uppercase mb-2 ms-1">{t('auth', 'emailLabel')}</label>
-                            <div className="relative">
-                                <Mail className="absolute start-5 top-1/2 -translate-y-1/2 text-ink-4 group-focus-within:text-teal transition-colors" size={20} />
-                                <input
-                                    type="email"
-                                    required
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder="name@atlantis.com"
-                                    className="w-full bg-surface sm:bg-surface-2 border-2 border-line rounded-xl sm:rounded-xl ps-14 pe-6 py-4 md:py-5 text-sm md:text-base text-heading font-bold outline-none focus:border-[#2EC4B6] focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="relative group">
-                            <div className="flex justify-between items-center mb-2 md:mb-3 ms-1 pe-1">
-                                <label className="block text-[10px] md:text-xs font-bold text-ink-4 tracking-widest uppercase">{t('auth', 'passwordLabel')}</label>
-                                <a href="/auth/forgot-password" className="text-[13px] font-semibold text-teal hover:text-heading transition-colors">{t('auth', 'recovery')}</a>
+                        <div>
+                            <div className="flex items-center justify-between">
+                                <label htmlFor="l-password" className={authLabel}>Password</label>
+                                <Link href="/auth/forgot-password" className="mb-1.5 text-[13px] font-semibold text-teal hover:underline">Forgot password?</Link>
                             </div>
                             <div className="relative">
-                                <Lock className="absolute start-5 top-1/2 -translate-y-1/2 text-ink-4 group-focus-within:text-teal transition-colors" size={20} />
-                                <input
-                                    type={showPass ? 'text' : 'password'}
-                                    required
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder="••••••••"
-                                    className="w-full bg-surface sm:bg-surface-2 border-2 border-line rounded-xl sm:rounded-xl ps-14 pe-14 py-4 md:py-5 text-sm md:text-base text-heading font-bold outline-none focus:border-[#2EC4B6] focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300 overflow-hidden resize-none"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPass(!showPass)}
-                                    className="absolute end-5 top-1/2 -translate-y-1/2 text-ink-4 hover:text-heading transition-colors"
-                                >
-                                    {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
-                                </button>
+                                <input id="l-password" type={showPw ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" className={cn(authInput, 'pe-11')} />
+                                <button type="button" onClick={() => setShowPw((s) => !s)} aria-label={showPw ? 'Hide password' : 'Show password'} className="absolute inset-y-0 end-0 w-11 flex items-center justify-center text-ink-3 hover:text-ink">{showPw ? <EyeOff size={17} /> : <Eye size={17} />}</button>
                             </div>
                         </div>
-
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="group relative w-full h-12 bg-cta hover:bg-cta-hover text-white rounded-xl sm:rounded-xl font-semibold text-[14px] overflow-hidden transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-[#FF8A00]/20"
-                        >
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
-                            <div className="flex items-center justify-center gap-3">
-                                {loading ? (
-                                    <span className="flex items-center gap-2.5">
-                                        <span className="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin shrink-0" />
-                                        <span className="text-xs tracking-wide">{loadingMsg}</span>
-                                    </span>
-                                ) : (
-                                    <>
-                                        <span>{t('auth', 'authenticate')}</span>
-                                        <ArrowRight size={20} className="transition-transform group-hover:translate-x-1" />
-                                    </>
-                                )}
-                            </div>
+                        {error && <FormAlert>{error}</FormAlert>}
+                        {unverified && (
+                            <FormAlert tone="info">
+                                Your email isn’t verified yet. <Link href={`/auth/verify-email?email=${encodeURIComponent(unverified)}`} className="font-semibold text-teal hover:underline">Enter your code or get a new one</Link>.
+                            </FormAlert>
+                        )}
+                        <button type="submit" disabled={busy} className={authPrimary}>
+                            {busy ? <><Loader2 size={16} className="animate-spin" /> {slow ? 'Waking up the server…' : 'Signing in…'}</> : 'Sign in'}
                         </button>
-                    </form>}
-
-
-
-                    <div className="mt-12 text-center">
-                        <p className="text-[#64748B] font-medium text-sm mb-4">
-                            {t('auth', 'partnershipInquiry')}{' '}
-                            <Link href="/auth/register" className="text-teal font-semibold hover:underline ms-1">
-                                {t('auth', 'createBrandProfile')}
-                            </Link>
-                        </p>
-                        <p className="text-[10px] text-ink-4 font-bold uppercase tracking-[0.2em]">
-                            {t('footer', 'developedBy')}
-                        </p>
-                    </div>
-
-                    {/* Social/Trust Badges Placeholder */}
-                    <div className="mt-16 pt-8 border-t border-line">
-                        <div className="flex justify-center items-center gap-8 opacity-[0.4] grayscale hover:grayscale-0 transition-all duration-700">
-                            <div className="h-4 w-16 bg-slate-300 rounded" />
-                            <div className="h-4 w-16 bg-slate-300 rounded" />
-                            <div className="h-4 w-16 bg-slate-300 rounded" />
+                    </form>
+                    <p className="mt-6 text-[14px] text-ink-3">New to Atlantis? <Link href="/auth/register" className="font-semibold text-teal hover:underline">Create a business account</Link></p>
+                </>) : (<>
+                    <button type="button" onClick={() => { setStep(1); setError(''); setCode2fa(''); setPartialToken(''); setQrCodeUrl(null); }} className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-3 hover:text-ink"><ArrowLeft size={14} /> Back</button>
+                    <span className="mt-4 w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><KeyRound size={22} /></span>
+                    <h1 className="mt-4 text-[22px] font-semibold text-heading">Two-step verification</h1>
+                    <p className="mt-1 text-[14px] text-ink-3">Enter the 6-digit code from your authenticator app.</p>
+                    {qrCodeUrl && (
+                        <div className="mt-4 flex flex-col items-center gap-2 rounded-xl ring-1 ring-line p-4">
+                            <p className="text-[13px] text-ink-2">Scan with your authenticator app</p>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={qrCodeUrl} alt="Two-step verification QR code" className="w-40 h-40 rounded-lg bg-white p-2" />
                         </div>
-                    </div>
-                </div>
+                    )}
+                    <form className="mt-5 space-y-4" onSubmit={submit2fa} noValidate>
+                        <div>
+                            <label htmlFor="l-2fa" className={authLabel}>Code</label>
+                            <input id="l-2fa" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus value={code2fa} onChange={(e) => setCode2fa(e.target.value.replace(/\D/g, ''))} className={cn(authInput, 'h-12 text-center text-[20px] tracking-[0.4em] font-semibold')} />
+                        </div>
+                        {error && <FormAlert>{error}</FormAlert>}
+                        <button type="submit" disabled={busy || code2fa.length < 6} className={authPrimary}>{busy ? <Loader2 size={16} className="animate-spin" /> : 'Verify and sign in'}</button>
+                    </form>
+                </>)}
             </div>
-        </div>
+        </AuthShell>
     );
 }
 
-
+export default function LoginPage() {
+    return <React.Suspense fallback={null}><Login /></React.Suspense>;
+}

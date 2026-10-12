@@ -1,215 +1,88 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import * as React from 'react';
 import Link from 'next/link';
-import { Lock, ArrowRight, ShieldCheck, Sparkles, CheckCircle2, Eye, EyeOff } from 'lucide-react';
-import { motion } from 'framer-motion';
-import toast from 'react-hot-toast';
+import { useSearchParams } from 'next/navigation';
+import { Loader2, CheckCircle2, AlertTriangle, Eye, EyeOff, LockKeyhole } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { AuthShell, authInput, authLabel, authPrimary, FormAlert, PasswordChecklist, passwordOk } from '@/components/auth/AuthShell';
 import { cn } from '@/lib/utils';
 
-function ResetPasswordContent() {
-    const router = useRouter();
-    const searchParams = useSearchParams();
-    const token = searchParams.get('token');
+function Reset() {
+    const sp = useSearchParams();
+    const token = sp.get('token') || '';
+    const [state, setState] = React.useState<'checking' | 'invalid' | 'form' | 'done'>('checking');
+    const [pw, setPw] = React.useState('');
+    const [confirm, setConfirm] = React.useState('');
+    const [show, setShow] = React.useState(false);
+    const [busy, setBusy] = React.useState(false);
+    const [error, setError] = React.useState('');
 
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
-    const [showPassword, setShowPassword] = useState(false);
-    const [loading, setLoading] = useState(false);
-    const [success, setSuccess] = useState(false);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-        if (!token) {
-            setError('Invalid reset link. Please request a new password reset.');
-        }
+    React.useEffect(() => {
+        if (!token) { setState('invalid'); return; }
+        apiFetch('/auth/reset-password/check', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) })
+            .then((r) => r.json().catch(() => ({})).then((b) => ({ ok: r.ok, b, status: r.status })))
+            // Older backends without /check: fall through to the form; the reset call itself validates.
+            .then(({ ok, b }) => setState(ok ? (b?.valid ? 'form' : 'invalid') : 'form'))
+            .catch(() => setState('form'));
     }, [token]);
 
-    const handleReset = async (e: React.FormEvent) => {
+    const submit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setError('');
-
-        if (password !== confirmPassword) {
-            setError('Passwords do not match.');
-            return;
-        }
-
-        // Match backend regex: 8+ chars, 1 upper, 1 lower, 1 digit, 1 special
-        const isStrong = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/.test(password);
-        if (!isStrong) {
-            setError('Password does not meet security requirements.');
-            return;
-        }
-
-        setLoading(true);
+        if (busy) return;
+        if (!passwordOk(pw)) { setError('Your new password doesn’t meet all the requirements yet.'); return; }
+        if (pw !== confirm) { setError('Passwords don’t match.'); return; }
+        setBusy(true); setError('');
         try {
-            const { apiFetch } = await import('@/lib/api');
-            const res = await apiFetch('/auth/reset-password', {
-                method: 'POST',
-                body: JSON.stringify({ token, newPassword: password }),
-            });
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}));
-                throw new Error(data.message || 'Failed to reset password');
-            }
-            setSuccess(true);
-            toast.success('Password reset successful!');
-            setTimeout(() => router.push('/auth/login'), 3000);
-        } catch (err: any) {
-            setError(err.message || 'Failed to reset password');
-        } finally {
-            setLoading(false);
-        }
+            const res = await apiFetch('/auth/reset-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token, newPassword: pw }) });
+            if (res.ok) { setState('done'); return; }
+            if (res.status === 400) { setState('invalid'); return; }
+            setError('Something went wrong. Try again in a moment.');
+        } catch { setError('We couldn’t reach Atlantis. Check your connection and try again.'); }
+        finally { setBusy(false); }
     };
 
     return (
-        <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden font-sans">
-            {/* Background Aesthetics */}
-            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-teal-500/10 rounded-full blur-[120px] animate-pulse" />
-            <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[150px] animate-pulse" />
-
-            <motion.div
-                initial={{ opacity: 0, y: 30 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6 }}
-                className="w-full max-w-[450px] z-10"
-            >
-                <div className="text-center mb-10">
-                    <Link href="/" className="inline-block group">
-                        <span className="font-bold text-4xl tracking-tighter text-white">
-                            Atlan<span className="text-[#1BC7C9]">tis</span>
-                        </span>
-                    </Link>
-                </div>
-
-                <div className="bg-[#0F172A]/80 backdrop-blur-3xl border border-white/5 rounded-[2.5rem] p-8 sm:p-10 shadow-2xl relative overflow-hidden">
-                    <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#1BC7C9] to-transparent opacity-50" />
-                    
-                    <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-                        New Password <Sparkles className="text-[#1BC7C9] w-6 h-6" />
-                    </h1>
-                    <p className="text-ink-4 text-sm font-medium mb-8">
-                        Please enter your new secure password below.
-                    </p>
-
-                    {error && (
-                        <motion.div 
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 mb-6 text-red-400 text-sm font-bold flex items-center gap-3"
-                        >
-                            <div className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                            {error}
-                        </motion.div>
-                    )}
-
-                    {success ? (
-                        <div className="text-center py-8 space-y-6">
-                            <div className="w-20 h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto shadow-2xl shadow-emerald-500/20">
-                                <CheckCircle2 className="w-10 h-10 text-emerald-500" />
+        <AuthShell>
+            <div className="rounded-2xl bg-surface ring-1 ring-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-6 sm:p-8">
+                {state === 'checking' && <p className="flex items-center gap-2 text-[14px] text-ink-3"><Loader2 size={16} className="animate-spin" /> Checking your link…</p>}
+                {state === 'invalid' && (<>
+                    <span className="w-12 h-12 rounded-2xl bg-[#FFFBEB] dark:bg-amber-500/10 text-[#B45309] flex items-center justify-center"><AlertTriangle size={22} /></span>
+                    <h1 className="mt-4 text-[22px] font-semibold text-heading">This link has expired or was already used</h1>
+                    <p className="mt-2 text-[14.5px] text-ink-2">Reset links work once and expire after 60 minutes. Request a new one to continue.</p>
+                    <Link href="/auth/forgot-password" className={cn(authPrimary, 'mt-6')}>Request a new link</Link>
+                </>)}
+                {state === 'done' && (<>
+                    <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><CheckCircle2 size={24} /></span>
+                    <h1 className="mt-4 text-[22px] font-semibold text-heading">Password updated</h1>
+                    <p className="mt-2 text-[14.5px] text-ink-2">Sign in with your new password. For your security, other devices were signed out.</p>
+                    <Link href="/auth/login" className={cn(authPrimary, 'mt-6')}>Sign in</Link>
+                </>)}
+                {state === 'form' && (<>
+                    <span className="w-12 h-12 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><LockKeyhole size={22} /></span>
+                    <h1 className="mt-4 text-[22px] font-semibold text-heading">Choose a new password</h1>
+                    <form className="mt-6 space-y-4" onSubmit={submit} noValidate>
+                        <div>
+                            <label htmlFor="rp-pw" className={authLabel}>New password</label>
+                            <div className="relative">
+                                <input id="rp-pw" type={show ? 'text' : 'password'} value={pw} onChange={(e) => setPw(e.target.value)} autoComplete="new-password" autoFocus className={cn(authInput, 'pe-11')} />
+                                <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? 'Hide password' : 'Show password'} className="absolute inset-y-0 end-0 w-11 flex items-center justify-center text-ink-3 hover:text-ink">{show ? <EyeOff size={17} /> : <Eye size={17} />}</button>
                             </div>
-                            <div className="space-y-2">
-                                <h3 className="text-2xl font-bold text-white">Security Updated</h3>
-                                <p className="text-ink-4">Your password has been reset successfully. We're taking you to the login page...</p>
-                            </div>
+                            <PasswordChecklist value={pw} />
                         </div>
-                    ) : (
-                        <form onSubmit={handleReset} className="space-y-6">
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-bold text-ink-3 uppercase tracking-[0.2em] ms-1">New Password</label>
-                                <div className="relative group">
-                                    <Lock className="absolute start-5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-3 group-focus-within:text-[#1BC7C9] transition-colors" />
-                                    <input
-                                        type={showPassword ? "text" : "password"}
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full bg-slate-900/50 border border-white/5 rounded-2xl ps-14 pe-14 py-4 text-white outline-none focus:border-[#1BC7C9]/50 focus:bg-slate-900 transition-all text-base tracking-widest placeholder:tracking-normal placeholder:text-ink-2"
-                                        placeholder="••••••••"
-                                        required
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute end-5 top-1/2 -translate-y-1/2 text-ink-3 hover:text-white transition-colors"
-                                    >
-                                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                                    </button>
-                                </div>
-                                
-                                {/* Password Requirements Guide */}
-                                <div className="grid grid-cols-2 gap-2 mt-4 p-4 bg-white/5 rounded-2xl border border-white/5">
-                                    {[
-                                        { label: '8+ Characters', met: password.length >= 8 },
-                                        { label: 'Uppercase', met: /[A-Z]/.test(password) },
-                                        { label: 'Number', met: /\d/.test(password) },
-                                        { label: 'Symbol', met: /[!@#$%^&*]/.test(password) }
-                                    ].map((req, i) => (
-                                        <div key={i} className="flex items-center gap-2">
-                                            <div className={cn(
-                                                "w-1.5 h-1.5 rounded-full transition-all duration-300",
-                                                req.met ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" : "bg-slate-700"
-                                            )} />
-                                            <span className={cn(
-                                                "text-[10px] font-bold uppercase tracking-tight",
-                                                req.met ? "text-emerald-400" : "text-ink-3"
-                                            )}>
-                                                {req.label}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <div className="space-y-3">
-                                <label className="text-[11px] font-bold text-ink-3 uppercase tracking-[0.2em] ms-1">Confirm Identity</label>
-                                <div className="relative group">
-                                    <ShieldCheck className="absolute start-5 top-1/2 -translate-y-1/2 w-5 h-5 text-ink-3 group-focus-within:text-[#1BC7C9] transition-colors" />
-                                    <input
-                                        type="password"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="w-full bg-slate-900/50 border border-white/5 rounded-2xl ps-14 pe-6 py-4 text-white outline-none focus:border-[#1BC7C9]/50 focus:bg-slate-900 transition-all text-base tracking-widest placeholder:tracking-normal placeholder:text-ink-2"
-                                        placeholder="••••••••"
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={loading || !password || !confirmPassword}
-                                className="w-full relative group overflow-hidden rounded-2xl"
-                            >
-                                <div className="absolute inset-0 bg-gradient-to-r from-[#1BC7C9] to-blue-500 opacity-100 group-hover:scale-105 transition-transform duration-500" />
-                                <div className="relative py-5 bg-transparent text-white font-bold text-sm uppercase tracking-[0.3em] flex items-center justify-center gap-3 disabled:opacity-50">
-                                    {loading ? (
-                                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        <>
-                                            Secure Account <ArrowRight size={18} />
-                                        </>
-                                    )}
-                                </div>
-                            </button>
-                        </form>
-                    )}
-                </div>
-
-                <div className="mt-8 text-center">
-                    <Link href="/auth/login" className="text-[11px] font-bold text-ink-3 uppercase tracking-[0.2em] hover:text-[#1BC7C9] transition-colors">
-                        Back to Security Login
-                    </Link>
-                </div>
-            </motion.div>
-        </div>
+                        <div>
+                            <label htmlFor="rp-confirm" className={authLabel}>Confirm new password</label>
+                            <input id="rp-confirm" type={show ? 'text' : 'password'} value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="new-password" className={authInput} />
+                        </div>
+                        {error && <FormAlert>{error}</FormAlert>}
+                        <button type="submit" disabled={busy} className={authPrimary}>{busy ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : 'Update password'}</button>
+                    </form>
+                </>)}
+            </div>
+        </AuthShell>
     );
 }
 
 export default function ResetPasswordPage() {
-    return (
-        <Suspense fallback={<div className="min-h-screen bg-[#020617] flex items-center justify-center"><div className="w-8 h-8 border-4 border-white/30 border-t-[#1BC7C9] rounded-full animate-spin" /></div>}>
-            <ResetPasswordContent />
-        </Suspense>
-    );
+    return <React.Suspense fallback={null}><Reset /></React.Suspense>;
 }

@@ -9,6 +9,8 @@ import { Logger } from '@nestjs/common';
 import { NotificationsService } from '../notifications/notifications.service';
 
 import { PrismaService } from '../common/prisma.service';
+import { ForbiddenException, ConflictException } from '@nestjs/common';
+import { newCode, hashSecret, checkCode, cooldownLeft, publicRole, normEmail, EMAIL_RE, STRONG_PASSWORD_RE, CODE_TTL_MS, MAX_ATTEMPTS } from './verification';
 
 interface AuthUser {
     id: string;
@@ -171,120 +173,188 @@ export class AuthService {
         return null;
     }
 
+    /**
+     * Sign-up. Creates a PENDING_APPROVAL account with an UNVERIFIED email and
+     * sends a 6-digit code. No session is issued until the email is verified
+     * (and approval still applies afterwards). The response is identical
+     * whether or not the email already has an account, so sign-up can't be
+     * used to discover who is registered.
+     */
     async register(data: any) {
-        this.logger.log(`[AUTH] Registration attempt for email: ${data.email}, role: ${data.role}`);
-        
-        const trimmedEmail = (data.email || '').trim().toLowerCase();
-        const trimmedPass = (data.password || '').trim();
-        const existing = await this.prisma.user.findUnique({ where: { email: trimmedEmail } });
+        const email = normEmail(data?.email);
+        const password = String(data?.password ?? '');
+        const role = publicRole(data?.role);
+        const name = String(data?.name ?? '').trim().slice(0, 120);
+        if (!EMAIL_RE.test(email)) throw new BadRequestException({ code: 'INVALID_EMAIL', message: 'Enter a valid work email.' });
+        if (!STRONG_PASSWORD_RE.test(password)) throw new BadRequestException({ code: 'WEAK_PASSWORD', message: 'Password needs 8+ characters with upper- and lower-case letters, a number and a symbol (!@#$%^&*).' });
+        if (!role) throw new BadRequestException({ code: 'INVALID_ROLE', message: 'Choose Buyer or Supplier.' });
+        if (!name) throw new BadRequestException({ code: 'NAME_REQUIRED', message: 'Enter your full name.' });
+        const companyName = String(data?.companyName ?? '').trim().slice(0, 160);
+        if (!companyName) throw new BadRequestException({ code: 'COMPANY_REQUIRED', message: 'Enter your company name.' });
+        this.logger.log(`[AUTH] Sign-up attempt (${role})`);
+
+        const generic = { verificationRequired: true, email, pendingApproval: true };
+        const existing = await this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
         if (existing) {
-            console.warn(`[AUTH] Registration failed: User ${data.email} already exists.`);
-            throw new UnauthorizedException('User already exists');
+            if (existing.emailVerificationRequired && !existing.emailVerified) {
+                // Unfinished sign-up: just (re)send a code, respecting the cooldown.
+                await this.sendSignupCode(existing.id).catch(() => undefined);
+            } else {
+                this.emailService.sendSignupExisting(existing.email, existing.name || '').catch(() => undefined);
+            }
+            return generic;
         }
 
-        const hashedPassword = await bcrypt.hash(trimmedPass, 10);
-        const verificationToken = crypto.randomBytes(32).toString('hex');
-
-        const isInvited = !!data.inviteToken;
-        // User's final request: "Let everyone get approved, even the one I send an invite link to."
-        const status = 'PENDING_APPROVAL';
-
+        const blankToNull = (v: any) => (typeof v === 'string' ? (v.trim() ? v.trim().slice(0, 300) : null) : null);
+        let user;
         try {
-            this.logger.log(`[AUTH] Attempting database creation for ${trimmedEmail} with status ${status}`);
-            // Defensive: any optional column with a Prisma @unique
-            // constraint MUST come in as `null` (not `""`) when the
-            // user left it blank — a second empty-string row would
-            // collide on the unique index. Normalise here so that
-            // even if a future caller forgets the frontend defensiveness
-            // the DB stays clean.
-            const blankToNull = (s: any) =>
-                typeof s === 'string' ? (s.trim() ? s.trim() : null) : (s ?? null);
-            const user = await this.prisma.user.create({
+            user = await this.prisma.user.create({
                 data: {
-                    email: trimmedEmail,
-                    password: hashedPassword,
-                    name: data.name,
+                    email,
+                    password: await bcrypt.hash(password, 12),
+                    name,
                     phone: blankToNull(data.phone),
-                    companyName: blankToNull(data.companyName),
+                    companyName,
                     website: blankToNull(data.website),
-                    socialLinks: blankToNull(data.socialLinks),
+                    country: blankToNull(data.country),
+                    businessCity: blankToNull(data.businessCity),
+                    businessType: blankToNull(data.businessType),
                     vatNumber: blankToNull(data.vatNumber),
-                    taxId: blankToNull(data.taxId) ? this.cryptoService.encrypt(data.taxId) : null,
-                    country: data.country,
-                    bankAddress: blankToNull(data.bankAddress),
-                    iban: blankToNull(data.iban) ? this.cryptoService.encrypt(data.iban) : null,
-                    swiftCode: blankToNull(data.swiftCode) ? this.cryptoService.encrypt(data.swiftCode) : null,
-                    role: data.role.toUpperCase(),
-                    status,
-                    verificationToken: null,
-                    emailVerified: true,
+                    role,
+                    status: 'PENDING_APPROVAL',
+                    emailVerified: false,
+                    emailVerificationRequired: true,
                     onboardingCompleted: true,
-                },
+                } as any,
             });
-
-            this.logger.log(`[AUTH] User created successfully: ${user.id} (${user.email})`);
-
-            // Generate tokens for auto-login (Only useful if status is ACTIVE)
-            const tokens = await this.generateTokens(user as any);
-
-            (async () => {
-                try {
-                    this.logger.log(`[AUTH] Background tasks started for ${user.email}`);
-
-                    // 1. Send Registration Confirmation Email
-                    await this.emailService.sendRegistrationConfirmationEmail(user.email, user.name, data.locale);
-                    
-                    // 2. Send Welcome Email (only if active, which currently is never for new signups)
-                    if ((status as any) === 'ACTIVE') {
-                        await this.emailService.sendWelcomeEmail(user.email, user.name, user.role);
-                    }
-
-                    // 3. Send Admin Alert Email
-                    await this.emailService.sendAdminSignupAlert({
-                        name: user.name || 'N/A',
-                        email: user.email,
-                        role: data.role,
-                        companyName: user.companyName,
-                        registeredAt: user.createdAt || new Date(),
-                    });
-
-                    // Acknowledgement to the new user — matches the
-                    // "Registration Pending" in-app screen so they
-                    // know to expect a 24-48h review window.
-                    await this.emailService.sendRegistrationPendingEmail(
-                        user.email,
-                        user.name || 'there',
-                        data.role,
-                    ).catch(() => {});
-                    
-                    // 4. Notify Admins about the new registration
-                    await this.notificationsService.notifyAdmins(
-                        'New Registration Pending Approval',
-                        `${user.name} (${user.companyName}) has registered as a ${data.role} and is waiting for your approval.`,
-                        'INFO',
-                        { userId: user.id }
-                    ).catch(() => {});
-                } catch (error: any) {
-                    this.logger.error(`[AUTH] Background tasks failed for ${user.email}: ${error.message}`);
-                }
-            })();
-
-            // Strict scrubbing
-            const {
-                password, iban, swiftCode, taxId, bankAddress, vatNumber,
-                verificationToken: vt, resetPasswordToken, resetPasswordExpires,
-                ...safeUser
-            } = user;
-
-            return { 
-                user: safeUser,
-                isInvited,
-                pendingApproval: true 
-            };
-        } catch (error) {
-            this.logger.error('[AUTH] Registration database error:', error);
-            throw error;
+        } catch (e: any) {
+            // Double submit / race on the unique email: same generic answer.
+            if (e?.code === 'P2002' && String(e?.meta?.target || '').includes('email')) return generic;
+            if (e?.code === 'P2002') throw new ConflictException({ code: 'DUPLICATE_FIELD', message: 'That VAT number is already registered. Leave it blank or contact Atlantis.' });
+            throw e;
         }
+        this.logger.log(`[AUTH] Sign-up created ${user.id}`);
+        const sent = await this.sendSignupCode(user.id);
+        // Admin alerts go out only after the email is verified (see verifySignupCode).
+        return { ...generic, emailSent: sent.ok };
+    }
+
+    /** Issue + email a fresh sign-up code (cooldown enforced). The code itself is never stored. */
+    private async sendSignupCode(userId: string): Promise<{ ok: boolean; retryAfter: number }> {
+        const u = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!u || u.emailVerified) return { ok: false, retryAfter: 0 };
+        const wait = cooldownLeft((u as any).emailVerifySentAt);
+        if (wait > 0) return { ok: false, retryAfter: wait };
+        const code = newCode();
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { emailVerifyCodeHash: hashSecret(code), emailVerifyExpiry: new Date(Date.now() + CODE_TTL_MS), emailVerifyAttempts: 0, emailVerifySentAt: new Date() } as any,
+        });
+        const res = await this.emailService.sendSignupCode(u.email, u.name || '', code, CODE_TTL_MS / 60000).catch((e) => ({ success: false, error: e?.message }));
+        if (!res.success) this.logger.error(`[AUTH] Verification email failed for ${userId}: ${res.error}`);
+        return { ok: !!res.success, retryAfter: 60 };
+    }
+
+    /** Resend: same answer for unknown, verified and unverified emails (no enumeration). */
+    async resendSignupCode(rawEmail: string) {
+        const email = normEmail(rawEmail);
+        const u = EMAIL_RE.test(email) ? await this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } }) : null;
+        if (u && (u as any).emailVerificationRequired && !u.emailVerified) {
+            const r = await this.sendSignupCode(u.id);
+            if (!r.ok && r.retryAfter > 0) return { ok: true, retryAfter: r.retryAfter };
+        }
+        return { ok: true, retryAfter: 60 };
+    }
+
+    async verifySignupCode(rawEmail: string, code: string) {
+        const email = normEmail(rawEmail);
+        const fail = (codeName: string, message: string) => { throw new BadRequestException({ code: codeName, message }); };
+        const u = await this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } });
+        if (!u || !(u as any).emailVerificationRequired) fail('INVALID_CODE', 'That code isn’t valid. Check the latest email or request a new code.');
+        if (u!.emailVerified) return { verified: true, alreadyVerified: true, role: u!.role, status: u!.status };
+        const result = checkCode(code, { hash: (u as any).emailVerifyCodeHash, expiry: (u as any).emailVerifyExpiry, attempts: (u as any).emailVerifyAttempts });
+        if (result === 'TOO_MANY') fail('TOO_MANY_ATTEMPTS', 'Too many wrong codes. Request a new code.');
+        if (result === 'EXPIRED' || result === 'NO_CODE') fail('CODE_EXPIRED', 'This code has expired. Request a new one.');
+        if (result === 'WRONG') {
+            await this.prisma.user.update({ where: { id: u!.id }, data: { emailVerifyAttempts: { increment: 1 } } as any });
+            fail('INVALID_CODE', `That code isn’t right. ${Math.max(0, MAX_ATTEMPTS - (u as any).emailVerifyAttempts - 1)} attempts left.`);
+        }
+        // Single-use: the conditional update only succeeds once.
+        const done = await this.prisma.user.updateMany({
+            where: { id: u!.id, emailVerified: false, emailVerifyCodeHash: (u as any).emailVerifyCodeHash } as any,
+            data: { emailVerified: true, emailVerifyCodeHash: null, emailVerifyExpiry: null, emailVerifyAttempts: 0 } as any,
+        });
+        if (done.count === 1) {
+            const role = u!.role === 'SUPPLIER' ? 'SUPPLIER' : 'CUSTOMER';
+            (async () => {
+                await this.emailService.sendEmailVerified(u!.email, u!.name || '', role).catch(() => undefined);
+                await this.emailService.sendAdminSignupAlert({ name: u!.name || 'N/A', email: u!.email, role, companyName: u!.companyName, registeredAt: u!.createdAt }).catch(() => undefined);
+                await this.notificationsService.notifyAdmins('New Registration Pending Approval', `${u!.name} (${u!.companyName}) verified their email and is waiting for approval as ${role === 'SUPPLIER' ? 'a supplier' : 'a buyer'}.`, 'INFO', { userId: u!.id }).catch(() => undefined);
+            })();
+        }
+        return { verified: true, role: u!.role, status: u!.status };
+    }
+
+    /** Called by login after the password matched: block accounts whose sign-up email isn't verified yet. */
+    assertEmailVerified(user: any) {
+        if (user?.emailVerificationRequired && !user?.emailVerified) {
+            throw new ForbiddenException({ code: 'EMAIL_NOT_VERIFIED', message: 'Verify your email to sign in. We can send you a new code.', email: user.email });
+        }
+    }
+
+    // ── Change email (authenticated) ──────────────────────────────────────
+    async requestEmailChange(userId: string, rawNew: string, currentPassword: string) {
+        const newEmail = normEmail(rawNew);
+        if (!EMAIL_RE.test(newEmail)) throw new BadRequestException({ code: 'INVALID_EMAIL', message: 'Enter a valid email address.' });
+        const u = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!u) throw new UnauthorizedException();
+        if (!(await bcrypt.compare(String(currentPassword || '').trim(), u.password))) throw new BadRequestException({ code: 'WRONG_PASSWORD', message: 'Your current password is incorrect.' });
+        if (newEmail === normEmail(u.email)) throw new BadRequestException({ code: 'SAME_EMAIL', message: 'That is already your email.' });
+        const wait = cooldownLeft((u as any).pendingEmailSentAt);
+        if (wait > 0 && (u as any).pendingEmail === newEmail) return { pendingEmail: newEmail, retryAfter: wait };
+        const taken = await this.prisma.user.findFirst({ where: { email: { equals: newEmail, mode: 'insensitive' } }, select: { id: true } });
+        const code = newCode();
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: { pendingEmail: newEmail, pendingEmailCodeHash: taken ? hashSecret(crypto.randomBytes(16).toString('hex')) : hashSecret(code), pendingEmailExpiry: new Date(Date.now() + CODE_TTL_MS), pendingEmailAttempts: 0, pendingEmailSentAt: new Date() } as any,
+        });
+        // If the address belongs to another account we send nothing (and the stored hash can never match).
+        if (!taken) {
+            const r = await this.emailService.sendChangeEmailCode(newEmail, u.name || '', code, CODE_TTL_MS / 60000).catch((e) => ({ success: false, error: e?.message }));
+            if (!r.success) this.logger.error(`[AUTH] Change-email code failed for ${userId}: ${r.error}`);
+            this.emailService.sendChangeEmailNotice(u.email, u.name || '', newEmail, false).catch(() => undefined);
+        }
+        return { pendingEmail: newEmail, retryAfter: 60 };
+    }
+
+    async confirmEmailChange(userId: string, code: string) {
+        const u = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (!u || !(u as any).pendingEmail) throw new BadRequestException({ code: 'NO_PENDING_CHANGE', message: 'There’s no email change waiting for confirmation.' });
+        const r = checkCode(code, { hash: (u as any).pendingEmailCodeHash, expiry: (u as any).pendingEmailExpiry, attempts: (u as any).pendingEmailAttempts });
+        if (r === 'TOO_MANY') throw new BadRequestException({ code: 'TOO_MANY_ATTEMPTS', message: 'Too many wrong codes. Start the change again.' });
+        if (r === 'EXPIRED' || r === 'NO_CODE') throw new BadRequestException({ code: 'CODE_EXPIRED', message: 'This code has expired. Start the change again.' });
+        if (r === 'WRONG') {
+            await this.prisma.user.update({ where: { id: userId }, data: { pendingEmailAttempts: { increment: 1 } } as any });
+            throw new BadRequestException({ code: 'INVALID_CODE', message: 'That code isn’t right.' });
+        }
+        const newEmail = (u as any).pendingEmail as string;
+        const oldEmail = u.email;
+        try {
+            await this.prisma.user.update({
+                where: { id: userId },
+                data: { email: newEmail, emailVerified: true, pendingEmail: null, pendingEmailCodeHash: null, pendingEmailExpiry: null, pendingEmailAttempts: 0 } as any,
+            });
+        } catch (e: any) {
+            if (e?.code === 'P2002') throw new ConflictException({ code: 'EMAIL_TAKEN', message: 'That email can’t be used. Try another address.' });
+            throw e;
+        }
+        this.emailService.sendChangeEmailNotice(oldEmail, u.name || '', newEmail, true).catch(() => undefined);
+        return { email: newEmail };
+    }
+
+    async cancelEmailChange(userId: string) {
+        await this.prisma.user.update({ where: { id: userId }, data: { pendingEmail: null, pendingEmailCodeHash: null, pendingEmailExpiry: null, pendingEmailAttempts: 0 } as any });
+        return { ok: true };
     }
 
     async verifyEmail(token: string) {
@@ -556,8 +626,9 @@ export class AuthService {
         return { ok: true, action: 'created', userId: created.id, role: created.role };
     }
 
-    async forgotPassword(email: string) {
-        const user = await this.prisma.user.findUnique({ where: { email } });
+    async forgotPassword(rawEmail: string) {
+        const email = normEmail(rawEmail);
+        const user = EMAIL_RE.test(email) ? await this.prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } } }) : null;
 
         // Security: Always return success for non-existent users to prevent enumeration
         if (!user) {
@@ -569,9 +640,10 @@ export class AuthService {
         const expires = new Date(Date.now() + 1000 * 60 * 60); // 1 hour expiry
 
         await this.prisma.user.update({
-            where: { email },
+            where: { id: user.id },
             data: {
-                resetPasswordToken: token,
+                // Only the hash is stored; the raw token lives in the emailed link.
+                resetPasswordToken: hashSecret(token),
                 resetPasswordExpires: expires,
             },
         });
@@ -595,7 +667,7 @@ export class AuthService {
     async resetPassword(token: string, newPassword: string) {
         const user = await this.prisma.user.findFirst({
             where: {
-                resetPasswordToken: token,
+                resetPasswordToken: hashSecret(String(token || '')),
                 resetPasswordExpires: { gt: new Date() }, // Token must not be expired
             },
         });
@@ -621,7 +693,16 @@ export class AuthService {
             },
         });
 
+        // The reset link proved inbox ownership; sign out other sessions.
+        await this.prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } }).catch(() => undefined);
+        await this.revokeAllRefreshTokens(user.id);
         return { success: true, message: 'Password reset successfully. You can now log in.' };
+    }
+
+    /** Lets the reset page tell the user up front that a link is invalid or expired. */
+    async checkResetToken(token: string) {
+        const ok = token ? await this.prisma.user.findFirst({ where: { resetPasswordToken: hashSecret(String(token)), resetPasswordExpires: { gt: new Date() } }, select: { id: true } }) : null;
+        return { valid: !!ok };
     }
 
     async getUserProfile(userId: string) {
@@ -639,7 +720,8 @@ export class AuthService {
                 phone: true,
                 country: true,
                 emailVerified: true,
-            },
+                pendingEmail: true,
+            } as any,
         });
         if (!user) throw new UnauthorizedException('User not found');
         return user;

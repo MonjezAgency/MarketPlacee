@@ -1,646 +1,266 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import {
-    Mail, Lock, User, Phone, ShieldCheck,
-    ArrowRight, CheckCircle2, Building2,
-    Eye, EyeOff, Globe, Link as LinkIcon,
-    Tag, CreditCard, RefreshCw
-} from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Check, Eye, EyeOff, Loader2, ArrowLeft, ArrowRight, Pencil, ShoppingCart, Warehouse, MailCheck } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { apiFetch } from '@/lib/api';
-import { signIn } from 'next-auth/react';
-import { Suspense } from 'react';
-import { cn } from '@/lib/utils';
 import { COUNTRIES } from '@/lib/countries';
+import { cn } from '@/lib/utils';
+import { AuthShell, authInput, authLabel, authPrimary, authSecondary, FieldError, FormAlert, PasswordChecklist, passwordOk } from '@/components/auth/AuthShell';
 
-const EU_COUNTRIES = [
-    'Austria', 'Belgium', 'Bulgaria', 'Croatia', 'Cyprus', 'Czechia', 'Czech Republic',
-    'Denmark', 'Estonia', 'Finland', 'France', 'Germany', 'Greece', 'Hungary',
-    'Ireland', 'Italy', 'Latvia', 'Lithuania', 'Luxembourg', 'Malta', 'Netherlands',
-    'Poland', 'Portugal', 'Romania', 'Slovakia', 'Slovenia', 'Spain', 'Sweden'
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const STEPS = ['Account', 'Business', 'Review'] as const;
+
+/** Self-declared wholesale profile — informs the team's review, verifies nothing. */
+const BUSINESS_TYPES = [
+    'Wholesaler / distributor',
+    'Importer / exporter',
+    'Retail chain or supermarket group',
+    'Cash & carry',
+    'Food service / HoReCa supply',
+    'Brand owner / manufacturer',
+    'Trading company',
+    'Other',
 ];
 
-function RegisterForm() {
-    const searchParams = useSearchParams();
-    const inviteEmail = searchParams.get('email') || '';
-    const inviteToken = searchParams.get('invite') || '';
-    const rawInviteRole = searchParams.get('role') || '';
-    const isFixedRole = searchParams.get('fixed') === 'true';
-    // Public signup now exposes both Supplier + Buyer choices — supplier
-    // accounts still go through KYC + admin approval before they go live,
-    // so allowing self-selection is safe.
-    const inviteRole = rawInviteRole;
-    const [form, setForm] = useState({
-        name: '', email: inviteEmail, phone: '', phoneCode: '+20', companyName: '', website: '', socialLinks: '', password: '', confirmPassword: '', role: inviteRole || 'customer',
-        vatNumber: '', taxId: '', country: 'Egypt', bankAddress: '', iban: '', swiftCode: ''
-    });
-    const [viesStatus, setViesStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
-    const [viesInfo, setViesInfo] = useState<{ name?: string, address?: string }>({});
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [showPass, setShowPass] = useState(false);
-    const [isSuccess, setIsSuccess] = useState(false);
+type Form = {
+    name: string; email: string; password: string; confirm: string;
+    role: 'customer' | 'supplier' | ''; companyName: string; website: string;
+    phoneCode: string; phone: string; country: string; city: string; businessType: string;
+};
+type Errors = Partial<Record<keyof Form, string>>;
 
-    // CAPTCHA state
-    const generateCaptcha = useCallback(() => ({
-        a: Math.floor(Math.random() * 12) + 1,
-        b: Math.floor(Math.random() * 12) + 1,
-    }), []);
-    const [captcha, setCaptcha] = useState(() => ({ a: 7, b: 3 }));
-    const [captchaAnswer, setCaptchaAnswer] = useState('');
-    const [captchaError, setCaptchaError] = useState(false);
-    useEffect(() => { setCaptcha(generateCaptcha()); }, [generateCaptcha]);
+function validate(step: number, f: Form): Errors {
+    const e: Errors = {};
+    if (step === 0) {
+        if (!f.name.trim()) e.name = 'Enter your full name.';
+        if (!EMAIL_RE.test(f.email.trim())) e.email = 'Enter a valid work email.';
+        if (!passwordOk(f.password)) e.password = 'Your password doesn’t meet all the requirements yet.';
+        if (!f.confirm) e.confirm = 'Confirm your password.';
+        else if (f.confirm !== f.password) e.confirm = 'Passwords don’t match.';
+    }
+    if (step === 1) {
+        if (!f.role) e.role = 'Choose how you’ll use Atlantis.';
+        if (!f.companyName.trim()) e.companyName = 'Enter your company name.';
+        const digits = f.phone.replace(/[\s()-]/g, '');
+        if (!/^\d{6,14}$/.test(digits)) e.phone = 'Enter the phone number without the country code (6–14 digits).';
+        if (!f.country) e.country = 'Choose your country.';
+        if (!f.businessType) e.businessType = 'Choose the option closest to your business.';
+        if (f.website.trim() && !/^(https?:\/\/)?[\w-]+(\.[\w-]+)+([/?#].*)?$/i.test(f.website.trim())) e.website = 'Enter a website like company.com, or leave it empty.';
+    }
+    return e;
+}
 
+function RegisterWizard() {
     const router = useRouter();
+    const sp = useSearchParams();
     const { register } = useAuth();
-    const { locale } = useLanguage();
+    const { locale } = useLanguage() as any;
+    const inviteRole = (sp.get('role') || '').toLowerCase();
+    const [step, setStep] = React.useState(0);
+    const [done, setDone] = React.useState<number[]>([]);
+    const [showPw, setShowPw] = React.useState(false);
+    const [errors, setErrors] = React.useState<Errors>({});
+    const [submitting, setSubmitting] = React.useState(false);
+    const [serverError, setServerError] = React.useState('');
+    const [f, setF] = React.useState<Form>({
+        name: '', email: sp.get('email') || '', password: '', confirm: '',
+        role: inviteRole === 'supplier' ? 'supplier' : inviteRole === 'customer' || inviteRole === 'buyer' ? 'customer' : '',
+        companyName: '', website: '', phoneCode: '+40', phone: '', country: '', city: '', businessType: '',
+    });
+    const set = <K extends keyof Form>(k: K, v: Form[K]) => { setF((p) => ({ ...p, [k]: v })); if (errors[k]) setErrors((e) => ({ ...e, [k]: undefined })); };
+    const heading = React.useRef<HTMLHeadingElement>(null);
+    React.useEffect(() => { heading.current?.focus(); }, [step]);
 
-    const update = (field: string, value: string) => setForm(f => ({ ...f, [field]: value }));
+    const next = () => {
+        const e = validate(step, f);
+        setErrors(e);
+        if (Object.keys(e).length) { document.getElementById(`f-${Object.keys(e)[0]}`)?.focus(); return; }
+        setDone((d) => Array.from(new Set([...d, step])));
+        setStep((s) => Math.min(2, s + 1));
+    };
+    const goTo = (i: number) => { if (i < step || done.includes(i - 1) || i === 0) setStep(i); };
 
-    const handleVatCheck = async (vat: string) => {
-        if (vat.length < 3) return;
-        setViesStatus('loading');
-        try {
-            // Simple split of country code and number (e.g. DE123456789)
-            const countryCode = vat.substring(0, 2).toUpperCase();
-            const vatNumber = vat.substring(2);
-
-            const response = await apiFetch(`/auth/validate-vat?countryCode=${countryCode}&vatNumber=${vatNumber}`);
-            const data = await response.json();
-
-            if (data.valid) {
-                setViesStatus('valid');
-                setViesInfo({ name: data.name, address: data.address });
-            } else {
-                setViesStatus('invalid');
-            }
-        } catch (err) {
-            // If API is unreachable, accept the VAT and mark for manual review
-            setViesStatus('valid');
-            setViesInfo({ name: '(Will be verified manually by admin)' });
-        }
+    const submit = async () => {
+        if (submitting) return; // no double submit
+        for (const s of [0, 1]) { const e = validate(s, f); if (Object.keys(e).length) { setErrors(e); setStep(s); return; } }
+        setSubmitting(true); setServerError('');
+        const res: any = await register({
+            name: f.name.trim(), email: f.email.trim(), password: f.password, role: f.role,
+            companyName: f.companyName.trim(), website: f.website.trim() || undefined,
+            phone: `${f.phoneCode}${f.phone.replace(/[\s()-]/g, '')}`, country: f.country,
+            ...( { businessCity: f.city.trim() || undefined, businessType: f.businessType } as any),
+            inviteToken: sp.get('invite') || undefined, locale,
+        } as any);
+        if (typeof res === 'string' || !res) { setServerError(typeof res === 'string' ? res : 'We couldn’t reach Atlantis. Check your connection and try again.'); setSubmitting(false); return; }
+        // Only now — after the server has issued a code — move to the code screen.
+        try { sessionStorage.setItem('atl_verify_email', res.email || f.email.trim().toLowerCase()); } catch { /* ignore */ }
+        router.push(`/auth/verify-email?email=${encodeURIComponent(res.email || f.email.trim().toLowerCase())}&sent=1`);
     };
 
-    const hasUppercase = /[A-Z]/.test(form.password);
-    const hasLowercase = /[a-z]/.test(form.password);
-    const hasNumber = /[0-9]/.test(form.password);
-    const hasSpecialChar = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password);
-    const hasMinLength = form.password.length >= 8;
-    const isStrong = hasUppercase && hasLowercase && hasNumber && hasSpecialChar && hasMinLength;
-
-    const handleRegister = (e: React.FormEvent) => {
-        e.preventDefault();
-        setError('');
-
-        // Strict Validation for Mandatory Fields
-        if (!form.name || !form.email || !form.password || !form.phone || !form.companyName || !form.country) {
-            setError('Please fill in all required business fields (Name, Email, Phone, Company, Country).');
-            return;
-        }
-
-        if (form.password !== form.confirmPassword) {
-            setError('Passwords do not match. Please verify your security sequence.');
-            return;
-        }
-
-        const isTaxRequired = form.country !== 'OTHER' && !['USA'].includes(form.country);
-        if (isTaxRequired && form.taxId !== 'NOT_APPLICABLE' && !form.taxId) {
-            setError(`Please provide a Tax ID for ${form.country}.`);
-            return;
-        }
-
-        if (!isStrong) { setError('Please meet all password requirements before submitting.'); return; }
-
-        // CAPTCHA validation
-        if (parseInt(captchaAnswer.trim()) !== captcha.a + captcha.b) {
-            setCaptchaError(true);
-            setCaptcha(generateCaptcha());
-            setCaptchaAnswer('');
-            setError('Incorrect verification answer. Please try the new challenge.');
-            return;
-        }
-
-        setLoading(true);
-        const submitRegister = async () => {
-            const success = await register({
-                name: form.name,
-                email: form.email,
-                phone: form.phone,
-                companyName: form.companyName,
-                website: form.website,
-                socialLinks: form.socialLinks,
-                password: form.password,
-                role: form.role,
-                inviteToken: inviteToken || undefined,
-                // Optional fields — send `undefined` (not "") when the
-                // user left them blank. Prisma has a `@unique` constraint
-                // on vatNumber / taxId / iban / swiftCode and treats two
-                // separate empty strings as a duplicate, so sending ""
-                // for a blank VAT triggered "Unique constraint failed
-                // on the fields: (vatNumber)" the second time anyone
-                // registered without a VAT.
-                vatNumber: form.vatNumber?.trim() || undefined,
-                taxId: form.taxId?.trim() || undefined,
-                country: form.country,
-                bankAddress: form.role === 'supplier' ? (form.bankAddress?.trim() || undefined) : undefined,
-                iban: form.iban?.trim() || undefined,
-                swiftCode: form.swiftCode?.trim() || undefined,
-                locale,
-            });
-
-            // BUG FIX (operator-reported "I registered but nothing
-            // landed in the DB"): the auth lib's register() returns
-            // EITHER a result object on success OR an error STRING on
-            // failure. The previous `if (!success)` check was wrong —
-            // a non-empty error string is truthy, so the block was
-            // SKIPPED and the user saw the success screen even when
-            // the backend rejected the request silently.
-            //
-            // Distinguish them explicitly: a string return value is
-            // ALWAYS an error, an object is ALWAYS success.
-            if (typeof success === 'string') {
-                setError(success || 'Registration failed.');
-                setLoading(false);
-                return;
-            }
-            if (!success) {
-                setError('Unable to reach the registration server.');
-                setLoading(false);
-                return;
-            }
-            const result = success as any;
-            setIsSuccess(true);
-            setLoading(false);
-
-            // If user needs admin approval, don't redirect, let them see the success screen
-            if (result && result.pendingApproval) {
-                return;
-            }
-
-            // For auto-approved users, redirect after a short delay
-            setTimeout(() => {
-                const dashboardPath = form.role === 'supplier' ? '/supplier' : '/';
-                router.push(dashboardPath);
-            }, 2000);
-        };
-        submitRegister();
-    };
-
-    const isEUCountry = EU_COUNTRIES.some(
-        eu => form.country.toLowerCase().includes(eu.toLowerCase())
-    );
-
-    const inputClass = "w-full bg-surface-2 border-2 border-slate-50 rounded-[20px] px-6 py-4 text-heading text-sm font-bold outline-none focus:bg-white focus:border-[#1BC7C9]/30 focus:shadow-[0_0_0_8px_rgba(255,138,0,0.05)] transition-all placeholder:text-slate-300";
-    const labelClass = "text-[10px] font-bold uppercase tracking-[0.2em] text-heading/40 ms-2";
-
+    const countryName = f.country;
     return (
-        <div className="force-light min-h-screen bg-surface flex overflow-hidden font-sans" style={{ colorScheme: 'light' }}>
-            {/* Left Side: Onboarding Content */}
-            <motion.div
-                initial={{ x: -100, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                transition={{ duration: 0.8, ease: "easeOut" }}
-                className="hidden lg:flex lg:w-[40%] relative bg-[#0A1A2F] items-center justify-center p-16 overflow-hidden"
-            >
-                <div className="absolute top-0 start-0 w-full h-full bg-gradient-to-br from-[#1BC7C9]/10 via-transparent to-blue-500/5" />
+        <AuthShell wide>
+            <div className="rounded-2xl bg-surface ring-1 ring-line shadow-[0_12px_32px_rgba(15,23,42,0.06)] p-5 sm:p-8">
+                <h1 className="text-[22px] font-semibold text-heading">Create your business account</h1>
+                <p className="mt-1 text-[14px] text-ink-3">For wholesalers, distributors and high-volume buyers. Already registered? <Link href="/auth/login" className="font-semibold text-teal hover:underline">Sign in</Link></p>
 
-                <div className="relative z-10 space-y-12">
-                    <Link href="/" className="inline-block mb-12">
-                        <span className="font-heading font-bold text-4xl tracking-tighter text-white">
-                            Atlan<span className="text-[#1BC7C9]">tis</span>
-                        </span>
-                    </Link>
+                {/* Progress: 1 → 2 → 3 */}
+                <ol className="mt-6 flex items-center" aria-label="Registration progress">
+                    {STEPS.map((label, i) => {
+                        const isDone = done.includes(i) && i < step || (i < step);
+                        const current = i === step;
+                        return (
+                            <li key={label} className={cn('flex items-center', i < STEPS.length - 1 && 'flex-1')}>
+                                <button type="button" onClick={() => goTo(i)} disabled={!(i < step)} aria-current={current ? 'step' : undefined}
+                                    className="flex items-center gap-2 group disabled:cursor-default">
+                                    <span className={cn('w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-semibold transition-colors',
+                                        isDone ? 'bg-[#0E7C74] text-white' : current ? 'bg-heading text-surface' : 'ring-1 ring-line-strong text-ink-3')}>
+                                        {isDone ? <Check size={15} strokeWidth={2.5} /> : i + 1}
+                                    </span>
+                                    <span className={cn('text-[13px] font-medium hidden sm:inline', current ? 'text-heading' : isDone ? 'text-teal group-hover:underline' : 'text-ink-3')}>{label}</span>
+                                    <span className="sr-only">{isDone ? ' (completed)' : current ? ' (current step)' : ''}</span>
+                                </button>
+                                {i < STEPS.length - 1 && <span aria-hidden className="flex-1 mx-3 h-[2px] rounded-full bg-line overflow-hidden"><span className={cn('block h-full bg-[#0E7C74] transition-[width] duration-300', i < step ? 'w-full' : 'w-0')} /></span>}
+                            </li>
+                        );
+                    })}
+                </ol>
 
-                    <div className="space-y-6">
-                        <h2 className="text-4xl font-bold text-white leading-tight">Scale Your <span className="text-[#1BC7C9]">Distribution</span> Globally.</h2>
-                        <p className="text-[#B0B0C8] text-lg font-medium leading-relaxed">Join 500+ verified enterprise partners sourcing premium inventory through our secure B2B framework.</p>
-                    </div>
+                <form className="mt-6" noValidate onSubmit={(e) => { e.preventDefault(); step < 2 ? next() : submit(); }}>
+                    <h2 ref={heading} tabIndex={-1} className="text-[16px] font-semibold text-heading outline-none">
+                        {step === 0 ? 'Account basics' : step === 1 ? 'Business profile' : 'Review and create'}
+                    </h2>
 
-                    <div className="space-y-8 pt-12 border-t border-white/10">
-                        {[
-                            { title: 'Verified Profiles', desc: 'Secure KYC validation for every partner.' },
-                            { title: 'Smart Logistics', desc: 'Automated bulk shipping and warehousing.' },
-                            { title: 'Net-Terms Credit', desc: 'Flexible financing for scale-up orders.' }
-                        ].map((item, i) => (
-                            <div key={i} className="flex gap-4">
-                                <div className="w-1.5 h-1.5 rounded-full bg-[#1BC7C9] mt-2.5 shrink-0 shadow-[0_0_10px_#1BC7C9]" />
+                    <div key={step} className="mt-4 space-y-4 motion-safe:animate-[atl-toast-in_200ms_ease-out]">
+                        {step === 0 && (<>
+                            <div>
+                                <label htmlFor="f-name" className={authLabel}>Full name</label>
+                                <input id="f-name" value={f.name} onChange={(e) => set('name', e.target.value)} autoComplete="name" className={authInput} aria-invalid={!!errors.name} aria-describedby="e-name" />
+                                <FieldError id="e-name">{errors.name}</FieldError>
+                            </div>
+                            <div>
+                                <label htmlFor="f-email" className={authLabel}>Work email</label>
+                                <input id="f-email" type="email" inputMode="email" value={f.email} onChange={(e) => set('email', e.target.value)} autoComplete="email" placeholder="name@company.com" className={authInput} aria-invalid={!!errors.email} aria-describedby="e-email" />
+                                <FieldError id="e-email">{errors.email}</FieldError>
+                            </div>
+                            <div className="grid sm:grid-cols-2 gap-4">
                                 <div>
-                                    <h4 className="text-white font-bold text-xs uppercase tracking-widest mb-1">{item.title}</h4>
-                                    <p className="text-[#6B6B8D] text-sm">{item.desc}</p>
+                                    <label htmlFor="f-password" className={authLabel}>Password</label>
+                                    <div className="relative">
+                                        <input id="f-password" type={showPw ? 'text' : 'password'} value={f.password} onChange={(e) => set('password', e.target.value)} autoComplete="new-password" className={cn(authInput, 'pe-11')} aria-invalid={!!errors.password} aria-describedby="e-password pw-rules" />
+                                        <button type="button" onClick={() => setShowPw((s) => !s)} aria-label={showPw ? 'Hide password' : 'Show password'} className="absolute inset-y-0 end-0 w-11 flex items-center justify-center text-ink-3 hover:text-ink">{showPw ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label htmlFor="f-confirm" className={authLabel}>Confirm password</label>
+                                    <input id="f-confirm" type={showPw ? 'text' : 'password'} value={f.confirm} onChange={(e) => set('confirm', e.target.value)} autoComplete="new-password" className={authInput} aria-invalid={!!errors.confirm} aria-describedby="e-confirm" />
+                                    <FieldError id="e-confirm">{errors.confirm}</FieldError>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </div>
-            </motion.div>
+                            <div id="pw-rules"><PasswordChecklist value={f.password} /></div>
+                            <FieldError id="e-password">{errors.password}</FieldError>
+                        </>)}
 
-            {/* Right Side: Form Panel */}
-            <div className="w-full lg:w-[60%] flex items-center justify-center p-4 sm:p-8 md:p-12 lg:p-20 bg-[#F8FAFC] overflow-y-auto hide-scrollbar">
-                <motion.div
-                    initial={{ opacity: 0, y: 40 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6 }}
-                    className="w-full max-w-2xl bg-surface p-6 sm:p-0 sm:bg-transparent rounded-2xl sm:rounded-none shadow-sm sm:shadow-none"
-                >
-                    {isSuccess ? (
-                        <div className="flex flex-col items-center text-center py-20 space-y-8">
-                            <div className="w-24 h-24 rounded-2xl bg-emerald-500 flex items-center justify-center shadow-2xl shadow-emerald-500/20">
-                                <CheckCircle2 size={48} className="text-white" />
-                            </div>
-                            <div className="space-y-3">
-                                <h1 className="text-4xl font-bold text-heading tracking-tight">Onboarding Initiated.</h1>
-                                <p className="text-[#64748B] text-lg font-medium">Your enterprise profile is now under priority review.</p>
-                            </div>
-                            <div className="p-10 bg-surface border border-line rounded-[40px] w-full text-start space-y-6 shadow-xl shadow-slate-200/50">
-                                <div className="flex items-start gap-6">
-                                    <div className="w-12 h-12 rounded-2xl bg-[#0A1A2F]/5 flex items-center justify-center shrink-0">
-                                        <ShieldCheck size={24} className="text-heading" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-heading">Identity Validation</h4>
-                                        <p className="text-sm text-[#64748B] font-medium mt-2 leading-relaxed">Our compliance team is verifying your business credentials and tax documentation.</p>
-                                    </div>
-                                </div>
-                                <div className="flex items-start gap-6">
-                                    <div className="w-12 h-12 rounded-2xl bg-[#1BC7C9]/10 flex items-center justify-center shrink-0">
-                                        <Mail size={24} className="text-[#1BC7C9]" />
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-xs uppercase tracking-[0.2em] text-[#1BC7C9]">Approval Protocol</h4>
-                                        <p className="text-sm text-[#64748B] font-medium mt-2 leading-relaxed">You will receive an activation encrypted link once the review phase is completed.</p>
-                                    </div>
-                                </div>
-                            </div>
-                            <Link href="/" className="h-16 px-12 bg-[#0A1A2F] text-white text-xs font-bold uppercase tracking-[0.3em] rounded-2xl hover:bg-[#162a44] transition-all flex items-center shadow-xl">
-                                Return to Atlantis
-                            </Link>
-                        </div>
-                    ) : (
-                        <>
-                            <div className="mb-8 md:mb-12">
-                                <div className="flex items-center justify-center md:justify-start gap-4 mb-4">
-                                    <div className="h-1 w-12 bg-[#1BC7C9] rounded-full" />
-                                    <span className="text-[10px] md:text-[11px] font-bold uppercase tracking-[0.3em] text-[#1BC7C9]">Onboarding Flow</span>
-                                </div>
-                                <h1 className="text-3xl md:text-4xl font-bold text-heading tracking-tight text-center md:text-start">Register Business.</h1>
-                                <p className="text-[#64748B] text-sm md:text-base font-medium mt-2 text-center md:text-start">Professional onboarding for verified B2B partners.</p>
-                            </div>
-
-                            {error && (
-                                <motion.div
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    className="bg-red-50 border border-red-100 rounded-2xl p-6 mb-10 text-red-700 text-sm font-bold"
-                                >
-                                    {error}
-                                </motion.div>
-                            )}
-
-
-
-                            <form onSubmit={handleRegister} className="space-y-10">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-3">
-                                        <label className={labelClass}>Full Name <span className="text-[#1BC7C9]">*</span></label>
-                                        <input className={inputClass} placeholder="Authorized Signatory" value={form.name} onChange={e => update('name', e.target.value)} />
-                                    </div>
-                                    <div className="space-y-3">
-                                        <label className={labelClass}>Work Email <span className="text-[#1BC7C9]">*</span></label>
-                                        <input className={inputClass} placeholder="business@company.com" value={form.email} disabled={!!inviteEmail} onChange={e => update('email', e.target.value)} />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-3">
-                                        <label className={labelClass}>Business Phone <span className="text-[#1BC7C9]">*</span></label>
-                                        <div className="flex gap-2">
-                                            <select 
-                                                className={cn(inputClass, "w-[120px] px-3 text-center")}
-                                                value={form.phoneCode}
-                                                onChange={e => update('phoneCode', e.target.value)}
-                                            >
-                                                {COUNTRIES.map(c => (
-                                                    <option key={c.iso} value={c.dialCode}>
-                                                        {c.flag} {c.dialCode}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <input 
-                                                className={inputClass} 
-                                                placeholder="100..." 
-                                                value={form.phone} 
-                                                onChange={e => update('phone', e.target.value)} 
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-3">
-                                        <label className={labelClass}>Legal Entity <span className="text-[#1BC7C9]">*</span></label>
-                                        <input className={inputClass} placeholder="Company Name" value={form.companyName} onChange={e => update('companyName', e.target.value)} />
-                                    </div>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-3">
-                                        <label className={labelClass}>Corporate URL</label>
-                                        <input className={inputClass} placeholder="https://..." value={form.website} onChange={e => update('website', e.target.value)} />
-                                    </div>
-                                    <div className="space-y-3">
-                                        <label className={labelClass}>Linked Services</label>
-                                        <input className={inputClass} placeholder="LinkedIn / Portfolio" value={form.socialLinks} onChange={e => update('socialLinks', e.target.value)} />
-                                    </div>
-                                </div>
-
-                                {/* Business Identity & Tax */}
-                                <div className="space-y-6 pt-6 border-t border-line">
-                                    <div className="flex items-center justify-between">
-                                        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-heading">Business Identity & Tax</h3>
-                                        <div className="flex items-center gap-2 bg-surface-2 px-3 py-1.5 rounded-full border border-line">
-                                            <input
-                                                type="checkbox"
-                                                id="noTaxId"
-                                                checked={form.taxId === 'NOT_APPLICABLE'}
-                                                onChange={e => {
-                                                    const isChecked = e.target.checked;
-                                                    update('taxId', isChecked ? 'NOT_APPLICABLE' : '');
-                                                    if (isChecked) {
-                                                        update('vatNumber', '');
-                                                        update('bankAddress', '');
-                                                        update('iban', '');
-                                                        update('swiftCode', '');
-                                                    }
-                                                }}
-                                                className="w-4 h-4 rounded border-slate-300 text-[#1BC7C9] focus:ring-[#1BC7C9]"
-                                            />
-                                            <label htmlFor="noTaxId" className="text-[9px] font-bold uppercase tracking-widest text-ink-4 cursor-pointer select-none">
-                                                No Tax ID / VAT
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <div className="space-y-3">
-                                            <label className={labelClass}>Operating Country <span className="text-[#1BC7C9]">*</span></label>
-                                            <select 
-                                                className={inputClass} 
-                                                value={form.country} 
-                                                onChange={e => update('country', e.target.value)}
-                                            >
-                                                <option value="">Select Country</option>
-                                                {COUNTRIES.map(c => (
-                                                    <option key={c.iso} value={c.name}>
-                                                        {c.flag} {c.name}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                        {form.taxId !== 'NOT_APPLICABLE' && (
-                                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                                                <label className={labelClass}>Tax ID Number <span className="text-[#1BC7C9]">*</span></label>
-                                                <input className={inputClass} placeholder="National Tax ID" value={form.taxId} onChange={e => update('taxId', e.target.value)} />
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {form.taxId !== 'NOT_APPLICABLE' && isEUCountry && (
-                                        <div className="space-y-3 relative animate-in fade-in slide-in-from-top-2">
-                                            <label className={labelClass}>VIES Valid Number (VAT)</label>
-                                            <div className="relative">
-                                                <input
-                                                    className={cn(inputClass,
-                                                        viesStatus === 'valid' && "border-emerald-500/30 bg-emerald-50/30",
-                                                        viesStatus === 'invalid' && "border-red-500/30 bg-red-50/30"
-                                                    )}
-                                                    placeholder="e.g. DE123456789"
-                                                    value={form.vatNumber}
-                                                    onChange={e => {
-                                                        const val = e.target.value;
-                                                        update('vatNumber', val);
-                                                        if (val.length >= 3) handleVatCheck(val);
-                                                        else setViesStatus('idle');
-                                                    }}
-                                                />
-                                                <div className="absolute end-6 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                                    {viesStatus === 'loading' && <div className="w-4 h-4 border-2 border-[#0A1A2F]/20 border-t-[#0A1A2F] rounded-full animate-spin" />}
-                                                    {viesStatus === 'valid' && <CheckCircle2 size={20} className="text-emerald-500" />}
-                                                    {viesStatus === 'invalid' && <span className="text-[10px] font-bold text-red-500 uppercase">Invalid</span>}
-                                                </div>
-                                            </div>
-                                            {viesStatus === 'valid' && viesInfo.name && (
-                                                <p className="text-[10px] font-bold text-emerald-600 ms-2 animate-in fade-in slide-in-from-top-1">
-                                                    Verified: {viesInfo.name}
-                                                </p>
-                                            )}
-                                            <p className="text-[9px] text-ink-4 font-medium ms-2">
-                                                Real-time validation via <Link href="https://ec.europa.eu/taxation_customs/vies/#/vat-validation" target="_blank" className="underline hover:text-heading">EU VIES</Link>
-                                            </p>
-                                        </div>
-                                    )}
-
-                                    {form.taxId === 'NOT_APPLICABLE' && (
-                                        <div className="p-6 bg-surface-2 border-2 border-dashed border-line rounded-2xl flex items-center gap-4 animate-in fade-in zoom-in-95">
-                                            <div className="w-12 h-12 rounded-2xl bg-surface border border-line flex items-center justify-center shrink-0 shadow-sm">
-                                                <Tag className="text-[#1BC7C9] w-6 h-6" />
-                                            </div>
-                                            <div>
-                                                <h4 className="text-[10px] font-bold uppercase tracking-widest text-heading">Personal Account Mode</h4>
-                                                <p className="text-xs text-ink-4 font-medium mt-1">Tax identification skipped. Suitable for individuals or non-VAT entities.</p>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Financial Details */}
-                                {form.taxId !== 'NOT_APPLICABLE' && (
-                                    <div className="space-y-6 pt-6 border-t border-line animate-in fade-in slide-in-from-bottom-4">
-                                        <h3 className="text-xs font-bold uppercase tracking-[0.2em] text-heading">Financial Details (Payouts)</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                            <div className="space-y-3">
-                                                <label className={labelClass}>IBAN</label>
-                                                <input className={inputClass} placeholder="International Bank Account Number" value={form.iban} onChange={e => update('iban', e.target.value)} />
-                                            </div>
-                                            <div className="space-y-3">
-                                                <label className={labelClass}>Swift / BIC Code</label>
-                                                <input className={inputClass} placeholder="Bank Identifier Code" value={form.swiftCode} onChange={e => update('swiftCode', e.target.value)} />
-                                            </div>
-                                        </div>
-                                        {form.role === 'supplier' && (
-                                            <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                                                <label className={labelClass}>Bank Full Address</label>
-                                                <textarea
-                                                    className={cn(inputClass, "min-h-[100px] resize-none py-4")}
-                                                    placeholder="Complete street address of your bank branch"
-                                                    value={form.bankAddress}
-                                                    onChange={e => update('bankAddress', e.target.value)}
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                )}
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div className="space-y-4">
-                                        <label className={labelClass}>Account Security</label>
-                                        <div className="relative group">
-                                            <input
-                                                type={showPass ? 'text' : 'password'}
-                                                className={inputClass + ' pe-16'}
-                                                placeholder="New Password"
-                                                value={form.password}
-                                                onChange={e => update('password', e.target.value)}
-                                            />
-                                            <button type="button" onClick={() => setShowPass(!showPass)} className="absolute end-6 top-1/2 -translate-y-1/2 text-slate-300 hover:text-heading transition-colors">
-                                                {showPass ? <EyeOff size={20} /> : <Eye size={20} />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-4">
-                                        <label className={labelClass}>Confirm Sequence</label>
-                                        <div className="relative group">
-                                            <input
-                                                type={showPass ? 'text' : 'password'}
-                                                className={cn(inputClass, form.confirmPassword && form.password !== form.confirmPassword && "border-red-200 bg-red-50/20")}
-                                                placeholder="Repeat Password"
-                                                value={form.confirmPassword}
-                                                onChange={e => update('confirmPassword', e.target.value)}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                    {[
-                                        { label: 'Min 8 characters', met: form.password.length >= 8 },
-                                        { label: 'Uppercase', met: /[A-Z]/.test(form.password) },
-                                        { label: 'Lowercase', met: /[a-z]/.test(form.password) },
-                                        { label: 'Number', met: /[0-9]/.test(form.password) },
-                                        { label: 'Special Character', met: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(form.password) },
-                                        { label: 'Passwords Match', met: form.password && form.confirmPassword && form.password === form.confirmPassword }
-                                    ].map((req, idx) => (
-                                        <span key={idx} className={`text-[9px] font-bold uppercase tracking-wider px-4 py-2 rounded-full border transition-all ${req.met ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-surface-2 text-ink-4 border-line'}`}>
-                                            {req.met && <CheckCircle2 size={10} className="inline me-1.5 -mt-0.5" />}
-                                            {req.label}
-                                        </span>
+                        {step === 1 && (<>
+                            <fieldset>
+                                <legend className={authLabel}>Account type</legend>
+                                <div id="f-role" tabIndex={-1} role="radiogroup" aria-describedby="e-role" className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 outline-none">
+                                    {([['customer', 'Buyer', 'Purchase by case, pallet or truckload', ShoppingCart], ['supplier', 'Supplier', 'List products and supply Atlantis', Warehouse]] as const).map(([v, t, d, Icon]) => (
+                                        <label key={v} className={cn('flex items-start gap-3 rounded-xl px-3.5 py-3 ring-1 cursor-pointer transition-colors', f.role === v ? 'ring-2 ring-[#2EC4B6] bg-teal-soft/60' : 'ring-line hover:ring-line-strong')}>
+                                            <input type="radio" name="role" value={v} checked={f.role === v} onChange={() => set('role', v)} aria-label={`${t} — ${d}`} className="sr-only" />
+                                            <span className={cn('w-9 h-9 shrink-0 rounded-lg flex items-center justify-center', f.role === v ? 'bg-[#0E7C74] text-white' : 'bg-surface-2 text-ink-2')}><Icon size={17} /></span>
+                                            <span><span className="block text-[14.5px] font-semibold text-ink">{t}</span><span className="block text-[12.5px] text-ink-3">{d}</span></span>
+                                        </label>
                                     ))}
                                 </div>
-
-                                {/* Public registration — pick Buyer or Supplier.
-                                    Supplier accounts always go through admin
-                                    KYC + approval before going live. */}
-                                {!inviteToken && !isFixedRole && (
-                                    <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
-                                        <label className={labelClass}>Account Type <span className="text-[#1BC7C9]">*</span></label>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <button
-                                                type="button"
-                                                onClick={() => update('role', 'customer')}
-                                                className={`h-24 rounded-[24px] text-xs font-bold uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 px-4 ${form.role === 'customer' ? 'bg-[#0A1A2F] border-[#0A1A2F] text-white shadow-xl shadow-[#0A1A2F]/20' : 'bg-surface border-line text-ink-4 hover:border-line'}`}
-                                            >
-                                                <span className="text-2xl mb-0.5">📦</span>
-                                                <span>Business Buyer</span>
-                                                <span className="text-[9px] font-medium tracking-normal opacity-70 normal-case">Source from verified suppliers</span>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => update('role', 'supplier')}
-                                                className={`h-24 rounded-[24px] text-xs font-bold uppercase tracking-widest border-2 transition-all flex flex-col items-center justify-center gap-1 px-4 ${form.role === 'supplier' ? 'bg-[#1BC7C9] border-[#1BC7C9] text-white shadow-xl shadow-[#1BC7C9]/20' : 'bg-surface border-line text-ink-4 hover:border-line'}`}
-                                            >
-                                                <span className="text-2xl mb-0.5">🏭</span>
-                                                <span>Supplier / Brand</span>
-                                                <span className="text-[9px] font-medium tracking-normal opacity-70 normal-case">Sell inventory at scale</span>
-                                            </button>
-                                        </div>
-                                        {form.role === 'supplier' && (
-                                            <p className="text-[10px] font-bold text-[#1BC7C9] ms-2">
-                                                Supplier accounts require KYC + admin approval before going live.
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-
-                                {/* CAPTCHA Widget */}
-                                <div className={cn(
-                                    "p-5 rounded-[20px] border-2 transition-all",
-                                    captchaError
-                                        ? "border-red-200 bg-red-50/50"
-                                        : "border-line bg-surface-2"
-                                )}>
-                                    <div className="flex items-center justify-between mb-3">
-                                        <label className={labelClass}>Human Verification</label>
-                                        <button
-                                            type="button"
-                                            onClick={() => { setCaptcha(generateCaptcha()); setCaptchaAnswer(''); setCaptchaError(false); }}
-                                            className="text-slate-300 hover:text-[#1BC7C9] transition-colors"
-                                            title="Refresh challenge"
-                                        >
-                                            <RefreshCw size={14} />
-                                        </button>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex-1 h-12 bg-surface border-2 border-line rounded-[14px] flex items-center justify-center font-bold text-heading text-base tracking-widest select-none">
-                                            {captcha.a} + {captcha.b} = ?
-                                        </div>
-                                        <input
-                                            type="number"
-                                            inputMode="numeric"
-                                            placeholder="Answer"
-                                            value={captchaAnswer}
-                                            onChange={e => { setCaptchaAnswer(e.target.value); setCaptchaError(false); }}
-                                            className={cn(
-                                                "w-28 h-12 bg-surface border-2 rounded-[14px] px-4 text-center text-heading font-bold text-sm outline-none transition-all",
-                                                captchaError
-                                                    ? "border-red-300 focus:border-red-400"
-                                                    : "border-line focus:border-[#1BC7C9]/40"
-                                            )}
-                                        />
-                                    </div>
-                                    {captchaError && (
-                                        <p className="text-[10px] font-bold text-red-500 mt-2 ms-1">Incorrect answer. New challenge generated.</p>
-                                    )}
+                                <FieldError id="e-role">{errors.role}</FieldError>
+                            </fieldset>
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="f-companyName" className={authLabel}>Company name</label>
+                                    <input id="f-companyName" value={f.companyName} onChange={(e) => set('companyName', e.target.value)} autoComplete="organization" className={authInput} aria-invalid={!!errors.companyName} aria-describedby="e-companyName" />
+                                    <FieldError id="e-companyName">{errors.companyName}</FieldError>
                                 </div>
-
-                                <button
-                                    type="submit"
-                                    disabled={loading || !isStrong}
-                                    className="w-full h-14 md:h-20 bg-[#0A1A2F] hover:bg-[#162a44] text-white rounded-xl md:rounded-[24px] font-bold uppercase tracking-[0.4em] text-[10px] md:text-xs transition-all shadow-2xl shadow-[#0A1A2F]/20 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-4 mt-8 group/btn relative overflow-hidden"
-                                >
-                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-1000" />
-                                    {loading ? (
-                                        <div className="w-5 h-5 md:w-6 md:h-6 border-3 border-white/20 border-t-white rounded-full animate-spin" />
-                                    ) : (
-                                        <>
-                                            <span>Create Profile</span>
-                                            <ArrowRight size={20} className="transition-transform group-hover/btn:translate-x-1" />
-                                        </>
-                                    )}
-                                </button>
-                            </form>
-
-                            <div className="mt-16 pt-8 border-t border-line text-center">
-                                <p className="text-sm text-[#64748B] font-medium">
-                                    Registered Partner?{' '}
-                                    <Link href="/auth/login" className="text-[#1BC7C9] font-bold uppercase tracking-widest text-xs hover:underline ms-2">
-                                        Authenticate
-                                    </Link>
-                                </p>
+                                <div>
+                                    <label htmlFor="f-businessType" className={authLabel}>Business type</label>
+                                    <select id="f-businessType" value={f.businessType} onChange={(e) => set('businessType', e.target.value)} className={authInput} aria-invalid={!!errors.businessType} aria-describedby="e-businessType">
+                                        <option value="">Select…</option>
+                                        {BUSINESS_TYPES.map((b) => <option key={b} value={b}>{b}</option>)}
+                                    </select>
+                                    <FieldError id="e-businessType">{errors.businessType}</FieldError>
+                                </div>
                             </div>
-                        </>
-                    )}
-                </motion.div>
+                            <div>
+                                <label htmlFor="f-phone" className={authLabel}>Business phone</label>
+                                <div className="flex gap-2">
+                                    <select aria-label="Country code" value={f.phoneCode} onChange={(e) => set('phoneCode', e.target.value)} className={cn(authInput, 'w-[112px] shrink-0 px-2')}>
+                                        {COUNTRIES.map((c) => <option key={c.iso} value={c.dialCode}>{c.flag} {c.dialCode}</option>)}
+                                    </select>
+                                    <input id="f-phone" type="tel" inputMode="tel" value={f.phone} onChange={(e) => set('phone', e.target.value)} autoComplete="tel-national" placeholder="712 345 678" className={authInput} aria-invalid={!!errors.phone} aria-describedby="e-phone" />
+                                </div>
+                                <FieldError id="e-phone">{errors.phone}</FieldError>
+                            </div>
+                            <div className="grid sm:grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="f-country" className={authLabel}>Country</label>
+                                    <select id="f-country" value={f.country} onChange={(e) => { const c = COUNTRIES.find((x) => x.name === e.target.value); set('country', e.target.value); if (c && !f.phone) set('phoneCode', c.dialCode); }} autoComplete="country-name" className={authInput} aria-invalid={!!errors.country} aria-describedby="e-country">
+                                        <option value="">Select…</option>
+                                        {COUNTRIES.map((c) => <option key={c.iso} value={c.name}>{c.name}</option>)}
+                                    </select>
+                                    <FieldError id="e-country">{errors.country}</FieldError>
+                                </div>
+                                <div>
+                                    <label htmlFor="f-city" className={authLabel}>City / business location <span className="font-normal text-ink-4">(optional)</span></label>
+                                    <input id="f-city" value={f.city} onChange={(e) => set('city', e.target.value)} autoComplete="address-level2" className={authInput} />
+                                </div>
+                            </div>
+                            <div>
+                                <label htmlFor="f-website" className={authLabel}>Company website <span className="font-normal text-ink-4">(optional)</span></label>
+                                <input id="f-website" value={f.website} onChange={(e) => set('website', e.target.value)} autoComplete="url" placeholder="company.com" className={authInput} aria-invalid={!!errors.website} aria-describedby="e-website" />
+                                <FieldError id="e-website">{errors.website}</FieldError>
+                            </div>
+                        </>)}
+
+                        {step === 2 && (<>
+                            {[
+                                { s: 0, title: 'Account', rows: [['Name', f.name], ['Work email', f.email], ['Password', '••••••••']] },
+                                { s: 1, title: 'Business', rows: [['Account type', f.role === 'supplier' ? 'Supplier' : 'Buyer'], ['Company', f.companyName], ['Business type', f.businessType], ['Phone', `${f.phoneCode} ${f.phone}`], ['Location', [f.city, countryName].filter(Boolean).join(', ')], ['Website', f.website || '—']] },
+                            ].map((g) => (
+                                <section key={g.title} className="rounded-xl ring-1 ring-line">
+                                    <header className="flex items-center justify-between px-4 py-2.5 border-b border-line">
+                                        <h3 className="text-[13.5px] font-semibold text-ink">{g.title}</h3>
+                                        <button type="button" onClick={() => setStep(g.s)} className="inline-flex items-center gap-1 text-[13px] font-semibold text-teal hover:underline"><Pencil size={13} /> Edit</button>
+                                    </header>
+                                    <dl className="px-4 py-2 divide-y divide-line">
+                                        {g.rows.map(([k, v]) => <div key={k} className="flex justify-between gap-4 py-2 text-[13.5px]"><dt className="text-ink-3">{k}</dt><dd className="text-ink text-end break-all">{v}</dd></div>)}
+                                    </dl>
+                                </section>
+                            ))}
+                            <FormAlert tone="info">
+                                <span className="flex gap-2.5"><MailCheck size={17} className="text-teal shrink-0 mt-0.5" />
+                                    <span>We’ll email a 6-digit code to <strong className="text-ink">{f.email}</strong> to verify it. After that, our team reviews new business accounts before trading starts — formal business verification isn’t part of sign-up yet.</span></span>
+                            </FormAlert>
+                            <p className="text-[12.5px] text-ink-3">By creating an account you agree to the <Link href="/terms" className="text-teal hover:underline">Terms</Link> and <Link href="/privacy-policy" className="text-teal hover:underline">Privacy policy</Link>.</p>
+                        </>)}
+
+                        {serverError && <FormAlert>{serverError}</FormAlert>}
+                    </div>
+
+                    <div className="mt-6 flex items-center gap-3">
+                        {step > 0 && <button type="button" onClick={() => setStep((s) => s - 1)} disabled={submitting} className={authSecondary}><ArrowLeft size={16} /> Back</button>}
+                        <button type="submit" disabled={submitting} className={cn(authPrimary, 'flex-1')}>
+                            {submitting ? <><Loader2 size={16} className="animate-spin" /> Creating account…</> : step < 2 ? <>Continue <ArrowRight size={16} /></> : 'Create account'}
+                        </button>
+                    </div>
+                </form>
             </div>
-        </div>
+        </AuthShell>
     );
 }
 
 export default function RegisterPage() {
-    return (
-        <Suspense fallback={<div className="min-h-screen bg-[#F8FAFC] flex justify-center items-center text-heading font-bold uppercase tracking-[0.4em] text-xs">Synchronizing Atlantis Node...</div>}>
-            <RegisterForm />
-        </Suspense>
-    );
+    return <React.Suspense fallback={null}><RegisterWizard /></React.Suspense>;
 }
-
-

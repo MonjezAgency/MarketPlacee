@@ -2,6 +2,7 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import axios from 'axios';
 import { getInvitationEmailHtml } from './email-templates';
+import * as authTpl from './auth-email-templates';
 
 @Injectable()
 export class EmailService {
@@ -223,32 +224,33 @@ export class EmailService {
   }
 
   async sendPasswordResetEmail(email: string, name: string, token: string) {
-    const frontendUrl = this.getFrontendUrl();
-    const url = `${frontendUrl}/auth/reset-password?token=${token}`;
+    const url = `${this.getFrontendUrl()}/auth/reset-password?token=${encodeURIComponent(token)}`;
+    const t = authTpl.passwordResetEmail(name, url);
+    return this.sendMail(email, t.subject, t.html);
+  }
 
-    console.log(`[EMAIL] Preparing password reset for ${email} with token: ${token.substring(0, 8)}...`);
-
-    const html = `
-      <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
-        <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
-          <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
-          <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
-        </div>
-        <div style="padding: 40px 30px; background: #FFFFFF;">
-          <h2 style="color: #0A1A2F; font-size: 22px; margin: 0 0 16px;">Password Reset Request 🔐</h2>
-          <p style="color: #2E2E2E; font-size: 15px; line-height: 1.7; margin: 0 0 24px;">Hi ${name}, you requested to reset your password. Click the button below to proceed. This link expires in 1 hour.</p>
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${url}" style="display: inline-block; padding: 16px 40px; background: #1BC7C9; color: #FFFFFF; text-decoration: none; border-radius: 12px; font-weight: 800; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Reset Password →</a>
-          </div>
-          <p style="margin-top: 20px; font-size: 12px; color: #667085; text-align: center;">If you didn't request this, please ignore this email.</p>
-        </div>
-        <div style="background: #0A1A2F; padding: 20px; text-align: center;">
-          <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Atlantis Marketplace. All rights reserved.</p>
-        </div>
-      </div>
-    `;
-
-    return this.sendMail(email, 'Atlantis — Password Reset Request 🔐', html);
+  /** Transactional auth emails. Each returns the provider result so callers can report real delivery state. */
+  sendSignupCode(email: string, name: string, code: string, minutes: number) {
+    const link = `${this.getFrontendUrl()}/auth/verify-email?email=${encodeURIComponent(email)}`;
+    const t = authTpl.verifySignupEmail(name, code, link, minutes);
+    return this.sendMailDetailed(email, t.subject, t.html);
+  }
+  sendEmailVerified(email: string, name: string, role: 'CUSTOMER' | 'SUPPLIER') {
+    const t = authTpl.emailVerifiedEmail(name, role);
+    return this.sendMailDetailed(email, t.subject, t.html);
+  }
+  sendChangeEmailCode(newEmail: string, name: string, code: string, minutes: number) {
+    const t = authTpl.changeEmailCodeEmail(name, code, minutes);
+    return this.sendMailDetailed(newEmail, t.subject, t.html);
+  }
+  sendChangeEmailNotice(oldEmail: string, name: string, newEmail: string, done: boolean) {
+    const t = authTpl.changeEmailNoticeEmail(name, newEmail, done);
+    return this.sendMailDetailed(oldEmail, t.subject, t.html);
+  }
+  sendSignupExisting(email: string, name: string) {
+    const base = this.getFrontendUrl();
+    const t = authTpl.signupExistingAccountEmail(name, `${base}/auth/login`, `${base}/auth/forgot-password`);
+    return this.sendMailDetailed(email, t.subject, t.html);
   }
 
   async sendTeamInvitation(email: string, name: string, role: string, tempPassword?: string): Promise<boolean> {

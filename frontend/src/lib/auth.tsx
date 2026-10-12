@@ -13,6 +13,7 @@ export interface User {
     companyName?: string;
     company?: string;
     country?: string;
+    pendingEmail?: string | null;
     vatNumber?: string;
     website?: string;
     socialLinks?: string;
@@ -25,7 +26,7 @@ export interface User {
 interface AuthContextType {
     user: User | null;
     isLoggedIn: boolean;
-    login: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string; qrCodeUrl?: string }>;
+    login: (email: string, password: string) => Promise<{ success: boolean; user?: User; message?: string; code?: string; email?: string; requiresTwoFactor?: boolean; partialToken?: string; qrCodeUrl?: string }>;
     verify2FALogin: (partialToken: string, code: string) => Promise<{ success: boolean; user?: User; message?: string }>;
     register: (data: {
         name: string;
@@ -47,6 +48,8 @@ interface AuthContextType {
     }) => Promise<boolean | string>;
     updateUser: (data: Partial<User>) => void;
     logout: () => void;
+    /** Re-read the signed-in user from the server (authoritative). */
+    refreshUser: () => Promise<void>;
     isAuthReady: boolean;
 }
 
@@ -58,6 +61,7 @@ const AuthContext = createContext<AuthContextType>({
     register: async () => false,
     updateUser: () => { },
     logout: () => { },
+    refreshUser: async () => { },
     isAuthReady: false,
 });
 
@@ -118,6 +122,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => { isMounted = false; };
     }, []);
 
+    const refreshUser = async () => {
+        try {
+            const res = await apiFetch('/auth/me');
+            if (res.ok) setUser(await res.json());
+        } catch { /* keep current state */ }
+    };
+
     const register = async (data: {
         name: string;
         email: string;
@@ -168,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const login = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string; requiresTwoFactor?: boolean; partialToken?: string; qrCodeUrl?: string }> => {
+    const login = async (email: string, password: string): Promise<{ success: boolean; user?: User; message?: string; code?: string; email?: string; requiresTwoFactor?: boolean; partialToken?: string; qrCodeUrl?: string }> => {
         const attemptLogin = async () => {
             const res = await fetch('/api/auth/login', {
                 method: 'POST',
@@ -204,7 +215,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             if (!ok) {
-                return { success: false, message: data?.message || 'Invalid email or password.' };
+                return { success: false, message: data?.message || 'Invalid email or password.', code: data?.code, email: data?.email };
             }
 
             // 2FA challenge
@@ -292,7 +303,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <AuthContext.Provider value={{ user, isLoggedIn: !!user, login, verify2FALogin, register, updateUser, logout, isAuthReady }}>
+        <AuthContext.Provider value={{ user, isLoggedIn: !!user, login, verify2FALogin, register, updateUser, logout, isAuthReady, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );
