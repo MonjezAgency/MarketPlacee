@@ -68,7 +68,7 @@ function OrderCard({ o, onChanged }: { o: BuyerOrder; onChanged: () => void }) {
                 <span className="ms-auto text-[15px] font-semibold text-heading tabular-nums">{formatPrice(o.totalAmount)}</span>
             </header>
 
-            <div className="px-4 sm:px-5 py-4 grid gap-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] md:items-center">
+            <div className="px-4 sm:px-5 py-4 space-y-5">
                 <ul className="space-y-2">
                     {lines.slice(0, 3).map((l) => (
                         <li key={l.id} className="flex items-center gap-3">
@@ -88,7 +88,7 @@ function OrderCard({ o, onChanged }: { o: BuyerOrder; onChanged: () => void }) {
                 {o.status === 'CANCELLED' ? (
                     <p className="text-[13.5px] text-ink-3">This order was cancelled.</p>
                 ) : (
-                    <div>
+                    <div className="pt-4 border-t border-line">
                         <Stepper o={o} />
                         <p className="mt-2 text-[12.5px] text-ink-3 flex items-center gap-1.5">
                             {o.status === 'SHIPPED' && <Truck size={13} className="shrink-0" />}{st.note}

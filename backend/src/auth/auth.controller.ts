@@ -1,11 +1,12 @@
-import { Controller, Post, Body, Req, Res, UseGuards, Get, UnauthorizedException, ForbiddenException, Request, Delete, Param } from '@nestjs/common';
+import { Controller, Post, Body, Req, Res, UseGuards, Get, UnauthorizedException, ForbiddenException, Request, Delete, Param, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
+import { TwoFaService } from './twofa.service';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-    constructor(private authService: AuthService) { }
+    constructor(private authService: AuthService, private twoFaService: TwoFaService) { }
 
     private getCookieOptions(maxAgeMs: number) {
         return {
@@ -185,6 +186,50 @@ export class AuthController {
         const cookieToken = req?.cookies?.token;
         if (!cookieToken) throw new UnauthorizedException('No token cookie');
         return { token: cookieToken };
+    }
+
+    // ── Two-step verification (routes were missing: every call 404'd) ──
+    @UseGuards(JwtAuthGuard)
+    @Get('2fa/status')
+    twoFaStatus(@Request() req: any) { return this.twoFaService.get2faStatus(req.user.sub); }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('2fa/setup')
+    twoFaSetup(@Request() req: any) { return this.twoFaService.generateTotpSetup(req.user.sub); }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('2fa/enable')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    twoFaEnable(@Request() req: any, @Body('token') token: string) { return this.twoFaService.verifyAndEnableTotp(req.user.sub, String(token || '')); }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('2fa/disable')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async twoFaDisable(@Request() req: any, @Body('token') token: string) { await this.twoFaService.disableTotp(req.user.sub, String(token || '')); return { ok: true }; }
+
+    @Post('2fa/login-verify')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async twoFaLoginVerify(@Body() body: { partialToken: string; code: string }, @Res({ passthrough: true }) res: any) {
+        const result: any = await this.authService.loginVerify2FA(body?.partialToken, String(body?.code || ''));
+        if (result?.access_token) {
+            res.cookie('token', result.access_token, this.getCookieOptions(30 * 24 * 60 * 60 * 1000));
+            res.cookie('refreshToken', result.refresh_token, this.getCookieOptions(90 * 24 * 60 * 60 * 1000));
+        }
+        return result;
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('email-otp/send')
+    @Throttle({ default: { limit: 3, ttl: 60_000 } })
+    async emailOtpSend(@Request() req: any) { await this.twoFaService.sendEmailOtp(req.user.sub); return { ok: true }; }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('email-otp/verify')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    async emailOtpVerify(@Request() req: any, @Body('code') code: string) {
+        const ok = await this.twoFaService.verifyEmailOtp(req.user.sub, String(code || ''));
+        if (!ok) throw new BadRequestException({ code: 'INVALID_CODE', message: 'That code isn’t valid or has expired.' });
+        return { verified: true };
     }
 
     @UseGuards(JwtAuthGuard)

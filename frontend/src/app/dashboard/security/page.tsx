@@ -54,6 +54,7 @@ export default function SecuritySettingsPage() {
         try {
             const res = await apiFetch(`/auth/2fa/setup`, { method: 'POST' });
             const data = await res.json();
+            if (!res.ok || !data?.secret) throw new Error(data?.message || 'Could not start setup. Try again.');
             setQrCode(data.qrCodeUrl);
             setSecret(data.secret);
             setTotpStep('setup');
@@ -229,7 +230,7 @@ export default function SecuritySettingsPage() {
                                 <p className="text-xs text-muted-foreground font-bold">Can't scan? Enter this code manually:</p>
                                 <div className="flex items-center gap-2 p-3 bg-muted/40 rounded-xl">
                                     <code className="flex-1 text-xs font-mono font-bold text-foreground break-all">
-                                        {showSecret ? secret : secret.replace(/./g, '•')}
+                                        {showSecret ? secret : (secret || '').replace(/./g, '•')}
                                     </code>
                                     <button onClick={() => setShowSecret(v => !v)} className="text-muted-foreground hover:text-foreground">
                                         {showSecret ? <EyeOff size={14} /> : <Eye size={14} />}

@@ -549,11 +549,11 @@ export class AuthService {
         try {
             payload = this.jwtService.verify(partialToken);
         } catch (_e) {
-            throw new UnauthorizedException('انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى');
+            throw new UnauthorizedException('Your sign-in expired. Please sign in again.');
         }
 
         if (!payload.twoFactorPending) {
-            throw new UnauthorizedException('رمز غير صالح');
+            throw new UnauthorizedException('Invalid sign-in step.');
         }
 
         const user = await this.prisma.user.findUnique({
@@ -566,12 +566,12 @@ export class AuthService {
         });
 
         if (!user?.twoFactorEnabled || !user?.twoFactorSecret) {
-            throw new UnauthorizedException('لم يتم تفعيل التحقق بخطوتين');
+            throw new UnauthorizedException('Two-step verification isn’t enabled for this account.');
         }
 
         const isValid = await this.twoFaService.verifyTotpToken(user.twoFactorSecret, code);
         if (!isValid) {
-            throw new UnauthorizedException('رمز التحقق غير صحيح');
+            throw new UnauthorizedException('That code isn’t right.');
         }
 
         const { twoFactorSecret, twoFactorEnabled, ...safeUser } = user;

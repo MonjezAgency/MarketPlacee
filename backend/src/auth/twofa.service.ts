@@ -1,3 +1,4 @@
+import { newCode, hashSecret, sameHash } from './verification';
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { generateSecret, generate, verify, generateURI } from 'otplib';
 import * as QRCode from 'qrcode';
@@ -81,15 +82,16 @@ export class TwoFaService {
     });
     if (!user) throw new BadRequestException('User not found');
 
-    const code = String(Math.floor(100000 + Math.random() * 900000)); // 6-digit
+    const code = newCode(); // crypto RNG; only the hash is stored
     const expiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { emailOtpCode: code, emailOtpExpiry: expiry },
+      data: { emailOtpCode: hashSecret(code), emailOtpExpiry: expiry },
     });
 
-    await this.emailService.sendEmailOtp(user.email, user.name || 'Partner', code);
+    const r = await this.emailService.sendChangeEmailCode(user.email, user.name || '', code, 10);
+    if (!r.success) throw new BadRequestException({ code: 'EMAIL_FAILED', message: 'We couldn’t send the email just now. Try again in a minute.' });
   }
 
   async verifyEmailOtp(userId: string, code: string): Promise<boolean> {
@@ -100,7 +102,7 @@ export class TwoFaService {
 
     if (!user?.emailOtpCode || !user?.emailOtpExpiry) return false;
     if (user.emailOtpExpiry < new Date()) return false;
-    if (user.emailOtpCode !== code.trim()) return false;
+    if (!sameHash(String(code || '').trim(), user.emailOtpCode)) return false;
 
     // Invalidate the code after use
     await this.prisma.user.update({
