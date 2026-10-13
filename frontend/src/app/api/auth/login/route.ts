@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { clientHeaders } from '@/lib/client-headers';
 
 // Extend Vercel function timeout to 60s (works on Pro; Hobby is capped at 10s but doesn't error the config)
 export const maxDuration = 60;
@@ -9,13 +10,13 @@ const BACKEND_BASE = () =>
     .trim()
     .replace(/\/+$/, '');
 
-async function callBackend(backendUrl: string, body: any, timeoutMs: number) {
+async function callBackend(backendUrl: string, body: any, timeoutMs: number, extra: Record<string, string> = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(backendUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...extra },
       body: JSON.stringify(body),
       redirect: 'manual',
       signal: controller.signal,
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     let res: Response;
     try {
       // First attempt — 15s timeout
-      res = await callBackend(backendUrl, body, 15000);
+      res = await callBackend(backendUrl, body, 15000, clientHeaders(request));
     } catch (firstError: any) {
       const isTimeout =
         firstError.name === 'AbortError' ||
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
       // Railway was cold-starting — wait 2s then retry once
       console.warn('[PROXY_LOGIN] First attempt timed out (cold start likely) — retrying in 2s...');
       await new Promise((r) => setTimeout(r, 2000));
-      res = await callBackend(backendUrl, body, 15000);
+      res = await callBackend(backendUrl, body, 15000, clientHeaders(request));
     }
 
     // A redirect means the backend is returning an error page (down / misconfigured)

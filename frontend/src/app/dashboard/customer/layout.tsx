@@ -27,25 +27,28 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
                     </div>
                     <Link href="/categories" className="h-10 px-4 inline-flex items-center rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold">Start a new order</Link>
                 </div>
-                <nav aria-label="Account" className="mt-5 -mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto scrollbar-hide border-b border-line">
-                    <ul className="flex gap-1 min-w-max">
-                        {TABS.map((t) => {
-                            const active = t.exact ? pathname === t.href : pathname.startsWith(t.href);
-                            const Icon = t.icon;
-                            return (
-                                <li key={t.href}>
-                                    <Link href={t.href} aria-current={active ? 'page' : undefined}
-                                        className={cn('relative inline-flex items-center gap-2 h-11 px-3 text-[14px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] rounded-t-md',
-                                            active ? 'text-heading' : 'text-ink-3 hover:text-ink')}>
-                                        <Icon size={16} /> {t.label}
-                                        {active && <span aria-hidden className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-heading" />}
-                                    </Link>
-                                </li>
-                            );
-                        })}
-                    </ul>
-                </nav>
-                <div className="pt-6">{children}</div>
+                <div className="mt-6 lg:grid lg:grid-cols-[216px_minmax(0,1fr)] lg:gap-8 items-start">
+                    {/* Side tabs on desktop; a scrollable tab row on phones/tablets. */}
+                    <nav aria-label="Account" className="-mx-4 px-4 sm:mx-0 sm:px-0 overflow-x-auto scrollbar-hide border-b border-line lg:border-0 lg:overflow-visible lg:sticky lg:top-[120px]">
+                        <ul className="flex lg:flex-col gap-1 min-w-max lg:min-w-0">
+                            {TABS.map((t) => {
+                                const active = t.exact ? pathname === t.href : pathname.startsWith(t.href);
+                                const Icon = t.icon;
+                                return (
+                                    <li key={t.href}>
+                                        <Link href={t.href} aria-current={active ? 'page' : undefined}
+                                            className={cn('relative flex items-center gap-2.5 h-11 px-3 text-[14px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] rounded-t-md lg:rounded-xl',
+                                                active ? 'text-heading lg:bg-surface-2' : 'text-ink-3 hover:text-ink lg:hover:bg-surface-2/60')}>
+                                            <Icon size={17} /> {t.label}
+                                            {active && <span aria-hidden className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-heading lg:inset-x-auto lg:start-0 lg:top-2 lg:bottom-2 lg:h-auto lg:w-[3px]" />}
+                                        </Link>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </nav>
+                    <div className="pt-6 lg:pt-0 min-w-0">{children}</div>
+                </div>
             </div>
         </div>
     );

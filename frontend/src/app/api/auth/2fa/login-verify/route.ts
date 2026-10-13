@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { clientHeaders } from '@/lib/client-headers';
 
 const BACKEND_BASE = () =>
   (process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || '')
@@ -12,7 +13,7 @@ export async function POST(request: Request) {
 
     const res = await fetch(`${BACKEND_BASE()}/auth/2fa/login-verify`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...clientHeaders(request) },
       body: JSON.stringify(body),
       redirect: 'manual',
     });

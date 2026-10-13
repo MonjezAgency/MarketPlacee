@@ -1,3 +1,4 @@
+import { contextMiddleware } from './auth/request-context';
 import * as fs from 'fs';
 import { join } from 'path';
 import * as cookieParser from 'cookie-parser';
@@ -57,6 +58,7 @@ async function bootstrap() {
 
     // 3. THIRD: Cookie parser
     app.use(cookieParser());
+    app.use(contextMiddleware);
 
     // 4. FOURTH: Increase payload size limit to support high-res KYC images (10MB+)
     app.use(express.json({ limit: '50mb' }));

@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { clientHeaders } from '@/lib/client-headers';
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth-options";
 
@@ -68,8 +69,8 @@ async function handler(
   const search = req.nextUrl.search; // includes the '?' and query string
   const backendUrl = `${getBackendUrl()}/${backendPath}${search}`;
 
-  // Build forwarded headers
-  const forwardHeaders: Record<string, string> = {};
+  // Build forwarded headers (device info feeds the session list in Settings)
+  const forwardHeaders: Record<string, string> = { ...clientHeaders(req) };
   if (token) {
     forwardHeaders['Cookie'] = `token=${token}`;
     forwardHeaders['Authorization'] = `Bearer ${token}`;

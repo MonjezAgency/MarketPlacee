@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Req, Res, UseGuards, Get, UnauthorizedException, ForbiddenException, Request, Delete } from '@nestjs/common';
+import { Controller, Post, Body, Req, Res, UseGuards, Get, UnauthorizedException, ForbiddenException, Request, Delete, Param } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from './jwt-auth.guard';
@@ -187,8 +187,28 @@ export class AuthController {
         return { token: cookieToken };
     }
 
+    @UseGuards(JwtAuthGuard)
+    @Get('sessions')
+    async sessions(@Request() req: any) {
+        return this.authService.listSessions(req.user.sub, req.user.sid);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Delete('sessions/:id')
+    async revokeSession(@Request() req: any, @Param('id') id: string) {
+        return this.authService.revokeSession(req.user.sub, id);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Post('sessions/revoke-others')
+    async revokeOthers(@Request() req: any) {
+        return this.authService.revokeOtherSessions(req.user.sub, req.user.sid);
+    }
+
     @Post('logout')
-    async logout(@Res({ passthrough: true }) res: any) {
+    async logout(@Req() req: any, @Res({ passthrough: true }) res: any) {
+        const bearer = String(req.headers?.authorization || '').replace(/^Bearer\s+/i, '');
+        await this.authService.logoutSession(req?.cookies?.token || bearer || undefined, req?.cookies?.refreshToken);
         res.clearCookie('token', {
             httpOnly: true,
             secure: true,

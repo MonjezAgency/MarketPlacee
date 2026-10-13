@@ -10,6 +10,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 
 import { PrismaService } from '../common/prisma.service';
 import { ForbiddenException, ConflictException } from '@nestjs/common';
+import { requestContext, deviceLabel } from './request-context';
+import { forgetSession, forgetUserTokens } from './jwt.strategy';
 import { checkPassword } from './password-policy';
 import { verifyGoogleIdToken, type GoogleIdentity } from './google-token';
 import { newCode, hashSecret, checkCode, cooldownLeft, publicRole, normEmail, EMAIL_RE, STRONG_PASSWORD_RE, CODE_TTL_MS, MAX_ATTEMPTS } from './verification';
@@ -401,27 +403,78 @@ export class AuthService {
         return crypto.createHash('sha256').update(rawToken).digest('hex');
     }
 
-    private async issueRefreshToken(userId: string): Promise<string> {
+    private async issueRefreshToken(userId: string, sessionId?: string): Promise<string> {
         const rawToken = crypto.randomBytes(40).toString('hex');
         const tokenHash = this.hashToken(rawToken);
         const expiresAt = new Date(Date.now() + this.REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
 
-        await this.prisma.refreshToken.create({ data: { tokenHash, userId, expiresAt } });
+        await this.prisma.refreshToken.create({ data: { tokenHash, userId, expiresAt, sessionId: sessionId ?? null } as any });
         return rawToken;
     }
 
-    private async generateTokens(user: AuthUser) {
-        const payload = { 
-            sub: user.id, 
-            email: user.email, 
+    /** A new sign-in = a new session row with the requesting device's details. */
+    private async startSession(userId: string): Promise<string | undefined> {
+        const ctx = requestContext.getStore();
+        try {
+            const s = await (this.prisma as any).userSession.create({ data: { userId, userAgent: ctx?.userAgent ?? null, ip: ctx?.ip ?? null } });
+            return s.id;
+        } catch (e: any) {
+            this.logger.warn(`[AUTH] Could not record session: ${e?.message}`);
+            return undefined; // never block sign-in on session bookkeeping
+        }
+    }
+
+    private async generateTokens(user: AuthUser, sessionId?: string) {
+        const sid = sessionId ?? await this.startSession(user.id);
+        const payload: any = {
+            sub: user.id,
+            email: user.email,
             role: user.role,
-            onboardingCompleted: !!user.onboardingCompleted 
+            onboardingCompleted: !!user.onboardingCompleted,
         };
-        
+        if (sid) payload.sid = sid;
+
         return {
             access_token: await this.jwtService.signAsync(payload),
-            refresh_token: await this.issueRefreshToken(user.id),
+            refresh_token: await this.issueRefreshToken(user.id, sid),
         };
+    }
+
+    // ── Sessions (devices) ─────────────────────────────────────────────
+    async listSessions(userId: string, currentSid?: string) {
+        const rows = await (this.prisma as any).userSession.findMany({ where: { userId, revokedAt: null }, orderBy: { lastSeenAt: 'desc' }, take: 50 });
+        // Sessions whose refresh tokens are all gone/expired are effectively over.
+        const live = await this.prisma.refreshToken.findMany({ where: { userId, expiresAt: { gt: new Date() } } as any, select: { sessionId: true } as any });
+        const liveIds = new Set((live as any[]).map((r) => r.sessionId).filter(Boolean));
+        return rows
+            .filter((r: any) => r.id === currentSid || liveIds.has(r.id))
+            .map((r: any) => ({ id: r.id, device: deviceLabel(r.userAgent), ip: r.ip, createdAt: r.createdAt, lastSeenAt: r.lastSeenAt, current: r.id === currentSid }));
+    }
+
+    async revokeSession(userId: string, sessionId: string) {
+        const res = await (this.prisma as any).userSession.updateMany({ where: { id: sessionId, userId, revokedAt: null }, data: { revokedAt: new Date() } });
+        await this.prisma.refreshToken.deleteMany({ where: { userId, sessionId } as any });
+        forgetSession(sessionId);
+        return { revoked: res.count };
+    }
+
+    /** Sign-out: end this device's session (access JWT + refresh token). */
+    async logoutSession(rawAccess?: string, rawRefresh?: string) {
+        try {
+            const p: any = rawAccess ? this.jwtService.decode(rawAccess) : null;
+            if (p?.sid && p?.sub) { await this.revokeSession(p.sub, p.sid); forgetSession(p.sid); }
+        } catch { /* best effort */ }
+        if (rawRefresh) await this.revokeRefreshToken(rawRefresh);
+    }
+
+    /** Sign out every other device — including old sign-ins made before sessions were recorded. */
+    async revokeOtherSessions(userId: string, currentSid?: string) {
+        const res = await (this.prisma as any).userSession.updateMany({ where: { userId, revokedAt: null, ...(currentSid ? { id: { not: currentSid } } : {}) }, data: { revokedAt: new Date() } });
+        await this.prisma.refreshToken.deleteMany({ where: { userId, ...(currentSid ? { NOT: { sessionId: currentSid } } : {}) } as any });
+        // 1s back-dated so the current session's token (iat this second) isn't affected; it has a sid anyway.
+        await this.prisma.user.update({ where: { id: userId }, data: { tokensValidAfter: new Date() } as any });
+        forgetUserTokens(userId);
+        return { revoked: res.count };
     }
 
     async refreshTokens(rawRefreshToken: string) {
@@ -436,6 +489,13 @@ export class AuthService {
 
         // Rotate — delete old token immediately (single-use)
         await this.prisma.refreshToken.delete({ where: { tokenHash } });
+        // Same device keeps the same session; a revoked session can't refresh.
+        const sid = (stored as any).sessionId as string | null;
+        if (sid) {
+            const sess = await (this.prisma as any).userSession.findUnique({ where: { id: sid } });
+            if (!sess || sess.revokedAt) throw new UnauthorizedException('This session was signed out');
+            await (this.prisma as any).userSession.update({ where: { id: sid }, data: { lastSeenAt: new Date() } }).catch(() => undefined);
+        }
 
         const user = await this.prisma.user.findUnique({
             where: { id: stored.userId },
@@ -446,7 +506,7 @@ export class AuthService {
             throw new UnauthorizedException('Account is not active');
         }
 
-        const tokens = await this.generateTokens(user as AuthUser);
+        const tokens = await this.generateTokens(user as AuthUser, sid ?? undefined);
         return { ...tokens, user };
     }
 

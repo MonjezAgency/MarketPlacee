@@ -126,6 +126,8 @@ model User {
   profileReminder1SentAt    DateTime?
   profileReminder2SentAt    DateTime?
   profileReminderFailures   Int      @default(0)
+  /// Tokens without a session id issued before this time are rejected ("sign out everywhere").
+  tokensValidAfter          DateTime?
 
   // Business & Financial Fields
   vatNumber   String? @unique
@@ -754,6 +756,8 @@ model RefreshToken {
   userId    String
   expiresAt DateTime
   createdAt DateTime @default(now())
+  /// The sign-in session this (rotating) token belongs to.
+  sessionId String?
 
   @@index([userId])
   @@index([expiresAt])
@@ -1020,4 +1024,18 @@ model ShoppingListItem {
   updatedAt        DateTime     @updatedAt
 
   @@unique([listId, productId, variantKey, tier])
+}
+
+/// One sign-in on one device. Access tokens carry its id (sid); revoking it
+/// signs that device out on its next request.
+model UserSession {
+  id         String    @id @default(uuid())
+  userId     String
+  userAgent  String?
+  ip         String?
+  createdAt  DateTime  @default(now())
+  lastSeenAt DateTime  @default(now())
+  revokedAt  DateTime?
+
+  @@index([userId])
 }

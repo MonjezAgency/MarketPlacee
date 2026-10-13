@@ -11,6 +11,7 @@ import { resizeImage } from '@/lib/resize-image';
 import { cn } from '@/lib/utils';
 import { checkPassword } from '@/lib/password-policy';
 import { ChangeEmailCard } from '@/components/account/ChangeEmailCard';
+import { SessionsCard } from '@/components/account/SessionsCard';
 import { CompanyDetailsCard, BrandPreferencesCard, VerificationCard } from '@/components/account/AccountCards';
 
 
@@ -174,11 +175,7 @@ export default function SettingsPage() {
                     <Link href="/dashboard/security" className="text-[13.5px] font-semibold text-teal hover:underline">Manage two-step verification</Link>
                 </Card>
 
-                <Card icon={<MonitorSmartphone size={17} />} title="Sessions">
-                    <p className="text-[13.5px] text-ink-2">You’re signed in on this device.</p>
-                    <p className="mt-1 text-[12.5px] text-ink-3">A list of your other signed-in devices isn’t available yet — Atlantis doesn’t record device details for sign-ins. If you think someone else has access, change your password and contact Atlantis.</p>
-                    <button type="button" onClick={() => logout?.()} className="mt-3 h-9 px-3 inline-flex items-center gap-1.5 rounded-lg ring-1 ring-line-strong text-[13px] font-semibold text-ink hover:bg-surface-2"><LogOut size={14} /> Sign out of this device</button>
-                </Card>
+                <SessionsCard />
 
                 <Card icon={<Bell size={17} />} title="Email notifications">
                     {prefs === null ? <p className="text-[13px] text-ink-3">Preferences couldn’t be loaded.</p> : (
