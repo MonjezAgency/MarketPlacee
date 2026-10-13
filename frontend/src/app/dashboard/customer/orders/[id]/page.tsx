@@ -91,7 +91,7 @@ const DISPUTE_REASONS = [
 
 function buildInvoiceHtml(invoice: any, order: OrderDetail): string {
     const itemRows = order.items
-        .map(i => `<tr><td>${i.product.name}</td><td>${i.quantity}</td><td>€${i.price.toFixed(2)}</td><td>€${(i.price * i.quantity).toFixed(2)}</td></tr>`)
+        .map(i => `<tr><td>${(i as any).product?.name || (i as any).productNameSnapshot || 'Mixed load'}</td><td>${i.quantity}</td><td>€${i.price.toFixed(2)}</td><td>€${(i.price * i.quantity).toFixed(2)}</td></tr>`)
         .join('');
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
@@ -445,7 +445,8 @@ export default function OrderTrackingPage() {
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Items ({order.items.length})</p>
                     <div className="space-y-4">
                         {order.items.map(item => {
-                            const p = item.product;
+                            // Mixed pallet/truck lines (and deleted products) have no single product record.
+                            const p: any = item.product ?? { name: (item as any).productNameSnapshot || ((item as any).mixedLoadId ? 'Mixed load' : 'Product no longer listed') };
                             const u = (p.unit || 'piece').toLowerCase();
                             const ppc = p.unitsPerCase || 0;
                             const cpp = p.casesPerPallet || 0;

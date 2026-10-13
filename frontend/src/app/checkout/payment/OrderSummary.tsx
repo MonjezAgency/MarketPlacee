@@ -66,10 +66,10 @@ export default function OrderSummary({ order }: Props) {
           {order.items.map((item) => (
             <div key={item.id} className="flex gap-4 group">
               <div className="relative w-20 h-20 bg-background rounded-xl overflow-hidden border border-border/50 shrink-0 shadow-sm">
-                {item.product.images?.[0] ? (
+                {item.product?.images?.[0] ? (
                   <Image
-                    src={item.product.images[0]}
-                    alt={item.product.name}
+                    src={item.product?.images?.[0]}
+                    alt={item.product?.name || ''}
                     fill
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
                   />
@@ -81,7 +81,7 @@ export default function OrderSummary({ order }: Props) {
               </div>
               <div className="flex-1 py-1 flex flex-col justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-white line-clamp-2 leading-snug">{item.product.name}</h3>
+                  <h3 className="text-sm font-semibold text-white line-clamp-2 leading-snug">{item.product?.name || (item as any).productNameSnapshot || 'Mixed load'}</h3>
                   <p className="text-xs text-muted-foreground mt-1">Qty: {item.quantity}</p>
                 </div>
                 <p className="text-sm font-bold text-white">{formatPrice(item.price)}</p>

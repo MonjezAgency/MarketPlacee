@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Camera, Loader2, Check, AlertCircle, UserRound, Bell, KeyRound } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { apiFetch } from '@/lib/api';
+import { resizeImage } from '@/lib/resize-image';
 import { cn } from '@/lib/utils';
 import { authInput, authLabel } from '@/components/auth/AuthShell';
 import { SettingsCard, CompanyDetailsCard, BrandPreferencesCard, VerificationCard } from '@/components/account/AccountCards';
@@ -70,7 +71,7 @@ export default function SupplierSettingsPage() {
         if (file.size > 4 * 1024 * 1024) { setMsg({ ok: false, text: 'Image must be 4 MB or smaller.' }); return; }
         setUploading(true); setMsg(null);
         try {
-            const fd = new FormData(); fd.append('file', file);
+            const fd = new FormData(); fd.append('file', await resizeImage(file));
             const res = await apiFetch('/users/me/avatar', { method: 'POST', body: fd });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data?.message || 'Upload failed.');

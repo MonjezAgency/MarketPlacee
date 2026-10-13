@@ -135,8 +135,16 @@ export class UsersController {
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 4 * 1024 * 1024 } }))
     async uploadAvatar(@Request() req, @UploadedFile() file: any) {
         if (!file) throw new BadRequestException('No file uploaded');
-        if (!file.mimetype?.startsWith('image/')) throw new BadRequestException('File must be an image');
-        const url = await this.storageService.uploadProductImage(file.buffer, file.originalname, file.mimetype);
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.mimetype)) throw new BadRequestException('Use a PNG, JPG or WebP image.');
+        let url: string;
+        try {
+            url = await this.storageService.uploadProductImage(file.buffer, file.originalname, file.mimetype);
+        } catch (e: any) {
+            // Object storage unavailable (e.g. paused Supabase project): keep small,
+            // client-resized avatars inline so the profile still works.
+            if (file.size > 512 * 1024) throw new BadRequestException('Image storage is temporarily unavailable — use an image under 500 KB.');
+            url = `data:${file.mimetype};base64,${file.buffer.toString('base64')}`;
+        }
         await this.prisma.user.update({
             where: { id: req.user.sub },
             data: { avatar: url },
