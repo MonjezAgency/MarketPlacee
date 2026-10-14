@@ -63,7 +63,7 @@ export const quoteCart = (items: CartItem[], couponCode?: string) =>
 export type LoadKind = 'PALLET' | 'TRUCK';
 export interface LoadLine { productId: string; variant?: string | null; quantity: number }
 export interface MixedLoadQuote {
-    kind: LoadKind; supplierId: string | null; fill: number; requiredFill: number; subtotal: number; markup: number; total: number; ready: boolean; issues: string[];
+    kind: LoadKind; supplierId: string | null; fill: number; requiredFill: number; subtotal: number; total: number; ready: boolean; issues: string[];
     origin?: { status: 'VERIFIED' | 'UNVERIFIED'; label: string | null; country: string | null; unverified: string[] };
     lines: (LoadLine & { name: string; unit: 'case' | 'pallet'; casePrice: number; cases: number; units: number; share: number; lineSubtotal: number })[];
 }

@@ -138,7 +138,7 @@ export class ProductsController {
         // Map basePrice → price so suppliers see their original price, not the markup
         return products.map(p => ({
             ...p,
-            price: p.basePrice ?? p.price,
+            price: p.basePrice ?? null, // supplier price only; never fall back to the buyer price
         }));
     }
 
@@ -404,7 +404,7 @@ export class ProductsController {
             supplierId,
         }, isAdmin, false, { submit, actorId: req.user.sub });
 
-        if (!isAdmin) return this.productsService.withCompleteness({ ...(product as any), price: (product as any).basePrice ?? (product as any).price });
+        if (!isAdmin) return this.productsService.withCompleteness({ ...(product as any), price: (product as any).basePrice ?? null });
         return plainToInstance(ProductDto, product);
     }
 

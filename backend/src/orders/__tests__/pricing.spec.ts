@@ -67,9 +67,13 @@ describe('priceLoad — mixed pallets and truckloads', () => {
         const q = priceLoad('TRUCK', [{ productId: 'prime', quantity: 13 }, { productId: 'half', quantity: 10 }], map(prime, half), M);
         expect(q.fill).toBeCloseTo(1);
         expect(q.ready).toBe(true);
-        // subtotal = 13*132 cases*13.81 + 10*60*13.81 ; total = ×1.15
-        expect(q.subtotal).toBe(Math.round((13 * 132 * 13.81 + 10 * 60 * 13.81) * 100) / 100);
-        expect(q.total).toBe(Math.round(q.subtotal * 1.15 * 100) / 100);
+        // total = (13*132 + 10*60) cases × 13.81 × 1.15, rounded once (unchanged buyer total)
+        const raw = Math.round((13 * 132 * 13.81 + 10 * 60 * 13.81) * 100) / 100;
+        expect(q.total).toBe(Math.round(raw * 1.15 * 100) / 100);
+        // the quote only shows buyer prices: no markup field, lines already include it
+        expect(q.subtotal).toBe(q.total);
+        expect((q as any).markup).toBeUndefined();
+        expect(q.lines[0].casePrice).toBeCloseTo(13.81 * 1.15, 3);
     });
     it('under-filled loads are priced but not ready', () => {
         const q = priceLoad('PALLET', [{ productId: 'prime', quantity: 66 }], map(prime), M);
@@ -111,7 +115,8 @@ describe('priceLoad — mixed pallets and truckloads', () => {
     it('uses per-variant case prices and rejects unknown variants', () => {
         const v = { ...prime, id: 'v', variantPrices: { 'Flavour=Grape': 12, 'Flavour=Ice': 14 } };
         const q = priceLoad('PALLET', [{ productId: 'v', variant: 'Flavour=Grape', quantity: 66 }, { productId: 'v', variant: 'Flavour=Ice', quantity: 66 }], map(v), M);
-        expect(q.subtotal).toBe(66 * 12 + 66 * 14);
+        expect(q.total).toBe(Math.round((66 * 12 + 66 * 14) * 1.15 * 100) / 100);
+        expect(q.lines.map((l) => l.casePrice)).toEqual([13.8, 16.1]); // buyer case prices
         expect(code(() => priceLoad('PALLET', [{ productId: 'v', variant: 'Flavour=Lime', quantity: 1 }], map(v), M))).toBe('UNKNOWN_VARIANT');
     });
 });

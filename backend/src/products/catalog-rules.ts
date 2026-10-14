@@ -11,6 +11,8 @@
  */
 
 export const MOQ_UNITS = ['PIECE', 'CASE', 'PALLET', 'TRUCK'] as const;
+/** What one piece is. Display/labeling only; prices are always per case. */
+export const UNIT_TYPES = ['piece', 'bottle', 'can', 'jar', 'bag', 'box', 'pack', 'bar', 'pouch', 'tube', 'carton', 'pallet'] as const;
 export const WEIGHT_UNITS = ['g', 'kg', 'mg', 'ml', 'cl', 'l', 'oz', 'lb'] as const;
 
 /** Approximate EUR value of one unit of each accepted input currency. */
@@ -18,6 +20,41 @@ export const TO_EUR: Record<string, number> = {
     EUR: 1, USD: 0.926, GBP: 1.162, EGP: 0.018, AED: 0.252,
     SAR: 0.247, KWD: 3.24, QAR: 0.253, TRY: 0.027, INR: 0.011, RON: 0.201,
 };
+
+/** Suggested default currency from a supplier's country (null → EUR). */
+const COUNTRY_CURRENCY: Record<string, string> = {
+    'romania': 'RON', 'egypt': 'EGP', 'united arab emirates': 'AED', 'uae': 'AED', 'saudi arabia': 'SAR', 'united kingdom': 'GBP',
+    'uk': 'GBP', 'united states': 'USD', 'usa': 'USD', 'turkey': 'TRY', 'türkiye': 'TRY', 'india': 'INR', 'kuwait': 'KWD', 'qatar': 'QAR',
+};
+export function suggestedCurrency(country?: string | null): string {
+    const c = COUNTRY_CURRENCY[String(country || '').trim().toLowerCase()];
+    return c && TO_EUR[c] ? c : 'EUR';
+}
+
+/**
+ * The supplier enters a case price in their currency; the platform price
+ * (basePrice) is EUR. Converts with the platform's fixed TO_EUR table and
+ * keeps the typed figure + currency so it is never reinterpreted later.
+ * Mutates and returns `o`. Throws on an unsupported currency.
+ */
+export function applySupplierCurrency(o: any): any {
+    if (o.supplierCurrency !== undefined && o.supplierCurrency !== null) {
+        const cur = String(o.supplierCurrency).toUpperCase();
+        if (!TO_EUR[cur]) throw new Error(`Currency “${o.supplierCurrency}” isn’t supported. Use one of ${Object.keys(TO_EUR).join(', ')}.`);
+        o.supplierCurrency = cur;
+        if (o.supplierPrice !== undefined && o.supplierPrice !== null && o.supplierPrice !== '') {
+            const n = Number(o.supplierPrice);
+            if (!Number.isFinite(n) || n <= 0) throw new Error('Price must be a number above 0.');
+            o.supplierPrice = Math.round(n * 10000) / 10000;
+            o.price = Math.round(n * TO_EUR[cur] * 10000) / 10000; // EUR per case
+        }
+    } else if (o.price !== undefined && o.price !== null && o.supplierPrice === undefined) {
+        // A plain EUR price (older clients): record it as entered in EUR.
+        const n = Number(o.price);
+        if (Number.isFinite(n) && n > 0) { o.supplierCurrency = 'EUR'; o.supplierPrice = n; }
+    }
+    return o;
+}
 
 /** True for a real image (not empty, not the generated SVG placeholder). */
 export function isRealImage(url: unknown): boolean {
@@ -74,8 +111,8 @@ export interface Missing { field: string; label: string; reason: string }
 
 /**
  * Everything that must be true before a product can be reviewed or sold.
- * Description, BBD, cases per pallet, pallets per truck and lead time are
- * optional (pallet / truck prices are offered only when their pack sizes exist).
+ * Description, BBD, pallets per truck and lead time are optional (truck
+ * prices are offered only when pallets per truck is given).
  */
 export function missingForPublish(p: any): Missing[] {
     const out: Missing[] = [];
@@ -93,6 +130,8 @@ export function missingForPublish(p: any): Missing[] {
     need('price', 'Price per case', posNum(price));
     need('stock', 'Stock (cases)', Number.isInteger(Number(p.stock)) && Number(p.stock) >= 0 && p.stock !== null && p.stock !== undefined && p.stock !== '');
     need('unitsPerCase', 'Pieces per case', posInt(p.unitsPerCase));
+    need('casesPerPallet', 'Cases per pallet', posInt(p.casesPerPallet));
+    need('unit', 'Unit type', !!text(p.unit));
     need('moq', 'Minimum order quantity', posInt(p.moq));
     need('moqUnit', 'MOQ unit', MOQ_UNITS.includes(String(p.moqUnit || '').toUpperCase() as any), 'MOQ unit must be piece, case, pallet or truck.');
     need('images', 'Product image', realImages(p.images).length > 0, 'Add at least one real product photo (upload, URL or barcode lookup).');

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { PricePrivacyInterceptor } from './common/price-privacy.interceptor';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
@@ -96,6 +97,11 @@ import { EmailTrackingModule } from './email-tracking/email-tracking.module';
         {
             provide: APP_INTERCEPTOR,
             useClass: AuditInterceptor,
+        },
+        {
+            // Supplier price / markup privacy on every response (see common/price-privacy.ts).
+            provide: APP_INTERCEPTOR,
+            useClass: PricePrivacyInterceptor,
         },
     ],
 })

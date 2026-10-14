@@ -9,6 +9,7 @@ export interface ImportRequest {
     mapping: Mapping;
     currency?: string;
     moqUnit?: string;
+    unit?: string;
     firstRow?: number;          // spreadsheet row number of rows[0]
     onExisting?: 'skip' | 'update';
 }
@@ -46,7 +47,7 @@ export class SupplierImportService {
     /** Build + validate every row; nothing is written. */
     async validate(supplierId: string, req: ImportRequest) {
         const { mapping, mappingWarnings } = this.checkRequest(req);
-        const opts = { currency: String(req.currency || 'EUR').toUpperCase(), moqUnit: String(req.moqUnit || 'CASE').toUpperCase() };
+        const opts = { currency: String(req.currency || 'EUR').toUpperCase(), moqUnit: String(req.moqUnit || 'CASE').toUpperCase(), unit: String(req.unit || 'piece').toLowerCase() };
         const start = Number(req.firstRow) || 2;
         const built: BuiltRow[] = req.rows.map((cells, i) => buildRow(Array.isArray(cells) ? cells.map((c) => String(c ?? '')) : [], start + i, mapping, opts));
 

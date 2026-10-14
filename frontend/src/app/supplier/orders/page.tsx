@@ -19,8 +19,9 @@ const VIEWS = [
 ] as const;
 const TIER: Record<string, string> = { carton: 'case', case: 'case', pallet: 'pallet', truck: 'truck' };
 const ref = (id: string) => `#${id.slice(-8).toUpperCase()}`;
+const ORDER_STATUS_LABEL: Record<string, string> = { PENDING: 'Placed — awaiting your confirmation', PAID: 'Paid', PROCESSING: 'Confirmed — preparing', SHIPPED: 'Shipped', DELIVERED: 'Delivered', CANCELLED: 'Cancelled' };
 
-/** My Sales — orders containing this supplier's products, with confirm / decline. */
+/** Orders — orders containing this supplier's products, with confirm / decline. */
 export default function SupplierOrdersPage() {
     return <React.Suspense fallback={null}><SupplierOrders /></React.Suspense>;
 }
@@ -30,7 +31,9 @@ function SupplierOrders() {
     const [orders, setOrders] = React.useState<any[] | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [view, setView] = React.useState<string>(params.get('view') || 'action');
-    const [q, setQ] = React.useState('');
+    const [q, setQ] = React.useState(params.get('q') || '');
+    const [fromDate, setFromDate] = React.useState('');
+    const [toDate, setToDate] = React.useState('');
     const [decline, setDecline] = React.useState<any | null>(null);
 
     const load = React.useCallback(() => {
@@ -43,19 +46,20 @@ function SupplierOrders() {
 
     const v = VIEWS.find((x) => x.id === view) ?? VIEWS[5];
     const term = q.trim().toLowerCase().replace('#', '');
-    const shown = (orders ?? []).filter((o) => v.match(o) && (!term || o.id.toLowerCase().includes(term) || o.items.some((i: any) => `${i.name} ${i.ean || ''}`.toLowerCase().includes(term))));
+    const inRange = (o: any) => (!fromDate || o.createdAt.slice(0, 10) >= fromDate) && (!toDate || o.createdAt.slice(0, 10) <= toDate);
+    const shown = (orders ?? []).filter((o) => v.match(o) && inRange(o) && (!term || o.id.toLowerCase().includes(term) || o.items.some((i: any) => `${i.name} ${i.ean || ''}`.toLowerCase().includes(term))));
     const count = (id: string) => (orders ?? []).filter(VIEWS.find((x) => x.id === id)!.match).length;
     const open = (orders ?? []).filter((o) => ['PENDING', 'PAID', 'PROCESSING', 'SHIPPED'].includes(o.status));
 
     return (
         <div>
-            <PageHeader title="My sales" description="Orders that include your products. Confirm what you can fulfil; Atlantis handles shipping and delivery updates." />
+            <PageHeader title="Orders" description="Orders that include your products. Confirm what you can fulfil; Atlantis arranges transport and delivery updates. Values are at your own prices." />
 
             <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-4">
                 <Stat label="Awaiting your confirmation" value={orders ? int(count('action')) : '—'} tone="warning" icon={<AlertCircle size={17} />} loading={!orders && !error} />
                 <Stat label="Preparing" value={orders ? int(count('progress')) : '—'} tone="brand" icon={<ShoppingCart size={17} />} loading={!orders && !error} />
                 <Stat label="Shipped" value={orders ? int(count('shipped')) : '—'} tone="info" icon={<ShoppingCart size={17} />} loading={!orders && !error} />
-                <Stat label="Open order value" value={orders ? eur(open.reduce((s, o) => s + (o.supplierSubtotal || 0), 0)) : '—'} icon={<ShoppingCart size={17} />} loading={!orders && !error} hint="your lines, buyer prices" />
+                <Stat label="Open order value" value={orders ? eur(open.reduce((s, o) => s + (o.supplierSubtotal || 0), 0)) : '—'} icon={<ShoppingCart size={17} />} loading={!orders && !error} hint="your lines, your prices" />
             </div>
 
             <Card bodyClassName="p-0">
@@ -68,11 +72,19 @@ function SupplierOrders() {
                             </button>
                         ))}
                     </div>
-                    <label className="relative sm:max-w-[320px]">
-                        <span className="sr-only">Search orders</span>
-                        <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-ink-4" />
-                        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Order #, product or barcode" className={cn(inputCls, 'ps-9')} />
-                    </label>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <label className="relative flex-1 min-w-[220px] sm:max-w-[320px]">
+                            <span className="sr-only">Search orders</span>
+                            <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-ink-4" />
+                            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Order #, product or barcode" className={cn(inputCls, 'ps-9')} />
+                        </label>
+                        <label className="sr-only" htmlFor="ord-from">Placed from</label>
+                        <input id="ord-from" type="date" value={fromDate} max={toDate || undefined} onChange={(e) => setFromDate(e.target.value)} className={cn(inputCls, 'w-[150px]')} />
+                        <span className="text-[13px] text-ink-3">to</span>
+                        <label className="sr-only" htmlFor="ord-to">Placed until</label>
+                        <input id="ord-to" type="date" value={toDate} min={fromDate || undefined} onChange={(e) => setToDate(e.target.value)} className={cn(inputCls, 'w-[150px]')} />
+                        {(fromDate || toDate) && <Button size="sm" variant="ghost" onClick={() => { setFromDate(''); setToDate(''); }}>Clear dates</Button>}
+                    </div>
                 </div>
 
                 {error && <div className="p-4"><ErrorState message={error} onRetry={load} /></div>}
@@ -131,7 +143,7 @@ function OrderRow({ o, onChanged, onDecline }: { o: any; onChanged: () => void; 
                 </button>
                 <div className="text-end">
                     <p className="font-semibold text-heading tabular-nums">{eur(o.supplierSubtotal)}</p>
-                    <p className="text-[12px] text-ink-3">your lines</p>
+                    <p className="text-[12px] text-ink-3">{o.valueEstimated ? 'estimated · your price' : 'your price'}</p>
                 </div>
                 {o.needsAction && (
                     <div className="flex gap-2 w-full sm:w-auto">
@@ -149,7 +161,7 @@ function OrderRow({ o, onChanged, onDecline }: { o: any; onChanged: () => void; 
                                 <th className="text-start font-medium px-3 py-2">Product</th>
                                 <th className="text-end font-medium px-3 py-2">Ordered</th>
                                 <th className="text-end font-medium px-3 py-2">Cases</th>
-                                <th className="text-end font-medium px-3 py-2 hidden sm:table-cell">Unit price</th>
+                                <th className="text-end font-medium px-3 py-2 hidden sm:table-cell">Your unit price</th>
                                 <th className="text-end font-medium px-3 py-2">Line total</th>
                             </tr></thead>
                             <tbody>
@@ -175,7 +187,19 @@ function OrderRow({ o, onChanged, onDecline }: { o: any; onChanged: () => void; 
                             </tbody>
                         </table>
                     </div>
-                    {o.lastStatusNote && <p className="text-[12.5px] text-ink-3">Latest update: {o.lastStatusNote}</p>}
+                    {Array.isArray(o.timeline) && o.timeline.length > 0 && (
+                        <ol className="relative ms-1 border-s border-line ps-4 space-y-2" aria-label="Order timeline">
+                            {o.timeline.map((h: any, i: number) => (
+                                <li key={i} className="relative text-[12.5px]">
+                                    <span aria-hidden className={cn('absolute -start-[21px] top-1 w-2.5 h-2.5 rounded-full ring-2 ring-surface', i === o.timeline.length - 1 ? 'bg-teal' : 'bg-line-strong')} />
+                                    <span className="font-medium text-ink">{ORDER_STATUS_LABEL[h.status] || h.status}</span>
+                                    <span className="text-ink-3"> · {new Date(h.at).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                                    {h.note && <span className="block text-ink-3">{h.note}</span>}
+                                </li>
+                            ))}
+                        </ol>
+                    )}
+                    {o.valueEstimated && <p className="text-[12px] text-ink-3">This order was placed before your price was recorded on each line, so its value is estimated from your current price.</p>}
                     {o.status === 'PROCESSING' && <p className="text-[12.5px] text-ink-3">Next: Atlantis books transport and marks the order shipped. Prepare the goods at your EXW location.</p>}
                     {['PROCESSING', 'SHIPPED', 'DELIVERED'].includes(o.status) && <InvoiceAttachment orderId={o.id} initial={o.supplierInvoiceUrl} />}
                 </div>

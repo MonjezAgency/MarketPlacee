@@ -24,6 +24,7 @@ export default function BulkImportDialog({ open, onClose }: { open: boolean; onC
     const [mapping, setMapping] = React.useState<Record<string, string>>({});
     const [currency, setCurrency] = React.useState('EUR');
     const [moqUnit, setMoqUnit] = React.useState('CASE');
+    const [unit, setUnit] = React.useState('piece');
     const [review, setReview] = React.useState<any | null>(null);
     const [onExisting, setOnExisting] = React.useState<'skip' | 'update'>('skip');
     const [result, setResult] = React.useState<any | null>(null);
@@ -31,6 +32,8 @@ export default function BulkImportDialog({ open, onClose }: { open: boolean; onC
     const [error, setError] = React.useState<string | null>(null);
 
     React.useEffect(() => { if (open && !schema) supplierApi.importSchema().then(setSchema).catch((e) => setError(e.message)); }, [open, schema]);
+    // Start in the supplier's default currency from Settings.
+    React.useEffect(() => { if (open) supplierApi.preferences().then((p) => setCurrency(p.effectiveCurrency)).catch(() => {}); }, [open]);
     const reset = () => { setStep('upload'); setFile(null); setParsed(null); setMapping({}); setReview(null); setResult(null); setError(null); };
     const close = () => { if (busy === 'commit') return; reset(); onClose(); };
 
@@ -72,7 +75,7 @@ export default function BulkImportDialog({ open, onClose }: { open: boolean; onC
     const dupFields = Array.from(usedBy.entries()).filter(([, cols]) => cols.length > 1);
     const unresolvedAmbiguous = (parsed?.matches ?? []).filter((m: any) => m.status === 'ambiguous' && mapping[String(m.index)] === undefined);
 
-    const body = () => ({ headers: parsed.headers, rows: parsed.rows, mapping, currency, moqUnit, firstRow: (parsed.headerRow || 1) + 1, onExisting });
+    const body = () => ({ headers: parsed.headers, rows: parsed.rows, mapping, currency, moqUnit, unit, firstRow: (parsed.headerRow || 1) + 1, onExisting });
 
     const runReview = async () => {
         setBusy('review'); setError(null);
@@ -117,7 +120,7 @@ export default function BulkImportDialog({ open, onClose }: { open: boolean; onC
                 <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
                     <div className="min-w-0 space-y-4">
                         <DropZone busy={busy === 'parse'} file={file} onFile={readFile} />
-                        <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-3 sm:grid-cols-3">
                             <div>
                                 <label htmlFor="imp-cur" className="block mb-1.5 text-[13px] font-medium text-ink-2">Prices in the file are in</label>
                                 <select id="imp-cur" value={currency} onChange={(e) => setCurrency(e.target.value)} className={selectCls}>
@@ -131,6 +134,13 @@ export default function BulkImportDialog({ open, onClose }: { open: boolean; onC
                                     {(schema?.moqUnits ?? ['CASE']).map((u: string) => <option key={u} value={u}>{u.toLowerCase()}s</option>)}
                                 </select>
                                 <p className="mt-1 text-[12px] text-ink-3">Used when a row has no MOQ Unit column.</p>
+                            </div>
+                            <div>
+                                <label htmlFor="imp-unit" className="block mb-1.5 text-[13px] font-medium text-ink-2">One piece is a</label>
+                                <select id="imp-unit" value={unit} onChange={(e) => setUnit(e.target.value)} className={selectCls}>
+                                    {(schema?.unitTypes ?? ['piece']).map((u: string) => <option key={u} value={u}>{u}</option>)}
+                                </select>
+                                <p className="mt-1 text-[12px] text-ink-3">Used when a row has no Unit Type column.</p>
                             </div>
                         </div>
                         <FormatGuide fields={fields} />

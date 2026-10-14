@@ -99,6 +99,8 @@ model User {
   // visual interrupts. Missing keys default to true (subscribed)
   // so legacy rows behave exactly as before.
   notificationPrefs    Json?
+  // Supplier's chosen currency for entering prices (ISO code). Null = suggest from country.
+  defaultCurrency      String?
 
   // Two-Factor Authentication
   twoFactorEnabled     Boolean   @default(false)
@@ -270,6 +272,10 @@ model Product {
   reviews      Review[]
   wishlistItems WishlistItem[]
   changeLog    ProductChangeLog[]
+  // What the supplier typed: price per case in their own currency. basePrice
+  // (EUR) is derived from it; kept so the entered figure is never reinterpreted.
+  supplierCurrency String?
+  supplierPrice    Float?
 
   @@index([supplierId])
   @@index([status])
@@ -387,6 +393,9 @@ model OrderItem {
   // cases in the ordered tier). Restored on cancellation before dispatch.
   // Null on orders placed before this was recorded.
   stockCases Int?
+  // The supplier's price for one ordered unit (case / pallet / truck) at
+  // order time, before the Atlantis margin. Never sent to buyers.
+  supplierUnitPrice Float?
 
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)

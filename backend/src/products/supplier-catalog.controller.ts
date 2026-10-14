@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Post, Query, Request, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Request, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
@@ -10,7 +10,8 @@ import { SupplierImportService, type ImportRequest } from './supplier-import.ser
 import { ImageLookupService } from './image-lookup.service';
 import { SupplierOverviewService } from './supplier-overview.service';
 import { IMPORT_FIELDS, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, buildTemplate, matchHeaders, parseSpreadsheet } from './product-import';
-import { TO_EUR, MOQ_UNITS } from './catalog-rules';
+import { TO_EUR, MOQ_UNITS, UNIT_TYPES, suggestedCurrency } from './catalog-rules';
+import { PrismaService } from '../common/prisma.service';
 
 /**
  * Supplier workspace API. Every route is SUPPLIER-only and scoped to the
@@ -25,6 +26,7 @@ export class SupplierCatalogController {
         private readonly importer: SupplierImportService,
         private readonly images: ImageLookupService,
         private readonly overviewSvc: SupplierOverviewService,
+        private readonly prisma: PrismaService,
     ) {}
 
     @Get('overview')
@@ -48,6 +50,22 @@ export class SupplierCatalogController {
         return this.products.changeLog(id);
     }
 
+    /** Supplier preferences: default price currency (suggested from country until set). */
+    @Get('preferences')
+    async preferences(@Request() req) {
+        const u: any = await this.prisma.user.findUnique({ where: { id: req.user.sub }, select: { defaultCurrency: true, country: true } });
+        const suggested = suggestedCurrency(u?.country);
+        return { defaultCurrency: u?.defaultCurrency || null, suggestedCurrency: suggested, effectiveCurrency: u?.defaultCurrency || suggested, country: u?.country || null, currencies: Object.keys(TO_EUR), rates: TO_EUR };
+    }
+
+    @Patch('preferences')
+    async setPreferences(@Request() req, @Body() body: { defaultCurrency?: string | null }) {
+        const cur = body?.defaultCurrency ? String(body.defaultCurrency).toUpperCase() : null;
+        if (cur && !TO_EUR[cur]) throw new BadRequestException(`Currency “${body.defaultCurrency}” isn’t supported.`);
+        await this.prisma.user.update({ where: { id: req.user.sub }, data: { defaultCurrency: cur } as any });
+        return this.preferences(req);
+    }
+
     @Get('reputation')
     reputation(@Request() req) {
         return this.products.supplierReputation(req.user.sub);
@@ -57,7 +75,7 @@ export class SupplierCatalogController {
 
     @Get('import/schema')
     schema() {
-        return { fields: IMPORT_FIELDS, currencies: Object.keys(TO_EUR), rates: TO_EUR, moqUnits: MOQ_UNITS, maxRows: MAX_IMPORT_ROWS, maxBytes: MAX_IMPORT_BYTES, formats: ['.xlsx', '.csv'] };
+        return { fields: IMPORT_FIELDS, currencies: Object.keys(TO_EUR), rates: TO_EUR, moqUnits: MOQ_UNITS, unitTypes: UNIT_TYPES, maxRows: MAX_IMPORT_ROWS, maxBytes: MAX_IMPORT_BYTES, formats: ['.xlsx', '.csv'] };
     }
 
     @Get('import/template')

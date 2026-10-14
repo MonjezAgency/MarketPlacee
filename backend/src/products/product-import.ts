@@ -6,12 +6,12 @@
  * judged by catalog-rules.ts, exactly like a manually created product.
  */
 import * as XLSX from 'xlsx';
-import { TO_EUR, MOQ_UNITS, invalidValues, missingForPublish, normaliseBarcode, normaliseWeight, type Missing } from './catalog-rules';
+import { TO_EUR, MOQ_UNITS, UNIT_TYPES, invalidValues, missingForPublish, normaliseBarcode, normaliseWeight, type Missing } from './catalog-rules';
 
 export type FieldKey =
     | 'name' | 'brand' | 'category' | 'ean' | 'price' | 'piecePrice' | 'currency' | 'stock' | 'stockPieces'
     | 'unitsPerCase' | 'moq' | 'moqUnit' | 'origin' | 'exwLocation' | 'weight'
-    | 'description' | 'shelfLife' | 'casesPerPallet' | 'palletsPerShipment' | 'leadTime' | 'imageUrl' | 'variants';
+    | 'unit' | 'description' | 'shelfLife' | 'casesPerPallet' | 'palletsPerShipment' | 'leadTime' | 'imageUrl' | 'variants';
 
 export interface ImportField {
     key: FieldKey;
@@ -24,8 +24,8 @@ export interface ImportField {
 }
 
 export const IMPORT_FIELDS: ImportField[] = [
-    { key: 'name', header: 'Product Name', required: 'yes', description: 'Full product name as buyers should see it.', example: 'Nutella Hazelnut Spread 400 g', aliases: ['name', 'product name', 'product title', 'title', 'item name', 'product', 'item', 'اسم المنتج', 'الاسم', 'المنتج', 'اسم الصنف', 'الصنف'] },
-    { key: 'brand', header: 'Brand', required: 'yes', description: 'Brand printed on the pack.', example: 'Nutella', aliases: ['brand', 'brand name', 'العلامة التجارية', 'الماركة', 'البراند', 'العلامه التجاريه'] },
+    { key: 'name', header: 'Product Name', required: 'yes', description: 'Full product name as buyers should see it.', example: 'Nutella Hazelnut Spread 400 g', aliases: ['name', 'product name', 'product title', 'title', 'item name', 'item description', 'product', 'item', 'اسم المنتج', 'الاسم', 'المنتج', 'اسم الصنف', 'الصنف'] },
+    { key: 'brand', header: 'Brand', required: 'yes', description: 'Brand printed on the pack.', example: 'Nutella', aliases: ['brand', 'brand name', 'manufacturer', 'العلامة التجارية', 'الماركة', 'البراند', 'العلامه التجاريه'] },
     { key: 'category', header: 'Category', required: 'yes', description: 'Catalog category, e.g. Chocolates & Sweets, Beverages.', example: 'Spreads & Breakfast', aliases: ['category', 'product category', 'categories', 'الفئة', 'التصنيف', 'القسم', 'الفئه'] },
     { key: 'ean', header: 'EAN', required: 'yes', description: 'Barcode — EAN-13, EAN-8, UPC-A (12) or GTIN-14, digits only. Format the column as Text so leading zeros are kept.', example: '3017620422003', aliases: ['ean', 'barcode', 'bar code', 'ean code', 'ean13', 'ean 13', 'ean8', 'gtin', 'gtin13', 'gtin 13', 'upc', 'upc code', 'الباركود', 'رمز الباركود', 'باركود'] },
     { key: 'price', header: 'Price per Case', required: 'one-of', group: 'price', description: 'Your price for one case (carton), in the file currency.', example: '36.00', aliases: ['price per case', 'case price', 'price case', 'price per carton', 'carton price', 'price carton', 'سعر الكرتونة', 'سعر الكرتونه', 'سعر الكرتون'] },
@@ -39,9 +39,10 @@ export const IMPORT_FIELDS: ImportField[] = [
     { key: 'origin', header: 'Country of Origin', required: 'yes', description: 'Where the product was made.', example: 'France', aliases: ['country of origin', 'origin', 'made in', 'coo', 'origin country', 'بلد المنشأ', 'المنشأ', 'بلد الصنع'] },
     { key: 'exwLocation', header: 'EXW Location', required: 'yes', description: 'City and country of the warehouse the goods are collected from (Ex Works).', example: 'Bucharest, Romania', aliases: ['exw location', 'exw', 'warehouse', 'warehouse location', 'ship from location', 'ship from', 'pickup location', 'loading location', 'exw warehouse', 'مكان الاستلام', 'المستودع', 'موقع المستودع', 'مكان التحميل'] },
     { key: 'weight', header: 'Weight per Piece', required: 'yes', description: 'Net weight or volume of one piece, with unit: g, kg, ml, cl, L, oz or lb.', example: '400 g', aliases: ['weight per piece', 'weight', 'net weight', 'unit weight', 'piece weight', 'volume', 'net content', 'الوزن', 'الوزن الصافي', 'الحجم'] },
+    { key: 'unit', header: 'Unit Type', required: 'no', description: `What one piece is: ${UNIT_TYPES.slice(0, 10).join(', ')}. Empty = the unit type you pick when uploading.`, example: 'jar', aliases: ['unit type', 'unit', 'uom', 'unit of measure', 'packaging type', 'نوع الوحدة', 'الوحدة'] },
     { key: 'description', header: 'Description', required: 'no', description: 'Optional product description.', example: 'Hazelnut spread with cocoa, 400 g jar.', aliases: ['description', 'product description', 'details', 'الوصف', 'وصف المنتج'] },
     { key: 'shelfLife', header: 'BBD / Shelf Life', required: 'no', description: 'Best-before date or remaining shelf life, e.g. 2027-03-31 or 9 months.', example: '9 months', aliases: ['bbd', 'best before', 'best before date', 'shelf life', 'expiry', 'expiry date', 'exp date', 'تاريخ الانتهاء', 'الصلاحية', 'مدة الصلاحية'] },
-    { key: 'casesPerPallet', header: 'Cases per Pallet', required: 'no', description: 'Needed to offer pallet prices.', example: '84', aliases: ['cases per pallet', 'cartons per pallet', 'cs per pallet', 'case per pallet', 'casesperpallet', 'كراتين في البالتة', 'عدد الكراتين في البالتة'] },
+    { key: 'casesPerPallet', header: 'Cases per Pallet', required: 'yes', description: 'Cases on one pallet.', example: '84', aliases: ['cases per pallet', 'cartons per pallet', 'cs per pallet', 'case per pallet', 'casesperpallet', 'كراتين في البالتة', 'عدد الكراتين في البالتة'] },
     { key: 'palletsPerShipment', header: 'Pallets per Truck', required: 'no', description: 'Needed to offer full-truck prices.', example: '33', aliases: ['pallets per truck', 'pallets per shipment', 'pallets per container', 'pallets truck', 'palletspershipment', 'بالتات في الشاحنة', 'عدد البالتات في الشاحنة'] },
     { key: 'leadTime', header: 'Lead Time (days)', required: 'no', description: 'Days you need to prepare the order. 0 = ready to dispatch.', example: '0', aliases: ['lead time', 'lead time days', 'preparation time', 'مدة التجهيز'] },
     { key: 'imageUrl', header: 'Image URL', required: 'no', description: 'Optional https link(s) to product photos, separated by |. Without a photo the product is saved as a draft; you can then find one by barcode or upload it.', example: '', aliases: ['image url', 'image', 'images', 'image link', 'photo', 'picture', 'photo url', 'صورة', 'رابط الصورة', 'الصورة'] },
@@ -50,7 +51,7 @@ export const IMPORT_FIELDS: ImportField[] = [
 
 /** Header names that could mean two different things; the supplier must choose. */
 const AMBIGUOUS: Record<string, FieldKey[]> = {
-    'price': ['price', 'piecePrice'], 'السعر': ['price', 'piecePrice'], 'cost': ['price', 'piecePrice'], 'wholesale price': ['price', 'piecePrice'],
+    'price': ['price', 'piecePrice'], 'السعر': ['price', 'piecePrice'], 'cost': ['price', 'piecePrice'], 'wholesale price': ['price', 'piecePrice'], 'supplier price': ['price', 'piecePrice'], 'net price': ['price', 'piecePrice'],
     'quantity': ['stock', 'stockPieces'], 'qty': ['stock', 'stockPieces'], 'الكمية': ['stock', 'stockPieces'], 'الكميه': ['stock', 'stockPieces'],
 };
 
@@ -146,7 +147,7 @@ export function parseSpreadsheet(buf: Buffer, filename: string): ParsedSheet {
 
 // ─── Row → product ─────────────────────────────────────────────────────
 
-export interface ImportOptions { currency: string; moqUnit: string }
+export interface ImportOptions { currency: string; moqUnit: string; unit?: string }
 export type Mapping = Record<string, FieldKey | null | ''>; // column index → field
 
 export interface BuiltRow {
@@ -206,6 +207,9 @@ export function buildRow(cells: string[], rowNumber: number, mapping: Mapping, o
     const moqUnitRaw = (values.moqUnit || opts.moqUnit || 'CASE').toUpperCase().replace(/S$/, '').replace('CARTON', 'CASE').replace('PCS', 'PIECE').replace('UNIT', 'PIECE');
     if (!MOQ_UNITS.includes(moqUnitRaw as any)) err('moqUnit', 'MOQ Unit', `“${values.moqUnit}” isn’t a valid MOQ unit (piece, case, pallet, truck).`);
 
+    const u0 = String(values.unit || opts.unit || 'piece').trim().toLowerCase();
+    const unitType = (UNIT_TYPES as readonly string[]).includes(u0) ? u0 : (UNIT_TYPES.find((t) => u0 === `${t}s` || u0 === `${t}es`) ?? u0);
+    if (!(UNIT_TYPES as readonly string[]).includes(unitType)) err('unit', 'Unit Type', `“${values.unit}” isn’t a supported unit type (${UNIT_TYPES.join(', ')}).`);
     const ean = normaliseBarcode(values.ean);
     const ex = (k: FieldKey) => IMPORT_FIELDS.find((f) => f.key === k)!.example;
     if (ean === ex('ean') && (values.name || '') === ex('name')) err('name', 'Example row', 'This is the template’s example row — delete it from your file.');
@@ -229,8 +233,11 @@ export function buildRow(cells: string[], rowNumber: number, mapping: Mapping, o
         weight: values.weight ? (normaliseWeight(values.weight) || values.weight) : '',
         shelfLife: values.shelfLife || null,
         price: priceCase !== undefined && rate ? Math.round(priceCase * rate * 10000) / 10000 : undefined,
+        // Keep what the supplier typed, in their currency (never reinterpreted later).
+        supplierCurrency: priceCase !== undefined && rate ? currency : undefined,
+        supplierPrice: priceCase !== undefined && rate ? Math.round(priceCase * 10000) / 10000 : undefined,
         stock,
-        unit: 'case',
+        unit: unitType,
         unitsPerCase: upc !== undefined && !Number.isNaN(upc) ? upc : undefined,
         moq: num(values.moq),
         moqUnit: moqUnitRaw,

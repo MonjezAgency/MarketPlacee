@@ -1,16 +1,16 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
-import { casesForItem } from './stock-ledger';
+import { casesForItem, supplierLineValue } from './stock-ledger';
 import { missingForPublish } from './catalog-rules';
 
 /**
  * Supplier Business Overview — every figure comes from order lines of the
  * supplier's own products. Definitions (also shown in the UI):
  *
- *  • Sales     = Σ (line price × quantity) of the supplier's lines on CONFIRMED
- *                orders (PAID, PROCESSING, SHIPPED, DELIVERED) placed in the
- *                period. Buyer prices, EUR. Pending (unconfirmed) and
- *                cancelled orders are excluded.
+ *  • Sales     = value of the supplier's lines on CONFIRMED orders (PAID,
+ *                PROCESSING, SHIPPED, DELIVERED) placed in the period, at the
+ *                SUPPLIER's own prices (EUR) — never buyer prices. Pending
+ *                (unconfirmed) and cancelled orders are excluded.
  *  • Orders    = distinct orders placed in the period containing the
  *                supplier's products, excluding cancelled ones.
  *  • Cases sold = cases on those confirmed lines (pallet lines × cases/pallet…).
@@ -31,21 +31,22 @@ export class SupplierOverviewService {
         return this.prisma.orderItem.findMany({
             where: { product: { supplierId }, order: { createdAt: { gte: from, lt: to } } },
             select: {
-                orderId: true, productId: true, quantity: true, price: true, stockCases: true, selectedTier: true, mixComposition: true, mixedLoadId: true,
+                orderId: true, productId: true, quantity: true, supplierUnitPrice: true, stockCases: true, selectedTier: true, mixComposition: true, mixedLoadId: true,
                 productNameSnapshot: true,
                 order: { select: { status: true, createdAt: true } },
-                product: { select: { name: true, images: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true } },
+                product: { select: { name: true, images: true, category: true, basePrice: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true } },
             },
         });
     }
 
     private summarise(rows: any[]) {
         const confirmed = rows.filter((r) => CONFIRMED.includes(r.order.status));
-        const sales = confirmed.reduce((s, r) => s + r.price * r.quantity, 0);
+        const sales = confirmed.reduce((s, r) => s + supplierLineValue(r).total, 0);
+        const estimated = confirmed.some((r) => supplierLineValue(r).estimated);
         const cases = confirmed.reduce((s, r) => s + casesForItem(r), 0);
         const orders = new Set(rows.filter((r) => r.order.status !== 'CANCELLED').map((r) => r.orderId)).size;
         const confirmedOrders = new Set(confirmed.map((r) => r.orderId)).size;
-        return { sales: Math.round(sales * 100) / 100, cases, orders, confirmedOrders };
+        return { sales: Math.round(sales * 100) / 100, cases, orders, confirmedOrders, estimated };
     }
 
     async overview(supplierId: string, fromIn?: string, toIn?: string) {
@@ -75,7 +76,7 @@ export class SupplierOverviewService {
             if (!CONFIRMED.includes(r.order.status)) continue;
             const i = idx.get(key(new Date(r.order.createdAt)));
             if (i === undefined) continue;
-            series[i].sales = Math.round((series[i].sales + r.price * r.quantity) * 100) / 100;
+            series[i].sales = Math.round((series[i].sales + supplierLineValue(r).total) * 100) / 100;
             const ok = `${i}:${r.orderId}`;
             if (!seen.has(ok)) { seen.add(ok); series[i].orders++; }
         }
@@ -85,7 +86,7 @@ export class SupplierOverviewService {
         for (const r of cur) {
             if (!CONFIRMED.includes(r.order.status) || !r.productId) continue;
             const e = byProduct.get(r.productId) || { productId: r.productId, name: r.product?.name || r.productNameSnapshot || 'Product', image: r.product?.images?.find((x: string) => /^https?:/.test(x)) || null, cases: 0, sales: 0, orders: new Set<string>() };
-            e.cases += casesForItem(r); e.sales += r.price * r.quantity; e.orders.add(r.orderId);
+            e.cases += casesForItem(r); e.sales += supplierLineValue(r).total; e.orders.add(r.orderId);
             byProduct.set(r.productId, e);
         }
         const top = [...byProduct.values()].sort((a, b) => b.cases - a.cases || b.sales - a.sales).slice(0, 5)
@@ -109,7 +110,50 @@ export class SupplierOverviewService {
             count('REJECTED') && { id: 'rejected', tone: 'danger', count: count('REJECTED'), label: `${count('REJECTED')} rejected listing${count('REJECTED') === 1 ? '' : 's'}`, href: '/supplier/products?status=REJECTED' },
         ].filter(Boolean);
 
+        // Sales by category (same population as Sales).
+        const catMap = new Map<string, number>();
+        for (const r of cur) if (CONFIRMED.includes(r.order.status)) { const c = r.product?.category || 'Other'; catMap.set(c, (catMap.get(c) || 0) + supplierLineValue(r).total); }
+        const byCategory = [...catMap.entries()].map(([category, sales]) => ({ category, sales: Math.round(sales * 100) / 100 })).sort((a, b) => b.sales - a.sales).slice(0, 6);
+
+        // Recent orders with this supplier's products (any status, newest first).
+        const recentRaw = await this.prisma.order.findMany({
+            where: { items: { some: { product: { supplierId } } } }, orderBy: { createdAt: 'desc' }, take: 6,
+            select: { id: true, status: true, createdAt: true, items: { where: { product: { supplierId } }, select: { quantity: true, supplierUnitPrice: true, selectedTier: true, stockCases: true, mixComposition: true, mixedLoadId: true, product: { select: { basePrice: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true } } } } },
+        });
+        const recentOrders = recentRaw.map((o: any) => ({ id: o.id, status: o.status, createdAt: o.createdAt, lines: o.items.length, cases: o.items.reduce((s: number, i: any) => s + casesForItem(i), 0), value: Math.round(o.items.reduce((s: number, i: any) => s + supplierLineValue(i).total, 0) * 100) / 100 }));
+
+        // Products that need the supplier (review outcome or incomplete).
+        const needWork = await this.prisma.product.findMany({
+            where: { supplierId, status: { in: ['NEEDS_CHANGES', 'DRAFT', 'REJECTED', 'PENDING'] as any } }, orderBy: { updatedAt: 'desc' }, take: 6,
+            select: { id: true, name: true, status: true, images: true, adminNotes: true, updatedAt: true },
+        });
+
+        // Stock alerts from real rules only: no stock, or less stock than one minimum order.
+        const casesFor = (p: any) => {
+            const u = String(p.moqUnit || 'PIECE').toUpperCase(), n = Number(p.moq) || 0;
+            if (!n) return 0;
+            if (u === 'CASE') return n;
+            if (u === 'PALLET') return n * (Number(p.casesPerPallet) || 0);
+            if (u === 'TRUCK') return n * (Number(p.casesPerPallet) || 0) * (Number(p.palletsPerShipment) || 0);
+            const upc = Number(p.unitsPerCase) || 0; return upc ? Math.ceil(n / upc) : 0;
+        };
+        const liveFull = await this.prisma.product.findMany({ where: { supplierId, status: 'APPROVED' }, select: { id: true, name: true, stock: true, moq: true, moqUnit: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, images: true } });
+        const stockAlerts = liveFull
+            .map((p: any) => ({ id: p.id, name: p.name, image: (p.images || []).find((x: string) => /^https?:/.test(x)) || null, stock: p.stock ?? 0, minOrderCases: casesFor(p) }))
+            .filter((p) => p.stock <= 0 || (p.minOrderCases > 0 && p.stock < p.minOrderCases))
+            .map((p) => ({ ...p, kind: p.stock <= 0 ? 'out' : 'below_moq' }))
+            .slice(0, 8);
+
+        // Recent stock changes recorded in the product change log.
+        const stockChanges = await (this.prisma as any).productChangeLog.findMany({
+            where: { field: 'stock', product: { supplierId } }, orderBy: { createdAt: 'desc' }, take: 6,
+            select: { id: true, oldValue: true, newValue: true, reason: true, createdAt: true, product: { select: { id: true, name: true } } },
+        }).catch(() => []);
+
         return {
+            byCategory, recentOrders, stockAlerts,
+            needsWork: needWork.map((p: any) => ({ id: p.id, name: p.name, status: p.status, note: p.adminNotes, image: (p.images || []).find((x: string) => /^https?:/.test(x)) || null, updatedAt: p.updatedAt })),
+            stockChanges: stockChanges.map((c: any) => ({ id: c.id, productId: c.product?.id, name: c.product?.name, from: c.oldValue, to: c.newValue, at: c.createdAt })),
             range: { from: from.toISOString(), to: new Date(to.getTime() - 1).toISOString(), granularity: monthly ? 'month' : 'day', timezone: 'UTC' },
             totals, previous,
             products: { active: count('APPROVED'), pending: count('PENDING'), drafts: count('DRAFT'), needsChanges: count('NEEDS_CHANGES'), rejected: count('REJECTED'), outOfStock },

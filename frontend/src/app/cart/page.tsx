@@ -371,7 +371,7 @@ export default function CartPage() {
                                     } : undefined}
                                     error={loadError[load.id] || load.error?.message || (q && !q.ready ? q.issues.join(' ') : null) || null}
                                     total={q ? formatPrice(q.total) : '—'}
-                                    totalNote={q ? `incl. ${Math.round((q.markup - 1) * 100)}% mixing surcharge` : undefined}
+                                    totalNote={q ? 'incl. mixed-load handling' : undefined}
                                     suggestions={candidates.length > 0 ? (
                                         <div className="px-5 py-4 border-t border-line">
                                             <p className="text-[13.5px] text-ink-3">Add more to reach the minimum:</p>

@@ -4,10 +4,11 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Plus, Upload, Search, Package, Pencil, Trash2, Send, ChevronLeft, ChevronRight, AlertCircle, Boxes, Tags, Clock3, CheckCircle2 } from 'lucide-react';
+import { Plus, Upload, Search, Package, Pencil, Trash2, Send, SlidersHorizontal, Image as ImageIcon, ChevronLeft, ChevronRight, AlertCircle, Boxes, Tags, Clock3, CheckCircle2 } from 'lucide-react';
 import { supplierApi, type ProductPage, type SupplierProduct } from '@/lib/supplier-api';
 import { Button, Card, EmptyState, ErrorState, PageHeader, Skeleton, Stat, StatusBadge, Thumb, eur, int, inputCls, selectCls, useConfirm } from '@/components/supplier/ui';
 import BulkImportDialog from '@/components/supplier/BulkImportDialog';
+import StockAdjustDialog from '@/components/supplier/StockAdjustDialog';
 import { cn } from '@/lib/utils';
 
 const STATUS_TABS = [
@@ -24,7 +25,7 @@ const SORTS = [
     { id: 'price_asc', label: 'Price: low to high' }, { id: 'price_desc', label: 'Price: high to low' },
 ];
 
-/** Inventory Manager — the supplier's own catalog, paginated on the server. */
+/** Inventory & Products — the supplier's own catalog, paginated on the server. */
 export default function InventoryManagerPage() {
     return <React.Suspense fallback={null}><InventoryManager /></React.Suspense>;
 }
@@ -46,6 +47,7 @@ function InventoryManager() {
     const [selected, setSelected] = React.useState<Set<string>>(new Set());
     const [busy, setBusy] = React.useState(false);
     const [importOpen, setImportOpen] = React.useState(params.get('import') === '1');
+    const [adjust, setAdjust] = React.useState<SupplierProduct | null>(null);
 
     React.useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
     React.useEffect(() => { setPage(1); }, [debouncedQ, status, category, stock, sort]);
@@ -97,7 +99,7 @@ function InventoryManager() {
 
     return (
         <div>
-            <PageHeader title="Inventory manager" description="Your products, prices and stock. Changes to live listings are saved instantly; new products and identity changes go through Atlantis review."
+            <PageHeader title="Inventory & products" description="Your catalog, your prices and your stock. Price and stock changes on live listings apply immediately; new products and identity changes go through Atlantis review."
                 actions={<>
                     <Button icon={<Upload size={15} />} onClick={() => setImportOpen(true)}>Bulk upload</Button>
                     <Link href="/supplier/products/new"><Button variant="primary" icon={<Plus size={15} />}>Add product</Button></Link>
@@ -213,7 +215,9 @@ function InventoryManager() {
                                             <td className="px-2 py-2.5 hidden lg:table-cell font-mono text-[12.5px] text-ink-2">{p.ean || <span className="font-sans text-amber-800">Missing</span>}</td>
                                             <td className="pe-4 py-2.5">
                                                 <div className="flex justify-end gap-1">
-                                                    <Link href={`/supplier/products/${p.id}/edit`} aria-label={`Edit ${p.name}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><Pencil size={15} /></Link>
+                                                    {p.status === 'APPROVED' && <button type="button" onClick={() => setAdjust(p)} aria-label={`Adjust stock of ${p.name}`} title="Adjust stock" className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><SlidersHorizontal size={15} /></button>}
+                                                    <Link href={`/supplier/products/${p.id}/edit#media`} aria-label={`Photos of ${p.name}`} title="Photos" className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><ImageIcon size={15} /></Link>
+                                                    <Link href={`/supplier/products/${p.id}/edit`} title="Edit" aria-label={`Edit ${p.name}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><Pencil size={15} /></Link>
                                                     <button type="button" onClick={() => removeOne(p)} aria-label={`Delete ${p.name}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:text-red-700 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><Trash2 size={15} /></button>
                                                 </div>
                                             </td>
@@ -257,9 +261,10 @@ function InventoryManager() {
                 )}
             </Card>
 
-            <p className="mt-3 text-[12.5px] text-ink-3">Prices are your price per case in EUR, before Atlantis margin. Stock is counted in cases; “reserved” cases are on orders not yet delivered and are already taken off stock. Per-product movement history is on <Link href="/supplier/inventory" className="text-teal hover:underline">Stock &amp; reservations</Link>.</p>
+            <p className="mt-3 text-[12.5px] text-ink-3">Prices are your price per case (EUR), before the Atlantis margin. Stock is counted in cases; “reserved” cases are on orders not yet delivered and are already taken off stock. Per-product movement history is on <Link href="/supplier/inventory" className="text-teal hover:underline">Stock &amp; reservations</Link>.</p>
 
             <BulkImportDialog open={importOpen} onClose={() => { setImportOpen(false); load(); }} />
+            <StockAdjustDialog product={adjust} onClose={() => setAdjust(null)} onSaved={() => { setAdjust(null); load(); }} />
         </div>
     );
 }

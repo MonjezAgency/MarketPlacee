@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import {
     LayoutDashboard,
-    Box,
-    ListPlus,
+    Package,
+    Warehouse,
+    LifeBuoy,
     ShoppingCart,
     MessageSquare,
     Bell,
@@ -17,10 +18,7 @@ import {
     Moon,
     Sun,
     Star,
-    TrendingUp,
-    Settings,
-    CreditCard,
-    Lock
+    Settings
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -53,31 +51,20 @@ const SUPPLIER_LANGUAGES: { code: Locale; name: string; flag: string }[] = [
     { code: 'tr', name: 'Türkçe',      flag: '🇹🇷' },
 ];
 
-const SUPPLIER_LINKS = [
+// Supplier navigation. Removed from the menu (pages and APIs still exist, so
+// old links keep working): Analytics (its useful metrics now live on the
+// Business Overview), Wholesale Offers, Offers & Ads, Payment Methods.
+const SUPPLIER_LINKS: { label: string; href: string; icon: any; key?: string; locked?: boolean }[] = [
     { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
-    { label: 'Inventory Manager', href: '/supplier/products', icon: Box, key: 'products' },
-    // New "Stock & Reservations" tab — operator request.
-    // Shows per-product breakdown: in-stock vs reserved (pending +
-    // processing + shipped orders) vs sold (delivered) vs cancelled
-    // (restored to stock). The supplier reads this to answer "what's
-    // committed vs what's free vs what's left the warehouse".
-    { label: 'Stock & Reservations', href: '/supplier/inventory', icon: Box, key: 'inventory' },
-    // Wholesale Offers is hidden from the sidebar for now (not a current
-    // priority). The page, API and stored offers are untouched and still
-    // reachable at /supplier/wholesale-offers; approved offers keep
-    // showing their discount on product pages.
-    // "Offers & Ads" is gated behind the payment integration —
-    // suppliers can't run paid placements until billing is live, so
-    // we lock the row and show a "Soon" badge instead of opening
-    // the (incomplete) page. Operator decision: ship the UI placeholder
-    // now, unlock when Stripe Connect ads-billing flow lands.
-    { label: 'Offers & Ads', href: '/supplier/offers', icon: ListPlus, locked: true, comingSoon: true },
-    { label: 'My Sales', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
-    { label: 'Analytics', href: '/supplier/analytics', icon: TrendingUp },
-    { label: 'Payment Methods', href: '/supplier/payment-methods', icon: CreditCard, locked: true },
-    { label: 'Support', href: '/supplier/support', icon: MessageSquare },
+    { label: 'Inventory & Products', href: '/supplier/products', icon: Package, key: 'products' },
+    { label: 'Stock & Reservations', href: '/supplier/inventory', icon: Warehouse },
+    { label: 'Orders', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
     { label: 'Settings', href: '/supplier/settings', icon: Settings },
+    { label: 'Support', href: '/supplier/support', icon: LifeBuoy },
 ];
+
+/** Overview matches only itself; other items also match their sub-pages. */
+const isLinkActive = (pathname: string, href: string) => (href === '/supplier' ? pathname === '/supplier' : pathname === href || pathname.startsWith(href + '/'));
 
 export default function SupplierLayout({ children }: { children: React.ReactNode }) {
     const [isOpen, setIsOpen] = React.useState(true);
@@ -202,7 +189,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     }
 
     return (
-        <div className="flex h-screen bg-[#F8FAFC] font-sans selection:bg-[#0EA5A4]/10">
+        <div className="flex h-[100dvh] overflow-hidden bg-[#F8FAFC] font-sans selection:bg-[#0EA5A4]/10">
             {/* Sidebar (Desktop) */}
             <aside className={cn(
                 "hidden md:flex flex-col h-full bg-[#0F172A] transition-all duration-300 ease-in-out shrink-0 text-start",
@@ -230,42 +217,31 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 </div>
 
                 {/* Sidebar Navigation */}
-                <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto no-scrollbar">
+                <nav aria-label="Supplier navigation" className="flex-1 py-5 px-3 space-y-0.5 overflow-y-auto no-scrollbar">
+                    {isOpen && <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Workspace</p>}
                     {SUPPLIER_LINKS.map((link) => {
                         const Icon = link.icon;
-                        const isActive = link.href === '/supplier' ? pathname === '/supplier' : pathname === link.href || pathname.startsWith(link.href + '/');
+                        const isActive = isLinkActive(pathname, link.href);
                         const badgeCount = link.key ? pendingCounts[link.key] : 0;
-
                         return (
                             <Link
                                 key={link.href}
-                                href={link.locked ? '#' : link.href}
+                                href={link.href}
+                                aria-current={isActive ? 'page' : undefined}
+                                title={isOpen ? undefined : link.label}
                                 className={cn(
-                                    "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative",
-                                    isActive 
-                                        ? "bg-[#1E293B] text-white" 
-                                        : "text-[#94A3B8] hover:text-white hover:bg-[#1E293B]/50",
-                                    link.locked && "opacity-50 cursor-not-allowed"
+                                    "relative flex items-center gap-3 h-10 px-3 rounded-lg transition-colors group outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]",
+                                    isActive ? "bg-white/[0.08] text-white" : "text-[#A3B1C6] hover:text-white hover:bg-white/[0.04]",
                                 )}
                             >
-                                <Icon size={20} className={cn(isActive ? "text-[#0EA5A4]" : "text-[#94A3B8] group-hover:text-white")} />
-                                {isOpen && <span className="text-[14px] font-medium flex-1 truncate">{link.label}</span>}
-                                {isOpen && badgeCount > 0 && (
-                                    <span className="bg-[#EF4444] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                {isActive && <span aria-hidden className="absolute start-0 top-2 bottom-2 w-[3px] rounded-full bg-[#2EC4B6]" />}
+                                <Icon size={18} strokeWidth={1.9} className={cn("shrink-0", isActive ? "text-[#2EC4B6]" : "text-[#7C8BA1] group-hover:text-white")} />
+                                {isOpen && <span className="text-[13.5px] font-medium flex-1 truncate">{link.label}</span>}
+                                {badgeCount > 0 && (
+                                    <span className={cn("min-w-[20px] h-5 px-1.5 rounded-full bg-[#F59E0B] text-[#111827] text-[11px] font-bold flex items-center justify-center", !isOpen && "absolute top-0.5 end-0.5 min-w-[16px] h-4 text-[10px]")} aria-label={`${badgeCount} need attention`}>
                                         {badgeCount}
                                     </span>
                                 )}
-                                {/* "Soon" pill for features that aren't shipped yet.
-                                    Takes priority over the lock icon when both are
-                                    set — the lock alone reads as "you don't have
-                                    permission" whereas "Soon" reads as "we haven't
-                                    built it yet". */}
-                                {(link as any).comingSoon && isOpen && (
-                                    <span className="inline-flex items-center h-5 px-2 rounded-full bg-amber-500/15 text-amber-400 text-[9px] font-bold uppercase tracking-wider border border-amber-500/20">
-                                        Soon
-                                    </span>
-                                )}
-                                {link.locked && isOpen && !(link as any).comingSoon && <Lock size={14} className="text-[#94A3B8]/50" />}
                             </Link>
                         );
                     })}
@@ -348,7 +324,12 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 </header>
 
                 {/* Main Content (Scrollable) */}
-                <main className="flex-1 overflow-y-auto scroll-smooth text-start">
+                {/* `relative` makes this scroll area the containing block for
+                    absolutely-positioned descendants (e.g. sr-only labels). Without
+                    it they anchored to <body>, stretched the document past the
+                    viewport and the window scrolled the whole app up, leaving a
+                    blank band at the bottom of long pages like the product editor. */}
+                <main className="relative flex-1 min-h-0 overflow-y-auto overscroll-contain scroll-smooth text-start">
                     <div className="max-w-[1320px] mx-auto w-full py-6 px-4 sm:px-6 lg:px-8">
                         <ConfirmProvider>{children}</ConfirmProvider>
                     </div>
@@ -377,17 +358,21 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                 <button onClick={() => setIsMobileOpen(false)} className="text-white/60"><X size={20} /></button>
                             </div>
                             <nav className="flex-1 p-4 space-y-1">
-                                {SUPPLIER_LINKS.map((link) => (
-                                    <Link
-                                        key={link.href}
-                                        href={link.locked ? '#' : link.href}
-                                        onClick={() => !link.locked && setIsMobileOpen(false)}
-                                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-[#94A3B8] hover:text-white transition-colors"
-                                    >
-                                        <link.icon size={20} />
-                                        <span className="text-[14px] font-medium">{link.label}</span>
-                                    </Link>
-                                ))}
+                                {SUPPLIER_LINKS.map((link) => {
+                                    const active = isLinkActive(pathname, link.href);
+                                    return (
+                                        <Link
+                                            key={link.href}
+                                            href={link.href}
+                                            aria-current={active ? 'page' : undefined}
+                                            onClick={() => setIsMobileOpen(false)}
+                                            className={cn("flex items-center gap-3 h-11 px-3 rounded-lg transition-colors", active ? "bg-white/[0.08] text-white" : "text-[#A3B1C6] hover:text-white")}
+                                        >
+                                            <link.icon size={18} className={active ? "text-[#2EC4B6]" : undefined} />
+                                            <span className="text-[14px] font-medium">{link.label}</span>
+                                        </Link>
+                                    );
+                                })}
                             </nav>
                         </motion.aside>
                     </div>

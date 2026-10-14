@@ -8,12 +8,13 @@ export interface SupplierProduct {
     id: string; name: string; brand: string | null; category: string; status: string; adminNotes: string | null;
     images: string[]; ean: string | null; price: number | null; basePrice: number | null; stock: number; unit: string | null;
     moq: number | null; moqUnit: string | null; unitsPerCase: number | null; casesPerPallet: number | null; palletsPerShipment: number | null;
+    supplierCurrency?: string | null; supplierPrice?: number | null;
     weight: string | null; origin: string | null; exwLocation: string | null; shelfLife: string | null; leadTime: number | null;
     description?: string; videos?: string[]; readyForDispatch?: boolean;
     variants: { name: string; values: string[] }[];
     createdAt: string; updatedAt: string; reserved?: number;
     missing: Missing[]; statusNote: string;
-    movement?: { reserved: number; delivered: number; cancelled: number; ordered: number };
+    movement?: { reserved: number; inTransit: number; delivered: number; cancelled: number; ordered: number };
 }
 
 export interface ProductPage {
@@ -58,6 +59,9 @@ export const supplierApi = {
     uploadImage: (file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/products/upload-image', { method: 'POST', body: fd }).then((r) => json<{ url: string }>(r)); },
     imageLookup: (ean: string, name?: string, brand?: string) => post('/supplier-catalog/image-lookup', { ean, name, brand }).then((r) => json<any>(r)),
     acceptImage: (url: string) => post('/supplier-catalog/image-lookup/accept', { url }).then((r) => json<{ url: string }>(r)),
+    preferences: () => apiFetch('/supplier-catalog/preferences', { cache: 'no-store' }).then((r) => json<{ defaultCurrency: string | null; suggestedCurrency: string; effectiveCurrency: string; country: string | null; currencies: string[]; rates: Record<string, number> }>(r)),
+    setPreferences: (body: { defaultCurrency: string | null }) => apiFetch('/supplier-catalog/preferences', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => json<any>(r)),
+    inventory: () => apiFetch('/products/inventory', { cache: 'no-store' }).then((r) => json<any[]>(r)),
     reputation: () => apiFetch('/supplier-catalog/reputation', { cache: 'no-store' }).then((r) => json<any>(r)),
     importSchema: () => apiFetch('/supplier-catalog/import/schema').then((r) => json<any>(r)),
     importParse: (file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/supplier-catalog/import/parse', { method: 'POST', body: fd }).then((r) => json<any>(r)); },

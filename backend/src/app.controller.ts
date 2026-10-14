@@ -1,4 +1,6 @@
-import { Controller, Get, Post, Body, HttpCode, Logger, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpCode, Logger, Query, Req, UseGuards } from '@nestjs/common';
+import { OptionalJwtAuthGuard } from './auth/optional-jwt.guard';
+import { isPriceStaff, relativeMarkups } from './common/price-privacy';
 import { IsEmail, IsString, IsOptional } from 'class-validator';
 import { AppService } from './app.service';
 import { EmailService } from './email/email.service';
@@ -43,9 +45,18 @@ export class AppController {
         return { unit };
     }
 
+    /**
+     * Tier pricing factors for the storefront. Atlantis staff get the real
+     * markups; everyone else gets only the ratio between tiers (case = 1),
+     * which together with the buyer case price reproduces buyer prices
+     * without revealing the margin. See common/price-privacy.ts.
+     */
     @Get('config/markup')
-    async getPublicMarkup() {
-        return this.appService.getPublicMarkup();
+    @UseGuards(OptionalJwtAuthGuard)
+    async getPublicMarkup(@Req() req: any) {
+        const m = await this.appService.getPublicMarkup();
+        const viewer = req?.user ? { id: req.user.sub, role: req.user.role } : null;
+        return isPriceStaff(viewer) ? m : relativeMarkups(m);
     }
 
     @Get('config/homepage-banners')

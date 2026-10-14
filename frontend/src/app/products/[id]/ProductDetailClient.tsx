@@ -384,7 +384,7 @@ export default function ProductDetailClient() {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
         Promise.all([
             fetch(`${apiBase}/config/default-unit`).then(r => r.json()).catch(() => ({})),
-            fetch(`${apiBase}/config/markup`).then(r => r.json()).catch(() => ({})),
+            apiFetch('/config/markup').then(r => r.json()).catch(() => ({})),
         ]).then(([unitData, markupData]) => {
             if (unitData?.unit && ['truck', 'pallet', 'carton'].includes(unitData.unit)) {
                 setAdminDefaultUnit(unitData.unit as 'truck' | 'pallet' | 'carton');

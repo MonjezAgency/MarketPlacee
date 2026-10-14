@@ -8,7 +8,7 @@ import { assertTransition, ORDER_TRANSITIONS } from '../../orders/orders.service
 const complete = {
     name: 'Nutella Hazelnut Spread 400 g', brand: 'Nutella', category: 'Spreads & Breakfast', ean: '3017620422003',
     origin: 'France', exwLocation: 'Bucharest, Romania', weight: '400 g', price: 36, stock: 120, unitsPerCase: 15,
-    moq: 10, moqUnit: 'CASE', images: ['https://cdn.example.com/n.jpg'],
+    moq: 10, moqUnit: 'CASE', images: ['https://cdn.example.com/n.jpg'], casesPerPallet: 84, unit: 'jar',
 };
 
 describe('catalog rules', () => {
@@ -72,20 +72,22 @@ describe('import header matching', () => {
 });
 
 describe('import rows', () => {
-    const headers = ['Product Name', 'Brand', 'Category', 'EAN', 'Price per Piece', 'Pieces per Case', 'Stock (cases)', 'MOQ', 'Country of Origin', 'EXW Location', 'Weight per Piece', 'Image URL'];
+    const headers = ['Product Name', 'Brand', 'Category', 'EAN', 'Price per Piece', 'Pieces per Case', 'Stock (cases)', 'MOQ', 'Country of Origin', 'EXW Location', 'Weight per Piece', 'Image URL', 'Cases per Pallet'];
     const mapping = Object.fromEntries(matchHeaders(headers).map((m) => [String(m.index), m.field]));
     const opts = { currency: 'EUR', moqUnit: 'CASE' };
 
     it('computes the case price from a piece price and keeps the barcode as text', () => {
-        const r = buildRow(['Milka Choco & Cake 35 g', 'Milka', 'Chocolates & Sweets', '0012345678905', '0.28', '24', '1000', '10', 'Germany', 'Bucharest, Romania', '35g', 'https://img.example.com/a.jpg'], 2, mapping, opts);
+        const r = buildRow(['Milka Choco & Cake 35 g', 'Milka', 'Chocolates & Sweets', '0012345678905', '0.28', '24', '1000', '10', 'Germany', 'Bucharest, Romania', '35g', 'https://img.example.com/a.jpg', '250'], 2, mapping, opts);
         expect(r.errors).toEqual([]);
         expect(r.missing).toEqual([]);
         expect(r.product.price).toBeCloseTo(6.72, 4);
         expect(r.product.ean).toBe('0012345678905');
         expect(r.product.weight).toBe('35 g');
+        // what the supplier typed is kept with its currency
+        expect(r.product).toMatchObject({ supplierCurrency: 'EUR', supplierPrice: 6.72, unit: 'piece' });
     });
     it('missing photo → draft (missing), not error', () => {
-        const r = buildRow(['Milka', 'Milka', 'Chocolates & Sweets', '0012345678905', '0.28', '24', '1000', '10', 'Germany', 'Bucharest', '35 g', ''], 3, mapping, opts);
+        const r = buildRow(['Milka', 'Milka', 'Chocolates & Sweets', '0012345678905', '0.28', '24', '1000', '10', 'Germany', 'Bucharest', '35 g', '', '250'], 3, mapping, opts);
         expect(r.errors).toEqual([]);
         expect(r.missing.map((m) => m.field)).toEqual(['images']);
     });
@@ -217,5 +219,67 @@ describe('barcode image lookup', () => {
         const r = await svc.accept('https://images.openfoodfacts.org/images/products/x.full.jpg', f);
         expect(r.url).toBe('https://storage.example/stored.jpg');
         expect(storage.uploadProductImage).toHaveBeenCalled();
+    });
+});
+
+
+import { applyPricePrivacy, relativeMarkups } from '../../common/price-privacy';
+import { applySupplierCurrency, suggestedCurrency } from '../catalog-rules';
+
+describe('price privacy', () => {
+    const m = { piece: 1.1, pallet: 1.05, container: 1.02, mix: 1.15 };
+    const product = () => ({ id: 'p1', supplierId: 'sup-a', name: 'X', price: 7.392, basePrice: 6.72, previousPrice: 7.0, adminNotes: 'internal', supplierPrice: 33, supplierCurrency: 'RON', variantPrices: { 'Size=L': 7 } });
+
+    it('buyers get buyer prices only — never the supplier price, notes or markups', () => {
+        const out: any = applyPricePrivacy({ data: [product()] }, { id: 'buyer', role: 'CUSTOMER' }, m);
+        const p = out.data[0];
+        expect(p.basePrice).toBeCloseTo(7.392, 4); // buyer case price, not 6.72
+        expect(p.variantPrices['Size=L']).toBeCloseTo(7.7, 4);
+        expect(p).not.toHaveProperty('adminNotes');
+        expect(p).not.toHaveProperty('supplierPrice');
+        expect(p).not.toHaveProperty('supplierCurrency');
+        // storefront maths (basePrice × tier ratio) still yields the exact buyer prices
+        const r = relativeMarkups(m);
+        expect(r.piece).toBe(1);
+        expect(p.basePrice * r.pallet).toBeCloseTo(6.72 * 1.05, 3);
+        expect(p.basePrice * r.container).toBeCloseTo(6.72 * 1.02, 3);
+    });
+    it('another supplier is treated like a buyer', () => {
+        const p: any = applyPricePrivacy(product(), { id: 'sup-b', role: 'SUPPLIER' }, m);
+        expect(p.basePrice).toBeCloseTo(7.392, 4);
+        expect(p).not.toHaveProperty('adminNotes');
+    });
+    it('the owning supplier sees their own price, never the buyer price', () => {
+        const p: any = applyPricePrivacy(product(), { id: 'sup-a', role: 'SUPPLIER' }, m);
+        expect(p.price).toBe(6.72);
+        expect(p.basePrice).toBe(6.72);
+        expect(p).not.toHaveProperty('previousPrice');
+        expect(p.adminNotes).toBe('internal');
+        const legacy: any = applyPricePrivacy({ ...product(), basePrice: null }, { id: 'sup-a', role: 'SUPPLIER' }, m);
+        expect(legacy.price).toBeNull();
+    });
+    it('owner-scoped supplier routes never inflate the supplier’s own prices', () => {
+        const p: any = applyPricePrivacy({ data: [{ id: 'p1', price: 6.72, basePrice: 6.72 }] }, { id: 'sup-a', role: 'SUPPLIER' }, m, 0, true);
+        expect(p.data[0].basePrice).toBe(6.72);
+    });
+    it('staff see everything; supplierUnitPrice is removed for non-staff', () => {
+        const staff: any = applyPricePrivacy(product(), { id: 'a', role: 'ADMIN' }, m);
+        expect(staff.basePrice).toBe(6.72);
+        const order: any = applyPricePrivacy({ items: [{ price: 10, supplierUnitPrice: 9 }] }, { id: 'buyer', role: 'CUSTOMER' }, m);
+        expect(order.items[0]).not.toHaveProperty('supplierUnitPrice');
+    });
+});
+
+describe('supplier currency', () => {
+    it('converts the typed price to EUR and keeps the original', () => {
+        const o = applySupplierCurrency({ supplierCurrency: 'ron', supplierPrice: '100' });
+        expect(o).toMatchObject({ supplierCurrency: 'RON', supplierPrice: 100, price: 20.1 });
+        expect(applySupplierCurrency({ price: 12 })).toMatchObject({ supplierCurrency: 'EUR', supplierPrice: 12, price: 12 });
+        expect(() => applySupplierCurrency({ supplierCurrency: 'XYZ', supplierPrice: 1 })).toThrow(/isn’t supported/);
+    });
+    it('suggests a currency from the country', () => {
+        expect(suggestedCurrency('Romania')).toBe('RON');
+        expect(suggestedCurrency('Germany')).toBe('EUR');
+        expect(suggestedCurrency(null)).toBe('EUR');
     });
 });

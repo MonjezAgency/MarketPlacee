@@ -1,4 +1,5 @@
 import type { Product } from '@/lib/types';
+import { apiFetch } from '@/lib/api';
 
 export type Markups = { piece: number; pallet: number; container: number };
 export type DefaultUnit = 'truck' | 'pallet' | 'carton';
@@ -32,7 +33,10 @@ let _markupsPromise: Promise<Markups> | null = null;
 export function getAdminMarkups(): Promise<Markups> {
     if (_markups) return Promise.resolve(_markups);
     if (!_markupsPromise) {
-        _markupsPromise = fetch(`${apiBase()}/config/markup`)
+        // Through the authenticated proxy: staff get real markups, everyone
+        // else tier ratios that pair with the buyer case price (see backend
+        // common/price-privacy.ts).
+        _markupsPromise = apiFetch('/config/markup')
             .then(r => r.json())
             .then(d => {
                 _markups = {

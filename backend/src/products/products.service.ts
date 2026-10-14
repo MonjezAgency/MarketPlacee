@@ -3,7 +3,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EanService } from './ean.service';
-import { missingForPublish, invalidValues, normaliseBarcode, normaliseWeight, realImages, REVIEWED_FIELDS, statusExplanation, type Missing } from './catalog-rules';
+import { applySupplierCurrency, missingForPublish, invalidValues, normaliseBarcode, normaliseWeight, realImages, REVIEWED_FIELDS, statusExplanation, type Missing } from './catalog-rules';
 import { stockMovements } from './stock-ledger';
 import { listedSince } from './listed-since';
 import { buildBrandCanon, brandKey, canonicalBrand, type BrandCanon } from './brand-canon';
@@ -145,6 +145,7 @@ export class ProductsService {
         if (dtoIn.ean !== undefined && dtoIn.ean !== null && String(dtoIn.ean).trim()) dtoIn.ean = normaliseBarcode(dtoIn.ean);
         if (dtoIn.weight) dtoIn.weight = normaliseWeight(dtoIn.weight) || String(dtoIn.weight).trim();
         if (!isAdmin) delete dtoIn.adminNotes; // suppliers can't write review notes
+        try { applySupplierCurrency(dtoIn); } catch (e: any) { throw new BadRequestException({ code: 'INVALID_PRODUCT', message: e.message }); }
         const invalid = invalidValues(dtoIn);
         if (invalid.length) throw new BadRequestException({ code: 'INVALID_PRODUCT', message: invalid.map((m) => m.reason).join(' '), invalid });
         // KYC enforcement DISABLED — operator decision to let
@@ -239,7 +240,7 @@ export class ProductsService {
         // incomplete or not submitted → DRAFT (never public), complete and
         // submitted → PENDING (Atlantis review). Staff: complete → APPROVED,
         // incomplete → PENDING with a note listing what's missing.
-        const missing = missingForPublish({ ...createProductDto, images: productImages, basePrice: (createProductDto as any).price });
+        const missing = missingForPublish({ ...createProductDto, unit: (createProductDto as any).unit || 'piece', images: productImages, basePrice: (createProductDto as any).price });
         const submit = options?.submit !== false;
         let finalStatus: ProductStatus;
         let adminNotes = isAdmin ? ((createProductDto as any).adminNotes || null) : null;
@@ -320,6 +321,8 @@ export class ProductsService {
                 weight: dto.weight || null,         // stored as String? in schema
                 origin: dto.origin || null,         // stored as String? in schema
                 exwLocation: dto.exwLocation || null,
+                supplierCurrency: dto.supplierCurrency || null,
+                supplierPrice: Number.isFinite(Number(dto.supplierPrice)) && Number(dto.supplierPrice) > 0 ? Number(dto.supplierPrice) : null,
                 readyForDispatch: dto.readyForDispatch ?? true,
                 leadTime: dto.leadTime ?? 0,
                 warehouseId: dto.warehouseId || null,
@@ -1118,6 +1121,8 @@ export class ProductsService {
                 : [];
         }
         if (data.ean !== undefined) updateData.ean = data.ean ? normaliseBarcode(data.ean) : null;
+        if (data.supplierCurrency !== undefined) updateData.supplierCurrency = data.supplierCurrency || null;
+        if (data.supplierPrice !== undefined) updateData.supplierPrice = data.supplierPrice ?? null;
         if (data.exwLocation !== undefined) updateData.exwLocation = data.exwLocation ? String(data.exwLocation).trim() : null;
         if (data.variants !== undefined) updateData.variants = data.variants;
         // Mix-composer pricing + metadata. Both are JSON maps keyed by
@@ -1314,11 +1319,12 @@ export class ProductsService {
         const ledger = await stockMovements(this.prisma, products.map((p) => p.id));
         // All buckets in CASES (see stock-ledger.ts) so a pallet line counts
         // as casesPerPallet cases, matching Product.stock.
-        const pick = (k: 'reserved' | 'delivered' | 'cancelled' | 'ordered') => Object.fromEntries(Object.entries(ledger).map(([id, m]) => [id, m[k]])) as Record<string, number>;
+        const pick = (k: 'reserved' | 'inTransit' | 'delivered' | 'cancelled' | 'ordered') => Object.fromEntries(Object.entries(ledger).map(([id, m]) => [id, m[k]])) as Record<string, number>;
         const totalOrdered = pick('ordered');
         const reservedMap = pick('reserved');
         const soldMap = pick('delivered');
         const cancelledMap = pick('cancelled');
+        const inTransitMap = pick('inTransit');
 
         return products.map((p) => {
             // ── Variant breakdown ─────────────────────────────────
@@ -1411,12 +1417,15 @@ export class ProductsService {
                 palletsPerShipment: (p as any).palletsPerShipment ?? null,
                 // Pricing — surface supplier's raw case price, not the
                 // marked-up customer price. Consistent with /my-products.
-                price: p.basePrice ?? p.price,
+                price: p.basePrice ?? null,
                 // Stock buckets
                 stock: p.stock,                            // still available to sell (cases)
                 stockPallets,                              // derived: floor(cases ÷ casesPerPallet)
                 stockTrucks,                               // derived: floor(cases ÷ (casesPerPallet × palletsPerTruck))
-                reserved: reservedMap[p.id] || 0,           // committed to ship
+                reserved: reservedMap[p.id] || 0,           // on open orders, still in the warehouse
+                inTransit: inTransitMap[p.id] || 0,         // shipped, not yet delivered
+                onHand: (p.stock ?? 0) + (reservedMap[p.id] || 0), // physically in the warehouse
+                available: Math.max(0, p.stock ?? 0),       // can be sold now
                 sold: soldMap[p.id] || 0,                   // delivered to customers
                 cancelled: cancelledMap[p.id] || 0,         // returned to stock
                 totalOrdered: totalOrdered[p.id] || 0,      // gross lifetime orders
@@ -1656,10 +1665,11 @@ export class ProductsService {
         }
         const ALLOWED = ['name', 'description', 'brand', 'category', 'ean', 'price', 'stock', 'images', 'videos', 'unit', 'moq', 'moqUnit',
             'unitsPerCase', 'casesPerPallet', 'unitsPerPallet', 'palletsPerShipment', 'shelfLife', 'weight', 'origin', 'exwLocation',
-            'readyForDispatch', 'leadTime', 'variants', 'variantPrices', 'variantMeta', 'warehouseId'];
+            'readyForDispatch', 'leadTime', 'variants', 'variantPrices', 'variantMeta', 'warehouseId', 'supplierCurrency', 'supplierPrice'];
         const patch: any = {};
         for (const k of ALLOWED) if (patchIn[k] !== undefined) patch[k] = patchIn[k];
         if (patch.images !== undefined) patch.images = realImages(patch.images);
+        try { applySupplierCurrency(patch); } catch (e: any) { throw new BadRequestException({ code: 'INVALID_PRODUCT', message: e.message }); }
         if (patch.ean) patch.ean = normaliseBarcode(patch.ean);
         if (patch.weight) patch.weight = normaliseWeight(patch.weight) || String(patch.weight).trim();
         // Keep the hidden translation entry when the supplier edits variants.
@@ -1707,12 +1717,12 @@ export class ProductsService {
         const before: any = { ...existing, price: existing.basePrice };
         const after: any = {};
         for (const k of tracked) if (k === 'status' ? statusData.status : patch[k] !== undefined) after[k] = k === 'status' ? statusData.status : (k === 'price' ? (saved as any).basePrice : (saved as any)[k]);
-        this.logChanges(id, supplierId, before, after, nextStatus !== existing.status ? `Status → ${nextStatus}` : undefined).catch((e) => this.logger.warn(`change log failed: ${e?.message}`));
+        this.logChanges(id, supplierId, before, after, [typeof patchIn.changeReason === 'string' && patchIn.changeReason.trim() ? patchIn.changeReason.trim().slice(0, 200) : null, nextStatus !== existing.status ? `Status → ${nextStatus}` : null].filter(Boolean).join(' · ') || undefined).catch((e) => this.logger.warn(`change log failed: ${e?.message}`));
 
         if (nextStatus === ProductStatus.PENDING && existing.status !== ProductStatus.PENDING) {
             this.notificationsService.notifyAdmins('Product submitted for review', `"${(saved as any).name}" is waiting for review.`, 'INFO', { productId: id }).catch(() => {});
         }
-        return this.withCompleteness({ ...(saved as any), price: (saved as any).basePrice ?? (saved as any).price });
+        return this.withCompleteness({ ...(saved as any), price: (saved as any).basePrice ?? null });
     }
 
     /** Adds `missing` and a plain-language `statusNote` for the supplier UI. */
@@ -1770,7 +1780,7 @@ export class ProductsService {
             data: rows.map((r: any) => this.withCompleteness({
                 ...r,
                 variants: Array.isArray(r.variants) ? r.variants.filter((v: any) => !String(v?.name || '').startsWith('__')) : [],
-                price: r.basePrice ?? r.price, // the supplier's own price (EUR per case), never the marked-up one
+                price: r.basePrice ?? null, // the supplier's own price (EUR per case), never the marked-up one
                 reserved: ledger[r.id]?.reserved ?? 0,
             })),
             total, page, limit, pages: Math.max(1, Math.ceil(total / limit)),
@@ -1792,8 +1802,8 @@ export class ProductsService {
         return this.withCompleteness({
             ...p,
             variants: Array.isArray(p.variants) ? p.variants.filter((v: any) => !String(v?.name || '').startsWith('__')) : [],
-            price: p.basePrice ?? p.price,
-            movement: ledger[id] ?? { reserved: 0, delivered: 0, cancelled: 0, ordered: 0 },
+            price: p.basePrice ?? null,
+            movement: ledger[id] ?? { reserved: 0, inTransit: 0, delivered: 0, cancelled: 0, ordered: 0 },
         });
     }
 

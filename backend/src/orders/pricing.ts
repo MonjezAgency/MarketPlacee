@@ -176,7 +176,6 @@ export interface PricedLoad {
     fill: number;         // 0..1+
     requiredFill: number;
     subtotal: number;
-    markup: number;
     total: number;
     ready: boolean;
     issues: string[];
@@ -289,8 +288,9 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
     if (fill > 1 + EPS) {
         throw new PricingError('OVER_CAPACITY', `This mixed ${kind === 'PALLET' ? 'pallet' : 'truckload'} is ${Math.round(fill * 100)}% full — remove some quantity.`, { fill });
     }
-    const subtotal = round2(out.reduce((s, l) => s + l.lineSubtotal, 0));
-    const total = round2(subtotal * m.mix);
+    const rawSubtotal = round2(out.reduce((s, l) => s + l.lineSubtotal, 0));
+    // Same total as always (supplier prices × mix markup, rounded once).
+    const total = round2(rawSubtotal * m.mix);
     const issues: string[] = [];
     if (out.length === 0) issues.push('Add at least one product.');
     else if (requiredFill > 0 && fill < requiredFill - EPS) issues.push(`${Math.round(fill * 100)}% full — fill to ${Math.round(requiredFill * 100)}% to order.`);
@@ -298,5 +298,8 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
     if (new Set(out.map((l) => l.productId)).size > 1 && origin.status !== 'VERIFIED') {
         issues.push(`Dispatch location needs verification before these products can ship together (${origin.unverified.join(', ')}). Atlantis will confirm.`);
     }
-    return { kind, supplierId: mixedSuppliers ? null : supplierId, lines: out, fill, requiredFill, subtotal, markup: m.mix, total, ready: issues.length === 0, issues, origin };
+    // What leaves the server is buyer-priced: each line carries the mix markup,
+    // so neither the supplier price nor the markup is part of a quote.
+    const buyerLines = out.map((l) => ({ ...l, casePrice: Math.round(l.casePrice * m.mix * 10000) / 10000, lineSubtotal: round2(l.lineSubtotal * m.mix) }));
+    return { kind, supplierId: mixedSuppliers ? null : supplierId, lines: buyerLines, fill, requiredFill, subtotal: total, total, ready: issues.length === 0, issues, origin };
 }

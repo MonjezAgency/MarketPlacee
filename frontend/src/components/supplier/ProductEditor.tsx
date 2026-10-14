@@ -8,7 +8,7 @@ import { ArrowLeft, ImagePlus, Link2, Star, Trash2, ChevronLeft, ChevronRight, P
 import { supplierApi, ApiError, type SupplierProduct } from '@/lib/supplier-api';
 import { CATEGORIES_LIST } from '@/lib/products';
 import { COUNTRIES } from '@/lib/countries';
-import { MOQ_UNITS, WEIGHT_UNITS, digitsOnly, gtinProblem, isRealImage, missingFields, splitWeight } from '@/lib/catalog-rules';
+import { MOQ_UNITS, UNIT_TYPES, WEIGHT_UNITS, digitsOnly, gtinProblem, isRealImage, missingFields, splitWeight } from '@/lib/catalog-rules';
 import { Badge, Button, Card, ErrorState, Field, Notice, Skeleton, StatusBadge, eur, inputCls, int, selectCls, shortDate, useConfirm } from '@/components/supplier/ui';
 import BarcodeImageFinder from '@/components/supplier/BarcodeImageFinder';
 import { cn } from '@/lib/utils';
@@ -21,14 +21,14 @@ interface FormState {
     weightValue: string; weightUnit: string; weightPack: string;
     currency: string; priceBasis: 'case' | 'piece'; priceInput: string;
     stock: string; unitsPerCase: string; casesPerPallet: string; palletsPerShipment: string;
-    moq: string; moqUnit: string; shelfLife: string; leadTime: string;
+    moq: string; moqUnit: string; shelfLife: string; leadTime: string; unit: string;
     images: string[]; variants: Variety[];
 }
 
 const EMPTY: FormState = {
     name: '', brand: '', category: '', ean: '', description: '', origin: '', exwLocation: '',
     weightValue: '', weightUnit: 'g', weightPack: '', currency: 'EUR', priceBasis: 'case', priceInput: '',
-    stock: '', unitsPerCase: '', casesPerPallet: '', palletsPerShipment: '', moq: '', moqUnit: 'CASE', shelfLife: '', leadTime: '0',
+    stock: '', unitsPerCase: '', casesPerPallet: '', palletsPerShipment: '', moq: '', moqUnit: 'CASE', shelfLife: '', leadTime: '0', unit: 'piece',
     images: [], variants: [],
 };
 
@@ -38,10 +38,12 @@ const fromProduct = (p: SupplierProduct): FormState => {
         name: p.name || '', brand: p.brand || '', category: p.category === 'General' ? '' : p.category || '', ean: p.ean || '',
         description: p.description || '', origin: p.origin || '', exwLocation: p.exwLocation || '',
         weightValue: w.value, weightUnit: w.unit, weightPack: w.pack,
-        currency: 'EUR', priceBasis: 'case', priceInput: p.price ? String(Math.round(p.price * 10000) / 10000) : '',
+        // Show the price exactly as the supplier typed it, in their currency.
+        currency: p.supplierCurrency || 'EUR', priceBasis: 'case',
+        priceInput: p.supplierCurrency && p.supplierPrice ? String(p.supplierPrice) : p.price ? String(Math.round(p.price * 10000) / 10000) : '',
         stock: p.stock !== null && p.stock !== undefined ? String(p.stock) : '', unitsPerCase: p.unitsPerCase ? String(p.unitsPerCase) : '',
         casesPerPallet: p.casesPerPallet ? String(p.casesPerPallet) : '', palletsPerShipment: p.palletsPerShipment ? String(p.palletsPerShipment) : '',
-        moq: p.moq ? String(p.moq) : '', moqUnit: (p.moqUnit || 'CASE').toUpperCase(), shelfLife: p.shelfLife || '', leadTime: String(p.leadTime ?? 0),
+        moq: p.moq ? String(p.moq) : '', moqUnit: (p.moqUnit || 'CASE').toUpperCase(), shelfLife: p.shelfLife || '', leadTime: String(p.leadTime ?? 0), unit: p.unit || 'piece',
         images: (p.images || []).filter(isRealImage), variants: (p.variants || []).map((v) => ({ name: v.name, values: [...(v.values || [])] })),
     };
 };
@@ -52,12 +54,16 @@ function buildPayload(f: FormState, rates: Record<string, number>, submit: boole
     const rate = rates[f.currency] ?? 1;
     const upc = num(f.unitsPerCase);
     const entered = num(f.priceInput);
-    const priceCaseEur = entered && entered > 0 ? (f.priceBasis === 'case' ? entered * rate : upc && upc > 0 ? entered * upc * rate : null) : null;
+    // Case price in the supplier's own currency; the server converts to EUR.
+    const caseInCurrency = entered && entered > 0 ? (f.priceBasis === 'case' ? entered : upc && upc > 0 ? entered * upc : null) : null;
+    const priceCaseEur = caseInCurrency ? caseInCurrency * rate : null;
     const weight = f.weightValue ? `${f.weightPack ? `${f.weightPack} x ` : ''}${f.weightValue} ${f.weightUnit}` : '';
     return {
         name: f.name.trim(), brand: f.brand.trim(), category: f.category.trim(), ean: digitsOnly(f.ean) || null,
         description: f.description.trim(), origin: f.origin.trim() || null, exwLocation: f.exwLocation.trim() || null,
-        weight: weight || null, price: priceCaseEur ? Math.round(priceCaseEur * 10000) / 10000 : undefined,
+        weight: weight || null,
+        supplierCurrency: f.currency, supplierPrice: caseInCurrency ? Math.round(caseInCurrency * 10000) / 10000 : undefined,
+        unit: f.unit,
         stock: num(f.stock) ?? undefined, unitsPerCase: num(f.unitsPerCase), casesPerPallet: num(f.casesPerPallet),
         palletsPerShipment: num(f.palletsPerShipment), moq: num(f.moq), moqUnit: f.moqUnit, shelfLife: f.shelfLife.trim() || null,
         leadTime: num(f.leadTime) ?? 0, readyForDispatch: (num(f.leadTime) ?? 0) === 0,
@@ -84,7 +90,15 @@ export default function ProductEditor({ productId }: { productId?: string }) {
     const [touched, setTouched] = React.useState(false);
     const [history, setHistory] = React.useState<any[] | null>(null);
 
-    React.useEffect(() => { supplierApi.importSchema().then((s) => s?.rates && setRates(s.rates)).catch(() => {}); }, []);
+    const [defaultCurrency, setDefaultCurrency] = React.useState<string | null>(null);
+    React.useEffect(() => {
+        supplierApi.preferences().then((pr) => {
+            setRates(pr.rates || { EUR: 1 });
+            setDefaultCurrency(pr.effectiveCurrency);
+            // New product: start in the supplier's default currency (from Settings).
+            if (!productId) { setF((x) => ({ ...x, currency: pr.effectiveCurrency })); setInitial((i) => JSON.stringify({ ...JSON.parse(i), currency: pr.effectiveCurrency })); }
+        }).catch(() => {});
+    }, [productId]);
     const load = React.useCallback(() => {
         if (!productId) return;
         setLoading(true); setLoadError(null);
@@ -118,6 +132,7 @@ export default function ProductEditor({ productId }: { productId?: string }) {
     const entered = num(f.priceInput);
     const priceCaseEur = entered && entered > 0 ? (f.priceBasis === 'case' ? entered * rate : upc && upc > 0 ? entered * upc * rate : null) : null;
     const piecePriceEur = priceCaseEur && upc ? priceCaseEur / upc : null;
+    const caseInCurrencyView = entered && entered > 0 ? (f.priceBasis === 'case' ? entered : upc && upc > 0 ? entered * upc : null) : null;
     const switchBasis = (b: 'case' | 'piece') => {
         if (b === f.priceBasis) return;
         const e = num(f.priceInput);
@@ -183,11 +198,11 @@ export default function ProductEditor({ productId }: { productId?: string }) {
         : <Button variant="primary" loading={saving === 'submit'} disabled={rejected || !!saving || missing.length > 0} onClick={() => save('submit')} title={missing.length ? 'Complete the required details first' : undefined}>Submit for review</Button>;
 
     return (
-        <div className="pb-24 lg:pb-0">
+        <div>
             <div className="flex flex-wrap items-center gap-3 mb-5">
                 <button type="button" onClick={leave} className="w-9 h-9 rounded-lg ring-1 ring-line flex items-center justify-center text-ink-2 hover:bg-surface-2" aria-label="Back to inventory"><ArrowLeft size={17} /></button>
                 <div className="min-w-0 flex-1">
-                    <p className="text-[12.5px] text-ink-3">Inventory manager</p>
+                    <p className="text-[12.5px] text-ink-3">Inventory &amp; products</p>
                     <h1 className="text-[22px] font-semibold text-heading truncate">{productId ? f.name || 'Edit product' : 'Add product'}</h1>
                 </div>
                 {product && <StatusBadge status={product.status} />}
@@ -244,7 +259,7 @@ export default function ProductEditor({ productId }: { productId?: string }) {
 
                     <Card title="Price" description="Your price before the Atlantis margin. Stored in EUR per case.">
                         <div className="grid gap-4 sm:grid-cols-[140px_minmax(0,1fr)]">
-                            <Field label="Currency" htmlFor="pe-cur">
+                            <Field label="Currency" htmlFor="pe-cur" hint={defaultCurrency ? (f.currency === defaultCurrency ? 'Your default (Settings)' : `Default: ${defaultCurrency}`) : undefined}>
                                 <select id="pe-cur" value={f.currency} onChange={(e) => set('currency', e.target.value)} className={selectCls}>
                                     {Object.keys(rates).map((c) => <option key={c} value={c}>{c}</option>)}
                                 </select>
@@ -262,10 +277,10 @@ export default function ProductEditor({ productId }: { productId?: string }) {
                             </Field>
                         </div>
                         <div className="mt-3 rounded-lg bg-surface-2 ring-1 ring-line px-3 py-2.5 text-[13px] text-ink-2 grid gap-1 sm:grid-cols-3">
-                            <span>Case price: <b className="tabular-nums">{priceCaseEur ? eur(priceCaseEur) : '—'}</b></span>
+                            <span>Case price: <b className="tabular-nums">{caseInCurrencyView ? `${caseInCurrencyView.toFixed(2)} ${f.currency}` : '—'}</b>{f.currency !== 'EUR' && priceCaseEur ? <span className="text-ink-3"> ≈ {eur(priceCaseEur)}</span> : null}</span>
                             <span>Piece price: <b className="tabular-nums">{piecePriceEur ? eur(piecePriceEur, 3) : upc ? '—' : 'needs pieces per case'}</b></span>
                             <span>Pallet price: <b className="tabular-nums">{priceCaseEur && num(f.casesPerPallet) ? eur(priceCaseEur * num(f.casesPerPallet)!) : '—'}</b></span>
-                            {f.currency !== 'EUR' && <span className="sm:col-span-3 text-[12px] text-ink-3">Converted at 1 {f.currency} = {rate} EUR.</span>}
+                            {f.currency !== 'EUR' && <span className="sm:col-span-3 text-[12px] text-ink-3">Your price is saved in {f.currency} exactly as typed. The EUR figure used on the platform is converted at a fixed rate of 1 {f.currency} = {rate} EUR — it is not a live exchange rate.</span>}
                         </div>
                     </Card>
 
@@ -274,11 +289,17 @@ export default function ProductEditor({ productId }: { productId?: string }) {
                             <Field label="Pieces per case" htmlFor="pe-unitsPerCase" required error={err('unitsPerCase')}>
                                 <input id="pe-unitsPerCase" value={f.unitsPerCase} onChange={(e) => set('unitsPerCase', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={inputCls} aria-invalid={!!err('unitsPerCase')} />
                             </Field>
-                            <Field label="Cases per pallet" htmlFor="pe-casesPerPallet" optional error={serverErrors.casesPerPallet}>
+                            <Field label="Cases per pallet" htmlFor="pe-casesPerPallet" required error={err('casesPerPallet')}>
                                 <input id="pe-casesPerPallet" value={f.casesPerPallet} onChange={(e) => set('casesPerPallet', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={inputCls} />
                             </Field>
                             <Field label="Pallets per truck" htmlFor="pe-palletsPerShipment" optional error={serverErrors.palletsPerShipment}>
                                 <input id="pe-palletsPerShipment" value={f.palletsPerShipment} onChange={(e) => set('palletsPerShipment', e.target.value.replace(/\D/g, ''))} inputMode="numeric" className={inputCls} />
+                            </Field>
+                            <Field label="Unit type" htmlFor="pe-unit" required hint="What one piece is. Prices and stock stay per case.">
+                                <select id="pe-unit" value={f.unit} onChange={(e) => set('unit', e.target.value)} className={selectCls}>
+                                    {!UNIT_TYPES.includes(f.unit as any) && f.unit && <option value={f.unit}>{f.unit}</option>}
+                                    {UNIT_TYPES.map((u) => <option key={u} value={u}>{u}</option>)}
+                                </select>
                             </Field>
                             <Field label="Stock available (cases)" htmlFor="pe-stock" required error={err('stock')}
                                 hint={num(f.stock) !== null && num(f.casesPerPallet) ? `≈ ${Math.floor(num(f.stock)! / num(f.casesPerPallet)!)} full pallets${upc ? ` · ${int(num(f.stock)! * upc)} pieces` : ''}` : upc && num(f.stock) !== null ? `${int(num(f.stock)! * upc)} pieces` : 'Whole cases ready to sell.'}>
@@ -360,7 +381,8 @@ export default function ProductEditor({ productId }: { productId?: string }) {
             </fieldset>
 
             {/* Mobile action bar */}
-            <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-surface border-t border-line px-4 py-3 flex gap-2 justify-end">
+            {/* Sticky inside the scroll area (not fixed to the window) so it never covers the sidebar or the last fields. */}
+            <div className="lg:hidden sticky bottom-0 z-30 -mx-4 sm:-mx-6 mt-4 bg-surface/95 backdrop-blur border-t border-line px-4 sm:px-6 py-3 flex flex-wrap gap-2 justify-end">
                 <Button variant="ghost" onClick={leave}>Cancel</Button>
                 {!live && status !== 'PENDING' && <Button variant="secondary" loading={saving === 'draft'} disabled={rejected || !!saving} onClick={() => save('draft')}>Save draft</Button>}
                 {primaryAction}

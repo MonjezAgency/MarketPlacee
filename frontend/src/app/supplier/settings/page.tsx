@@ -13,6 +13,7 @@ import { ChangeEmailCard } from '@/components/account/ChangeEmailCard';
 import { SessionsCard } from '@/components/account/SessionsCard';
 import { TwoStepCard } from '@/components/account/TwoStepCard';
 import { ReputationCard } from '@/components/supplier/ReputationCard';
+import { DefaultCurrencyCard, ListingStatusCard } from '@/components/supplier/SupplierPreferenceCards';
 
 type Prefs = { orderUpdates: boolean; productComments: boolean; lowStockAlerts: boolean; inboundOffers: boolean; marketingEmails: boolean; muteToasts: boolean };
 const PREF_ROWS: { key: keyof Prefs; label: string; desc: string }[] = [
@@ -113,9 +114,11 @@ export default function SupplierSettingsPage() {
                     </SettingsCard>
                     <CompanyDetailsCard />
                     <BrandPreferencesCard role="supplier" />
+                    <DefaultCurrencyCard />
                 </div>
                 <div className="space-y-5 min-w-0">
                     <VerificationCard />
+                    <ListingStatusCard />
                     <ReputationCard />
                     <ChangeEmailCard currentEmail={user?.email || ''} pendingEmail={user?.pendingEmail} onChanged={() => refreshUser()} />
                     <SettingsCard icon={<KeyRound size={17} />} title="Password & security">

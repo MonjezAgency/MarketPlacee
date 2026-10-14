@@ -5,6 +5,7 @@
  */
 export const MOQ_UNITS = ['PIECE', 'CASE', 'PALLET', 'TRUCK'] as const;
 export const WEIGHT_UNITS = ['g', 'kg', 'ml', 'cl', 'L', 'oz', 'lb'] as const;
+export const UNIT_TYPES = ['piece', 'bottle', 'can', 'jar', 'bag', 'box', 'pack', 'bar', 'pouch', 'tube', 'carton', 'pallet'] as const;
 
 export const digitsOnly = (s: string) => String(s || '').replace(/[\s-]/g, '');
 
@@ -23,11 +24,11 @@ export const isRealImage = (u?: string | null) => !!u && !u.startsWith('data:ima
 
 export interface Draft {
     name: string; brand: string; category: string; ean: string; origin: string; exwLocation: string;
-    weightValue: string; weightUnit: string; priceCaseEur: number | null; stock: string; unitsPerCase: string;
+    weightValue: string; weightUnit: string; priceCaseEur: number | null; stock: string; unitsPerCase: string; casesPerPallet: string; unit: string;
     moq: string; moqUnit: string; images: string[];
 }
 
-/** Same required list as the server (description, BBD, pallet sizes, lead time optional). */
+/** Same required list as the server (description, BBD, pallets per truck, lead time optional). */
 export function missingFields(d: Draft): { field: string; label: string }[] {
     const out: { field: string; label: string }[] = [];
     const need = (field: string, label: string, ok: boolean) => { if (!ok) out.push({ field, label }); };
@@ -42,6 +43,8 @@ export function missingFields(d: Draft): { field: string; label: string }[] {
     need('price', 'Price', !!d.priceCaseEur && d.priceCaseEur > 0);
     need('stock', 'Stock (cases)', /^\d+$/.test(d.stock.trim()));
     need('unitsPerCase', 'Pieces per case', posInt(d.unitsPerCase));
+    need('casesPerPallet', 'Cases per pallet', posInt(d.casesPerPallet));
+    need('unit', 'Unit type', !!d.unit.trim());
     need('moq', 'Minimum order', posInt(d.moq));
     need('images', 'Product photo', d.images.some(isRealImage));
     return out;

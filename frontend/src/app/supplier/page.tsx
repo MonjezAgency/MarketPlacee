@@ -3,17 +3,17 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { Euro, Package, ShoppingCart, Boxes, Plus, Upload, ArrowRight, CheckCircle2, ChevronRight, Info } from 'lucide-react';
+import { Euro, Package, ShoppingCart, Boxes, Plus, Upload, ArrowRight, CheckCircle2, ChevronRight, Info, BellRing, PackageX, History } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { supplierApi, isoDay } from '@/lib/supplier-api';
-import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Skeleton, Stat, TONE, Thumb, eur, int, inputCls, type Tone } from '@/components/supplier/ui';
+import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Skeleton, Stat, StatusBadge, TONE, Thumb, eur, int, inputCls, shortDate, type Tone } from '@/components/supplier/ui';
 import { cn } from '@/lib/utils';
 
 const DAY = 86_400_000;
 const RANGES = [
-    { id: '7d', label: '7 days', days: 7 },
-    { id: '30d', label: '30 days', days: 30 },
-    { id: '12m', label: '12 months', days: 365 },
+    { id: '7d', label: 'Last 7 days', days: 7 },
+    { id: '30d', label: 'Last 30 days', days: 30 },
+    { id: '12m', label: 'Last 12 months', days: 365 },
     { id: 'custom', label: 'Custom', days: 0 },
 ] as const;
 
@@ -28,8 +28,9 @@ function pctDelta(cur: number, prev: number) {
 const fmtBucket = (k: string, monthly: boolean) =>
     monthly ? new Date(k + '-01T00:00:00Z').toLocaleDateString('en-GB', { month: 'short', year: '2-digit', timeZone: 'UTC' })
         : new Date(k + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const fmtDay = (d: string) => new Date(d + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
 
-/** Business Overview — every number comes from the supplier's real order lines. */
+/** Business Overview — every figure comes from the supplier's own orders and catalog, at the supplier's own prices. */
 export default function SupplierOverviewPage() {
     const { user } = useAuth();
     const [range, setRange] = React.useState<(typeof RANGES)[number]['id']>('30d');
@@ -56,23 +57,23 @@ export default function SupplierOverviewPage() {
     const monthly = data?.range?.granularity === 'month';
     const chart = (data?.series ?? []).map((s: any) => ({ ...s, label: fmtBucket(s.date, monthly) }));
     const hasSales = chart.some((s: any) => s.sales > 0);
-    const periodLabel = `${new Date(from + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })} – ${new Date(to + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`;
+    const periodLabel = `${fmtDay(from)} – ${fmtDay(to)}`;
+    const first = loading && !data;
 
     return (
         <div>
             <PageHeader
                 eyebrow={user?.companyName || user?.name}
                 title="Business overview"
-                description="Sales, orders and catalog health for your products."
+                description="Your sales, orders and catalog health. Money figures are at your own prices (EUR), before the Atlantis margin."
                 actions={<>
                     <Link href="/supplier/products?import=1"><Button icon={<Upload size={15} />}>Bulk upload</Button></Link>
                     <Link href="/supplier/products/new"><Button variant="primary" icon={<Plus size={15} />}>Add product</Button></Link>
                 </>}
             />
 
-            {/* Date range */}
             <div className="flex flex-wrap items-center gap-2 mb-4">
-                <div role="radiogroup" aria-label="Date range" className="inline-flex rounded-lg bg-surface ring-1 ring-line p-0.5">
+                <div role="radiogroup" aria-label="Date range" className="inline-flex flex-wrap rounded-lg bg-surface ring-1 ring-line p-0.5">
                     {RANGES.map((r) => (
                         <button key={r.id} role="radio" aria-checked={range === r.id} onClick={() => setRange(r.id)}
                             className={cn('h-8 px-3 rounded-md text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal',
@@ -90,32 +91,30 @@ export default function SupplierOverviewPage() {
                         <input id="ov-to" type="date" min={custom.from} max={today} value={custom.to} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} className={cn(inputCls, 'h-9 w-[150px]')} />
                     </div>
                 )}
-                <span className="text-[12.5px] text-ink-3">{periodLabel} · UTC · compared with the previous {range === '12m' ? '12 months' : 'period of the same length'}</span>
+                <span className="text-[12.5px] text-ink-3">{periodLabel} (UTC) · compared with the previous period of the same length</span>
             </div>
 
             {error && <div className="mb-4"><ErrorState message={error} onRetry={load} /></div>}
 
-            {/* KPIs */}
             <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-                <Stat label="Sales (confirmed orders)" icon={<Euro size={17} />} tone="brand" loading={loading && !data}
-                    value={eur(t?.sales)} delta={t && p ? pctDelta(t.sales, p.sales) : null} hint={t ? 'vs previous period' : undefined} />
-                <Stat label="Orders received" icon={<ShoppingCart size={17} />} tone="neutral" loading={loading && !data}
-                    value={int(t?.orders)} delta={t && p ? pctDelta(t.orders, p.orders) : null} hint={data ? `${data.awaitingConfirmation} awaiting your confirmation` : undefined} href="/supplier/orders" />
-                <Stat label="Cases sold" icon={<Boxes size={17} />} tone="neutral" loading={loading && !data}
-                    value={int(t?.cases)} delta={t && p ? pctDelta(t.cases, p.cases) : null} hint={t ? 'on confirmed orders' : undefined} />
-                <Stat label="Live products" icon={<Package size={17} />} tone="success" loading={loading && !data}
-                    value={int(data?.products?.active)} hint={data ? `${data.products.pending} in review · ${data.products.drafts} drafts` : undefined} href="/supplier/products" />
+                <Stat label="Sales · selected period" icon={<Euro size={17} />} tone="brand" loading={first}
+                    value={eur(t?.sales)} delta={t && p ? pctDelta(t.sales, p.sales) : null} hint={t ? (t.estimated ? 'includes estimated older orders' : 'confirmed orders, your prices') : undefined} />
+                <Stat label="Orders · selected period" icon={<ShoppingCart size={17} />} loading={first} href="/supplier/orders?view=all"
+                    value={int(t?.orders)} delta={t && p ? pctDelta(t.orders, p.orders) : null} hint={t ? `${int(t.cases)} cases sold` : undefined} />
+                <Stat label="Awaiting your confirmation" icon={<BellRing size={17} />} tone={data?.awaitingConfirmation ? 'warning' : 'neutral'} loading={first} href="/supplier/orders?view=action"
+                    value={int(data?.awaitingConfirmation)} hint={data ? (data.awaitingConfirmation ? 'confirm or decline' : 'nothing waiting') : undefined} />
+                <Stat label="Live products · now" icon={<Package size={17} />} tone="success" loading={first} href="/supplier/products?status=APPROVED"
+                    value={int(data?.products?.active)} hint={data ? `${data.stockAlerts?.length ?? 0} stock alert${data.stockAlerts?.length === 1 ? '' : 's'} · ${data.products.pending} in review` : undefined} />
             </div>
 
             <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
-                {/* Revenue trend */}
-                <Card title="Sales over time" description={`Confirmed order value per ${monthly ? 'month' : 'day'}, EUR. Pending and cancelled orders aren’t counted.`}>
-                    {loading && !data ? <Skeleton className="h-[260px] w-full" /> : !hasSales ? (
+                <Card title="Sales over time" description={`Confirmed order value per ${monthly ? 'month' : 'day'} at your prices. Pending and cancelled orders aren’t counted.`}>
+                    {first ? <Skeleton className="h-[240px] w-full" /> : !hasSales ? (
                         <EmptyState icon={<Euro size={20} />} title="No confirmed sales in this period">
                             Sales appear here once you confirm an order. Try a longer range to see earlier sales.
                         </EmptyState>
                     ) : (
-                        <div className="h-[260px] -ms-2" role="img" aria-label={`Sales per ${monthly ? 'month' : 'day'}, ${periodLabel}`}>
+                        <div className="h-[240px] -ms-2" role="img" aria-label={`Sales per ${monthly ? 'month' : 'day'}, ${periodLabel}`}>
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={chart} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                                     <CartesianGrid vertical={false} stroke="rgb(230 232 236)" />
@@ -135,9 +134,8 @@ export default function SupplierOverviewPage() {
                     )}
                 </Card>
 
-                {/* Needs attention */}
                 <Card title="Needs attention" description="Only shown when something is actually waiting.">
-                    {loading && !data ? <div className="space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+                    {first ? <div className="space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
                         : data && data.attention.length === 0 ? (
                             <p className="flex items-center gap-2 text-[13.5px] text-ink-2"><CheckCircle2 size={16} className="text-emerald-600" /> All clear — nothing needs you right now.</p>
                         ) : (
@@ -156,49 +154,122 @@ export default function SupplierOverviewPage() {
                 </Card>
             </div>
 
-            {/* Top products */}
-            <Card className="mt-4" title="Top 5 products" description="Ranked by cases sold on confirmed orders in this period; ties by sales value."
-                actions={<Link href="/supplier/orders" className="text-[13px] font-semibold text-teal hover:underline inline-flex items-center gap-1">All orders <ArrowRight size={14} /></Link>}
-                bodyClassName="px-0 sm:px-0 py-0">
-                {loading && !data ? <div className="p-5 space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
-                    : !data?.top?.length ? (
-                        <EmptyState icon={<Boxes size={20} />} title="No product sales yet in this period">Once buyers’ orders are confirmed, your best sellers show up here.</EmptyState>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-[13.5px]">
-                                <thead>
-                                    <tr className="text-start text-[12px] font-medium text-ink-3 border-y border-line bg-surface-2/60">
-                                        <th className="text-start font-medium px-5 py-2 w-8">#</th>
-                                        <th className="text-start font-medium px-2 py-2">Product</th>
-                                        <th className="text-end font-medium px-2 py-2">Cases sold</th>
-                                        <th className="text-end font-medium px-2 py-2 hidden sm:table-cell">Orders</th>
-                                        <th className="text-end font-medium px-5 py-2">Sales</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+            <div className="mt-4 grid gap-4 lg:grid-cols-2 items-start">
+                <Card title="Top 5 products · selected period" description="By cases sold on confirmed orders; ties by sales." bodyClassName="px-0 sm:px-0 py-0"
+                    actions={<Link href="/supplier/products" className="text-[13px] font-semibold text-teal hover:underline inline-flex items-center gap-1">Catalog <ArrowRight size={14} /></Link>}>
+                    {first ? <div className="p-5 space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
+                        : !data?.top?.length ? <EmptyState icon={<Boxes size={20} />} title="No product sales in this period">Your best sellers show up once orders are confirmed.</EmptyState>
+                            : (
+                                <ul className="divide-y divide-line">
                                     {data.top.map((r: any, i: number) => (
-                                        <tr key={r.productId} className="border-b border-line last:border-0">
-                                            <td className="px-5 py-2.5 text-ink-3 tabular-nums">{i + 1}</td>
-                                            <td className="px-2 py-2.5">
-                                                <Link href={`/supplier/products/${r.productId}/edit`} className="flex items-center gap-3 min-w-0 hover:underline">
-                                                    <Thumb src={r.image} size={36} />
-                                                    <span className="truncate font-medium text-ink max-w-[42ch]">{r.name}</span>
-                                                </Link>
-                                            </td>
-                                            <td className="px-2 py-2.5 text-end tabular-nums font-medium">{int(r.cases)}</td>
-                                            <td className="px-2 py-2.5 text-end tabular-nums hidden sm:table-cell">{int(r.orders)}</td>
-                                            <td className="px-5 py-2.5 text-end tabular-nums">{eur(r.sales)}</td>
-                                        </tr>
+                                        <li key={r.productId}>
+                                            <Link href={`/supplier/products/${r.productId}/edit`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-surface-2/50">
+                                                <span className="w-4 text-[12px] text-ink-4 tabular-nums">{i + 1}</span>
+                                                <Thumb src={r.image} size={34} />
+                                                <span className="flex-1 min-w-0 truncate text-[13.5px] font-medium text-ink">{r.name}</span>
+                                                <span className="text-end text-[12.5px] tabular-nums"><b className="text-ink">{int(r.cases)}</b> <span className="text-ink-3">cases</span><span className="block text-ink-3">{eur(r.sales)}</span></span>
+                                            </Link>
+                                        </li>
                                     ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    )}
-            </Card>
+                                </ul>
+                            )}
+                </Card>
 
-            <p className="mt-4 flex items-start gap-2 text-[12.5px] text-ink-3 max-w-[90ch]">
+                <Card title="Recent orders" description="Latest orders with your products, any status." bodyClassName="px-0 sm:px-0 py-0"
+                    actions={<Link href="/supplier/orders?view=all" className="text-[13px] font-semibold text-teal hover:underline inline-flex items-center gap-1">All orders <ArrowRight size={14} /></Link>}>
+                    {first ? <div className="p-5 space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
+                        : !data?.recentOrders?.length ? <EmptyState icon={<ShoppingCart size={20} />} title="No orders yet">Orders for your products will appear here.</EmptyState>
+                            : (
+                                <ul className="divide-y divide-line">
+                                    {data.recentOrders.map((o: any) => (
+                                        <li key={o.id}>
+                                            <Link href={`/supplier/orders?view=all&q=${o.id.slice(-8)}`} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-5 py-2.5 hover:bg-surface-2/50">
+                                                <span className="font-semibold text-[13.5px] text-heading tabular-nums">#{o.id.slice(-8).toUpperCase()}</span>
+                                                <StatusBadge kind="order" status={o.status} />
+                                                <span className="flex-1 text-[12.5px] text-ink-3">{shortDate(o.createdAt)} · {int(o.cases)} cases</span>
+                                                <span className="text-[13.5px] tabular-nums text-ink">{eur(o.value)}</span>
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                </Card>
+
+                <Card title="Stock alerts · now" description="Live products with no stock, or less stock than one minimum order." bodyClassName="px-0 sm:px-0 py-0">
+                    {first ? <div className="p-5"><Skeleton className="h-10" /></div>
+                        : !data?.stockAlerts?.length ? <p className="px-5 py-4 flex items-center gap-2 text-[13.5px] text-ink-2"><CheckCircle2 size={16} className="text-emerald-600" /> Every live product can fill at least one minimum order.</p>
+                            : (
+                                <ul className="divide-y divide-line">
+                                    {data.stockAlerts.map((a: any) => (
+                                        <li key={a.id}>
+                                            <Link href={`/supplier/products/${a.id}/edit`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-surface-2/50">
+                                                <Thumb src={a.image} size={34} />
+                                                <span className="flex-1 min-w-0 truncate text-[13.5px] text-ink">{a.name}</span>
+                                                {a.kind === 'out' ? <Badge tone="danger"><PackageX size={12} />Out of stock</Badge> : <Badge tone="warning">{int(a.stock)} cases · min. order {int(a.minOrderCases)}</Badge>}
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                </Card>
+
+                <Card title="Products needing your input" description="Drafts, changes requested by Atlantis, rejected listings and items in review." bodyClassName="px-0 sm:px-0 py-0">
+                    {first ? <div className="p-5"><Skeleton className="h-10" /></div>
+                        : !data?.needsWork?.length ? <p className="px-5 py-4 flex items-center gap-2 text-[13.5px] text-ink-2"><CheckCircle2 size={16} className="text-emerald-600" /> Nothing waiting — all your listings are live.</p>
+                            : (
+                                <ul className="divide-y divide-line">
+                                    {data.needsWork.map((p2: any) => (
+                                        <li key={p2.id}>
+                                            <Link href={`/supplier/products/${p2.id}/edit`} className="flex items-center gap-3 px-5 py-2.5 hover:bg-surface-2/50">
+                                                <Thumb src={p2.image} size={34} />
+                                                <span className="flex-1 min-w-0">
+                                                    <span className="block truncate text-[13.5px] text-ink">{p2.name}</span>
+                                                    {p2.note && <span className="block truncate text-[12px] text-ink-3">{p2.note}</span>}
+                                                </span>
+                                                <StatusBadge status={p2.status} />
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                </Card>
+
+                <Card title="Recent stock changes" description="From your product change history." bodyClassName="px-0 sm:px-0 py-0">
+                    {first ? <div className="p-5"><Skeleton className="h-10" /></div>
+                        : !data?.stockChanges?.length ? <p className="px-5 py-4 flex items-center gap-2 text-[13.5px] text-ink-3"><History size={15} /> No stock changes recorded yet. Changes you make are listed here from now on.</p>
+                            : (
+                                <ul className="divide-y divide-line">
+                                    {data.stockChanges.map((c: any) => (
+                                        <li key={c.id} className="flex items-center gap-3 px-5 py-2.5 text-[13px]">
+                                            <Link href={`/supplier/products/${c.productId}/edit`} className="flex-1 min-w-0 truncate text-ink hover:underline">{c.name}</Link>
+                                            <span className="tabular-nums text-ink-2">{c.from ?? '—'} → <b>{c.to ?? '—'}</b> cases</span>
+                                            <span className="text-[12px] text-ink-4 w-[84px] text-end">{shortDate(c.at)}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                </Card>
+
+                <Card title="Sales by category · selected period" description="Confirmed orders, your prices.">
+                    {first ? <Skeleton className="h-16" /> : !data?.byCategory?.length ? <p className="text-[13.5px] text-ink-3">No confirmed sales in this period.</p> : (
+                        <ul className="space-y-2">
+                            {data.byCategory.map((c: any) => {
+                                const max = data.byCategory[0].sales || 1;
+                                return (
+                                    <li key={c.category} className="text-[13px]">
+                                        <div className="flex justify-between gap-3"><span className="text-ink truncate">{c.category}</span><span className="tabular-nums text-ink-2">{eur(c.sales)}</span></div>
+                                        <div className="mt-1 h-1.5 rounded-full bg-surface-3 overflow-hidden"><div className="h-full bg-teal rounded-full" style={{ width: `${Math.max(3, (c.sales / max) * 100)}%` }} /></div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    )}
+                </Card>
+            </div>
+
+            <p className="mt-4 flex items-start gap-2 text-[12.5px] text-ink-3 max-w-[95ch]">
                 <Info size={14} className="mt-0.5 shrink-0" />
-                Sales = value of your lines on orders that are paid, confirmed, shipped or delivered, at the price the buyer paid (EUR). Orders received = distinct orders with your products, excluding cancelled. Mixed pallets combining several products aren’t attributed per product.
+                Sales = value of your lines on paid, confirmed, shipped or delivered orders, at your own prices. Orders placed before your price was recorded on each order line are estimated from your current price and marked as estimated. Mixed pallets combining several products aren’t attributed per product.
             </p>
         </div>
     );

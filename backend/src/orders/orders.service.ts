@@ -8,8 +8,8 @@ import { InvoiceService } from '../invoices/invoice.service';
 import { EscrowService } from '../payments/escrow.service';
 import { AppConfigService } from '../admin/app-config.service';
 import { MixedLoadsService, asHttp } from './mixed-loads.service';
-import { PricingError, normaliseTier, priceLine, priceLoad, round2 } from './pricing';
-import { casesForItem } from '../products/stock-ledger';
+import { PricingError, basePerCase, casesInUnit, normaliseTier, priceLine, priceLoad, round2 } from './pricing';
+import { casesForItem, supplierLineValue } from '../products/stock-ledger';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
     PENDING: 'Pending',
@@ -188,7 +188,9 @@ export class OrdersService {
                     continue;
                 }
                 const priced = priceLine(p, tier, Number(raw.quantity), markups, { raw: !!p.supplierId && p.supplierId === customerId });
-                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null, leadTime: (p as any).leadTime ?? null, readyForDispatch: !!(p as any).readyForDispatch, exwLocation: p.exwLocation ?? null } });
+                // Supplier's own price for one ordered unit (no Atlantis margin) — for supplier views only.
+                const supplierUnitPrice = round2(basePerCase(p, markups) * casesInUnit(p, priced.tier));
+                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, supplierUnitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null, leadTime: (p as any).leadTime ?? null, readyForDispatch: !!(p as any).readyForDispatch, exwLocation: p.exwLocation ?? null } });
             } catch (e) {
                 // Cart view: flag the line and keep pricing the rest. Orders stay strict.
                 if (opts.lenient && e instanceof PricingError) {
@@ -267,6 +269,7 @@ export class OrdersService {
                                 quantity: l.quantity,
                                 price: l.price,
                                 stockCases: l.stockCases ?? null,
+                                supplierUnitPrice: typeof l.supplierUnitPrice === 'number' ? l.supplierUnitPrice : null,
                                 productNameSnapshot: l.name,
                                 selectedVariants: l.selectedVariants && typeof l.selectedVariants === 'object' ? l.selectedVariants : undefined,
                                 selectedTier: l.tier,
@@ -548,9 +551,9 @@ export class OrdersService {
                 customer: { select: { id: true, name: true, email: true } },
                 items: {
                     where: { product: { supplierId } },
-                    include: { product: { select: { id: true, name: true, images: true, supplierId: true, ean: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, stock: true } } },
+                    include: { product: { select: { id: true, name: true, images: true, supplierId: true, ean: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, stock: true, basePrice: true } } },
                 },
-                history: { orderBy: { createdAt: 'desc' }, take: 1, select: { reason: true, newStatus: true, createdAt: true } },
+                history: { orderBy: { createdAt: 'asc' }, select: { reason: true, newStatus: true, previousStatus: true, createdAt: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -571,15 +574,19 @@ export class OrdersService {
             const maskedEmail = (raw?: string) =>
                 raw ? raw.replace(/^(.{2}).*@/, '$1***@') : '';
             const allMine = (order as any)._allItems?.every((i: any) => i.product?.supplierId === supplierId && !i.mixedLoadId) ?? false;
-            const subtotal = Math.round(order.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0) * 100) / 100;
-            const lastReason = (order as any).history?.[0]?.reason ?? null;
+            // Supplier views use the supplier's own prices only — never the buyer
+            // price or the order total (which would reveal the Atlantis margin).
+            const values = order.items.map((i: any) => supplierLineValue(i));
+            const subtotal = Math.round(values.reduce((s: number, v) => s + v.total, 0) * 100) / 100;
+            const hist = ((order as any).history || []) as any[];
+            const lastReason = hist.length ? hist[hist.length - 1].reason : null;
             return {
             id: order.id,
             status: order.status,
-            totalAmount: order.totalAmount,
-            // Value of THIS supplier's lines (buyer prices, EUR) — the order
-            // total also includes other suppliers' goods.
+            // Value of THIS supplier's lines at the supplier's own prices (EUR).
             supplierSubtotal: subtotal,
+            valueEstimated: values.some((v) => v.estimated),
+            timeline: hist.map((h) => ({ status: h.newStatus, at: h.createdAt, note: h.reason ?? null })),
             needsAction: AWAITING_SUPPLIER.includes(order.status as OrderStatus),
             canDecline: AWAITING_SUPPLIER.includes(order.status as OrderStatus) && allMine,
             sharedOrder: !allMine,
@@ -606,7 +613,9 @@ export class OrdersService {
                 name: (item as any).product?.name ?? (item as any).productNameSnapshot ?? 'Deleted product',
                 image: (item as any).product?.images?.[0] ?? null,
                 quantity: item.quantity,
-                price: item.price,
+                // The supplier's own price per ordered unit (see supplierLineValue).
+                price: supplierLineValue(item as any).unit,
+                priceEstimated: supplierLineValue(item as any).estimated,
                 ean: (item as any).product?.ean ?? null,
                 unitsPerCase: (item as any).product?.unitsPerCase ?? null,
                 cases: casesForItem(item as any),
@@ -917,7 +926,7 @@ export class OrdersService {
             include: {
                 items: {
                     where: { product: { supplierId } },
-                    include: { product: { select: { id: true, name: true, basePrice: true, category: true } } },
+                    include: { product: { select: { id: true, name: true, basePrice: true, category: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true } } },
                 },
             },
         });
@@ -934,7 +943,8 @@ export class OrdersService {
         for (const order of orders) {
             if (!CONFIRMED_FOR_REVENUE.includes(order.status)) continue;
             for (const item of order.items) {
-                const lineTotal = item.price * item.quantity;
+                // Supplier's own prices only — buyer prices would reveal the margin.
+                const lineTotal = supplierLineValue(item as any).total;
                 totalRevenue += lineTotal;
                 totalItems += item.quantity;
                 const pid = item.product?.id ?? 'unknown';
@@ -954,7 +964,7 @@ export class OrdersService {
             const key = new Date(order.createdAt).toLocaleString('en-US', { month: 'short', year: '2-digit' });
             if (!monthlyMap[key]) monthlyMap[key] = { revenue: 0, orders: 0 };
             monthlyMap[key].orders += 1;
-            for (const item of order.items) monthlyMap[key].revenue += item.price * item.quantity;
+            for (const item of order.items) monthlyMap[key].revenue += supplierLineValue(item as any).total;
         }
 
         const topProducts = Object.entries(productMap)
