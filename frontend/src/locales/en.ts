@@ -381,6 +381,7 @@ export const en = {
         defaultDesc: "High-grade wholesale variant natively optimized for B2B procurement pipelines. Features an extended shelf-life, bulk-ready packaging, and full compliance documentation required for enterprise distribution."
     },
     admin: {
+        targetPriceRequests: "Target Prices",
         groupControlPanel: "Control Panel",
         panelTitle: "Control Panel",
         enterpriseAdmin: "Enterprise Administrator",

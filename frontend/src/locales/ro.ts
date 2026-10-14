@@ -293,6 +293,7 @@ export const ro = {
         defaultDesc: "Variantă wholesale de înaltă calitate optimizată pentru achiziții B2B."
     },
     admin: {
+        targetPriceRequests: "Prețuri țintă",
         groupControlPanel: "Panou de Control",
         panelTitle: "Panou de Control",
         enterpriseAdmin: "Administrator Enterprise",

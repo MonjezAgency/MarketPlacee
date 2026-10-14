@@ -129,6 +129,9 @@ export class SupplierImportService {
             this.notifications.notifyAdmins('Bulk products submitted', `${pending} product${pending === 1 ? '' : 's'} from a supplier import are waiting for review.`, 'INFO', { supplierId, count: pending }).catch(() => {});
         }
         const count = (o: string) => results.filter((x) => x.outcome === o).length;
+        if (count('failed')) {
+            this.notifications.notifyUser(supplierId, 'Bulk upload: some rows weren’t imported', `${count('failed')} of ${results.length} rows failed. Fix them in your file and upload it again — rows already imported are skipped.`, 'WARNING', { type: 'BULK_IMPORT' }).catch(() => {});
+        }
         return {
             summary: {
                 total: results.length,

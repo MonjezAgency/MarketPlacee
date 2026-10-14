@@ -50,6 +50,7 @@ import {
     CheckCircle2,
     ScrollText,
     Image as ImageIcon,
+    Target
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -87,6 +88,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             { label: 'Inventory Hub', translationKey: 'allProducts', href: '/admin/products', icon: Package },
             { label: 'Approve Offers', translationKey: 'approveOffers', href: '/admin/wholesale-offers', icon: CheckCircle2 },
             { label: 'Global Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
+            { label: 'Target Prices', translationKey: 'targetPriceRequests', href: '/admin/target-prices', icon: Target },
             { label: 'Supply Chain', translationKey: 'suppliers', href: '/admin/suppliers', icon: Store },
             { label: 'B2B Customers', translationKey: 'buyers', href: '/admin/buyers', icon: Users },
             { label: 'Finance & Logistics', translationKey: 'groupFinance', href: '/admin/finance', icon: DollarSign },

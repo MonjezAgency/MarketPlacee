@@ -94,13 +94,13 @@ export class EmailService {
       .slice(0, 4000);
   }
 
-  async sendMailDetailed(to: string, subject: string, html: string): Promise<{ success: boolean; error?: string; provider?: string }> {
+  async sendMailDetailed(to: string, subject: string, html: string, opts: { unsubscribeUrl?: string } = {}): Promise<{ success: boolean; error?: string; provider?: string }> {
     const resendKey = process.env.RESEND_API_KEY;
     const text = this.htmlToPlainText(html);
     // Support / unsubscribe address that recipients can hit in their
     // mail client. Resend honours List-Unsubscribe-Post for one-click
     // unsubscribe, which is a major Gmail / Outlook deliverability win.
-    const unsubscribeUrl = `${process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com'}/unsubscribe?email=${encodeURIComponent(to)}`;
+    const unsubscribeUrl = opts.unsubscribeUrl || `${process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com'}/unsubscribe?email=${encodeURIComponent(to)}`;
     const replyTo = process.env.EMAIL_USER || 'Info@atlantisfmcg.com';
 
     // ──── Strategy 1: Resend API (PRIMARY) ────
@@ -155,20 +155,20 @@ export class EmailService {
         }
         // Fall through to SMTP attempt
         console.warn(`[EMAIL] Falling back to SMTP — ${reason}`);
-        return this.smtpFallback(to, subject, html, reason);
+        return this.smtpFallback(to, subject, html, reason, opts.unsubscribeUrl);
       }
     } else {
       console.warn(`[EMAIL] RESEND_API_KEY not set — SMTP-only mode (likely fails on Railway)`);
-      return this.smtpFallback(to, subject, html, 'RESEND_API_KEY not configured');
+      return this.smtpFallback(to, subject, html, 'RESEND_API_KEY not configured', opts.unsubscribeUrl);
     }
   }
 
-  private async smtpFallback(to: string, subject: string, html: string, prevError: string): Promise<{ success: boolean; error?: string; provider?: string }> {
+  private async smtpFallback(to: string, subject: string, html: string, prevError: string, unsubscribeOverride?: string): Promise<{ success: boolean; error?: string; provider?: string }> {
     try {
       console.log(`[EMAIL] SMTP fallback → ${to}...`);
       const text = this.htmlToPlainText(html);
       const replyTo = process.env.EMAIL_USER || 'Info@atlantisfmcg.com';
-      const unsubscribeUrl = `${process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com'}/unsubscribe?email=${encodeURIComponent(to)}`;
+      const unsubscribeUrl = unsubscribeOverride || `${process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com'}/unsubscribe?email=${encodeURIComponent(to)}`;
       const info = await this.transporter.sendMail({
         from: this.getFrom(),
         to,

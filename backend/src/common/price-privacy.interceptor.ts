@@ -2,28 +2,15 @@ import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nes
 import { Observable, from } from 'rxjs';
 import { mergeMap } from 'rxjs/operators';
 import { PrismaService } from './prisma.service';
+import { readMarkups } from './markups';
 import { applyPricePrivacy, isOwnerScoped, isPriceStaff, type Markups } from './price-privacy';
 
 /** Applies price-privacy (see price-privacy.ts) to every JSON response. */
 @Injectable()
 export class PricePrivacyInterceptor implements NestInterceptor {
-    private cache: { at: number; m: Markups } | null = null;
     constructor(private readonly prisma: PrismaService) {}
 
-    async markups(): Promise<Markups> {
-        if (this.cache && Date.now() - this.cache.at < 60_000) return this.cache.m;
-        const keys = ['MARKUP_PERCENTAGE_PIECE', 'MARKUP_PERCENTAGE', 'MARKUP_PERCENTAGE_PALLET', 'MARKUP_PERCENTAGE_CONTAINER', 'MARKUP_PERCENTAGE_MIX'];
-        const rows = await this.prisma.appConfig.findMany({ where: { key: { in: keys } } }).catch(() => [] as any[]);
-        const val = (k: string) => { const r = rows.find((x: any) => x.key === k); const n = r ? parseFloat(r.value) : NaN; return Number.isFinite(n) && n >= 1 ? n : null; };
-        const m = {
-            piece: val('MARKUP_PERCENTAGE_PIECE') ?? val('MARKUP_PERCENTAGE') ?? 1.1,
-            pallet: val('MARKUP_PERCENTAGE_PALLET') ?? 1.05,
-            container: val('MARKUP_PERCENTAGE_CONTAINER') ?? 1.02,
-            mix: val('MARKUP_PERCENTAGE_MIX') ?? 1.15,
-        };
-        this.cache = { at: Date.now(), m };
-        return m;
-    }
+    markups(): Promise<Markups> { return readMarkups(this.prisma); }
 
     intercept(ctx: ExecutionContext, next: CallHandler): Observable<any> {
         if (ctx.getType() !== 'http') return next.handle();

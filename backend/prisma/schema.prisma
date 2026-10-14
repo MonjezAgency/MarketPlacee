@@ -101,6 +101,7 @@ model User {
   notificationPrefs    Json?
   // Supplier's chosen currency for entering prices (ISO code). Null = suggest from country.
   defaultCurrency      String?
+  targetPriceRequests  TargetPriceRequest[] @relation("TargetPriceBuyer")
 
   // Two-Factor Authentication
   twoFactorEnabled     Boolean   @default(false)
@@ -272,6 +273,8 @@ model Product {
   reviews      Review[]
   wishlistItems WishlistItem[]
   changeLog    ProductChangeLog[]
+  targetPrices TargetPriceRequest[]
+  priceObservations PriceObservation[]
   // What the supplier typed: price per case in their own currency. basePrice
   // (EUR) is derived from it; kept so the entered figure is never reinterpreted.
   supplierCurrency String?
@@ -970,8 +973,73 @@ model NewsletterSubscriber {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Consent record (marketing newsletter only — separate from account /
+  // order notifications). PENDING = signed up, waiting for the email
+  // confirmation (double opt-in). Rows created before these fields
+  // existed have null consent data (legacy).
+  consentAt        DateTime?
+  consentSource    String?   // where consent was given, e.g. "footer"
+  policyVersion    String?   // privacy notice version shown at consent
+  confirmTokenHash String?   @unique
+  confirmSentAt    DateTime?
+  confirmedAt      DateTime?
+  unsubscribeToken String?   @unique
+  unsubscribedAt   DateTime?
+  userId           String?   // linked account, when signed in at sign-up
+
   @@index([email])
   @@index([status])
+}
+
+// A buyer's desired price for a product. Routed to Atlantis operations, who
+// negotiate with the supplier. Never changes the listing or creates an order.
+model TargetPriceRequest {
+  id              String    @id @default(uuid())
+  ref             String    @unique          // short human reference, e.g. TP-7K3Q9A
+  productId       String
+  product         Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  buyerId         String
+  buyer           User      @relation("TargetPriceBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  // Normalised target: buyer price per CASE in EUR (same basis as listings).
+  targetCasePrice Float
+  // Exactly what the buyer typed.
+  enteredPrice    Float
+  enteredBasis    String                     // CASE | PIECE
+  currency        String    @default("EUR")
+  quantity        Int
+  quantityUnit    String                     // CASE | PALLET | TRUCK
+  quantityCases   Int
+  message         String?
+  // OPEN → RESPONDED (counter / info) → ACCEPTED | DECLINED; or WITHDRAWN by the buyer.
+  status          String    @default("OPEN")
+  response        String?
+  counterCasePrice Float?
+  respondedAt     DateTime?
+  respondedById   String?
+  reachedNotifiedAt DateTime?               // buyer told the listed price reached the target
+  history         Json      @default("[]")   // [{status, at, by, note}]
+  idempotencyKey  String?   @unique
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([productId, status])
+  @@index([buyerId, createdAt])
+  @@index([status, createdAt])
+}
+
+// Buyer-facing listed price over time, one row each time it changes.
+// Basis: price per case at the case tier, EUR. Never the supplier price.
+model PriceObservation {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  casePrice  Float
+  currency   String   @default("EUR")
+  basis      String   @default("LISTED_CASE")
+  source     String                          // PRICE_CHANGE | APPROVED | OBSERVED
+  observedAt DateTime @default(now())
+
+  @@index([productId, observedAt])
 }
 
 model InviteToken {

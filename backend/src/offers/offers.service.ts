@@ -392,24 +392,25 @@ export class OffersService {
         const product = (offer as any).product;
         const supplier = (offer as any).supplier;
 
-        const [subs, customers] = await Promise.all([
-            this.prisma.newsletterSubscriber.findMany({
-                where: { status: 'ACTIVE' },
-                select: { email: true, name: true },
-            }),
-            this.prisma.user.findMany({
-                where: { role: 'CUSTOMER', status: 'ACTIVE' },
-                select: { email: true, name: true },
-            }),
+        // Marketing consent only: ACTIVE newsletter subscribers, plus accounts
+        // that explicitly switched marketing emails on. Anyone unsubscribed,
+        // pending, bounced or blocked is excluded.
+        const [subs, users] = await Promise.all([
+            this.prisma.newsletterSubscriber.findMany({ select: { email: true, name: true, status: true, unsubscribeToken: true } as any }),
+            this.prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { email: true, name: true, notificationPrefs: true } }),
         ]);
-
+        const suppressed = new Set((subs as any[]).filter((s) => s.status !== 'ACTIVE').map((s) => String(s.email).toLowerCase()));
         const seen = new Set<string>();
-        const recipients: { email: string; name: string | null }[] = [];
-        for (const r of [...subs, ...customers]) {
+        const recipients: { email: string; name: string | null; unsubscribeToken?: string | null }[] = [];
+        for (const r of subs as any[]) {
             const e = (r.email || '').toLowerCase().trim();
-            if (!e || seen.has(e)) continue;
-            seen.add(e);
-            recipients.push({ email: r.email, name: r.name ?? null });
+            if (r.status !== 'ACTIVE' || !e || seen.has(e)) continue;
+            seen.add(e); recipients.push({ email: r.email, name: r.name ?? null, unsubscribeToken: r.unsubscribeToken ?? null });
+        }
+        for (const u of users as any[]) {
+            const e = (u.email || '').toLowerCase().trim();
+            if (!e || seen.has(e) || suppressed.has(e) || (u.notificationPrefs as any)?.marketingEmails !== true) continue;
+            seen.add(e); recipients.push({ email: u.email, name: u.name ?? null });
         }
 
         const subject = `New Atlantis offer: ${product.name}`;
@@ -431,8 +432,12 @@ export class OffersService {
                     /<\/body>/i,
                     `${this.emailTracking.trackingPixelHtml(trackingId)}</body>`,
                 );
-                const ok = await this.emailService.sendMail(r.email, subject, trackedHtml);
-                if (ok) successCount++;
+                const base = process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com';
+                const unsubscribeUrl = r.unsubscribeToken ? `${base}/unsubscribe?token=${encodeURIComponent(r.unsubscribeToken)}` : `${base}/unsubscribe?email=${encodeURIComponent(r.email)}`;
+                const withUnsub = trackedHtml.replace(/<\/body>/i, `<p style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#94A3B8;margin:16px 0"><a href="${unsubscribeUrl}" style="color:#64748B">Unsubscribe from marketing emails</a></p></body>`);
+                const res = await this.emailService.sendMailDetailed(r.email, subject, withUnsub, { unsubscribeUrl });
+                if (res.success) successCount++;
+                else this.logger.warn(`Offer email to ${r.email.replace(/^(.{2}).*@/, '$1***@')} failed: ${res.error}`);
             } catch (err) {
                 this.logger.warn(`Failed to email ${r.email}: ${(err as any)?.message}`);
             }

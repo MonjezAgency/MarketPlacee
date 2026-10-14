@@ -5,6 +5,7 @@ import { PrismaService } from '../common/prisma.service';
 import { EanService } from './ean.service';
 import { applySupplierCurrency, missingForPublish, invalidValues, normaliseBarcode, normaliseWeight, realImages, REVIEWED_FIELDS, statusExplanation, type Missing } from './catalog-rules';
 import { stockMovements } from './stock-ledger';
+import { PriceHistoryService } from './price-history.service';
 import { listedSince } from './listed-since';
 import { buildBrandCanon, brandKey, canonicalBrand, type BrandCanon } from './brand-canon';
 import { translateProduct } from '../common/translator';
@@ -22,6 +23,7 @@ export class ProductsService {
         private aiAgent: AiAgentService,
         private notificationsService: NotificationsService,
         private emailService: EmailService,
+        private readonly priceHistory: PriceHistoryService,
     ) { }
 
     private buildWhiteCatalogPlaceholder(name?: string, ean?: string): string {
@@ -816,6 +818,7 @@ export class ProductsService {
             where: { id },
             data: { status, adminNotes },
         });
+        if (status === ProductStatus.APPROVED) this.priceHistory.record(id, 'APPROVED').catch(() => {});
 
         // Notify Supplier on status change
         if (updated.supplierId) {
@@ -1066,6 +1069,7 @@ export class ProductsService {
             }
         }
 
+        for (const id of okIds) this.priceHistory.record(id, 'APPROVED').catch(() => {});
         return { count: updated.count, skipped };
     }
 
@@ -1211,6 +1215,7 @@ export class ProductsService {
         }
 
         const updated = await this.prisma.product.update({ where: { id }, data: updateData });
+        if (updateData.basePrice !== undefined || updateData.price !== undefined) this.priceHistory.record(id, 'PRICE_CHANGE').catch(() => {});
 
         // Update translations if name or description changed
         if (data.name !== undefined || data.description !== undefined) {

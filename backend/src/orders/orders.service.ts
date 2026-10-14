@@ -10,6 +10,7 @@ import { AppConfigService } from '../admin/app-config.service';
 import { MixedLoadsService, asHttp } from './mixed-loads.service';
 import { PricingError, basePerCase, casesInUnit, normaliseTier, priceLine, priceLoad, round2 } from './pricing';
 import { casesForItem, supplierLineValue } from '../products/stock-ledger';
+import { minOrderCases } from '../common/markups';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
     PENDING: 'Pending',
@@ -325,6 +326,7 @@ export class OrdersService {
         // after the order exists; a retried submit returns the existing order
         // above and never reaches this point, so there are no duplicates.
         this.emailSuppliersNewOrder(order, quote.lines).catch((e) => console.error(`[ORDER_SUPPLIER_EMAIL_FAIL] ${order.id}: ${e?.message}`));
+        this.alertLowStock(quote.lines).catch((e) => console.error(`[LOW_STOCK_ALERT_FAIL] ${order.id}: ${e?.message}`));
 
         // Notify Admins & Owners
         this.notificationsService.notifyAdmins(
@@ -634,6 +636,31 @@ export class OrdersService {
             })),
             };
         });
+    }
+
+    /**
+     * Tell a supplier when this order took a product below one minimum order
+     * (or to zero). Fires only on the crossing, so it isn't repeated per order.
+     * Respects the supplier's "Low stock alerts" preference.
+     */
+    private async alertLowStock(lines: any[]) {
+        const taken = lines.filter((l) => l.productId && typeof l.stockCases === 'number' && l.stockCases > 0);
+        if (!taken.length) return;
+        const products = await this.prisma.product.findMany({
+            where: { id: { in: taken.map((l) => l.productId) } },
+            select: { id: true, name: true, stock: true, moq: true, moqUnit: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, supplierId: true, supplier: { select: { notificationPrefs: true } } },
+        });
+        for (const p of products as any[]) {
+            const took = taken.filter((l) => l.productId === p.id).reduce((s, l) => s + l.stockCases, 0);
+            const after = p.stock ?? 0, before = after + took;
+            const min = minOrderCases(p);
+            if ((p.supplier?.notificationPrefs as any)?.lowStockAlerts === false || !p.supplierId) continue;
+            if (after <= 0 && before > 0) {
+                this.notificationsService.create(p.supplierId, 'Out of stock', `“${p.name}” is out of stock after a new order. Buyers can’t order it until you add stock.`, 'WARNING', { productId: p.id, type: 'LOW_STOCK' }).catch(() => {});
+            } else if (min > 0 && after < min && before >= min) {
+                this.notificationsService.create(p.supplierId, 'Low stock', `“${p.name}” has ${after} cases left — less than one minimum order (${min} cases).`, 'WARNING', { productId: p.id, type: 'LOW_STOCK' }).catch(() => {});
+            }
+        }
     }
 
     private async emailSuppliersNewOrder(order: any, lines: any[]) {

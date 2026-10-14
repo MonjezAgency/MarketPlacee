@@ -15,6 +15,10 @@ import { SupplierCatalogController } from './supplier-catalog.controller';
 import { SupplierImportService } from './supplier-import.service';
 import { ImageLookupService } from './image-lookup.service';
 import { SupplierOverviewService } from './supplier-overview.service';
+import { PriceHistoryService } from './price-history.service';
+import { SupplierUpdatesService } from './supplier-updates.service';
+import { TargetPricesService } from './target-prices.service';
+import { PriceHistoryController, TargetPricesController } from './market.controller';
 
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -22,8 +26,8 @@ import { EmailModule } from '../email/email.module';
 
 @Module({
     imports: [PricingModule, AiAgentModule, StorageModule, NotificationsModule, EmailModule],
-    providers: [ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService, SupplierImportService, ImageLookupService, SupplierOverviewService],
-    controllers: [SupplierCatalogController, ProductsController, PlacementController, ReviewsController, AdminReviewsController],
-    exports: [ProductsService, PlacementService],
+    providers: [ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService, SupplierImportService, ImageLookupService, SupplierOverviewService, PriceHistoryService, TargetPricesService, SupplierUpdatesService],
+    controllers: [SupplierCatalogController, PriceHistoryController, TargetPricesController, ProductsController, PlacementController, ReviewsController, AdminReviewsController],
+    exports: [ProductsService, PlacementService, PriceHistoryService],
 })
 export class ProductsModule { }

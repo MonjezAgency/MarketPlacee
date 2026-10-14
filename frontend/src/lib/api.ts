@@ -80,6 +80,7 @@ function mapProduct(item: any): Product {
         unit: item.unit || 'unit',
         minOrder: item.minOrder ?? item.moq ?? 10,
         moq: item.moq ?? item.minOrder ?? 10,
+        moqUnit: item.moqUnit ?? null,
         image: (item.images && item.images.length > 0) ? item.images[0] : '',
         images: item.images || [],
         // Videos array — short product demo clips. Falls through to []

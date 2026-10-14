@@ -180,7 +180,7 @@ export default function SettingsPage() {
                 <Card icon={<Bell size={17} />} title="Email notifications">
                     {prefs === null ? <p className="text-[13px] text-ink-3">Preferences couldn’t be loaded.</p> : (
                         <div className="space-y-2">
-                            {[['orderUpdates', 'Order updates', 'Confirmations, dispatch and delivery'], ['onboardingReminders', 'Profile reminders', 'Up to two reminders if your business profile is unfinished'], ['marketingEmails', 'News and offers', 'New products and promotions']].map(([k, t, d]) => (
+                            {[['orderUpdates', 'Order updates', 'Confirmations, dispatch and delivery'], ['onboardingReminders', 'Profile reminders', 'Up to two reminders if your business profile is unfinished'], ['marketingEmails', 'Marketing emails (optional)', 'Newsletter and offer emails — fresh arrivals, new offers, promotions. Off unless you switch it on.']].map(([k, t, d]) => (
                                 <label key={k} className="flex items-start gap-3 rounded-xl px-3 py-2.5 ring-1 ring-line cursor-pointer hover:ring-line-strong">
                                     <input type="checkbox" checked={!!prefs[k]} onChange={() => togglePref(k)} className="mt-0.5 w-4 h-4 accent-[#0E7C74]" />
                                     <span><span className="block text-[14px] font-medium text-ink">{t}</span><span className="block text-[12.5px] text-ink-3">{d}</span></span>

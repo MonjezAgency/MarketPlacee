@@ -293,6 +293,7 @@ export const fr = {
         defaultDesc: "Variante wholesale de haute qualité optimisée pour les achats B2B."
     },
     admin: {
+        targetPriceRequests: "Prix cibles",
         groupControlPanel: "Panneau de Contrôle",
         panelTitle: "Panneau de Contrôle",
         enterpriseAdmin: "Administrateur Enterprise",

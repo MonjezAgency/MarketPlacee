@@ -62,6 +62,8 @@ export const supplierApi = {
     preferences: () => apiFetch('/supplier-catalog/preferences', { cache: 'no-store' }).then((r) => json<{ defaultCurrency: string | null; suggestedCurrency: string; effectiveCurrency: string; country: string | null; currencies: string[]; rates: Record<string, number> }>(r)),
     setPreferences: (body: { defaultCurrency: string | null }) => apiFetch('/supplier-catalog/preferences', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => json<any>(r)),
     inventory: () => apiFetch('/products/inventory', { cache: 'no-store' }).then((r) => json<any[]>(r)),
+    updatesPreview: (body: any) => post('/supplier-catalog/updates/preview', body).then((r) => json<any>(r)),
+    updatesCommit: (body: any) => post('/supplier-catalog/updates/commit', body).then((r) => json<any>(r)),
     reputation: () => apiFetch('/supplier-catalog/reputation', { cache: 'no-store' }).then((r) => json<any>(r)),
     importSchema: () => apiFetch('/supplier-catalog/import/schema').then((r) => json<any>(r)),
     importParse: (file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/supplier-catalog/import/parse', { method: 'POST', body: fd }).then((r) => json<any>(r)); },

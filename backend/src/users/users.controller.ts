@@ -96,7 +96,8 @@ export class UsersController {
             productComments: true,
             lowStockAlerts: true,
             inboundOffers: true,
-            marketingEmails: true,
+            // Marketing is opt-in: off until the user switches it on.
+            marketingEmails: false,
             muteToasts: false,
             onboardingReminders: true,
         };

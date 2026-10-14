@@ -269,8 +269,11 @@ export class ProductsController {
 
     /** Public: aggregated buyer demand for the Targets page (counts only). */
     @Get('targets')
-    async getBuyerTargets(@Query('limit') limit?: string) {
-        return this.productsService.findBuyerTargets(limit ? parseInt(limit, 10) : 24);
+    @UseGuards(OptionalJwtAuthGuard)
+    async getBuyerTargets(@Query('limit') limit?: string, @Request() req?: any) {
+        const rows = await this.productsService.findBuyerTargets(limit ? parseInt(limit, 10) : 24);
+        // Wholesale prices are for signed-in accounts only (same rule as the catalog).
+        return req?.user ? rows : (rows as any[]).map((r: any) => ({ ...r, product: r?.product ? stripPrices(r.product) : r?.product }));
     }
 
     /** Public endpoint — products that recently changed price, for the live header ticker */

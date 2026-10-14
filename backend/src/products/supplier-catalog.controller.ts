@@ -8,6 +8,7 @@ import { Roles } from '../auth/roles.decorator';
 import { ProductsService } from './products.service';
 import { SupplierImportService, type ImportRequest } from './supplier-import.service';
 import { ImageLookupService } from './image-lookup.service';
+import { SupplierUpdatesService, type UpdateRequest } from './supplier-updates.service';
 import { SupplierOverviewService } from './supplier-overview.service';
 import { IMPORT_FIELDS, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, buildTemplate, matchHeaders, parseSpreadsheet } from './product-import';
 import { TO_EUR, MOQ_UNITS, UNIT_TYPES, suggestedCurrency } from './catalog-rules';
@@ -27,6 +28,7 @@ export class SupplierCatalogController {
         private readonly images: ImageLookupService,
         private readonly overviewSvc: SupplierOverviewService,
         private readonly prisma: PrismaService,
+        private readonly updates: SupplierUpdatesService,
     ) {}
 
     @Get('overview')
@@ -111,6 +113,27 @@ export class SupplierCatalogController {
     @Throttle({ default: { limit: 10, ttl: 60_000 } })
     commit(@Request() req, @Body() body: ImportRequest) {
         return this.importer.commit(req.user.sub, body);
+    }
+
+    // ─── Bulk price & stock updates (existing products only) ─────────
+
+    @Get('updates/template')
+    async updatesTemplate(@Request() req, @Res() res: any) {
+        const buf = await this.updates.template(req.user.sub);
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename="atlantis-price-stock-update.xlsx"');
+        res.send(buf);
+    }
+
+    @Post('updates/preview')
+    updatesPreview(@Request() req, @Body() body: UpdateRequest) {
+        return this.updates.preview(req.user.sub, body);
+    }
+
+    @Post('updates/commit')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    updatesCommit(@Request() req, @Body() body: UpdateRequest) {
+        return this.updates.commit(req.user.sub, body);
     }
 
     // ─── Barcode image lookup ────────────────────────────────────────

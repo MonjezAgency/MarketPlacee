@@ -1,3 +1,5 @@
+import { recordAllListedPrices } from '../common/markups';
+import { PrismaService } from '../common/prisma.service';
 import { Controller, Get, Post, Put, Body, Param, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
 import { AppConfigService } from './app-config.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -15,7 +17,7 @@ import { Role } from '@prisma/client';
 // team — RolesGuard still enforces, just with a wider allow-list.
 @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR, Role.EDITOR)
 export class AppConfigController {
-    constructor(private readonly appConfigService: AppConfigService) { }
+    constructor(private readonly appConfigService: AppConfigService, private readonly prisma: PrismaService) { }
 
     @Get('markup')
     async getMarkup() {
@@ -26,6 +28,8 @@ export class AppConfigController {
     @Post('markup')
     async setMarkup(@Body() body: { piece: number; pallet: number; container: number; platformFee?: number; shippingMarkup?: number }) {
         await this.appConfigService.setMarkupPercentage(body);
+        // Buyer prices moved: record them for price history (background).
+        recordAllListedPrices(this.prisma).catch((e) => console.error('[price-history] markup change record failed:', e?.message));
         return { message: 'Markup percentages updated', data: body };
     }
 

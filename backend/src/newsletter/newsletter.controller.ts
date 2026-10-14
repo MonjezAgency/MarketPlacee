@@ -1,7 +1,9 @@
 import {
     Controller, Post, Get, Delete, Body, Param, Req, UseGuards, UseInterceptors,
-    UploadedFile, Query, Logger, BadRequestException
+    UploadedFile, Query, Logger, BadRequestException, Res
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { NewsletterService } from './newsletter.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -16,12 +18,38 @@ export class NewsletterController {
         this.logger.log('NewsletterController loaded — POST /newsletter/subscribe is registered');
     }
 
+    /** Public sign-up (double opt-in). `consent` must be the user's explicit tick. */
     @Post('subscribe')
-    async subscribe(@Body() body: { email: string; source?: string; region?: string; name?: string }) {
+    @UseGuards(OptionalJwtAuthGuard)
+    @Throttle({ default: { limit: 5, ttl: 60_000 } })
+    async subscribe(@Body() body: { email: string; source?: string; region?: string; name?: string; consent?: boolean; policyVersion?: string }, @Req() req: any) {
         if (!body || !body.email) {
             throw new BadRequestException('Email is required');
         }
-        return this.newsletterService.subscribe(body.email, body.source, body.region, body.name);
+        return this.newsletterService.subscribe(body.email, body.source, body.region, body.name, { consent: body.consent === true, policyVersion: body.policyVersion, userId: req?.user?.sub ?? null });
+    }
+
+    @Post('confirm')
+    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    confirm(@Body() body: { token: string }) {
+        return this.newsletterService.confirm(String(body?.token || ''));
+    }
+
+    @Post('unsubscribe')
+    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    unsubscribe(@Body() body: { token?: string; email?: string }) {
+        return this.newsletterService.unsubscribe({ token: body?.token, email: body?.email });
+    }
+
+    /** CSV of marketing-eligible subscribers with consent data (admins only). */
+    @Get('export')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles('ADMIN', 'OWNER')
+    async export(@Res() res: any) {
+        const csv = await this.newsletterService.exportCsv();
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="atlantis-newsletter-subscribers-${new Date().toISOString().slice(0, 10)}.csv"`);
+        res.send('\uFEFF' + csv);
     }
 
     @Get()

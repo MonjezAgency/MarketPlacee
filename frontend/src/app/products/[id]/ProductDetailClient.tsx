@@ -7,7 +7,7 @@ import {
     Star, Plus, Minus, Check, Truck,
     ShieldCheck, RotateCcw, ChevronRight, Share2,
     Heart, Info, Package, Sparkles, ArrowLeft, ShoppingCart, X, ChevronLeft,
-    Shield, CheckCircle2, Download, FileText, FileBadge, Barcode
+    Shield, CheckCircle2, Download, FileText, FileBadge, Barcode, Target
 } from 'lucide-react';
 import { type Product, ProductStatus } from '@/lib/types';
 import { fetchProductById, apiFetch, fetchProductsWithFilters } from '@/lib/api';
@@ -28,6 +28,8 @@ import { getDisplayCategory } from '@/lib/product-utils';
 import ImageLightbox from '@/components/ImageLightbox';
 import { brandLogo } from '@/lib/brand-logos';
 import { computeCardPrice } from '@/lib/card-pricing';
+import TargetPriceDialog from '@/components/product/TargetPriceDialog';
+import PriceHistorySection from '@/components/product/PriceHistorySection';
 import { round2, minUnitsFor as serverMinUnits, type LoadKind } from '@/lib/wholesale';
 import MixBuilder from '@/components/product/MixBuilder';
 import MixDiscovery from '@/components/product/MixDiscovery';
@@ -536,6 +538,8 @@ export default function ProductDetailClient() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [allImages.join('|')]);
 
+    const [targetOpen, setTargetOpen] = useState(false); // Target-price dialog (declared before early returns)
+
     if (isLoading) {
         return (
             <div className="min-h-[60vh] flex items-center justify-center p-6 bg-surface">
@@ -737,6 +741,11 @@ export default function ProductDetailClient() {
 
     return (
         <div className="min-h-screen bg-surface text-ink text-start pb-20">
+            {!isSupplierOwner && isLoggedIn && (
+                <TargetPriceDialog open={targetOpen} onClose={() => setTargetOpen(false)}
+                    product={{ id: product.id, name: product.name, ean: (product as any).ean, unitsPerCase: product.unitsPerCase, casesPerPallet: product.casesPerPallet, palletsPerShipment: (product as any).palletsPerShipment, moq: (product as any).moq, moqUnit: (product as any).moqUnit }}
+                    listedCasePrice={typeof (product as any).basePrice === 'number' ? (product as any).basePrice : null} />
+            )}
             <main className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
                 {/* Breadcrumb + utilities */}
                 <div className="flex items-center justify-between gap-4 pt-4 pb-4">
@@ -1009,6 +1018,14 @@ export default function ProductDetailClient() {
                                             : isMixing ? <><ShoppingCart size={16} /> Add mixed {tierData.activeLabel.toLowerCase()} to cart</>
                                             : <><ShoppingCart size={16} /> Add to cart</>}
                                     </button>
+                                    {/* Buyers propose the price they'd pay; reviewed by the Atlantis sourcing desk. */}
+                                    {!isSupplierOwner && (
+                                        <button type="button"
+                                            onClick={() => { if (!isLoggedIn) { router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname)); return; } setTargetOpen(true); }}
+                                            className="sm:w-auto h-10 px-4 rounded-xl ring-1 ring-line-strong hover:ring-ink text-[13.5px] font-semibold text-heading inline-flex items-center justify-center gap-2 transition-shadow">
+                                            <Target size={16} /> {isLoggedIn ? 'Set target price' : 'Sign in to set a target price'}
+                                        </button>
+                                    )}
                                     <Link href={quoteHref} className="sm:w-auto h-10 px-4 rounded-xl ring-1 ring-line-strong hover:ring-ink text-[13.5px] font-semibold text-heading inline-flex items-center justify-center gap-2 transition-shadow">
                                         <FileText size={16} /> Request a quote
                                     </Link>
@@ -1368,6 +1385,9 @@ export default function ProductDetailClient() {
                         )}
                     </div>
                 </section>
+
+                {/* ── Price history (listed price, signed-in buyers) ───────── */}
+                <PriceHistorySection productId={product.id} isLoggedIn={isLoggedIn} />
 
                 {/* ── Reviews (always visible, below the details) ─────────── */}
                 <div id="pdp-reviews" className="mt-2 pt-8 border-t border-line scroll-mt-[112px]">

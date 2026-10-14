@@ -21,7 +21,7 @@ const PREF_ROWS: { key: keyof Prefs; label: string; desc: string }[] = [
     { key: 'productComments', label: 'Listing feedback', desc: 'Comments from Atlantis on your products.' },
     { key: 'lowStockAlerts', label: 'Low stock alerts', desc: 'When a listing runs low.' },
     { key: 'inboundOffers', label: 'Buyer enquiries', desc: 'Requests that match your listings.' },
-    { key: 'marketingEmails', label: 'Atlantis news', desc: 'Occasional product and platform updates.' },
+    { key: 'marketingEmails', label: 'Marketing emails (optional)', desc: 'Newsletter and offer emails. Off unless you switch it on.' },
     { key: 'muteToasts', label: 'Mute pop-up notifications', desc: 'Keep the bell, hide in-page pop-ups.' },
 ];
 

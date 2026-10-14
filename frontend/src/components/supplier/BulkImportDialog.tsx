@@ -198,7 +198,7 @@ function Stepper({ step }: { step: Step }) {
     );
 }
 
-function DropZone({ onFile, busy, file }: { onFile: (f: File) => void; busy: boolean; file: File | null }) {
+export function DropZone({ onFile, busy, file }: { onFile: (f: File) => void; busy: boolean; file: File | null }) {
     const input = React.useRef<HTMLInputElement>(null);
     const [over, setOver] = React.useState(false);
     const depth = React.useRef(0);

@@ -32,6 +32,8 @@ const PUBLIC_PATHS = [
   'auth/refresh',
   'auth/emergency-reset',
   'newsletter/subscribe',
+  'newsletter/confirm',
+  'newsletter/unsubscribe',
   'products/price-ticker',
   // Health endpoints — no auth so the operator can hit them from
   // the browser to verify Railway connectivity even when locked out.

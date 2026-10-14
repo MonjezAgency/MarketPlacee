@@ -26,7 +26,7 @@ import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { cn } from '@/lib/utils';
 
-type StatusFilter = 'all' | 'active' | 'hidden' | 'blocked';
+type StatusFilter = 'all' | 'active' | 'pending' | 'unsubscribed' | 'hidden' | 'blocked';
 
 export default function NewsletterPage() {
     const [subscribers, setSubscribers] = React.useState<any[]>([]);
@@ -110,6 +110,8 @@ export default function NewsletterPage() {
             if (statusFilter === 'active') return s.status === 'ACTIVE';
             if (statusFilter === 'hidden') return s.status === 'HIDDEN';
             if (statusFilter === 'blocked') return s.status === 'BLOCKED';
+            if (statusFilter === 'pending') return s.status === 'PENDING';
+            if (statusFilter === 'unsubscribed') return s.status === 'UNSUBSCRIBED';
             return true;
         })
         .filter(s => {
@@ -159,10 +161,12 @@ export default function NewsletterPage() {
         try {
             const res = await apiFetch('/newsletter/subscribe', {
                 method: 'POST',
-                body: JSON.stringify({ email, name: name || undefined, region: region || undefined, source: 'Manual Add' }),
+                // Double opt-in: the person gets a confirmation email and is only
+                // added to the newsletter once they confirm.
+                body: JSON.stringify({ email, name: name || undefined, region: region || undefined, source: 'admin invite', consent: true, policyVersion: 'admin-invite' }),
             });
             if (res.ok) {
-                toast.success('Client added');
+                toast.success('Invitation sent — they’re added once they confirm by email');
                 setIsAddOpen(false);
                 fetchSubscribers();
             } else {
@@ -201,27 +205,22 @@ export default function NewsletterPage() {
         }
     };
 
-    const handleExport = () => {
+    // Export from the server: only marketing-eligible (ACTIVE) subscribers,
+    // with their consent record.
+    const handleExport = async () => {
         setIsExporting(true);
-        const headers = ['Name', 'Email', 'Region', 'Source', 'Status', 'Date Joined'];
-        const csv = [
-            headers.join(','),
-            ...subscribers.map(s => [
-                JSON.stringify(s.name || ''),
-                JSON.stringify(s.email),
-                JSON.stringify(s.region || ''),
-                JSON.stringify(s.source || ''),
-                s.status,
-                new Date(s.createdAt).toLocaleDateString(),
-            ].join(',')),
-        ].join('\n');
-        const blob = new Blob([csv], { type: 'text/csv' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `atlantis_clients_${new Date().toISOString().split('T')[0]}.csv`;
-        a.click();
-        setTimeout(() => setIsExporting(false), 600);
+        try {
+            const res = await apiFetch('/newsletter/export');
+            if (!res.ok) throw new Error();
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `atlantis-newsletter-subscribers-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        } catch { toast.error('Export failed'); }
+        finally { setIsExporting(false); }
     };
 
     const handleSendCampaign = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -259,6 +258,8 @@ export default function NewsletterPage() {
     const STATUS_TABS: { key: StatusFilter; label: string; count: number; color: string }[] = [
         { key: 'all',     label: 'All',     count: subscribers.length, color: 'text-slate-700' },
         { key: 'active',  label: 'Active',  count: subscribers.filter(s => s.status === 'ACTIVE').length, color: 'text-emerald-600' },
+        { key: 'pending', label: 'Pending confirmation', count: subscribers.filter(s => s.status === 'PENDING').length, color: 'text-amber-600' },
+        { key: 'unsubscribed', label: 'Unsubscribed', count: subscribers.filter(s => s.status === 'UNSUBSCRIBED').length, color: 'text-slate-500' },
         { key: 'hidden',  label: 'Hidden',  count: subscribers.filter(s => s.status === 'HIDDEN').length, color: 'text-slate-500' },
         { key: 'blocked', label: 'Blocked', count: subscribers.filter(s => s.status === 'BLOCKED').length, color: 'text-rose-600' },
     ];
@@ -508,7 +509,11 @@ export default function NewsletterPage() {
                                                     sub.status === 'UNSUBSCRIBED' && 'text-slate-500',
                                                     sub.status === 'HIDDEN' && 'text-slate-500',
                                                     sub.status === 'BLOCKED' && 'text-rose-600',
-                                                )}>{sub.status}</span>
+                                                    sub.status === 'PENDING' && 'text-amber-600',
+                                                )}>{sub.status === 'PENDING' ? 'Pending confirmation' : sub.status}</span>
+                                                <span className="text-[10px] text-slate-400 normal-case" title={(sub as any).consentAt ? `Consent ${new Date((sub as any).consentAt).toLocaleString()} via ${(sub as any).consentSource || 'unknown'} (policy ${(sub as any).policyVersion || '—'})` : 'Added before consent tracking'}>
+                                                    {(sub as any).confirmedAt ? `confirmed ${new Date((sub as any).confirmedAt).toLocaleDateString()}` : (sub as any).consentAt ? 'consent recorded' : 'legacy'}
+                                                </span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-[12px] text-slate-500 font-bold">{new Date(sub.createdAt).toLocaleDateString()}</td>

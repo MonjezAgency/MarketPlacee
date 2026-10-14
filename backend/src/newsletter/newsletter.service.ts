@@ -1,4 +1,5 @@
-import { Injectable, ConflictException, BadRequestException, Logger } from '@nestjs/common';
+import * as crypto from 'crypto';
+import { Injectable, ConflictException, BadRequestException, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
 import { EmailTrackingService } from '../email-tracking/email-tracking.service';
@@ -13,35 +14,128 @@ export class NewsletterService {
         private emailTracking: EmailTrackingService,
     ) {}
 
-    async subscribe(email: string, source?: string, region?: string, name?: string) {
-        // Validate email format
+    /**
+     * Newsletter sign-up with double opt-in. Marketing consent is given only
+     * by the explicit checkbox on the form (`consent: true`); the address
+     * becomes ACTIVE only after the emailed link is clicked. Unsubscribed or
+     * suppressed addresses need a fresh confirmation, never a silent
+     * re-activation. The response is the same whatever the address's state,
+     * so the form can't be used to discover who is subscribed.
+     */
+    async subscribe(email: string, source?: string, region?: string, name?: string, opts: { consent?: boolean; policyVersion?: string; userId?: string | null } = {}) {
         const trimmed = (email || '').trim().toLowerCase();
-        if (!trimmed || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
-            throw new ConflictException('Invalid email address');
+        if (!trimmed || trimmed.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(trimmed)) {
+            throw new BadRequestException('Enter a valid email address.');
         }
+        if (opts.consent !== true) throw new BadRequestException('Tick the box to agree to receive the newsletter.');
+        const generic = { ok: true, status: 'CHECK_EMAIL', message: 'Almost done — check your inbox and click the link to confirm your subscription.' };
 
-        const existing = await this.prisma.newsletterSubscriber.findUnique({
-            where: { email: trimmed }
-        });
+        const existing: any = await this.prisma.newsletterSubscriber.findUnique({ where: { email: trimmed } });
+        if (existing?.status === 'ACTIVE') return { ok: true, status: 'CHECK_EMAIL', message: generic.message };
+        if (existing && ['BLOCKED', 'BOUNCED'].includes(existing.status)) return generic; // suppressed: never emailed
+        // Don't resend a confirmation more than once every 10 minutes.
+        if (existing?.status === 'PENDING' && existing.confirmSentAt && Date.now() - +new Date(existing.confirmSentAt) < 10 * 60_000) return generic;
 
-        if (existing) {
-            if (existing.status === 'ACTIVE') {
-                throw new ConflictException('This email is already subscribed to our newsletter');
+        const token = crypto.randomBytes(24).toString('base64url');
+        const data: any = {
+            status: 'PENDING', consentAt: new Date(), consentSource: (source || 'footer').slice(0, 60), policyVersion: (opts.policyVersion || 'v1').slice(0, 20),
+            confirmTokenHash: crypto.createHash('sha256').update(token).digest('hex'), confirmSentAt: new Date(), confirmedAt: null,
+            unsubscribeToken: existing?.unsubscribeToken || crypto.randomBytes(24).toString('base64url'),
+            source: source || existing?.source || 'footer', region: region || existing?.region || null, name: name || existing?.name || null,
+            userId: opts.userId || existing?.userId || null,
+        };
+        const row = existing
+            ? await this.prisma.newsletterSubscriber.update({ where: { email: trimmed }, data })
+            : await this.prisma.newsletterSubscriber.create({ data: { email: trimmed, ...data } });
+
+        const base = process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com';
+        const link = `${base}/newsletter/confirm?token=${encodeURIComponent(token)}`;
+        const result = await this.emailService.sendMailDetailed(trimmed, 'Confirm your Atlantis newsletter subscription',
+            `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:28px;color:#0F172A">
+              <h2 style="margin:0 0 8px">Confirm your subscription</h2>
+              <p style="color:#475569;line-height:1.6">You asked to receive the Atlantis newsletter: weekly FMCG market updates with fresh arrivals, new offers and live availability.</p>
+              <p style="margin:24px 0"><a href="${link}" style="background:#0B1F3A;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Confirm subscription</a></p>
+              <p style="color:#94A3B8;font-size:12px">If you didn't ask for this, ignore this email — you won't be subscribed.</p></div>`);
+        if (!result.success) {
+            this.logger.error(`[NEWSLETTER_CONFIRM_FAIL] ${row.id}: ${result.error || 'provider rejected'}`);
+            // Honest: the subscription isn't active and the email didn't go out.
+            await this.prisma.newsletterSubscriber.update({ where: { id: row.id }, data: { confirmSentAt: null } as any }).catch(() => {});
+            throw new ServiceUnavailableException('We couldn’t send the confirmation email right now. Please try again later.');
+        }
+        return generic;
+    }
+
+    /** Double opt-in: activates the subscription for the emailed token. */
+    async confirm(token: string) {
+        if (!token || token.length < 20) throw new BadRequestException('This confirmation link is invalid.');
+        const hash = crypto.createHash('sha256').update(token).digest('hex');
+        const row: any = await this.prisma.newsletterSubscriber.findUnique({ where: { confirmTokenHash: hash } as any });
+        if (!row) throw new BadRequestException('This confirmation link is invalid or was already used.');
+        if (row.confirmSentAt && Date.now() - +new Date(row.confirmSentAt) > 7 * 86_400_000) throw new BadRequestException('This confirmation link has expired. Subscribe again to get a new one.');
+        if (['BLOCKED', 'BOUNCED'].includes(row.status)) throw new BadRequestException('This address can’t receive the newsletter.');
+        await this.prisma.newsletterSubscriber.update({ where: { id: row.id }, data: { status: 'ACTIVE', confirmedAt: new Date(), confirmTokenHash: null, unsubscribedAt: null } as any });
+        return { ok: true, status: 'ACTIVE', email: this.mask(row.email) };
+    }
+
+    /**
+     * Unsubscribe by the per-subscriber token (links in newsletters) or by
+     * address (older emails). Always succeeds silently for unknown addresses
+     * and keeps a minimal suppression row so the address isn't emailed again.
+     */
+    async unsubscribe(input: { token?: string; email?: string }) {
+        let row: any = null;
+        if (input.token) row = await this.prisma.newsletterSubscriber.findUnique({ where: { unsubscribeToken: input.token } as any });
+        const email = (input.email || '').trim().toLowerCase();
+        if (!row && email) {
+            if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new BadRequestException('Enter a valid email address.');
+            row = await this.prisma.newsletterSubscriber.findUnique({ where: { email } });
+            if (!row) {
+                await this.prisma.newsletterSubscriber.create({ data: { email, status: 'UNSUBSCRIBED', source: 'unsubscribe', unsubscribedAt: new Date(), unsubscribeToken: crypto.randomBytes(24).toString('base64url') } as any });
+                return { ok: true, status: 'UNSUBSCRIBED' };
             }
-            // Re-activate previously unsubscribed accounts
-            return this.prisma.newsletterSubscriber.update({
-                where: { email: trimmed },
-                data: {
-                    status: 'ACTIVE',
-                    source: source || existing.source,
-                    name: name || existing.name,
-                },
-            });
         }
+        if (!row) throw new BadRequestException('This unsubscribe link is invalid.');
+        if (row.status !== 'UNSUBSCRIBED') {
+            await this.prisma.newsletterSubscriber.update({ where: { id: row.id }, data: { status: row.status === 'BLOCKED' ? 'BLOCKED' : 'UNSUBSCRIBED', unsubscribedAt: new Date(), confirmTokenHash: null } as any });
+        }
+        return { ok: true, status: 'UNSUBSCRIBED', email: this.mask(row.email) };
+    }
 
-        return this.prisma.newsletterSubscriber.create({
-            data: { email: trimmed, source, region, name }
-        });
+    private mask(e: string) { return String(e).replace(/^(.{2}).*@/, '$1***@'); }
+
+    /**
+     * The only list marketing emails may go to: confirmed (or pre-existing
+     * ACTIVE) newsletter subscribers, plus — for PLATFORM sends — signed-up
+     * accounts that explicitly switched marketing emails on. Unsubscribed,
+     * pending, bounced and blocked addresses are always excluded.
+     */
+    async marketingRecipients(audience: 'NEWSLETTER' | 'PLATFORM'): Promise<{ email: string; unsubscribeToken: string | null }[]> {
+        const subs: any[] = await this.prisma.newsletterSubscriber.findMany({ select: { id: true, email: true, status: true, unsubscribeToken: true } as any });
+        const suppressed = new Set(subs.filter((s) => s.status !== 'ACTIVE').map((s) => String(s.email).toLowerCase()));
+        const out = new Map<string, string | null>();
+        for (const s of subs) {
+            if (s.status !== 'ACTIVE') continue;
+            let token = s.unsubscribeToken;
+            if (!token) { token = crypto.randomBytes(24).toString('base64url'); await this.prisma.newsletterSubscriber.update({ where: { id: s.id }, data: { unsubscribeToken: token } as any }).catch(() => {}); }
+            out.set(String(s.email).toLowerCase(), token);
+        }
+        if (audience === 'PLATFORM') {
+            const users: any[] = await this.prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { email: true, notificationPrefs: true } });
+            for (const u of users) {
+                const e = String(u.email || '').toLowerCase();
+                if (!e || out.has(e) || suppressed.has(e)) continue;
+                if ((u.notificationPrefs as any)?.marketingEmails === true) out.set(e, null); // explicit opt-in only
+            }
+        }
+        return [...out.entries()].map(([email, unsubscribeToken]) => ({ email, unsubscribeToken }));
+    }
+
+    /** CSV of marketing-eligible subscribers with their consent record (admins). */
+    async exportCsv(): Promise<string> {
+        const rows: any[] = await this.prisma.newsletterSubscriber.findMany({ where: { status: 'ACTIVE' }, orderBy: { createdAt: 'asc' } });
+        const esc = (v: any) => { const t = v === null || v === undefined ? '' : v instanceof Date ? v.toISOString() : String(v); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+        const head = ['email', 'name', 'status', 'source', 'consentAt', 'consentSource', 'policyVersion', 'confirmedAt', 'createdAt'];
+        return [head.join(','), ...rows.map((r) => [r.email, r.name, r.status, r.source, r.consentAt, r.consentSource, r.policyVersion, r.confirmedAt ?? (r.consentAt ? '' : 'legacy (before double opt-in)'), r.createdAt].map(esc).join(','))].join('\n');
     }
 
     /**
@@ -88,23 +182,31 @@ export class NewsletterService {
         }
         const valid = ids.filter(id => typeof id === 'string' && id.length > 0);
         if (action === 'delete') {
+            // Opt-outs keep a minimal suppression row (email + status only) so
+            // the address is never emailed again; everything else is deleted.
+            const keep = ['UNSUBSCRIBED', 'BLOCKED', 'BOUNCED'];
+            const scrubbed = await this.prisma.newsletterSubscriber.updateMany({ where: { id: { in: valid }, status: { in: keep } }, data: { name: null, region: null, source: 'suppression' } as any });
             const r = await this.prisma.newsletterSubscriber.deleteMany({
-                where: { id: { in: valid } },
+                where: { id: { in: valid }, status: { notIn: keep } },
             });
-            return { action, affected: r.count };
+            return { action, affected: r.count + scrubbed.count, suppressionKept: scrubbed.count };
         }
         const statusMap: Record<string, string> = {
             hide: 'HIDDEN',
             block: 'BLOCKED',
             unhide: 'ACTIVE',
             unblock: 'ACTIVE',
+            // (unhide/unblock below never re-activate unsubscribed or pending rows)
         };
         const status = statusMap[action];
         if (!status) throw new BadRequestException('Unknown bulk action');
-        const r = await this.prisma.newsletterSubscriber.updateMany({
-            where: { id: { in: valid } },
-            data: { status },
-        });
+        // hide/block apply to anyone; unhide/unblock only restore rows that
+        // were hidden or blocked — never an unsubscribed or unconfirmed address.
+        const where: any = { id: { in: valid } };
+        if (action === 'unhide') where.status = 'HIDDEN';
+        if (action === 'unblock') where.status = 'BLOCKED';
+        if (action === 'unhide' || action === 'unblock') where.OR = [{ unsubscribedAt: null }];
+        const r = await this.prisma.newsletterSubscriber.updateMany({ where, data: { status } });
         return { action, affected: r.count, newStatus: status };
     }
 
@@ -172,7 +274,8 @@ export class NewsletterService {
                             region: region || existing.region,
                             // If the row had been hidden/blocked, leave it that way
                             // — the importer doesn't silently un-block clients.
-                            status: existing.status === 'UNSUBSCRIBED' ? 'ACTIVE' : existing.status,
+                            // An unsubscribe is never undone by an import.
+                            status: existing.status,
                             source: source || existing.source,
                         },
                     });
@@ -185,6 +288,8 @@ export class NewsletterService {
                             region: region || undefined,
                             source: source || 'Bulk Upload',
                             status: 'ACTIVE',
+                            // Admin import: the uploader asserts these contacts agreed to marketing.
+                            consentAt: new Date(), consentSource: 'admin import',
                         },
                     });
                     created++;
@@ -236,26 +341,8 @@ export class NewsletterService {
             opts.audience === 'PLATFORM' ? 'PLATFORM' : 'NEWSLETTER';
 
         // Build the recipient list per audience mode, dedup by email.
-        const seen = new Set<string>();
-        const recipients: { email: string }[] = [];
-        const subs = await this.prisma.newsletterSubscriber.findMany({
-            where: { status: 'ACTIVE' },
-            select: { email: true },
-        });
-        for (const s of subs) {
-            const e = (s.email || '').toLowerCase().trim();
-            if (e && !seen.has(e)) { seen.add(e); recipients.push({ email: s.email }); }
-        }
-        if (audience === 'PLATFORM') {
-            const customers = await this.prisma.user.findMany({
-                where: { role: 'CUSTOMER', status: 'ACTIVE' },
-                select: { email: true },
-            });
-            for (const c of customers) {
-                const e = (c.email || '').toLowerCase().trim();
-                if (e && !seen.has(e)) { seen.add(e); recipients.push({ email: c.email }); }
-            }
-        }
+        // Marketing goes only to people who consented (see marketingRecipients).
+        const recipients = await this.marketingRecipients(audience);
 
         // ─── Canonical Atlantis email shell ─────────────────────────────────
         // ALL campaigns get wrapped in this shell on the backend, regardless
@@ -555,7 +642,11 @@ export class NewsletterService {
                     /<\/body>/i,
                     `${this.emailTracking.trackingPixelHtml(trackingId)}</body>`,
                 );
-                const result = await this.emailService.sendMailDetailed(r.email, subject, trackedHtml);
+                // Per-recipient unsubscribe link (token) in the body and the List-Unsubscribe header.
+                const base = process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com';
+                const unsubscribeUrl = r.unsubscribeToken ? `${base}/unsubscribe?token=${encodeURIComponent(r.unsubscribeToken)}` : `${base}/unsubscribe?email=${encodeURIComponent(r.email)}`;
+                const withUnsub = trackedHtml.replace(/<\/body>/i, `<p style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#94A3B8;margin:16px 0">You receive this because you subscribed to Atlantis updates. <a href="${unsubscribeUrl}" style="color:#64748B">Unsubscribe</a></p></body>`);
+                const result = await this.emailService.sendMailDetailed(r.email, subject, withUnsub, { unsubscribeUrl });
                 if (result.success) {
                     successCount++;
                 } else if (result.error) {
