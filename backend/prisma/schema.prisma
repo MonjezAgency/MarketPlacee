@@ -1003,6 +1003,11 @@ model ShoppingList {
   id        String             @id @default(uuid())
   userId    String
   name      String
+  description String?
+  /// Reorder reminder: notify (never auto-order) at nextReminderAt; repeat = none | weekly | monthly.
+  reminderRepeat  String    @default("none")
+  nextReminderAt  DateTime?
+  lastRemindedAt  DateTime?
   items     ShoppingListItem[]
   createdAt DateTime           @default(now())
   updatedAt DateTime           @updatedAt

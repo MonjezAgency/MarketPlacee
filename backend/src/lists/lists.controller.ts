@@ -13,7 +13,7 @@ export class ListsController {
     @Post('from-order/:orderId') fromOrder(@Request() req, @Param('orderId') orderId: string, @Body() body: { listId?: string; name?: string }) {
         return this.lists.fromOrder(req.user.sub, orderId, body || {});
     }
-    @Patch(':id') rename(@Request() req, @Param('id') id: string, @Body('name') name: string) { return this.lists.rename(req.user.sub, id, name); }
+    @Patch(':id') update(@Request() req, @Param('id') id: string, @Body() body: any) { return this.lists.updateDetails(req.user.sub, id, body || {}); }
     @Delete(':id') remove(@Request() req, @Param('id') id: string) { return this.lists.remove(req.user.sub, id); }
     @Post(':id/items') add(@Request() req, @Param('id') id: string, @Body('items') items: any[]) { return this.lists.addItems(req.user.sub, id, items); }
     @Patch(':id/items/:itemId') qty(@Request() req, @Param('id') id: string, @Param('itemId') itemId: string, @Body('quantity') quantity: number) {

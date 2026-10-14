@@ -3,7 +3,8 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ListChecks, Plus, Trash2, Pencil, Package, Minus, ShoppingCart, AlertTriangle, Loader2, Check } from 'lucide-react';
+import { ListDetails, ProductPicker } from '@/components/account/ListExtras';
+import { RotateCcw, ListChecks, Plus, Trash2, Pencil, Package, Minus, ShoppingCart, AlertTriangle, Loader2, Check } from 'lucide-react';
 import { useCart } from '@/lib/cart';
 import { getLists, createList, renameList, deleteList, setListQty, removeListItem, tierLabel, type ShoppingList, type ListItem } from '@/lib/lists';
 import { ApiError } from '@/lib/wholesale';
@@ -101,6 +102,17 @@ function ListDetail({ list, reload }: { list: ShoppingList; reload: () => Promis
     const unavailable = list.items.length - orderable.length;
 
     const lineId = (i: ListItem) => (i.variantKey ? `${i.productId}::${i.variantKey}` : i.productId);
+    const addOne = (i: ListItem) => {
+        const id = lineId(i);
+        const clash = cart.find((c) => c.id === id && c.tier && c.tier !== i.tier);
+        if (clash) { setMsg({ ok: false, text: `${i.product!.name} is already in your cart by the ${clash.tier}.` }); return; }
+        addItem({
+            id, productId: i.productId, name: i.product!.name, brand: i.product!.brand || '', price: 0,
+            image: i.product!.image || '', unit: tierLabel(i.tier, 1).replace(/^./, (c) => c.toUpperCase()), tier: i.tier,
+            selectedVariants: i.selectedVariants ?? undefined,
+        }, i.quantity);
+        setMsg({ ok: true, text: `${i.product!.name} added to your cart at today’s price.` });
+    };
     const addAll = () => {
         let added = 0; const conflicts: string[] = [];
         for (const i of orderable) {
@@ -133,10 +145,13 @@ function ListDetail({ list, reload }: { list: ShoppingList; reload: () => Promis
                 <button type="button" onClick={() => { if (confirm(`Delete “${list.name}”? This can’t be undone.`)) run('delete', () => deleteList(list.id)); }} aria-label="Delete list" className="w-9 h-9 rounded-lg flex items-center justify-center text-ink-3 hover:text-[#B91C1C] hover:bg-surface-2"><Trash2 size={15} /></button>
             </header>
 
+            <ListDetails key={list.id + (list.updatedAt || '')} list={list} reload={reload} />
+            <ProductPicker list={list} reload={reload} />
+
             {list.items.length === 0 ? (
                 <div className="px-5 py-10 text-center text-[13.5px] text-ink-3">
                     <Package size={22} className="mx-auto text-ink-4 mb-2" />
-                    This list is empty. Save items from an order, or <Link href="/categories" className="text-teal font-semibold hover:underline">browse the catalog</Link>.
+                    This list is empty. Add products above, or save items from an order.
                 </div>
             ) : (
                 <ul className="divide-y divide-line">
@@ -165,6 +180,7 @@ function ListDetail({ list, reload }: { list: ShoppingList; reload: () => Promis
                                         <button type="button" aria-label="Increase" disabled={!!busy} onClick={() => run(i.id, () => setListQty(list.id, i.id, i.quantity + 1))} className="w-8 h-full flex items-center justify-center text-ink-2 disabled:opacity-30"><Plus size={14} /></button>
                                     </span>
                                     <span className="w-14 text-[12.5px] text-ink-3">{tierLabel(i.tier, i.quantity)}</span>
+                                    {!off && <button type="button" onClick={() => addOne(i)} className="h-8 px-2.5 inline-flex items-center gap-1 rounded-lg ring-1 ring-line-strong text-[12.5px] font-semibold text-ink hover:bg-surface-2"><RotateCcw size={13} /> Reorder</button>}
                                     <button type="button" aria-label={`Remove ${p?.name ?? 'item'}`} disabled={!!busy} onClick={() => run('rm' + i.id, () => removeListItem(list.id, i.id))} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-4 hover:text-[#B91C1C]"><Trash2 size={14} /></button>
                                 </span>
                             </li>

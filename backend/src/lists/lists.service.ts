@@ -32,6 +32,28 @@ export class ListsService {
         return this.prisma.shoppingList.create({ data: { userId, name: n } });
     }
 
+    /** Name, description and reorder reminder (date + repeat). */
+    async updateDetails(userId: string, id: string, body: { name?: string; description?: string | null; nextReminderAt?: string | null; reminderRepeat?: string }) {
+        await this.own(userId, id);
+        const data: any = {};
+        if (body.name !== undefined) { const n = String(body.name || '').trim().slice(0, 80); if (!n) throw new BadRequestException('Give the list a name.'); data.name = n; }
+        if (body.description !== undefined) data.description = String(body.description || '').trim().slice(0, 500) || null;
+        if (body.reminderRepeat !== undefined) {
+            if (!['none', 'weekly', 'monthly'].includes(String(body.reminderRepeat))) throw new BadRequestException('Repeat must be none, weekly or monthly.');
+            data.reminderRepeat = body.reminderRepeat;
+        }
+        if (body.nextReminderAt !== undefined) {
+            if (!body.nextReminderAt) data.nextReminderAt = null;
+            else {
+                const d = new Date(body.nextReminderAt);
+                if (isNaN(d.getTime())) throw new BadRequestException('Invalid reminder date.');
+                if (d.getTime() < Date.now() - 60_000) throw new BadRequestException('Pick a reminder date in the future.');
+                data.nextReminderAt = d;
+            }
+        }
+        return this.prisma.shoppingList.update({ where: { id }, data });
+    }
+
     async rename(userId: string, id: string, name: string) {
         await this.own(userId, id);
         const n = String(name || '').trim().slice(0, 80);
