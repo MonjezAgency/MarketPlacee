@@ -18,6 +18,7 @@
  * the existing Inventory Manager page; this one is a dashboard.
  */
 
+import { PageHeader } from '@/components/supplier/ui';
 import * as React from 'react';
 import Link from 'next/link';
 import {
@@ -187,23 +188,14 @@ export default function SupplierInventoryPage() {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500 pb-16">
-            {/* Header */}
-            <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#2EC4B6]">Warehouse</p>
-                <h1 className="text-[28px] font-black tracking-tight text-[#0F172A]">Stock &amp; Reservations</h1>
-                <p className="text-[13px] text-slate-500 mt-1 max-w-xl">
-                    For every product you list: what's still on the shelf, what's committed
-                    to active orders, what already shipped, and what came back via cancellations.
-                    Updates in real time as customers place and orders move through fulfillment.
-                </p>
-            </div>
+            <PageHeader title="Stock & reservations" description="Live products only. Everything is counted in cases: what you have now, what is committed to open orders, and what was delivered or cancelled over time." />
 
             {/* Aggregate KPIs */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Kpi label="In stock"   value={totals.stock}     icon={Box}          tone="slate"   help="Units still available for new orders." />
-                <Kpi label="Reserved"   value={totals.reserved}  icon={Truck}        tone="amber"   help="Committed to PENDING / PROCESSING / SHIPPED orders." />
-                <Kpi label="Delivered"  value={totals.sold}      icon={Check}        tone="emerald" help="Units that left the warehouse and were received." />
-                <Kpi label="Cancelled"  value={totals.cancelled} icon={XCircle}      tone="rose"    help="Orders that were cancelled — units returned to stock." />
+                <Kpi label="In stock"   value={totals.stock}     icon={Box}          tone="slate"   help="Cases available for new orders right now (current Product stock)." />
+                <Kpi label="Reserved"   value={totals.reserved}  icon={Truck}        tone="amber"   help="Cases on orders not yet delivered (awaiting confirmation, paid, preparing or shipped). Already taken off stock." />
+                <Kpi label="Delivered"  value={totals.sold}      icon={Check}        tone="emerald" help="Cases on delivered orders, all time." />
+                <Kpi label="Cancelled"  value={totals.cancelled} icon={XCircle}      tone="rose"    help="Cases on cancelled orders, all time. Returned to stock only when cancelled before dispatch." />
             </div>
 
             {/* Search */}
@@ -246,7 +238,7 @@ export default function SupplierInventoryPage() {
                                     <th className="px-4 py-4 text-right">Reserved</th>
                                     <th className="px-4 py-4 text-right">Delivered</th>
                                     <th className="px-4 py-4 text-right">Cancelled</th>
-                                    <th className="px-4 py-4 text-right">Lifetime ordered</th>
+                                    <th className="px-4 py-4 text-right">Lifetime ordered (cases)</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">

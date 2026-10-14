@@ -16,6 +16,7 @@ import {
     UploadedFile,
     BadRequestException,
     ForbiddenException,
+    NotFoundException,
     Logger
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -110,7 +111,10 @@ export class ProductsController {
         const minPrice = anon ? undefined : req.query.minPrice;
         const maxPrice = anon ? undefined : req.query.maxPrice;
         const sort = anon && /price/.test(String(req.query.sort || '')) ? undefined : req.query.sort;
-        const products = await this.productsService.findAll(status, { 
+        // Only Atlantis staff may list unapproved products; everyone else
+        // gets the live catalog no matter what ?status= says.
+        const isStaff = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER'].includes(String(req.user?.role || '').toUpperCase());
+        const products = await this.productsService.findAll(isStaff ? status : 'APPROVED' as any, { 
             category, brand, brands, categoryAny, categoryNone, minPrice, maxPrice, sort, q, limit, page, origin, listed
         });
         if (req.user) return products;
@@ -283,6 +287,12 @@ export class ProductsController {
     @UseGuards(OptionalJwtAuthGuard)
     async findOne(@Param('id') id: string, @Request() req) {
         const product = await this.productsService.findOne(id);
+        // Unapproved listings are visible only to their supplier and staff.
+        if (product && product.status !== ProductStatus.APPROVED) {
+            const role = String(req.user?.role || '').toUpperCase();
+            const allowed = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER'].includes(role) || (req.user?.sub && req.user.sub === product.supplierId);
+            if (!allowed) throw new NotFoundException('Product not found');
+        }
         const out = plainToInstance(ProductDto, product);
         return req.user ? out : stripPrices(out);
     }
@@ -357,6 +367,10 @@ export class ProductsController {
     @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER)
     async create(@Body() createProductDto: any, @Request() req) {
         const isAdmin = req.user.role === Role.ADMIN || req.user.role === Role.OWNER;
+        // `submit: false` saves a draft; omitted/true submits for review when complete.
+        const submit = createProductDto?.submit !== false;
+        delete createProductDto?.submit;
+        delete createProductDto?.status;
         // Admin-created products default to the Atlantis platform supplier
         // (not the admin's personal account) so the PDP credits "Atlantis"
         // as the brand. Admin can still override with an explicit supplierId
@@ -388,8 +402,9 @@ export class ProductsController {
         const product = await this.productsService.create({
             ...createProductDto,
             supplierId,
-        }, isAdmin);
+        }, isAdmin, false, { submit, actorId: req.user.sub });
 
+        if (!isAdmin) return this.productsService.withCompleteness({ ...(product as any), price: (product as any).basePrice ?? (product as any).price });
         return plainToInstance(ProductDto, product);
     }
 
@@ -679,15 +694,9 @@ export class ProductsController {
         // legitimately leave a field blank while triaging.
         const isAdmin = ['ADMIN', 'OWNER'].includes((req.user?.role || '').toUpperCase());
         if (!isAdmin) {
-            const missing = await this.productsService.validateSupplierEdit(
-                id,
-                updateProductDto,
-            );
-            if (missing.length > 0) {
-                throw new BadRequestException(
-                    `Fill in every required field before saving. Missing: ${missing.join(', ')}.`,
-                );
-            }
+            // Suppliers go through the shared catalog rules (draft / review /
+            // live-must-stay-complete) with ownership re-checked in the service.
+            return this.productsService.supplierUpdate(id, req.user.sub, updateProductDto || {}, { submit: updateProductDto?.submit === true });
         }
 
         // AI Auto-Categorization on update if name changed and category is missing/General
@@ -716,7 +725,7 @@ export class ProductsController {
         if (!isStaff) {
             const owned = await this.productsService.findOne(id);
             if (!owned || owned.supplierId !== req.user.sub) {
-                return { message: 'Forbidden' };
+                throw new ForbiddenException('You can only delete your own products.');
             }
         }
         await this.productsService.deleteProduct(id);
@@ -731,8 +740,8 @@ export class ProductsController {
         const role = String(req.user.role || '').toUpperCase();
         const isStaff = ['ADMIN', 'OWNER', 'MODERATOR'].includes(role);
         const supplierId = isStaff ? undefined : req.user.sub;
-        await this.productsService.deleteProducts(body.ids, supplierId);
-        return { message: 'Products deleted', count: body.ids.length };
+        const r = await this.productsService.deleteProducts(body.ids, supplierId);
+        return { message: 'Products deleted', count: r.deletedCount, skipped: body.ids.length - r.deletedCount };
     }
 
     @Post('bulk-approve')
@@ -740,8 +749,12 @@ export class ProductsController {
     @Roles(Role.ADMIN)
     async approveBulk(@Body() body: { ids: string[] }) {
         if (!body.ids || !body.ids.length) return { message: 'No IDs provided' };
-        await this.productsService.bulkApprove(body.ids);
-        return { message: 'Products approved', count: body.ids.length };
+        const r = await this.productsService.bulkApprove(body.ids);
+        return {
+            message: r.skipped.length ? `Approved ${r.count}; ${r.skipped.length} incomplete product(s) left for the supplier to finish.` : 'Products approved',
+            count: r.count,
+            skipped: r.skipped,
+        };
     }
 
     @Post('bulk-reject')
@@ -862,6 +875,8 @@ export class ProductsController {
     }
 
     @Get('dev/fixup')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.ADMIN, Role.OWNER)
     async fixup() {
         return this.productsService.fixupIncompleteProducts();
     }

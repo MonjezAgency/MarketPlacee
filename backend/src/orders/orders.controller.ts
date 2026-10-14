@@ -206,6 +206,20 @@ export class OrdersController {
         throw new ForbiddenException();
     }
 
+    /** Supplier confirms an order awaiting them (PENDING/PAID → PROCESSING). */
+    @Post(':id/supplier-accept')
+    @Roles(Role.SUPPLIER)
+    async supplierAccept(@Param('id') id: string, @Request() req) {
+        return plainToInstance(OrderDto, await this.ordersService.supplierAccept(id, req.user.sub));
+    }
+
+    /** Supplier declines an order awaiting them, with a reason for the buyer. */
+    @Post(':id/supplier-decline')
+    @Roles(Role.SUPPLIER)
+    async supplierDecline(@Param('id') id: string, @Body('reason') reason: string, @Request() req) {
+        return plainToInstance(OrderDto, await this.ordersService.supplierReject(id, req.user.sub, reason));
+    }
+
     @Patch(':id/status')
     @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS)
     @UseGuards(PolicyGuard)
@@ -227,6 +241,7 @@ export class OrdersController {
                     'Suppliers can only confirm orders (PENDING → PROCESSING). Shipping and delivery transitions are handled by admin/logistics.',
                 );
             }
+            return plainToInstance(OrderDto, await this.ordersService.supplierAccept(id, req.user.sub));
         }
         // reason is optional, service handles default
         const order = await this.ordersService.updateStatus(

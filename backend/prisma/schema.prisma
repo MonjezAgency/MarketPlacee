@@ -40,6 +40,7 @@ enum KYCStatus {
 }
 
 enum ProductStatus {
+  DRAFT          // saved by the supplier, incomplete or not yet submitted — never public
   PENDING        // submitted, awaiting admin review
   APPROVED       // admin approved, live on the catalog
   REJECTED       // admin rejected — supplier blocked from re-submitting
@@ -268,6 +269,7 @@ model Product {
   tieredPrices TieredPrice[]
   reviews      Review[]
   wishlistItems WishlistItem[]
+  changeLog    ProductChangeLog[]
 
   @@index([supplierId])
   @@index([status])
@@ -381,6 +383,10 @@ model OrderItem {
   id       String @id @default(uuid())
   quantity Int
   price    Float
+  // Cases taken from Product.stock when the order was placed (quantity ×
+  // cases in the ordered tier). Restored on cancellation before dispatch.
+  // Null on orders placed before this was recorded.
+  stockCases Int?
 
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -1045,4 +1051,21 @@ model UserSession {
   revokedAt  DateTime?
 
   @@index([userId])
+}
+
+
+// Audit trail for supplier-relevant product changes (price, stock, status,
+// identity fields). One row per changed field.
+model ProductChangeLog {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  actorId   String?
+  field     String
+  oldValue  String?
+  newValue  String?
+  reason    String?
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt])
 }

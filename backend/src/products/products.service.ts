@@ -3,6 +3,8 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { ProductStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EanService } from './ean.service';
+import { missingForPublish, invalidValues, normaliseBarcode, normaliseWeight, realImages, REVIEWED_FIELDS, statusExplanation, type Missing } from './catalog-rules';
+import { stockMovements } from './stock-ledger';
 import { listedSince } from './listed-since';
 import { buildBrandCanon, brandKey, canonicalBrand, type BrandCanon } from './brand-canon';
 import { translateProduct } from '../common/translator';
@@ -138,7 +140,13 @@ export class ProductsService {
         });
     }
 
-    async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false, options?: { preFetchedConfigs?: any[], preFetchedCategories?: string[], supplierKycStatus?: string }) {
+    async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false, options?: { preFetchedConfigs?: any[], preFetchedCategories?: string[], supplierKycStatus?: string, submit?: boolean, actorId?: string }) {
+        const dtoIn = createProductDto as any;
+        if (dtoIn.ean !== undefined && dtoIn.ean !== null && String(dtoIn.ean).trim()) dtoIn.ean = normaliseBarcode(dtoIn.ean);
+        if (dtoIn.weight) dtoIn.weight = normaliseWeight(dtoIn.weight) || String(dtoIn.weight).trim();
+        if (!isAdmin) delete dtoIn.adminNotes; // suppliers can't write review notes
+        const invalid = invalidValues(dtoIn);
+        if (invalid.length) throw new BadRequestException({ code: 'INVALID_PRODUCT', message: invalid.map((m) => m.reason).join(' '), invalid });
         // KYC enforcement DISABLED — operator decision to let
         // suppliers list products immediately without an identity-
         // verification gate. The KYC module + AI checks + admin
@@ -210,7 +218,9 @@ export class ProductsService {
         // Fetch EAN images if ean is provided and no images are uploaded.
         // Pass product name so the Google/Bing fallback can use it as a smarter query.
         let productImages = createProductDto.images || [];
-        if (!skipAi && createProductDto.ean && productImages.length === 0) {
+        if (!isAdmin) {
+            productImages = realImages(productImages);
+        } else if (!skipAi && createProductDto.ean && productImages.length === 0) {
             const fetchedImages = await this.eanService.fetchImagesByEan(
                 createProductDto.ean,
                 3,
@@ -225,20 +235,22 @@ export class ProductsService {
             productImages = [this.buildWhiteCatalogPlaceholder(createProductDto.name, createProductDto.ean)];
         }
 
-        const hasRealImage = productImages.some(img => img && img.trim() !== '');
-        const isMissingInfo = !createProductDto.name || createProductDto.name.trim() === '' || !createProductDto.description || createProductDto.description.trim() === '' || !hasRealImage;
-        let finalStatus = isAdmin ? ProductStatus.APPROVED : ProductStatus.PENDING;
-        let adminNotes = createProductDto.adminNotes || null;
-
-        if (isMissingInfo) {
-            finalStatus = ProductStatus.PENDING;
-            const missing = [];
-            if (!createProductDto.name || createProductDto.name.trim() === '') missing.push('Title');
-            if (!createProductDto.description || createProductDto.description.trim() === '') missing.push('Description');
-            if (!hasRealImage) missing.push('Image');
-            
-            const msg = `System Warning: Product incomplete. Missing: ${missing.join(', ')}. Please update before approval.`;
-            adminNotes = adminNotes ? `${adminNotes} | ${msg}` : msg;
+        // One completeness rule for every path (catalog-rules.ts). Suppliers:
+        // incomplete or not submitted → DRAFT (never public), complete and
+        // submitted → PENDING (Atlantis review). Staff: complete → APPROVED,
+        // incomplete → PENDING with a note listing what's missing.
+        const missing = missingForPublish({ ...createProductDto, images: productImages, basePrice: (createProductDto as any).price });
+        const submit = options?.submit !== false;
+        let finalStatus: ProductStatus;
+        let adminNotes = isAdmin ? ((createProductDto as any).adminNotes || null) : null;
+        if (isAdmin) {
+            finalStatus = missing.length ? ProductStatus.PENDING : ProductStatus.APPROVED;
+            if (missing.length) {
+                const msg = `System Warning: Product incomplete. Missing: ${missing.map((m) => m.label).join(', ')}. Please update before approval.`;
+                adminNotes = adminNotes ? `${adminNotes} | ${msg}` : msg;
+            }
+        } else {
+            finalStatus = missing.length || !submit ? ProductStatus.DRAFT : ProductStatus.PENDING;
         }
 
         // Auto-categorize if missing or incorrect (unit-based)
@@ -291,8 +303,9 @@ export class ProductsService {
                 category: finalCategory || 'General',
                 adminNotes,
                 status: finalStatus,
-                basePrice: dto.price,
-                price: dto.price * finalMarkup,
+                // A draft may not have a price yet (price is a required column, so 0 = none).
+                basePrice: Number.isFinite(Number(dto.price)) && Number(dto.price) > 0 ? Number(dto.price) : null,
+                price: Number.isFinite(Number(dto.price)) && Number(dto.price) > 0 ? Number(dto.price) * finalMarkup : 0,
                 images: productImages,
                 videos: Array.isArray(dto.videos) ? dto.videos.filter((v: any) => typeof v === 'string' && v.trim()) : [],
                 supplierId: dto.supplierId,
@@ -340,8 +353,9 @@ export class ProductsService {
                 this.logger.error(`Auto-translation failed for product ${product.id}: ${err.message}`);
             }
 
-            // Notify Admins if created by supplier
-            if (!isAdmin && product.supplierId && !skipAi) {
+            if (options?.actorId) this.logChanges(product.id, options.actorId, {}, { status: product.status }, 'Created').catch(() => {});
+            // Notify Admins if created by supplier and it is ready for review
+            if (!isAdmin && product.supplierId && !skipAi && product.status === ProductStatus.PENDING) {
                 this.notificationsService.notifyAdmins(
                     'New Product Submitted',
                     `New product "${product.name}" from supplier ID: ${product.supplierId} is waiting for review.`,
@@ -669,6 +683,10 @@ export class ProductsService {
     }
 
     private requiredSupplierFieldsMissing(p: any): string[] {
+        return missingForPublish(p).map((m) => m.label);
+    }
+
+    private legacyRequiredSupplierFieldsMissing(p: any): string[] {
         const miss: string[] = [];
         if (!p.name || String(p.name).trim().length < 2)            miss.push('Name');
         if (!p.price || Number(p.price) <= 0)                       miss.push('Price');
@@ -779,34 +797,13 @@ export class ProductsService {
             const product = await this.findOne(id);
             if (!product) throw new BadRequestException('Product not found');
 
-            const errors = [];
-            // Relaxed validation: Allow Admin to approve even with thin content.
-            if (!product.name || product.name.trim() === '') errors.push('name');
-            if (!product.price || product.price <= 0) errors.push('price');
-            if (!product.category || product.category.trim() === '') errors.push('category');
+            // Same completeness rule as supplier create / edit / import:
+            // an incomplete product can't go live.
+            const errors = missingForPublish(product).map((m) => m.label);
 
             if (errors.length > 0) {
-                const missingFieldsMsg = `Validation failed: missing ${errors.join(', ')}`;
-                // Update product to PENDING and append the notes
-                await this.prisma.product.update({
-                    where: { id },
-                    data: {
-                        status: ProductStatus.PENDING,
-                        adminNotes: adminNotes ? `${adminNotes} | ${missingFieldsMsg}` : missingFieldsMsg
-                    }
-                });
-
-                // Create a notification for the supplier
-                await this.notificationsService.notifyUser(
-                    product.supplierId,
-                    'Product Approval Failed',
-                    `Your product "${product.name}" could not be approved due to missing information.`,
-                    'ERROR',
-                    { productId: product.id, errors: errors }
-                ).catch(() => {});
-
                 throw new BadRequestException({
-                    message: 'Incomplete product cannot be approved.',
+                    message: `Incomplete product cannot be approved. Missing: ${errors.join(', ')}.`,
                     errors: errors
                 });
             }
@@ -874,9 +871,10 @@ export class ProductsService {
 
     async deleteProducts(ids: string[], supplierId?: string) {
         // Snapshot names for any OrderItems still linked to these products
-        // so order history doesn't lose context after deletion.
+        // so order history doesn't lose context after deletion. A supplier
+        // only ever touches their own rows (dependants included).
         const products = await this.prisma.product.findMany({
-            where: { id: { in: ids } },
+            where: { id: { in: ids }, ...(supplierId ? { supplierId } : {}) },
             select: { id: true, name: true },
         });
         for (const p of products) {
@@ -890,7 +888,7 @@ export class ProductsService {
 
         // Clean related rows — OrderItem.productId will SET NULL via the
         // schema-level cascade rule, so we don't touch OrderItem here.
-        const idsToDelete = ids;
+        const idsToDelete = products.map((p) => p.id);
         await this.prisma.$transaction([
             this.prisma.productPlacement.deleteMany({ where: { productId: { in: idsToDelete } } }),
             this.prisma.tieredPrice.deleteMany({ where: { productId: { in: idsToDelete } } }),
@@ -1041,13 +1039,14 @@ export class ProductsService {
     }
 
     async bulkApprove(ids: string[]) {
-        const products = await this.prisma.product.findMany({
-            where: { id: { in: ids } },
-            select: { id: true, name: true, supplierId: true }
-        });
+        const all = await this.prisma.product.findMany({ where: { id: { in: ids } } });
+        // Only complete products go live; the rest are reported back untouched.
+        const skipped = all.map((p) => ({ id: p.id, name: p.name, missing: missingForPublish(p).map((m) => m.label) })).filter((x) => x.missing.length);
+        const okIds = all.filter((p) => !skipped.some((x) => x.id === p.id)).map((p) => p.id);
+        const products = all.filter((p) => okIds.includes(p.id)).map((p) => ({ id: p.id, name: p.name, supplierId: p.supplierId }));
 
-        const result = await this.prisma.product.updateMany({
-            where: { id: { in: ids } },
+        const updated = await this.prisma.product.updateMany({
+            where: { id: { in: okIds } },
             data: { status: ProductStatus.APPROVED, adminNotes: '' }
         });
 
@@ -1064,7 +1063,7 @@ export class ProductsService {
             }
         }
 
-        return result;
+        return { count: updated.count, skipped };
     }
 
     async bulkReject(ids: string[], reason?: string) {
@@ -1118,7 +1117,8 @@ export class ProductsService {
                 ? data.videos.filter((v: any) => typeof v === 'string' && v.trim())
                 : [];
         }
-        if (data.ean !== undefined) updateData.ean = data.ean;
+        if (data.ean !== undefined) updateData.ean = data.ean ? normaliseBarcode(data.ean) : null;
+        if (data.exwLocation !== undefined) updateData.exwLocation = data.exwLocation ? String(data.exwLocation).trim() : null;
         if (data.variants !== undefined) updateData.variants = data.variants;
         // Mix-composer pricing + metadata. Both are JSON maps keyed by
         // variant signature; we accept them verbatim and let the
@@ -1140,7 +1140,7 @@ export class ProductsService {
         if (data.brand !== undefined) updateData.brand = data.brand;
         if (data.origin !== undefined) updateData.origin = data.origin;
         if (data.shelfLife !== undefined) updateData.shelfLife = data.shelfLife;
-        if (data.weight !== undefined) updateData.weight = data.weight;
+        if (data.weight !== undefined) updateData.weight = data.weight ? (normaliseWeight(data.weight) || String(data.weight).trim()) : null;
         if (data.adminNotes !== undefined) updateData.adminNotes = data.adminNotes;
         if (data.readyForDispatch !== undefined) updateData.readyForDispatch = data.readyForDispatch;
         if (data.leadTime !== undefined) updateData.leadTime = data.leadTime;
@@ -1311,54 +1311,14 @@ export class ProductsService {
 
         if (products.length === 0) return [];
 
-        // Aggregate quantities per (productId, orderStatus) in one go.
-        const aggregates = await this.prisma.orderItem.groupBy({
-            by: ['productId'],
-            where: { productId: { in: products.map((p) => p.id) } },
-            _sum: { quantity: true },
-        });
-        // We need a separate group-by per status bucket to compute
-        // reserved vs sold vs cancelled. Run the three queries in
-        // parallel — each is just a fast aggregate against an indexed
-        // foreign key, so the round-trip cost is small.
-        const [reserved, sold, cancelled] = await Promise.all([
-            this.prisma.orderItem.groupBy({
-                by: ['productId'],
-                where: {
-                    productId: { in: products.map((p) => p.id) },
-                    order: { status: { in: ['PENDING', 'PROCESSING', 'SHIPPED'] } },
-                },
-                _sum: { quantity: true },
-            }),
-            this.prisma.orderItem.groupBy({
-                by: ['productId'],
-                where: {
-                    productId: { in: products.map((p) => p.id) },
-                    order: { status: 'DELIVERED' },
-                },
-                _sum: { quantity: true },
-            }),
-            this.prisma.orderItem.groupBy({
-                by: ['productId'],
-                where: {
-                    productId: { in: products.map((p) => p.id) },
-                    order: { status: 'CANCELLED' },
-                },
-                _sum: { quantity: true },
-            }),
-        ]);
-
-        const indexBy = (rows: any[]) => {
-            const map: Record<string, number> = {};
-            for (const r of rows) {
-                if (r.productId) map[r.productId] = Number(r._sum?.quantity || 0);
-            }
-            return map;
-        };
-        const totalOrdered = indexBy(aggregates);
-        const reservedMap = indexBy(reserved);
-        const soldMap = indexBy(sold);
-        const cancelledMap = indexBy(cancelled);
+        const ledger = await stockMovements(this.prisma, products.map((p) => p.id));
+        // All buckets in CASES (see stock-ledger.ts) so a pallet line counts
+        // as casesPerPallet cases, matching Product.stock.
+        const pick = (k: 'reserved' | 'delivered' | 'cancelled' | 'ordered') => Object.fromEntries(Object.entries(ledger).map(([id, m]) => [id, m[k]])) as Record<string, number>;
+        const totalOrdered = pick('ordered');
+        const reservedMap = pick('reserved');
+        const soldMap = pick('delivered');
+        const cancelledMap = pick('cancelled');
 
         return products.map((p) => {
             // ── Variant breakdown ─────────────────────────────────
@@ -1661,6 +1621,210 @@ export class ProductsService {
             take: 8 // Autocomplete should return 8 suggestions max
         });
     }
+
+    // ─── Supplier workspace ──────────────────────────────────────────
+
+    /** One audit row per changed field. Never throws into the caller's flow. */
+    async logChanges(productId: string, actorId: string | null, before: Record<string, any>, after: Record<string, any>, reason?: string) {
+        const str = (v: any) => (v === null || v === undefined ? null : typeof v === 'object' ? JSON.stringify(v).slice(0, 500) : String(v).slice(0, 500));
+        const rows = Object.keys(after)
+            .filter((k) => str(before[k]) !== str(after[k]))
+            .map((k) => ({ productId, actorId, field: k, oldValue: str(before[k]), newValue: str(after[k]), reason: reason ?? null }));
+        if (rows.length) await (this.prisma as any).productChangeLog.createMany({ data: rows });
+    }
+
+    async changeLog(productId: string, limit = 30) {
+        return (this.prisma as any).productChangeLog.findMany({ where: { productId }, orderBy: { createdAt: 'desc' }, take: Math.min(limit, 100) });
+    }
+
+    /**
+     * Supplier edit with the shared catalog rules:
+     *  • REJECTED listings are closed — create a new one.
+     *  • A live (APPROVED) product must stay complete. Changing identity or
+     *    media (name, brand, category, barcode, images, origin, weight) sends it
+     *    back to review; price, stock, packaging, MOQ, BBD and lead time don't.
+     *  • Otherwise: incomplete → DRAFT; complete + submit → PENDING; complete
+     *    without submit keeps its status.
+     * Fields left out of the request are never cleared.
+     */
+    async supplierUpdate(id: string, supplierId: string, patchIn: any, opts: { submit?: boolean } = {}) {
+        const existing: any = await this.prisma.product.findUnique({ where: { id } });
+        if (!existing) throw new NotFoundException('Product not found');
+        if (existing.supplierId !== supplierId) throw new ForbiddenException('You can only edit your own products.');
+        if (existing.status === ProductStatus.REJECTED) {
+            throw new ForbiddenException({ code: 'PRODUCT_REJECTED', message: 'Rejected listings can’t be edited. Create a new listing that addresses the rejection reason.' });
+        }
+        const ALLOWED = ['name', 'description', 'brand', 'category', 'ean', 'price', 'stock', 'images', 'videos', 'unit', 'moq', 'moqUnit',
+            'unitsPerCase', 'casesPerPallet', 'unitsPerPallet', 'palletsPerShipment', 'shelfLife', 'weight', 'origin', 'exwLocation',
+            'readyForDispatch', 'leadTime', 'variants', 'variantPrices', 'variantMeta', 'warehouseId'];
+        const patch: any = {};
+        for (const k of ALLOWED) if (patchIn[k] !== undefined) patch[k] = patchIn[k];
+        if (patch.images !== undefined) patch.images = realImages(patch.images);
+        if (patch.ean) patch.ean = normaliseBarcode(patch.ean);
+        if (patch.weight) patch.weight = normaliseWeight(patch.weight) || String(patch.weight).trim();
+        // Keep the hidden translation entry when the supplier edits variants.
+        if (Array.isArray(patch.variants)) {
+            const hidden = (Array.isArray(existing.variants) ? existing.variants : []).filter((v: any) => String(v?.name || '').startsWith('__'));
+            patch.variants = [...patch.variants.filter((v: any) => v && !String(v.name || '').startsWith('__')), ...hidden];
+        }
+        const invalid = invalidValues(patch);
+        if (invalid.length) throw new BadRequestException({ code: 'INVALID_PRODUCT', message: invalid.map((m) => m.reason).join(' '), invalid });
+
+        const merged = { ...existing, ...patch, basePrice: patch.price !== undefined ? patch.price : existing.basePrice };
+        const missing = missingForPublish(merged);
+        const sameSet = (a: any, b: any) => JSON.stringify([...(a || [])].sort()) === JSON.stringify([...(b || [])].sort());
+        // Filling a field that was empty is not a change of identity; replacing a value is.
+        const wasSet = (f: string) => (f === 'images' ? realImages(existing.images).length > 0 : String(existing[f] ?? '').trim() !== '');
+        const identityChanged = REVIEWED_FIELDS.some((f) => patch[f] !== undefined && wasSet(f) && (f === 'images' ? !sameSet(patch[f], realImages(existing[f])) : String(patch[f] ?? '') !== String(existing[f] ?? '')));
+
+        let nextStatus: ProductStatus = existing.status;
+        let note: string | null | undefined;
+        if (existing.status === ProductStatus.APPROVED) {
+            // Older live listings may predate these rules; an edit may not
+            // remove anything that was there, but it doesn't have to fix it all.
+            const before = new Set(missingForPublish(existing).map((m) => m.field));
+            const newlyMissing = missing.filter((m) => !before.has(m.field));
+            if (newlyMissing.length) {
+                throw new BadRequestException({ code: 'LIVE_PRODUCT_INCOMPLETE', message: `A live product must stay complete. You removed: ${newlyMissing.map((m) => m.label).join(', ')}.`, missing: newlyMissing });
+            }
+            if (identityChanged) { nextStatus = ProductStatus.PENDING; note = 'Supplier changed product details — re-review before it goes live again.'; }
+        } else if (missing.length) {
+            nextStatus = ProductStatus.DRAFT;
+        } else if (opts.submit) {
+            nextStatus = ProductStatus.PENDING;
+            note = null; // fresh review
+        }
+
+        await this.update(id, patch);
+        const statusData: any = {};
+        if (nextStatus !== existing.status) statusData.status = nextStatus;
+        if (note !== undefined) statusData.adminNotes = note;
+        const saved = Object.keys(statusData).length
+            ? await this.prisma.product.update({ where: { id }, data: statusData })
+            : await this.prisma.product.findUnique({ where: { id } });
+
+        const tracked = ['price', 'stock', 'moq', 'moqUnit', 'unitsPerCase', 'casesPerPallet', 'palletsPerShipment', ...REVIEWED_FIELDS, 'status'];
+        const before: any = { ...existing, price: existing.basePrice };
+        const after: any = {};
+        for (const k of tracked) if (k === 'status' ? statusData.status : patch[k] !== undefined) after[k] = k === 'status' ? statusData.status : (k === 'price' ? (saved as any).basePrice : (saved as any)[k]);
+        this.logChanges(id, supplierId, before, after, nextStatus !== existing.status ? `Status → ${nextStatus}` : undefined).catch((e) => this.logger.warn(`change log failed: ${e?.message}`));
+
+        if (nextStatus === ProductStatus.PENDING && existing.status !== ProductStatus.PENDING) {
+            this.notificationsService.notifyAdmins('Product submitted for review', `"${(saved as any).name}" is waiting for review.`, 'INFO', { productId: id }).catch(() => {});
+        }
+        return this.withCompleteness({ ...(saved as any), price: (saved as any).basePrice ?? (saved as any).price });
+    }
+
+    /** Adds `missing` and a plain-language `statusNote` for the supplier UI. */
+    withCompleteness<T extends Record<string, any>>(p: T): T & { missing: Missing[]; statusNote: string } {
+        const missing = missingForPublish({ ...p, basePrice: p.basePrice ?? p.price });
+        return { ...p, missing, statusNote: statusExplanation(String(p.status), missing, p.adminNotes) };
+    }
+
+    /**
+     * The supplier's own products, paginated server-side, with stock movement
+     * (cases) for the rows on the page and summary counts for the whole catalog.
+     */
+    async findMine(supplierId: string, q: { q?: string; status?: string; category?: string; sort?: string; page?: string | number; limit?: string | number; stock?: string }) {
+        const page = Math.max(1, Number(q.page) || 1);
+        const limit = Math.min(100, Math.max(5, Number(q.limit) || 25));
+        const where: any = { supplierId };
+        const statuses = ['DRAFT', 'PENDING', 'APPROVED', 'NEEDS_CHANGES', 'REJECTED'];
+        if (q.status && statuses.includes(String(q.status).toUpperCase())) where.status = String(q.status).toUpperCase();
+        if (q.category) where.category = q.category;
+        if (q.stock === 'out') where.stock = { lte: 0 };
+        const term = String(q.q || '').trim();
+        if (term) {
+            const digits = term.replace(/\D/g, '');
+            where.OR = [
+                { name: { contains: term, mode: 'insensitive' } },
+                { brand: { contains: term, mode: 'insensitive' } },
+                ...(digits.length >= 4 ? [{ ean: { contains: digits } }] : []),
+            ];
+        }
+        const SORTS: Record<string, any> = {
+            newest: { createdAt: 'desc' }, oldest: { createdAt: 'asc' }, name: { name: 'asc' },
+            price_asc: { basePrice: 'asc' }, price_desc: { basePrice: 'desc' }, stock_asc: { stock: 'asc' }, stock_desc: { stock: 'desc' },
+            updated: { updatedAt: 'desc' },
+        };
+        const orderBy = SORTS[String(q.sort || 'newest')] || SORTS.newest;
+        const [total, rows, byStatus, cats, outOfStock] = await Promise.all([
+            this.prisma.product.count({ where }),
+            this.prisma.product.findMany({
+                where, orderBy, skip: (page - 1) * limit, take: limit,
+                select: {
+                    id: true, name: true, brand: true, category: true, status: true, adminNotes: true, images: true, ean: true,
+                    basePrice: true, price: true, stock: true, unit: true, moq: true, moqUnit: true, unitsPerCase: true,
+                    casesPerPallet: true, palletsPerShipment: true, weight: true, origin: true, exwLocation: true, shelfLife: true,
+                    leadTime: true, createdAt: true, updatedAt: true, variants: true,
+                },
+            }),
+            this.prisma.product.groupBy({ by: ['status'], where: { supplierId }, _count: { _all: true } }),
+            this.prisma.product.groupBy({ by: ['category'], where: { supplierId }, _count: { _all: true } }),
+            this.prisma.product.count({ where: { supplierId, status: ProductStatus.APPROVED, stock: { lte: 0 } } }),
+        ]);
+        const ledger = await stockMovements(this.prisma, rows.map((r) => r.id));
+        const counts: Record<string, number> = Object.fromEntries(statuses.map((s) => [s, 0]));
+        for (const g of byStatus as any[]) counts[g.status] = g._count._all;
+        return {
+            data: rows.map((r: any) => this.withCompleteness({
+                ...r,
+                variants: Array.isArray(r.variants) ? r.variants.filter((v: any) => !String(v?.name || '').startsWith('__')) : [],
+                price: r.basePrice ?? r.price, // the supplier's own price (EUR per case), never the marked-up one
+                reserved: ledger[r.id]?.reserved ?? 0,
+            })),
+            total, page, limit, pages: Math.max(1, Math.ceil(total / limit)),
+            summary: {
+                total: Object.values(counts).reduce((a, b) => a + b, 0),
+                byStatus: counts,
+                categories: (cats as any[]).filter((c) => c.category).length,
+                outOfStock,
+            },
+            categories: (cats as any[]).map((c) => c.category).filter(Boolean).sort(),
+        };
+    }
+
+    /** Supplier-scoped single product for the editor (404 for anyone else's). */
+    async findMineOne(id: string, supplierId: string) {
+        const p: any = await this.prisma.product.findFirst({ where: { id, supplierId } });
+        if (!p) throw new NotFoundException('Product not found');
+        const ledger = await stockMovements(this.prisma, [id]);
+        return this.withCompleteness({
+            ...p,
+            variants: Array.isArray(p.variants) ? p.variants.filter((v: any) => !String(v?.name || '').startsWith('__')) : [],
+            price: p.basePrice ?? p.price,
+            movement: ledger[id] ?? { reserved: 0, delivered: 0, cancelled: 0, ordered: 0 },
+        });
+    }
+
+    /** Products sharing a barcode with this supplier's existing catalog (for import / editor duplicate warnings). */
+    async findMineByBarcodes(supplierId: string, codes: string[]) {
+        const list = [...new Set(codes.map(normaliseBarcode).filter(Boolean))];
+        if (!list.length) return [];
+        return this.prisma.product.findMany({ where: { supplierId, ean: { in: list } }, select: { id: true, name: true, ean: true, status: true } });
+    }
+
+    /**
+     * Aggregate rating across the supplier's products, from Review rows only
+     * (one per buyer per product). The legacy /rate counter is not used.
+     */
+    async supplierReputation(supplierId: string) {
+        const where = { product: { supplierId } };
+        const [agg, dist, recent] = await Promise.all([
+            this.prisma.review.aggregate({ where, _avg: { rating: true }, _count: { _all: true } }),
+            this.prisma.review.groupBy({ by: ['rating'], where, _count: { _all: true } }),
+            this.prisma.review.findMany({
+                where, orderBy: { createdAt: 'desc' }, take: 8,
+                select: { id: true, rating: true, comment: true, createdAt: true, product: { select: { id: true, name: true } } },
+            }),
+        ]);
+        const distribution: Record<number, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        for (const d of dist as any[]) if (distribution[d.rating] !== undefined) distribution[d.rating] = d._count._all;
+        return {
+            average: agg._count._all ? Math.round((agg._avg.rating || 0) * 10) / 10 : null,
+            count: agg._count._all,
+            distribution,
+            recent: recent.map((r: any) => ({ id: r.id, rating: r.rating, comment: r.comment, createdAt: r.createdAt, productId: r.product?.id, productName: r.product?.name })),
+        };
+    }
 }
-
-

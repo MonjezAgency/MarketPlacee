@@ -1,520 +1,248 @@
 'use client';
 
 import * as React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-    ShoppingBag, Search, Truck, Package, Eye,
-    ShieldCheck, Loader2, RefreshCw, CheckCircle2, FileText, Upload, X, MapPin,
-} from 'lucide-react';
-import { cn, prettifyVariantSignature } from '@/lib/utils';
-import { apiFetch } from '@/lib/api';
-import { formatPrice } from '@/lib/currency';
+import { useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
+import { ShoppingCart, Check, X, Search, FileUp, FileText, Trash2, AlertCircle, ChevronDown } from 'lucide-react';
+import { apiFetch } from '@/lib/api';
+import { supplierApi } from '@/lib/supplier-api';
+import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Notice, PageHeader, Skeleton, Stat, StatusBadge, Thumb, eur, int, inputCls, shortDate, useConfirm } from '@/components/supplier/ui';
+import { cn } from '@/lib/utils';
 
-type OrderStatus = 'PENDING' | 'PROCESSING' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
+const VIEWS = [
+    { id: 'action', label: 'Needs your action', match: (o: any) => o.needsAction },
+    { id: 'progress', label: 'Preparing', match: (o: any) => o.status === 'PROCESSING' },
+    { id: 'shipped', label: 'Shipped', match: (o: any) => o.status === 'SHIPPED' },
+    { id: 'delivered', label: 'Delivered', match: (o: any) => o.status === 'DELIVERED' },
+    { id: 'cancelled', label: 'Cancelled', match: (o: any) => o.status === 'CANCELLED' },
+    { id: 'all', label: 'All', match: () => true },
+] as const;
+const TIER: Record<string, string> = { carton: 'case', case: 'case', pallet: 'pallet', truck: 'truck' };
+const ref = (id: string) => `#${id.slice(-8).toUpperCase()}`;
 
-interface SupplierOrder {
-    id: string;
-    status: OrderStatus;
-    totalAmount: number;
-    shippingCompany: string | null;
-    createdAt: string;
-    buyer: { name: string; email: string };
-    items: { id: string; name: string; image: string | null; quantity: number; price: number; exwLocation?: string | null }[];
-    supplierInvoiceUrl?: string | null;
+/** My Sales — orders containing this supplier's products, with confirm / decline. */
+export default function SupplierOrdersPage() {
+    return <React.Suspense fallback={null}><SupplierOrders /></React.Suspense>;
 }
 
-const STATUS_STYLES: Record<OrderStatus, string> = {
-    PENDING: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
-    PROCESSING: 'bg-amber-400/10 text-amber-400 border-amber-400/20',
-    SHIPPED: 'bg-primary/10 text-primary border-primary/20',
-    DELIVERED: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    CANCELLED: 'bg-red-500/10 text-red-400 border-red-500/20',
-};
+function SupplierOrders() {
+    const params = useSearchParams();
+    const [orders, setOrders] = React.useState<any[] | null>(null);
+    const [error, setError] = React.useState<string | null>(null);
+    const [view, setView] = React.useState<string>(params.get('view') || 'action');
+    const [q, setQ] = React.useState('');
+    const [decline, setDecline] = React.useState<any | null>(null);
 
-// Suppliers can ONLY move PENDING → PROCESSING (Confirm Order).
-// Marking an order as SHIPPED is now an admin/logistics responsibility
-// per operator request — the carrier assignment + tracking number live
-// in /admin/orders, so the "Mark as Shipped" button has been removed
-// from the supplier-facing table. Suppliers stop after they confirm.
-const NEXT_STATUS: Partial<Record<OrderStatus, OrderStatus>> = {
-    PENDING: 'PROCESSING',
-};
-
-const NEXT_LABEL: Partial<Record<OrderStatus, string>> = {
-    PENDING: 'Confirm Order',
-};
-
-export default function SupplierOrdersPage() {
-    const [orders, setOrders] = React.useState<SupplierOrder[]>([]);
-    const [isLoading, setIsLoading] = React.useState(true);
-    const [searchTerm, setSearchTerm] = React.useState('');
-    const [expandedId, setExpandedId] = React.useState<string | null>(null);
-    const [updatingId, setUpdatingId] = React.useState<string | null>(null);
-
-    
-
-    const fetchOrders = React.useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const res = await apiFetch(`/orders/my-orders`);
-            if (res.ok) setOrders(await res.json());
-        } catch (_e) { /* ignore */ }
-        finally { setIsLoading(false); }
+    const load = React.useCallback(() => {
+        setError(null);
+        supplierApi.orders().then((d) => setOrders(Array.isArray(d) ? d : [])).catch((e) => setError(e.message));
     }, []);
+    React.useEffect(() => { load(); }, [load]);
+    // Default to "All" when nothing needs action.
+    React.useEffect(() => { if (orders && view === 'action' && !params.get('view') && !orders.some((o) => o.needsAction)) setView('all'); }, [orders]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    React.useEffect(() => { fetchOrders(); }, [fetchOrders]);
-
-    // Operator request: orders should appear without a manual refresh.
-    // We poll every 30s — cheap, reliable, no WebSocket plumbing here
-    // because the page already has the fetcher. Pauses when the tab
-    // is hidden to avoid burning quota.
-    React.useEffect(() => {
-        const tick = () => { if (!document.hidden) fetchOrders(); };
-        const id = setInterval(tick, 30000);
-        return () => clearInterval(id);
-    }, [fetchOrders]);
-
-    const handleStatusUpdate = async (orderId: string, status: OrderStatus) => {
-        setUpdatingId(orderId);
-        try {
-            // BUG FIX: backend declares @Patch(':id/status') — the previous
-            // PUT here was a no-op (404 silently swallowed by the try/catch),
-            // which is why clicking "Confirm Order" on the supplier dashboard
-            // did nothing visible. Method now matches the controller.
-            const res = await apiFetch(`/orders/${orderId}/status`, {
-                method: 'PATCH',
-                body: JSON.stringify({ status }),
-            });
-            if (res.ok) {
-                setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-                // Suppliers only confirm orders now — SHIPPED is handled
-                // by admin/logistics. Toast wording reflects that.
-                toast.success(
-                    status === 'PROCESSING'
-                        ? 'Order confirmed — admin has been notified.'
-                        : `Order updated to ${status}.`
-                );
-            } else {
-                const err = await res.json().catch(() => null);
-                toast.error(err?.message || `Failed to update order (${res.status})`);
-            }
-        } catch (e: any) {
-            toast.error(e?.message || 'Network error — try again.');
-        } finally {
-            setUpdatingId(null);
-        }
-    };
-
-    const filtered = orders.filter(o =>
-        o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (o.buyer?.name || '').toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const v = VIEWS.find((x) => x.id === view) ?? VIEWS[5];
+    const term = q.trim().toLowerCase().replace('#', '');
+    const shown = (orders ?? []).filter((o) => v.match(o) && (!term || o.id.toLowerCase().includes(term) || o.items.some((i: any) => `${i.name} ${i.ean || ''}`.toLowerCase().includes(term))));
+    const count = (id: string) => (orders ?? []).filter(VIEWS.find((x) => x.id === id)!.match).length;
+    const open = (orders ?? []).filter((o) => ['PENDING', 'PAID', 'PROCESSING', 'SHIPPED'].includes(o.status));
 
     return (
-        <div className="space-y-8 max-w-7xl mx-auto pb-20">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                    <h1 className="text-3xl font-black tracking-tight">Order Management</h1>
-                    <p className="text-muted-foreground font-medium mt-1">Track and fulfill wholesale orders from your customers.</p>
-                </div>
-                <div className="flex gap-3">
-                    <div className="relative">
-                        <Search className="absolute start-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={16} />
-                        <input
-                            type="text"
-                            placeholder="Search order ID or customer..."
-                            className="h-11 ps-11 pe-6 bg-card border border-border/50 rounded-xl outline-none focus:ring-2 focus:ring-primary/20 text-sm w-64 transition-all"
-                            value={searchTerm}
-                            onChange={e => setSearchTerm(e.target.value)}
-                        />
-                    </div>
-                    <button
-                        onClick={fetchOrders}
-                        className="h-11 w-11 flex items-center justify-center bg-card border border-border/50 rounded-xl hover:bg-muted/40 transition-colors"
-                    >
-                        <RefreshCw size={16} className={isLoading ? 'animate-spin text-primary' : 'text-muted-foreground'} />
-                    </button>
-                </div>
+        <div>
+            <PageHeader title="My sales" description="Orders that include your products. Confirm what you can fulfil; Atlantis handles shipping and delivery updates." />
+
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-4 mb-4">
+                <Stat label="Awaiting your confirmation" value={orders ? int(count('action')) : '—'} tone="warning" icon={<AlertCircle size={17} />} loading={!orders && !error} />
+                <Stat label="Preparing" value={orders ? int(count('progress')) : '—'} tone="brand" icon={<ShoppingCart size={17} />} loading={!orders && !error} />
+                <Stat label="Shipped" value={orders ? int(count('shipped')) : '—'} tone="info" icon={<ShoppingCart size={17} />} loading={!orders && !error} />
+                <Stat label="Open order value" value={orders ? eur(open.reduce((s, o) => s + (o.supplierSubtotal || 0), 0)) : '—'} icon={<ShoppingCart size={17} />} loading={!orders && !error} hint="your lines, buyer prices" />
             </div>
 
-            {/* Privacy notice */}
-            <div className="bg-primary/5 border border-primary/20 p-4 rounded-2xl flex items-center gap-4">
-                <ShieldCheck className="text-primary shrink-0" size={20} />
-                <p className="text-xs text-muted-foreground font-medium">
-                    <span className="font-black text-primary uppercase tracking-widest me-2">Secure View:</span>
-                    Showing only orders containing your products. Customer data is partially masked for privacy compliance.
-                </p>
-            </div>
-
-            {/* Stats row */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {(['PENDING', 'PROCESSING', 'SHIPPED', 'DELIVERED'] as OrderStatus[]).map(status => (
-                    <div key={status} className="rounded-2xl p-4 bg-card border border-border/50 text-center">
-                        <p className={cn('text-2xl font-black', STATUS_STYLES[status].split(' ')[1])}>
-                            {orders.filter(o => o.status === status).length}
-                        </p>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{status}</p>
-                    </div>
-                ))}
-            </div>
-
-            {/* Orders list */}
-            {isLoading ? (
-                <div className="flex items-center justify-center py-20">
-                    <Loader2 className="w-8 h-8 animate-spin text-primary" />
-                </div>
-            ) : filtered.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-20 text-muted-foreground">
-                    <ShoppingBag className="w-12 h-12 opacity-20" />
-                    <p className="font-bold">{searchTerm ? 'No orders match your search.' : 'No orders yet.'}</p>
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    <AnimatePresence mode="popLayout">
-                        {filtered.map((order, i) => (
-                            <motion.div
-                                key={order.id}
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: i * 0.05 }}
-                                className="bg-card border border-border/50 rounded-3xl overflow-hidden hover:border-primary/20 transition-all"
-                            >
-                                {/* Summary row */}
-                                <div className="p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center shrink-0">
-                                            <ShoppingBag className="text-primary" size={20} />
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-[10px] font-black text-primary uppercase tracking-widest">
-                                                    #{order.id.slice(-8).toUpperCase()}
-                                                </span>
-                                                <span className="text-[10px] text-muted-foreground font-bold">
-                                                    {new Date(order.createdAt).toLocaleDateString()}
-                                                </span>
-                                            </div>
-                                            <p className="font-black">{order.buyer.name}</p>
-                                            <p className="text-[11px] text-muted-foreground">{order.buyer.email}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-8">
-                                        <div className="text-center">
-                                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Total</p>
-                                            <p className="text-lg font-black">{formatPrice(order.totalAmount)}</p>
-                                        </div>
-                                        <div className="text-center">
-                                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Items</p>
-                                            <p className="text-lg font-black">{order.items.length}</p>
-                                        </div>
-                                        <span className={cn('px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border', STATUS_STYLES[order.status])}>
-                                            {order.status}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 shrink-0">
-                                        {NEXT_STATUS[order.status] && (
-                                            <button
-                                                onClick={() => handleStatusUpdate(order.id, NEXT_STATUS[order.status]!)}
-                                                disabled={updatingId === order.id}
-                                                className="h-10 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-black text-xs rounded-xl border border-primary/20 transition-all flex items-center gap-2 disabled:opacity-50"
-                                            >
-                                                {updatingId === order.id
-                                                    ? <Loader2 size={14} className="animate-spin" />
-                                                    : order.status === 'PROCESSING' ? <Truck size={14} /> : <CheckCircle2 size={14} />
-                                                }
-                                                {NEXT_LABEL[order.status]}
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={() => setExpandedId(prev => prev === order.id ? null : order.id)}
-                                            className={cn(
-                                                'h-10 px-4 text-xs font-black rounded-xl border transition-all flex items-center gap-2',
-                                                expandedId === order.id
-                                                    ? 'bg-primary/20 text-primary border-primary/30'
-                                                    : 'bg-muted/30 text-muted-foreground border-border/50 hover:text-foreground'
-                                            )}
-                                        >
-                                            <Eye size={14} />
-                                            {expandedId === order.id ? 'Close' : 'Details'}
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Expanded details */}
-                                <AnimatePresence>
-                                    {expandedId === order.id && (
-                                        <motion.div
-                                            initial={{ height: 0, opacity: 0 }}
-                                            animate={{ height: 'auto', opacity: 1 }}
-                                            exit={{ height: 0, opacity: 0 }}
-                                            className="border-t border-border/50 bg-muted/20 overflow-hidden"
-                                        >
-                                            <div className="p-6 space-y-4">
-                                                <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Line Items</p>
-                                                <div className="space-y-2">
-                                                    {order.items.map(item => (
-                                                        <div key={item.id} className="flex flex-col gap-3 p-4 bg-card rounded-2xl border border-border/50">
-                                                          <div className="flex items-start justify-between gap-4 flex-wrap">
-                                                            <div className="flex items-start gap-3 min-w-0">
-                                                                {item.image ? (
-                                                                    <img src={item.image} alt="" className="w-12 h-12 rounded-xl object-cover border border-border/50 shrink-0" />
-                                                                ) : (
-                                                                    <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center shrink-0">
-                                                                        <Package size={16} className="text-muted-foreground" />
-                                                                    </div>
-                                                                )}
-                                                                <div className="min-w-0">
-                                                                    <p className="font-bold text-sm">{item.name}</p>
-                                                                    {(item as any).selectedVariants && Object.keys((item as any).selectedVariants).length > 0 && (
-                                                                        <div className="flex flex-wrap gap-1 mt-1">
-                                                                            {Object.entries((item as any).selectedVariants as Record<string, string>)
-                                                                                .filter(([k]) => !k.startsWith('__'))
-                                                                                .map(([k, v]) => (
-                                                                                    <span key={k} className="inline-flex items-center h-5 px-2 rounded-md bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-bold">
-                                                                                        {k}: <span className="ml-1">{String(v)}</span>
-                                                                                    </span>
-                                                                                ))}
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                            <div className="flex items-center gap-8 text-end">
-                                                                <div>
-                                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Qty</p>
-                                                                    <p className="font-bold">
-                                                                        {item.quantity}
-                                                                        <span className="ms-1 text-[10px] text-muted-foreground uppercase tracking-wider">
-                                                                            × {(item as any).selectedTier || 'unit'}
-                                                                        </span>
-                                                                    </p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Unit Price</p>
-                                                                    <p className="font-bold text-primary">{formatPrice(item.price)}</p>
-                                                                </div>
-                                                                <div>
-                                                                    <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Subtotal</p>
-                                                                    <p className="font-black">{formatPrice(item.price * item.quantity)}</p>
-                                                                </div>
-                                                            </div>
-                                                          </div>
-                                                          {Array.isArray((item as any).mixComposition) && (item as any).mixComposition.length > 0 && (
-                                                                <div className="rounded-lg border border-orange-200 bg-orange-50/50 px-3 py-2 text-[11px]">
-                                                                    <p className="font-black text-orange-700 uppercase tracking-widest text-[9px] mb-1">Mixed composition — exactly what the customer ordered</p>
-                                                                    <ul className="space-y-0.5 text-slate-700">
-                                                                        {((item as any).mixComposition as Array<{ signature: string; quantity: number }>).map((c) => (
-                                                                            <li key={c.signature} className="break-all">
-                                                                                {c.quantity} × {prettifyVariantSignature(c.signature) || 'Variant'}
-                                                                            </li>
-                                                                        ))}
-                                                                    </ul>
-                                                                </div>
-                                                          )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-
-                                                {/* Financial summary */}
-                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-border/50">
-                                                    <div className="p-4 bg-card rounded-2xl border border-border/50 space-y-2">
-                                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Financial Summary</p>
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-muted-foreground">Gross Value</span>
-                                                            <span className="font-bold">{formatPrice(order.totalAmount * 1.05)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-sm">
-                                                            <span className="text-red-400">Platform Fee (5%)</span>
-                                                            <span className="font-bold text-red-400">-${(order.totalAmount * 0.05).toFixed(2)}</span>
-                                                        </div>
-                                                        <div className="flex justify-between text-sm pt-2 border-t border-border/50">
-                                                            <span className="font-black text-primary">Your Net Revenue</span>
-                                                            <span className="font-black text-primary">{formatPrice(order.totalAmount)}</span>
-                                                        </div>
-                                                    </div>
-                                                    {order.shippingCompany && (
-                                                        <div className="p-4 bg-card rounded-2xl border border-border/50 space-y-2">
-                                                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Shipping</p>
-                                                            <div className="flex items-center gap-2">
-                                                                <Truck size={14} className="text-primary" />
-                                                                <span className="font-bold text-sm">{order.shippingCompany}</span>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* ── EXW summary (operator-requested) ─
-                                                    Suppliers see the EXW location for
-                                                    every item — same field the customer
-                                                    + admin see, kept in sync. */}
-                                                {order.items.some(i => i.exwLocation) && (
-                                                    <div className="p-4 bg-card rounded-2xl border border-border/50 space-y-2">
-                                                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">EXW (Origin)</p>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {Array.from(new Set(order.items.map(i => i.exwLocation).filter(Boolean))).map(loc => (
-                                                                <span key={String(loc)} className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-bold">
-                                                                    <MapPin size={11} /> EXW {String(loc)}
-                                                                </span>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
-
-                                                {/* ── Supplier invoice attachment ───
-                                                    Lets the supplier attach a receipt /
-                                                    invoice scan that the customer sees
-                                                    on their order detail page. */}
-                                                <SupplierInvoiceBlock
-                                                    order={order}
-                                                    onUpdate={(url) =>
-                                                        setOrders(prev =>
-                                                            prev.map(o => o.id === order.id ? { ...o, supplierInvoiceUrl: url } : o),
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                        </motion.div>
-                                    )}
-                                </AnimatePresence>
-                            </motion.div>
+            <Card bodyClassName="p-0">
+                <div className="flex flex-col gap-3 p-3 sm:p-4 border-b border-line">
+                    <div role="tablist" aria-label="Order status" className="flex gap-1 overflow-x-auto">
+                        {VIEWS.map((x) => (
+                            <button key={x.id} role="tab" aria-selected={view === x.id} onClick={() => setView(x.id)}
+                                className={cn('h-8 px-3 rounded-md text-[13px] font-medium whitespace-nowrap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal', view === x.id ? 'bg-heading text-white' : 'text-ink-2 hover:bg-surface-2')}>
+                                {x.label}{orders && <span className={cn('ms-1.5 tabular-nums', view === x.id ? 'text-white/70' : 'text-ink-4')}>{count(x.id)}</span>}
+                            </button>
                         ))}
-                    </AnimatePresence>
+                    </div>
+                    <label className="relative sm:max-w-[320px]">
+                        <span className="sr-only">Search orders</span>
+                        <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-ink-4" />
+                        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Order #, product or barcode" className={cn(inputCls, 'ps-9')} />
+                    </label>
                 </div>
-            )}
+
+                {error && <div className="p-4"><ErrorState message={error} onRetry={load} /></div>}
+                {!orders && !error ? <div className="p-4 space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-28" />)}</div>
+                    : orders && shown.length === 0 ? (
+                        <EmptyState icon={<ShoppingCart size={20} />} title={orders.length ? 'No orders in this view' : 'No orders yet'}>
+                            {orders.length ? 'Try another tab or search.' : 'When a buyer orders your products, the order appears here for you to confirm.'}
+                        </EmptyState>
+                    ) : (
+                        <ul className="divide-y divide-line">
+                            {shown.map((o) => <OrderRow key={o.id} o={o} onChanged={load} onDecline={() => setDecline(o)} />)}
+                        </ul>
+                    )}
+            </Card>
+
+            <DeclineDialog order={decline} onClose={() => setDecline(null)} onDone={() => { setDecline(null); load(); }} />
         </div>
     );
 }
 
-// ────────────────────────────────────────────────────────────────────
-// Supplier invoice attachment block — sits inside the expanded order
-// row. Supplier picks a file (image OR PDF, ≤ 10 MB), it uploads to
-// /orders/:id/supplier-invoice, and the URL is stored on the order
-// so the customer + admin can view it. Existing attachment renders
-// as an inline preview with a "Replace" / "Remove" toolbar.
-// ────────────────────────────────────────────────────────────────────
-function SupplierInvoiceBlock({
-    order,
-    onUpdate,
-}: {
-    order: SupplierOrder;
-    onUpdate: (url: string | null) => void;
-}) {
-    const inputRef = React.useRef<HTMLInputElement>(null);
-    const [uploading, setUploading] = React.useState(false);
-    const url = order.supplierInvoiceUrl;
-    const isPdf = !!url && /\.pdf(\?|$)/i.test(url);
+function OrderRow({ o, onChanged, onDecline }: { o: any; onChanged: () => void; onDecline: () => void }) {
+    const confirm = useConfirm();
+    const [busy, setBusy] = React.useState(false);
+    const [expanded, setExpanded] = React.useState(o.needsAction);
 
-    const handlePick = async (file: File) => {
-        const okMime = file.type.startsWith('image/') || file.type === 'application/pdf';
-        if (!okMime) {
-            toast.error('Invoice must be an image or PDF.');
-            return;
-        }
-        if (file.size > 10 * 1024 * 1024) {
-            toast.error(`File is ${(file.size / 1024 / 1024).toFixed(1)} MB — max is 10 MB.`);
-            return;
-        }
-        setUploading(true);
-        try {
-            const fd = new FormData();
-            fd.append('file', file);
-            const res = await apiFetch(`/orders/${order.id}/supplier-invoice`, { method: 'POST', body: fd });
-            if (!res.ok) {
-                const err = await res.json().catch(() => null);
-                throw new Error(err?.message || `Upload failed (HTTP ${res.status})`);
-            }
-            const data = await res.json();
-            onUpdate(data?.url || null);
-            toast.success('Invoice uploaded — the customer can now see it.');
-        } catch (e: any) {
-            toast.error(e?.message || 'Could not upload invoice');
-        } finally {
-            setUploading(false);
-            if (inputRef.current) inputRef.current.value = '';
-        }
-    };
-
-    const handleRemove = async () => {
-        if (!confirm('Remove this invoice from the order?')) return;
-        try {
-            const res = await apiFetch(`/orders/${order.id}/supplier-invoice`, { method: 'DELETE' });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            onUpdate(null);
-            toast.success('Invoice removed.');
-        } catch (e: any) {
-            toast.error(e?.message || 'Could not remove invoice');
-        }
+    const accept = async () => {
+        const ok = await confirm({
+            title: `Confirm order ${ref(o.id)}?`,
+            body: <>
+                <p>You’re confirming you can supply these lines. The stock for them was already reserved when the buyer ordered, so nothing more is deducted.</p>
+                <ul className="mt-2 list-disc ps-5 text-[13px]">{o.items.map((i: any) => <li key={i.id}>{i.quantity} × {TIER[i.selectedTier] || 'case'} — {i.name}{i.cases ? ` (${int(i.cases)} cases)` : ''}</li>)}</ul>
+                <p className="mt-2 text-ink-3 text-[13px]">The buyer is notified. Shipping is arranged by Atlantis.</p>
+            </>,
+            confirm: 'Confirm order',
+        });
+        if (!ok) return;
+        setBusy(true);
+        try { await supplierApi.acceptOrder(o.id); toast.success(`Order ${ref(o.id)} confirmed`); onChanged(); }
+        catch (e: any) { toast.error(e.message); onChanged(); }
+        finally { setBusy(false); }
     };
 
     return (
-        <div className="p-4 bg-card rounded-2xl border border-border/50 space-y-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                    <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                        Invoice / Receipt
-                    </p>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                        {url
-                            ? 'Customer can see this attachment from their order detail.'
-                            : 'Attach a receipt / invoice scan so the customer can see it.'}
-                    </p>
+        <li className="p-4">
+            <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
+                <button type="button" onClick={() => setExpanded((x: boolean) => !x)} aria-expanded={expanded} className="flex items-start gap-3 min-w-0 flex-1 text-start group">
+                    <ChevronDown size={16} className={cn('mt-1 text-ink-3 transition-transform shrink-0', expanded && 'rotate-180')} />
+                    <span className="min-w-0">
+                        <span className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-heading tabular-nums group-hover:underline">Order {ref(o.id)}</span>
+                            <StatusBadge kind="order" status={o.status} />
+                            {o.sharedOrder && <Badge tone="neutral">Includes other suppliers</Badge>}
+                        </span>
+                        <span className="block mt-0.5 text-[12.5px] text-ink-3">{shortDate(o.createdAt)} · buyer {o.buyer?.name || 'Customer'} · {o.items.length} line{o.items.length === 1 ? '' : 's'} · {int(o.items.reduce((s: number, i: any) => s + (i.cases || 0), 0))} cases</span>
+                    </span>
+                </button>
+                <div className="text-end">
+                    <p className="font-semibold text-heading tabular-nums">{eur(o.supplierSubtotal)}</p>
+                    <p className="text-[12px] text-ink-3">your lines</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => inputRef.current?.click()}
-                        disabled={uploading}
-                        className="h-9 px-4 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[11px] font-black inline-flex items-center gap-2 disabled:opacity-50"
-                    >
-                        {uploading ? <Loader2 className="animate-spin" size={13} /> : <Upload size={13} />}
-                        {url ? 'Replace' : 'Upload invoice'}
-                    </button>
-                    {url && (
-                        <button
-                            type="button"
-                            onClick={handleRemove}
-                            className="h-9 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[11px] font-black inline-flex items-center gap-1.5"
-                        >
-                            <X size={13} /> Remove
-                        </button>
-                    )}
-                </div>
-                <input
-                    ref={inputRef}
-                    type="file"
-                    accept="image/*,application/pdf"
-                    className="hidden"
-                    onChange={e => {
-                        const f = e.target.files?.[0];
-                        if (f) handlePick(f);
-                    }}
-                />
+                {o.needsAction && (
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <Button variant="secondary" icon={<X size={14} />} onClick={onDecline} disabled={busy}>Decline</Button>
+                        <Button variant="primary" icon={<Check size={14} />} loading={busy} onClick={accept}>Confirm</Button>
+                    </div>
+                )}
             </div>
-            {url && (
-                isPdf ? (
-                    <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block rounded-xl border border-border/50 bg-muted/30 px-4 py-3 text-[12px] font-bold text-primary hover:underline inline-flex items-center gap-2"
-                    >
-                        <FileText size={14} /> Open invoice PDF
-                    </a>
-                ) : (
-                    <a
-                        href={url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block w-full max-w-sm rounded-xl overflow-hidden border border-border/50"
-                    >
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={url} alt="Supplier invoice" className="w-full h-auto" />
-                    </a>
-                )
+
+            {expanded && (
+                <div className="mt-3 ms-7 space-y-3">
+                    <div className="overflow-x-auto rounded-lg ring-1 ring-line">
+                        <table className="w-full text-[13px]">
+                            <thead><tr className="bg-surface-2/60 text-[12px] text-ink-3">
+                                <th className="text-start font-medium px-3 py-2">Product</th>
+                                <th className="text-end font-medium px-3 py-2">Ordered</th>
+                                <th className="text-end font-medium px-3 py-2">Cases</th>
+                                <th className="text-end font-medium px-3 py-2 hidden sm:table-cell">Unit price</th>
+                                <th className="text-end font-medium px-3 py-2">Line total</th>
+                            </tr></thead>
+                            <tbody>
+                                {o.items.map((i: any) => (
+                                    <tr key={i.id} className="border-t border-line align-top">
+                                        <td className="px-3 py-2">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <Thumb src={i.image} size={34} />
+                                                <span className="min-w-0">
+                                                    <span className="block truncate max-w-[34ch] text-ink">{i.name}</span>
+                                                    <span className="block text-[12px] text-ink-3 font-mono">{i.ean || ''}{i.unitsPerCase ? <span className="font-sans"> · {i.unitsPerCase} pcs/case</span> : null}</span>
+                                                    {i.selectedVariants && typeof i.selectedVariants === 'object' && Object.keys(i.selectedVariants).length > 0 && <span className="block text-[12px] text-ink-3">{Object.entries(i.selectedVariants).map(([k, v]) => `${k}: ${v}`).join(' · ')}</span>}
+                                                    {Array.isArray(i.mixComposition) && i.mixComposition.length > 0 && <span className="block text-[12px] text-ink-3">Mix: {i.mixComposition.map((m: any) => `${m.quantity}× ${m.signature || m.name || m.variant || ''}`).join(', ')}</span>}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 py-2 text-end tabular-nums whitespace-nowrap">{i.quantity} × {TIER[i.selectedTier] || 'case'}</td>
+                                        <td className="px-3 py-2 text-end tabular-nums">{i.cases ? int(i.cases) : '—'}</td>
+                                        <td className="px-3 py-2 text-end tabular-nums hidden sm:table-cell">{eur(i.price)}</td>
+                                        <td className="px-3 py-2 text-end tabular-nums">{eur(i.price * i.quantity)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    {o.lastStatusNote && <p className="text-[12.5px] text-ink-3">Latest update: {o.lastStatusNote}</p>}
+                    {o.status === 'PROCESSING' && <p className="text-[12.5px] text-ink-3">Next: Atlantis books transport and marks the order shipped. Prepare the goods at your EXW location.</p>}
+                    {['PROCESSING', 'SHIPPED', 'DELIVERED'].includes(o.status) && <InvoiceAttachment orderId={o.id} initial={o.supplierInvoiceUrl} />}
+                </div>
             )}
+        </li>
+    );
+}
+
+function DeclineDialog({ order, onClose, onDone }: { order: any | null; onClose: () => void; onDone: () => void }) {
+    const [reason, setReason] = React.useState('');
+    const [busy, setBusy] = React.useState(false);
+    const [err, setErr] = React.useState<string | null>(null);
+    React.useEffect(() => { setReason(''); setErr(null); }, [order]);
+    if (!order) return null;
+    const submit = async () => {
+        if (reason.trim().length < 5) { setErr('Give the buyer a short reason (at least 5 characters).'); return; }
+        setBusy(true); setErr(null);
+        try { await supplierApi.declineOrder(order.id, reason.trim()); toast.success(`Order ${ref(order.id)} declined — stock returned.`); onDone(); }
+        catch (e: any) { setErr(e.message); }
+        finally { setBusy(false); }
+    };
+    return (
+        <Dialog open={!!order} onClose={onClose} title={`Decline order ${ref(order.id)}?`} size="sm"
+            footer={order.canDecline ? <><Button variant="secondary" onClick={onClose}>Keep order</Button><Button variant="danger" loading={busy} onClick={submit}>Decline order</Button></> : <Button variant="primary" onClick={onClose}>OK</Button>}>
+            {order.canDecline ? (
+                <div className="space-y-3">
+                    <p className="text-[13.5px] text-ink-2">The order is cancelled, the reserved cases go back to your stock, and the buyer is told why.</p>
+                    <label htmlFor="decline-reason" className="block text-[13px] font-medium text-ink-2">Reason for the buyer <span className="text-red-600">*</span></label>
+                    <textarea id="decline-reason" data-autofocus value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={500} className={cn(inputCls, 'h-auto py-2')} placeholder="e.g. This batch sold out; next availability in 3 weeks." />
+                    {err && <p role="alert" className="text-[12.5px] text-red-700">{err}</p>}
+                </div>
+            ) : (
+                <Notice tone="warning">This order also has other suppliers’ products, so it can’t be declined from here. Contact Atlantis support with the order number and what you can’t supply.</Notice>
+            )}
+        </Dialog>
+    );
+}
+
+function InvoiceAttachment({ orderId, initial }: { orderId: string; initial?: string | null }) {
+    const [url, setUrl] = React.useState<string | null>(initial ?? null);
+    const [busy, setBusy] = React.useState(false);
+    const confirm = useConfirm();
+    const input = React.useRef<HTMLInputElement>(null);
+    const pick = async (file: File) => {
+        if (!(file.type.startsWith('image/') || file.type === 'application/pdf')) return toast.error('Invoice must be an image or PDF.');
+        if (file.size > 10 * 1024 * 1024) return toast.error('Invoice must be 10 MB or smaller.');
+        setBusy(true);
+        try {
+            const fd = new FormData(); fd.append('file', file);
+            const res = await apiFetch(`/orders/${orderId}/supplier-invoice`, { method: 'POST', body: fd });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d?.message || 'Upload failed.');
+            setUrl(d?.url || null); toast.success('Invoice attached — the buyer can see it.');
+        } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+    };
+    const remove = async () => {
+        if (!(await confirm({ title: 'Remove the invoice?', confirm: 'Remove', tone: 'danger' }))) return;
+        const res = await apiFetch(`/orders/${orderId}/supplier-invoice`, { method: 'DELETE' });
+        res.ok ? (setUrl(null), toast.success('Invoice removed')) : toast.error('Couldn’t remove the invoice.');
+    };
+    return (
+        <div className="flex flex-wrap items-center gap-2 text-[13px]">
+            <span className="text-ink-2 font-medium">Invoice:</span>
+            {url ? <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-teal hover:underline"><FileText size={14} /> View attached file</a> : <span className="text-ink-3">none attached</span>}
+            <input ref={input} type="file" accept="image/*,application/pdf" hidden onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) pick(f); }} />
+            <Button size="sm" variant="secondary" icon={<FileUp size={13} />} loading={busy} onClick={() => input.current?.click()}>{url ? 'Replace' : 'Attach'}</Button>
+            {url && <Button size="sm" variant="ghost" icon={<Trash2 size={13} />} onClick={remove}>Remove</Button>}
         </div>
     );
 }

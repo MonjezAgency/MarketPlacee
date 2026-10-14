@@ -33,6 +33,7 @@ import type { Locale } from '@/locales';
 import { formatPrice } from '@/lib/currency';
 import { GuidedTour } from '@/components/ui/GuidedTour';
 import NotificationBell from '@/components/ui/NotificationBell';
+import { ConfirmProvider } from '@/components/supplier/ui';
 
 // Languages available to suppliers — kept in sync with the public
 // Navbar list (LANGUAGES in components/layout/Navbar.tsx) so a
@@ -61,7 +62,10 @@ const SUPPLIER_LINKS = [
     // (restored to stock). The supplier reads this to answer "what's
     // committed vs what's free vs what's left the warehouse".
     { label: 'Stock & Reservations', href: '/supplier/inventory', icon: Box, key: 'inventory' },
-    { label: 'Wholesale Offers', href: '/supplier/wholesale-offers', icon: ListPlus, key: 'wholesale-offers' },
+    // Wholesale Offers is hidden from the sidebar for now (not a current
+    // priority). The page, API and stored offers are untouched and still
+    // reachable at /supplier/wholesale-offers; approved offers keep
+    // showing their discount on product pages.
     // "Offers & Ads" is gated behind the payment integration —
     // suppliers can't run paid placements until billing is live, so
     // we lock the row and show a "Soon" badge instead of opening
@@ -160,20 +164,22 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
         const fetchCounts = async () => {
             try {
                 const [ordersRes, prodsRes] = await Promise.all([
-                    apiFetch('/orders'),
-                    apiFetch('/products/my-products')
+                    apiFetch('/supplier-catalog/overview?from=' + new Date(Date.now() - 86400000).toISOString().slice(0, 10)),
+                    apiFetch('/supplier-catalog/products?limit=5'),
                 ]);
-                
+
                 let oCount = 0;
                 let pCount = 0;
 
+                // Orders badge = orders waiting for this supplier to confirm.
                 if (ordersRes.ok) {
                     const data = await ordersRes.json();
-                    oCount = data.filter((o: any) => o.status === 'PENDING').length;
+                    oCount = Number(data?.awaitingConfirmation) || 0;
                 }
+                // Products badge = listings Atlantis asked to change.
                 if (prodsRes.ok) {
                     const data = await prodsRes.json();
-                    pCount = data.filter((p: any) => p.status === 'PENDING').length;
+                    pCount = Number(data?.summary?.byStatus?.NEEDS_CHANGES) || 0;
                 }
 
                 setPendingCounts({ orders: oCount, products: pCount });
@@ -199,14 +205,14 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
         <div className="flex h-screen bg-[#F8FAFC] font-sans selection:bg-[#0EA5A4]/10">
             {/* Sidebar (Desktop) */}
             <aside className={cn(
-                "hidden md:flex flex-col h-full bg-[#0F172A] transition-all duration-300 ease-in-out shrink-0",
+                "hidden md:flex flex-col h-full bg-[#0F172A] transition-all duration-300 ease-in-out shrink-0 text-start",
                 isOpen ? "w-[260px]" : "w-[80px]"
             )}>
                 {/* Brand Logo */}
-                <div className="h-[72px] flex items-center px-6 border-b border-white/5">
+                <div className="h-16 flex items-center px-6 border-b border-white/5">
                     <Link href="/" className="flex items-center gap-3 overflow-hidden">
                         <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
-                            <img src="/icon.png" alt="A" className="w-6 h-6 object-contain" />
+                            <img src="/brand/atlantis-mark.png" alt="Atlantis" className="w-6 h-6 object-contain" />
                         </div>
                         <AnimatePresence>
                             {isOpen && (
@@ -227,7 +233,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto no-scrollbar">
                     {SUPPLIER_LINKS.map((link) => {
                         const Icon = link.icon;
-                        const isActive = pathname === link.href;
+                        const isActive = link.href === '/supplier' ? pathname === '/supplier' : pathname === link.href || pathname.startsWith(link.href + '/');
                         const badgeCount = link.key ? pendingCounts[link.key] : 0;
 
                         return (
@@ -287,7 +293,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
             {/* Main Wrapper */}
             <div className="flex-1 flex flex-col min-w-0 h-full">
                 {/* Top Header */}
-                <header className="h-[72px] bg-white border-b border-[#E2E8F0] flex items-center justify-between px-8 shrink-0 z-30">
+                <header className="h-16 bg-white border-b border-[#E2E8F0] flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 shrink-0 z-30 text-start">
                     <div className="flex items-center gap-4">
                         {/* Mobile Menu Trigger */}
                         <button 
@@ -296,26 +302,31 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                         >
                             <Menu size={24} />
                         </button>
-                        <h1 className="text-[20px] font-semibold text-[#0F172A] tracking-tight">Business Hub</h1>
+                        <h1 className="text-[17px] sm:text-[20px] font-semibold text-[#0F172A] tracking-tight whitespace-nowrap">Business Hub</h1>
                     </div>
 
-                    <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2 sm:gap-4">
                         {/* Status Badge */}
-                        <div className="hidden lg:flex items-center gap-2 px-3 py-1 bg-[#F1F5F9] border border-[#E2E8F0] rounded-full">
-                            <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
-                            <span className="text-[12px] font-semibold text-[#64748B]">Verified Supplier</span>
-                        </div>
+                        {/* Company verification comes from the KYC review, not from having an account. */}
+                        <Link href="/dashboard/kyc" className={cn('hidden lg:flex items-center gap-2 px-3 py-1 rounded-full ring-1 ring-inset text-[12px] font-semibold',
+                            user?.kycStatus === 'VERIFIED' ? 'bg-emerald-50 text-emerald-700 ring-emerald-200'
+                                : user?.kycStatus === 'PENDING' ? 'bg-amber-50 text-amber-800 ring-amber-200'
+                                    : 'bg-slate-100 text-slate-600 ring-slate-200')}>
+                            <span className={cn('w-1.5 h-1.5 rounded-full', user?.kycStatus === 'VERIFIED' ? 'bg-emerald-500' : user?.kycStatus === 'PENDING' ? 'bg-amber-500' : 'bg-slate-400')} />
+                            {user?.kycStatus === 'VERIFIED' ? 'Verified supplier' : user?.kycStatus === 'PENDING' ? 'Verification in review' : user?.kycStatus === 'REJECTED' ? 'Verification declined' : 'Not verified yet'}
+                        </Link>
 
                         {/* Language picker — supplier can switch to their
                             language directly from the dashboard, matches
                             the same dropdown style used in the public
                             Navbar so it feels like one consistent app. */}
-                        <SupplierLanguagePicker />
+                        <div className="hidden sm:block"><SupplierLanguagePicker /></div>
 
                         {/* Theme Toggle */}
                         <button
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                            className="w-10 h-10 rounded-full hover:bg-slate-50 flex items-center justify-center text-[#64748B] transition-all"
+                            aria-label="Toggle dark mode"
+                            className="hidden sm:flex w-10 h-10 rounded-full hover:bg-slate-50 items-center justify-center text-[#64748B] transition-all"
                         >
                             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
                         </button>
@@ -323,7 +334,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                         {/* Notifications */}
                         <NotificationBell isLight={theme !== 'dark'} />
 
-                        <div className="h-8 w-[1px] bg-[#E2E8F0]" />
+                        <div className="hidden sm:block h-8 w-[1px] bg-[#E2E8F0]" />
 
                         {/* User Profile */}
                         <div className="flex items-center gap-3 ps-2">
@@ -337,9 +348,9 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 </header>
 
                 {/* Main Content (Scrollable) */}
-                <main className="flex-1 overflow-y-auto no-scrollbar scroll-smooth">
-                    <div className="max-w-[1440px] mx-auto w-full py-8 px-8 md:px-10">
-                        {children}
+                <main className="flex-1 overflow-y-auto scroll-smooth text-start">
+                    <div className="max-w-[1320px] mx-auto w-full py-6 px-4 sm:px-6 lg:px-8">
+                        <ConfirmProvider>{children}</ConfirmProvider>
                     </div>
                 </main>
             </div>
@@ -359,9 +370,9 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             initial={{ x: -260 }}
                             animate={{ x: 0 }}
                             exit={{ x: -260 }}
-                            className="absolute top-0 left-0 h-full w-[260px] bg-[#0F172A] flex flex-col shadow-2xl"
+                            className="absolute top-0 left-0 h-full w-[260px] bg-[#0F172A] flex flex-col shadow-2xl text-start"
                         >
-                            <div className="h-[72px] flex items-center justify-between px-6 border-b border-white/5">
+                            <div className="h-16 flex items-center justify-between px-6 border-b border-white/5">
                                 <span className="font-black text-lg text-white uppercase">Atlan<span className="text-[#0EA5A4]">tis.</span></span>
                                 <button onClick={() => setIsMobileOpen(false)} className="text-white/60"><X size={20} /></button>
                             </div>

@@ -9,6 +9,7 @@ import { EscrowService } from '../payments/escrow.service';
 import { AppConfigService } from '../admin/app-config.service';
 import { MixedLoadsService, asHttp } from './mixed-loads.service';
 import { PricingError, normaliseTier, priceLine, priceLoad, round2 } from './pricing';
+import { casesForItem } from '../products/stock-ledger';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
     PENDING: 'Pending',
@@ -18,6 +19,35 @@ const STATUS_LABELS: Record<OrderStatus, string> = {
     DELIVERED: 'Delivered',
     CANCELLED: 'Cancelled',
 };
+
+/**
+ * The order lifecycle. Anything not listed is refused (e.g. DELIVERED →
+ * PROCESSING, or re-saving the same status), so a status can't be applied
+ * twice and stock can't be restored twice.
+ *   PENDING   placed, waiting for the supplier to confirm
+ *   PAID      paid, waiting for the supplier to confirm
+ *   PROCESSING confirmed by the supplier, being prepared
+ *   SHIPPED   dispatched;  DELIVERED / CANCELLED are final.
+ */
+export const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+    PENDING: [OrderStatus.PAID, OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+    PAID: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+    PROCESSING: [OrderStatus.SHIPPED, OrderStatus.CANCELLED],
+    SHIPPED: [OrderStatus.DELIVERED, OrderStatus.CANCELLED],
+    DELIVERED: [],
+    CANCELLED: [],
+};
+/** Cancelling from these returns the cases to stock (goods haven't left). */
+export const RESTOCK_FROM: OrderStatus[] = [OrderStatus.PENDING, OrderStatus.PAID, OrderStatus.PROCESSING];
+/** Statuses where the supplier still has to accept or reject. */
+export const AWAITING_SUPPLIER: OrderStatus[] = [OrderStatus.PENDING, OrderStatus.PAID];
+
+export function assertTransition(from: OrderStatus, to: OrderStatus) {
+    if (from === to) throw new ConflictException({ code: 'INVALID_TRANSITION', message: `This order is already ${STATUS_LABELS[from] || from}.`, status: from });
+    if (!ORDER_TRANSITIONS[from]?.includes(to)) {
+        throw new BadRequestException({ code: 'INVALID_TRANSITION', message: `An order that is ${STATUS_LABELS[from] || from} can't be changed to ${STATUS_LABELS[to] || to}.`, from, to, allowed: ORDER_TRANSITIONS[from] });
+    }
+}
 
 @Injectable()
 export class OrdersService {
@@ -212,11 +242,14 @@ export class OrdersService {
         let order: any;
         try {
             order = await this.prisma.$transaction(async (tx) => {
-                // Stock gate (single-product lines, same unit semantics as before):
-                // conditional decrement so two buyers can't oversell the same stock.
+                // Stock gate: Product.stock is kept in CASES, so a line takes
+                // quantity × cases-in-its-tier (a pallet = casesPerPallet cases).
+                // The conditional decrement means two buyers can't oversell.
                 for (const l of quote.lines) {
                     if (!l.productId || l.mixComposition) continue;
-                    const res = await tx.product.updateMany({ where: { id: l.productId, stock: { gte: l.quantity } }, data: { stock: { decrement: l.quantity } } });
+                    const cases = Number.isInteger(l.casesTotal) && l.casesTotal > 0 ? l.casesTotal : l.quantity;
+                    l.stockCases = cases;
+                    const res = await tx.product.updateMany({ where: { id: l.productId, stock: { gte: cases } }, data: { stock: { decrement: cases } } });
                     if (res.count === 0) throw new BadRequestException({ code: 'INSUFFICIENT_STOCK', message: `Not enough stock for ${l.name}. Reduce the quantity or contact the supplier.`, productId: l.productId });
                 }
                 const created = await tx.order.create({
@@ -233,6 +266,7 @@ export class OrdersService {
                                 productId: l.productId,
                                 quantity: l.quantity,
                                 price: l.price,
+                                stockCases: l.stockCases ?? null,
                                 productNameSnapshot: l.name,
                                 selectedVariants: l.selectedVariants && typeof l.selectedVariants === 'object' ? l.selectedVariants : undefined,
                                 selectedTier: l.tier,
@@ -284,6 +318,10 @@ export class OrdersService {
                 { orderId: order.id },
             ).catch(() => {});
         }
+        // Email each supplier (unless they turned order emails off). Sent once,
+        // after the order exists; a retried submit returns the existing order
+        // above and never reaches this point, so there are no duplicates.
+        this.emailSuppliersNewOrder(order, quote.lines).catch((e) => console.error(`[ORDER_SUPPLIER_EMAIL_FAIL] ${order.id}: ${e?.message}`));
 
         // Notify Admins & Owners
         this.notificationsService.notifyAdmins(
@@ -510,11 +548,15 @@ export class OrdersService {
                 customer: { select: { id: true, name: true, email: true } },
                 items: {
                     where: { product: { supplierId } },
-                    include: { product: { select: { id: true, name: true, images: true, supplierId: true } } },
+                    include: { product: { select: { id: true, name: true, images: true, supplierId: true, ean: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, stock: true } } },
                 },
+                history: { orderBy: { createdAt: 'desc' }, take: 1, select: { reason: true, newStatus: true, createdAt: true } },
             },
             orderBy: { createdAt: 'desc' },
         });
+        // Every line's supplier (not just this supplier's) to know if the order is shared.
+        const allItems = await this.prisma.orderItem.findMany({ where: { orderId: { in: orders.map((o) => o.id) } }, select: { orderId: true, mixedLoadId: true, product: { select: { supplierId: true } } } });
+        for (const o of orders as any[]) o._allItems = allItems.filter((i) => i.orderId === o.id);
 
         return orders.map(order => {
             // Privacy mask: suppliers should NOT see the customer's
@@ -528,10 +570,22 @@ export class OrdersService {
                 raw ? raw.split(' ').map((p) => (p ? p[0] + '***' : '')).join(' ') : 'Customer';
             const maskedEmail = (raw?: string) =>
                 raw ? raw.replace(/^(.{2}).*@/, '$1***@') : '';
+            const allMine = (order as any)._allItems?.every((i: any) => i.product?.supplierId === supplierId && !i.mixedLoadId) ?? false;
+            const subtotal = Math.round(order.items.reduce((s: number, i: any) => s + i.price * i.quantity, 0) * 100) / 100;
+            const lastReason = (order as any).history?.[0]?.reason ?? null;
             return {
             id: order.id,
             status: order.status,
             totalAmount: order.totalAmount,
+            // Value of THIS supplier's lines (buyer prices, EUR) — the order
+            // total also includes other suppliers' goods.
+            supplierSubtotal: subtotal,
+            needsAction: AWAITING_SUPPLIER.includes(order.status as OrderStatus),
+            canDecline: AWAITING_SUPPLIER.includes(order.status as OrderStatus) && allMine,
+            sharedOrder: !allMine,
+            lastStatusNote: lastReason,
+            supplierInvoiceUrl: (order as any).supplierInvoiceUrl ?? null,
+            updatedAt: (order as any).updatedAt,
             shippingCompany: order.shippingCompany,
             createdAt: order.createdAt,
             // The supplier UI reads `buyer` — keep this as the canonical
@@ -553,6 +607,10 @@ export class OrdersService {
                 image: (item as any).product?.images?.[0] ?? null,
                 quantity: item.quantity,
                 price: item.price,
+                ean: (item as any).product?.ean ?? null,
+                unitsPerCase: (item as any).product?.unitsPerCase ?? null,
+                cases: casesForItem(item as any),
+                stockNow: (item as any).product?.stock ?? null,
                 // Forward the Shopify-style tier + variant snapshot so the
                 // supplier order page can render "10 × Pallet" next to qty
                 // (operator-requested) and the chosen variants for buyers
@@ -567,6 +625,57 @@ export class OrdersService {
             })),
             };
         });
+    }
+
+    private async emailSuppliersNewOrder(order: any, lines: any[]) {
+        const ids = [...new Set(lines.map((l) => l.supplierId).filter(Boolean))] as string[];
+        if (!ids.length) return;
+        const suppliers = await this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, email: true, name: true, notificationPrefs: true } });
+        const ref = order.id.slice(-8).toUpperCase();
+        const base = process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com';
+        const esc = (t: string) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string));
+        for (const s of suppliers) {
+            const prefs = (s.notificationPrefs as any) || {};
+            if (prefs.orderUpdates === false || !s.email) continue;
+            const mine = lines.filter((l) => l.supplierId === s.id);
+            const rows = mine.map((l) => `<tr><td style="padding:6px 0;color:#0F172A">${esc(l.name)}</td><td style="padding:6px 0;text-align:right;color:#334155">${l.quantity} × ${l.tier === 'carton' ? 'case' : esc(l.tier)}</td></tr>`).join('');
+            // No buyer identity in the email — the supplier ships via Atlantis.
+            const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:28px;color:#0F172A">
+                <h2 style="margin:0 0 8px">New order #${ref}</h2>
+                <p style="color:#475569;line-height:1.6;margin:0 0 16px">A buyer ordered your products. Please confirm or decline it in your Atlantis supplier workspace.</p>
+                <table style="width:100%;border-collapse:collapse;font-size:14px">${rows}</table>
+                <p style="margin:24px 0"><a href="${base}/supplier/orders?view=action" style="background:#0B1F3A;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none;font-weight:600">Review order</a></p>
+                <p style="color:#94A3B8;font-size:12px">You can turn off order emails in Settings → Notifications.</p></div>`;
+            const r = await this.emailService.sendMailDetailed(s.email, `New order #${ref} — please confirm`, html);
+            if (!r.success) console.error(`[ORDER_SUPPLIER_EMAIL_FAIL] order=${order.id} supplier=${s.id}: ${r.error || 'provider rejected'}`);
+        }
+    }
+
+    /** Supplier confirms an order containing their products: PENDING/PAID → PROCESSING. */
+    async supplierAccept(orderId: string, supplierId: string) {
+        const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { items: { include: { product: { select: { supplierId: true, stock: true, name: true } } } } } });
+        if (!order || !order.items.some((i: any) => i.product?.supplierId === supplierId)) throw new NotFoundException('Order not found');
+        // Stock for these lines was taken when the order was placed, so
+        // confirming never oversells; nothing more is deducted here.
+        return this.internalUpdateStatus(orderId, OrderStatus.PROCESSING, supplierId, 'Confirmed by supplier', AWAITING_SUPPLIER);
+    }
+
+    /**
+     * Supplier declines an order before confirming it. Only possible when every
+     * line on the order is theirs — otherwise other suppliers' goods would be
+     * cancelled too, so Atlantis handles it.
+     */
+    async supplierReject(orderId: string, supplierId: string, reason: string) {
+        const text = String(reason || '').trim();
+        if (text.length < 5) throw new BadRequestException({ code: 'REASON_REQUIRED', message: 'Tell the buyer why you can’t fulfil this order (at least 5 characters).' });
+        const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { items: { include: { product: { select: { supplierId: true } } } } } });
+        if (!order || !order.items.some((i: any) => i.product?.supplierId === supplierId)) throw new NotFoundException('Order not found');
+        const othersOnOrder = order.items.some((i: any) => i.product?.supplierId !== supplierId || i.mixedLoadId);
+        if (othersOnOrder) {
+            this.notificationsService.notifyAdmins('Supplier can’t fulfil part of an order', `Order #${orderId.slice(-8).toUpperCase()}: a supplier asked to decline their lines. Reason: ${text.slice(0, 300)}`, 'WARNING', { orderId, supplierId }).catch(() => {});
+            throw new ConflictException({ code: 'SHARED_ORDER', message: 'This order also contains other suppliers’ products, so it can’t be declined from here. We’ve told the Atlantis team — they will contact you.' });
+        }
+        return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, supplierId, `Declined by supplier: ${text.slice(0, 500)}`, AWAITING_SUPPLIER);
     }
 
     // ─── Admin Stats ─────────────────────────────────────────────────
@@ -621,7 +730,7 @@ export class OrdersService {
         return results;
     }
 
-    private async internalUpdateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string) {
+    private async internalUpdateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string, expectFrom?: OrderStatus[]) {
         const order = await this.prisma.order.findUnique({
             where: { id: orderId },
             include: {
@@ -641,53 +750,31 @@ export class OrdersService {
         if (!order) throw new NotFoundException(`Order ${orderId} not found`);
 
         const previousStatus = order.status;
-
-        // ── Stock restoration on cancel ───────────────────────────
-        // Operator rule: cancelling an order returns the reserved
-        // stock to the supplier. We only fire the increment on the
-        // transition INTO CANCELLED (not on every save while
-        // already cancelled). Refund flow doesn't touch stock here
-        // because the payments / dispute pipeline already handles
-        // it through escrow events — adding a second increment
-        // would double-credit.
-        if (status === 'CANCELLED' && previousStatus !== 'CANCELLED') {
-            await Promise.all(
-                order.items
-                    .filter((it) => it.productId)
-                    .map((it) =>
-                        this.prisma.product
-                            .update({
-                                where: { id: it.productId! },
-                                data: { stock: { increment: it.quantity } },
-                            })
-                            .catch((err) =>
-                                console.error(
-                                    `[STOCK_RESTORE_FAIL] order=${orderId} product=${it.productId}: ${err?.message}`,
-                                ),
-                            ),
-                    ),
-            );
+        if (expectFrom && !expectFrom.includes(previousStatus)) {
+            throw new ConflictException({ code: 'INVALID_TRANSITION', message: `This order is already ${STATUS_LABELS[previousStatus] || previousStatus}.`, status: previousStatus });
         }
+        assertTransition(previousStatus, status);
 
-        // Update order status + create history entry
-        const updated = await this.prisma.order.update({
-            where: { id: orderId },
-            data: {
-                status,
-                history: {
-                    create: {
-                        previousStatus,
-                        newStatus: status,
-                        changedById,
-                        reason: reason || `Status changed to ${STATUS_LABELS[status] || status}`,
-                    },
-                },
-            },
-            include: {
-                items: true,
-                history: true,
-                customer: { select: { email: true, name: true } },
-            },
+        // Status change, history and stock return happen in one transaction,
+        // and only if the order is still in the status we read — a retried or
+        // concurrent request can't apply the same change (or restock) twice.
+        // Stock returns only when cancelled BEFORE dispatch (goods still in the
+        // supplier's warehouse), and only what the order actually took.
+        const restock = status === OrderStatus.CANCELLED && RESTOCK_FROM.includes(previousStatus);
+        const updated = await this.prisma.$transaction(async (tx) => {
+            const moved = await tx.order.updateMany({ where: { id: orderId, status: previousStatus }, data: { status } });
+            if (moved.count === 0) throw new ConflictException({ code: 'ORDER_CHANGED', message: 'This order was updated by someone else just now. Refresh and try again.' });
+            if (restock) {
+                for (const it of order.items as any[]) {
+                    if (!it.productId || it.mixedLoadId || (Array.isArray(it.mixComposition) && it.mixComposition.length)) continue;
+                    const cases = typeof it.stockCases === 'number' ? it.stockCases : it.quantity; // legacy orders took `quantity`
+                    if (cases > 0) await tx.product.update({ where: { id: it.productId }, data: { stock: { increment: cases } } });
+                }
+            }
+            await tx.orderStatusHistory.create({
+                data: { orderId, previousStatus, newStatus: status, changedById, reason: reason || `Status changed to ${STATUS_LABELS[status] || status}` },
+            });
+            return tx.order.findUnique({ where: { id: orderId }, include: { items: true, history: true, customer: { select: { email: true, name: true } } } });
         });
 
         // Fetch shipment info if it exists for tracking
@@ -731,6 +818,18 @@ export class OrdersService {
 
         } catch (e) {
             console.error(`[ORDER_EMAIL_FAIL] ${orderId}:`, e);
+        }
+
+        // Tell the buyer in-app too (the email above may be filtered or fail).
+        if ((order as any).customerId && (order as any).customerId !== changedById) {
+            const label = STATUS_LABELS[status] || status;
+            this.notificationsService.create(
+                (order as any).customerId,
+                `Order #${orderId.slice(-8).toUpperCase()}: ${label}`,
+                status === OrderStatus.CANCELLED && reason ? `Your order was cancelled. ${reason}` : `Your order is now ${label.toLowerCase()}.`,
+                status === OrderStatus.CANCELLED ? 'WARNING' : 'INFO',
+                { orderId, status },
+            ).catch(() => {});
         }
 
         // Notify each supplier involved
@@ -829,8 +928,11 @@ export class OrdersService {
         const productMap: Record<string, { name: string; orders: number; revenue: number; category: string }> = {};
         const categoryMap: Record<string, number> = {};
 
+        // Same revenue definition as the Business Overview: only confirmed
+        // orders (paid, preparing, shipped, delivered) count as sales.
+        const CONFIRMED_FOR_REVENUE = ['PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED'];
         for (const order of orders) {
-            if (order.status === 'CANCELLED') continue;
+            if (!CONFIRMED_FOR_REVENUE.includes(order.status)) continue;
             for (const item of order.items) {
                 const lineTotal = item.price * item.quantity;
                 totalRevenue += lineTotal;
@@ -848,7 +950,7 @@ export class OrdersService {
         // Monthly revenue buckets (last 7 months)
         const monthlyMap: Record<string, { revenue: number; orders: number }> = {};
         for (const order of orders) {
-            if (order.status === 'CANCELLED') continue;
+            if (!CONFIRMED_FOR_REVENUE.includes(order.status)) continue;
             const key = new Date(order.createdAt).toLocaleString('en-US', { month: 'short', year: '2-digit' });
             if (!monthlyMap[key]) monthlyMap[key] = { revenue: 0, orders: 0 };
             monthlyMap[key].orders += 1;

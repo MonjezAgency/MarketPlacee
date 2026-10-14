@@ -1,353 +1,205 @@
 'use client';
-import { apiFetch } from '@/lib/api';
-import { toast } from 'react-hot-toast';
-
 
 import * as React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { BarChart3, Package, ShoppingCart, Eye, TrendingUp, ArrowUpRight, Plus, Loader2, Clock, Lock } from 'lucide-react';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid } from 'recharts';
-import { useAuth } from '@/lib/auth';
-import { formatPrice } from '@/lib/currency';
-import { useLanguage } from '@/contexts/LanguageContext';
 import Link from 'next/link';
+import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Euro, Package, ShoppingCart, Boxes, Plus, Upload, ArrowRight, CheckCircle2, ChevronRight, Info } from 'lucide-react';
+import { useAuth } from '@/lib/auth';
+import { supplierApi, isoDay } from '@/lib/supplier-api';
+import { Badge, Button, Card, EmptyState, ErrorState, PageHeader, Skeleton, Stat, TONE, Thumb, eur, int, inputCls, type Tone } from '@/components/supplier/ui';
+import { cn } from '@/lib/utils';
 
-const REVENUE_SPARKLINE: any[] = [];
-const ORDERS_SPARKLINE: any[] = [];
+const DAY = 86_400_000;
+const RANGES = [
+    { id: '7d', label: '7 days', days: 7 },
+    { id: '30d', label: '30 days', days: 30 },
+    { id: '12m', label: '12 months', days: 365 },
+    { id: 'custom', label: 'Custom', days: 0 },
+] as const;
 
+function pctDelta(cur: number, prev: number) {
+    if (!prev && !cur) return null;
+    if (!prev) return <Badge tone="success">New</Badge>;
+    const p = ((cur - prev) / prev) * 100;
+    const tone: Tone = p > 0.5 ? 'success' : p < -0.5 ? 'danger' : 'neutral';
+    return <span className={cn('font-medium', TONE[tone].text)}>{p > 0 ? '+' : ''}{p.toFixed(0)}%</span>;
+}
+
+const fmtBucket = (k: string, monthly: boolean) =>
+    monthly ? new Date(k + '-01T00:00:00Z').toLocaleDateString('en-GB', { month: 'short', year: '2-digit', timeZone: 'UTC' })
+        : new Date(k + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+
+/** Business Overview — every number comes from the supplier's real order lines. */
 export default function SupplierOverviewPage() {
-    const { t } = useLanguage();
     const { user } = useAuth();
-    const [dashboardStats, setDashboardStats] = React.useState<any>(null);
-    const [dateRange, setDateRange] = React.useState('7d');
-    const [isDateOpen, setIsDateOpen] = React.useState(false);
+    const [range, setRange] = React.useState<(typeof RANGES)[number]['id']>('30d');
+    const today = isoDay(new Date());
+    const [custom, setCustom] = React.useState({ from: isoDay(new Date(Date.now() - 29 * DAY)), to: today });
+    const [data, setData] = React.useState<any | null>(null);
+    const [error, setError] = React.useState<string | null>(null);
+    const [loading, setLoading] = React.useState(true);
 
-    // MOCK: In a real app, user.createdAt comes from the DB
-    // We'll use a fallback or mock it for the demo logic
-    const joinedAt = user?.createdAt ? new Date(user.createdAt) : new Date('2025-05-20'); 
-    
-    const RANGES = [
-        { id: 'today', label: 'Today', days: 0 },
-        { id: '7d', label: 'Last 7 Days', days: 7 },
-        { id: '30d', label: 'Last 30 Days', days: 30 },
-        { id: '90d', label: 'Last 90 Days', days: 90 },
-        { id: 'all', label: 'All Time', days: Infinity },
-    ];
+    const { from, to } = React.useMemo(() => {
+        if (range === 'custom') return custom;
+        const r = RANGES.find((x) => x.id === range)!;
+        return { from: isoDay(new Date(Date.now() - (r.days - 1) * DAY)), to: today };
+    }, [range, custom, today]);
 
-    const filteredRanges = RANGES.filter(range => {
-        const now = new Date();
-        const diffDays = Math.ceil((now.getTime() - joinedAt.getTime()) / (1000 * 60 * 60 * 24));
-        if (range.id === 'all' || range.id === 'today') return true;
-        return diffDays >= range.days;
-    });
+    const load = React.useCallback(() => {
+        if (from > to) { setError('The start date must be on or before the end date.'); return; }
+        setLoading(true); setError(null);
+        supplierApi.overview(from, to).then(setData).catch((e) => setError(e.message)).finally(() => setLoading(false));
+    }, [from, to]);
+    React.useEffect(() => { load(); }, [load]);
 
-    const getRangeLabel = () => {
-        return RANGES.find(r => r.id === dateRange)?.label || 'Last 7 Days';
-    };
-
-    const getDateString = () => {
-        const now = new Date();
-        const start = new Date();
-        const range = RANGES.find(r => r.id === dateRange);
-        
-        if (range?.id === 'all') return `Since ${joinedAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-        if (range?.id === 'today') return start.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        
-        start.setDate(now.getDate() - (range?.days || 7));
-        return `${start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    };
-
-    React.useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await apiFetch(`/dashboard/supplier?range=${dateRange}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    setDashboardStats(data);
-                }
-            } catch (err) {
-                console.error('Failed to fetch dashboard stats:', err);
-            }
-        };
-        fetchStats();
-    }, [dateRange]);
-
-    const KPI_DATA = [
-        { label: 'Revenue (MTD)', value: dashboardStats?.totalRevenue ? formatPrice(dashboardStats.totalRevenue) : '€0.00', trend: '+0.0%', icon: BarChart3, color: 'text-[#10B981]' },
-        { label: 'Active Products', value: dashboardStats?.activeProductsCount?.toString() || '0', trend: 'Stable', icon: Package, color: 'text-[#0EA5A4]' },
-        { label: 'Total Orders', value: dashboardStats?.totalOrders?.toString() || '0', trend: '+0.0%', icon: ShoppingCart, color: 'text-blue-500' },
-        { label: 'Digital Impressions', value: dashboardStats?.impressions?.toString() || '0', trend: '+0.0%', icon: Eye, color: 'text-teal' },
-    ];
+    const t = data?.totals, p = data?.previous;
+    const monthly = data?.range?.granularity === 'month';
+    const chart = (data?.series ?? []).map((s: any) => ({ ...s, label: fmtBucket(s.date, monthly) }));
+    const hasSales = chart.some((s: any) => s.sales > 0);
+    const periodLabel = `${new Date(from + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })} – ${new Date(to + 'T00:00:00Z').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })}`;
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            {/* Welcome & Action Row */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                <div>
-                    <h2 className="text-[28px] font-black text-[#0F172A] tracking-tight">
-                        Welcome back, {user?.name?.split(' ')[0] || 'Monjez'}! 👋
-                    </h2>
-                    <p className="text-[#64748B] text-sm font-medium mt-1">
-                        Here's what's happening with your business {dateRange === 'today' ? 'today' : 'over this period'}.
-                    </p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <button 
-                            onClick={() => setIsDateOpen(!isDateOpen)}
-                            className="flex items-center gap-3 px-5 py-3 bg-white border border-[#E2E8F0] rounded-xl text-sm font-bold text-[#64748B] hover:border-[#0EA5A4] transition-all shadow-sm group"
-                        >
-                            <Clock size={18} className="text-[#0EA5A4]" />
-                            <div className="flex flex-col items-start leading-none">
-                                <span className="text-[10px] text-[#94A3B8] uppercase tracking-wider mb-1">{getRangeLabel()}</span>
-                                <span className="text-[#0F172A]">{getDateString()}</span>
-                            </div>
+        <div>
+            <PageHeader
+                eyebrow={user?.companyName || user?.name}
+                title="Business overview"
+                description="Sales, orders and catalog health for your products."
+                actions={<>
+                    <Link href="/supplier/products?import=1"><Button icon={<Upload size={15} />}>Bulk upload</Button></Link>
+                    <Link href="/supplier/products/new"><Button variant="primary" icon={<Plus size={15} />}>Add product</Button></Link>
+                </>}
+            />
+
+            {/* Date range */}
+            <div className="flex flex-wrap items-center gap-2 mb-4">
+                <div role="radiogroup" aria-label="Date range" className="inline-flex rounded-lg bg-surface ring-1 ring-line p-0.5">
+                    {RANGES.map((r) => (
+                        <button key={r.id} role="radio" aria-checked={range === r.id} onClick={() => setRange(r.id)}
+                            className={cn('h-8 px-3 rounded-md text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal',
+                                range === r.id ? 'bg-heading text-white' : 'text-ink-2 hover:bg-surface-2')}>
+                            {r.label}
                         </button>
-
-                        <AnimatePresence>
-                            {isDateOpen && (
-                                <>
-                                    <div className="fixed inset-0 z-20" onClick={() => setIsDateOpen(false)} />
-                                    <motion.div 
-                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        className="absolute right-0 mt-2 w-[220px] bg-white border border-[#E2E8F0] rounded-2xl shadow-2xl z-30 overflow-hidden"
-                                    >
-                                        <div className="p-2">
-                                            {filteredRanges.map((range) => (
-                                                <button
-                                                    key={range.id}
-                                                    onClick={() => {
-                                                        setDateRange(range.id);
-                                                        setIsDateOpen(false);
-                                                    }}
-                                                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${
-                                                        dateRange === range.id 
-                                                            ? 'bg-[#0EA5A4]/10 text-[#0EA5A4]' 
-                                                            : 'text-[#64748B] hover:bg-slate-50'
-                                                    }`}
-                                                >
-                                                    {range.label}
-                                                    {dateRange === range.id && <div className="w-1.5 h-1.5 rounded-full bg-[#0EA5A4]" />}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </motion.div>
-                                </>
-                            )}
-                        </AnimatePresence>
-                    </div>
-                    
-                    <button 
-                        onClick={async () => {
-                            const tid = toast.loading('Generating business report...');
-                            try {
-                                const data = [
-                                    [`BUSINESS PERFORMANCE REPORT - ${user?.companyName || user?.name}`],
-                                    [`Generated on: ${new Date().toLocaleDateString()}`],
-                                    [`Period: ${getRangeLabel()}`],
-                                    [''],
-                                    ['--- SECTION 1: BUSINESS SUMMARY ---'],
-                                    ['Metric', 'Value'],
-                                    ['Total Revenue', formatPrice(dashboardStats?.totalRevenue || 0)],
-                                    ['Total Orders', dashboardStats?.totalOrders?.toString() || '0'],
-                                    ['Active Products', dashboardStats?.activeProductsCount?.toString() || '0'],
-                                    ['Digital Impressions', dashboardStats?.impressions?.toString() || '0'],
-                                    [''],
-                                    ['--- SECTION 2: TOP PRODUCT PERFORMANCE ---'],
-                                    ['Product Name', 'Price', 'Units Sold', 'Revenue'],
-                                    ...(dashboardStats?.topProducts || []).map((p: any) => [
-                                        p.name, 
-                                        `€${p.price || 0}`, 
-                                        p.totalQuantitySold, 
-                                        formatPrice(p.totalRevenue)
-                                    ]),
-                                ];
-
-                                const csvContent = data.map((row: any) => row.map((cell: any) => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
-                                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                                const link = document.createElement('a');
-                                const url = URL.createObjectURL(blob);
-                                link.setAttribute('href', url);
-                                link.setAttribute('download', `business-report-${new Date().toISOString().split('T')[0]}.csv`);
-                                link.click();
-                                toast.success('Report exported successfully', { id: tid });
-                            } catch (err) {
-                                toast.error('Failed to export report', { id: tid });
-                            }
-                        }}
-                        className="flex items-center gap-2 px-6 py-3 bg-white border border-[#E2E8F0] text-[#64748B] font-bold text-sm rounded-xl hover:bg-slate-50 transition-all"
-                    >
-                        <TrendingUp size={18} /> Export
-                    </button>
-                    <Link href="/supplier/products" className="flex items-center gap-2 px-6 py-3 bg-[#0EA5A4] text-white font-bold text-sm rounded-xl hover:shadow-lg hover:shadow-[#0EA5A4]/20 transition-all active:scale-95">
-                        <Plus size={18} strokeWidth={3} /> Add New Product
-                    </Link>
+                    ))}
                 </div>
+                {range === 'custom' && (
+                    <div className="flex items-center gap-2">
+                        <label className="sr-only" htmlFor="ov-from">From</label>
+                        <input id="ov-from" type="date" max={custom.to} value={custom.from} onChange={(e) => setCustom((c) => ({ ...c, from: e.target.value }))} className={cn(inputCls, 'h-9 w-[150px]')} />
+                        <span className="text-ink-3 text-[13px]">to</span>
+                        <label className="sr-only" htmlFor="ov-to">To</label>
+                        <input id="ov-to" type="date" min={custom.from} max={today} value={custom.to} onChange={(e) => setCustom((c) => ({ ...c, to: e.target.value }))} className={cn(inputCls, 'h-9 w-[150px]')} />
+                    </div>
+                )}
+                <span className="text-[12.5px] text-ink-3">{periodLabel} · UTC · compared with the previous {range === '12m' ? '12 months' : 'period of the same length'}</span>
             </div>
 
-            {/* KPI Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {KPI_DATA.map((kpi, i) => (
-                    <motion.div
-                        key={kpi.label}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: i * 0.1 }}
-                        className="bg-white p-5 rounded-[16px] border border-[#E2E8F0] h-[140px] flex flex-col justify-between group hover:border-[#0EA5A4]/30 transition-colors"
-                    >
-                        <div className="flex items-center justify-between">
-                            <div className="w-10 h-10 rounded-xl bg-[#F1F5F9] flex items-center justify-center text-[#64748B] group-hover:bg-[#0EA5A4]/10 group-hover:text-[#0EA5A4] transition-colors">
-                                <kpi.icon size={20} />
-                            </div>
-                            <div className="text-[12px] font-bold text-[#10B981] bg-[#10B981]/5 px-2 py-0.5 rounded-full flex items-center gap-1">
-                                {kpi.trend} <ArrowUpRight size={12} />
-                            </div>
-                        </div>
-                        <div className="flex items-end justify-between">
-                            <div className="space-y-0.5">
-                                <p className="text-[13px] font-medium text-[#64748B]">{kpi.label}</p>
-                                <p className="text-2xl font-bold text-[#0F172A] tracking-tight">{kpi.value}</p>
-                            </div>
-                            <div className="w-20 h-10">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <AreaChart data={[{v:10}, {v:15}, {v:12}, {v:18}, {v:20}]}>
-                                        <Area type="monotone" dataKey="v" stroke={i === 0 ? '#10B981' : '#0EA5A4'} strokeWidth={2} fillOpacity={0.1} fill={i === 0 ? '#10B981' : '#0EA5A4'} />
-                                    </AreaChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    </motion.div>
-                ))}
+            {error && <div className="mb-4"><ErrorState message={error} onRetry={load} /></div>}
+
+            {/* KPIs */}
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+                <Stat label="Sales (confirmed orders)" icon={<Euro size={17} />} tone="brand" loading={loading && !data}
+                    value={eur(t?.sales)} delta={t && p ? pctDelta(t.sales, p.sales) : null} hint={t ? 'vs previous period' : undefined} />
+                <Stat label="Orders received" icon={<ShoppingCart size={17} />} tone="neutral" loading={loading && !data}
+                    value={int(t?.orders)} delta={t && p ? pctDelta(t.orders, p.orders) : null} hint={data ? `${data.awaitingConfirmation} awaiting your confirmation` : undefined} href="/supplier/orders" />
+                <Stat label="Cases sold" icon={<Boxes size={17} />} tone="neutral" loading={loading && !data}
+                    value={int(t?.cases)} delta={t && p ? pctDelta(t.cases, p.cases) : null} hint={t ? 'on confirmed orders' : undefined} />
+                <Stat label="Live products" icon={<Package size={17} />} tone="success" loading={loading && !data}
+                    value={int(data?.products?.active)} hint={data ? `${data.products.pending} in review · ${data.products.drafts} drafts` : undefined} href="/supplier/products" />
             </div>
 
-            {/* Analytics & Payments Row */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Revenue Analytics */}
-                <div className="lg:col-span-2 bg-white p-6 rounded-[16px] border border-[#E2E8F0] h-[320px] flex flex-col">
-                    <div className="flex items-center justify-between mb-6">
-                        <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-lg bg-[#0EA5A4]/10 flex items-center justify-center text-[#0EA5A4]">
-                                <TrendingUp size={18} />
-                            </div>
-                            <h3 className="text-base font-bold text-[#0F172A]">Monthly Revenue</h3>
-                        </div>
-                        <select className="text-xs font-bold text-[#64748B] bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-2 py-1 outline-none">
-                            <option>Last 7 Days</option>
-                            <option>Last 30 Days</option>
-                        </select>
-                    </div>
-                    <div className="flex-1 min-h-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <AreaChart data={REVENUE_SPARKLINE.length > 0 ? REVENUE_SPARKLINE : [{month:'Mon', value:0}, {month:'Tue', value:0}, {month:'Wed', value:0}, {month:'Thu', value:0}, {month:'Fri', value:0}]}>
-                                <defs>
-                                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#0EA5A4" stopOpacity={0.1}/>
-                                        <stop offset="95%" stopColor="#0EA5A4" stopOpacity={0}/>
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
-                                <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8'}} />
-                                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11, fill: '#94A3B8'}} />
-                                <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }} />
-                                <Area type="monotone" dataKey="value" stroke="#0EA5A4" strokeWidth={3} fillOpacity={1} fill="url(#colorRev)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-
-                {/* CRITICAL: LOCKED PAYMENT MODULE */}
-                <div className="relative group overflow-hidden">
-                    <div className="bg-white p-6 rounded-[16px] border border-[#E2E8F0] h-full min-h-[320px]">
-                        <div className="space-y-6">
-                            <h3 className="text-base font-bold text-[#0F172A]">Payment Methods</h3>
-                            <div className="space-y-4 opacity-20 grayscale">
-                                <div className="h-14 bg-slate-50 rounded-xl border border-dashed border-slate-200" />
-                                <div className="h-14 bg-slate-50 rounded-xl border border-dashed border-slate-200" />
-                                <div className="h-14 bg-slate-50 rounded-xl border border-dashed border-slate-200" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* LOCKED OVERLAY SYSTEM */}
-                    <div className="absolute inset-0 z-10 bg-[#0F172A]/55 backdrop-blur-[4px] flex flex-col items-center justify-center text-center p-8 rounded-[16px]">
-                        <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md flex items-center justify-center mb-6 border border-white/20">
-                            <Lock size={32} className="text-white" />
-                        </div>
-                        <h4 className="text-[18px] font-bold text-white mb-2">Payments Coming Soon</h4>
-                        <p className="text-[13px] text-[#E2E8F0] mb-8 leading-relaxed max-w-[200px]">
-                            This feature will be enabled once payment systems are activated.
-                        </p>
-                        <button className="px-8 py-3 bg-[#1E293B] text-[#94A3B8] font-bold text-[13px] rounded-xl cursor-not-allowed border border-white/5 shadow-2xl">
-                            Enable Payments
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* Top Selling Products Table */}
-            <div className="bg-white rounded-[16px] border border-[#E2E8F0] overflow-hidden">
-                <div className="px-8 py-6 border-b border-[#E2E8F0] flex items-center justify-between">
-                    <h3 className="text-base font-bold text-[#0F172A]">Top 5 Selling Products</h3>
-                    <Link href="/supplier/analytics" className="text-[12px] font-bold text-[#0EA5A4] hover:underline">View Sales Report →</Link>
-                </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full">
-                        <thead>
-                            <tr className="bg-[#F8FAFC] border-b border-[#E2E8F0]">
-                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">#</th>
-                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Product</th>
-                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Price</th>
-                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Sales (Units)</th>
-                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Revenue</th>
-                                <th className="px-8 py-4 text-left text-[11px] font-bold text-[#64748B] uppercase tracking-wider">Trend</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-[#E2E8F0]">
-                            {dashboardStats?.topProducts?.length > 0 ? dashboardStats.topProducts.map((product: any, idx: number) => (
-                                <tr key={product.productId} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-8 py-4 text-sm font-medium text-[#64748B]">{idx + 1}</td>
-                                    <td className="px-8 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-lg bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200">
-                                                {product.image ? <img src={product.image} className="w-full h-full object-cover" /> : <Package className="w-full h-full p-2 text-slate-400" />}
+            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px] items-start">
+                {/* Revenue trend */}
+                <Card title="Sales over time" description={`Confirmed order value per ${monthly ? 'month' : 'day'}, EUR. Pending and cancelled orders aren’t counted.`}>
+                    {loading && !data ? <Skeleton className="h-[260px] w-full" /> : !hasSales ? (
+                        <EmptyState icon={<Euro size={20} />} title="No confirmed sales in this period">
+                            Sales appear here once you confirm an order. Try a longer range to see earlier sales.
+                        </EmptyState>
+                    ) : (
+                        <div className="h-[260px] -ms-2" role="img" aria-label={`Sales per ${monthly ? 'month' : 'day'}, ${periodLabel}`}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={chart} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                                    <CartesianGrid vertical={false} stroke="rgb(230 232 236)" />
+                                    <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#64748B' }} interval="preserveStartEnd" minTickGap={16} />
+                                    <YAxis tickLine={false} axisLine={false} width={56} tick={{ fontSize: 11, fill: '#64748B' }} tickFormatter={(v) => (v >= 1000 ? `€${(v / 1000).toFixed(v >= 10000 ? 0 : 1)}k` : `€${v}`)} />
+                                    <Tooltip cursor={{ fill: 'rgba(14,124,116,0.06)' }}
+                                        content={({ active, payload }) => active && payload?.length ? (
+                                            <div className="rounded-lg bg-white ring-1 ring-line shadow-lg px-3 py-2 text-[12.5px]">
+                                                <p className="font-semibold text-heading">{(payload[0].payload as any).label}</p>
+                                                <p className="text-ink-2">{eur((payload[0].payload as any).sales)} · {(payload[0].payload as any).orders} order{(payload[0].payload as any).orders === 1 ? '' : 's'}</p>
                                             </div>
-                                            <span className="text-sm font-bold text-[#0F172A]">{product.name}</span>
-                                        </div>
-                                    </td>
-                                    <td className="px-8 py-4 text-sm font-semibold text-[#0F172A]">€{product.price || '0.00'}</td>
-                                    <td className="px-8 py-4 text-sm font-bold text-[#0F172A]">{product.totalQuantitySold} pcs</td>
-                                    <td className="px-8 py-4 text-sm font-bold text-[#10B981]">{formatPrice(product.totalRevenue)}</td>
-                                    <td className="px-8 py-4">
-                                        <div className="w-16 h-6">
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <AreaChart data={[{v:10}, {v:12}, {v:15}]}>
-                                                    <Area type="monotone" dataKey="v" stroke="#10B981" fillOpacity={0.1} fill="#10B981" />
-                                                </AreaChart>
-                                            </ResponsiveContainer>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )) : (
-                                <tr>
-                                    <td colSpan={6} className="px-8 py-16 text-center">
-                                        <div className="flex flex-col items-center gap-4">
-                                            <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center">
-                                                <Package size={32} className="text-slate-300" />
-                                            </div>
-                                            <div>
-                                                <p className="text-base font-bold text-[#0F172A]">No sales yet</p>
-                                                <p className="text-sm text-[#64748B]">Start adding products to see your top selling items here.</p>
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                                        ) : null} />
+                                    <Bar dataKey="sales" fill="#0E7C74" radius={[3, 3, 0, 0]} maxBarSize={28} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+                </Card>
+
+                {/* Needs attention */}
+                <Card title="Needs attention" description="Only shown when something is actually waiting.">
+                    {loading && !data ? <div className="space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+                        : data && data.attention.length === 0 ? (
+                            <p className="flex items-center gap-2 text-[13.5px] text-ink-2"><CheckCircle2 size={16} className="text-emerald-600" /> All clear — nothing needs you right now.</p>
+                        ) : (
+                            <ul className="-mx-2 space-y-0.5">
+                                {(data?.attention ?? []).map((a: any) => (
+                                    <li key={a.id}>
+                                        <Link href={a.href} className="flex items-center gap-2.5 rounded-lg px-2 py-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal">
+                                            <span className={cn('w-2 h-2 rounded-full shrink-0', TONE[a.tone as Tone]?.dot || 'bg-slate-400')} />
+                                            <span className="flex-1 text-[13.5px] text-ink">{a.label}</span>
+                                            <ChevronRight size={15} className="text-ink-4" />
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                </Card>
             </div>
+
+            {/* Top products */}
+            <Card className="mt-4" title="Top 5 products" description="Ranked by cases sold on confirmed orders in this period; ties by sales value."
+                actions={<Link href="/supplier/orders" className="text-[13px] font-semibold text-teal hover:underline inline-flex items-center gap-1">All orders <ArrowRight size={14} /></Link>}
+                bodyClassName="px-0 sm:px-0 py-0">
+                {loading && !data ? <div className="p-5 space-y-3">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
+                    : !data?.top?.length ? (
+                        <EmptyState icon={<Boxes size={20} />} title="No product sales yet in this period">Once buyers’ orders are confirmed, your best sellers show up here.</EmptyState>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-[13.5px]">
+                                <thead>
+                                    <tr className="text-start text-[12px] font-medium text-ink-3 border-y border-line bg-surface-2/60">
+                                        <th className="text-start font-medium px-5 py-2 w-8">#</th>
+                                        <th className="text-start font-medium px-2 py-2">Product</th>
+                                        <th className="text-end font-medium px-2 py-2">Cases sold</th>
+                                        <th className="text-end font-medium px-2 py-2 hidden sm:table-cell">Orders</th>
+                                        <th className="text-end font-medium px-5 py-2">Sales</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {data.top.map((r: any, i: number) => (
+                                        <tr key={r.productId} className="border-b border-line last:border-0">
+                                            <td className="px-5 py-2.5 text-ink-3 tabular-nums">{i + 1}</td>
+                                            <td className="px-2 py-2.5">
+                                                <Link href={`/supplier/products/${r.productId}/edit`} className="flex items-center gap-3 min-w-0 hover:underline">
+                                                    <Thumb src={r.image} size={36} />
+                                                    <span className="truncate font-medium text-ink max-w-[42ch]">{r.name}</span>
+                                                </Link>
+                                            </td>
+                                            <td className="px-2 py-2.5 text-end tabular-nums font-medium">{int(r.cases)}</td>
+                                            <td className="px-2 py-2.5 text-end tabular-nums hidden sm:table-cell">{int(r.orders)}</td>
+                                            <td className="px-5 py-2.5 text-end tabular-nums">{eur(r.sales)}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+            </Card>
+
+            <p className="mt-4 flex items-start gap-2 text-[12.5px] text-ink-3 max-w-[90ch]">
+                <Info size={14} className="mt-0.5 shrink-0" />
+                Sales = value of your lines on orders that are paid, confirmed, shipped or delivered, at the price the buyer paid (EUR). Orders received = distinct orders with your products, excluding cancelled. Mixed pallets combining several products aren’t attributed per product.
+            </p>
         </div>
     );
 }

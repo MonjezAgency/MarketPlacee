@@ -12,6 +12,7 @@ import { SettingsCard, CompanyDetailsCard, BrandPreferencesCard, VerificationCar
 import { ChangeEmailCard } from '@/components/account/ChangeEmailCard';
 import { SessionsCard } from '@/components/account/SessionsCard';
 import { TwoStepCard } from '@/components/account/TwoStepCard';
+import { ReputationCard } from '@/components/supplier/ReputationCard';
 
 type Prefs = { orderUpdates: boolean; productComments: boolean; lowStockAlerts: boolean; inboundOffers: boolean; marketingEmails: boolean; muteToasts: boolean };
 const PREF_ROWS: { key: keyof Prefs; label: string; desc: string }[] = [
@@ -115,6 +116,7 @@ export default function SupplierSettingsPage() {
                 </div>
                 <div className="space-y-5 min-w-0">
                     <VerificationCard />
+                    <ReputationCard />
                     <ChangeEmailCard currentEmail={user?.email || ''} pendingEmail={user?.pendingEmail} onChanged={() => refreshUser()} />
                     <SettingsCard icon={<KeyRound size={17} />} title="Password & security">
                         <p className="text-[13.5px] text-ink-2">Change your password or set up two-step verification.</p>

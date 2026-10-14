@@ -72,11 +72,14 @@ const err = async (p: Promise<unknown>) => { try { await p; } catch (e: any) { r
 describe('OrdersService.create — server-side pricing', () => {
     it('ignores client prices and stores server prices', async () => {
         const db = makeDb(), svc = makeService(db);
+        db.state.products.get('prime').stock = 500;
         const order: any = await svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 2, price: 0.01 }]);
         // 132 cases × €14.50 = €1,914.00 per pallet
         expect(order.items[0].price).toBe(1914);
         expect(order.totalAmount).toBe(3828);
-        expect(db.state.products.get('prime').stock).toBe(48);
+        // Stock is kept in cases: 2 pallets × 132 cases come off stock and are recorded on the line.
+        expect(db.state.products.get('prime').stock).toBe(500 - 264);
+        expect(order.items[0].stockCases).toBe(264);
     });
     it('refuses when the client total disagrees with the server (PRICE_CHANGED)', async () => {
         const db = makeDb(), svc = makeService(db);
@@ -85,6 +88,7 @@ describe('OrdersService.create — server-side pricing', () => {
     });
     it('applies a valid coupon server-side and rejects an invalid one', async () => {
         const db = makeDb(), svc = makeService(db);
+        db.state.products.get('prime').stock = 500;
         const o: any = await svc.create('buyer', 3445.2, [{ productId: 'prime', tier: 'pallet', quantity: 2 }], undefined, undefined, { couponCode: 'SAVE10' });
         expect(o.totalAmount).toBe(3445.2);
         expect(await err(svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }], undefined, undefined, { couponCode: 'NOPE' }))).toBe('INVALID_COUPON');
@@ -96,6 +100,11 @@ describe('OrdersService.create — server-side pricing', () => {
         const svc = makeService(db);
         expect(await err(svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'truck', quantity: 1 }]))).toBe('TIER_UNAVAILABLE');
         expect(await err(svc.create('buyer', undefined as any, [{ productId: 'zero', tier: 'carton', quantity: 10 }]))).toBe('BELOW_MOQ');
+    });
+    it('refuses a pallet when stock holds fewer cases than a pallet (no overselling by tier)', async () => {
+        const db = makeDb(), svc = makeService(db); // prime: 50 cases, a pallet is 132
+        expect(await err(svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }]))).toBe('INSUFFICIENT_STOCK');
+        expect(db.state.products.get('prime').stock).toBe(50);
     });
     it('rolls back everything when stock is short on any line', async () => {
         const db = makeDb(), svc = makeService(db);

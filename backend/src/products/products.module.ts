@@ -11,6 +11,10 @@ import { EanValidatorService } from './ean-validator.service';
 import { ExcelService } from '../admin/excel.service';
 import { ReviewsService } from './reviews.service';
 import { ReviewsController, AdminReviewsController } from './reviews.controller';
+import { SupplierCatalogController } from './supplier-catalog.controller';
+import { SupplierImportService } from './supplier-import.service';
+import { ImageLookupService } from './image-lookup.service';
+import { SupplierOverviewService } from './supplier-overview.service';
 
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -18,8 +22,8 @@ import { EmailModule } from '../email/email.module';
 
 @Module({
     imports: [PricingModule, AiAgentModule, StorageModule, NotificationsModule, EmailModule],
-    providers: [ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService],
-    controllers: [ProductsController, PlacementController, ReviewsController, AdminReviewsController],
+    providers: [ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService, SupplierImportService, ImageLookupService, SupplierOverviewService],
+    controllers: [SupplierCatalogController, ProductsController, PlacementController, ReviewsController, AdminReviewsController],
     exports: [ProductsService, PlacementService],
 })
 export class ProductsModule { }
