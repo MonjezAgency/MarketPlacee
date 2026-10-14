@@ -1,3 +1,4 @@
+import { StepUpService, stepUpCodesFrom } from '../auth/step-up.service';
 import {
     Controller,
     Get,
@@ -40,6 +41,7 @@ export class OrdersController {
         private readonly excelService: ExcelService,
         private readonly storageService: SupabaseStorageService,
         private readonly prisma: PrismaService,
+        private readonly stepUp: StepUpService,
     ) { }
 
     /**
@@ -99,6 +101,8 @@ export class OrdersController {
     @Roles(Role.CUSTOMER, Role.ADMIN, Role.OWNER, Role.SUPPLIER)
     async create(@Body() data: any, @Request() req) {
         await this.ordersService.assertProfileComplete(req.user.sub);
+        // Money action: accounts with 2FA confirm with authenticator + email code.
+        await this.stepUp.require(req.user.sub, stepUpCodesFrom(req), { email: true, action: 'this order' });
         const order = await this.ordersService.create(
             req.user.sub,
             data.totalAmount,

@@ -77,6 +77,8 @@ async function handler(
   }
 
   // Forward Content-Type if present (needed for JSON/FormData bodies)
+  // Step-up codes for sensitive actions (2FA accounts).
+  for (const h of ['x-2fa-code', 'x-email-code']) { const v = req.headers.get(h); if (v) forwardHeaders[h] = v.slice(0, 32); }
   const contentType = req.headers.get('content-type');
   if (contentType) {
     forwardHeaders['Content-Type'] = contentType;

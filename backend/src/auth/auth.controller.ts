@@ -1,12 +1,13 @@
 import { Controller, Post, Body, Req, Res, UseGuards, Get, UnauthorizedException, ForbiddenException, Request, Delete, Param, BadRequestException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { TwoFaService } from './twofa.service';
+import { StepUpService, stepUpCodesFrom } from './step-up.service';
 import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from './jwt-auth.guard';
 
 @Controller('auth')
 export class AuthController {
-    constructor(private authService: AuthService, private twoFaService: TwoFaService) { }
+    constructor(private authService: AuthService, private twoFaService: TwoFaService, private stepUp: StepUpService) { }
 
     private getCookieOptions(maxAgeMs: number) {
         return {
@@ -91,6 +92,7 @@ export class AuthController {
     @Post('change-email')
     @Throttle({ default: { limit: 5, ttl: 60_000 } })
     async requestEmailChange(@Request() req: any, @Body() body: { newEmail: string; currentPassword: string }) {
+        await this.stepUp.require(req.user.sub, stepUpCodesFrom(req), { action: 'this email change' });
         return this.authService.requestEmailChange(req.user.sub, body?.newEmail, body?.currentPassword);
     }
 
@@ -146,6 +148,7 @@ export class AuthController {
     @UseGuards(JwtAuthGuard)
     @Post('change-password')
     async changePassword(@Request() req: any, @Body() body: any) {
+        await this.stepUp.require(req.user.sub, stepUpCodesFrom(req), { action: 'this password change' });
         return this.authService.changePassword(req.user.sub, body.currentPassword, body.newPassword);
     }
 

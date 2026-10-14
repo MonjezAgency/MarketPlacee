@@ -7,11 +7,13 @@ import { useAuth } from '@/lib/auth';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { SUPPORTED_CURRENCIES } from '@/lib/currency';
 import { apiFetch } from '@/lib/api';
+import { withStepUp } from '@/components/security/StepUp';
 import { resizeImage } from '@/lib/resize-image';
 import { cn } from '@/lib/utils';
 import { checkPassword } from '@/lib/password-policy';
 import { ChangeEmailCard } from '@/components/account/ChangeEmailCard';
 import { SessionsCard } from '@/components/account/SessionsCard';
+import { TwoStepCard } from '@/components/account/TwoStepCard';
 import { CompanyDetailsCard, BrandPreferencesCard, VerificationCard } from '@/components/account/AccountCards';
 
 
@@ -96,7 +98,7 @@ export default function SettingsPage() {
         if (next !== confirm) { setPwMsg({ ok: false, text: 'The new passwords don’t match.' }); return; }
         setPwBusy(true); setPwMsg(null);
         try {
-            const res = await apiFetch('/auth/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ currentPassword: cur, newPassword: next }) });
+            const res = await withStepUp((h) => apiFetch('/auth/change-password', { method: 'POST', headers: { 'Content-Type': 'application/json', ...h }, body: JSON.stringify({ currentPassword: cur, newPassword: next }) }));
             if (!res.ok) throw new Error(res.status === 400 ? 'Your current password is incorrect.' : 'Could not change the password. Try again.');
             setCur(''); setNext(''); setConfirm('');
             setPwMsg({ ok: true, text: 'Password changed.' });
@@ -171,9 +173,7 @@ export default function SettingsPage() {
                     </form>
                 </Card>
 
-                <Card icon={<ShieldCheck size={17} />} title="Two-step verification" desc="Add a code from an authenticator app or email when you sign in.">
-                    <Link href="/dashboard/security" className="text-[13.5px] font-semibold text-teal hover:underline">Manage two-step verification</Link>
-                </Card>
+                <TwoStepCard />
 
                 <SessionsCard />
 

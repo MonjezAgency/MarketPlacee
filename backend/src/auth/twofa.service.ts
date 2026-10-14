@@ -42,13 +42,12 @@ export class TwoFaService {
     const result = await verify({ token, secret: user.twoFactorSecret });
     if (!result.valid) throw new UnauthorizedException('Invalid verification code');
 
+    // Backup codes: shown once, stored only as hashes, each usable once.
+    const backupCodes = Array.from({ length: 8 }, () => crypto.randomBytes(4).toString('hex').toUpperCase());
     await this.prisma.user.update({
       where: { id: userId },
-      data: { twoFactorEnabled: true },
+      data: { twoFactorEnabled: true, twoFactorBackupCodes: backupCodes.map((c) => hashSecret(c)) } as any,
     });
-
-    // Return dummy backup codes (in production, generate & store encrypted)
-    const backupCodes = Array.from({ length: 8 }, () => crypto.randomBytes(4).toString('hex').toUpperCase());
     return { backupCodes };
   }
 
@@ -64,7 +63,7 @@ export class TwoFaService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { twoFactorEnabled: false, twoFactorSecret: null },
+      data: { twoFactorEnabled: false, twoFactorSecret: null, twoFactorBackupCodes: [] } as any,
     });
   }
 

@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { AtSign, Loader2, Check, AlertCircle } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
+import { withStepUp } from '@/components/security/StepUp';
 import { cn } from '@/lib/utils';
 
 const input = 'w-full h-11 px-3.5 rounded-xl ring-1 ring-line bg-surface text-[14px] text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6] placeholder:text-ink-4';
@@ -10,7 +11,7 @@ const label = 'block text-[13px] font-medium text-ink-2 mb-1.5';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 async function post(path: string, body?: unknown, method = 'POST') {
-    const res = await apiFetch(path, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const res = await withStepUp((h) => apiFetch(path, { method, headers: { 'Content-Type': 'application/json', ...h }, body: body ? JSON.stringify(body) : undefined }));
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(res.status === 429 ? 'Too many attempts. Wait a minute and try again.' : typeof data?.message === 'string' ? data.message : 'Something went wrong. Try again.');
     return data;

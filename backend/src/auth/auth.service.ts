@@ -446,9 +446,15 @@ export class AuthService {
         // Sessions whose refresh tokens are all gone/expired are effectively over.
         const live = await this.prisma.refreshToken.findMany({ where: { userId, expiresAt: { gt: new Date() } } as any, select: { sessionId: true } as any });
         const liveIds = new Set((live as any[]).map((r) => r.sessionId).filter(Boolean));
-        return rows
+        const list = rows
             .filter((r: any) => r.id === currentSid || liveIds.has(r.id))
-            .map((r: any) => ({ id: r.id, device: deviceLabel(r.userAgent), ip: r.ip, createdAt: r.createdAt, lastSeenAt: r.lastSeenAt, current: r.id === currentSid }));
+            .map((r: any) => ({ id: r.id, device: deviceLabel(r.userAgent), ip: r.ip, createdAt: r.createdAt, lastSeenAt: r.lastSeenAt, current: r.id === currentSid, legacy: false }));
+        if (!currentSid) {
+            // Signed in before device tracking: still show THIS device (from the request).
+            const ctx = requestContext.getStore();
+            list.unshift({ id: 'current', device: deviceLabel(ctx?.userAgent), ip: ctx?.ip ?? null, createdAt: null as any, lastSeenAt: new Date() as any, current: true, legacy: true });
+        }
+        return list;
     }
 
     async revokeSession(userId: string, sessionId: string) {

@@ -1,3 +1,4 @@
+import { StepUpService } from '../auth/step-up.service';
 import { Module, forwardRef } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { OrdersController } from './orders.controller';
@@ -14,7 +15,7 @@ import { StorageModule } from '../storage/storage.module';
 
 @Module({
     imports: [PrismaModule, EmailModule, NotificationsModule, InvoiceModule, StorageModule, forwardRef(() => PaymentsModule), forwardRef(() => AdminModule)],
-    providers: [OrdersService, MixedLoadsService],
+    providers: [OrdersService, MixedLoadsService, StepUpService],
     controllers: [OrdersController, MixedLoadsController],
     exports: [OrdersService],
 })

@@ -5,6 +5,7 @@ import { Providers } from './providers';
 import ClientLayout from "@/components/layout/ClientLayout";
 import { Toaster } from 'react-hot-toast';
 import { NotifyToasts } from '@/components/ui/NotifyToasts';
+import { StepUpDialog } from '@/components/security/StepUp';
 import { CookieConsent } from '@/components/CookieConsent';
 import { cn } from "@/lib/utils";
 
@@ -229,6 +230,7 @@ export default function RootLayout({
                 <Providers>
                     <Toaster position="top-right" />
                     <NotifyToasts />
+                    <StepUpDialog />
                     <ClientLayout>
                         {children}
                     </ClientLayout>

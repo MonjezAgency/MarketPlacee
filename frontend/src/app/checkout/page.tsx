@@ -1,5 +1,6 @@
 'use client';
 
+import { withStepUp } from '@/components/security/StepUp';
 import React, { useState } from 'react';
 
 import {
@@ -189,8 +190,10 @@ export default function CheckoutPage() {
         if (isProcessing) return;
         setIsProcessing(true);
         try {
-            const res = await apiFetch('/orders', {
+            // 2FA accounts confirm the order with authenticator + email code (StepUpDialog).
+            const res = await withStepUp((stepUp) => apiFetch('/orders', {
                 method: 'POST',
+                headers: stepUp,
                 body: JSON.stringify({
                     // `i.id` for older cart entries IS the productId; for
                     // configurable-product entries it's `${productId}::sig`,
@@ -213,7 +216,7 @@ export default function CheckoutPage() {
                         country: addrCountry,
                     },
                 })
-            });
+            }));
 
             if (res.ok) {
                 const order = await res.json();

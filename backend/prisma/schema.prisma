@@ -128,6 +128,8 @@ model User {
   profileReminderFailures   Int      @default(0)
   /// Tokens without a session id issued before this time are rejected ("sign out everywhere").
   tokensValidAfter          DateTime?
+  /// SHA-256 hashes of unused 2FA backup codes.
+  twoFactorBackupCodes      String[] @default([])
 
   // Business & Financial Fields
   vatNumber   String? @unique

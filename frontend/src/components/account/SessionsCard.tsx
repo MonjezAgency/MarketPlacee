@@ -7,7 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { SettingsCard } from '@/components/account/AccountCards';
 import { cn } from '@/lib/utils';
 
-type Session = { id: string; device: string | null; ip: string | null; createdAt: string; lastSeenAt: string; current: boolean };
+type Session = { id: string; device: string | null; ip: string | null; createdAt: string | null; lastSeenAt: string; current: boolean; legacy?: boolean };
 
 const ago = (iso: string) => {
     const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -59,6 +59,7 @@ export function SessionsCard() {
                                     <span className="flex flex-wrap items-center gap-2">
                                         <span className="text-[14px] font-medium text-ink">{s.device || 'Unknown device'}</span>
                                         {s.current && <span className="text-[11.5px] font-semibold px-2 py-0.5 rounded-md bg-teal-soft text-teal">This device</span>}
+                                        {s.legacy && <span className="text-[11.5px] text-ink-4">signed in before device tracking</span>}
                                     </span>
                                     <span className="block text-[12.5px] text-ink-3">{ago(s.lastSeenAt)}{s.ip ? ` · ${s.ip}` : ''}</span>
                                 </span>

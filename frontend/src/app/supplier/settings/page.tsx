@@ -11,6 +11,7 @@ import { authInput, authLabel } from '@/components/auth/AuthShell';
 import { SettingsCard, CompanyDetailsCard, BrandPreferencesCard, VerificationCard } from '@/components/account/AccountCards';
 import { ChangeEmailCard } from '@/components/account/ChangeEmailCard';
 import { SessionsCard } from '@/components/account/SessionsCard';
+import { TwoStepCard } from '@/components/account/TwoStepCard';
 
 type Prefs = { orderUpdates: boolean; productComments: boolean; lowStockAlerts: boolean; inboundOffers: boolean; marketingEmails: boolean; muteToasts: boolean };
 const PREF_ROWS: { key: keyof Prefs; label: string; desc: string }[] = [
@@ -119,6 +120,7 @@ export default function SupplierSettingsPage() {
                         <p className="text-[13.5px] text-ink-2">Change your password or set up two-step verification.</p>
                         <Link href="/dashboard/security" className="mt-2 inline-block text-[13.5px] font-semibold text-teal hover:underline">Open security settings</Link>
                     </SettingsCard>
+                    <TwoStepCard />
                     <SessionsCard />
                     <SettingsCard icon={<Bell size={17} />} title="Notifications" desc="Security and account emails are always sent.">
                         {prefs === null ? <p className="text-[13px] text-ink-3">Preferences couldn’t be loaded.</p> : (
