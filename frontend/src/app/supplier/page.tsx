@@ -67,7 +67,7 @@ export default function SupplierOverviewPage() {
                 title="Business overview"
                 description="Your sales, orders and catalog health. Money figures are at your own prices (EUR), before the Atlantis margin."
                 actions={<>
-                    <Link href="/supplier/products?import=1"><Button icon={<Upload size={15} />}>Bulk upload</Button></Link>
+                    <Link href="/supplier/products/import"><Button icon={<Upload size={15} />}>Bulk upload</Button></Link>
                     <Link href="/supplier/products/new"><Button variant="primary" icon={<Plus size={15} />}>Add product</Button></Link>
                 </>}
             />

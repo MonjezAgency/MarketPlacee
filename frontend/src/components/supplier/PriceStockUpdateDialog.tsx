@@ -4,7 +4,7 @@ import * as React from 'react';
 import { Download, ArrowRight, FileSpreadsheet } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { supplierApi } from '@/lib/supplier-api';
-import { DropZone } from '@/components/supplier/BulkImportDialog';
+import { DropZone } from '@/components/supplier/DropZone';
 import { Badge, Button, Dialog, ErrorState, Notice, int, useConfirm } from '@/components/supplier/ui';
 import { cn } from '@/lib/utils';
 

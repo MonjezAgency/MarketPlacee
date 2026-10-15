@@ -1,16 +1,17 @@
-import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Query, Request, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Query, Request, Res, UploadedFile, UploadedFiles, UseGuards, UseInterceptors } from '@nestjs/common';
+import { AnyFilesInterceptor, FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { ProductsService } from './products.service';
-import { SupplierImportService, type ImportRequest } from './supplier-import.service';
+import { MAX_COMMIT_ROWS, MAX_IMPORT_ROWS_TOTAL, SupplierImportService, compactReview, type ImportRequest } from './supplier-import.service';
+import { analyseWorkbook } from './import-analysis';
 import { ImageLookupService } from './image-lookup.service';
 import { SupplierUpdatesService, type UpdateRequest } from './supplier-updates.service';
 import { SupplierOverviewService } from './supplier-overview.service';
-import { IMPORT_FIELDS, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, buildTemplate, matchHeaders, parseSpreadsheet } from './product-import';
+import { ALL_FIELDS, IMPORT_FIELDS, MAX_IMPORT_BYTES, buildTemplate, matchHeaders, parseSpreadsheet } from './product-import';
 import { TO_EUR, MOQ_UNITS, UNIT_TYPES, suggestedCurrency } from './catalog-rules';
 import { PrismaService } from '../common/prisma.service';
 
@@ -77,7 +78,7 @@ export class SupplierCatalogController {
 
     @Get('import/schema')
     schema() {
-        return { fields: IMPORT_FIELDS, currencies: Object.keys(TO_EUR), rates: TO_EUR, moqUnits: MOQ_UNITS, unitTypes: UNIT_TYPES, maxRows: MAX_IMPORT_ROWS, maxBytes: MAX_IMPORT_BYTES, formats: ['.xlsx', '.csv'] };
+        return { fields: IMPORT_FIELDS, allFields: ALL_FIELDS.map((f) => ({ ...f, stored: f.stored !== false })), currencies: Object.keys(TO_EUR), rates: TO_EUR, moqUnits: MOQ_UNITS, unitTypes: UNIT_TYPES, maxRows: MAX_IMPORT_ROWS_TOTAL, commitRows: MAX_COMMIT_ROWS, maxBytes: MAX_IMPORT_BYTES, formats: ['.xlsx', '.xls', '.csv'] };
     }
 
     @Get('import/template')
@@ -89,7 +90,24 @@ export class SupplierCatalogController {
         res.send(buf);
     }
 
-    /** Read the file and propose a column mapping. Nothing is saved. */
+    /**
+     * Read the file and propose a mapping, with the evidence for each column.
+     * Nothing is saved. For .xlsx the browser sends a copy without picture
+     * bytes (it keeps the pictures) so large offers stay within upload limits;
+     * the picture positions are still read from the copy.
+     */
+    @Post('import/analyse')
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMPORT_BYTES } }))
+    analyse(@UploadedFile() file: any) {
+        if (!file?.buffer?.length) throw new BadRequestException('Choose a file to upload.');
+        try {
+            return analyseWorkbook(file.buffer, String(file.originalname || 'upload').slice(0, 200));
+        } catch (e: any) {
+            throw new BadRequestException(e?.message || 'Couldn’t read that file.');
+        }
+    }
+
+    /** Plain one-sheet read (used by the price & stock update file). Nothing is saved. */
     @Post('import/parse')
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMPORT_BYTES } }))
     parse(@UploadedFile() file: any) {
@@ -106,13 +124,20 @@ export class SupplierCatalogController {
     async validate(@Request() req, @Body() body: ImportRequest) {
         const { built, ...out } = await this.importer.validate(req.user.sub, body);
         void built;
-        return out;
+        return compactReview(out);
     }
 
+    /** One batch of rows (multipart: "payload" JSON + the batch's pictures as "photos", named by their path in the file). */
     @Post('import/commit')
-    @Throttle({ default: { limit: 10, ttl: 60_000 } })
-    commit(@Request() req, @Body() body: ImportRequest) {
-        return this.importer.commit(req.user.sub, body);
+    @Throttle({ default: { limit: 40, ttl: 60_000 } })
+    // A batch carries at most 60 rows' photos (up to 5 each); the browser batches by count and size.
+    @UseInterceptors(AnyFilesInterceptor({ limits: { fileSize: 10 * 1024 * 1024, files: 300, fieldSize: 8 * 1024 * 1024 } }))
+    commit(@Request() req, @Body() body: any, @UploadedFiles() files: any[] = []) {
+        let payload: ImportRequest;
+        try { payload = typeof body?.payload === 'string' ? JSON.parse(body.payload) : body; }
+        catch { throw new BadRequestException('The import request is malformed.'); }
+        const photos = (files || []).filter((f) => f.fieldname === 'photos').map((f) => ({ originalname: String(f.originalname || ''), buffer: f.buffer, mimetype: f.mimetype, size: f.size }));
+        return this.importer.commit(req.user.sub, payload, photos);
     }
 
     // ─── Bulk price & stock updates (existing products only) ─────────

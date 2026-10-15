@@ -149,7 +149,6 @@ export default function ReturnsPage() {
                         </div>
                         <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground pt-2">
                             <Link href="/shipping" className="hover:text-foreground transition-colors">Shipping Policy</Link>
-                            <Link href="/help" className="hover:text-foreground transition-colors">Help Center</Link>
                         </div>
                     </div>
                 </motion.div>

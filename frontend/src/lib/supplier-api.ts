@@ -66,9 +66,17 @@ export const supplierApi = {
     updatesCommit: (body: any) => post('/supplier-catalog/updates/commit', body).then((r) => json<any>(r)),
     reputation: () => apiFetch('/supplier-catalog/reputation', { cache: 'no-store' }).then((r) => json<any>(r)),
     importSchema: () => apiFetch('/supplier-catalog/import/schema').then((r) => json<any>(r)),
+    /** One-sheet read, used by the price & stock update file. */
     importParse: (file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/supplier-catalog/import/parse', { method: 'POST', body: fd }).then((r) => json<any>(r)); },
+    importAnalyse: (file: Blob, name: string) => { const fd = new FormData(); fd.append('file', file, name); return apiFetch('/supplier-catalog/import/analyse', { method: 'POST', body: fd }).then((r) => json<any>(r)); },
     importValidate: (body: any) => post('/supplier-catalog/import/validate', body).then((r) => json<any>(r)),
-    importCommit: (body: any) => post('/supplier-catalog/import/commit', body).then((r) => json<any>(r)),
+    /** One import batch: the rows as JSON plus that batch's photos (named by their path in the workbook). */
+    importCommit: (payload: any, photos: { path: string; blob: Blob }[]) => {
+        const fd = new FormData();
+        fd.append('payload', JSON.stringify(payload));
+        for (const p of photos) fd.append('photos', p.blob, p.path.split('/').pop() || 'photo');
+        return apiFetch('/supplier-catalog/import/commit', { method: 'POST', body: fd }).then((r) => json<any>(r));
+    },
     orders: () => apiFetch('/orders/my-orders', { cache: 'no-store' }).then((r) => json<any[]>(r)),
     acceptOrder: (id: string) => apiFetch(`/orders/${id}/supplier-accept`, { method: 'POST' }).then((r) => json<any>(r)),
     declineOrder: (id: string, reason: string) => post(`/orders/${id}/supplier-decline`, { reason }).then((r) => json<any>(r)),

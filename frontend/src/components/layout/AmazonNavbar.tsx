@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useCart } from '@/lib/cart';
 import {
     Search, ShoppingCart, Menu, ChevronDown, X,
-    Building2, Package, Tag, Users, HelpCircle,
+    Building2, Package, Tag, Users,
     Moon, Sun, Globe, LogIn, LayoutDashboard
 } from 'lucide-react';
 import Link from 'next/link';
@@ -113,7 +113,6 @@ export default function AmazonNavbar() {
         { href: '/deals', label: t('navbar', 'volumeDeals') || 'Daily Deals', icon: Tag },
         { href: '/categories', label: t('navbar', 'browseCatalog') || 'All Products', icon: Package },
         { href: '/suppliers', label: t('navbar', 'supplyPartners') || 'Suppliers', icon: Users },
-        { href: '/help', label: t('navbar', 'logisticsHelp') || 'Help & Support', icon: HelpCircle },
     ];
 
     return (

@@ -1,145 +1,407 @@
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ProductsService } from './products.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { IMPORT_FIELDS, MAX_IMPORT_ROWS, buildRow, labelOf, type BuiltRow, type FieldKey, type Mapping } from './product-import';
+import { SupabaseStorageService } from '../storage/supabase-storage.service';
+import { ALL_FIELDS, IMPORT_FIELDS, buildFromValues, labelOf, weightAmounts, weightFromName, type BuiltRow, type FieldKey } from './product-import';
+import { missingForPublish, realImages } from './catalog-rules';
 
-export interface ImportRequest {
-    headers: string[];
-    rows: string[][];
-    mapping: Mapping;
-    currency?: string;
-    moqUnit?: string;
-    unit?: string;
-    firstRow?: number;          // spreadsheet row number of rows[0]
-    onExisting?: 'skip' | 'update';
+/** Where a field's value comes from when the file has no column for it. */
+export interface ImportSource {
+    kind: 'constant' | 'section' | 'sheetName' | 'fromName';
+    value?: string;
+    perSheet?: Record<string, string>;
 }
 
-const FIELD_KEYS = new Set(IMPORT_FIELDS.map((f) => f.key));
+export interface ImportRequest {
+    fileName?: string;
+    sheets: {
+        name: string;
+        columns: { index: number; key: string; header: string; parent?: string }[];
+        rows: { row: number; cells: string[]; shown?: Record<string, string>; section?: string; images?: string[] }[];
+    }[];
+    /** Column key (normalised header) → field, or '' to leave the column out. */
+    mapping: Record<string, FieldKey | '' | null>;
+    sources?: Partial<Record<FieldKey, ImportSource>>;
+    settings?: {
+        currency?: string; moqUnit?: string; unit?: string;
+        /** 'shown' = use the value a price cell displays (€ 1.15), 'exact' = its full value (1.14926875). */
+        pricePrecision?: 'exact' | 'shown';
+        /** Decimal separator per column key, when a column's numbers can be read two ways. */
+        decimal?: Record<string, '.' | ','>;
+    };
+    onExisting?: 'skip' | 'update';
+    /** Commit only: when the whole import started, and whether this is its last batch. */
+    startedAt?: string;
+    last?: boolean;
+}
+
+/** Keeps the review response well under the ~4.5 MB proxy limit (≈1.2 KB per row). */
+export const MAX_IMPORT_ROWS_TOTAL = 2500;
+export const MAX_COMMIT_ROWS = 250;
+const FIELD_KEYS = new Set(ALL_FIELDS.map((f) => f.key));
+const STORED = new Set(IMPORT_FIELDS.map((f) => f.key));
+const PRICE_FIELDS: FieldKey[] = ['price', 'piecePrice', 'displayPrice'];
+/** Which fields may take a value from somewhere other than a column. */
+const SOURCE_RULES: Record<ImportSource['kind'], FieldKey[]> = {
+    constant: ['brand', 'category', 'origin', 'exwLocation', 'currency', 'stock', 'moq', 'moqUnit', 'unit', 'leadTime', 'palletsPerShipment', 'casesPerPallet', 'unitsPerCase', 'shelfLife', 'weight', 'description'],
+    section: ['brand', 'category', 'origin'],
+    sheetName: ['brand', 'category', 'origin'],
+    fromName: ['weight', 'brand'],
+};
+const DIFF_FIELDS: [string, string][] = [
+    ['name', 'Name'], ['brand', 'Brand'], ['category', 'Category'], ['weight', 'Weight'], ['origin', 'Origin'], ['exwLocation', 'EXW location'],
+    ['unitsPerCase', 'Pieces per case'], ['casesPerPallet', 'Cases per pallet'], ['palletsPerShipment', 'Pallets per truck'],
+    ['moq', 'MOQ'], ['moqUnit', 'MOQ unit'], ['stock', 'Stock (cases)'], ['shelfLife', 'BBD / shelf life'], ['leadTime', 'Lead time'],
+];
+
+const fold = (s: string) => String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[’`´]/g, "'").replace(/\s+/g, ' ').trim();
+
+/** Longest known brand the product name starts with ("Kellogg's Trésor…" → "Kellogg's"). */
+export function brandFromName(name: string, known: string[]): string | null {
+    const n = fold(name);
+    let best: string | null = null;
+    for (const b of known) {
+        const f = fold(b);
+        if (f.length < 2) continue;
+        if ((n === f || n.startsWith(`${f} `)) && (!best || f.length > fold(best).length)) best = b.trim();
+    }
+    return best;
+}
+
+const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 
 @Injectable()
 export class SupplierImportService {
     private readonly logger = new Logger(SupplierImportService.name);
-    constructor(private readonly products: ProductsService, private readonly notifications: NotificationsService) {}
+    constructor(private readonly products: ProductsService, private readonly notifications: NotificationsService, private readonly storage: SupabaseStorageService) {}
 
-    private checkRequest(req: ImportRequest) {
-        if (!Array.isArray(req?.rows) || !req.rows.length) throw new BadRequestException('No rows to import.');
-        if (req.rows.length > MAX_IMPORT_ROWS) throw new BadRequestException(`Import at most ${MAX_IMPORT_ROWS} rows at a time.`);
-        const mapping: Mapping = {};
-        const taken = new Map<FieldKey, string>();
-        for (const [col, field] of Object.entries(req.mapping || {})) {
+    /** Reject malformed requests; return the mapping problems the supplier must fix first. */
+    private checkRequest(req: ImportRequest, maxRows = MAX_IMPORT_ROWS_TOTAL) {
+        if (!Array.isArray(req?.sheets) || !req.sheets.length) throw new BadRequestException('No sheets to import.');
+        const total = req.sheets.reduce((s, x) => s + (Array.isArray(x?.rows) ? x.rows.length : 0), 0);
+        if (!total) throw new BadRequestException('No rows to import.');
+        if (total > maxRows) throw new BadRequestException(`Import at most ${maxRows} rows at a time.`);
+        const mapping: Record<string, FieldKey> = {};
+        for (const [key, field] of Object.entries(req.mapping || {})) {
             if (!field) continue;
             if (!FIELD_KEYS.has(field as FieldKey)) throw new BadRequestException(`Unknown field “${field}”.`);
-            if (taken.has(field as FieldKey)) throw new BadRequestException(`Two columns are mapped to ${labelOf(field as FieldKey)} (“${req.headers?.[Number(taken.get(field as FieldKey))]}” and “${req.headers?.[Number(col)]}”). Keep one.`);
-            taken.set(field as FieldKey, col);
-            mapping[col] = field;
+            mapping[key] = field as FieldKey;
         }
-        const has = (k: FieldKey) => taken.has(k);
-        const mappingWarnings: string[] = [];
-        for (const f of IMPORT_FIELDS.filter((x) => x.required === 'yes')) {
-            if (!has(f.key)) mappingWarnings.push(`No column for ${f.header} — every product will be saved as a draft until you add it.`);
+        // Within one sheet a field can come from one column only.
+        for (const sh of req.sheets) {
+            const taken = new Map<FieldKey, string>();
+            for (const col of sh.columns || []) {
+                const f = mapping[col.key];
+                if (!f) continue;
+                const as = f === 'eanPair' ? 'ean' : f;
+                if (taken.has(as as FieldKey)) throw new BadRequestException(`Sheet “${sh.name}”: two columns are set to ${labelOf(as as FieldKey)} (“${taken.get(as as FieldKey)}” and “${col.header}”). Keep one.`);
+                taken.set(as as FieldKey, col.header);
+            }
         }
-        if (!has('price') && !has('piecePrice')) mappingWarnings.push('No price column (Price per Case or Price per Piece) — products will be saved as drafts.');
-        if (!has('stock') && !has('stockPieces')) mappingWarnings.push('No stock column — products will be saved as drafts.');
-        if (!has('imageUrl')) mappingWarnings.push('No image column — products are saved as drafts; add photos by barcode lookup or upload afterwards.');
-        return { mapping, mappingWarnings };
+        const sources: Partial<Record<FieldKey, ImportSource>> = {};
+        for (const [f, src] of Object.entries(req.sources || {})) {
+            if (!src || !src.kind) continue;
+            const allowed = SOURCE_RULES[src.kind as ImportSource['kind']];
+            if (!allowed) throw new BadRequestException(`Unknown value source “${src.kind}”.`);
+            if (!allowed.includes(f as FieldKey)) throw new BadRequestException(`${labelOf(f as FieldKey)} can’t take its value from ${src.kind === 'constant' ? 'one value for all rows' : src.kind}.`);
+            if (src.kind === 'constant' && !String(src.value ?? '').trim() && !Object.values(src.perSheet || {}).some((v) => String(v ?? '').trim())) continue;
+            sources[f as FieldKey] = { kind: src.kind, value: src.value != null ? String(src.value).slice(0, 200) : undefined, perSheet: src.perSheet };
+        }
+        return { mapping, sources };
     }
 
-    /** Build + validate every row; nothing is written. */
-    async validate(supplierId: string, req: ImportRequest) {
-        const { mapping, mappingWarnings } = this.checkRequest(req);
-        const opts = { currency: String(req.currency || 'EUR').toUpperCase(), moqUnit: String(req.moqUnit || 'CASE').toUpperCase(), unit: String(req.unit || 'piece').toLowerCase() };
-        const start = Number(req.firstRow) || 2;
-        const built: BuiltRow[] = req.rows.map((cells, i) => buildRow(Array.isArray(cells) ? cells.map((c) => String(c ?? '')) : [], start + i, mapping, opts));
+    /** Build and check every row; nothing is written. */
+    async validate(supplierId: string, req: ImportRequest, maxRows = MAX_IMPORT_ROWS_TOTAL) {
+        const { mapping, sources } = this.checkRequest(req, maxRows);
+        const opts = { currency: String(req.settings?.currency || 'EUR').toUpperCase(), moqUnit: String(req.settings?.moqUnit || 'CASE').toUpperCase(), unit: String(req.settings?.unit || 'piece').toLowerCase() };
+        const shownPrices = req.settings?.pricePrecision === 'shown';
+        const knownBrands = sources.brand?.kind === 'fromName'
+            ? [...new Set([...(await this.products.knownBrands(supplierId)), ...req.sheets.map((s) => s.name.trim()), ...req.sheets.flatMap((s) => s.rows.map((r) => r.section || '').filter(Boolean))])]
+            : [];
 
-        // Duplicate barcodes inside the file: the first occurrence wins.
-        const firstSeen = new Map<string, number>();
-        for (const b of built) {
-            const code = b.product.ean;
-            if (!code) continue;
-            if (firstSeen.has(code)) b.errors.push({ field: 'ean', label: 'Barcode (EAN/GTIN)', reason: `Same barcode as row ${firstSeen.get(code)} — each product once per file.` });
-            else firstSeen.set(code, b.row);
+        type Item = { sheet: string; key: string; built: BuiltRow; from: Partial<Record<FieldKey, { column: string; value: string }>>; images: string[]; original: Record<string, string> };
+        const items: Item[] = [];
+        for (const sh of req.sheets) {
+            const cols = (sh.columns || []).filter((c) => mapping[c.key]);
+            const colFields = new Set(cols.map((c) => mapping[c.key]));
+            for (const r of sh.rows) {
+                const cells = Array.isArray(r.cells) ? r.cells.map((c) => String(c ?? '')) : [];
+                const values: Partial<Record<FieldKey, string>> = {};
+                const headers: Partial<Record<FieldKey, string>> = {};
+                const decimal: Partial<Record<FieldKey, '.' | ','>> = {};
+                const from: Item['from'] = {};
+                for (const c of cols) {
+                    const f = mapping[c.key];
+                    let v = cells[c.index] ?? '';
+                    // A price cell that displays fewer decimals than it holds: use what the supplier chose.
+                    if (shownPrices && PRICE_FIELDS.includes(f) && r.shown?.[String(c.index)]) v = r.shown[String(c.index)];
+                    values[f] = v;
+                    headers[f] = c.parent ? `${c.parent} ${c.header}` : c.header;
+                    const d = req.settings?.decimal?.[c.key];
+                    if (d === '.' || d === ',') decimal[f] = d;
+                    from[f] = { column: c.parent ? `${c.parent} › ${c.header}` : c.header, value: cells[c.index] ?? '' };
+                }
+                // Fields without a column in this sheet: the supplier's chosen source.
+                const derived: Partial<Record<FieldKey, string>> = {};
+                for (const [f, src] of Object.entries(sources) as [FieldKey, ImportSource][]) {
+                    if (colFields.has(f) || (f === 'ean' && colFields.has('eanPair'))) continue;
+                    let v = '', note = '';
+                    if (src.kind === 'constant') { v = String(src.perSheet?.[sh.name] ?? src.value ?? '').trim(); note = src.perSheet?.[sh.name] ? `Set by you for sheet “${sh.name}”` : 'Set by you for all rows'; }
+                    else if (src.kind === 'section') { v = r.section || ''; note = v ? `From the heading “${v}” above this row` : ''; }
+                    else if (src.kind === 'sheetName') { v = sh.name.trim(); note = `From the sheet name “${v}”`; }
+                    else if (src.kind === 'fromName' && f === 'weight') { v = weightFromName(values.name) || ''; note = v ? `Read from the product name` : ''; }
+                    else if (src.kind === 'fromName' && f === 'brand') {
+                        v = brandFromName(values.name || '', knownBrands) || '';
+                        note = v ? 'Matched at the start of the product name' : '';
+                        // No brand found in the name: the supplier's own value for this sheet (or all rows), if they gave one.
+                        const fb = String(src.perSheet?.[sh.name] ?? src.value ?? '').trim();
+                        if (!v && fb) { v = fb; note = src.perSheet?.[sh.name] ? `No brand in the name — set by you for sheet “${sh.name}”` : 'No brand in the name — set by you for all rows'; }
+                    }
+                    if (v) { values[f] = v; derived[f] = note; }
+                }
+                const built = buildFromValues(values, r.row, opts, { headers, decimal, derived });
+                if (sources.brand?.kind === 'fromName' && !colFields.has('brand') && !values.brand) built.warnings.push('No brand found at the start of the name — add the brand before this product can be reviewed.');
+                const original: Record<string, string> = {};
+                (sh.columns || []).forEach((c) => { const v = cells[c.index]; if (v !== undefined && String(v).trim() !== '') original[c.parent ? `${c.parent} › ${c.header}` : c.header] = String(v); });
+                items.push({ sheet: sh.name, key: `${sh.name}!${r.row}`, built, from, images: (Array.isArray(r.images) ? r.images : []).filter((p) => typeof p === 'string').slice(0, 5), original });
+            }
         }
-        const existing = await this.products.findMineByBarcodes(supplierId, [...firstSeen.keys()]);
-        const byCode = new Map(existing.map((e) => [e.ean!, e]));
+        const where = (it: Item) => (req.sheets.length > 1 ? `sheet “${it.sheet}” row ${it.built.row}` : `row ${it.built.row}`);
 
-        const rows = built.map((b) => {
-            const ex = b.product.ean ? byCode.get(b.product.ean) : undefined;
-            const state = b.errors.length ? 'error' : b.missing.length ? 'draft' : 'ready';
+        // A picture placed on the row counts as the product photo when the file has no image link.
+        for (const it of items) {
+            if (it.images.length && !it.built.product.images?.length) {
+                it.built.missing = it.built.missing.filter((m) => m.field !== 'images');
+                it.built.notes.imageUrl = `${it.images.length === 1 ? 'Picture' : `${it.images.length} pictures`} placed on this row in the file`;
+            }
+        }
+
+        // Duplicates inside the file.
+        const byEan = new Map<string, Item>();
+        const byNameWeight = new Map<string, Item>();
+        for (const it of items) {
+            const code = it.built.product.ean;
+            if (code) {
+                const first = byEan.get(code);
+                if (first) {
+                    const other = fold(first.built.product.name) !== fold(it.built.product.name);
+                    it.built.errors.push({ field: 'ean', label: 'Barcode (EAN/GTIN)', reason: `Same barcode as ${where(first)}${other ? ` (“${first.built.product.name}”)` : ''} — each barcode once per file.${other ? ' If these are designs or flavours of one product, list it once and add them as Varieties.' : ''}` });
+                }
+                else byEan.set(code, it);
+            }
+            const nk = `${fold(it.built.product.name)}|${it.built.product.weight || ''}`;
+            if (it.built.product.name) {
+                const first = byNameWeight.get(nk);
+                if (first && first.built.product.ean !== code && !it.built.errors.some((e) => e.field === 'ean')) it.built.warnings.push(`Same name and weight as ${where(first)}, with a different barcode — check it isn’t the same product twice.`);
+                else if (!first) byNameWeight.set(nk, it);
+            }
+        }
+
+        // Prices far from the rest of the file (per kg or per litre) — usually a price on a different basis.
+        const perKg = (it: Item) => {
+            const p = it.built.product, w = weightAmounts(p.weight);
+            if (!p.price || !p.unitsPerCase || !w || !w.total) return null;
+            return { v: p.price / (p.unitsPerCase * w.total / 1000), dim: w.dim };
+        };
+        for (const dim of ['mass', 'volume'] as const) {
+            const list = items.map((it) => ({ it, k: perKg(it) })).filter((x) => x.k && x.k.dim === dim && !x.it.built.errors.length) as { it: Item; k: { v: number } }[];
+            if (list.length < 8) continue;
+            const med = median(list.map((x) => x.k.v));
+            for (const { it, k } of list) {
+                if (k.v > med * 6 || k.v < med / 6) it.built.warnings.push(`Price looks unusual: €${k.v.toFixed(2)} per ${dim === 'mass' ? 'kg' : 'litre'}, against about €${med.toFixed(2)} for most of this file. Check the price is per ${PRICE_FIELDS.some((f) => it.from[f]) ? labelOf((PRICE_FIELDS.find((f) => it.from[f]) as FieldKey)).replace('Price per ', '').toLowerCase() : 'case'}.`);
+            }
+        }
+
+        // The supplier's own catalog: by barcode, or by exact name when a row has no barcode.
+        const existing = await this.products.findMineForImport(supplierId, [...byEan.keys()], items.filter((i) => !i.built.product.ean).map((i) => i.built.product.name));
+        const exByEan = new Map(existing.filter((e: any) => e.ean).map((e: any) => [e.ean, e]));
+        const exByName = new Map(existing.map((e: any) => [fold(e.name), e]));
+        const onExisting = req.onExisting === 'update' ? 'update' : 'skip';
+
+        const rows = items.map((it) => {
+            const b = it.built, p = b.product;
+            const ex: any = p.ean ? exByEan.get(p.ean) : exByName.get(fold(p.name));
+            let changes: { field: string; label: string; from: string; to: string }[] = [];
+            if (ex) {
+                const show = (v: any) => (v === null || v === undefined || v === '' ? '—' : String(v));
+                for (const [f, label] of DIFF_FIELDS) {
+                    const nv = p[f];
+                    if (nv === undefined || nv === null || nv === '' || (f === 'moqUnit' && p.moq === undefined)) continue;
+                    if (String(nv).trim().toLowerCase() !== String(ex[f] ?? '').trim().toLowerCase()) changes.push({ field: f, label, from: show(ex[f]), to: show(nv) });
+                }
+                if (p.supplierPrice !== undefined) {
+                    const sameCur = (ex.supplierCurrency || 'EUR') === p.supplierCurrency;
+                    const old = sameCur ? ex.supplierPrice ?? ex.basePrice : ex.basePrice, nw = sameCur ? p.supplierPrice : p.price;
+                    if (old == null || Math.abs(Number(old) - Number(nw)) > 0.0001) {
+                        changes.push({ field: 'price', label: `Price per case (${sameCur ? p.supplierCurrency : 'EUR'})`, from: old == null ? '—' : Number(old).toFixed(2), to: Number(nw).toFixed(2) });
+                        if (old && Math.abs(nw - old) / old > 0.5) b.warnings.push(`Price per case changes by ${nw > old ? '+' : ''}${Math.round(((nw - old) / old) * 100)}% (${Number(old).toFixed(2)} → ${Number(nw).toFixed(2)}). Check before updating.`);
+                    }
+                }
+                if (ex.status === 'REJECTED') b.errors.push({ field: 'ean', label: 'Rejected listing', reason: 'This product was rejected and can’t be updated. Create a new listing that addresses the reason.' });
+                // An update fills in the saved product: judge completeness on the result, not on the row alone.
+                const filled = Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length)));
+                const merged: any = { ...ex, ...filled, images: realImages(ex.images).length ? ex.images : (p.images?.length ? p.images : it.images.length ? ['https://picture-from-file.invalid/'] : []) }; // marker for the completeness check only
+                b.missing = missingForPublish({ ...merged, basePrice: filled.price ?? ex.basePrice }).filter((m) => !b.errors.some((e) => e.field === m.field));
+            }
+            const state = b.errors.length ? 'error' : ex ? (onExisting === 'skip' ? 'skip' : changes.length ? 'update' : 'unchanged') : b.missing.length ? 'draft' : 'ready';
+            const action = state === 'ready' || state === 'draft' ? 'create' : state === 'update' ? 'update' : 'none';
             return {
-                row: b.row, state,
-                name: b.product.name, brand: b.product.brand, ean: b.product.ean, category: b.product.category,
-                priceEur: b.product.price ?? null, stock: b.product.stock ?? null, origin: b.product.origin, exwLocation: b.product.exwLocation,
-                weight: b.product.weight, moq: b.product.moq ?? null, moqUnit: b.product.moqUnit,
-                imageStatus: b.product.images?.length ? 'from_file' : 'missing',
+                key: it.key, sheet: it.sheet, row: b.row, state, action,
+                name: p.name, brand: p.brand, ean: p.ean, category: p.category,
+                priceEur: p.price ?? null, supplierPrice: p.supplierPrice ?? null, supplierCurrency: p.supplierCurrency ?? null,
+                stock: p.stock ?? null, origin: p.origin, exwLocation: p.exwLocation, weight: p.weight,
+                unitsPerCase: p.unitsPerCase ?? null, casesPerPallet: p.casesPerPallet ?? null, moq: p.moq ?? null, moqUnit: p.moqUnit, shelfLife: p.shelfLife,
+                images: it.images, imageStatus: p.images?.length ? 'from_link' : it.images.length ? 'from_file' : 'missing',
+                from: it.from, notes: b.notes, aux: b.aux,
                 errors: b.errors, missing: b.missing, warnings: b.warnings,
-                existing: ex ? { id: ex.id, name: ex.name, status: ex.status } : null,
+                existing: ex ? { id: ex.id, name: ex.name, status: ex.status } : null, changes,
             };
         });
+        const count = (s: string) => rows.filter((r) => r.state === s).length;
         const summary = {
-            total: rows.length,
-            ready: rows.filter((r) => r.state === 'ready' && !r.existing).length,
-            draft: rows.filter((r) => r.state === 'draft' && !r.existing).length,
-            error: rows.filter((r) => r.state === 'error').length,
-            existing: rows.filter((r) => r.state !== 'error' && r.existing).length,
-            missingImages: rows.filter((r) => r.imageStatus === 'missing').length,
+            total: rows.length, ready: count('ready'), draft: count('draft'), update: count('update'), unchanged: count('unchanged'), skip: count('skip'), error: count('error'),
+            create: count('ready') + count('draft'), withWarnings: rows.filter((r) => r.warnings.length).length,
+            photosFromFile: rows.filter((r) => r.imageStatus === 'from_file').length, missingImages: rows.filter((r) => r.imageStatus === 'missing').length,
         };
-        return { rows, summary, mappingWarnings, built };
+        // What will be stored where — and what won't be stored at all.
+        const usedKeys = new Set(req.sheets.flatMap((s) => (s.columns || []).map((c) => c.key)));
+        const mappingReport = Object.entries(mapping).filter(([k]) => usedKeys.has(k)).map(([key, field]) => ({ key, field, label: labelOf(field), stored: STORED.has(field) }));
+        const notProvided = IMPORT_FIELDS.filter((f) => f.required !== 'no' && !Object.values(mapping).includes(f.key) && !sources[f.key] && !(f.key === 'ean' && Object.values(mapping).includes('eanPair')))
+            .filter((f) => !(f.group === 'price' && Object.values(mapping).some((m) => PRICE_FIELDS.includes(m))) && !(f.group === 'stock' && (Object.values(mapping).includes('stock') || Object.values(mapping).includes('stockPieces') || sources.stock)))
+            .map((f) => f.header);
+        return { rows, summary, mapping: mappingReport, notProvided: [...new Set(notProvided)], built: items };
     }
 
     /**
-     * Commit row by row. Each row is its own write, so a failure on one row
-     * never hides or rolls back the others — the report lists exactly what was
-     * saved. Re-uploading the same file is safe: rows whose barcode already
-     * exists are skipped (or updated, if asked), never duplicated.
+     * Import one batch. Each row is its own write, so a failure never hides or
+     * rolls back the others. Rows already in the catalog are skipped or, when
+     * asked, updated with valid values only — an invalid row never touches a
+     * saved product. The original spreadsheet row is kept with each product.
      */
-    async commit(supplierId: string, req: ImportRequest) {
-        const v = await this.validate(supplierId, req);
-        const onExisting = req.onExisting === 'update' ? 'update' : 'skip';
+    async commit(supplierId: string, req: ImportRequest, files: { originalname: string; buffer: Buffer; mimetype: string; size: number }[] = []) {
+        const v = await this.validate(supplierId, req, MAX_COMMIT_ROWS);
+        // Media names are unique inside a workbook (xl/media/imageN.ext); uploads may arrive without the folder.
+        const base = (p: string) => String(p || '').split('/').pop() || '';
+        const photos = new Map(files.map((f) => [base(f.originalname), f]));
         const results: any[] = [];
-        let pending = 0;
         for (let i = 0; i < v.rows.length; i++) {
             const r = v.rows[i];
-            const b = v.built[i];
-            const base = { row: r.row, name: r.name, ean: r.ean };
-            if (r.state === 'error') { results.push({ ...base, outcome: 'failed', reasons: r.errors.map((e) => e.reason) }); continue; }
+            const it = v.built[i];
+            const head = { key: r.key, sheet: r.sheet, row: r.row, name: r.name, ean: r.ean };
+            if (r.state === 'error') { results.push({ ...head, outcome: 'failed', reasons: r.errors.map((e: any) => e.reason) }); continue; }
+            if (r.state === 'skip') { results.push({ ...head, outcome: 'skipped', productId: r.existing?.id, reasons: ['Already in your catalog (you chose to skip these).'] }); continue; }
+            if (r.state === 'unchanged') { results.push({ ...head, outcome: 'unchanged', productId: r.existing?.id }); continue; }
+            const notes: string[] = [];
             try {
-                if (r.existing) {
-                    if (onExisting === 'skip') { results.push({ ...base, outcome: 'skipped', productId: r.existing.id, reasons: ['A product with this barcode is already in your catalog.'] }); continue; }
-                    // Only send filled values: an empty cell never clears saved data.
-                    const patch: any = {};
-                    for (const [k, val] of Object.entries(b.product)) {
-                        if (val === undefined || val === null || val === '' || (Array.isArray(val) && !val.length)) continue;
-                        patch[k] = val;
-                    }
-                    const saved: any = await this.products.supplierUpdate(r.existing.id, supplierId, patch, { submit: true });
-                    if (saved.status === 'PENDING') pending++;
-                    results.push({ ...base, outcome: 'updated', productId: saved.id, status: saved.status, missing: saved.missing?.map((m: any) => m.label) ?? [] });
-                } else {
-                    const created: any = await this.products.create({ ...b.product, supplierId } as any, false, true, { submit: true, actorId: supplierId });
-                    if (created.status === 'PENDING') pending++;
-                    results.push({ ...base, outcome: 'created', productId: created.id, status: created.status, missing: r.missing.map((m) => m.label), imageMissing: r.imageStatus === 'missing' });
+                // Pictures from the file: stored first so a complete product goes straight to review.
+                let images: string[] = it.built.product.images?.length ? it.built.product.images : [];
+                const wantsPhotos = !images.length && r.images.length && (r.action === 'create' || r.action === 'update');
+                if (wantsPhotos) {
+                    if (r.action === 'update') {
+                        const ex = await this.products.findOneRaw(r.existing!.id);
+                        if (realImages(ex?.images).length) { notes.push('Kept your current photos; the picture in the file was not used.'); }
+                        else images = await this.storePhotos(r.images, photos, notes);
+                    } else images = await this.storePhotos(r.images, photos, notes);
                 }
+                const product = { ...it.built.product, images };
+                let saved: any;
+                if (r.action === 'update') {
+                    const patch = updatePatch(product, it.built.values);
+                    saved = await this.products.supplierUpdate(r.existing!.id, supplierId, patch, { submit: true });
+                    results.push({ ...head, outcome: 'updated', productId: saved.id, status: saved.status, changes: r.changes.map((c: any) => c.label), notes });
+                } else {
+                    saved = await this.products.create({ ...product, supplierId } as any, false, true, { submit: true, actorId: supplierId, noInference: true });
+                    // What the saved product still lacks — after any photo upload, so a failed photo is counted.
+                    const missing = missingForPublish({ ...product, basePrice: product.price }).map((m) => m.label);
+                    results.push({ ...head, outcome: 'created', productId: saved.id, status: saved.status, missing, imageMissing: !images.length, notes });
+                }
+                await this.products.recordImportSource(saved.id, supplierId, { file: req.fileName, sheet: r.sheet, row: r.row, columns: it.original })
+                    .catch((e) => this.logger.warn(`[import] source record for ${saved.id}: ${e?.message}`));
             } catch (e: any) {
                 const msg = e?.response?.message || e?.message || 'Could not save this row.';
-                this.logger.warn(`[import] row ${r.row}: ${msg}`);
-                results.push({ ...base, outcome: 'failed', reasons: [Array.isArray(msg) ? msg.join(', ') : String(msg)] });
+                this.logger.warn(`[import] ${r.key}: ${Array.isArray(msg) ? msg.join(', ') : msg}`);
+                results.push({ ...head, outcome: 'failed', reasons: [Array.isArray(msg) ? msg.join(', ') : String(msg)], notes });
             }
         }
-        if (pending) {
-            this.notifications.notifyAdmins('Bulk products submitted', `${pending} product${pending === 1 ? '' : 's'} from a supplier import are waiting for review.`, 'INFO', { supplierId, count: pending }).catch(() => {});
-        }
+        if (req.last) await this.notifyReviewers(supplierId, req.startedAt);
         const count = (o: string) => results.filter((x) => x.outcome === o).length;
-        if (count('failed')) {
-            this.notifications.notifyUser(supplierId, 'Bulk upload: some rows weren’t imported', `${count('failed')} of ${results.length} rows failed. Fix them in your file and upload it again — rows already imported are skipped.`, 'WARNING', { type: 'BULK_IMPORT' }).catch(() => {});
-        }
         return {
             summary: {
-                total: results.length,
-                created: count('created'), updated: count('updated'), skipped: count('skipped'), failed: count('failed'),
-                pendingReview: results.filter((x) => x.status === 'PENDING').length,
-                drafts: results.filter((x) => x.status === 'DRAFT').length,
+                total: results.length, created: count('created'), updated: count('updated'), unchanged: count('unchanged'), skipped: count('skipped'), failed: count('failed'),
+                pendingReview: results.filter((x) => x.status === 'PENDING').length, drafts: results.filter((x) => x.status === 'DRAFT').length,
             },
             results,
         };
     }
+
+    /** Store a row's pictures; a picture that can't be stored is reported, never silently dropped. */
+    private async storePhotos(paths: string[], photos: Map<string, { buffer: Buffer; mimetype: string; size: number }>, notes: string[]): Promise<string[]> {
+        const out: string[] = [];
+        for (const p of paths) {
+            const f = photos.get(String(p).split('/').pop() || '');
+            if (!f) { notes.push('A picture from the file wasn’t received — add a photo later.'); continue; }
+            const type = sniffImage(f.buffer);
+            if (!type) { notes.push('A picture in the file isn’t a JPEG, PNG, GIF or WebP image — add a photo later.'); continue; }
+            if (f.size > 10 * 1024 * 1024) { notes.push('A picture in the file is larger than 10 MB — add a smaller photo later.'); continue; }
+            try { out.push(await this.storage.uploadProductImage(f.buffer, `import-${p.split('/').pop()}`, type)); }
+            catch (e: any) {
+                this.logger.warn(`[import] photo ${p} not stored: ${e?.message}`);
+                notes.push('The picture from your file couldn’t be stored right now — the product is a draft; add a photo later or import the file again.');
+            }
+        }
+        return out;
+    }
+
+    /** One notice to the review team per import, counted from the database (not from the client). */
+    private async notifyReviewers(supplierId: string, startedAt?: string) {
+        const t = new Date(startedAt || Date.now() - 60 * 60 * 1000);
+        const since = Number.isFinite(t.getTime()) ? new Date(Math.max(t.getTime(), Date.now() - 6 * 60 * 60 * 1000)) : new Date(Date.now() - 60 * 60 * 1000);
+        const pending = await this.products.countPendingSince(supplierId, since).catch(() => 0);
+        if (pending) this.notifications.notifyAdmins('Bulk products submitted', `${pending} product${pending === 1 ? '' : 's'} from a supplier import are waiting for review.`, 'INFO', { supplierId, count: pending }).catch(() => {});
+    }
+}
+
+/**
+ * The review travels through a proxy with a response size limit, so repeated
+ * text is sent once: column names and notes as tables, missing fields as keys.
+ * The browser expands it back (frontend components/supplier/import/types.ts).
+ */
+export function compactReview(out: { rows: any[]; [k: string]: any }) {
+    const columns: string[] = [], notes: string[] = [];
+    const missingLabels: Record<string, string> = {};
+    const intern = (list: string[], v: string) => { let i = list.indexOf(v); if (i < 0) { i = list.length; list.push(v); } return i; };
+    const rows = out.rows.map((r) => ({
+        ...r,
+        from: Object.fromEntries(Object.entries(r.from || {}).map(([f, x]: [string, any]) => [f, [intern(columns, x.column), x.value]])),
+        notes: Object.fromEntries(Object.entries(r.notes || {}).map(([f, n]) => [f, intern(notes, String(n))])),
+        missing: (r.missing || []).map((m: any) => { missingLabels[m.field] = m.label; return m.field; }),
+    }));
+    return { ...out, rows, tables: { columns, notes, missingLabels } };
+}
+
+/**
+ * What an update may change: only values that came from the file (or a value the
+ * supplier set for the import). Empty cells never clear saved data, and the
+ * importer's defaults — MOQ unit, unit type, currency — never travel on their own.
+ */
+export function updatePatch(product: any, values: Partial<Record<FieldKey, string>>): any {
+    const patch: any = {};
+    for (const [k, val] of Object.entries(product)) {
+        if (val === undefined || val === null || val === '' || (Array.isArray(val) && !val.length)) continue;
+        patch[k] = val;
+    }
+    if (!values.moq && !values.moqUnit) delete patch.moqUnit;
+    if (!values.unit) delete patch.unit;
+    if (patch.supplierPrice === undefined) { delete patch.supplierCurrency; delete patch.price; }
+    return patch;
+}
+
+/** Image type from the file's first bytes (the extension can't be trusted). */
+export function sniffImage(b: Buffer): string | null {
+    if (!b || b.length < 12) return null;
+    if (b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+    if (b.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+    if (b.slice(0, 6).toString('ascii') === 'GIF87a' || b.slice(0, 6).toString('ascii') === 'GIF89a') return 'image/gif';
+    if (b.slice(0, 4).toString('ascii') === 'RIFF' && b.slice(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+    return null;
 }

@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 import { Plus, Upload, Search, Package, Pencil, Trash2, Send, SlidersHorizontal, Image as ImageIcon, RefreshCw, ChevronLeft, ChevronRight, AlertCircle, Boxes, Tags, Clock3, CheckCircle2 } from 'lucide-react';
 import { supplierApi, type ProductPage, type SupplierProduct } from '@/lib/supplier-api';
 import { Button, Card, EmptyState, ErrorState, PageHeader, Skeleton, Stat, StatusBadge, Thumb, eur, int, inputCls, selectCls, useConfirm } from '@/components/supplier/ui';
-import BulkImportDialog from '@/components/supplier/BulkImportDialog';
 import StockAdjustDialog from '@/components/supplier/StockAdjustDialog';
 import PriceStockUpdateDialog from '@/components/supplier/PriceStockUpdateDialog';
 import { cn } from '@/lib/utils';
@@ -47,7 +46,6 @@ function InventoryManager() {
     const [loading, setLoading] = React.useState(true);
     const [selected, setSelected] = React.useState<Set<string>>(new Set());
     const [busy, setBusy] = React.useState(false);
-    const [importOpen, setImportOpen] = React.useState(params.get('import') === '1');
     const [adjust, setAdjust] = React.useState<SupplierProduct | null>(null);
     const [updateOpen, setUpdateOpen] = React.useState(false);
 
@@ -104,7 +102,7 @@ function InventoryManager() {
             <PageHeader title="Inventory & products" description="Your catalog, your prices and your stock. Price and stock changes on live listings apply immediately; new products and identity changes go through Atlantis review."
                 actions={<>
                     <Button icon={<RefreshCw size={15} />} onClick={() => setUpdateOpen(true)}>Update prices &amp; stock</Button>
-                    <Button icon={<Upload size={15} />} onClick={() => setImportOpen(true)}>Bulk upload</Button>
+                    <Link href="/supplier/products/import"><Button icon={<Upload size={15} />}>Bulk upload</Button></Link>
                     <Link href="/supplier/products/new"><Button variant="primary" icon={<Plus size={15} />}>Add product</Button></Link>
                 </>} />
 
@@ -170,7 +168,7 @@ function InventoryManager() {
                         <EmptyState icon={<Search size={20} />} title="No products match these filters" action={<Button onClick={() => { setQ(''); setStatus(''); setCategory(''); setStock(''); }}>Clear filters</Button>}>Try another search or status.</EmptyState>
                     ) : (
                         <EmptyState icon={<Boxes size={20} />} title="Add your first product"
-                            action={<><Button icon={<Upload size={15} />} onClick={() => setImportOpen(true)}>Bulk upload</Button><Link href="/supplier/products/new"><Button variant="primary" icon={<Plus size={15} />}>Add product</Button></Link></>}>
+                            action={<><Link href="/supplier/products/import"><Button icon={<Upload size={15} />}>Bulk upload</Button></Link><Link href="/supplier/products/new"><Button variant="primary" icon={<Plus size={15} />}>Add product</Button></Link></>}>
                             Add products one by one, or upload a spreadsheet. Atlantis reviews each listing before buyers can see it.
                         </EmptyState>
                     )
@@ -266,7 +264,6 @@ function InventoryManager() {
 
             <p className="mt-3 text-[12.5px] text-ink-3">Prices are your price per case (EUR), before the Atlantis margin. Stock is counted in cases; “reserved” cases are on orders not yet delivered and are already taken off stock. Per-product movement history is on <Link href="/supplier/inventory" className="text-teal hover:underline">Stock &amp; reservations</Link>.</p>
 
-            <BulkImportDialog open={importOpen} onClose={() => { setImportOpen(false); load(); }} />
             <PriceStockUpdateDialog open={updateOpen} onClose={() => { setUpdateOpen(false); load(); }} />
             <StockAdjustDialog product={adjust} onClose={() => setAdjust(null)} onSaved={() => { setAdjust(null); load(); }} />
         </div>

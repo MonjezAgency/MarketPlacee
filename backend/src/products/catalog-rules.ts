@@ -97,9 +97,10 @@ export function barcodeProblem(code: string): string | null {
 export function normaliseWeight(raw: unknown): string | null {
     if (raw === null || raw === undefined) return null;
     const s = String(raw).trim().replace(',', '.');
-    const m = s.match(/^(?:(\d+)\s*[x×]\s*)?(\d+(?:\.\d+)?)\s*(mg|kg|g|ml|cl|l|oz|lb)$/i);
+    const m = s.match(/^(?:(\d+)\s*[x×]\s*)?(\d+(?:\.\d+)?)\s*(mg|kg|grams?|grs?|gr|g|ml|cl|ltr|l|oz|lb)\.?$/i);
     if (!m) return null;
-    const unit = m[3].toLowerCase() === 'l' ? 'L' : m[3].toLowerCase();
+    const u = m[3].toLowerCase();
+    const unit = u === 'l' || u === 'ltr' ? 'L' : /^gr/.test(u) ? 'g' : u;
     return `${m[1] ? `${m[1]} x ` : ''}${m[2]} ${unit}`;
 }
 

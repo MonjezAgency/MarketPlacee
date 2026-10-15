@@ -142,7 +142,7 @@ export class ProductsService {
         });
     }
 
-    async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false, options?: { preFetchedConfigs?: any[], preFetchedCategories?: string[], supplierKycStatus?: string, submit?: boolean, actorId?: string }) {
+    async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false, options?: { preFetchedConfigs?: any[], preFetchedCategories?: string[], supplierKycStatus?: string, submit?: boolean, actorId?: string, noInference?: boolean }) {
         const dtoIn = createProductDto as any;
         if (dtoIn.ean !== undefined && dtoIn.ean !== null && String(dtoIn.ean).trim()) dtoIn.ean = normaliseBarcode(dtoIn.ean);
         if (dtoIn.weight) dtoIn.weight = normaliseWeight(dtoIn.weight) || String(dtoIn.weight).trim();
@@ -257,7 +257,8 @@ export class ProductsService {
         }
 
         // Auto-categorize if missing or incorrect (unit-based)
-        let finalCategory = this.extractCategoryFromName(createProductDto.name, createProductDto.category);
+        // Imports pass noInference: what the supplier reviewed is exactly what is saved — nothing filled in from the name.
+        let finalCategory = options?.noInference ? (createProductDto.category || 'General') : this.extractCategoryFromName(createProductDto.name, createProductDto.category);
         
         if (!skipAi && (!finalCategory || finalCategory.toLowerCase() === 'general' || finalCategory.toLowerCase() === 'others')) {
             let catList = options?.preFetchedCategories;
@@ -282,7 +283,7 @@ export class ProductsService {
         // Operator-requested: the supplier shouldn't have to retype
         // weight + brand if both are already in the name string.
         const dtoMutable = createProductDto as any;
-        if (dtoMutable.name) {
+        if (dtoMutable.name && !options?.noInference) {
             if (!dtoMutable.brand) {
                 const extracted = this.extractBrandFromName(dtoMutable.name);
                 if (extracted) dtoMutable.brand = extracted;
@@ -1827,6 +1828,51 @@ export class ProductsService {
         const list = [...new Set(codes.map(normaliseBarcode).filter(Boolean))];
         if (!list.length) return [];
         return this.prisma.product.findMany({ where: { supplierId, ean: { in: list } }, select: { id: true, name: true, ean: true, status: true } });
+    }
+
+    /**
+     * The supplier's own products matching an import, by barcode or (for rows
+     * without one) by exact name — with the fields an import can change, so
+     * the review can show old → new. Never another supplier's products.
+     */
+    async findMineForImport(supplierId: string, codes: string[], names: string[]) {
+        const eans = [...new Set(codes.map(normaliseBarcode).filter(Boolean))];
+        const nm = [...new Set(names.map((n) => String(n || '').trim()).filter(Boolean))];
+        if (!eans.length && !nm.length) return [];
+        return this.prisma.product.findMany({
+            where: { supplierId, OR: [...(eans.length ? [{ ean: { in: eans } }] : []), ...(nm.length ? [{ name: { in: nm, mode: 'insensitive' as const } }] : [])] },
+            select: {
+                id: true, name: true, ean: true, status: true, brand: true, category: true, weight: true, origin: true, exwLocation: true,
+                unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, moq: true, moqUnit: true, stock: true, shelfLife: true,
+                leadTime: true, basePrice: true, supplierPrice: true, supplierCurrency: true, unit: true, images: true,
+            },
+        });
+    }
+
+    /** Brands already on Atlantis (live listings) plus the supplier's own — for reading a brand from a product name. */
+    async knownBrands(supplierId: string): Promise<string[]> {
+        const rows = await this.prisma.product.findMany({
+            where: { brand: { not: null }, OR: [{ status: ProductStatus.APPROVED }, { supplierId }] },
+            select: { brand: true }, distinct: ['brand'], take: 5000,
+        });
+        return rows.map((r) => String(r.brand || '').trim()).filter((b) => b.length >= 2);
+    }
+
+    async findOneRaw(id: string) {
+        return this.prisma.product.findUnique({ where: { id }, select: { id: true, images: true, status: true, supplierId: true } });
+    }
+
+    /** Products of this supplier waiting for review that were created or changed since `since`. */
+    async countPendingSince(supplierId: string, since: Date): Promise<number> {
+        return this.prisma.product.count({ where: { supplierId, status: ProductStatus.PENDING, updatedAt: { gte: since } } });
+    }
+
+    /** Keep the supplier's original spreadsheet row with the product (every column, as typed). */
+    async recordImportSource(productId: string, actorId: string, source: { file?: string; sheet: string; row: number; columns: Record<string, string> }) {
+        const json = JSON.stringify(source);
+        await this.prisma.productChangeLog.create({
+            data: { productId, actorId, field: 'import', oldValue: null, newValue: json.length > 8000 ? json.slice(0, 8000) : json, reason: `Imported from ${source.file || 'a supplier file'}, sheet “${source.sheet}”, row ${source.row}` },
+        });
     }
 
     /**
