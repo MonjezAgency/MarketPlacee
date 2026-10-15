@@ -18,3 +18,11 @@ export const SOCIAL_LINKS: { id: 'facebook' | 'instagram' | 'linkedin'; label: s
     { id: 'facebook', label: 'Facebook', url: process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK || null },
     { id: 'instagram', label: 'Instagram', url: process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM || null },
 ];
+
+/**
+ * Indicative arrival text for the cart (e.g. "approximately 1 week"). Not a
+ * verified estimate: there is no transport integration yet, so it is shown
+ * only when set (NEXT_PUBLIC_ARRIVAL_ESTIMATE) and always labelled
+ * indicative. Replace with real carrier data when that integration exists.
+ */
+export const ARRIVAL_ESTIMATE: string | null = process.env.NEXT_PUBLIC_ARRIVAL_ESTIMATE?.trim() || null;

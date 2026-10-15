@@ -13,10 +13,11 @@ import { formatPrice } from '@/lib/currency';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn, prettifyVariantSignature } from '@/lib/utils';
 import {
-    quoteCart, listLoads, updateLoad, deleteLoad, createLoad, loadLabel, ApiError,
+    quoteCart, listLoads, updateLoad, deleteLoad, loadLabel, ApiError,
     type CartQuote, type QuoteLine, type MixedLoad,
 } from '@/lib/wholesale';
-import { BelowMinimumPanel, LineMinimumBar, MixedLoadPicker, ProgressMeter, StockShortPanel, loadProgress } from '@/components/cart/MinimumOrder';
+import { LineStatus, MixedLoadPicker, ProgressMeter, loadProgress } from '@/components/cart/MinimumOrder';
+import { ARRIVAL_ESTIMATE } from '@/lib/config';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const UNIT_SHORT: Record<string, string> = { carton: 'cs', pallet: 'pal.', truck: 'trk' };
@@ -33,9 +34,12 @@ function dispatchStrip(rows: { leadTime?: number | null; readyForDispatch?: bool
     const lead = Math.max(0, ...rows.filter((r) => !r.readyForDispatch).map((r) => Number(r.leadTime) || 0));
     const allReady = rows.every((r) => r.readyForDispatch);
     const unknown = rows.some((r) => !r.readyForDispatch && !r.leadTime);
-    const left = allReady ? 'Ready for dispatch' : unknown ? null : `Dispatch lead time up to ${lead} days`;
+    const dispatch = allReady ? 'Ready for dispatch' : unknown ? null : `Dispatch lead time up to ${lead} days`;
+    // An arrival estimate is shown only when configured, and always marked indicative (no carrier integration yet).
+    const left = ARRIVAL_ESTIMATE ? `Estimated arrival ${ARRIVAL_ESTIMATE} (indicative)${dispatch ? ` · ${dispatch}` : ''}` : dispatch;
+    // The product's stated EXW (Ex Works) location — the commercial term stored on Atlantis listings.
     const locs = Array.from(new Set(rows.map((r) => r.exwLocation).filter(Boolean))) as string[];
-    return { left, right: locs.length === 1 ? `Ships from ${locs[0]}` : null };
+    return { left, right: locs.length === 1 ? `EXW · ${locs[0]}` : locs.length > 1 ? `EXW · ${locs.length} locations` : null };
 }
 const UNAVAILABLE = new Set(['PRODUCT_NOT_FOUND', 'PRODUCT_NOT_AVAILABLE', 'LOAD_NOT_FOUND', 'LOAD_ALREADY_ORDERED']);
 
@@ -64,7 +68,7 @@ function Stepper({ value, onChange, min = 1, max, unit, disabled }: { value: num
 
 function Thumb({ src, alt }: { src?: string | null; alt: string }) {
     return (
-        <span className="relative w-[60px] h-[60px] shrink-0 rounded-xl bg-media ring-1 ring-line overflow-hidden">
+        <span className="relative w-16 h-16 shrink-0 rounded-2xl bg-white ring-1 ring-line overflow-hidden">
             {src
                 // eslint-disable-next-line @next/next/no-img-element
                 ? <img src={src} alt={alt} className="absolute inset-0 m-auto max-w-[80%] max-h-[80%] object-contain mix-blend-multiply" />
@@ -78,7 +82,7 @@ function LineRow(props: {
     href: string; image?: string | null; name: string; ean?: string | null; meta: (string | null | undefined)[]; bbd?: string | null;
     error?: string | null; unavailable?: boolean;
     stepper: React.ReactNode; price: string; units?: string | null; onRemove: () => void; removeDisabled?: boolean;
-    extra?: React.ReactNode;
+    extra?: React.ReactNode; muted?: boolean;
 }) {
     return (
         <li className="px-5 py-4">
@@ -97,18 +101,18 @@ function LineRow(props: {
                             <AlertTriangle size={14} className="mt-0.5 shrink-0" />{props.error}
                         </p>
                     )}
+                    {props.extra}
                 </div>
             </div>
-            <div className="flex items-center justify-between md:justify-end gap-4 md:gap-6 ps-[74px] md:ps-0">
+            <div className="flex items-center justify-between md:justify-end gap-3 md:gap-6 sm:ps-[78px] md:ps-0">
                 {props.stepper}
-                <div className="w-[120px] text-end">
-                    <p className="text-[15.5px] font-semibold text-ink tabular-nums">{props.price}</p>
+                <div className="min-w-0 flex-1 sm:flex-none sm:w-[120px] text-end">
+                    <p className={cn('text-[15.5px] font-semibold tabular-nums', props.muted ? 'text-ink-3' : 'text-ink')}>{props.price}</p>
                     {props.units && <p className="text-[12.5px] text-ink-4 tabular-nums">{props.units}</p>}
                 </div>
                 <button type="button" onClick={props.onRemove} disabled={props.removeDisabled} aria-label={`Remove ${props.name}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-4 hover:text-[#DC2626] hover:bg-surface-3 disabled:opacity-40"><Trash2 size={16} /></button>
             </div>
         </div>
-        {props.extra}
         </li>
     );
 }
@@ -181,7 +185,6 @@ export default function CartPage() {
     const [loadError, setLoadError] = React.useState<Record<string, string>>({});
     const [destination, setDestination] = React.useState<string | null>(null);
     const [pickerFor, setPickerFor] = React.useState<string | null>(null);
-    const [lineBusy, setLineBusy] = React.useState<string | null>(null);
     const [lineError, setLineError] = React.useState<Record<string, string>>({});
 
     React.useEffect(() => { try { setDestination(localStorage.getItem('atl_delivery_address')); } catch { /* none */ } }, []);
@@ -222,20 +225,6 @@ export default function CartPage() {
             if (e instanceof ApiError && e.code === 'STALE_VERSION') refreshLoads();
         } finally { setLoadBusy(null); }
     };
-    // Option 2 for a below-minimum line: move it into a new mixed load and open the product picker.
-    const startMix = async (i: CartItem, kind: 'PALLET' | 'TRUCK', quantity: number) => {
-        setLineBusy(i.id); setLineError((m) => ({ ...m, [i.id]: '' }));
-        const sv = i.selectedVariants || {};
-        const variant = Object.keys(sv).length ? Object.keys(sv).sort().map((k) => `${k}=${(sv as any)[k]}`).join('|') : null;
-        try {
-            const load = await createLoad(kind, [{ productId: i.productId || i.id.split('::')[0], variant, quantity }]);
-            removeItem(i.id);
-            refreshLoads();
-            setPickerFor(load.id);
-        } catch (e) {
-            setLineError((m) => ({ ...m, [i.id]: e instanceof ApiError ? e.message : 'Could not start a mixed load.' }));
-        } finally { setLineBusy(null); }
-    };
     // Mixed loads live on the server; a cart line is created when the buyer checks it out.
     const ensureLoadInCart = (load: MixedLoad) => {
         const lines = load.quote?.lines ?? [];
@@ -247,6 +236,10 @@ export default function CartPage() {
     // Order readiness
     const standardErrors = singles.map(lineFor).filter((q) => q?.error);
     const standardReady = singles.length > 0 && (legacy || (quoteState === 'idle' && !!quote && standardErrors.length === 0));
+    const belowCount = singles.filter((i) => lineFor(i)?.error?.code === 'BELOW_MOQ').length;
+    // "2 pallets · 10 cases" — what the standard order contains, by packaging unit.
+    const packSummary = Object.entries(singles.reduce((m: Record<string, number>, i) => { const t = i.tier || 'carton'; m[t] = (m[t] || 0) + i.quantity; return m; }, {}))
+        .map(([t, n]) => `${n.toLocaleString('en-GB')} ${unitWord(t, n)}`).join(' · ');
     const standardTotal = legacy ? singles.reduce((s, i) => s + i.price * i.quantity, 0) : singles.reduce((s, i) => s + (lineFor(i)?.lineTotal ?? 0), 0);
     const readyLoads = (loads ?? []).filter((l) => l.quote?.ready);
     const orders = (singles.length ? 1 : 0) + (loads?.length ?? 0);
@@ -263,7 +256,7 @@ export default function CartPage() {
                 <div className="text-center max-w-md">
                     <span className="mx-auto w-14 h-14 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><ShoppingBag size={26} /></span>
                     <h1 className="mt-5 text-[22px] font-bold text-heading">Your cart is empty</h1>
-                    <p className="mt-2 text-[14px] text-ink-3">Order by the case, pallet or truckload — or combine products into a mixed pallet or truckload.</p>
+                    <p className="mt-2 text-[14px] text-ink-3">Order by the case, pallet or truckload — or combine variants of a product into a mixed pallet or truckload.</p>
                     <Link href="/categories" className="mt-6 inline-flex items-center gap-2 h-10 px-5 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold">Browse catalog <ArrowRight size={15} /></Link>
                 </div>
             </main>
@@ -305,9 +298,9 @@ export default function CartPage() {
                             <OrderCard
                                 icon={<Package size={16} />}
                                 strip={dispatchStrip(singles.map((i) => lineFor(i)?.info).filter(Boolean) as any)}
-                                title="Standard order"
+                                title={<>Standard order{packSummary ? <span className="ms-2 text-[12.5px] font-medium text-ink-3">{packSummary}</span> : null}</>}
                                 destination={destination}
-                                status={quoteState === 'auth' ? { tone: 'warn', label: 'Sign in to price' } : standardReady ? { tone: 'ok', label: 'Ready' } : quoteState === 'loading' ? { tone: 'warn', label: 'Pricing…' } : { tone: standardErrors.some((q) => UNAVAILABLE.has(q!.error!.code)) ? 'err' : 'warn', label: standardErrors.some((q) => q!.error!.code === 'BELOW_MOQ') ? 'Below minimum' : 'Needs attention' }}
+                                status={quoteState === 'auth' ? { tone: 'warn', label: 'Sign in to price' } : standardReady ? { tone: 'ok', label: 'Ready' } : quoteState === 'loading' ? { tone: 'warn', label: 'Pricing…' } : { tone: standardErrors.some((q) => UNAVAILABLE.has(q!.error!.code)) ? 'err' : 'warn', label: belowCount ? `${belowCount} below MOQ` : 'Needs attention' }}
                                 total={standardTotal ? formatPrice(standardTotal) : '—'}
                                 totalNote={legacy ? 'estimate' : undefined}
                                 blockedReason={standardReady || quoteState === 'loading' ? null
@@ -329,6 +322,9 @@ export default function CartPage() {
                                     const locked = !!i.mixComposition?.length;
                                     const belowMin = q?.error?.code === 'BELOW_MOQ';
                                     const stockShort = q?.error?.code === 'INSUFFICIENT_STOCK';
+                                    const moq = q?.minimum ?? q?.error?.minimum;
+                                    // Below-minimum lines are still priced by the server (unit price), shown muted: not in the total yet.
+                                    const indicative = (belowMin || stockShort) && q?.error?.unitPrice ? q.error.unitPrice * i.quantity : null;
                                     return (
                                         <LineRow
                                             key={i.id}
@@ -339,25 +335,20 @@ export default function CartPage() {
                                             meta={[
                                                 casesPerUnit && i.tier !== 'carton' ? `${casesPerUnit.toLocaleString()} ctn` : null,
                                                 upc && i.tier === 'carton' ? `${upc} units/ctn` : null,
+                                                moq ? `MOQ ${moq.required.toLocaleString('en-GB')} ${moq.unit}${moq.required === 1 ? '' : 's'}` : null,
                                                 q?.perCase && upc ? `${formatPrice(q.perCase / upc)} per unit` : null,
                                                 locked ? i.mixComposition!.map((c) => `${prettifyVariantSignature(c.signature) || c.signature} × ${c.quantity}`).join(' · ') : null,
                                             ]}
                                             bbd={fmtDate(q?.info?.shelfLife)}
                                             error={belowMin || stockShort ? (lineError[i.id] || null) : (lineError[i.id] || q?.error?.message) ?? null}
                                             unavailable={!!q?.error && UNAVAILABLE.has(q.error.code)}
-                                            extra={!q || locked ? undefined
-                                                : belowMin ? (
-                                                    <BelowMinimumPanel line={q} tier={i.tier || 'carton'} busy={lineBusy === i.id}
-                                                        onSetMinimum={(n) => updateQuantity(i.id, n)}
-                                                        onStartMix={q.error?.mixable ? () => startMix(i, q.error!.mixable!.kind, q.error!.mixable!.quantity) : undefined} />
-                                                ) : stockShort ? (
-                                                    <StockShortPanel line={q} tier={i.tier || 'carton'} busy={lineBusy === i.id} onSetQuantity={(n) => updateQuantity(i.id, n)} />
-                                                ) : !q.error && q.minimum ? <LineMinimumBar minimum={q.minimum} /> : undefined}
+                                            extra={!q || locked ? undefined : <LineStatus line={q} tier={i.tier || 'carton'} onSetQuantity={(n) => updateQuantity(i.id, n)} />}
+                                            muted={!!indicative}
                                             stepper={locked
                                                 ? <span className="w-[190px] text-center text-[13px] text-ink-3">1 mixed {unitWord(i.tier, 1)}</span>
                                                 : <Stepper value={i.quantity} unit={UNIT_SHORT[i.tier || 'carton']} min={1} onChange={(n) => updateQuantity(i.id, n)} />}
-                                            price={q && !q.error ? formatPrice(q.lineTotal) : stockShort && q?.error?.lineTotal ? formatPrice(q.error.lineTotal) : legacy ? formatPrice(i.price * i.quantity) : quoteState === 'loading' ? '…' : '—'}
-                                            units={q?.unitsTotal ? `${q.unitsTotal.toLocaleString()} units` : null}
+                                            price={q && !q.error ? formatPrice(q.lineTotal) : indicative ? formatPrice(indicative) : legacy ? formatPrice(i.price * i.quantity) : quoteState === 'loading' ? '…' : '—'}
+                                            units={q?.unitsTotal ? `${q.unitsTotal.toLocaleString()} units` : indicative ? 'not in total yet' : null}
                                             onRemove={() => removeItem(i.id)}
                                         />
                                     );
@@ -467,19 +458,19 @@ export default function CartPage() {
                                         </div>
                                     </div>
                                 )}
-                                <div className="mt-5 flex items-baseline justify-between">
-                                    <span className="text-[15px] font-medium text-ink">Total ready for checkout</span>
+                                <dl className="mt-5 space-y-3 text-[14px]">
+                                    <div className="flex justify-between gap-4"><dt className="text-ink-3">Products <span className="text-ink-4">({orders - notReady} ready {orders - notReady === 1 ? 'order' : 'orders'})</span></dt><dd className="text-ink tabular-nums">{formatPrice(readyTotal)}</dd></div>
+                                    <div className="flex justify-between gap-4"><dt className="text-ink-3">Delivery</dt><dd className="text-ink-2 text-end">Quoted after you order</dd></div>
+                                    <div className="flex justify-between gap-4"><dt className="text-ink-3">VAT</dt><dd className="text-ink-2 text-end">Added on the invoice</dd></div>
+                                </dl>
+                                <div className="mt-4 pt-4 border-t border-line flex items-baseline justify-between gap-4">
+                                    <span className="text-[15px] font-semibold text-ink">Subtotal <span className="block text-[12px] font-normal text-ink-4">excl. delivery and VAT</span></span>
                                     <span className="text-[22px] font-semibold text-heading tabular-nums">{formatPrice(readyTotal)}</span>
                                 </div>
                                 <div className="mt-4 rounded-xl ring-1 ring-line p-4 flex gap-3">
                                     <ShieldCheck size={18} className="text-teal shrink-0 mt-0.5" />
-                                    <p className="text-[13.5px] text-ink-2"><span className="font-medium text-ink">Priced by Atlantis.</span> Totals are calculated on our server from current pack sizes and rates, and confirmed again when you place the order.</p>
+                                    <p className="text-[13px] text-ink-2"><span className="font-medium text-ink">Nothing is charged at checkout.</span> Atlantis re-checks prices, minimums and stock when you place the order, then contacts you to confirm payment and delivery.</p>
                                 </div>
-                                <dl className="mt-5 space-y-3 text-[14px]">
-                                    <div className="flex justify-between"><dt className="text-ink-3">Subtotal</dt><dd className="text-ink tabular-nums">{formatPrice(readyTotal)}</dd></div>
-                                    <div className="flex justify-between"><dt className="text-ink-3">Delivery</dt><dd className="text-ink-2">Quoted at checkout</dd></div>
-                                    <div className="flex justify-between"><dt className="text-ink-3">VAT</dt><dd className="text-ink-2">Added on invoice</dd></div>
-                                </dl>
                                 {quoteState === 'error' && <p className="mt-3 text-[13px] text-[#DC2626]">{quoteError}</p>}
                                 {legacy && <p className="mt-3 text-[12.5px] text-ink-3">Estimated from product-page prices; the final total is confirmed when you place the order.</p>}
                                 <button type="button" disabled={readyTotal <= 0} onClick={checkoutAll}

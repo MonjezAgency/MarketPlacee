@@ -37,83 +37,44 @@ export function ProgressMeter({ have, required, unit, ok, note, remaining, perce
     );
 }
 
-/** Green (or red) progress under a line that has an MOQ — shown even once it's met. */
-export function LineMinimumBar({ minimum }: { minimum: NonNullable<QuoteLine['minimum']> }) {
-    return (
-        <div className={cn('mt-3 rounded-xl p-3 ring-1', minimum.met ? 'ring-[#A7F3D0] bg-[#ECFDF5]/60 dark:bg-emerald-500/5' : 'ring-[#FECACA] bg-[#FEF2F2]/60')}>
-            <ProgressMeter have={minimum.have} required={minimum.required} unit={minimum.unit} ok={minimum.met} remaining={minimum.remaining} percent={minimum.percent} />
-        </div>
-    );
-}
-
-/** A line asking for more than the supplier has: what's available, and the largest quantity that fits. */
-export function StockShortPanel({ line, tier, onSetQuantity, busy }: { line: QuoteLine; tier: string; onSetQuantity: (n: number) => void; busy?: boolean }) {
-    const e = line.error!;
-    const unit = tier === 'carton' ? 'case' : tier;
-    const max = e.maxUnits ?? 0;
-    return (
-        <div className="mt-3 rounded-xl ring-1 ring-[#FDE68A] bg-[#FFFBEB]/70 dark:bg-amber-500/5 p-4 space-y-2.5">
-            <p className="text-[13.5px] font-medium text-ink">
-                {(e.availableCases ?? 0) > 0 ? <>Only {qtyText(e.availableCases!, 'case')} in stock{max >= 1 ? <> — up to {qtyText(max, unit)}</> : null}.</> : 'This product is out of stock.'}
-            </p>
-            {e.minimum && <ProgressMeter have={e.minimum.have} required={e.minimum.required} unit={e.minimum.unit} ok={e.minimum.met} remaining={e.minimum.remaining} percent={e.minimum.percent} />}
-            {max >= 1 ? (
-                <Button size="sm" variant="primary" disabled={busy} onClick={() => onSetQuantity(max)}>Set to {qtyText(max, unit)}</Button>
-            ) : (e.availableCases ?? 0) > 0 ? (
-                <p className="text-[12.5px] text-ink-3">That’s less than one {unitWord(unit, 1)}. Choose a smaller pack (pallet or case) on the product page.</p>
-            ) : null}
-        </div>
-    );
-}
-
 /**
- * Shown under a single-product line that is below the product's minimum:
- * progress in the MOQ's own unit, then the two ways to complete the order.
+ * The MOQ line under a cart product (server figures only): "Below MOQ: add 4
+ * more pallets to meet the minimum" with a slim progress bar, or a green
+ * "MOQ met". Stock shortfalls get the same compact treatment.
  */
-export function BelowMinimumPanel({ line, tier, onSetMinimum, onStartMix, busy }: {
-    line: QuoteLine; tier: string; onSetMinimum: (n: number) => void; onStartMix?: () => void; busy?: boolean;
-}) {
-    const e = line.error!;
-    const min = e.minUnits ?? 1;
-    const unit = tier === 'carton' ? 'case' : tier;
-    const m = e.minimum;
-    const mix = e.mixable;
-    const mixUnit = mix?.kind === 'TRUCK' ? 'pallet' : 'case';
-    return (
-        <div className="mt-3 rounded-xl ring-1 ring-[#FECACA] bg-[#FEF2F2]/60 dark:bg-red-500/5 p-4 space-y-3">
-            {m ? <ProgressMeter have={m.have} required={m.required} unit={m.unit} ok={false} remaining={m.remaining} percent={m.percent} />
-                : <ProgressMeter have={e.quantity ?? line.quantity} required={min} unit={unit} ok={false} />}
-            <p className="text-[13.5px] font-medium text-ink">
-                {m ? <>Minimum order: {qtyText(m.required, m.unit)}. Add {fmtQty(m.remaining)} more {unitWord(m.unit, m.remaining)} to continue.</>
-                    : <>Minimum order: {qtyText(min, unit)}. Add {fmtQty(e.remaining ?? 0)} more {unitWord(unit, e.remaining ?? 0)} to continue.</>}
-            </p>
-            <div className="grid gap-2.5 sm:grid-cols-2">
-                <div className="rounded-lg bg-surface ring-1 ring-line p-3">
-                    <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">Option 1 · More of this product</p>
-                    <p className="mt-1 text-[13px] text-ink-2 tabular-nums">
-                        {qtyText(min, unit)}{typeof e.unitPrice === 'number' && e.unitPrice > 0 ? <> × {formatPrice(e.unitPrice)} = <b className="text-ink">{formatPrice(e.minLineTotal ?? e.unitPrice * min)}</b></> : null}
-                    </p>
-                    <Button size="sm" variant="primary" className="mt-2.5" disabled={busy} onClick={() => onSetMinimum(min)}>Set to {qtyText(min, unit)}</Button>
-                </div>
-                <div className={cn('rounded-lg ring-1 ring-line p-3', mix ? 'bg-surface' : 'bg-surface-2')}>
-                    <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">Option 2 · Add Mix</p>
-                    {mix && onStartMix ? (
-                        <>
-                            <p className="mt-1 text-[13px] text-ink-2">
-                                Combine other variants of this same product (same SKU) in one {mix.kind === 'TRUCK' ? 'truck' : 'pallet'}. Together they count toward the minimum of {qtyText(mix.minUnits, mixUnit)}.
-                            </p>
-                            <Button size="sm" variant="secondary" className="mt-2.5" icon={mix.kind === 'TRUCK' ? <Truck size={14} /> : <Layers size={14} />} disabled={busy} onClick={onStartMix}>Add Mix</Button>
-                        </>
-                    ) : (
-                        <>
-                            <p className="mt-1 text-[13px] text-ink-3">No eligible mix options are currently available: {tier === 'truck' ? 'truckloads can’t be mixed.' : 'mixing is only between variants of the same product, and this product has no other variant that fits one load.'}</p>
-                            <Button size="sm" variant="secondary" className="mt-2.5" disabled icon={<Layers size={14} />}>Add Mix</Button>
-                        </>
-                    )}
+export function LineStatus({ line, tier, onSetQuantity }: { line: QuoteLine; tier: string; onSetQuantity?: (n: number) => void }) {
+    const e = line.error;
+    const m = e?.code === 'BELOW_MOQ' ? e.minimum : e ? e.minimum : line.minimum;
+    const tierUnit = tier === 'carton' ? 'case' : tier;
+    if (e?.code === 'INSUFFICIENT_STOCK') {
+        const max = e.maxUnits ?? 0;
+        return (
+            <div className="mt-2 text-[13px] text-[#B45309]">
+                <p className="inline-flex flex-wrap items-center gap-x-1.5"><AlertTriangle size={14} className="shrink-0" />
+                    {(e.availableCases ?? 0) > 0 ? <>Only {qtyText(e.availableCases!, 'case')} in stock{max >= 1 ? <> — up to {qtyText(max, tierUnit)}</> : ' — less than one ' + unitWord(tierUnit, 1)}.</> : 'Out of stock.'}
+                    {max >= 1 && onSetQuantity && <button type="button" onClick={() => onSetQuantity(max)} className="font-semibold underline underline-offset-2">Set to {qtyText(max, tierUnit)}</button>}
+                </p>
+            </div>
+        );
+    }
+    if (e?.code === 'BELOW_MOQ') {
+        const required = m?.required ?? e.minUnits ?? 1, have = m?.have ?? e.quantity ?? line.quantity, unit = m?.unit ?? tierUnit;
+        const remaining = m?.remaining ?? e.remaining ?? Math.max(0, required - have);
+        const pct = m?.percent ?? Math.min(100, (have / required) * 100);
+        return (
+            <div className="mt-2">
+                <p className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#B45309]"><AlertTriangle size={14} className="shrink-0" />Below MOQ: add {fmtQty(remaining)} more {unitWord(unit, remaining)} to meet the minimum.</p>
+                <div className="mt-1.5 flex items-center gap-2.5 max-w-[360px]">
+                    <div className="flex-1 h-1.5 rounded-full bg-[#FDE68A]/50 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label={`Minimum order progress: ${fmtQty(have)} of ${required} ${unitWord(unit, required)}`}>
+                        <div className="h-full rounded-full bg-[#F59E0B]" style={{ width: `${Math.max(3, Math.min(100, pct))}%` }} />
+                    </div>
+                    <span className="text-[12px] text-ink-3 tabular-nums whitespace-nowrap">{fmtQty(have)} of {qtyText(required, unit)}</span>
                 </div>
             </div>
-        </div>
-    );
+        );
+    }
+    if (!e && m) return <p className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-[#047857]"><CheckCircle2 size={14} />MOQ met · {fmtQty(m.have)} of {qtyText(m.required, m.unit)}</p>;
+    return null;
 }
 
 /** Minimum-order (or capacity) summary of a mixed load, from the server quote. */

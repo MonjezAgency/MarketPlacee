@@ -1,0 +1,72 @@
+import type { Article } from '../types';
+
+export const glossary: Article[] = [
+    {
+        slug: 'glossary',
+        category: 'glossary',
+        title: 'Glossary',
+        summary: 'The trade and platform terms used across Atlantis, in plain language.',
+        audience: 'both',
+        keywords: ['terms', 'definitions', 'meaning', 'abbreviations'],
+        blocks: [
+            { table: { head: ['Term', 'Meaning'], rows: [
+                ['BBD', 'Best-before date. The date until which the product keeps its full quality.'],
+                ['Case (carton)', 'The supplier\'s outer pack containing a fixed number of pieces. Atlantis prices and counts stock in cases.'],
+                ['EAN / GTIN', 'The product barcode. EAN-13 is the most common; Atlantis also accepts 8, 12 and 14 digits.'],
+                ['EXW (Ex Works)', 'The location where the supplier makes the goods available for collection. Freight is quoted from there.'],
+                ['FMCG', 'Fast-moving consumer goods: everyday products such as drinks, snacks, toiletries and household items.'],
+                ['Lead time', 'Days the supplier needs before the goods are ready to dispatch. 0 means ready now.'],
+                ['Mixed load', 'A pallet or truck filled with several variants of the same product.'],
+                ['MOQ', 'Minimum order quantity: the smallest amount of a product you can order.'],
+                ['Pallet', 'A platform loaded with a fixed number of cases.'],
+                ['Piece', 'A single retail unit, such as one bottle or one bar.'],
+                ['Reserved stock', 'Cases set aside for orders that are placed but not yet shipped.'],
+                ['RFQ', 'Request for quotation. On Atlantis, a sourcing request sent from the Requests page.'],
+                ['Target price', 'The price per case a buyer would like to pay, sent to the Atlantis desk.'],
+                ['Truckload', 'A full truck loaded with a fixed number of pallets.'],
+                ['Variant', 'A version of a product, such as a flavour or size.'],
+            ] } },
+        ],
+        related: ['products-pricing/cases-pallets-trucks', 'orders-cart/minimum-order-quantity', 'orders-cart/mixed-loads'],
+    },
+    {
+        slug: 'catalog-best-practices',
+        category: 'glossary',
+        title: 'Best practices for supplier listings',
+        summary: 'Habits that get listings approved faster and help buyers order with confidence.',
+        audience: 'supplier',
+        keywords: ['best practices', 'listing quality', 'approval', 'tips'],
+        blocks: [
+            { list: [
+                '**Use the exact barcode of the unit you sell.** It groups your offer with others for the same product and finds the right photos.',
+                '**Give complete packaging data.** Pieces per case, cases per pallet and pallets per truck unlock every ordering option.',
+                '**Use real, clear photos.** Show the front of the pack. Check that the pack size matches the listing.',
+                '**Choose a specific category,** not a general one.',
+                '**Keep stock current.** Orders reserve stock immediately; out-of-date stock leads to declined orders.',
+                '**Set a realistic minimum order.** Too high a minimum blocks smaller buyers.',
+                '**Add lead time and BBD.** Buyers compare them across offers.',
+                '**Confirm orders promptly.** Buyers see "Awaiting confirmation" until you do.',
+            ] },
+        ],
+        related: ['suppliers/create-a-product', 'suppliers/product-status', 'suppliers/update-prices-and-stock'],
+    },
+    {
+        slug: 'ordering-best-practices',
+        category: 'glossary',
+        title: 'Best practices for buyers',
+        summary: 'Tips for ordering efficiently and avoiding surprises.',
+        audience: 'buyer',
+        keywords: ['best practices', 'buying tips', 'save money'],
+        blocks: [
+            { list: [
+                '**Compare the price per piece** when pack sizes differ.',
+                '**Fill pallets and trucks.** Combine variants of the same product in a [mixed load](/help/orders-cart/mixed-loads) instead of ordering partial pallets.',
+                '**Check the EXW location.** Goods dispatched closer to you are usually cheaper to deliver.',
+                '**Use target prices** on products you buy often, and watch the price history.',
+                '**Save regular orders to a list** with a reorder reminder.',
+                '**Inspect goods on arrival** before confirming delivery, and report problems with details.',
+            ] },
+        ],
+        related: ['buyers/compare-offers', 'buyers/target-prices', 'buyers/lists-and-reordering'],
+    },
+];

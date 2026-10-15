@@ -59,6 +59,11 @@ export function cleanAddress(a: unknown): { name: string; company: string; stree
     return out.country ? out : null;
 }
 
+/** Public product facts shown on a cart line (no prices, no supplier identity). */
+function lineInfo(p: any) {
+    return { ean: p.ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: p.shelfLife ?? null, leadTime: p.leadTime ?? null, readyForDispatch: !!p.readyForDispatch, exwLocation: p.exwLocation ?? null };
+}
+
 @Injectable()
 export class OrdersService {
     constructor(
@@ -226,11 +231,14 @@ export class OrdersService {
                 }
                 // Supplier's own price for one ordered unit (no Atlantis margin) — for supplier views only.
                 const supplierUnitPrice = round2(basePerCase(p, markups) * offerFactor(offerPercent) * casesInUnit(p, priced.tier));
-                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, supplierUnitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, minimum: priced.minimum, offerPercent: offerPercent || null, stockTake: [{ productId, cases: priced.casesTotal }], info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null, leadTime: (p as any).leadTime ?? null, readyForDispatch: !!(p as any).readyForDispatch, exwLocation: p.exwLocation ?? null } });
+                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, supplierUnitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, minimum: priced.minimum, offerPercent: offerPercent || null, stockTake: [{ productId, cases: priced.casesTotal }], info: lineInfo(p) });
             } catch (e) {
                 // Cart view: flag the line and keep pricing the rest. Orders stay strict.
                 if (opts.lenient && e instanceof PricingError) {
-                    lines.push({ productId: raw.productId ? String(raw.productId).split('::')[0] : null, mixedLoadId: raw.mixedLoadId ?? null, quantity: Number(raw.quantity) || 0, price: 0, lineTotal: 0, error: { code: e.code, message: e.message, ...e.detail } });
+                    const pid = raw.productId ? String(raw.productId).split('::')[0] : null;
+                    // Below-minimum and stock-short lines keep the product facts (barcode, dispatch) the cart shows.
+                    const known = pid && !raw.mixedLoadId && ['BELOW_MOQ', 'INSUFFICIENT_STOCK'].includes(e.code) ? products.get(pid) : undefined;
+                    lines.push({ productId: pid, mixedLoadId: raw.mixedLoadId ?? null, quantity: Number(raw.quantity) || 0, price: 0, lineTotal: 0, error: { code: e.code, message: e.message, ...e.detail }, ...(known ? { info: lineInfo(known) } : {}) });
                     continue;
                 }
                 asHttp(e);
