@@ -53,15 +53,19 @@ export interface QuoteLine {
     perCase: number | null; casesTotal: number | null; unitsTotal: number | null; minUnits: number | null;
     info: { ean: string | null; unitsPerCase: number | null; shelfLife: string | null; leadTime?: number | null; readyForDispatch?: boolean; exwLocation?: string | null } | null;
     offerPercent?: number | null;
+    /** Progress toward the product's MOQ, in the MOQ's own unit (server-computed). */
+    minimum?: LineMinimum | null;
     error: {
         code: string; message: string; minUnits?: number;
         // BELOW_MOQ
         quantity?: number; remaining?: number; unitPrice?: number; minLineTotal?: number; moq?: number | null; moqUnit?: string | null;
-        mixable?: { kind: LoadKind; quantity: number; minUnits: number; capacity: number } | null;
+        mixable?: { kind: LoadKind; quantity: number; minUnits: number; capacity: number; variants?: number } | null;
+        minimum?: LineMinimum | null;
         // INSUFFICIENT_STOCK
-        availableCases?: number;
+        availableCases?: number; maxUnits?: number; lineTotal?: number; casesPerUnit?: number;
     } | null;
 }
+export interface LineMinimum { unit: 'piece' | 'case' | 'pallet' | 'truck'; required: number; have: number; remaining: number; percent: number; met: boolean }
 export interface CartQuote { subtotal: number; discountPercent: number; discount: number; coupon: string | null; total: number; lines: QuoteLine[]; ready: boolean }
 
 export const quoteCart = (items: CartItem[], couponCode?: string) =>
@@ -109,7 +113,7 @@ export const loadLabel = (k: LoadKind) => (k === 'PALLET' ? 'Mixed pallet' : 'Mi
 
 /** Products that can count toward a mixed load (server-filtered: same supplier, same site, in stock). */
 export interface LoadCandidate {
-    id: string; name: string; brand: string | null; image: string | null; ean: string | null; origin: string | null;
+    id: string; variant?: string | null; variantLabel?: string; sku?: string; supplier?: string; name: string; brand: string | null; image: string | null; ean: string | null; origin: string | null;
     unitsPerCase: number; casesPerPallet: number; palletsPerShipment: number | null;
     unit: 'case' | 'pallet'; casesPerUnit: number; casePrice: number; unitPrice: number; maxQuantity: number; shareOfLoadPerUnit: number; minUnits: number;
     variants: string[];

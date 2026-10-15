@@ -10,43 +10,84 @@ import { addToLoad, loadCandidates, loadLabel, ApiError, type LoadCandidate, typ
 const WORD: Record<string, [string, string]> = { carton: ['case', 'cases'], case: ['case', 'cases'], pallet: ['pallet', 'pallets'], truck: ['truckload', 'truckloads'], piece: ['piece', 'pieces'] };
 export const qtyText = (n: number, unit: string) => `${n.toLocaleString('en-GB')} ${(WORD[unit.toLowerCase()] ?? [unit, unit])[n === 1 ? 0 : 1]}`;
 
-/** Red while below the minimum, green once it's met. Numbers are whatever the server reported. */
-export function ProgressMeter({ have, required, unit, ok, note }: { have: number; required: number; unit: string; ok: boolean; note?: React.ReactNode }) {
-    const pct = required > 0 ? Math.min(100, (have / required) * 100) : 100;
+const fmtQty = (n: number) => n.toLocaleString('en-GB', { maximumFractionDigits: 2 });
+const unitWord = (unit: string, n: number) => (WORD[unit.toLowerCase()] ?? [unit, `${unit}s`])[n === 1 ? 0 : 1];
+
+/**
+ * Minimum-order progress: "1 of 5 pallets · 4 to go", bar at 20%. Red while
+ * below the minimum, green once it's met. All numbers come from the server.
+ */
+export function ProgressMeter({ have, required, unit, ok, note, remaining, percent }: { have: number; required: number; unit: string; ok: boolean; note?: React.ReactNode; remaining?: number; percent?: number }) {
+    const pct = typeof percent === 'number' ? percent : required > 0 ? Math.min(100, (have / required) * 100) : 100;
+    const left = typeof remaining === 'number' ? remaining : Math.max(0, required - have);
     return (
         <div>
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5 text-[13px]">
                 <span className="text-ink-2">Minimum order <b className="text-ink">{qtyText(required, unit)}</b></span>
                 <span className={cn('font-semibold tabular-nums', ok ? 'text-[#047857]' : 'text-[#B91C1C]')}>
-                    {ok ? <span className="inline-flex items-center gap-1"><CheckCircle2 size={14} /> Minimum reached</span> : <>{have.toLocaleString('en-GB')} of {required.toLocaleString('en-GB')} · {qtyText(Math.max(0, required - have), unit)} to go</>}
+                    {fmtQty(have)} of {qtyText(required, unit)}{ok ? <span className="ms-1.5 inline-flex items-center gap-1"><CheckCircle2 size={14} /> Minimum reached</span> : <> · {fmtQty(left)} {unitWord(unit, left)} to go</>}
                 </span>
             </div>
-            <div className="mt-1.5 h-2.5 rounded-full bg-[#FEE2E2] dark:bg-red-500/15 overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={required} aria-valuenow={Math.min(have, required)} aria-label={`Minimum order progress: ${have} of ${required} ${unit}s`}>
-                <div className={cn('h-full rounded-full transition-all duration-300', ok ? 'bg-[#10B981]' : 'bg-[#DC2626]')} style={{ width: `${Math.max(3, pct)}%` }} />
+            <div className={cn('mt-1.5 h-2.5 rounded-full overflow-hidden', ok ? 'bg-[#D1FAE5] dark:bg-emerald-500/15' : 'bg-[#FEE2E2] dark:bg-red-500/15')} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(pct)} aria-label={`Minimum order progress: ${fmtQty(have)} of ${required} ${unitWord(unit, required)}`}>
+                <div className={cn('h-full rounded-full transition-all duration-300', ok ? 'bg-[#10B981]' : 'bg-[#DC2626]')} style={{ width: `${Math.max(3, Math.min(100, pct))}%` }} />
             </div>
-            {note && <p className="mt-1.5 text-[12.5px] text-ink-3">{note}</p>}
+            <p className="mt-1 text-[12px] text-ink-4 tabular-nums">{Math.round(pct)}% of the minimum</p>
+            {note && <p className="mt-1 text-[12.5px] text-ink-3">{note}</p>}
+        </div>
+    );
+}
+
+/** Green (or red) progress under a line that has an MOQ — shown even once it's met. */
+export function LineMinimumBar({ minimum }: { minimum: NonNullable<QuoteLine['minimum']> }) {
+    return (
+        <div className={cn('mt-3 rounded-xl p-3 ring-1', minimum.met ? 'ring-[#A7F3D0] bg-[#ECFDF5]/60 dark:bg-emerald-500/5' : 'ring-[#FECACA] bg-[#FEF2F2]/60')}>
+            <ProgressMeter have={minimum.have} required={minimum.required} unit={minimum.unit} ok={minimum.met} remaining={minimum.remaining} percent={minimum.percent} />
+        </div>
+    );
+}
+
+/** A line asking for more than the supplier has: what's available, and the largest quantity that fits. */
+export function StockShortPanel({ line, tier, onSetQuantity, busy }: { line: QuoteLine; tier: string; onSetQuantity: (n: number) => void; busy?: boolean }) {
+    const e = line.error!;
+    const unit = tier === 'carton' ? 'case' : tier;
+    const max = e.maxUnits ?? 0;
+    return (
+        <div className="mt-3 rounded-xl ring-1 ring-[#FDE68A] bg-[#FFFBEB]/70 dark:bg-amber-500/5 p-4 space-y-2.5">
+            <p className="text-[13.5px] font-medium text-ink">
+                {(e.availableCases ?? 0) > 0 ? <>Only {qtyText(e.availableCases!, 'case')} in stock{max >= 1 ? <> — up to {qtyText(max, unit)}</> : null}.</> : 'This product is out of stock.'}
+            </p>
+            {e.minimum && <ProgressMeter have={e.minimum.have} required={e.minimum.required} unit={e.minimum.unit} ok={e.minimum.met} remaining={e.minimum.remaining} percent={e.minimum.percent} />}
+            {max >= 1 ? (
+                <Button size="sm" variant="primary" disabled={busy} onClick={() => onSetQuantity(max)}>Set to {qtyText(max, unit)}</Button>
+            ) : (e.availableCases ?? 0) > 0 ? (
+                <p className="text-[12.5px] text-ink-3">That’s less than one {unitWord(unit, 1)}. Choose a smaller pack (pallet or case) on the product page.</p>
+            ) : null}
         </div>
     );
 }
 
 /**
  * Shown under a single-product line that is below the product's minimum:
- * the progress, then the two ways to complete the order.
+ * progress in the MOQ's own unit, then the two ways to complete the order.
  */
 export function BelowMinimumPanel({ line, tier, onSetMinimum, onStartMix, busy }: {
     line: QuoteLine; tier: string; onSetMinimum: (n: number) => void; onStartMix?: () => void; busy?: boolean;
 }) {
     const e = line.error!;
-    const min = e.minUnits ?? 1, have = e.quantity ?? line.quantity, remaining = e.remaining ?? Math.max(0, min - have);
+    const min = e.minUnits ?? 1;
     const unit = tier === 'carton' ? 'case' : tier;
-    const moqNote = e.moq && e.moqUnit && e.moqUnit.toLowerCase() !== unit && !(e.moqUnit === 'CASE' && unit === 'case')
-        ? `The supplier’s minimum is ${qtyText(e.moq, e.moqUnit)}, which is ${qtyText(min, unit)} at this pack size.` : undefined;
+    const m = e.minimum;
     const mix = e.mixable;
+    const mixUnit = mix?.kind === 'TRUCK' ? 'pallet' : 'case';
     return (
         <div className="mt-3 rounded-xl ring-1 ring-[#FECACA] bg-[#FEF2F2]/60 dark:bg-red-500/5 p-4 space-y-3">
-            <ProgressMeter have={have} required={min} unit={unit} ok={false} note={moqNote} />
-            <p className="text-[13.5px] font-medium text-ink">Minimum order: {qtyText(min, unit)}. Add {remaining.toLocaleString('en-GB')} more {(WORD[unit] ?? [unit, `${unit}s`])[remaining === 1 ? 0 : 1]}{mix ? ' or build a mixed load with eligible products' : ''} to continue.</p>
-            <div className={cn('grid gap-2.5', mix && 'sm:grid-cols-2')}>
+            {m ? <ProgressMeter have={m.have} required={m.required} unit={m.unit} ok={false} remaining={m.remaining} percent={m.percent} />
+                : <ProgressMeter have={e.quantity ?? line.quantity} required={min} unit={unit} ok={false} />}
+            <p className="text-[13.5px] font-medium text-ink">
+                {m ? <>Minimum order: {qtyText(m.required, m.unit)}. Add {fmtQty(m.remaining)} more {unitWord(m.unit, m.remaining)} to continue.</>
+                    : <>Minimum order: {qtyText(min, unit)}. Add {fmtQty(e.remaining ?? 0)} more {unitWord(unit, e.remaining ?? 0)} to continue.</>}
+            </p>
+            <div className="grid gap-2.5 sm:grid-cols-2">
                 <div className="rounded-lg bg-surface ring-1 ring-line p-3">
                     <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">Option 1 · More of this product</p>
                     <p className="mt-1 text-[13px] text-ink-2 tabular-nums">
@@ -54,24 +95,23 @@ export function BelowMinimumPanel({ line, tier, onSetMinimum, onStartMix, busy }
                     </p>
                     <Button size="sm" variant="primary" className="mt-2.5" disabled={busy} onClick={() => onSetMinimum(min)}>Set to {qtyText(min, unit)}</Button>
                 </div>
-                {mix && onStartMix && (
-                    <div className="rounded-lg bg-surface ring-1 ring-line p-3">
-                        <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">Option 2 · Build a {mix.kind === 'TRUCK' ? 'mixed truckload' : 'mixed pallet'}</p>
-                        <p className="mt-1 text-[13px] text-ink-2">
-                            Keep {qtyText(mix.quantity, mix.kind === 'TRUCK' ? 'pallet' : 'case')} of this product and add other products from the same supplier.
-                            Together they need {qtyText(mix.minUnits, mix.kind === 'TRUCK' ? 'pallet' : 'case')}; {mix.kind === 'TRUCK' ? 'a truck' : 'a pallet'} holds up to {qtyText(mix.capacity, mix.kind === 'TRUCK' ? 'pallet' : 'case')}.
-                        </p>
-                        <Button size="sm" variant="secondary" className="mt-2.5" icon={mix.kind === 'TRUCK' ? <Truck size={14} /> : <Layers size={14} />} disabled={busy} onClick={onStartMix}>
-                            Start a {mix.kind === 'TRUCK' ? 'mixed truckload' : 'mixed pallet'}
-                        </Button>
-                    </div>
-                )}
+                <div className={cn('rounded-lg ring-1 ring-line p-3', mix ? 'bg-surface' : 'bg-surface-2')}>
+                    <p className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">Option 2 · Add Mix</p>
+                    {mix && onStartMix ? (
+                        <>
+                            <p className="mt-1 text-[13px] text-ink-2">
+                                Combine other variants of this same product (same SKU) in one {mix.kind === 'TRUCK' ? 'truck' : 'pallet'}. Together they count toward the minimum of {qtyText(mix.minUnits, mixUnit)}.
+                            </p>
+                            <Button size="sm" variant="secondary" className="mt-2.5" icon={mix.kind === 'TRUCK' ? <Truck size={14} /> : <Layers size={14} />} disabled={busy} onClick={onStartMix}>Add Mix</Button>
+                        </>
+                    ) : (
+                        <>
+                            <p className="mt-1 text-[13px] text-ink-3">No eligible mix options are currently available: {tier === 'truck' ? 'truckloads can’t be mixed.' : 'mixing is only between variants of the same product, and this product has no other variant that fits one load.'}</p>
+                            <Button size="sm" variant="secondary" className="mt-2.5" disabled icon={<Layers size={14} />}>Add Mix</Button>
+                        </>
+                    )}
+                </div>
             </div>
-            {!mix && (
-                <p className="text-[12.5px] text-ink-3">
-                    {tier === 'truck' ? 'Truckloads can’t be mixed, so only more of this product meets the minimum.' : 'This product can’t go in a mixed load (its pack data is incomplete, or its minimum is bigger than one load), so only more of it meets the minimum.'}
-                </p>
-            )}
         </div>
     );
 }
@@ -114,7 +154,7 @@ export function MixedLoadPicker({ open, onClose, load, onAdded }: { open: boolea
     }, [open, q, load.id, load.version]);
     React.useEffect(() => { if (!open) { setPick(null); setQ(''); } }, [open]);
 
-    const choose = (c: LoadCandidate) => { setPick(c); setQty(Math.min(c.maxQuantity, Math.max(1, c.minUnits > 1 ? 1 : 1))); setVariant(c.variants[0] ?? ''); setError(null); };
+    const choose = (c: LoadCandidate) => { setPick(c); setQty(Math.min(c.maxQuantity, 1)); setVariant(c.variant ?? ''); setError(null); };
     const quote = load.quote;
     const prog = loadProgress(load);
     const unit = load.kind === 'PALLET' ? 'case' : 'pallet';
@@ -131,10 +171,10 @@ export function MixedLoadPicker({ open, onClose, load, onAdded }: { open: boolea
     const fillAfter = pick && quote ? quote.fill + qty * pick.shareOfLoadPerUnit : null;
 
     return (
-        <Dialog open={open} onClose={onClose} size="xl" title={`Add products to your ${loadLabel(load.kind).toLowerCase()}`}
-            description="Only products that can ship together with this load are listed: same supplier, same dispatch location, in stock."
+        <Dialog open={open} onClose={onClose} size="xl" title={`Add Mix to your ${loadLabel(load.kind).toLowerCase()}`}
+            description="Only other variants of the same product (same SKU, same supplier) are listed — with stock and room left in this load."
             footer={pick
-                ? <><Button variant="ghost" icon={<ArrowLeft size={14} />} onClick={() => setPick(null)}>Back to products</Button><span className="flex-1" /><Button variant="primary" loading={saving} disabled={qty < 1 || qty > pick.maxQuantity} onClick={confirm}>Add {qtyText(qty, unit)} · {formatPrice(pick.unitPrice * qty)}</Button></>
+                ? <><Button variant="ghost" icon={<ArrowLeft size={14} />} onClick={() => setPick(null)}>Back to variants</Button><span className="flex-1" /><Button variant="primary" loading={saving} disabled={qty < 1 || qty > pick.maxQuantity} onClick={confirm}>Add {qtyText(qty, unit)} · {formatPrice(pick.unitPrice * qty)}</Button></>
                 : <Button variant="secondary" onClick={onClose}>Done</Button>}>
             <div className="space-y-4">
                 {prog ? <ProgressMeter have={after?.have ?? prog.have} required={after?.required ?? prog.required} unit={prog.unit} ok={!!after ? after.have >= after.required : prog.ok}
@@ -150,8 +190,8 @@ export function MixedLoadPicker({ open, onClose, load, onAdded }: { open: boolea
                         </div>
                         <div className="space-y-3 text-[13.5px]">
                             <div>
-                                <p className="text-[15px] font-semibold text-heading">{pick.name}</p>
-                                <p className="text-ink-3">{[pick.brand, pick.origin && `Origin: ${pick.origin}`, pick.ean].filter(Boolean).join(' · ')}</p>
+                                <p className="text-[15px] font-semibold text-heading">{pick.name}{pick.variantLabel ? <span className="text-teal"> — {pick.variantLabel}</span> : null}</p>
+                                <p className="text-ink-3">{[pick.sku && `SKU ${pick.sku}`, pick.brand, pick.origin && `Origin: ${pick.origin}`, pick.supplier].filter(Boolean).join(' · ')}</p>
                             </div>
                             <dl className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-lg bg-surface-2 ring-1 ring-line px-3 py-2.5">
                                 <dt className="text-ink-3">Price per case</dt><dd className="text-end tabular-nums">{formatPrice(pick.casePrice)}</dd>
@@ -159,14 +199,6 @@ export function MixedLoadPicker({ open, onClose, load, onAdded }: { open: boolea
                                 <dt className="text-ink-3">Price per {unit}</dt><dd className="text-end tabular-nums">{formatPrice(pick.unitPrice)}</dd>
                                 <dt className="text-ink-3">You can add</dt><dd className="text-end">up to {qtyText(pick.maxQuantity, unit)}</dd>
                             </dl>
-                            {pick.variants.length > 0 && (
-                                <label className="block">
-                                    <span className="text-[12.5px] text-ink-3">Variant</span>
-                                    <select value={variant} onChange={(e) => setVariant(e.target.value)} className="mt-1 w-full h-10 rounded-lg ring-1 ring-line-strong bg-surface px-3 text-[13.5px]">
-                                        {pick.variants.map((v) => <option key={v} value={v}>{prettifyVariantSignature(v) || v}</option>)}
-                                    </select>
-                                </label>
-                            )}
                             <div className="flex flex-wrap items-center gap-3">
                                 <span className="text-ink-3">Quantity</span>
                                 <div className="flex items-center gap-2">
@@ -184,7 +216,7 @@ export function MixedLoadPicker({ open, onClose, load, onAdded }: { open: boolea
                     <>
                         <label className="relative block">
                             <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-ink-4" />
-                            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name, brand or barcode" aria-label="Search eligible products" className="w-full h-10 rounded-lg ring-1 ring-line-strong bg-surface ps-9 pe-3 text-[13.5px]" />
+                            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search variants" aria-label="Search variants of this product" className="w-full h-10 rounded-lg ring-1 ring-line-strong bg-surface ps-9 pe-3 text-[13.5px]" />
                         </label>
                         {loading && !data ? (
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{[0, 1, 2].map((i) => <div key={i} className="h-[210px] rounded-xl bg-surface-2 animate-pulse" />)}</div>
@@ -193,14 +225,14 @@ export function MixedLoadPicker({ open, onClose, load, onAdded }: { open: boolea
                         ) : (
                             <div className={cn('grid gap-3 sm:grid-cols-2 lg:grid-cols-3', loading && 'opacity-60')}>
                                 {data?.items.map((c) => (
-                                    <button key={c.id} type="button" onClick={() => choose(c)} className="text-start rounded-xl ring-1 ring-line hover:ring-teal bg-surface overflow-hidden flex flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal">
+                                    <button key={`${c.id}:${c.variant ?? ''}`} type="button" onClick={() => choose(c)} className="text-start rounded-xl ring-1 ring-line hover:ring-teal bg-surface overflow-hidden flex flex-col focus-visible:outline focus-visible:outline-2 focus-visible:outline-teal">
                                         <span className="h-[120px] bg-white flex items-center justify-center border-b border-line">
                                             {/* eslint-disable-next-line @next/next/no-img-element */}
                                             {c.image ? <img src={c.image} alt="" className="max-w-[80%] max-h-[100px] object-contain" /> : <Package size={24} className="text-ink-4" />}
                                         </span>
                                         <span className="p-3 flex-1 flex flex-col gap-0.5 text-[12.5px]">
-                                            <span className="text-[13.5px] font-medium text-ink line-clamp-2">{c.name}</span>
-                                            <span className="text-ink-3">{[c.brand, c.origin].filter(Boolean).join(' · ') || '—'}</span>
+                                            <span className="text-[13.5px] font-medium text-ink line-clamp-2">{c.variantLabel || c.name}</span>
+                                            <span className="text-ink-3 truncate">{[c.sku, c.brand].filter(Boolean).join(' · ') || '—'}</span>
                                             <span className="mt-auto pt-1 text-ink-2 tabular-nums">{formatPrice(c.casePrice)} / case · {formatPrice(c.unitPrice)} / {c.unit}</span>
                                             <span className="text-ink-4">up to {qtyText(c.maxQuantity, c.unit)}</span>
                                         </span>

@@ -10,18 +10,36 @@ import { normaliseHeader, MAX_IMPORT_ROWS } from './product-import';
  * Bulk PRICE and STOCK updates for products the supplier already has.
  * Update-only: rows are matched to the supplier's own products by Atlantis
  * ID or barcode; nothing is ever created. Blank cells mean "no change".
- * Prices are the supplier's own case price in the stated currency (the
- * product's recorded currency when the column is empty).
+ * Prices are the supplier's own case price in the product's own currency
+ * (a price update never changes the currency or the price basis).
+ *
+ * The downloadable file lists the current values in REFERENCE columns that
+ * are never written back, and leaves the NEW columns empty — so a file
+ * downloaded yesterday can't put back stock that orders have used since.
  */
-type UpdField = 'id' | 'ean' | 'price' | 'currency' | 'stock' | 'name';
+type UpdField = 'id' | 'ean' | 'price' | 'currency' | 'stock' | 'name' | 'ref';
 const UPD_ALIASES: Record<UpdField, string[]> = {
     id: ['atlantis id', 'product id', 'atlantis product id', 'id'],
     ean: ['ean', 'barcode', 'ean code', 'gtin', 'upc', 'الباركود'],
-    price: ['price per case', 'case price', 'new price per case', 'سعر الكرتونة'],
+    // "Price per Case" / "Stock (cases)" are the column names of the earlier file; still accepted.
+    price: ['new price per case', 'price per case', 'case price', 'سعر الكرتونة الجديد', 'سعر الكرتونة'],
     currency: ['currency', 'العملة'],
-    stock: ['stock (cases)', 'stock cases', 'stock', 'available stock', 'cases in stock', 'المخزون'],
+    stock: ['new stock (cases)', 'new stock', 'stock (cases)', 'stock cases', 'stock', 'available stock', 'cases in stock', 'المخزون'],
     name: ['product name (reference only)', 'product name', 'name'],
+    // Reference columns: shown for context, never applied.
+    ref: ['current price per case', 'current stock (cases)', 'current stock', 'price basis', 'currency (reference)'],
 };
+export const UPDATE_COLUMNS = [
+    { header: 'Atlantis ID', role: 'Do not change', width: 38, note: 'Matches the row to your product. Keep it exactly as downloaded.' },
+    { header: 'EAN', role: 'Do not change', width: 16, note: 'Used to match the row when the Atlantis ID is empty.' },
+    { header: 'Product Name', role: 'Reference', width: 44, note: 'For your reference — not changed by this file.' },
+    { header: 'Currency (reference)', role: 'Reference', width: 12, note: 'Your listing’s currency. Prices are read in this currency; it can’t be changed here.' },
+    { header: 'Current Price per Case', role: 'Reference', width: 18, note: 'Your current price for one case. Not applied.' },
+    { header: 'New Price per Case', role: 'Edit', width: 18, note: 'Type the new price for one case. Leave empty to keep the current price.' },
+    { header: 'Current Stock (cases)', role: 'Reference', width: 18, note: 'Stock when you downloaded the file. Not applied.' },
+    { header: 'New Stock (cases)', role: 'Optional', width: 16, note: 'Whole cases available now. Leave empty to keep the current stock.' },
+] as const;
+const HELPER_WORDS = new Set(['do not change', 'reference', 'edit', 'optional', 'required']);
 const AMBIGUOUS = new Set(['price', 'cost', 'unit price', 'quantity', 'qty', 'السعر', 'الكمية']);
 
 export interface UpdateRequest { headers: string[]; rows: string[][]; firstRow?: number; fileName?: string }
@@ -31,17 +49,32 @@ export class SupplierUpdatesService {
     private readonly logger = new Logger(SupplierUpdatesService.name);
     constructor(private readonly prisma: PrismaService, private readonly products: ProductsService, private readonly notifications: NotificationsService) {}
 
-    /** Template pre-filled with the supplier's own catalog (current values). */
-    async template(supplierId: string): Promise<Buffer> {
-        const rows = await this.prisma.product.findMany({ where: { supplierId, status: { not: 'REJECTED' } }, orderBy: { name: 'asc' }, select: { id: true, ean: true, name: true, basePrice: true, stock: true, supplierCurrency: true, supplierPrice: true } as any });
-        const aoa = [['Atlantis ID', 'EAN', 'Product Name (reference only)', 'Price per Case', 'Currency', 'Stock (cases)'],
-            ...(rows as any[]).map((p) => [p.id, p.ean || '', p.name, p.supplierCurrency && p.supplierPrice ? p.supplierPrice : (p.basePrice ?? ''), p.supplierCurrency || 'EUR', p.stock ?? 0])];
+    /**
+     * The update file. `blank` gives the empty template; otherwise every
+     * product of the supplier (except rejected ones) with its current values
+     * in the reference columns and the NEW columns left empty.
+     */
+    async template(supplierId: string, blank = false): Promise<Buffer> {
+        const rows: any[] = blank ? [] : await this.prisma.product.findMany({ where: { supplierId, status: { not: 'REJECTED' } }, orderBy: { name: 'asc' }, select: { id: true, ean: true, name: true, basePrice: true, stock: true, supplierCurrency: true, supplierPrice: true } as any });
+        const aoa: any[][] = [UPDATE_COLUMNS.map((c) => c.header), UPDATE_COLUMNS.map((c) => c.role),
+            ...rows.map((p) => [p.id, p.ean || '', p.name, p.supplierCurrency || 'EUR', p.supplierCurrency && p.supplierPrice ? p.supplierPrice : (p.basePrice ?? ''), '', p.stock ?? 0, ''])];
         const ws = XLSX.utils.aoa_to_sheet(aoa);
-        for (let r = 1; r < aoa.length; r++) { const ref = XLSX.utils.encode_cell({ r, c: 1 }); if (ws[ref]) { ws[ref].t = 's'; ws[ref].z = '@'; } }
-        ws['!cols'] = [{ wch: 38 }, { wch: 16 }, { wch: 44 }, { wch: 14 }, { wch: 10 }, { wch: 14 }];
+        // Barcodes as text so leading zeros survive.
+        for (let r = 2; r < aoa.length; r++) { const ref = XLSX.utils.encode_cell({ r, c: 1 }); if (ws[ref]) { ws[ref].t = 's'; ws[ref].z = '@'; } }
+        ws['!cols'] = UPDATE_COLUMNS.map((c) => ({ wch: c.width }));
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Price & stock');
-        const help = XLSX.utils.aoa_to_sheet([['How to use'], ['Change Price per Case and/or Stock (cases). Leave a cell empty to keep the current value.'], ['Rows are matched by Atlantis ID (or EAN). Products are never created from this file.'], ['Price is your own price per case, in the Currency column. Stock is whole cases available now.'], ['Product Name is for reference only and is not changed.']]);
+        const help = XLSX.utils.aoa_to_sheet([
+            ['Column', 'Use', 'What to enter'],
+            ...UPDATE_COLUMNS.map((c) => [c.header, c.role, c.note]),
+            [],
+            ['Recommended: download your catalog, type new values in “New Price per Case” (and, if needed, “New Stock (cases)”), then upload the same file.'],
+            ['Keep “Atlantis ID” and “EAN” unchanged so every row updates the right product. Rows are never created from this file.'],
+            ['Empty cells change nothing. Price is per case, in your listing’s currency. Stock is whole cases.'],
+            ['You can also start from the blank template: add the Atlantis ID (or EAN) and the new values of only the products you want to change.'],
+            ['Row 2 (Do not change / Reference / Edit / Optional) is a guide row and is skipped on upload.'],
+        ]);
+        help['!cols'] = [{ wch: 24 }, { wch: 14 }, { wch: 90 }];
         XLSX.utils.book_append_sheet(wb, help, 'Instructions');
         return XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }) as Buffer;
     }
@@ -52,14 +85,14 @@ export class SupplierUpdatesService {
         headers.forEach((h, i) => {
             const n = normaliseHeader(h);
             if (!n) return;
-            if (AMBIGUOUS.has(n)) { problems.push(`Column “${h}” is ambiguous — rename it to “Price per Case” or “Stock (cases)”.`); return; }
+            if (AMBIGUOUS.has(n)) { problems.push(`Column “${h}” is ambiguous — rename it to “New Price per Case” or “New Stock (cases)”.`); return; }
             const f = (Object.keys(UPD_ALIASES) as UpdField[]).find((k) => UPD_ALIASES[k].map(normaliseHeader).includes(n));
-            if (!f) return;
+            if (!f || f === 'ref') return;
             if (map[f] !== undefined) problems.push(`Two columns mean ${f === 'price' ? 'Price per Case' : f}: “${headers[map[f]!]}” and “${h}”. Keep one.`);
             else map[f] = i;
         });
         if (map.id === undefined && map.ean === undefined) problems.push('Add an “Atlantis ID” or “EAN” column so rows can be matched to your products.');
-        if (map.price === undefined && map.stock === undefined) problems.push('Add a “Price per Case” and/or “Stock (cases)” column — there is nothing to update.');
+        if (map.price === undefined && map.stock === undefined) problems.push('Add a “New Price per Case” and/or “New Stock (cases)” column — there is nothing to update.');
         return { map, problems };
     }
 
@@ -77,8 +110,9 @@ export class SupplierUpdatesService {
         const start = Number(req.firstRow) || 2;
         const seen = new Map<string, number>();
         const cell = (r: string[], f: UpdField) => (map[f] === undefined ? '' : String(r[map[f]!] ?? '').trim());
-        const rows = req.rows.map((r, i) => {
-            const row = start + i;
+        // The guide row (Do not change / Reference / Edit …) and fully empty rows are skipped.
+        const isHelper = (r: string[]) => { const v = (r || []).map((x) => String(x ?? '').trim().toLowerCase()).filter(Boolean); return v.length === 0 || v.every((x) => HELPER_WORDS.has(x)); };
+        const rows = req.rows.map((r, i) => ({ r, row: start + i })).filter(({ r }) => !isHelper(r)).map(({ r, row }) => {
             const errors: string[] = [];
             let product: any = null;
             const id = cell(r, 'id'), ean = normaliseBarcode(cell(r, 'ean'));
@@ -95,8 +129,10 @@ export class SupplierUpdatesService {
             const curBefore = product?.supplierCurrency || 'EUR';
             const priceBefore = product ? (product.supplierCurrency && product.supplierPrice ? product.supplierPrice : product.basePrice) : null;
             const rawPrice = cell(r, 'price'), rawCur = cell(r, 'currency').toUpperCase(), rawStock = cell(r, 'stock');
-            let priceAfter: number | null = null, currency = rawCur || curBefore, stockAfter: number | null = null;
-            if (rawCur && !TO_EUR[rawCur]) errors.push(`Currency “${rawCur}” isn’t supported.`);
+            let priceAfter: number | null = null, stockAfter: number | null = null;
+            const currency = curBefore;
+            // The currency (and per-case basis) of a listing never changes through a price update.
+            if (rawCur && rawCur !== curBefore) errors.push(TO_EUR[rawCur] ? `Currency ${rawCur} differs from this product’s currency (${curBefore}). Enter the price in ${curBefore}, or change the currency in the product editor.` : `Currency “${rawCur}” isn’t supported.`);
             if (rawPrice) {
                 const n = Number(rawPrice.replace(/[€$£\s]/g, '').replace(/^(\d+),(\d+)$/, '$1.$2'));
                 if (!Number.isFinite(n) || n <= 0) errors.push(`Price “${rawPrice}” isn’t a valid price.`); else priceAfter = Math.round(n * 10000) / 10000;
@@ -105,13 +141,14 @@ export class SupplierUpdatesService {
                 const n = Number(rawStock);
                 if (!Number.isInteger(n) || n < 0) errors.push(`Stock “${rawStock}” must be a whole number of cases (0 or more).`); else stockAfter = n;
             }
-            const priceChanged = priceAfter !== null && (priceAfter !== priceBefore || currency !== curBefore);
+            const priceChanged = priceAfter !== null && priceAfter !== priceBefore;
             const stockChanged = stockAfter !== null && stockAfter !== product?.stock;
             return {
                 row, productId: product?.id ?? null, name: product?.name ?? cell(r, 'name') ?? null, ean: product?.ean ?? ean ?? null,
                 price: { before: priceBefore, after: priceAfter, currencyBefore: curBefore, currency, changed: priceChanged },
                 stock: { before: product?.stock ?? null, after: stockAfter, changed: stockChanged },
                 state: errors.length ? 'error' : priceChanged || stockChanged ? 'change' : 'unchanged',
+                fields: [...(priceChanged ? ['price'] : []), ...(stockChanged ? ['stock'] : [])],
                 errors,
             };
         });

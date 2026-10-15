@@ -16,7 +16,7 @@ import {
     quoteCart, listLoads, updateLoad, deleteLoad, createLoad, loadLabel, ApiError,
     type CartQuote, type QuoteLine, type MixedLoad,
 } from '@/lib/wholesale';
-import { BelowMinimumPanel, MixedLoadPicker, ProgressMeter, loadProgress } from '@/components/cart/MinimumOrder';
+import { BelowMinimumPanel, LineMinimumBar, MixedLoadPicker, ProgressMeter, StockShortPanel, loadProgress } from '@/components/cart/MinimumOrder';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const UNIT_SHORT: Record<string, string> = { carton: 'cs', pallet: 'pal.', truck: 'trk' };
@@ -328,6 +328,7 @@ export default function CartPage() {
                                     const casesPerUnit = q?.casesTotal && q.quantity ? q.casesTotal / q.quantity : null;
                                     const locked = !!i.mixComposition?.length;
                                     const belowMin = q?.error?.code === 'BELOW_MOQ';
+                                    const stockShort = q?.error?.code === 'INSUFFICIENT_STOCK';
                                     return (
                                         <LineRow
                                             key={i.id}
@@ -342,17 +343,20 @@ export default function CartPage() {
                                                 locked ? i.mixComposition!.map((c) => `${prettifyVariantSignature(c.signature) || c.signature} × ${c.quantity}`).join(' · ') : null,
                                             ]}
                                             bbd={fmtDate(q?.info?.shelfLife)}
-                                            error={belowMin ? (lineError[i.id] || null) : (lineError[i.id] || q?.error?.message) ?? null}
+                                            error={belowMin || stockShort ? (lineError[i.id] || null) : (lineError[i.id] || q?.error?.message) ?? null}
                                             unavailable={!!q?.error && UNAVAILABLE.has(q.error.code)}
-                                            extra={belowMin && q && !locked ? (
-                                                <BelowMinimumPanel line={q} tier={i.tier || 'carton'} busy={lineBusy === i.id}
-                                                    onSetMinimum={(n) => updateQuantity(i.id, n)}
-                                                    onStartMix={q.error?.mixable ? () => startMix(i, q.error!.mixable!.kind, q.error!.mixable!.quantity) : undefined} />
-                                            ) : undefined}
+                                            extra={!q || locked ? undefined
+                                                : belowMin ? (
+                                                    <BelowMinimumPanel line={q} tier={i.tier || 'carton'} busy={lineBusy === i.id}
+                                                        onSetMinimum={(n) => updateQuantity(i.id, n)}
+                                                        onStartMix={q.error?.mixable ? () => startMix(i, q.error!.mixable!.kind, q.error!.mixable!.quantity) : undefined} />
+                                                ) : stockShort ? (
+                                                    <StockShortPanel line={q} tier={i.tier || 'carton'} busy={lineBusy === i.id} onSetQuantity={(n) => updateQuantity(i.id, n)} />
+                                                ) : !q.error && q.minimum ? <LineMinimumBar minimum={q.minimum} /> : undefined}
                                             stepper={locked
                                                 ? <span className="w-[190px] text-center text-[13px] text-ink-3">1 mixed {unitWord(i.tier, 1)}</span>
                                                 : <Stepper value={i.quantity} unit={UNIT_SHORT[i.tier || 'carton']} min={1} onChange={(n) => updateQuantity(i.id, n)} />}
-                                            price={q && !q.error ? formatPrice(q.lineTotal) : legacy ? formatPrice(i.price * i.quantity) : quoteState === 'loading' ? '…' : '—'}
+                                            price={q && !q.error ? formatPrice(q.lineTotal) : stockShort && q?.error?.lineTotal ? formatPrice(q.error.lineTotal) : legacy ? formatPrice(i.price * i.quantity) : quoteState === 'loading' ? '…' : '—'}
                                             units={q?.unitsTotal ? `${q.unitsTotal.toLocaleString()} units` : null}
                                             onRemove={() => removeItem(i.id)}
                                         />
@@ -394,9 +398,9 @@ export default function CartPage() {
                                     totalNote={q ? 'incl. mixed-load handling' : undefined}
                                     suggestions={q && q.fill < 1 - 1e-9 && !load.error ? (
                                         <div className="px-5 py-3.5 border-t border-line flex flex-wrap items-center gap-3">
-                                            <p className="text-[13.5px] text-ink-3 flex-1 min-w-[14rem]">{minProg && !minProg.ok ? 'Add eligible products from the same supplier to reach the minimum.' : 'There’s room for more in this load.'}</p>
+                                            <p className="text-[13.5px] text-ink-3 flex-1 min-w-[14rem]">{minProg && !minProg.ok ? 'Add other variants of this product (same SKU) to reach the minimum.' : 'There’s room for more variants in this load.'}</p>
                                             <button type="button" disabled={busy} onClick={() => setPickerFor(load.id)} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg ring-1 ring-line-strong hover:ring-teal text-[13.5px] font-medium text-ink disabled:opacity-50">
-                                                <Plus size={14} /> Add eligible products
+                                                <Plus size={14} /> Add Mix
                                             </button>
                                         </div>
                                     ) : null}

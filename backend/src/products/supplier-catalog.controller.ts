@@ -118,10 +118,11 @@ export class SupplierCatalogController {
     // ─── Bulk price & stock updates (existing products only) ─────────
 
     @Get('updates/template')
-    async updatesTemplate(@Request() req, @Res() res: any) {
-        const buf = await this.updates.template(req.user.sub);
+    async updatesTemplate(@Request() req, @Res() res: any, @Query('blank') blank?: string) {
+        const isBlank = blank === '1' || blank === 'true';
+        const buf = await this.updates.template(req.user.sub, isBlank);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename="atlantis-price-stock-update.xlsx"');
+        res.setHeader('Content-Disposition', `attachment; filename="${isBlank ? 'atlantis-price-update-template' : 'atlantis-my-catalog-prices'}.xlsx"`);
         res.send(buf);
     }
 

@@ -78,8 +78,9 @@ function mapProduct(item: any): Product {
         basePrice: item.basePrice ?? undefined,
         supplierId: item.supplierId || undefined,
         unit: item.unit || 'unit',
-        minOrder: item.minOrder ?? item.moq ?? 10,
-        moq: item.moq ?? item.minOrder ?? 10,
+        // No invented default: a product without an MOQ has none (same as the server's pricing rules).
+        minOrder: item.minOrder ?? item.moq ?? undefined,
+        moq: item.moq ?? item.minOrder ?? undefined,
         moqUnit: item.moqUnit ?? null,
         image: (item.images && item.images.length > 0) ? item.images[0] : '',
         images: item.images || [],

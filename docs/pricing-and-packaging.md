@@ -44,15 +44,15 @@ A supplier buying their own listing pays the raw price (no markup). The supplier
 ### Mixed pallets and trucks
 
 * A mixed pallet is filled with whole cases; a mixed truck with whole pallets. Each line uses `quantity ÷ that product's capacity` of the load, and the load can't go above 100%.
-* **Minimum order in a mixed load:** the products' MOQs still apply, but volume from the **same supplier** counts together. For each supplier, the load needs at least the largest MOQ among that supplier's products, in the load's unit (cases or pallets). Volume from another supplier does not count toward it. A minimum larger than the load itself is reported as impossible, and the buyer is told to order by the full pallet or truck instead.
+* **Minimum order in a mixed load:** a product's MOQ applies to that product (its SKU) inside the load. On Atlantis one Product row is one supplier's listing, and its **variants** (flavour, size…) are the only items that share that SKU — so variants of the same product count together toward its minimum, and other products never do. A minimum larger than the load itself is reported as impossible (order by the full pallet or truck instead).
 * Several products in one load need one verified dispatch site (the same warehouse, or the same stated EXW location). Different countries are refused.
 * An optional admin fill rule (`MIX_MIN_FILL_PERCENT`) can also require a minimum fill. It is not set by default.
 * Price: `Σ (case price × cases) × mix markup`, rounded once.
-* *Business decision to confirm:* the same-supplier volume rule above is how the existing per-product MOQ is applied to mixed loads. If a supplier-level minimum (for example "15 pallets per order across all my products") is wanted instead, it needs a new supplier setting.
+* Each cart line also gets `minimum` (`unit`, `required`, `have`, `remaining`, `percent`, `met`) in the MOQ's own unit — e.g. 1 of 5 pallets = 20% — converted only through the product's own pack sizes; the cart's progress bar shows exactly this.
 
-### Products the cart offers for a mixed load
+### Add Mix candidates
 
-`GET /mixed-loads/:id/candidates` returns only products that can genuinely count toward the load. Each one is approved, in stock, from the same supplier, at the same verified dispatch site, has the pack data the load needs, has room left, and has a minimum that fits the load.
+`GET /mixed-loads/:id/candidates` returns only the **other variants of the same product** (same SKU, so same supplier and dispatch site) that still have stock and room in the load. If there are none, the cart disables Add Mix and says why.
 
 ## Stock
 
@@ -68,9 +68,9 @@ Pinned by `pricing.spec.ts › Documented pricing examples`. The product has a s
 | 15 pallets | €10.50 | €840.00 | €12,600.00 (1,200 cases) |
 | 1 truck | €10.20 | €26,928.00 | €26,928.00 (2,640 cases) |
 | 1 case with a 10% offer | €9.90 | €9.90 | €9.90 |
-| Mixed truck: 8 pallets of A + 7 of B (both €10/case) | — | — | €13,800.00 (1,200 cases × €10 × 1.15) |
+| Mixed truck: 8 + 7 pallets (both €10/case) | — | — | €13,800.00 (1,200 cases × €10 × 1.15) |
 
-With an MOQ of 15 pallets, 1 pallet gives `BELOW_MOQ` (14 more needed). 8 + 7 pallets from the same supplier qualify; 8 + 7 from two different suppliers do not.
+With an MOQ of 15 pallets, 1 pallet gives `BELOW_MOQ` (14 more needed). 8 pallets of one variant + 7 of another variant of the same product qualify; 8 + 7 of two different products do not.
 
 ## What was fixed in this round
 

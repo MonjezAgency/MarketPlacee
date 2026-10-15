@@ -60,10 +60,13 @@ export default function SponsoredProductCard({ product, index }: SponsoredProduc
                     {product.brand || 'Atlantis'}
                 </p>
                 <Link href={`/products/${product.id}`}>
-                    <h3 className="font-sans text-[15px] font-semibold leading-snug line-clamp-2 min-h-[2.6em] text-ink hover:text-teal transition-colors">
+                    <h3 className="font-sans text-[15px] font-semibold leading-snug line-clamp-2 h-[2.75em] text-ink hover:text-teal transition-colors">
                         {product.name}
                     </h3>
                 </Link>
+                <p className="mt-1 h-[18px] text-[12px] leading-[18px] text-ink-3 tabular-nums tracking-wide truncate" title={(product as any).ean || undefined}>
+                    {(product as any).ean || 'No link code'}
+                </p>
 
                 <div className="mt-auto pt-3">
                     <div className="flex items-end justify-between gap-2">

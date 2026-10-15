@@ -107,6 +107,11 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
         window.location.href = `/products/${product.id}`;
     };
 
+    // MOQ in its real unit (moq + moqUnit), never a made-up "pcs".
+    const moqN = Number(product.moq) || 0;
+    const moqUnitWord = ({ PIECE: 'pc', CASE: 'case', PALLET: 'pallet', TRUCK: 'truck' } as Record<string, string>)[String(product.moqUnit || 'PIECE').toUpperCase()] || 'pc';
+    const moqText = moqN > 0 ? `${moqN.toLocaleString('en-GB')} ${moqUnitWord}${moqN === 1 ? '' : 's'}` : null;
+
     return (
         // Card animation tuning: short fade-up, delay capped at ~0.18 s so
         // cards past the first row land together. Hover lifts only the
@@ -204,15 +209,15 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
                 {/* Title */}
                 <Link href={`/products/${product.id}`}>
-                    <h3 className="font-sans text-[14px] font-semibold leading-snug line-clamp-2 min-h-[2.6em] text-ink hover:text-teal transition-colors">
+                    <h3 className="font-sans text-[14px] font-semibold leading-snug line-clamp-2 h-[2.75em] text-ink hover:text-teal transition-colors">
                         {translatedName}
                     </h3>
                 </Link>
 
-                {/* EAN — B2B buyers search by barcode */}
-                {product.ean && (
-                    <p className="mt-1 text-[12px] text-ink-3 tabular-nums tracking-wide">{product.ean}</p>
-                )}
+                {/* Barcode (link code) — always one line, so every card in a row lines up. */}
+                <p className="mt-1 h-[18px] text-[12px] leading-[18px] text-ink-3 tabular-nums tracking-wide truncate" title={product.ean || undefined}>
+                    {product.ean || 'No link code'}
+                </p>
 
                 {/* Price & Min Order */}
                 <div className="mt-auto pt-2.5">
@@ -237,7 +242,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                             <span className="text-[14px] font-semibold text-ink-2">Price on request</span>
                         )}
                         <span className="text-[11px] text-ink-3 shrink-0 pb-0.5">
-                            MOQ <span className="font-semibold text-ink">{product.minOrder} pcs</span>
+                            {moqText ? <>MOQ <span className="font-semibold text-ink">{moqText}</span></> : 'No MOQ'}
                         </span>
                     </div>
 

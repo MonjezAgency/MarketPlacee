@@ -445,7 +445,7 @@ export default function HomePage() {
                                 className="grid grid-flow-col auto-cols-[minmax(160px,1fr)] sm:auto-cols-[minmax(180px,1fr)] lg:grid-flow-row lg:grid-cols-6 lg:auto-cols-auto gap-4 gap-y-8 overflow-x-auto lg:overflow-visible snap-x snap-mandatory pb-2 scroll-smooth scrollbar-hide"
                             >
                                 {products.slice(0, 12).map((p, i) => (
-                                    <div key={p.id} className="snap-start">
+                                    <div key={p.id} className="snap-start h-full">
                                         <ProductCard product={p} index={i} />
                                     </div>
                                 ))}

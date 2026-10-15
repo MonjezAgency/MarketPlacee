@@ -1,4 +1,4 @@
-import { PricingError, priceLine, priceLoad, minUnits, tierAvailability, PricingProduct } from '../pricing';
+import { PricingError, priceLine, priceLoad, minUnits, tierAvailability, lineMinimum, PricingProduct } from '../pricing';
 
 const M = { piece: 1.1, pallet: 1.05, container: 1.02, mix: 1.15 };
 // Real record: Prime Hydration UK Juventus DFA 500ml (production catalog).
@@ -134,7 +134,10 @@ describe('Minimum order — single lines and mixed loads', () => {
         expect(e.detail).toMatchObject({ minUnits: 15, quantity: 1, remaining: 14, moq: 15, moqUnit: 'PALLET' });
         expect(e.detail.unitPrice).toBe(Math.round(10.5 * 80 * 100) / 100);
         expect(e.detail.minLineTotal).toBe(Math.round(840 * 15 * 100) / 100);
-        expect(e.detail.mixable).toEqual({ kind: 'TRUCK', quantity: 1, minUnits: 15, capacity: 33 });
+        expect(e.detail.mixable).toBeNull(); // no variants → nothing of the same SKU to mix with
+        expect(e.detail.minimum).toEqual({ unit: 'pallet', required: 15, have: 1, remaining: 14, percent: 6.7, met: false });
+        const withVariants = sup('v', 's1', { variants: [{ name: 'Flavour', values: ['Grape', 'Lemon'] }] });
+        expect((thrown(() => priceLine(withVariants, 'pallet', 1, MM)) as any).detail.mixable).toEqual({ kind: 'TRUCK', quantity: 1, minUnits: 15, capacity: 33, variants: 2 });
     });
     it('exactly at and above the minimum is accepted', () => {
         expect(priceLine(sup('a', 's1'), 'pallet', 15, MM).lineTotal).toBe(12600);
@@ -148,12 +151,18 @@ describe('Minimum order — single lines and mixed loads', () => {
         const q = priceLoad('TRUCK', [{ productId: 'a', quantity: 1 }], mapOf(sup('a', 's1')), MM, { requiredFill: 0 });
         expect(q.ready).toBe(false);
         expect(q.minimums).toEqual([expect.objectContaining({ unit: 'pallet', required: 15, have: 1, remaining: 14, satisfiable: true })]);
-        expect(q.issues.join(' ')).toMatch(/Minimum order: 15 pallets\. Add 14 more pallets of a or other eligible products/);
+        expect(q.issues.join(' ')).toMatch(/Minimum order: 15 pallets\. Add 14 more pallets of a \(any of its variants\)/);
     });
-    it('mixed truck: same-supplier products count together (8 + 7 = 15 pallets)', () => {
-        const q = priceLoad('TRUCK', [{ productId: 'a', quantity: 8 }, { productId: 'b', quantity: 7 }], mapOf(sup('a', 's1'), sup('b', 's1', { moq: null })), MM, { requiredFill: 0 });
+    it('mixed truck: variants of the same product (same SKU) count together (8 + 7 = 15 pallets)', () => {
+        const v = sup('a', 's1', { variants: [{ name: 'Flavour', values: ['Grape', 'Lemon'] }] });
+        const q = priceLoad('TRUCK', [{ productId: 'a', variant: 'Flavour=Grape', quantity: 8 }, { productId: 'a', variant: 'Flavour=Lemon', quantity: 7 }], mapOf(v), MM, { requiredFill: 0 });
         expect(q.minimums[0]).toMatchObject({ required: 15, have: 15, remaining: 0 });
         expect(q.ready).toBe(true);
+    });
+    it('a different product (different SKU) of the same supplier does not count toward the minimum', () => {
+        const q = priceLoad('TRUCK', [{ productId: 'a', quantity: 8 }, { productId: 'b', quantity: 7 }], mapOf(sup('a', 's1'), sup('b', 's1', { moq: null })), MM, { requiredFill: 0 });
+        expect(q.minimums).toEqual([expect.objectContaining({ required: 15, have: 8, remaining: 7 })]);
+        expect(q.ready).toBe(false);
     });
     it('another supplier\'s pallets do not count toward this supplier\'s minimum', () => {
         const q = priceLoad('TRUCK', [{ productId: 'a', quantity: 8 }, { productId: 'c', quantity: 7 }], mapOf(sup('a', 's1'), sup('c', 's2', { moq: null })), MM, { requiredFill: 0 });
@@ -192,5 +201,31 @@ describe('Documented pricing examples', () => {
         expect(q.total).toBe(13800);
         expect(q.lines.map((l) => l.cases)).toEqual([640, 560]);
         expect(Math.round(q.fill * 1000) / 1000).toBe(Math.round((15 / 33) * 1000) / 1000);
+    });
+});
+
+describe('Minimum-order progress of a line (in the MOQ unit)', () => {
+    const p = (extra: Partial<PricingProduct> = {}): PricingProduct => ({ id: 'x', name: 'x', price: 11, basePrice: 10, unitsPerCase: 12, casesPerPallet: 80, palletsPerShipment: 33, moq: 5, moqUnit: 'PALLET', status: 'APPROVED', ...extra });
+    it('5-pallet minimum with 1, 2, 3, 4 and 5 pallets: 20/40/60/80/100%', () => {
+        const got = [1, 2, 3, 4, 5].map((n) => lineMinimum(p(), 'pallet', n)!);
+        expect(got.map((g) => g.have)).toEqual([1, 2, 3, 4, 5]);
+        expect(got.map((g) => g.remaining)).toEqual([4, 3, 2, 1, 0]);
+        expect(got.map((g) => g.percent)).toEqual([20, 40, 60, 80, 100]);
+        expect(got.map((g) => g.met)).toEqual([false, false, false, false, true]);
+    });
+    it('other minimums: 3 pallets, 200 cases, 1 truck', () => {
+        expect(lineMinimum(p({ moq: 3 }), 'pallet', 1)).toMatchObject({ required: 3, have: 1, remaining: 2, percent: 33.3 });
+        expect(lineMinimum(p({ moq: 200, moqUnit: 'CASE' }), 'carton', 50)).toMatchObject({ unit: 'case', required: 200, have: 50, percent: 25 });
+        expect(lineMinimum(p({ moq: 1, moqUnit: 'TRUCK' }), 'pallet', 11)).toMatchObject({ unit: 'truck', have: 0.33, met: false });
+    });
+    it('cases count toward a pallet minimum only through the product’s cases-per-pallet', () => {
+        expect(lineMinimum(p(), 'carton', 160)).toMatchObject({ unit: 'pallet', have: 2, remaining: 3, percent: 40 });
+        expect(lineMinimum(p({ casesPerPallet: null }), 'carton', 160)).toBeNull(); // no pack data → no claimed progress
+    });
+    it('no MOQ → no progress block', () => {
+        expect(lineMinimum(p({ moq: null }), 'pallet', 1)).toBeNull();
+    });
+    it('the quote line carries the same progress the server uses to decide', () => {
+        expect(priceLine(p(), 'pallet', 5, { piece: 1.1, pallet: 1.05, container: 1.02, mix: 1.15 }).minimum).toMatchObject({ have: 5, met: true, percent: 100 });
     });
 });

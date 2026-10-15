@@ -216,10 +216,17 @@ export class OrdersService {
                 }
                 const offerPercent = this.offerFor(offers.get(productId), raw.selectedVariants);
                 const priced = priceLine(p, tier, Number(raw.quantity), markups, { raw: !!p.supplierId && p.supplierId === customerId, discountPercent: offerPercent });
-                takeStock(p, priced.casesTotal);
+                try { takeStock(p, priced.casesTotal); } catch (e) {
+                    // Keep the price and progress on a stock-short line, plus the most that fits.
+                    if (e instanceof PricingError) {
+                        const per = casesInUnit(p, priced.tier);
+                        e.detail = { ...e.detail, tier: priced.tier, quantity: priced.quantity, unitPrice: priced.unitPrice, lineTotal: priced.lineTotal, minimum: priced.minimum, casesPerUnit: per, maxUnits: per > 0 ? Math.floor(Number((e.detail as any)?.availableCases ?? 0) / per) : 0 };
+                    }
+                    throw e;
+                }
                 // Supplier's own price for one ordered unit (no Atlantis margin) — for supplier views only.
                 const supplierUnitPrice = round2(basePerCase(p, markups) * offerFactor(offerPercent) * casesInUnit(p, priced.tier));
-                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, supplierUnitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, offerPercent: offerPercent || null, stockTake: [{ productId, cases: priced.casesTotal }], info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null, leadTime: (p as any).leadTime ?? null, readyForDispatch: !!(p as any).readyForDispatch, exwLocation: p.exwLocation ?? null } });
+                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, supplierUnitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, minimum: priced.minimum, offerPercent: offerPercent || null, stockTake: [{ productId, cases: priced.casesTotal }], info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null, leadTime: (p as any).leadTime ?? null, readyForDispatch: !!(p as any).readyForDispatch, exwLocation: p.exwLocation ?? null } });
             } catch (e) {
                 // Cart view: flag the line and keep pricing the rest. Orders stay strict.
                 if (opts.lenient && e instanceof PricingError) {

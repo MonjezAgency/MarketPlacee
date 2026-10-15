@@ -25,12 +25,11 @@
  *    when the shares add up to the required fill (default 100%, the rule
  *    an admin can require via MIX_MIN_FILL_PERCENT; none by default) and
  *    never above 100% of the products' own stated capacity.
- *  • Minimum order in a mixed load: each product's MOQ still applies to the
- *    load it ships in, but volume from the SAME supplier counts together.
- *    Per supplier, the load needs at least the largest MOQ of that
- *    supplier's products, in the load's unit (cases for a mixed pallet,
- *    pallets for a mixed truck). E.g. MOQ 15 pallets: 8 pallets of A + 7
- *    of B from that supplier qualify; 1 pallet does not. No supplier /
+ *  • Minimum order in a mixed load: a product's MOQ applies to that product
+ *    (its SKU) in the load. Its variants — the only things that share a
+ *    SKU on Atlantis (one Product row = one supplier listing) — count
+ *    together; other products never count toward it. E.g. MOQ 5 pallets:
+ *    3 pallets Grape + 2 pallets Lemon of the same product qualify. No supplier /
  *    location compatibility rule is applied (not yet defined by the
  *    business). Price = Σ case price × cases, then the admin mix markup.
  */
@@ -144,6 +143,31 @@ export interface PricedLine {
     casesTotal: number;
     unitsTotal: number;
     minUnits: number;
+    minimum: LineMinimum | null;
+}
+
+/** Minimum-order progress of one line, in the unit the MOQ is set in (5 pallets, 200 cases…). */
+export interface LineMinimum { unit: 'piece' | 'case' | 'pallet' | 'truck'; required: number; have: number; remaining: number; percent: number; met: boolean }
+
+const MOQ_UNIT_WORD: Record<string, LineMinimum['unit']> = { PIECE: 'piece', CASE: 'case', PALLET: 'pallet', TRUCK: 'truck' };
+
+/**
+ * Progress toward the product's MOQ for `qty` units of `tier`, expressed in
+ * the MOQ's own unit. Converted only through the product's real pack data;
+ * when a needed pack size is missing, no progress is claimed (null).
+ */
+export function lineMinimum(p: PricingProduct, tier: Tier, qty: number): LineMinimum | null {
+    const moq = pos(p.moq);
+    if (!moq) return null;
+    const unitKey = String(p.moqUnit || 'PIECE').toUpperCase();
+    const unit = MOQ_UNIT_WORD[unitKey] ?? 'piece';
+    const upc = pos(p.unitsPerCase), cpp = pos(p.casesPerPallet), ppt = pos(p.palletsPerShipment);
+    const casesPerMoqUnit = unit === 'piece' ? (upc ? 1 / upc : 0) : unit === 'case' ? 1 : unit === 'pallet' ? cpp : cpp * ppt;
+    const cases = qty * casesInUnit(p, tier);
+    if (!casesPerMoqUnit || !Number.isFinite(cases)) return null;
+    const have = Math.floor((cases / casesPerMoqUnit) * 100 + EPS) / 100;
+    const met = qty >= minUnits(p, tier);
+    return { unit, required: moq, have, remaining: met ? 0 : Math.max(0, Math.round((moq - have) * 100) / 100), percent: Math.min(100, Math.round((have / moq) * 1000) / 10), met };
 }
 
 /** Price one single-product line at a packaging tier, enforcing availability and MOQ. */
@@ -166,6 +190,7 @@ export function priceLine(p: PricingProduct, tierIn: unknown, quantity: unknown,
         throw new PricingError('BELOW_MOQ', `${p.name}: minimum order is ${min} ${UNIT_NAMES[tier][min === 1 ? 0 : 1]}.`, {
             productId: p.id, tier, minUnits: min, quantity: qty, remaining: min - qty, unitPrice, minLineTotal: round2(unitPrice * min),
             moq: pos(p.moq) || null, moqUnit: p.moqUnit ? String(p.moqUnit).toUpperCase() : null, mixable: mixOptions(p, tier, qty),
+            minimum: lineMinimum(p, tier, qty), casesPerUnit: cases,
         });
     }
     return {
@@ -174,6 +199,7 @@ export function priceLine(p: PricingProduct, tierIn: unknown, quantity: unknown,
         casesTotal: cases * qty,
         unitsTotal: cases * qty * pos(p.unitsPerCase),
         minUnits: min,
+        minimum: lineMinimum(p, tier, qty),
     };
 }
 
@@ -190,13 +216,16 @@ export function offerFactor(pct: unknown): number {
  * keeps the same quantity: cases → mixed pallet, pallets → mixed truck.
  * Only offered when the load could ever satisfy the product's own MOQ.
  */
-export function mixOptions(p: PricingProduct, tier: Tier, qty: number): { kind: LoadKind; quantity: number; minUnits: number; capacity: number } | null {
+export function mixOptions(p: PricingProduct, tier: Tier, qty: number): { kind: LoadKind; quantity: number; minUnits: number; capacity: number; variants: number } | null {
     const kind: LoadKind | null = tier === 'carton' ? 'PALLET' : tier === 'pallet' ? 'TRUCK' : null;
     if (!kind || !tierAvailability(p)[kind === 'PALLET' ? 'pallet' : 'truck'].ok) return null;
+    // Mixing is within one SKU: the product needs at least two variants to mix.
+    const variants = variantSignatures(p).length;
+    if (variants < 2) return null;
     const capacity = kind === 'PALLET' ? pos(p.casesPerPallet) : pos(p.palletsPerShipment);
     const need = minUnits(p, kind === 'PALLET' ? 'carton' : 'pallet');
     if (need > capacity || qty > capacity) return null;
-    return { kind, quantity: qty, minUnits: need, capacity };
+    return { kind, quantity: qty, minUnits: need, capacity, variants };
 }
 
 export interface LoadLineInput { productId: string; variant?: string | null; quantity: number }
@@ -356,7 +385,7 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
     for (const g of minimums) {
         const u = (n: number) => `${n.toLocaleString('en-GB')} ${g.unit}${n === 1 ? '' : 's'}`;
         if (!g.satisfiable) issues.push(`Minimum order for ${g.products.join(', ')} is ${u(g.required)}, more than this ${kind === 'PALLET' ? 'pallet' : 'truck'} can hold (${u(g.capacity)}). Order it ${kind === 'PALLET' ? 'by the pallet' : 'by the truckload'} instead.`);
-        else if (g.remaining > 0) issues.push(`Minimum order: ${u(g.required)}. Add ${g.remaining.toLocaleString('en-GB')} more ${g.unit}${g.remaining === 1 ? '' : 's'} of ${g.products.length > 1 ? 'these products' : g.products[0]} or other eligible products from the same supplier.`);
+        else if (g.remaining > 0) issues.push(`Minimum order: ${u(g.required)}. Add ${g.remaining.toLocaleString('en-GB')} more ${g.unit}${g.remaining === 1 ? '' : 's'} of ${g.products[0]} (any of its variants).`);
     }
     // Mixing several products needs one verified dispatch site; never assumed.
     if (new Set(out.map((l) => l.productId)).size > 1 && origin.status !== 'VERIFIED') {
@@ -379,7 +408,7 @@ export function loadMinimums(kind: LoadKind, lines: { productId: string; quantit
     for (const l of lines) {
         const p = products.get(l.productId);
         if (!p) continue;
-        const key = p.supplierId ?? `product:${p.id}`;
+        const key = p.id; // one SKU: variants of the product count together, other products never do
         const g = groups.get(key) ?? { have: 0, required: 1, setters: [], capacity: Infinity };
         g.have += l.quantity;
         const cap = kind === 'PALLET' ? pos(p.casesPerPallet) : pos(p.palletsPerShipment);

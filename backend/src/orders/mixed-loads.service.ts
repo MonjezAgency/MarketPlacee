@@ -109,55 +109,52 @@ export class MixedLoadsService {
     }
 
     /**
-     * Products that can genuinely count toward this load: approved, in stock,
-     * from the same supplier (so they count toward that supplier's minimum),
-     * dispatched from the same verified site, with the pack data the load
-     * needs, and room left for at least one unit. Prices are buyer prices.
+     * "Add Mix" candidates: the other variants of the SAME product (same
+     * SKU — one Product row is one supplier listing on Atlantis) that can
+     * still go in this load. Other products, other suppliers and other
+     * listings are never offered. Each candidate has room left in the load
+     * and stock left after what the load already takes. Buyer prices only.
      */
     async candidates(customerId: string, id: string, q?: string) {
         const row = await this.prisma.mixedLoad.findFirst({ where: { id, customerId, status: 'DRAFT' } });
         if (!row) throw new NotFoundException('Mixed load not found');
         const kind = row.kind as LoadKind;
         const lines = ((row.lines as any[]) || []) as LoadLineInput[];
-        const inLoad = await this.loadProducts(lines.map((l) => l.productId));
+        const products = await this.loadProducts(lines.map((l) => l.productId));
         const [m, priced] = await Promise.all([this.markups(), this.price(kind, lines).catch(() => null)]);
         const fillLeft = Math.max(0, 1 - (priced?.fill ?? 0));
-        const suppliers = new Set([...inLoad.values()].map((p) => p.supplierId).filter(Boolean) as string[]);
-        const siteOf = (p: any) => (p.warehouse?.id ? `wh:${p.warehouse.id}` : String(p.exwLocation ?? '').trim().replace(/\s+/g, ' ').toLowerCase() ? `exw:${String(p.exwLocation).trim().replace(/\s+/g, ' ').toLowerCase()}` : null);
-        const sites = new Set([...inLoad.values()].map(siteOf));
         const empty = (reason: string) => ({ kind, items: [], reason });
-        if (!inLoad.size) return empty('Add a product first.');
-        if (suppliers.size !== 1) return empty('Products in this load come from different suppliers, so nothing more can be added automatically.');
-        if (sites.size !== 1 || sites.has(null)) return empty('The dispatch location of this load isn’t verified, so other products can’t be confirmed to ship with it. Atlantis can check this for you.');
+        if (!products.size) return empty('Add a product first.');
         if (fillLeft <= 1e-9) return empty('This load is full.');
-        const site = [...sites][0] as string;
-        const search = String(q ?? '').trim().slice(0, 80);
-        const rows: any[] = await this.prisma.product.findMany({
-            where: {
-                status: 'APPROVED', supplierId: [...suppliers][0], id: { notIn: [...inLoad.keys()] }, stock: { gt: 0 },
-                unitsPerCase: { gt: 0 }, casesPerPallet: { gt: 0 }, ...(kind === 'TRUCK' ? { palletsPerShipment: { gt: 0 } } : {}),
-                ...(search ? { OR: [{ name: { contains: search, mode: 'insensitive' } }, { brand: { contains: search, mode: 'insensitive' } }, { ean: { contains: search } }] } : {}),
-            },
-            select: { ...PRODUCT_PRICING_SELECT, origin: true },
-            orderBy: { name: 'asc' },
-            take: 120,
-        });
-        const items = rows.filter((p) => siteOf(p) === site).map((p) => {
+        const search = String(q ?? '').trim().toLowerCase().slice(0, 80);
+        const items: any[] = [];
+        for (const p of products.values() as any) {
+            if (p.status !== 'APPROVED') continue;
+            const taken = new Set(lines.filter((l) => l.productId === p.id).map((l) => l.variant || ''));
+            const casesInLoad = (priced?.lines || []).filter((l) => l.productId === p.id).reduce((s, l) => s + l.cases, 0);
             const cap = kind === 'PALLET' ? Number(p.casesPerPallet) : Number(p.palletsPerShipment);
             const casesPerUnit = kind === 'PALLET' ? 1 : Number(p.casesPerPallet);
             const byRoom = Math.floor(fillLeft * cap + 1e-9);
-            const byStock = Math.floor(Number(p.stock) / casesPerUnit);
-            const casePrice = Math.round(basePerCase(p, m) * m.mix * 10000) / 10000;
-            return {
-                id: p.id, name: p.name, brand: p.brand ?? null, image: p.images?.[0] ?? null, ean: p.ean ?? null, origin: p.origin ?? null,
-                unitsPerCase: p.unitsPerCase, casesPerPallet: p.casesPerPallet, palletsPerShipment: p.palletsPerShipment ?? null,
-                unit: kind === 'PALLET' ? 'case' : 'pallet', casesPerUnit, casePrice, unitPrice: Math.round(casePrice * casesPerUnit * 100) / 100,
-                maxQuantity: Math.max(0, Math.min(byRoom, byStock)), shareOfLoadPerUnit: 1 / cap,
-                minUnits: minUnits(p, kind === 'PALLET' ? 'carton' : 'pallet'),
-                variants: variantSignatures(p),
-            };
-        }).filter((c) => c.maxQuantity >= 1 && c.minUnits <= (kind === 'PALLET' ? Number(c.casesPerPallet) : Number(c.palletsPerShipment))).slice(0, 60);
-        return { kind, items, reason: items.length ? null : search ? 'No eligible product matches that search.' : 'No other product from this supplier can ship in this load right now.' };
+            const byStock = typeof p.stock === 'number' ? Math.floor(Math.max(0, p.stock - casesInLoad) / casesPerUnit) : byRoom;
+            const prices = p.variantPrices && typeof p.variantPrices === 'object' ? p.variantPrices : {};
+            for (const sig of variantSignatures(p)) {
+                if (taken.has(sig)) continue;
+                const label = sig.split('|').map((x) => x.split('=').slice(1).join('=')).join(' · ');
+                if (search && !`${p.name} ${label}`.toLowerCase().includes(search)) continue;
+                const own = Number(prices[sig]);
+                const casePrice = Math.round((Number.isFinite(own) && own > 0 ? own : basePerCase(p, m)) * m.mix * 10000) / 10000;
+                const maxQuantity = Math.max(0, Math.min(byRoom, byStock));
+                if (maxQuantity < 1) continue;
+                items.push({
+                    id: p.id, variant: sig, variantLabel: label, name: p.name, sku: `ATL-${String(p.id).slice(0, 8).toUpperCase()}`, supplier: 'Same supplier as this load',
+                    brand: p.brand ?? null, image: p.images?.[0] ?? null, ean: p.ean ?? null, origin: p.origin ?? null,
+                    unitsPerCase: p.unitsPerCase, casesPerPallet: p.casesPerPallet, palletsPerShipment: p.palletsPerShipment ?? null,
+                    unit: kind === 'PALLET' ? 'case' : 'pallet', casesPerUnit, casePrice, unitPrice: Math.round(casePrice * casesPerUnit * 100) / 100,
+                    maxQuantity, shareOfLoadPerUnit: 1 / cap, minUnits: minUnits(p, kind === 'PALLET' ? 'carton' : 'pallet'), variants: [],
+                });
+            }
+        }
+        return { kind, items: items.slice(0, 60), reason: items.length ? null : search ? 'No variant matches that search.' : 'No eligible mix options: this product has no other variant with stock and room left in this load.' };
     }
 
     async remove(customerId: string, id: string) {

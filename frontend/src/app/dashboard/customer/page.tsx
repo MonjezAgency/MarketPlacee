@@ -65,7 +65,7 @@ export default function BuyerOverview() {
                         )}
                         {boughtLive.length > 0 ? (
                             <ProductRail title="" arrows={boughtLive.length > 4}>
-                                {boughtLive.map((p) => <div key={p.id} className="shrink-0 w-[220px] snap-start"><ProductCard product={p} /></div>)}
+                                {boughtLive.map((p) => <div key={p.id} className="shrink-0 w-[220px] snap-start self-stretch"><ProductCard product={p} /></div>)}
                             </ProductRail>
                         ) : null}
                         {bought.length > boughtLive.length && (
@@ -89,7 +89,7 @@ export default function BuyerOverview() {
                     <Empty icon={<Sparkles size={20} />} title="You’ve seen it all" text="Nothing new since your last order." action={<Link href="/categories?sort=newest" className="text-[13.5px] font-semibold text-teal hover:underline">See new offers</Link>} />
                 ) : (
                     <ProductRail title="" arrows viewAll={{ href: '/categories?sort=newest', label: 'See all new offers' }}>
-                        {discover.map((p) => <div key={p.id} className="shrink-0 w-[220px] snap-start"><ProductCard product={p} /></div>)}
+                        {discover.map((p) => <div key={p.id} className="shrink-0 w-[220px] snap-start self-stretch"><ProductCard product={p} /></div>)}
                     </ProductRail>
                 )}
             </section>
