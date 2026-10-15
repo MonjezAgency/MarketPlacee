@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { BotService } from './bot.service';
 
@@ -70,8 +70,16 @@ export class ChatService {
         }))
       };
 
+      // A person has taken over this conversation: no automatic reply.
+      const lastOwn = await this.prisma.supportMessage.findFirst({ where: { senderId, receiverId: null, orderId: null, id: { not: message.id } }, orderBy: { createdAt: 'desc' }, select: { isHandedOver: true } });
+      if (lastOwn?.isHandedOver) {
+        await this.prisma.supportMessage.update({ where: { id: message.id }, data: { isHandedOver: true } }).catch(() => {});
+        return { userMessage: message, botMessage: null };
+      }
       const aiResponse = await this.botService.getResponse(data.content || '', [], context);
-      
+      // Provider failure: keep the user's message, don't store a fake answer.
+      if (aiResponse.failed) return { userMessage: message, botMessage: null };
+
       // Save Bot Message
       const botMessage = await this.prisma.supportMessage.create({
         data: {
@@ -177,9 +185,20 @@ export class ChatService {
      });
   }
 
-  async markAsRead(messageIds: string[]) {
+  /** Order chat: the order's buyer, a supplier with products in it, or support staff. */
+  async assertOrderChatAccess(orderId: string, userId: string, role?: string) {
+    if (['ADMIN', 'SUPPORT', 'OWNER', 'LOGISTICS', 'DEVELOPER'].includes(String(role || '').toUpperCase())) return;
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { customerId: true, supplierId: true } });
+    if (!order) throw new NotFoundException('Order not found');
+    if (order.customerId === userId || order.supplierId === userId) return;
+    const supplies = await this.prisma.orderItem.count({ where: { orderId, product: { supplierId: userId } } });
+    if (!supplies) throw new ForbiddenException('Not your order.');
+  }
+
+  async markAsRead(messageIds: string[], userId?: string, isStaff = false) {
     return this.prisma.supportMessage.updateMany({
-      where: { id: { in: messageIds } },
+      // Users mark only messages addressed to them; staff mark messages sent to support.
+      where: { id: { in: Array.isArray(messageIds) ? messageIds.slice(0, 500) : [] }, ...(isStaff ? {} : { receiverId: userId ?? '__none__' }) },
       data: { isRead: true }
     });
   }

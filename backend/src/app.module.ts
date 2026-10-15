@@ -25,6 +25,7 @@ import { SecurityModule } from './security/security.module';
 import { SecurityInterceptor } from './security/security.interceptor';
 import { AdsModule } from './ads/ads.module';
 import { ChatModule } from './chat/chat.module';
+import { SupportModule } from './support/support.module';
 import { KycModule } from './kyc/kyc.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { WishlistModule } from './wishlist/wishlist.module';
@@ -59,6 +60,7 @@ import { EmailTrackingModule } from './email-tracking/email-tracking.module';
         CouponsModule,
         AdsModule,
         ChatModule,
+        SupportModule,
         KycModule,
         NotificationsModule,
         WishlistModule,

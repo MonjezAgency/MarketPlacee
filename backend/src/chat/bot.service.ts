@@ -68,7 +68,7 @@ export class BotService {
       const response = await axios.post(
         this.apiUrl,
         {
-          model: 'google/gemini-2.0-flash-001', // High performance & cost-effective
+          model: process.env.SUPPORT_AI_MODEL || 'google/gemini-3.5-flash-lite', // gemini-2.0-flash-001 was retired (404)
           messages,
         },
         {
@@ -98,13 +98,12 @@ export class BotService {
       return {
         content: cleanContent,
         assignedTeam,
+        failed: false,
       };
     } catch (error) {
       this.logger.error('Error fetching AI response', error.response?.data || error.message);
-      return {
-        content: "عذراً، أواجه مشكلة تقنية حالياً. سأقوم بتحويلك لفريق الدعم البشري لمساعدتك بشكل أفضل.",
-        assignedTeam: 'DEVELOPER', // Fallback to dev if AI fails
-      };
+      // No fake answer: the caller keeps the user's message and shows a retryable error.
+      return { content: '', assignedTeam: null as string | null, failed: true };
     }
   }
 }

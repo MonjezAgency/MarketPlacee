@@ -17,6 +17,6 @@ import { StorageModule } from '../storage/storage.module';
     imports: [PrismaModule, EmailModule, NotificationsModule, InvoiceModule, StorageModule, forwardRef(() => PaymentsModule), forwardRef(() => AdminModule)],
     providers: [OrdersService, MixedLoadsService, StepUpService],
     controllers: [OrdersController, MixedLoadsController],
-    exports: [OrdersService],
+    exports: [OrdersService, MixedLoadsService],
 })
 export class OrdersModule { }

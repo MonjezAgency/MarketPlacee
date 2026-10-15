@@ -5,6 +5,8 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { Role } from '@prisma/client';
 
+const CHAT_STAFF = ['ADMIN', 'SUPPORT', 'DEVELOPER', 'LOGISTICS', 'OWNER'];
+
 @Controller('chat')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ChatController {
@@ -12,7 +14,9 @@ export class ChatController {
 
   @Post('send')
   async sendMessage(@Request() req, @Body() data: { content?: string; imageUrl?: string; receiverId?: string }) {
-    return this.chatService.sendMessage(req.user.sub, data);
+    // Only support staff may address a message to a user; anyone else writes to support.
+    const staff = CHAT_STAFF.includes(String(req.user.role || '').toUpperCase());
+    return this.chatService.sendMessage(req.user.sub, { ...data, receiverId: staff ? data?.receiverId : undefined });
   }
 
   @Get('messages')
@@ -45,8 +49,8 @@ export class ChatController {
   }
 
   @Patch('read')
-  async markRead(@Body() data: { ids: string[] }) {
-    return this.chatService.markAsRead(data.ids);
+  async markRead(@Request() req, @Body() data: { ids: string[] }) {
+    return this.chatService.markAsRead(data.ids, req.user.sub, CHAT_STAFF.includes(String(req.user.role || '').toUpperCase()));
   }
 
   // ─── Order-linked chat ────────────────────────────────────────────────────
@@ -58,12 +62,14 @@ export class ChatController {
     @Body('content') content: string,
     @Request() req,
   ) {
+    await this.chatService.assertOrderChatAccess(orderId, req.user.sub, req.user.role);
     return this.chatService.sendOrderMessage(req.user.sub, orderId, content);
   }
 
   /** Get all messages for an order's chat thread */
   @Get('order/:orderId/messages')
-  async getOrderMessages(@Param('orderId') orderId: string) {
+  async getOrderMessages(@Param('orderId') orderId: string, @Request() req) {
+    await this.chatService.assertOrderChatAccess(orderId, req.user.sub, req.user.role);
     return this.chatService.getOrderMessages(orderId);
   }
 

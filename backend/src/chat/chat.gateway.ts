@@ -80,6 +80,9 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {
     const senderId = client.data.userId;
     if (!senderId) return;
+    // Only support staff may address a message to a specific user.
+    const staff = ['ADMIN', 'SUPPORT', 'DEVELOPER', 'LOGISTICS', 'OWNER'].includes(String(client.data.role || '').toUpperCase());
+    if (!staff) data = { ...data, receiverId: undefined };
 
     const result = await this.chatService.sendMessage(senderId, data);
 

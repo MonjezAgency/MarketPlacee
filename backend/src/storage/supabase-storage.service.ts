@@ -155,6 +155,30 @@ export class SupabaseStorageService implements OnModuleInit {
     }
 
     /**
+     * Support screenshots: stored in the PRIVATE bucket under
+     * support/<userId>/…, never public. Served only through the
+     * authenticated support-assistant endpoint (owner or staff).
+     */
+    async uploadSupportImage(userId: string, fileBuffer: Buffer, mimeType: string): Promise<string> {
+        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) throw new InternalServerErrorException('Attachment storage is not configured on the server.');
+        const ext = mimeType === 'image/png' ? '.png' : mimeType === 'image/webp' ? '.webp' : '.jpg';
+        const key = `support/${userId}/${crypto.randomBytes(12).toString('hex')}${ext}`;
+        const { error } = await this.client.storage.from(KYC_BUCKET).upload(key, fileBuffer, { contentType: mimeType, upsert: false });
+        if (error) {
+            this.logger.error(`[SUPPORT_UPLOAD_FAIL] ${error.message}`);
+            throw new InternalServerErrorException('The screenshot couldn’t be stored. Please try again.');
+        }
+        return key;
+    }
+
+    /** Bytes of a private support screenshot (caller must have checked access). */
+    async downloadSupportImage(key: string): Promise<{ buffer: Buffer; contentType: string }> {
+        const { data, error } = await this.client.storage.from(KYC_BUCKET).download(key);
+        if (error || !data) throw new InternalServerErrorException('Attachment unavailable.');
+        return { buffer: Buffer.from(await data.arrayBuffer()), contentType: data.type || 'image/jpeg' };
+    }
+
+    /**
      * Generate a temporary signed URL for a stored KYC file.
      * The URL expires after SIGNED_URL_EXPIRES_IN seconds.
      */
