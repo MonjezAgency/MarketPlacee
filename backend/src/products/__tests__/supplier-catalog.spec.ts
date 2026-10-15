@@ -2,7 +2,7 @@ import * as XLSX from 'xlsx';
 import { barcodeProblem, invalidValues, isRealImage, missingForPublish, normaliseBarcode, normaliseWeight } from '../catalog-rules';
 import { IMPORT_FIELDS, buildRow, buildTemplate, matchHeaders, normaliseHeader, parseSpreadsheet, parseVariants } from '../product-import';
 import { casesForItem } from '../stock-ledger';
-import { compareBrands, compareNames, ImageLookupService } from '../image-lookup.service';
+import { compareBrands, compareNames, comparePack, multipackCount, ImageLookupService } from '../image-lookup.service';
 import { assertTransition, ORDER_TRANSITIONS } from '../../orders/orders.service';
 
 const complete = {
@@ -206,6 +206,33 @@ describe('barcode image lookup', () => {
         const r = await svc.lookup('3046920022606', 'Lindt Excellence 70% 100 g', 'Lindt', f);
         expect(r.status).toBe('ambiguous');
         expect(r.candidates[0]).toMatchObject({ confidence: 'needs_confirmation', nameMatch: false, brandMatch: true });
+    });
+    it('returns every genuine photo of the record: front packshots per language first, then packaging', async () => {
+        const img = (n: string) => `https://images.openfoodfacts.org/images/products/301/762/042/2003/${n}.400.jpg`;
+        const rec = { ok: true, json: async () => ({ status: 1, code: '3017620422003', product: {
+            code: '3017620422003', product_name: 'Nutella hazelnut spread', brands: 'Nutella', quantity: '400 g',
+            selected_images: { front: { display: { ar: img('front_ar.14'), fr: img('front_fr.12'), en: img('front_en.10') } }, packaging: { display: { en: img('packaging_en.20') } } },
+            image_front_url: img('front_en.10'),
+        } }) };
+        const f: any = jest.fn(async (url: string) => (url.includes('openfoodfacts.org/api') ? rec : notFound));
+        const r = await svc.lookup('3017620422003', 'Nutella Hazelnut Spread 400 g', 'Nutella', f);
+        expect(r.candidates.map((c) => [c.kind, c.language])).toEqual([['front', 'en'], ['front', 'ar'], ['front', 'fr'], ['packaging', 'en']]);
+        expect(r.candidates.every((c) => c.confidence === 'verified' && c.packMatch === true && c.source === 'Open Food Facts')).toBe(true);
+        expect(r.message).toMatch(/Found 4 photos/);
+    });
+    it('a different pack size or a multipack under the same barcode is flagged, never verified', async () => {
+        expect(comparePack({ name: 'Coca-Cola 330 ml' }, { name: 'Coca-Cola', quantity: '500 ml' }).match).toBe(false);
+        expect(comparePack({ name: 'Coca-Cola 330 ml' }, { name: 'Coca-Cola', quantity: '6 x 330 ml' })).toMatchObject({ match: false, reason: expect.stringMatching(/6-pack/) });
+        expect(comparePack({ name: 'Coca-Cola', weight: '6 x 330 ml' }, { name: 'Coca-Cola', quantity: '6 x 330 ml' }).match).toBe(true);
+        expect(comparePack({ name: 'Coca-Cola' }, { name: 'Coca-Cola', quantity: null }).match).toBeNull();
+        expect(multipackCount('4×1.5 L')).toBe(4);
+        expect(multipackCount('330 ml')).toBeNull();
+        const rec = { ok: true, json: async () => ({ status: 1, code: '5449000000996', product: { code: '5449000000996', product_name: 'Coca-Cola', brands: 'Coca-Cola', quantity: '6 x 330 ml', image_front_url: 'https://images.openfoodfacts.org/images/products/544/900/000/0996/front_en.1.400.jpg' } }) };
+        const f: any = jest.fn(async (url: string) => (url.includes('openfoodfacts.org/api') ? rec : notFound));
+        const r = await svc.lookup('5449000000996', 'Coca-Cola 330 ml can', 'Coca-Cola', f);
+        expect(r.status).toBe('ambiguous');
+        expect(r.candidates[0]).toMatchObject({ confidence: 'needs_confirmation', packMatch: false, sourceQuantity: '6 x 330 ml' });
+        expect(r.candidates[0].warnings.join(' ')).toMatch(/6-pack/);
     });
     it('not found / invalid / unavailable are distinguished', async () => {
         expect((await svc.lookup('3017620422003', 'x', 'y', (async () => notFound) as any)).status).toBe('not_found');

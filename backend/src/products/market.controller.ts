@@ -6,13 +6,21 @@ import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
 import { TargetPricesService, TP_STAFF, type TargetPriceInput } from './target-prices.service';
 import { PriceHistoryService } from './price-history.service';
+import { OfferCompareService } from './offer-compare.service';
 
 const viewerOf = (req: any) => (req?.user ? { id: req.user.sub, role: req.user.role } : null);
 
 /** Buyer-facing market data: listed-price history for a product. */
 @Controller('products')
 export class PriceHistoryController {
-    constructor(private readonly history: PriceHistoryService) {}
+    constructor(private readonly history: PriceHistoryService, private readonly offers: OfferCompareService) {}
+
+    /** Other approved listings of the same barcode, for side-by-side comparison. */
+    @Get(':id/compare')
+    @UseGuards(OptionalJwtAuthGuard)
+    compare(@Param('id') id: string, @Request() req) {
+        return this.offers.compare(id, viewerOf(req));
+    }
 
     @Get(':id/price-history')
     @UseGuards(OptionalJwtAuthGuard)

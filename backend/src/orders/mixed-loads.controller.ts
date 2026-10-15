@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Request, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MixedLoadsService } from './mixed-loads.service';
 
@@ -27,6 +27,12 @@ export class MixedLoadsController {
     @Get()
     list(@Request() req) {
         return this.loads.list(req.user.sub);
+    }
+
+    /** Products that can count toward this load (same supplier, same dispatch site, in stock). */
+    @Get(':id/candidates')
+    candidates(@Request() req, @Param('id') id: string, @Query('q') q?: string) {
+        return this.loads.candidates(req.user.sub, id, q);
     }
 
     @Get(':id')

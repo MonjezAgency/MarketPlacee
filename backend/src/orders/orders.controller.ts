@@ -109,7 +109,7 @@ export class OrdersController {
             data.items,
             data.shippingCompany,
             data.shippingCost,
-            { idempotencyKey: data.idempotencyKey, couponCode: data.couponCode },
+            { idempotencyKey: data.idempotencyKey, couponCode: data.couponCode, shippingAddress: data.shippingAddress },
         );
         return plainToInstance(OrderDto, order);
     }
@@ -119,7 +119,7 @@ export class OrdersController {
     @Roles(Role.CUSTOMER, Role.ADMIN, Role.OWNER, Role.SUPPLIER)
     async quote(@Body() data: any, @Request() req) {
         const q = await this.ordersService.priceCart(req.user.sub, data?.items, data?.couponCode, undefined, { lenient: true });
-        return { subtotal: q.subtotal, discountPercent: q.discountPercent, discount: q.discount, coupon: q.coupon, total: q.total, lines: q.lines.map((l: any) => ({ productId: l.productId, mixedLoadId: l.mixedLoadId ?? null, tier: l.tier, quantity: l.quantity, price: l.price, lineTotal: l.lineTotal, perCase: l.perCase ?? null, casesTotal: l.casesTotal ?? null, unitsTotal: l.unitsTotal ?? null, minUnits: l.minUnits ?? null, info: l.info ?? null, error: l.error ?? null })), ready: q.lines.every((l: any) => !l.error) };
+        return { subtotal: q.subtotal, discountPercent: q.discountPercent, discount: q.discount, coupon: q.coupon, total: q.total, lines: q.lines.map((l: any) => ({ productId: l.productId, mixedLoadId: l.mixedLoadId ?? null, tier: l.tier, quantity: l.quantity, price: l.price, lineTotal: l.lineTotal, perCase: l.perCase ?? null, casesTotal: l.casesTotal ?? null, unitsTotal: l.unitsTotal ?? null, minUnits: l.minUnits ?? null, offerPercent: l.offerPercent ?? null, info: l.info ?? null, error: l.error ?? null })), ready: q.lines.every((l: any) => !l.error) };
     }
 
     @Get('stats')

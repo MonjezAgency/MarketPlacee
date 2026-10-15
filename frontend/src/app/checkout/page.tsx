@@ -20,7 +20,7 @@ import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
-import { quoteCart, toServerItem, type CartQuote } from '@/lib/wholesale';
+import { quoteCart, toServerItem, listDestinations, checkDestination, type CartQuote, type DestinationCheck } from '@/lib/wholesale';
 
 
 const ADDR_KEY = 'bev-checkout-address';
@@ -127,12 +127,32 @@ export default function CheckoutPage() {
         return () => clearTimeout(timeout);
     }, [addrCountry, addrCity]);
 
+    // Delivery destination — checked against the backend delivery policy as soon as it's chosen,
+    // and again when the order is placed.
+    const [destinations, setDestinations] = useState<{ code: string; name: string; supported: boolean }[]>([]);
+    const [destCheck, setDestCheck] = useState<DestinationCheck | null>(null);
+    const [destChecking, setDestChecking] = useState(false);
+    React.useEffect(() => { listDestinations().then((d) => setDestinations(d.countries)).catch(() => setDestinations([])); }, []);
+    React.useEffect(() => {
+        if (!addrCountry.trim()) { setDestCheck(null); return; }
+        setDestChecking(true);
+        const t = setTimeout(() => {
+            checkDestination(addrCountry)
+                .then(setDestCheck)
+                .catch(() => setDestCheck(null)) // the server re-checks on submit either way
+                .finally(() => setDestChecking(false));
+        }, 250);
+        return () => clearTimeout(t);
+    }, [addrCountry]);
+    const destBlocked = !!destCheck && !destCheck.supported;
+
     const handleNext = () => {
         if (!addrName.trim()) { alert('Please enter your contact name.'); return; }
         if (!addrStreet.trim()) { alert('Please enter your street address.'); return; }
         if (!addrCity.trim()) { alert('Please enter your city.'); return; }
         if (!addrPostal.trim()) { alert('Please enter your postal code.'); return; }
-        if (!addrCountry.trim()) { alert('Please enter your country.'); return; }
+        if (!addrCountry.trim()) { alert('Please choose your delivery country.'); return; }
+        if (destBlocked) return;
         // Persist address so next checkout is pre-filled
         localStorage.setItem(ADDR_KEY, JSON.stringify({
             name: addrName,
@@ -179,10 +199,7 @@ export default function CheckoutPage() {
             alert('Your cart is empty. Please add items before placing an order.');
             return;
         }
-        if (!selectedShipping) {
-            alert('Please select a shipping method.');
-            return;
-        }
+        if (destBlocked) { setStep(1); return; }
         if (!legacyPricing && (!quote || !quote.ready)) {
             setQuoteError(quoteError || 'Your order is still being priced.');
             return;
@@ -205,8 +222,8 @@ export default function CheckoutPage() {
                     couponCode: couponApplied || undefined,
                     idempotencyKey: idempotencyKey.current,
                     totalAmount: grandTotal,
+                    // Preferred carrier only — freight is quoted by Atlantis after the order.
                     shippingCompany: selectedShipping?.name,
-                    shippingCost: selectedShipping?.cost,
                     shippingAddress: {
                         name: addrName,
                         company: addrCompany,
@@ -225,7 +242,10 @@ export default function CheckoutPage() {
                 setStep(3);
             } else {
                 const err = await res.json().catch(() => ({}));
-                if (err?.code === 'PRICE_CHANGED') {
+                if (err?.code === 'DESTINATION_UNSUPPORTED' || err?.code === 'DESTINATION_REQUIRED') {
+                    setDestCheck({ supported: false, code: err.country ?? null, name: null, message: err.message });
+                    setStep(1);
+                } else if (err?.code === 'PRICE_CHANGED') {
                     // Show the server figures and let the buyer confirm again.
                     const q = await quoteCart(items, couponApplied || undefined).catch(() => null);
                     if (q) setQuote(q);
@@ -340,8 +360,32 @@ export default function CheckoutPage() {
                                             <h2 className="text-3xl font-heading font-bold">Distribution & Logistics</h2>
                                         </div>
 
-                                        <div className="space-y-6">
-                                            <h3 className="text-lg font-bold">Select Logistics Partner</h3>
+                                        <div className="space-y-3 text-start">
+                                            <h3 className="text-lg font-bold">Delivery country</h3>
+                                            <select aria-label="Delivery country" value={destinations.find((c) => c.name === addrCountry || c.code === addrCountry)?.name ?? ''}
+                                                onChange={(e) => setAddrCountry(e.target.value)}
+                                                className="w-full h-12 rounded-2xl border border-border bg-background px-4 text-[15px] font-medium">
+                                                <option value="">{addrCountry && !destinations.some((c) => c.name === addrCountry) ? addrCountry : 'Choose a country…'}</option>
+                                                {destinations.filter((c) => c.supported).length > 0 && (
+                                                    <optgroup label="We deliver to">
+                                                        {destinations.filter((c) => c.supported).map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
+                                                    </optgroup>
+                                                )}
+                                                <optgroup label="Not currently supported">
+                                                    {destinations.filter((c) => !c.supported).map((c) => <option key={c.code} value={c.name}>{c.name}</option>)}
+                                                </optgroup>
+                                            </select>
+                                            {destChecking ? <p className="text-xs text-muted-foreground">Checking delivery…</p>
+                                                : destBlocked ? (
+                                                    <div role="alert" className="p-4 rounded-2xl border border-red-200 bg-red-50 dark:bg-red-500/10 text-[13.5px] text-red-800 dark:text-red-200">
+                                                        {destCheck!.message} <Link href="/contact" className="underline font-semibold">Contact us</Link>
+                                                    </div>
+                                                ) : destCheck?.supported ? <p className="text-xs text-emerald-700 dark:text-emerald-400 font-medium">✓ We deliver to {destCheck.name}. Freight is quoted after you place the order.</p>
+                                                : null}
+                                        </div>
+
+                                        <div className="space-y-6 text-start">
+                                            <h3 className="text-lg font-bold">Preferred logistics partner <span className="text-sm font-medium text-muted-foreground">(optional)</span></h3>
 
                                             {isLoadingRates ? (
                                                 <div className="space-y-4">
@@ -377,10 +421,7 @@ export default function CheckoutPage() {
                                                                                 animate={{ opacity: 1, height: 'auto' }}
                                                                                 className="mt-2 pt-2 border-t border-secondary/20"
                                                                             >
-                                                                                <p className="text-xs text-muted-foreground">Transit: <span className="text-foreground font-semibold">{rate.estimatedDays} days</span>
-                                                                                    {rate.note && <span className="ml-2 text-primary/70">• {rate.note}</span>}
-                                                                                </p>
-                                                                                <p className="text-[10px] text-secondary font-bold uppercase mt-1">Certified B2B Rate</p>
+                                                                                <p className="text-xs text-muted-foreground">Cost and transit time are confirmed by Atlantis with this carrier after your order{rate.note ? ` · ${rate.note}` : ''}.</p>
                                                                             </motion.div>
                                                                         )}
                                                                     </AnimatePresence>
@@ -400,9 +441,9 @@ export default function CheckoutPage() {
                                             <div className="p-4 bg-muted/30 border border-dashed border-border rounded-2xl flex items-start gap-3">
                                                 <Info className="w-4 h-4 text-muted-foreground shrink-0 mt-0.5" />
                                                 <div>
-                                                    <p className="text-xs font-bold text-foreground">Need a custom quote?</p>
+                                                    <p className="text-xs font-bold text-foreground">Delivery isn’t charged at checkout</p>
                                                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                                        If the automated rates above don't fit your needs, tell us what you're looking for and we'll obtain a certified quote directly from our logistics partners for you.
+                                                        Atlantis quotes freight for your destination after the order is confirmed. Nothing is added to this total until you accept that quote.
                                                     </p>
                                                 </div>
                                             </div>
@@ -475,14 +516,14 @@ export default function CheckoutPage() {
                                                     value={addrCity} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrCity(e.target.value)} />
                                                 <Input label="Postal Code" placeholder="010000"
                                                     value={addrPostal} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrPostal(e.target.value)} />
-                                                <Input label="Country" placeholder="Romania"
-                                                    value={addrCountry} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAddrCountry(e.target.value)}
+                                                <Input label="Country" placeholder="Choose above" readOnly
+                                                    value={addrCountry} onChange={() => {}}
                                                     className="md:col-span-2" />
                                             </div>
                                         </div>
 
-                                        <Button onClick={handleNext} size="xl" className="w-full gap-3" disabled={!selectedShipping}>
-                                            Confirm Logistics Point
+                                        <Button onClick={handleNext} size="xl" className="w-full gap-3" disabled={!addrCountry || destBlocked || destChecking}>
+                                            {destBlocked ? 'Choose an eligible destination' : 'Continue to review'}
                                             <ArrowRight size={20} />
                                         </Button>
                                     </motion.div>
@@ -526,8 +567,12 @@ export default function CheckoutPage() {
 
                                         <div className="p-5 bg-muted/20 rounded-2xl border border-border/50 space-y-2">
                                             <div className="flex justify-between text-sm">
-                                                <span className="text-muted-foreground">Logistics via</span>
-                                                <span className="font-bold">{selectedShipping?.name}</span>
+                                                <span className="text-muted-foreground">Deliver to</span>
+                                                <span className="font-bold text-end">{[addrCity, destCheck?.name || addrCountry].filter(Boolean).join(', ')}</span>
+                                            </div>
+                                            <div className="flex justify-between text-sm">
+                                                <span className="text-muted-foreground">Preferred carrier</span>
+                                                <span className="font-bold">{selectedShipping?.name || 'Atlantis chooses'}</span>
                                             </div>
                                             <div className="flex justify-between text-sm">
                                                 <span className="text-muted-foreground">Shipping cost</span>

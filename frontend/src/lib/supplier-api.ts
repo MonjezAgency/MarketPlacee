@@ -57,7 +57,7 @@ export const supplierApi = {
     removeMany: (ids: string[]) => post('/products/bulk-delete', { ids }).then((r) => json<{ count: number; skipped: number }>(r)),
     resend: (id: string) => apiFetch(`/products/${id}/resend`, { method: 'PATCH' }).then((r) => json<any>(r)),
     uploadImage: (file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/products/upload-image', { method: 'POST', body: fd }).then((r) => json<{ url: string }>(r)); },
-    imageLookup: (ean: string, name?: string, brand?: string) => post('/supplier-catalog/image-lookup', { ean, name, brand }).then((r) => json<any>(r)),
+    imageLookup: (q: { productId?: string; ean: string; name?: string; brand?: string; weight?: string }) => post('/supplier-catalog/image-lookup', q).then((r) => json<any>(r)),
     acceptImage: (url: string) => post('/supplier-catalog/image-lookup/accept', { url }).then((r) => json<{ url: string }>(r)),
     preferences: () => apiFetch('/supplier-catalog/preferences', { cache: 'no-store' }).then((r) => json<{ defaultCurrency: string | null; suggestedCurrency: string; effectiveCurrency: string; country: string | null; currencies: string[]; rates: Record<string, number> }>(r)),
     setPreferences: (body: { defaultCurrency: string | null }) => apiFetch('/supplier-catalog/preferences', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => json<any>(r)),

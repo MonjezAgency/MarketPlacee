@@ -52,7 +52,15 @@ export interface QuoteLine {
     productId: string | null; mixedLoadId: string | null; tier: Tier; quantity: number; price: number; lineTotal: number;
     perCase: number | null; casesTotal: number | null; unitsTotal: number | null; minUnits: number | null;
     info: { ean: string | null; unitsPerCase: number | null; shelfLife: string | null; leadTime?: number | null; readyForDispatch?: boolean; exwLocation?: string | null } | null;
-    error: { code: string; message: string; minUnits?: number } | null;
+    offerPercent?: number | null;
+    error: {
+        code: string; message: string; minUnits?: number;
+        // BELOW_MOQ
+        quantity?: number; remaining?: number; unitPrice?: number; minLineTotal?: number; moq?: number | null; moqUnit?: string | null;
+        mixable?: { kind: LoadKind; quantity: number; minUnits: number; capacity: number } | null;
+        // INSUFFICIENT_STOCK
+        availableCases?: number;
+    } | null;
 }
 export interface CartQuote { subtotal: number; discountPercent: number; discount: number; coupon: string | null; total: number; lines: QuoteLine[]; ready: boolean }
 
@@ -64,6 +72,7 @@ export type LoadKind = 'PALLET' | 'TRUCK';
 export interface LoadLine { productId: string; variant?: string | null; quantity: number }
 export interface MixedLoadQuote {
     kind: LoadKind; supplierId: string | null; fill: number; requiredFill: number; subtotal: number; total: number; ready: boolean; issues: string[];
+    minimums?: { unit: 'case' | 'pallet'; required: number; have: number; remaining: number; capacity: number; satisfiable: boolean; products: string[] }[];
     origin?: { status: 'VERIFIED' | 'UNVERIFIED'; label: string | null; country: string | null; unverified: string[] };
     lines: (LoadLine & { name: string; unit: 'case' | 'pallet'; casePrice: number; cases: number; units: number; share: number; lineSubtotal: number })[];
 }
@@ -97,3 +106,18 @@ export const updateLoad = (id: string, lines: LoadLine[], version: number) =>
 export const deleteLoad = (id: string) => call<{ ok: true }>(`/mixed-loads/${id}`, { method: 'DELETE' });
 
 export const loadLabel = (k: LoadKind) => (k === 'PALLET' ? 'Mixed pallet' : 'Mixed truckload');
+
+/** Products that can count toward a mixed load (server-filtered: same supplier, same site, in stock). */
+export interface LoadCandidate {
+    id: string; name: string; brand: string | null; image: string | null; ean: string | null; origin: string | null;
+    unitsPerCase: number; casesPerPallet: number; palletsPerShipment: number | null;
+    unit: 'case' | 'pallet'; casesPerUnit: number; casePrice: number; unitPrice: number; maxQuantity: number; shareOfLoadPerUnit: number; minUnits: number;
+    variants: string[];
+}
+export const loadCandidates = (id: string, q?: string) =>
+    call<{ kind: LoadKind; items: LoadCandidate[]; reason: string | null }>(`/mixed-loads/${id}/candidates${q ? `?q=${encodeURIComponent(q)}` : ''}`);
+
+/** Delivery destinations (backend policy). */
+export interface DestinationCheck { supported: boolean; code: string | null; name: string | null; message: string | null }
+export const listDestinations = () => call<{ countries: { code: string; name: string; supported: boolean }[]; note: string }>('/shipping/destinations');
+export const checkDestination = (country: string) => call<DestinationCheck>('/shipping/check-destination', { method: 'POST', body: JSON.stringify({ country }) });

@@ -18,7 +18,7 @@ import { DefaultCurrencyCard, ListingStatusCard } from '@/components/supplier/Su
 type Prefs = { orderUpdates: boolean; productComments: boolean; lowStockAlerts: boolean; inboundOffers: boolean; marketingEmails: boolean; muteToasts: boolean };
 const PREF_ROWS: { key: keyof Prefs; label: string; desc: string }[] = [
     { key: 'orderUpdates', label: 'Order updates', desc: 'New orders and status changes.' },
-    { key: 'productComments', label: 'Listing feedback', desc: 'Comments from Atlantis on your products.' },
+    { key: 'productComments', label: 'Listing feedback & reviews', desc: 'Comments from Atlantis and new buyer reviews on your products (in-app and email).' },
     { key: 'lowStockAlerts', label: 'Low stock alerts', desc: 'When a listing runs low.' },
     { key: 'inboundOffers', label: 'Buyer enquiries', desc: 'Requests that match your listings.' },
     { key: 'marketingEmails', label: 'Marketing emails (optional)', desc: 'Newsletter and offer emails. Off unless you switch it on.' },

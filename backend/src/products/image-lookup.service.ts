@@ -27,6 +27,8 @@ const UA = 'AtlantisFMCG/1.0 (supplier catalog image lookup; https://atlantisfmc
 export interface ImageCandidate {
     url: string;            // full-size image (what gets stored if accepted)
     previewUrl: string;
+    kind: 'front' | 'packaging' | 'other';
+    language: string | null;
     source: string;
     sourceUrl: string;      // the public product page, for the supplier to check
     license: string;
@@ -35,8 +37,12 @@ export interface ImageCandidate {
     barcodeMatch: boolean;
     nameMatch: boolean | null;   // null = nothing to compare
     brandMatch: boolean | null;
+    /** Pack size / multipack agreement between the source record and the supplier's listing. */
+    packMatch: boolean | null;
+    sourceQuantity: string | null;
     confidence: 'verified' | 'needs_confirmation';
     reason: string;
+    warnings: string[];
 }
 
 export interface LookupResult {
@@ -85,6 +91,38 @@ export function compareBrands(supplierBrand: string | undefined, sourceBrands: s
     return sourceBrands.split(',').map((x) => x.toLowerCase().replace(/[^a-z0-9]+/g, '')).some((b) => b && (b.includes(a) || a.includes(b)));
 }
 
+/** "6 x 330 ml", "4×", "pack of 12" → 6 / 4 / 12; null when it's a single unit. */
+export function multipackCount(s: string | null | undefined): number | null {
+    const t = String(s || '').toLowerCase();
+    const m = t.match(/(\d{1,3})\s*[x×]\s*\d/) || t.match(/\b(\d{1,3})\s*[x×](?!\w)/) || t.match(/pack of (\d{1,3})/) || t.match(/(\d{1,3})\s*-?\s*pack\b/);
+    const n = m ? Number(m[1]) : NaN;
+    return Number.isFinite(n) && n > 1 ? n : null;
+}
+
+/**
+ * Same pack? Compares sizes (g / ml / %) and multipack counts found in the
+ * source record (name + quantity) with the supplier's name + weight.
+ * false = a clear difference, true = a size matches, null = nothing to compare.
+ */
+export function comparePack(supplier: { name?: string; weight?: string }, source: { name: string | null; quantity: string | null }): { match: boolean | null; reason: string | null } {
+    const mine = `${supplier.name || ''} ${supplier.weight || ''}`;
+    const theirs = `${source.name || ''} ${source.quantity || ''}`;
+    const a = specs(mine), b = specs(theirs);
+    let compared = false;
+    for (const [unit, vals] of a) {
+        const other = b.get(unit);
+        if (!other || unit === '%') continue;
+        compared = true;
+        if (![...vals].some((v) => other.has(v))) {
+            return { match: false, reason: `Size differs: the source says ${[...other].join('/')} ${unit}, your listing says ${[...vals].join('/')} ${unit}.` };
+        }
+    }
+    const ma = multipackCount(mine), mb = multipackCount(theirs);
+    if (mb && mb !== ma) return { match: false, reason: `The source record is a ${mb}-pack${ma ? `, yours is a ${ma}-pack` : ' — your listing doesn’t say it’s a multipack'}.` };
+    if (ma && mb === null && source.quantity) return { match: false, reason: `Your listing is a ${ma}-pack; the source record looks like a single unit (${source.quantity}).` };
+    return { match: compared ? true : null, reason: null };
+}
+
 /** Upgrade an OFF display image URL (…/front_en.12.400.jpg) to the full-size file. */
 const fullSize = (u: string) => u.replace(/\.(\d+)\.(100|200|400)\.(jpg|png)$/i, '.$1.full.$3');
 
@@ -93,7 +131,7 @@ export class ImageLookupService {
     private readonly logger = new Logger(ImageLookupService.name);
     constructor(private readonly storage: SupabaseStorageService) {}
 
-    async lookup(rawCode: string, name?: string, brand?: string, fetcher: typeof fetch = fetch): Promise<LookupResult> {
+    async lookup(rawCode: string, name?: string, brand?: string, fetcher: typeof fetch = fetch, weight?: string): Promise<LookupResult> {
         const barcode = normaliseBarcode(rawCode);
         const problem = barcodeProblem(barcode);
         if (problem) return { status: 'invalid_barcode', barcode, message: problem, candidates: [] };
@@ -102,7 +140,7 @@ export class ImageLookupService {
         const candidates: ImageCandidate[] = [];
         await Promise.all(SOURCES.map(async (src) => {
             try {
-                const res = await fetcher(`${src.api}/api/v2/product/${barcode}.json?fields=code,product_name,product_name_en,brands,image_front_url,image_url`, {
+                const res = await fetcher(`${src.api}/api/v2/product/${barcode}.json?fields=code,product_name,product_name_en,brands,quantity,selected_images,image_front_url,image_url,image_packaging_url`, {
                     headers: { 'User-Agent': UA, Accept: 'application/json' }, signal: AbortSignal.timeout(8000),
                 });
                 reachable++;
@@ -110,29 +148,61 @@ export class ImageLookupService {
                 const j: any = await res.json();
                 const p = j?.product;
                 if (j?.status !== 1 || !p) return;
-                const img: string | undefined = p.image_front_url || p.image_url;
-                if (!img) return;
+                // Every genuine photo the record has: the front packshot in each language, then packaging.
+                const photos: { url: string; kind: ImageCandidate['kind']; language: string | null }[] = [];
+                const seen = new Set<string>();
+                const addPhoto = (u: unknown, kind: ImageCandidate['kind'], language: string | null) => {
+                    if (typeof u !== 'string' || !/^https:\/\//.test(u)) return;
+                    const key = u.replace(/\.(\d+)\.(100|200|400|full)\./, '.$1.');
+                    if (seen.has(key)) return;
+                    seen.add(key); photos.push({ url: u, kind, language });
+                };
+                const sel = p.selected_images || {};
+                for (const [lang, u] of Object.entries(sel.front?.display || {})) addPhoto(u, 'front', lang);
+                addPhoto(p.image_front_url, 'front', null);
+                for (const [lang, u] of Object.entries(sel.packaging?.display || {})) addPhoto(u, 'packaging', lang);
+                addPhoto(p.image_packaging_url, 'packaging', null);
+                if (!photos.length) addPhoto(p.image_url, 'other', null);
+                if (!photos.length) return;
                 const barcodeMatch = normaliseBarcode(p.code || j.code) === barcode;
                 const productName = p.product_name_en || p.product_name || null;
+                const sourceQuantity = typeof p.quantity === 'string' && p.quantity.trim() ? p.quantity.trim() : null;
                 const nameMatch = compareNames(name, productName);
                 const brandMatch = compareBrands(brand, p.brands || null);
+                const pack = comparePack({ name, weight }, { name: productName, quantity: sourceQuantity });
                 const agrees = nameMatch === true || brandMatch === true;
-                const contradicts = nameMatch === false || brandMatch === false; // a conflicting name or brand is never auto-verified
+                // A conflicting name, brand or pack size is never auto-verified.
+                const contradicts = nameMatch === false || brandMatch === false || pack.match === false;
                 const confidence: ImageCandidate['confidence'] = barcodeMatch && agrees && !contradicts ? 'verified' : 'needs_confirmation';
+                const warnings = [pack.reason, nameMatch === false ? 'The product name differs from yours.' : null, brandMatch === false ? 'The brand differs from yours.' : null].filter(Boolean) as string[];
                 const reason = !barcodeMatch ? 'The source record has a different barcode.'
-                    : confidence === 'verified' ? `Same barcode, and the ${nameMatch ? 'name' : 'brand'} matches.`
-                    : nameMatch === null && brandMatch === null ? 'Same barcode, but there is no name or brand to compare — check the photo.'
-                    : 'Same barcode, but the name/brand differ from yours — check it is the same product.';
-                candidates.push({
-                    url: fullSize(img), previewUrl: img, source: src.label,
-                    sourceUrl: `${src.api}/product/${barcode}`, license: 'CC BY-SA 3.0 — ' + src.label + ' contributors',
-                    productName, brand: p.brands || null, barcodeMatch, nameMatch, brandMatch, confidence, reason,
-                });
+                    : confidence === 'verified' ? `Same barcode, the ${nameMatch ? 'name' : 'brand'} matches${pack.match ? ' and so does the size' : ''}.`
+                    : warnings.length ? `Same barcode, but: ${warnings.join(' ')} Check it is exactly your product.`
+                    : 'Same barcode, but there is no name or brand to compare — check the photo.';
+                for (const ph of photos) {
+                    candidates.push({
+                        url: fullSize(ph.url), previewUrl: ph.url, kind: ph.kind, language: ph.language, source: src.label,
+                        sourceUrl: `${src.api}/product/${barcode}`, license: 'CC BY-SA 3.0 — ' + src.label + ' contributors',
+                        productName, brand: p.brands || null, barcodeMatch, nameMatch, brandMatch, packMatch: pack.match, sourceQuantity, confidence, reason, warnings,
+                    });
+                }
             } catch (e: any) {
                 this.logger.warn(`[image-lookup] ${src.id} ${barcode}: ${e?.message}`);
             }
         }));
-        candidates.sort((a, b) => (a.confidence === b.confidence ? 0 : a.confidence === 'verified' ? -1 : 1));
+        // Verified first, then front packshots (preferred as the main photo), then packaging.
+        // English packshot first, then other languages (the storefront is English-first).
+        const rank = (c: ImageCandidate) => (c.confidence === 'verified' ? 0 : 100) + (c.kind === 'front' ? 0 : c.kind === 'packaging' ? 10 : 20) + (c.language === 'en' ? 0 : c.language === null ? 1 : 2);
+        candidates.sort((a, b) => rank(a) - rank(b));
+        // Front packshots in many languages are near-identical: keep a few of each kind so packaging photos show too.
+        const cap: Record<ImageCandidate['kind'], number> = { front: 4, packaging: 3, other: 2 };
+        const kept: ImageCandidate[] = [];
+        const used: Record<string, number> = {};
+        for (const c of candidates) {
+            const k = `${c.source}:${c.kind}`;
+            if ((used[k] = (used[k] ?? 0) + 1) <= cap[c.kind]) kept.push(c);
+        }
+        candidates.splice(0, candidates.length, ...kept.slice(0, 12));
 
         if (!reachable) return { status: 'unavailable', barcode, message: 'The product databases didn’t respond. Try again in a minute, or upload your own photo.', candidates: [] };
         if (!candidates.length) return { status: 'not_found', barcode, message: 'No product photo is registered for this barcode. Upload your own photo, or save as a draft and add it later.', candidates: [] };
@@ -140,7 +210,9 @@ export class ImageLookupService {
         return {
             status: verified ? 'found' : 'ambiguous',
             barcode,
-            message: verified ? 'Found a photo registered for this barcode. Check it and accept it if it’s your product.' : 'Found a photo for this barcode, but we can’t confirm it’s the same product. Only accept it if it clearly is.',
+            message: verified
+                ? `Found ${candidates.length === 1 ? 'a photo' : `${candidates.length} photos`} registered for this barcode. Check and choose the ones that show your product.`
+                : `Found ${candidates.length === 1 ? 'a photo' : `${candidates.length} photos`} for this barcode, but we can’t confirm ${candidates.length === 1 ? 'it shows' : 'they show'} the same product and pack. Only use a photo if it clearly does.`,
             candidates,
         };
     }

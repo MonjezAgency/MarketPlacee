@@ -776,9 +776,7 @@ export class OffersService {
                     </table>
                 </td>
                 <td align="right" style="vertical-align:middle;">
-                    <a href="https://www.linkedin.com/company/atlantis-fmcg" style="display:inline-block;width:30px;height:30px;background:#2EC4B6;color:#0B1F3A;text-align:center;line-height:30px;border-radius:50%;text-decoration:none;font-weight:900;font-size:14px;margin-left:6px;">in</a>
-                    <a href="https://www.facebook.com/atlantisfmcg" style="display:inline-block;width:30px;height:30px;background:#2EC4B6;color:#0B1F3A;text-align:center;line-height:30px;border-radius:50%;text-decoration:none;font-weight:900;font-size:14px;margin-left:6px;">f</a>
-                    <a href="https://www.instagram.com/atlantisfmcg" style="display:inline-block;width:30px;height:30px;background:#2EC4B6;color:#0B1F3A;text-align:center;line-height:30px;border-radius:50%;text-decoration:none;font-weight:900;font-size:14px;margin-left:6px;">◎</a>
+                    ${[['in', process.env.SOCIAL_LINKEDIN_URL], ['f', process.env.SOCIAL_FACEBOOK_URL], ['◎', process.env.SOCIAL_INSTAGRAM_URL]].filter(([, u]) => u).map(([t, u]) => `<a href="${u}" style="display:inline-block;width:30px;height:30px;background:#2EC4B6;color:#0B1F3A;text-align:center;line-height:30px;border-radius:50%;text-decoration:none;font-weight:900;font-size:14px;margin-left:6px;">${t}</a>`).join('')}
                 </td>
             </tr>
         </table>

@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Get, Param, Patch, Post, Query, Request, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, NotFoundException, Param, Patch, Post, Query, Request, Res, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Throttle } from '@nestjs/throttler';
 import { Role } from '@prisma/client';
@@ -138,10 +138,22 @@ export class SupplierCatalogController {
 
     // ─── Barcode image lookup ────────────────────────────────────────
 
+    /**
+     * Lookup uses the barcode SAVED on the supplier's own product (productId),
+     * so the photo is tied to what buyers will see; an unsaved barcode is refused.
+     */
     @Post('image-lookup')
     @Throttle({ default: { limit: 30, ttl: 60_000 } })
-    lookup(@Body() body: { ean: string; name?: string; brand?: string }) {
-        return this.images.lookup(String(body?.ean || ''), body?.name, body?.brand);
+    async lookup(@Request() req, @Body() body: { productId?: string; ean?: string; name?: string; brand?: string; weight?: string }) {
+        let ean = String(body?.ean || '');
+        if (body?.productId) {
+            const p: any = await this.prisma.product.findFirst({ where: { id: String(body.productId), supplierId: req.user.sub }, select: { ean: true } });
+            if (!p) throw new NotFoundException('Product not found.');
+            if (!p.ean) throw new BadRequestException('To find images using a barcode, enter the product’s EAN/barcode and save the product first.');
+            if (ean && ean.replace(/\D/g, '') !== String(p.ean).replace(/\D/g, '')) throw new BadRequestException('You changed the barcode. Save the product first, then search with the new barcode.');
+            ean = p.ean;
+        }
+        return this.images.lookup(ean, body?.name, body?.brand, fetch, body?.weight);
     }
 
     /** Copy an accepted candidate into Atlantis storage; returns the stored URL. */

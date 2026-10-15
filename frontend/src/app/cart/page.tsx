@@ -11,13 +11,12 @@ import { useCart, type CartItem } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { formatPrice } from '@/lib/currency';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { fetchProductPage } from '@/lib/api';
-import type { Product } from '@/lib/types';
 import { cn, prettifyVariantSignature } from '@/lib/utils';
 import {
-    quoteCart, listLoads, updateLoad, deleteLoad, addToLoad, loadLabel, ApiError,
+    quoteCart, listLoads, updateLoad, deleteLoad, createLoad, loadLabel, ApiError,
     type CartQuote, type QuoteLine, type MixedLoad,
 } from '@/lib/wholesale';
+import { BelowMinimumPanel, MixedLoadPicker, ProgressMeter, loadProgress } from '@/components/cart/MinimumOrder';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const UNIT_SHORT: Record<string, string> = { carton: 'cs', pallet: 'pal.', truck: 'trk' };
@@ -79,9 +78,11 @@ function LineRow(props: {
     href: string; image?: string | null; name: string; ean?: string | null; meta: (string | null | undefined)[]; bbd?: string | null;
     error?: string | null; unavailable?: boolean;
     stepper: React.ReactNode; price: string; units?: string | null; onRemove: () => void; removeDisabled?: boolean;
+    extra?: React.ReactNode;
 }) {
     return (
-        <li className="flex flex-col md:flex-row md:items-center gap-3 md:gap-5 px-5 py-4">
+        <li className="px-5 py-4">
+        <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
             <div className="flex items-start gap-3.5 min-w-0 flex-1">
                 <Thumb src={props.image} alt={props.name} />
                 <div className="min-w-0">
@@ -106,16 +107,20 @@ function LineRow(props: {
                 </div>
                 <button type="button" onClick={props.onRemove} disabled={props.removeDisabled} aria-label={`Remove ${props.name}`} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-4 hover:text-[#DC2626] hover:bg-surface-3 disabled:opacity-40"><Trash2 size={16} /></button>
             </div>
+        </div>
+        {props.extra}
         </li>
     );
 }
 
 /** Order card shell: header (type · destination · status), optional progress, lines, suggestions, footer. */
-function OrderCard({ icon, title, destination, status, progress, children, suggestions, total, totalNote, action, error, strip }: {
+function OrderCard({ icon, title, destination, status, progress, progressNode, children, suggestions, total, totalNote, action, error, strip, blockedReason }: {
     icon: React.ReactNode; title: React.ReactNode; destination?: string | null; strip?: { left?: string | null; right?: string | null };
     status: { tone: 'ok' | 'warn' | 'err'; label: string };
     progress?: { label: React.ReactNode; right?: React.ReactNode; value: number; ok: boolean };
+    progressNode?: React.ReactNode;
     children: React.ReactNode; suggestions?: React.ReactNode; total: string; totalNote?: string; action: React.ReactNode; error?: string | null;
+    blockedReason?: string | null;
 }) {
     return (
         <section className="rounded-2xl ring-1 ring-line bg-surface overflow-hidden">
@@ -135,14 +140,15 @@ function OrderCard({ icon, title, destination, status, progress, children, sugge
                         {status.tone === 'ok' ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}{status.label}
                     </span>
                 </div>
-                {progress && (
+                {progressNode && <div className="mt-3">{progressNode}</div>}
+                {progress && !progressNode && (
                     <>
                         <div className="mt-2.5 flex items-center justify-between text-[13px]">
                             <span className="text-ink-3">{progress.label}</span>
                             {progress.right && <span className="font-medium text-[#B45309]">{progress.right}</span>}
                         </div>
                         <div className="mt-2 h-2 rounded-full bg-surface-3 overflow-hidden">
-                            <div className={cn('h-full rounded-full transition-all duration-300', progress.ok ? 'bg-[#10B981]' : 'bg-[#F59E0B]')} style={{ width: `${Math.max(2, Math.min(100, progress.value * 100))}%` }} />
+                            <div className={cn('h-full rounded-full transition-all duration-300', progress.ok ? 'bg-[#10B981]' : 'bg-[#DC2626]')} style={{ width: `${Math.max(2, Math.min(100, progress.value * 100))}%` }} />
                         </div>
                     </>
                 )}
@@ -155,6 +161,7 @@ function OrderCard({ icon, title, destination, status, progress, children, sugge
                     {totalNote && <span className="ms-2 text-[12px] text-ink-4">{totalNote}</span>}
                 </p>
                 <div className="ms-auto">{action}</div>
+                {blockedReason && <p className="basis-full text-end text-[12.5px] text-ink-3">{blockedReason}</p>}
             </div>
         </section>
     );
@@ -172,8 +179,10 @@ export default function CartPage() {
     const [loads, setLoads] = React.useState<MixedLoad[] | null>(null);
     const [loadBusy, setLoadBusy] = React.useState<string | null>(null);
     const [loadError, setLoadError] = React.useState<Record<string, string>>({});
-    const [catalog, setCatalog] = React.useState<Product[]>([]);
     const [destination, setDestination] = React.useState<string | null>(null);
+    const [pickerFor, setPickerFor] = React.useState<string | null>(null);
+    const [lineBusy, setLineBusy] = React.useState<string | null>(null);
+    const [lineError, setLineError] = React.useState<Record<string, string>>({});
 
     React.useEffect(() => { try { setDestination(localStorage.getItem('atl_delivery_address')); } catch { /* none */ } }, []);
 
@@ -197,12 +206,6 @@ export default function CartPage() {
     }, [isLoggedIn]);
     React.useEffect(() => { refreshLoads(); }, [refreshLoads]);
 
-    // Real catalog for "Add more to reach the minimum" (only needed when a load is under capacity).
-    const needSuggestions = !!loads?.some((l) => l.quote && !l.quote.ready);
-    React.useEffect(() => {
-        if (!needSuggestions || catalog.length) return;
-        fetchProductPage({ limit: 100, sort: 'newest' }).then((r) => setCatalog(r.items)).catch(() => {});
-    }, [needSuggestions, catalog.length]);
 
     const lineFor = (i: CartItem): QuoteLine | undefined => quote?.lines[items.indexOf(i)];
     const singles = items.filter((i) => !i.mixedLoadId);
@@ -219,11 +222,19 @@ export default function CartPage() {
             if (e instanceof ApiError && e.code === 'STALE_VERSION') refreshLoads();
         } finally { setLoadBusy(null); }
     };
-    const addSuggestion = async (load: MixedLoad, productId: string) => {
-        setLoadBusy(load.id); setLoadError((m) => ({ ...m, [load.id]: '' }));
-        try { await addToLoad(load.kind, productId, 1, null, load.id); refreshLoads(); }
-        catch (e) { setLoadError((m) => ({ ...m, [load.id]: e instanceof ApiError ? e.message : 'Could not add that product.' })); }
-        finally { setLoadBusy(null); }
+    // Option 2 for a below-minimum line: move it into a new mixed load and open the product picker.
+    const startMix = async (i: CartItem, kind: 'PALLET' | 'TRUCK', quantity: number) => {
+        setLineBusy(i.id); setLineError((m) => ({ ...m, [i.id]: '' }));
+        const sv = i.selectedVariants || {};
+        const variant = Object.keys(sv).length ? Object.keys(sv).sort().map((k) => `${k}=${(sv as any)[k]}`).join('|') : null;
+        try {
+            const load = await createLoad(kind, [{ productId: i.productId || i.id.split('::')[0], variant, quantity }]);
+            removeItem(i.id);
+            refreshLoads();
+            setPickerFor(load.id);
+        } catch (e) {
+            setLineError((m) => ({ ...m, [i.id]: e instanceof ApiError ? e.message : 'Could not start a mixed load.' }));
+        } finally { setLineBusy(null); }
     };
     // Mixed loads live on the server; a cart line is created when the buyer checks it out.
     const ensureLoadInCart = (load: MixedLoad) => {
@@ -299,6 +310,11 @@ export default function CartPage() {
                                 status={quoteState === 'auth' ? { tone: 'warn', label: 'Sign in to price' } : standardReady ? { tone: 'ok', label: 'Ready' } : quoteState === 'loading' ? { tone: 'warn', label: 'Pricing…' } : { tone: standardErrors.some((q) => UNAVAILABLE.has(q!.error!.code)) ? 'err' : 'warn', label: standardErrors.some((q) => q!.error!.code === 'BELOW_MOQ') ? 'Below minimum' : 'Needs attention' }}
                                 total={standardTotal ? formatPrice(standardTotal) : '—'}
                                 totalNote={legacy ? 'estimate' : undefined}
+                                blockedReason={standardReady || quoteState === 'loading' ? null
+                                    : quoteState === 'auth' ? 'Sign in to check out.'
+                                    : standardErrors.some((q) => q!.error!.code === 'BELOW_MOQ') ? 'Checkout unlocks when every line reaches its minimum order.'
+                                    : standardErrors.some((q) => q!.error!.code === 'INSUFFICIENT_STOCK') ? 'Checkout unlocks when every line fits the available stock.'
+                                    : standardErrors.length ? 'Fix the flagged lines to check out.' : null}
                                 action={
                                     <button type="button" disabled={!standardReady} onClick={() => router.push('/checkout?scope=standard')}
                                         className="h-10 px-5 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14px] font-semibold disabled:bg-surface-3 disabled:text-ink-4 disabled:cursor-not-allowed">
@@ -311,6 +327,7 @@ export default function CartPage() {
                                     const upc = q?.info?.unitsPerCase;
                                     const casesPerUnit = q?.casesTotal && q.quantity ? q.casesTotal / q.quantity : null;
                                     const locked = !!i.mixComposition?.length;
+                                    const belowMin = q?.error?.code === 'BELOW_MOQ';
                                     return (
                                         <LineRow
                                             key={i.id}
@@ -325,8 +342,13 @@ export default function CartPage() {
                                                 locked ? i.mixComposition!.map((c) => `${prettifyVariantSignature(c.signature) || c.signature} × ${c.quantity}`).join(' · ') : null,
                                             ]}
                                             bbd={fmtDate(q?.info?.shelfLife)}
-                                            error={q?.error?.message ?? null}
+                                            error={belowMin ? (lineError[i.id] || null) : (lineError[i.id] || q?.error?.message) ?? null}
                                             unavailable={!!q?.error && UNAVAILABLE.has(q.error.code)}
+                                            extra={belowMin && q && !locked ? (
+                                                <BelowMinimumPanel line={q} tier={i.tier || 'carton'} busy={lineBusy === i.id}
+                                                    onSetMinimum={(n) => updateQuantity(i.id, n)}
+                                                    onStartMix={q.error?.mixable ? () => startMix(i, q.error!.mixable!.kind, q.error!.mixable!.quantity) : undefined} />
+                                            ) : undefined}
                                             stepper={locked
                                                 ? <span className="w-[190px] text-center text-[13px] text-ink-3">1 mixed {unitWord(i.tier, 1)}</span>
                                                 : <Stepper value={i.quantity} unit={UNIT_SHORT[i.tier || 'carton']} min={1} onChange={(n) => updateQuantity(i.id, n)} />}
@@ -346,13 +368,9 @@ export default function CartPage() {
                             const busy = loadBusy === load.id;
                             const capWord = load.kind === 'PALLET' ? 'cases' : 'pallets';
                             const remaining = q ? Math.max(0, q.requiredFill - q.fill) : 1;
+                            const minProg = loadProgress(load);
                             const setLineQty = (pid: string, variant: string | null | undefined, n: number) =>
                                 editLoad(load, lines.map((l) => ({ productId: l.productId, variant: l.variant ?? null, quantity: l.productId === pid && (l.variant ?? null) === (variant ?? null) ? n : l.quantity })).filter((l) => l.quantity > 0));
-                            // Real catalog products this load can accept: same supplier, pack data present, not already in it.
-                            const inLoad = new Set(lines.map((l) => l.productId));
-                            const candidates = q && !q.ready ? catalog.filter((p: any) =>
-                                !inLoad.has(p.id) && p.unitsPerCase && p.casesPerPallet && (load.kind === 'PALLET' || p.palletsPerShipment)
-                            ).slice(0, 12) : [];
                             return (
                                 <OrderCard
                                     key={load.id}
@@ -360,7 +378,9 @@ export default function CartPage() {
                                     title={<>{loadLabel(load.kind)}<span className="ms-2 text-[12.5px] font-medium text-ink-3">{q?.origin?.status === 'VERIFIED' && q.origin.label ? `Ships from ${q.origin.label}` : lines.length && new Set(lines.map((l) => l.productId)).size > 1 ? 'Dispatch location to be verified' : load.products[lines[0]?.productId]?.dispatch ? `Ships from ${load.products[lines[0].productId].dispatch}` : 'Dispatch location to be verified'}</span></>}
                                     strip={dispatchStrip(lines.map((l) => load.products[l.productId]).filter(Boolean) as any)}
                                     destination={destination}
-                                    status={load.error ? { tone: 'err', label: 'Unavailable' } : q?.ready ? { tone: 'ok', label: 'Ready' } : { tone: 'warn', label: q && q.requiredFill > 0 ? 'Below minimum' : 'Needs attention' }}
+                                    status={load.error ? { tone: 'err', label: 'Unavailable' } : q?.ready ? { tone: 'ok', label: 'Ready' } : { tone: 'warn', label: (q && q.requiredFill > 0) || (minProg && !minProg.ok) ? 'Below minimum' : 'Needs attention' }}
+                                    progressNode={minProg ? <ProgressMeter have={minProg.have} required={minProg.required} unit={minProg.unit} ok={minProg.ok} note={q ? `Capacity used: ${Math.round(q.fill * 100)}% of the ${load.kind === 'PALLET' ? 'pallet' : 'truck'}.` : undefined} /> : undefined}
+                                    blockedReason={q?.ready || !q ? null : 'Checkout unlocks when this load meets its minimum and every issue above is resolved.'}
                                     progress={q ? {
                                         label: q.requiredFill > 0
                                             ? <>Mixed load · <span className="font-semibold text-ink tabular-nums">{Math.round(q.fill * 100)}%</span> / {Math.round(q.requiredFill * 100)}% minimum of the {load.kind === 'PALLET' ? 'pallet' : 'truck'}</>
@@ -372,17 +392,12 @@ export default function CartPage() {
                                     error={loadError[load.id] || load.error?.message || (q && !q.ready ? q.issues.join(' ') : null) || null}
                                     total={q ? formatPrice(q.total) : '—'}
                                     totalNote={q ? 'incl. mixed-load handling' : undefined}
-                                    suggestions={candidates.length > 0 ? (
-                                        <div className="px-5 py-4 border-t border-line">
-                                            <p className="text-[13.5px] text-ink-3">Add more to reach the minimum:</p>
-                                            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
-                                                {candidates.map((p) => (
-                                                    <button key={p.id} type="button" disabled={busy} onClick={() => addSuggestion(load, p.id)} title={p.name}
-                                                        className="flex items-center gap-2 h-10 px-3.5 rounded-xl ring-1 ring-line hover:ring-line-strong text-[13.5px] text-ink-2 text-start disabled:opacity-50">
-                                                        <Plus size={14} className="shrink-0 text-ink-3" /><span className="truncate">{p.name}</span>
-                                                    </button>
-                                                ))}
-                                            </div>
+                                    suggestions={q && q.fill < 1 - 1e-9 && !load.error ? (
+                                        <div className="px-5 py-3.5 border-t border-line flex flex-wrap items-center gap-3">
+                                            <p className="text-[13.5px] text-ink-3 flex-1 min-w-[14rem]">{minProg && !minProg.ok ? 'Add eligible products from the same supplier to reach the minimum.' : 'There’s room for more in this load.'}</p>
+                                            <button type="button" disabled={busy} onClick={() => setPickerFor(load.id)} className="inline-flex items-center gap-1.5 h-9 px-4 rounded-lg ring-1 ring-line-strong hover:ring-teal text-[13.5px] font-medium text-ink disabled:opacity-50">
+                                                <Plus size={14} /> Add eligible products
+                                            </button>
                                         </div>
                                     ) : null}
                                     action={
@@ -424,6 +439,10 @@ export default function CartPage() {
                             );
                         })}
                     </div>
+
+                    {loads?.filter((l) => l.id === pickerFor).map((l) => (
+                        <MixedLoadPicker key={l.id} open onClose={() => setPickerFor(null)} load={l} onAdded={refreshLoads} />
+                    ))}
 
                     {/* Cart summary */}
                     <aside className="lg:sticky lg:top-[108px] rounded-2xl ring-1 ring-line bg-surface p-6">

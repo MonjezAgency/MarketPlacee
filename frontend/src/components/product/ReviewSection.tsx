@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Star, ThumbsUp, Trash2, Camera, X } from 'lucide-react';
+import { Star, ThumbsUp, Trash2, Camera, X, BadgeCheck } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Review {
     id: string;
     rating: number;
+    verifiedPurchase?: boolean;
     comment?: string;
     images?: string[];
     createdAt: string;
@@ -123,8 +124,9 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                 return;
             }
 
-            if (res.status === 403) {
-                setError('You do not have permission to review this product. Only verified buyers can leave reviews.');
+            if (res.status === 403 || res.status === 404) {
+                const d = await res.json().catch(() => ({}));
+                setError(typeof d?.message === 'string' ? d.message : 'You can’t review this product.');
                 return;
             }
 
@@ -190,7 +192,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                             <span className="font-semibold text-ink tabular-nums">{avgRating.toFixed(1)}</span>
                             <span>· {reviews.length} {reviews.length === 1 ? t('reviews', 'review') : t('reviews', 'reviews')}</span>
                         </div>
-                    ) : !loading && <p className="mt-1 text-[13px] text-ink-3">No reviews yet — reviews come from verified buyers on Atlantis.</p>}
+                    ) : !loading && <p className="mt-1 text-[13px] text-ink-3">No reviews yet — reviews come from signed-in Atlantis business accounts.</p>}
                 </div>
                 {isLoggedIn ? (
                     <button type="button" onClick={() => setShowForm(v => !v)} className="h-9 px-4 rounded-lg ring-1 ring-line-strong hover:ring-ink text-[13px] font-semibold text-ink">
@@ -249,6 +251,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                                             <p className="text-[13.5px] font-semibold text-ink truncate">{review.user.companyName || review.user.name}</p>
                                             <div className="flex items-center gap-2">
                                                 <StarRating value={review.rating} size={12} />
+                                                {review.verifiedPurchase && <span className="inline-flex items-center gap-1 text-[11.5px] font-medium text-[#047857]"><BadgeCheck size={12} /> Verified purchase</span>}
                                                 <span className="text-[12px] text-ink-4">{new Date(review.createdAt).toLocaleDateString(isAr ? 'ar-EG' : 'en-GB', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
                                             </div>
                                         </div>

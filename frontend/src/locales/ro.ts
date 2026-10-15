@@ -135,7 +135,7 @@ export const ro = {
         trackOrder: "Urmărește comanda",
         shippingPolicy: "Politică de expediere",
         returnsRefunds: "Retururi și Rambursări",
-        description: "Principala platformă B2B wholesale pentru băuturi și nu numai, conectând branduri globale cu distribuitori locali ca Atlantis.",
+        description: "Atlantis este un marketplace B2B pentru bunuri de larg consum. Cumpărătorii business și furnizorii integrați de Atlantis tranzacționează la bax, palet și camion, cu disponibilitatea afișată și prețuri en-gros pentru conturile autentificate.",
         copyright: "© 2026 Atlantis. Toate drepturile rezervate.",
         developedBy: "Dezvoltat de Monjez Company",
         privacy: "Confidențialitate",
@@ -294,6 +294,8 @@ export const ro = {
     },
     admin: {
         targetPriceRequests: "Prețuri țintă",
+        deliveryCountries: "Țări de livrare",
+        emailSetup: "E-mail: configurare și previzualizare",
         groupControlPanel: "Panou de Control",
         panelTitle: "Panou de Control",
         enterpriseAdmin: "Administrator Enterprise",

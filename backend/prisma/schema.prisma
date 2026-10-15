@@ -343,6 +343,11 @@ model Order {
   // so the admin order detail page can always show "this is what the
   // customer chose" even after operations re-routes the shipment.
   customerShippingCompany String?
+  // Delivery address the buyer entered at checkout ({ name, company, street,
+  // city, postal, country }) and its ISO country code, checked against the
+  // delivery policy (shipping/delivery-policy.ts) when the order is created.
+  shippingAddress    Json?
+  destinationCountry String?
   // Supplier-uploaded invoice / receipt image (or PDF) for this order.
   // Customer sees it on /dashboard/customer/orders/[id]; admin sees it
   // on /admin/orders/[id]. Optional — populated when the supplier

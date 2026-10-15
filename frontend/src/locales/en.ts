@@ -223,7 +223,7 @@ export const en = {
         trackOrder: "Track My Order",
         shippingPolicy: "Shipping Policy",
         returnsRefunds: "Returns & Refunds",
-        description: "The premier B2B wholesale platform for beverages and more, connecting global brands with local distributors as Atlantis.",
+        description: "Atlantis is a B2B marketplace for FMCG. Business buyers and suppliers onboarded by Atlantis trade by the case, pallet and truckload, with listed availability and wholesale prices for signed-in accounts.",
         copyright: "© 2026 Atlantis. All Rights Reserved.",
         developedBy: "Developed by Monjez Company",
         privacy: "Privacy",
@@ -382,6 +382,8 @@ export const en = {
     },
     admin: {
         targetPriceRequests: "Target Prices",
+        deliveryCountries: "Delivery Countries",
+        emailSetup: "Email Setup & Preview",
         groupControlPanel: "Control Panel",
         panelTitle: "Control Panel",
         enterpriseAdmin: "Enterprise Administrator",

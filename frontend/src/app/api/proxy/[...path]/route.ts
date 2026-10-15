@@ -35,6 +35,8 @@ const PUBLIC_PATHS = [
   'newsletter/confirm',
   'newsletter/unsubscribe',
   'products/price-ticker',
+  // Delivery policy (where Atlantis delivers) — public information.
+  'shipping/destinations',
   // Health endpoints — no auth so the operator can hit them from
   // the browser to verify Railway connectivity even when locked out.
   'health',

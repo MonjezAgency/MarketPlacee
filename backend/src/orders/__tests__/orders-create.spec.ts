@@ -16,10 +16,12 @@ function makeDb() {
         orders: [] as any[],
         loads: new Map<string, any>(),
         coupons: new Map<string, any>([['SAVE10', { code: 'SAVE10', discountPercent: 10, isActive: true, expirationDate: new Date(Date.now() + 864e5) }]]),
+        offers: [] as any[],
     };
     const db: any = {
         state,
         appConfig: { findUnique: jest.fn(async () => null) },
+        offer: { findMany: jest.fn(async () => state.offers ?? []) },
         coupon: { findUnique: jest.fn(async ({ where }: any) => state.coupons.get(where.code) ?? null) },
         product: {
             findMany: jest.fn(async ({ where }: any) => where.id.in.map((id: string) => state.products.get(id)).filter(Boolean)),
@@ -65,8 +67,13 @@ function makeService(db: any) {
     const appConfig: any = { getMarkupPercentage: jest.fn(async () => MARKUPS) };
     const loads = new MixedLoadsService(db, appConfig);
     const noop: any = { sendOrderConfirmationEmail: jest.fn(async () => {}), create: jest.fn(async () => {}), notifyAdmins: jest.fn(async () => {}) };
-    return new OrdersService(db, noop, noop, {} as any, {} as any, appConfig, loads);
+    const svc = new OrdersService(db, noop, noop, {} as any, {} as any, appConfig, loads);
+    // Every order needs a delivery address in a supported country; tests that don't care get Romania.
+    const create = svc.create.bind(svc);
+    (svc as any).create = (c: string, t: any, i: any[], sc?: string, cost?: number, opts: any = {}) => create(c, t, i, sc, cost, { shippingAddress: RO, ...opts });
+    return svc;
 }
+const RO = { name: 'Buyer', street: 'Str. 1', city: 'Bucharest', postal: '010000', country: 'Romania' };
 const err = async (p: Promise<unknown>) => { try { await p; } catch (e: any) { return e?.response?.code ?? e?.message; } return 'NO_ERROR'; };
 
 describe('OrdersService.create — server-side pricing', () => {
@@ -83,6 +90,7 @@ describe('OrdersService.create — server-side pricing', () => {
     });
     it('refuses when the client total disagrees with the server (PRICE_CHANGED)', async () => {
         const db = makeDb(), svc = makeService(db);
+        db.state.products.get('prime').stock = 500;
         expect(await err(svc.create('buyer', 100, [{ productId: 'prime', tier: 'pallet', quantity: 2 }]))).toBe('PRICE_CHANGED');
         expect(db.state.orders).toHaveLength(0);
     });
@@ -135,6 +143,7 @@ describe('Mixed loads in orders', () => {
     const fullTruck = { id: 'load-1', customerId: 'buyer', kind: 'TRUCK', status: 'DRAFT', version: 0, lines: [{ productId: 'prime', quantity: 13 }, { productId: 'zero', quantity: 12 }] };
     it('orders a full mixed truck at the server total and locks the load', async () => {
         const db = makeDb(); db.state.loads.set('load-1', { ...fullTruck });
+        db.state.products.get('prime').stock = 5000; db.state.products.get('zero').stock = 5000;
         const svc = makeService(db);
         const o: any = await svc.create('buyer', undefined as any, [{ mixedLoadId: 'load-1', price: 1 }]);
         const subtotal = 13 * 132 * 13.81 + 12 * 120 * 13.81;
@@ -142,6 +151,19 @@ describe('Mixed loads in orders', () => {
         expect(o.items[0].mixedLoadId).toBe('load-1');
         expect(o.items[0].mixComposition).toHaveLength(2);
         expect(db.state.loads.get('load-1').status).toBe('ORDERED');
+        // Mixed loads take stock per product, in cases, and record it on each entry.
+        expect(db.state.products.get('prime').stock).toBe(5000 - 13 * 132);
+        expect(db.state.products.get('zero').stock).toBe(5000 - 12 * 120);
+        expect(o.items[0].mixComposition.map((c: any) => c.stockCases)).toEqual([13 * 132, 12 * 120]);
+    });
+    it('refuses a mixed load when a product in it has too little stock, and changes nothing', async () => {
+        const db = makeDb(); db.state.loads.set('load-1', { ...fullTruck });
+        db.state.products.get('prime').stock = 5000; db.state.products.get('zero').stock = 100;
+        const svc = makeService(db);
+        expect(await err(svc.create('buyer', undefined as any, [{ mixedLoadId: 'load-1' }]))).toBe('LOAD_NOT_READY');
+        expect(db.state.products.get('prime').stock).toBe(5000);
+        expect(db.state.orders).toHaveLength(0);
+        expect(db.state.loads.get('load-1').status).toBe('DRAFT');
     });
     it('refuses an under-filled load (when a minimum is configured) and a load already ordered', async () => {
         const db = makeDb();
@@ -156,6 +178,7 @@ describe('Mixed loads in orders', () => {
     it('with no minimum configured, a partly filled load can be ordered', async () => {
         const db = makeDb();
         db.state.loads.set('half', { ...fullTruck, id: 'half', lines: [{ productId: 'prime', quantity: 13 }] });
+        db.state.products.get('prime').stock = 5000;
         const o: any = await makeService(db).create('buyer', undefined as any, [{ mixedLoadId: 'half' }]);
         expect(o.items[0].mixedLoadId).toBe('half');
     });
@@ -163,5 +186,49 @@ describe('Mixed loads in orders', () => {
         const db = makeDb(); db.state.loads.set('load-1', { ...fullTruck });
         const svc = makeService(db);
         expect(await err(svc.create('intruder', undefined as any, [{ mixedLoadId: 'load-1' }]))).toBe('LOAD_NOT_FOUND');
+    });
+});
+
+describe('Delivery destination and offers at order time', () => {
+    it('refuses an unsupported destination before anything is written (Egypt)', async () => {
+        const db = makeDb(), svc = makeService(db);
+        db.state.products.get('prime').stock = 500;
+        const e: any = await svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }], undefined, undefined, { shippingAddress: { ...RO, country: 'Egypt' } }).catch((x) => x);
+        expect(e.response.code).toBe('DESTINATION_UNSUPPORTED');
+        expect(e.response.message).toMatch(/Delivery to Egypt is not currently supported/);
+        expect(db.state.orders).toHaveLength(0);
+        expect(db.state.products.get('prime').stock).toBe(500);
+    });
+    it('needs a delivery country, and stores the address with its ISO code', async () => {
+        const db = makeDb(), svc = makeService(db);
+        db.state.products.get('prime').stock = 500;
+        expect(await err(svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }], undefined, undefined, { shippingAddress: { ...RO, country: '' } }))).toBe('DESTINATION_REQUIRED');
+        const o: any = await svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }], 'DB SCHENKER', 999);
+        expect(o.destinationCountry).toBe('RO');
+        expect(o.shippingAddress.city).toBe('Bucharest');
+        expect(o.shippingCost).toBeNull(); // a client-side freight figure is never stored
+    });
+    it('follows an admin-configured delivery list', async () => {
+        const db = makeDb(), svc = makeService(db);
+        db.state.products.get('prime').stock = 500;
+        db.appConfig.findUnique = jest.fn(async ({ where }: any) => (where.key === 'DELIVERY_COUNTRIES' ? { value: '["EG"]' } : null));
+        expect(await err(svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }]))).toBe('DESTINATION_UNSUPPORTED');
+        const o: any = await svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }], undefined, undefined, { shippingAddress: { ...RO, country: 'Egypt' } });
+        expect(o.destinationCountry).toBe('EG');
+    });
+    it('charges the approved offer price the product page shows (buyer and supplier price cut by the same %)', async () => {
+        const db = makeDb(), svc = makeService(db);
+        db.state.products.get('prime').stock = 500;
+        db.state.offers = [{ productId: 'prime', discountPercent: 10, variantDiscounts: null }];
+        const o: any = await svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }]);
+        // €13.81395 × 1.05 × 0.9 = €13.05 per case; × 132 cases
+        expect(o.items[0].price).toBe(Math.round(13.05 * 132 * 100) / 100);
+        expect(o.items[0].supplierUnitPrice).toBe(Math.round(13.81395348837209 * 0.9 * 132 * 100) / 100);
+    });
+    it('reports short stock in the quote, before checkout', async () => {
+        const db = makeDb(), svc = makeService(db);
+        const q: any = await svc.priceCart('buyer', [{ productId: 'prime', tier: 'pallet', quantity: 1 }], null, db, { lenient: true });
+        expect(q.lines[0].error.code).toBe('INSUFFICIENT_STOCK');
+        expect(q.lines[0].error.availableCases).toBe(50);
     });
 });

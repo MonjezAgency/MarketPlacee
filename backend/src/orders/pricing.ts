@@ -14,13 +14,23 @@
  *    listing pays the raw price.
  *  • MOQ is stored as `moq` + `moqUnit` (PIECE|CASE|PALLET|TRUCK) and is
  *    converted to the ordered packaging unit (rounded up).
+ *  • An approved, unexpired wholesale offer (Offer.discountPercent, or a
+ *    per-variant override) reduces the case price of a single-product
+ *    line — the same discount the product page shows. Supplier price and
+ *    buyer price are reduced by the same percentage.
  *  • Mixed loads: a mixed PALLET is filled with whole cases, a mixed TRUCK
  *    with whole pallets. Because every product has its own capacity
  *    (casesPerPallet / palletsPerShipment), each line occupies
  *    quantity ÷ that product's capacity of the load. The load is orderable
  *    when the shares add up to the required fill (default 100%, the rule
  *    an admin can require via MIX_MIN_FILL_PERCENT; none by default) and
- *    never above 100% of the products' own stated capacity. No supplier /
+ *    never above 100% of the products' own stated capacity.
+ *  • Minimum order in a mixed load: each product's MOQ still applies to the
+ *    load it ships in, but volume from the SAME supplier counts together.
+ *    Per supplier, the load needs at least the largest MOQ of that
+ *    supplier's products, in the load's unit (cases for a mixed pallet,
+ *    pallets for a mixed truck). E.g. MOQ 15 pallets: 8 pallets of A + 7
+ *    of B from that supplier qualify; 1 pallet does not. No supplier /
  *    location compatibility rule is applied (not yet defined by the
  *    business). Price = Σ case price × cases, then the admin mix markup.
  */
@@ -41,6 +51,7 @@ export interface PricingProduct {
     moq?: number | null;
     moqUnit?: string | null;
     status?: string | null;
+    stock?: number | null;
     supplierId?: string | null;
     exwLocation?: string | null;
     /** Verified stock location (supplier warehouse), when the product is linked to one. */
@@ -136,7 +147,7 @@ export interface PricedLine {
 }
 
 /** Price one single-product line at a packaging tier, enforcing availability and MOQ. */
-export function priceLine(p: PricingProduct, tierIn: unknown, quantity: unknown, m: Markups, opts: { raw?: boolean } = {}): PricedLine {
+export function priceLine(p: PricingProduct, tierIn: unknown, quantity: unknown, m: Markups, opts: { raw?: boolean; discountPercent?: number } = {}): PricedLine {
     assertOrderable(p);
     const tier = normaliseTier(tierIn);
     if (!tier) throw new PricingError('INVALID_TIER', `${p.name}: choose case, pallet or truckload.`);
@@ -145,11 +156,18 @@ export function priceLine(p: PricingProduct, tierIn: unknown, quantity: unknown,
         throw new PricingError('TIER_UNAVAILABLE', `${p.name} can't be ordered by the ${tier === 'carton' ? 'case' : tier === 'truck' ? 'truckload' : 'pallet'}: the supplier hasn't provided ${av.missing.join(', ')}.`, { productId: p.id, tier, missing: av.missing });
     }
     const qty = assertQuantity(quantity, p.name);
-    const min = minUnits(p, tier);
-    if (qty < min) throw new PricingError('BELOW_MOQ', `${p.name}: minimum order is ${min} ${tier === 'carton' ? 'case' : tier}${min === 1 ? '' : 's'}.`, { productId: p.id, tier, minUnits: min });
-    const perCase = round2(basePerCase(p, m) * (opts.raw ? 1 : tierMarkup(tier, m)));
+    const discount = offerFactor(opts.discountPercent);
+    const perCase = round2(basePerCase(p, m) * (opts.raw ? 1 : tierMarkup(tier, m)) * discount);
     const cases = casesInUnit(p, tier);
     const unitPrice = round2(perCase * cases);
+    const min = minUnits(p, tier);
+    if (qty < min) {
+        // Everything the cart needs to show progress and the "add more" path.
+        throw new PricingError('BELOW_MOQ', `${p.name}: minimum order is ${min} ${UNIT_NAMES[tier][min === 1 ? 0 : 1]}.`, {
+            productId: p.id, tier, minUnits: min, quantity: qty, remaining: min - qty, unitPrice, minLineTotal: round2(unitPrice * min),
+            moq: pos(p.moq) || null, moqUnit: p.moqUnit ? String(p.moqUnit).toUpperCase() : null, mixable: mixOptions(p, tier, qty),
+        });
+    }
     return {
         productId: p.id, tier, quantity: qty, perCase, unitPrice,
         lineTotal: round2(unitPrice * qty),
@@ -157,6 +175,28 @@ export function priceLine(p: PricingProduct, tierIn: unknown, quantity: unknown,
         unitsTotal: cases * qty * pos(p.unitsPerCase),
         minUnits: min,
     };
+}
+
+const UNIT_NAMES: Record<Tier, [string, string]> = { carton: ['case', 'cases'], pallet: ['pallet', 'pallets'], truck: ['truckload', 'truckloads'] };
+
+/** 1 − offer% (0–90% accepted; anything else is ignored). */
+export function offerFactor(pct: unknown): number {
+    const n = typeof pct === 'number' && Number.isFinite(pct) && pct > 0 && pct <= 90 ? pct : 0;
+    return 1 - n / 100;
+}
+
+/**
+ * Whether a below-minimum single line can instead start a mixed load that
+ * keeps the same quantity: cases → mixed pallet, pallets → mixed truck.
+ * Only offered when the load could ever satisfy the product's own MOQ.
+ */
+export function mixOptions(p: PricingProduct, tier: Tier, qty: number): { kind: LoadKind; quantity: number; minUnits: number; capacity: number } | null {
+    const kind: LoadKind | null = tier === 'carton' ? 'PALLET' : tier === 'pallet' ? 'TRUCK' : null;
+    if (!kind || !tierAvailability(p)[kind === 'PALLET' ? 'pallet' : 'truck'].ok) return null;
+    const capacity = kind === 'PALLET' ? pos(p.casesPerPallet) : pos(p.palletsPerShipment);
+    const need = minUnits(p, kind === 'PALLET' ? 'carton' : 'pallet');
+    if (need > capacity || qty > capacity) return null;
+    return { kind, quantity: qty, minUnits: need, capacity };
 }
 
 export interface LoadLineInput { productId: string; variant?: string | null; quantity: number }
@@ -169,12 +209,23 @@ export interface PricedLoadLine extends LoadLineInput {
     share: number;      // fraction of the load this line occupies
     lineSubtotal: number;
 }
+export interface LoadMinimum {
+    unit: 'case' | 'pallet';
+    required: number;     // largest MOQ of this supplier's products, in load units
+    have: number;         // this supplier's quantity in the load, in load units
+    remaining: number;
+    capacity: number;     // the most this load can hold of these products
+    satisfiable: boolean; // false when the MOQ is bigger than the load itself
+    products: string[];   // names of the products that set the minimum
+}
 export interface PricedLoad {
     kind: LoadKind;
     supplierId: string | null;
     lines: PricedLoadLine[];
     fill: number;         // 0..1+
     requiredFill: number;
+    /** Minimum-order progress per supplier in the load (see header). */
+    minimums: LoadMinimum[];
     subtotal: number;
     total: number;
     ready: boolean;
@@ -285,6 +336,7 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
 
     const origin = loadOrigin(out.map((l) => products.get(l.productId)!));
     const fill = out.reduce((s, l) => s + l.share, 0);
+    const minimums = loadMinimums(kind, out, products);
     if (fill > 1 + EPS) {
         throw new PricingError('OVER_CAPACITY', `This mixed ${kind === 'PALLET' ? 'pallet' : 'truckload'} is ${Math.round(fill * 100)}% full — remove some quantity.`, { fill });
     }
@@ -294,6 +346,18 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
     const issues: string[] = [];
     if (out.length === 0) issues.push('Add at least one product.');
     else if (requiredFill > 0 && fill < requiredFill - EPS) issues.push(`${Math.round(fill * 100)}% full — fill to ${Math.round(requiredFill * 100)}% to order.`);
+    // Stock is kept in cases; variant lines of one product share it.
+    const casesByProduct = new Map<string, number>();
+    for (const l of out) casesByProduct.set(l.productId, (casesByProduct.get(l.productId) ?? 0) + l.cases);
+    for (const [pid, cases] of casesByProduct) {
+        const p = products.get(pid)!;
+        if (typeof p.stock === 'number' && cases > p.stock) issues.push(p.stock > 0 ? `Only ${p.stock.toLocaleString('en-GB')} case${p.stock === 1 ? '' : 's'} of ${p.name} in stock — reduce it.` : `${p.name} is out of stock — remove it.`);
+    }
+    for (const g of minimums) {
+        const u = (n: number) => `${n.toLocaleString('en-GB')} ${g.unit}${n === 1 ? '' : 's'}`;
+        if (!g.satisfiable) issues.push(`Minimum order for ${g.products.join(', ')} is ${u(g.required)}, more than this ${kind === 'PALLET' ? 'pallet' : 'truck'} can hold (${u(g.capacity)}). Order it ${kind === 'PALLET' ? 'by the pallet' : 'by the truckload'} instead.`);
+        else if (g.remaining > 0) issues.push(`Minimum order: ${u(g.required)}. Add ${g.remaining.toLocaleString('en-GB')} more ${g.unit}${g.remaining === 1 ? '' : 's'} of ${g.products.length > 1 ? 'these products' : g.products[0]} or other eligible products from the same supplier.`);
+    }
     // Mixing several products needs one verified dispatch site; never assumed.
     if (new Set(out.map((l) => l.productId)).size > 1 && origin.status !== 'VERIFIED') {
         issues.push(`Dispatch location needs verification before these products can ship together (${origin.unverified.join(', ')}). Atlantis will confirm.`);
@@ -301,5 +365,37 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
     // What leaves the server is buyer-priced: each line carries the mix markup,
     // so neither the supplier price nor the markup is part of a quote.
     const buyerLines = out.map((l) => ({ ...l, casePrice: Math.round(l.casePrice * m.mix * 10000) / 10000, lineSubtotal: round2(l.lineSubtotal * m.mix) }));
-    return { kind, supplierId: mixedSuppliers ? null : supplierId, lines: buyerLines, fill, requiredFill, subtotal: total, total, ready: issues.length === 0, issues, origin };
+    return { kind, supplierId: mixedSuppliers ? null : supplierId, lines: buyerLines, fill, requiredFill, minimums, subtotal: total, total, ready: issues.length === 0, issues, origin };
+}
+
+/**
+ * Minimum-order groups of a mixed load: one per supplier. The requirement is
+ * the largest MOQ among that supplier's products in the load unit; the
+ * quantity is everything from that supplier in the load.
+ */
+export function loadMinimums(kind: LoadKind, lines: { productId: string; quantity: number }[], products: Map<string, PricingProduct>): LoadMinimum[] {
+    const unitTier: Tier = kind === 'PALLET' ? 'carton' : 'pallet';
+    const groups = new Map<string, { have: number; required: number; setters: string[]; capacity: number }>();
+    for (const l of lines) {
+        const p = products.get(l.productId);
+        if (!p) continue;
+        const key = p.supplierId ?? `product:${p.id}`;
+        const g = groups.get(key) ?? { have: 0, required: 1, setters: [], capacity: Infinity };
+        g.have += l.quantity;
+        const cap = kind === 'PALLET' ? pos(p.casesPerPallet) : pos(p.palletsPerShipment);
+        if (cap) g.capacity = Math.min(g.capacity, cap);
+        if (pos(p.moq)) {
+            const need = minUnits(p, unitTier);
+            if (need > g.required) { g.required = need; g.setters = [p.name]; }
+            else if (need === g.required && need > 1 && !g.setters.includes(p.name)) g.setters.push(p.name);
+        }
+        groups.set(key, g);
+    }
+    return [...groups.values()].filter((g) => g.required > 1).map((g) => {
+        const capacity = Number.isFinite(g.capacity) ? g.capacity : g.required;
+        return {
+            unit: kind === 'PALLET' ? 'case' : 'pallet', required: g.required, have: g.have, remaining: Math.max(0, g.required - g.have),
+            capacity, satisfiable: g.required <= capacity, products: g.setters,
+        } as LoadMinimum;
+    });
 }

@@ -62,7 +62,7 @@ export class EmailService {
    * Providing our own plain-text part keeps the subject line + an
    * inviting one-liner readable in clients that block HTML.
    */
-  private htmlToPlainText(html: string): string {
+  htmlToPlainText(html: string): string {
     return html
       // Drop style/script/title — they are not user-facing copy.
       .replace(/<style[\s\S]*?<\/style>/gi, '')
@@ -94,9 +94,9 @@ export class EmailService {
       .slice(0, 4000);
   }
 
-  async sendMailDetailed(to: string, subject: string, html: string, opts: { unsubscribeUrl?: string } = {}): Promise<{ success: boolean; error?: string; provider?: string }> {
+  async sendMailDetailed(to: string, subject: string, html: string, opts: { unsubscribeUrl?: string; text?: string } = {}): Promise<{ success: boolean; error?: string; provider?: string; id?: string }> {
     const resendKey = process.env.RESEND_API_KEY;
-    const text = this.htmlToPlainText(html);
+    const text = opts.text || this.htmlToPlainText(html);
     // Support / unsubscribe address that recipients can hit in their
     // mail client. Resend honours List-Unsubscribe-Post for one-click
     // unsubscribe, which is a major Gmail / Outlook deliverability win.
@@ -136,7 +136,7 @@ export class EmailService {
           },
         );
         console.log(`✅ [EMAIL] Resend success — ID ${res.data?.id}`);
-        return { success: true, provider: 'resend' };
+        return { success: true, provider: 'resend', id: res.data?.id };
       } catch (resendErr: any) {
         const status = resendErr.response?.status;
         const data = resendErr.response?.data;

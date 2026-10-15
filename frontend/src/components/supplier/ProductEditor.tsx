@@ -323,7 +323,7 @@ export default function ProductEditor({ productId }: { productId?: string }) {
                     </Card>
 
                     <Card id="media" title="Photos" description="At least one real photo is required before review. The first photo is the main one buyers see.">
-                        <MediaEditor images={f.images} onChange={(imgs) => set('images', imgs)} ean={f.ean} name={f.name} brand={f.brand} error={touched && !f.images.some(isRealImage) ? 'Add at least one photo.' : ''} />
+                        <MediaEditor images={f.images} onChange={(imgs) => set('images', imgs)} ean={f.ean} name={f.name} brand={f.brand} productId={productId} savedEan={product?.ean ?? null} weight={f.weightValue ? `${f.weightPack ? `${f.weightPack} x ` : ''}${f.weightValue} ${f.weightUnit}` : ''} error={touched && !f.images.some(isRealImage) ? 'Add at least one photo.' : ''} />
                     </Card>
 
                     <Card title="Varieties" description="Optional. Use only for options of THIS product that buyers choose between (e.g. sizes or flavours sold under the same listing).">
@@ -391,7 +391,7 @@ export default function ProductEditor({ productId }: { productId?: string }) {
     );
 }
 
-function MediaEditor({ images, onChange, ean, name, brand, error }: { images: string[]; onChange: (v: string[]) => void; ean: string; name: string; brand: string; error?: string }) {
+function MediaEditor({ images, onChange, ean, name, brand, error, productId, savedEan, weight }: { images: string[]; onChange: (v: string[]) => void; ean: string; name: string; brand: string; error?: string; productId?: string; savedEan?: string | null; weight?: string }) {
     const fileRef = React.useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = React.useState(0);
     const [url, setUrl] = React.useState('');
@@ -449,7 +449,9 @@ function MediaEditor({ images, onChange, ean, name, brand, error }: { images: st
                 </div>
             </div>
             {urlErr && <p role="alert" className="text-[12.5px] text-red-700">{urlErr}</p>}
-            <BarcodeImageFinder ean={digitsOnly(ean)} name={name} brand={brand} onAccept={(u) => { onChange([...imagesRef.current, u]); toast.success('Photo added — save to keep it.'); }} />
+            <BarcodeImageFinder productId={productId} savedEan={savedEan} ean={digitsOnly(ean)} name={name} brand={brand} weight={weight} current={images}
+                onAccept={(u) => { onChange([...imagesRef.current, u]); toast.success('Photo added — save to keep it.'); }}
+                onSkip={() => fileRef.current?.click()} />
         </div>
     );
 }

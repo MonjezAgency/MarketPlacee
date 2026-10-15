@@ -8,6 +8,7 @@ import { NotifyToasts } from '@/components/ui/NotifyToasts';
 import { StepUpDialog } from '@/components/security/StepUp';
 import { CookieConsent } from '@/components/CookieConsent';
 import { cn } from "@/lib/utils";
+import { SOCIAL_LINKS } from "@/lib/config";
 
 const cairo = Cairo({
     subsets: ["arabic", "latin"],
@@ -164,12 +165,8 @@ export default function RootLayout({
                             // sameAs populated so the entity is discoverable by AI
                             // search engines — the GEO audit flagged the empty
                             // array as one of the biggest brand-signal misses.
-                            sameAs: [
-                                'https://www.linkedin.com/company/atlantis-fmcg',
-                                'https://x.com/atlantisfmcg',
-                                'https://www.facebook.com/atlantisfmcg',
-                                'https://www.instagram.com/atlantisfmcg',
-                            ],
+                            // Only official profiles that exist (configured via NEXT_PUBLIC_SOCIAL_*).
+                            sameAs: SOCIAL_LINKS.map((l) => l.url).filter(Boolean),
                             contactPoint: [{
                                 '@type': 'ContactPoint',
                                 email: 'Info@atlantisfmcg.com',

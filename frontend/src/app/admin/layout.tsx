@@ -50,7 +50,9 @@ import {
     CheckCircle2,
     ScrollText,
     Image as ImageIcon,
-    Target
+    Target,
+    Globe2,
+    MailCheck
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
@@ -89,6 +91,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             { label: 'Approve Offers', translationKey: 'approveOffers', href: '/admin/wholesale-offers', icon: CheckCircle2 },
             { label: 'Global Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
             { label: 'Target Prices', translationKey: 'targetPriceRequests', href: '/admin/target-prices', icon: Target },
+            { label: 'Delivery Countries', translationKey: 'deliveryCountries', href: '/admin/delivery', icon: Globe2 },
             { label: 'Supply Chain', translationKey: 'suppliers', href: '/admin/suppliers', icon: Store },
             { label: 'B2B Customers', translationKey: 'buyers', href: '/admin/buyers', icon: Users },
             { label: 'Finance & Logistics', translationKey: 'groupFinance', href: '/admin/finance', icon: DollarSign },
@@ -101,6 +104,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         links: [
             { label: 'Newsletter Hub', translationKey: 'newsletter', href: '/admin/newsletter', icon: MessageCircle },
             { label: 'Email Analytics', translationKey: 'emailAnalytics', href: '/admin/email-analytics', icon: Activity },
+            { label: 'Email Setup & Preview', translationKey: 'emailSetup', href: '/admin/email-setup', icon: MailCheck },
             { label: 'Coupons & Codes', translationKey: 'coupons', href: '/admin/coupons', icon: Ticket },
             // Homepage banners — visual placement map where admin clicks
             // a section, sees the recommended dimensions, and uploads /

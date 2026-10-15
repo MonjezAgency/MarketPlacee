@@ -8,7 +8,8 @@ import { InvoiceService } from '../invoices/invoice.service';
 import { EscrowService } from '../payments/escrow.service';
 import { AppConfigService } from '../admin/app-config.service';
 import { MixedLoadsService, asHttp } from './mixed-loads.service';
-import { PricingError, basePerCase, casesInUnit, normaliseTier, priceLine, priceLoad, round2 } from './pricing';
+import { checkDestination, loadDeliveryCountries } from '../shipping/delivery-policy';
+import { PricingError, basePerCase, casesInUnit, normaliseTier, offerFactor, priceLine, priceLoad, round2 } from './pricing';
 import { casesForItem, supplierLineValue } from '../products/stock-ledger';
 import { minOrderCases } from '../common/markups';
 
@@ -48,6 +49,14 @@ export function assertTransition(from: OrderStatus, to: OrderStatus) {
     if (!ORDER_TRANSITIONS[from]?.includes(to)) {
         throw new BadRequestException({ code: 'INVALID_TRANSITION', message: `An order that is ${STATUS_LABELS[from] || from} can't be changed to ${STATUS_LABELS[to] || to}.`, from, to, allowed: ORDER_TRANSITIONS[from] });
     }
+}
+
+/** Keep only the address fields checkout sends, as trimmed strings; null when there's no country. */
+export function cleanAddress(a: unknown): { name: string; company: string; street: string; city: string; postal: string; country: string } | null {
+    if (!a || typeof a !== 'object') return null;
+    const v = (k: string) => String((a as any)[k] ?? '').trim().slice(0, 200);
+    const out = { name: v('name'), company: v('company'), street: v('street'), city: v('city'), postal: v('postal'), country: v('country') };
+    return out.country ? out : null;
 }
 
 @Injectable()
@@ -153,7 +162,19 @@ export class OrdersService {
         const markups = await this.mixedLoads.markups();
         const productIds = items.filter((i) => i && !i.mixedLoadId).map((i) => String(i.productId || '').split('::')[0]).filter(Boolean);
         const products = await this.mixedLoads.loadProducts(productIds, db);
+        const offers = await this.activeOffers(productIds, db);
         const lines: any[] = [];
+        // Stock is in cases; a product can appear in several lines, so the check is on the running total.
+        const wanted = new Map<string, number>();
+        const takeStock = (p: any, cases: number) => {
+            const total = (wanted.get(p.id) ?? 0) + cases;
+            if (typeof p.stock === 'number' && total > p.stock) {
+                throw new PricingError('INSUFFICIENT_STOCK', p.stock > 0
+                    ? `${p.name}: only ${p.stock.toLocaleString('en-GB')} case${p.stock === 1 ? '' : 's'} in stock${cases !== total ? ' for all your lines together' : ''}. Reduce the quantity.`
+                    : `${p.name} is out of stock.`, { productId: p.id, availableCases: Math.max(0, p.stock - (total - cases)) });
+            }
+            wanted.set(p.id, total);
+        };
         for (const raw of items) {
             if (!raw || typeof raw !== 'object') throw new BadRequestException({ code: 'INVALID_LINE', message: 'Invalid cart line.' });
             try {
@@ -164,11 +185,14 @@ export class OrdersService {
                     if (load.status !== 'DRAFT') throw new PricingError('LOAD_ALREADY_ORDERED', 'A mixed load in your cart has already been ordered.', { mixedLoadId: load.id });
                     const q = await this.mixedLoads.price(load.kind, load.lines as any[], db);
                     if (!q.ready) throw new PricingError('LOAD_NOT_READY', `Mixed ${load.kind === 'PALLET' ? 'pallet' : 'truckload'}: ${q.issues.join(' ')}`, { mixedLoadId: load.id });
+                    const loadProducts = await this.mixedLoads.loadProducts(q.lines.map((l) => l.productId), db);
+                    for (const l of q.lines) takeStock(loadProducts.get(l.productId), l.cases);
                     lines.push({
                         productId: null, mixedLoadId: load.id, quantity: 1, price: q.total, lineTotal: q.total,
                         tier: load.kind === 'PALLET' ? 'pallet' : 'truck',
                         name: `Mixed ${load.kind === 'PALLET' ? 'pallet' : 'truckload'} (${q.lines.length} product${q.lines.length === 1 ? '' : 's'})`,
                         mixComposition: q.lines.map((l) => ({ productId: l.productId, name: l.name, variant: l.variant ?? null, quantity: l.quantity, unit: l.unit, cases: l.cases, unitPrice: l.casePrice, lineSubtotal: l.lineSubtotal })),
+                        stockTake: q.lines.map((l) => ({ productId: l.productId, cases: l.cases })),
                         supplierId: q.supplierId,
                     });
                     continue;
@@ -185,13 +209,17 @@ export class OrdersService {
                     const q = priceLoad(kind, loadLines, products, markups, { requiredFill: 1 });
                     if (!q.ready) throw new PricingError('LOAD_NOT_READY', `${p.name}: ${q.issues.join(' ')}`);
                     if (Number(raw.quantity ?? 1) !== 1) throw new PricingError('INVALID_QUANTITY', `${p.name}: a mixed ${tier} is ordered one at a time.`);
-                    lines.push({ productId, quantity: 1, price: q.total, lineTotal: q.total, tier, name: p.name, selectedVariants: raw.selectedVariants, mixComposition: q.lines.map((l) => ({ signature: l.variant, quantity: l.quantity, unitPrice: l.casePrice * (kind === 'TRUCK' ? Number(p.casesPerPallet) : 1) })), supplierId: p.supplierId });
+                    const mixCases = q.lines.reduce((s, l) => s + l.cases, 0);
+                    takeStock(p, mixCases);
+                    lines.push({ productId, quantity: 1, price: q.total, lineTotal: q.total, tier, name: p.name, selectedVariants: raw.selectedVariants, stockTake: [{ productId, cases: mixCases }], mixComposition: q.lines.map((l) => ({ signature: l.variant, quantity: l.quantity, unitPrice: l.casePrice * (kind === 'TRUCK' ? Number(p.casesPerPallet) : 1) })), supplierId: p.supplierId });
                     continue;
                 }
-                const priced = priceLine(p, tier, Number(raw.quantity), markups, { raw: !!p.supplierId && p.supplierId === customerId });
+                const offerPercent = this.offerFor(offers.get(productId), raw.selectedVariants);
+                const priced = priceLine(p, tier, Number(raw.quantity), markups, { raw: !!p.supplierId && p.supplierId === customerId, discountPercent: offerPercent });
+                takeStock(p, priced.casesTotal);
                 // Supplier's own price for one ordered unit (no Atlantis margin) — for supplier views only.
-                const supplierUnitPrice = round2(basePerCase(p, markups) * casesInUnit(p, priced.tier));
-                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, supplierUnitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null, leadTime: (p as any).leadTime ?? null, readyForDispatch: !!(p as any).readyForDispatch, exwLocation: p.exwLocation ?? null } });
+                const supplierUnitPrice = round2(basePerCase(p, markups) * offerFactor(offerPercent) * casesInUnit(p, priced.tier));
+                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, supplierUnitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, offerPercent: offerPercent || null, stockTake: [{ productId, cases: priced.casesTotal }], info: { ean: (p as any).ean ?? null, unitsPerCase: p.unitsPerCase ?? null, shelfLife: (p as any).shelfLife ?? null, leadTime: (p as any).leadTime ?? null, readyForDispatch: !!(p as any).readyForDispatch, exwLocation: p.exwLocation ?? null } });
             } catch (e) {
                 // Cart view: flag the line and keep pricing the rest. Orders stay strict.
                 if (opts.lenient && e instanceof PricingError) {
@@ -215,6 +243,29 @@ export class OrdersService {
         return { lines, subtotal, discountPercent, discount, coupon: appliedCoupon, total: round2(subtotal - discount), markups };
     }
 
+    /** Deepest approved, unexpired offer per product (same rule the product page uses). */
+    async activeOffers(productIds: string[], db: any = this.prisma): Promise<Map<string, { discountPercent: number | null; variantDiscounts: any }>> {
+        const out = new Map<string, { discountPercent: number | null; variantDiscounts: any }>();
+        if (!productIds.length) return out;
+        const rows = await db.offer.findMany({
+            where: { productId: { in: [...new Set(productIds)] }, status: 'APPROVED', discountPercent: { not: null }, OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }] },
+            orderBy: { discountPercent: 'desc' },
+            select: { productId: true, discountPercent: true, variantDiscounts: true },
+        }).catch(() => []);
+        for (const r of rows) if (!out.has(r.productId) && Number(r.discountPercent) > 0) out.set(r.productId, r);
+        return out;
+    }
+
+    /** Offer % for a line: the variant override when the buyer picked that variant, else the offer's own %. */
+    offerFor(offer: { discountPercent: number | null; variantDiscounts: any } | undefined, selectedVariants: unknown): number {
+        if (!offer) return 0;
+        const sv = selectedVariants && typeof selectedVariants === 'object' ? (selectedVariants as Record<string, unknown>) : {};
+        const sig = Object.keys(sv).sort().map((k) => `${k}=${sv[k]}`).join('|');
+        const v = sig && offer.variantDiscounts && typeof offer.variantDiscounts === 'object' ? Number((offer.variantDiscounts as any)[sig]) : NaN;
+        const pct = Number.isFinite(v) ? v : Number(offer.discountPercent) || 0;
+        return pct > 0 && pct <= 90 ? pct : 0;
+    }
+
     /** Accounts that started with an incomplete business profile (e.g. Google sign-up) must finish it before ordering. */
     async assertProfileComplete(userId: string) {
         const u: any = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -223,7 +274,7 @@ export class OrdersService {
         }
     }
 
-    async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number, opts: { idempotencyKey?: string; couponCode?: string } = {}) {
+    async create(customerId: string, totalAmount: number, items: any[], shippingCompany?: string, shippingCost?: number, opts: { idempotencyKey?: string; couponCode?: string; shippingAddress?: any } = {}) {
         const key = typeof opts.idempotencyKey === 'string' && /^[A-Za-z0-9_-]{8,80}$/.test(opts.idempotencyKey) ? opts.idempotencyKey : null;
         if (key) {
             // A retried / double-clicked submit returns the order already created.
@@ -233,6 +284,14 @@ export class OrdersService {
                 return existing;
             }
         }
+
+        // Destination first: an order to a country Atlantis doesn't deliver to is refused here,
+        // whatever the client did (checkout also checks it before the review step).
+        const address = cleanAddress(opts.shippingAddress);
+        if (!address) throw new BadRequestException({ code: 'DESTINATION_REQUIRED', message: 'Enter the delivery address (including the country) before placing the order.' });
+        const { countries } = await loadDeliveryCountries(this.prisma);
+        const dest = checkDestination(address.country, countries);
+        if (!dest.supported) throw new BadRequestException({ code: 'DESTINATION_UNSUPPORTED', message: dest.message, country: dest.code });
 
         const quote = await this.priceCart(customerId, items, opts.couponCode);
         // The buyer must have seen the server price. If the client total
@@ -248,12 +307,16 @@ export class OrdersService {
                 // Stock gate: Product.stock is kept in CASES, so a line takes
                 // quantity × cases-in-its-tier (a pallet = casesPerPallet cases).
                 // The conditional decrement means two buyers can't oversell.
+                // Mixed loads take stock per product too (recorded on each composition entry).
                 for (const l of quote.lines) {
-                    if (!l.productId || l.mixComposition) continue;
-                    const cases = Number.isInteger(l.casesTotal) && l.casesTotal > 0 ? l.casesTotal : l.quantity;
-                    l.stockCases = cases;
-                    const res = await tx.product.updateMany({ where: { id: l.productId, stock: { gte: cases } }, data: { stock: { decrement: cases } } });
-                    if (res.count === 0) throw new BadRequestException({ code: 'INSUFFICIENT_STOCK', message: `Not enough stock for ${l.name}. Reduce the quantity or contact the supplier.`, productId: l.productId });
+                    const takes: { productId: string; cases: number }[] = Array.isArray(l.stockTake) ? l.stockTake : [];
+                    for (const t of takes) {
+                        if (!(t.cases > 0)) continue;
+                        const res = await tx.product.updateMany({ where: { id: t.productId, stock: { gte: t.cases } }, data: { stock: { decrement: t.cases } } });
+                        if (res.count === 0) throw new BadRequestException({ code: 'INSUFFICIENT_STOCK', message: `Not enough stock for ${l.mixedLoadId ? `a product in your ${l.name.toLowerCase()}` : l.name}. Reduce the quantity or contact the supplier.`, productId: t.productId });
+                    }
+                    if (l.mixedLoadId && Array.isArray(l.mixComposition)) l.mixComposition = l.mixComposition.map((c: any, i: number) => ({ ...c, stockCases: takes[i]?.cases ?? 0 }));
+                    else l.stockCases = takes.reduce((s, t) => s + t.cases, 0);
                 }
                 const created = await tx.order.create({
                     data: {
@@ -262,7 +325,10 @@ export class OrdersService {
                         totalAmount: quote.total,
                         shippingCompany: shippingCompany ?? null,
                         customerShippingCompany: shippingCompany ?? null,
-                        shippingCost: shippingCost ?? null,
+                        // Freight is quoted by Atlantis after the order; a client figure is never stored as the cost.
+                        shippingCost: null,
+                        shippingAddress: { ...address, country: dest.name },
+                        destinationCountry: dest.code,
                         status: OrderStatus.PENDING,
                         items: {
                             create: quote.lines.map((l) => ({
@@ -802,7 +868,16 @@ export class OrdersService {
             if (moved.count === 0) throw new ConflictException({ code: 'ORDER_CHANGED', message: 'This order was updated by someone else just now. Refresh and try again.' });
             if (restock) {
                 for (const it of order.items as any[]) {
-                    if (!it.productId || it.mixedLoadId || (Array.isArray(it.mixComposition) && it.mixComposition.length)) continue;
+                    const mix = Array.isArray(it.mixComposition) && it.mixComposition.length > 0;
+                    if (it.mixedLoadId) {
+                        // Only loads ordered since mixed loads take stock carry stockCases per entry.
+                        for (const c of mix ? it.mixComposition : []) {
+                            if (c?.productId && typeof c.stockCases === 'number' && c.stockCases > 0) await tx.product.update({ where: { id: c.productId }, data: { stock: { increment: c.stockCases } } });
+                        }
+                        continue;
+                    }
+                    if (!it.productId) continue;
+                    if (mix && typeof it.stockCases !== 'number') continue; // older variant mixes took no stock
                     const cases = typeof it.stockCases === 'number' ? it.stockCases : it.quantity; // legacy orders took `quantity`
                     if (cases > 0) await tx.product.update({ where: { id: it.productId }, data: { stock: { increment: cases } } });
                 }

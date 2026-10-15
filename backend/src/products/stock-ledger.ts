@@ -13,7 +13,8 @@ import { casesInUnit, normaliseTier } from '../orders/pricing';
  *                before dispatch.
  *  • ordered   — every order line ever, any status.
  *
- * Mixed pallets / trucks are not stock-tracked per product and are left out.
+ * Mixed pallets / trucks count per product from the stockCases recorded on
+ * each composition entry (orders placed before that was recorded count 0).
  */
 export const RESERVED_STATUSES = ['PENDING', 'PAID', 'PROCESSING'] as const;
 
@@ -32,7 +33,8 @@ type ItemRow = {
 
 /** Cases represented by one order line (0 for mixed loads). */
 export function casesForItem(it: ItemRow): number {
-    if (it.mixedLoadId || (Array.isArray(it.mixComposition) && it.mixComposition.length)) return 0;
+    if (it.mixedLoadId) return 0; // counted per composition entry, see mixedLoadCases
+    if (Array.isArray(it.mixComposition) && it.mixComposition.length) return typeof it.stockCases === 'number' ? it.stockCases : 0;
     if (typeof it.stockCases === 'number') return it.stockCases;
     const tier = normaliseTier(it.selectedTier) ?? 'carton';
     const per = it.product ? casesInUnit({ id: '', name: '', price: 0, ...it.product } as any, tier) : 1;
@@ -60,6 +62,21 @@ export async function stockMovements(prisma: any, productIds: string[]): Promise
         else if (s === 'SHIPPED') m.inTransit += c;
         else if (s === 'DELIVERED') m.delivered += c;
         else if (s === 'CANCELLED') m.cancelled += c;
+    }
+    // Mixed loads: one order line, many products — count each composition entry.
+    const wantedIds = new Set(productIds);
+    const mixed: any[] = await prisma.orderItem.findMany({ where: { mixedLoadId: { not: null } }, select: { mixComposition: true, order: { select: { status: true } } } });
+    for (const it of mixed) {
+        for (const c of Array.isArray(it.mixComposition) ? it.mixComposition : []) {
+            if (!c?.productId || !wantedIds.has(c.productId) || typeof c.stockCases !== 'number') continue;
+            const m = (out[c.productId] ||= { reserved: 0, inTransit: 0, delivered: 0, cancelled: 0, ordered: 0 });
+            const n = c.stockCases, s = it.order.status;
+            m.ordered += n;
+            if ((RESERVED_STATUSES as readonly string[]).includes(s)) m.reserved += n;
+            else if (s === 'SHIPPED') m.inTransit += n;
+            else if (s === 'DELIVERED') m.delivered += n;
+            else if (s === 'CANCELLED') m.cancelled += n;
+        }
     }
     return out;
 }

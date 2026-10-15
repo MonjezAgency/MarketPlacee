@@ -135,7 +135,7 @@ export const fr = {
         trackOrder: "Suivre commande",
         shippingPolicy: "Politique d'expédition",
         returnsRefunds: "Retours et Remboursements",
-        description: "La première plateforme B2B wholesale pour les boissons et plus, connectant les marques mondiales avec les distributeurs locaux comme Atlantis.",
+        description: "Atlantis est une marketplace B2B de produits de grande consommation. Acheteurs professionnels et fournisseurs intégrés par Atlantis échangent au carton, à la palette et au camion, avec la disponibilité affichée et les prix de gros pour les comptes connectés.",
         copyright: "© 2026 Atlantis. Tous droits réservés.",
         developedBy: "Développé par Monjez Company",
         privacy: "Confidentialité",
@@ -294,6 +294,8 @@ export const fr = {
     },
     admin: {
         targetPriceRequests: "Prix cibles",
+        deliveryCountries: "Pays de livraison",
+        emailSetup: "E-mails : réglages et aperçu",
         groupControlPanel: "Panneau de Contrôle",
         panelTitle: "Panneau de Contrôle",
         enterpriseAdmin: "Administrateur Enterprise",

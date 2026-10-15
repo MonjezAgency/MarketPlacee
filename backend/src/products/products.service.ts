@@ -444,11 +444,13 @@ export class ProductsService {
             ] }];
         }
 
-        // Country of origin (exact, case-insensitive). Facets below are
-        // computed WITHOUT this filter so the list of origins stays stable.
+        // Country of origin — one or more, comma-separated, each an exact
+        // case-insensitive match on the product's stored origin (not its stock
+        // location, the supplier's country or the delivery country). Facets
+        // below are computed WITHOUT this filter so the list stays stable.
         const whereNoOrigin = () => ({ ...where });
-        let originFilter: any = null;
-        if (filters?.origin) originFilter = { equals: filters.origin, mode: 'insensitive' };
+        const originList = Array.from(new Set(String(filters?.origin || '').split(',').map((o) => o.trim()).filter(Boolean))).slice(0, 30);
+        const originFilter: any = originList.length ? { OR: originList.map((o) => ({ origin: { equals: o, mode: 'insensitive' } })) } : null;
 
         // Price range
         if (filters?.minPrice || filters?.maxPrice) {
@@ -480,10 +482,10 @@ export class ProductsService {
 
         // Origins available under the current filters (minus origin itself).
         const baseWhere = whereNoOrigin();
-        if (originFilter) where.origin = originFilter;
+        if (originFilter) where.AND = [...(where.AND || []), originFilter];
         // Price bounds for the listing's range slider: computed without the
         // price filter itself so the slider keeps its full span.
-        const { price: _ignoredPrice, ...wherePriceFree } = { ...baseWhere, ...(originFilter ? { origin: originFilter } : {}) } as any;
+        const { price: _ignoredPrice, ...wherePriceFree } = { ...baseWhere, ...(originFilter ? { AND: [...(baseWhere.AND || []), originFilter] } : {}) } as any;
         const [originGroups, brandGroups, priceAgg] = await Promise.all([
             this.prisma.product.groupBy({
                 by: ['origin'],
@@ -554,10 +556,18 @@ export class ProductsService {
             facets: {
                 // Lets the storefront know it can page these filters server-side.
                 capabilities: ['brands', 'categoryAny', 'relevance'],
-                origins: originGroups
+                // "germany" and "Germany" are one origin: merged, shown with the most common spelling.
+                origins: Array.from(originGroups
                     .filter((g: any) => g.origin && String(g.origin).trim())
-                    .map((g: any) => ({ value: g.origin, count: g._count.origin }))
-                    .sort((a: any, b: any) => b.count - a.count),
+                    .reduce((m: Map<string, { value: string; count: number; best: number }>, g: any) => {
+                        const v = String(g.origin).trim(), k = v.toLowerCase(), c = g._count.origin;
+                        const e = m.get(k);
+                        if (!e) m.set(k, { value: v, count: c, best: c });
+                        else { e.count += c; if (c > e.best) { e.value = v; e.best = c; } }
+                        return m;
+                    }, new Map()).values())
+                    .map(({ value, count }: any) => ({ value, count }))
+                    .sort((a: any, b: any) => b.count - a.count || a.value.localeCompare(b.value)),
                 priceRange: priceAgg && priceAgg._min.price != null && priceAgg._max.price != null
                     ? { min: priceAgg._min.price, max: priceAgg._max.price }
                     : null,

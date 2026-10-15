@@ -30,6 +30,8 @@ import { brandLogo } from '@/lib/brand-logos';
 import { computeCardPrice } from '@/lib/card-pricing';
 import TargetPriceDialog from '@/components/product/TargetPriceDialog';
 import PriceHistorySection from '@/components/product/PriceHistorySection';
+import RatingSummary from '@/components/product/RatingSummary';
+import OfferComparison from '@/components/product/OfferComparison';
 import { round2, minUnitsFor as serverMinUnits, type LoadKind } from '@/lib/wholesale';
 import MixBuilder from '@/components/product/MixBuilder';
 import MixDiscovery from '@/components/product/MixDiscovery';
@@ -644,11 +646,12 @@ export default function ProductDetailClient() {
     const mPallet = isSupplierOwner ? 1 : markups.pallet;
     const mCase = isSupplierOwner ? 1 : markups.piece;
     type PackKey = 'truck' | 'pallet' | 'carton';
-    const packOptions: Array<{ key: PackKey; label: string; perCasePrice: number; casesInUnit: number; contents: string }> = [];
-    if (piecesPerCase > 0) packOptions.push({ key: 'carton', label: 'Case', perCasePrice: round2(basePerCase * mCase), casesInUnit: 1, contents: `${piecesPerCase.toLocaleString()} units per case` });
-    if (piecesPerCase > 0 && casesPerPallet > 0) packOptions.push({ key: 'pallet', label: 'Pallet', perCasePrice: round2(basePerCase * mPallet), casesInUnit: casesPerPallet, contents: `${casesPerPallet.toLocaleString()} cases · ${(casesPerPallet * piecesPerCase).toLocaleString()} units` });
-    if (piecesPerCase > 0 && casesPerPallet > 0 && palletsPerTruck > 0) packOptions.push({ key: 'truck', label: 'Truckload', perCasePrice: round2(basePerCase * mTruck), casesInUnit: casesPerPallet * palletsPerTruck, contents: `${palletsPerTruck.toLocaleString()} pallets · ${(casesPerPallet * palletsPerTruck).toLocaleString()} cases` });
-    if (packOptions.length === 0) packOptions.push({ key: 'carton', label: product.unit || 'Case', perCasePrice: product.price, casesInUnit: 1, contents: 'Pack size not specified' });
+    // rawPerCase is kept unrounded so an offer discount is applied before the single rounding, as on the server.
+    const packOptions: Array<{ key: PackKey; label: string; perCasePrice: number; rawPerCase: number; casesInUnit: number; contents: string }> = [];
+    if (piecesPerCase > 0) packOptions.push({ key: 'carton', label: 'Case', perCasePrice: round2(basePerCase * mCase), rawPerCase: basePerCase * mCase, casesInUnit: 1, contents: `${piecesPerCase.toLocaleString()} units per case` });
+    if (piecesPerCase > 0 && casesPerPallet > 0) packOptions.push({ key: 'pallet', label: 'Pallet', perCasePrice: round2(basePerCase * mPallet), rawPerCase: basePerCase * mPallet, casesInUnit: casesPerPallet, contents: `${casesPerPallet.toLocaleString()} cases · ${(casesPerPallet * piecesPerCase).toLocaleString()} units` });
+    if (piecesPerCase > 0 && casesPerPallet > 0 && palletsPerTruck > 0) packOptions.push({ key: 'truck', label: 'Truckload', perCasePrice: round2(basePerCase * mTruck), rawPerCase: basePerCase * mTruck, casesInUnit: casesPerPallet * palletsPerTruck, contents: `${palletsPerTruck.toLocaleString()} pallets · ${(casesPerPallet * palletsPerTruck).toLocaleString()} cases` });
+    if (packOptions.length === 0) packOptions.push({ key: 'carton', label: product.unit || 'Case', perCasePrice: product.price, rawPerCase: product.price, casesInUnit: 1, contents: 'Pack size not specified' });
 
     const initialPack = packOptions.find((o) => o.key === adminDefaultUnit)?.key ?? packOptions[packOptions.length - 1].key;
     if (selectedUnit === undefined) setTimeout(() => setSelectedUnit(initialPack), 0);
@@ -665,7 +668,8 @@ export default function ProductDetailClient() {
     const activeOffer = (product as any).activeOffer as { discountPercent?: number; variantDiscounts?: Record<string, number>; validUntil?: string | null } | undefined;
     const offerPct = Math.max(0, Math.min(100, Number(activeOffer ? ((activeOffer.variantDiscounts && offerVariantKey ? activeOffer.variantDiscounts[offerVariantKey] : undefined) ?? activeOffer.discountPercent ?? 0) : 0)));
     const listPerCase = activePack.perCasePrice;
-    const perCasePrice = offerPct > 0 ? +(listPerCase * (1 - offerPct / 100)).toFixed(2) : listPerCase;
+    // Same rule as the server (orders/pricing.ts): the approved offer % comes off the tier price, rounded once.
+    const perCasePrice = offerPct > 0 && offerPct <= 90 ? round2(activePack.rawPerCase * (1 - offerPct / 100)) : listPerCase;
     const perPackPrice = round2(perCasePrice * activePack.casesInUnit);
     const subtotal = round2(perPackPrice * quantity);
     const perPiece = piecesPerCase > 0 ? perCasePrice / piecesPerCase : null;
@@ -1386,11 +1390,18 @@ export default function ProductDetailClient() {
                     </div>
                 </section>
 
-                {/* ── Price history (listed price, signed-in buyers) ───────── */}
-                <PriceHistorySection productId={product.id} isLoggedIn={isLoggedIn} />
+                {/* ── Other offers for the same barcode (renders only when they exist) ── */}
+                <OfferComparison productId={product.id} />
 
-                {/* ── Reviews (always visible, below the details) ─────────── */}
-                <div id="pdp-reviews" className="mt-2 pt-8 border-t border-line scroll-mt-[112px]">
+                {/* ── Price intelligence: listed-price history beside the rating summary ── */}
+                <div className="mt-2 pt-8 border-t border-line grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] items-start">
+                    <PriceHistorySection productId={product.id} isLoggedIn={isLoggedIn}
+                        currentOffer={offerPct > 0 && showPrices ? (() => { const c = packOptions.find((o) => o.key === 'carton'); return c ? { percent: offerPct, casePrice: round2(c.rawPerCase * (1 - offerPct / 100)) } : null; })() : null} />
+                    <RatingSummary productId={product.id} refreshKey={`${localReviewsCount}-${localRating}`} onWrite={goToReviews} />
+                </div>
+
+                {/* ── Reviews: the full list, right below the summary ─────────── */}
+                <div id="pdp-reviews" className="mt-8 pt-8 border-t border-line scroll-mt-[112px]">
                     <ReviewSection
                         productId={product.id}
                         onReviewSubmitted={(newRating, newCount) => { setLocalRating(newRating); setLocalReviewsCount(newCount); }}

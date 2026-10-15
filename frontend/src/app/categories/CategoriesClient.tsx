@@ -58,7 +58,7 @@ function useListingParams() {
         dept: sp.get('dept') || '',
         categories: list('category'),
         brands: list('brand'),
-        origin: sp.get('origin') || '',
+        origins: list('origin'),
         listed: (LISTED.some((l) => l.id === sp.get('listed')) ? sp.get('listed') : '') as ListedId,
         min: sp.get('min') || '',
         max: sp.get('max') || '',
@@ -209,7 +209,7 @@ function CategoriesContent() {
             if (p.min) minEUR = String(convertToBase(Number(p.min), currency));
             if (p.max) maxEUR = String(convertToBase(Number(p.max), currency));
         } catch { /* no rate → effective currency is EUR already */ }
-        const base = { q: p.q || undefined, minPrice: minEUR, maxPrice: maxEUR, sort: sortApi, origin: p.origin || undefined, listed: p.listed || undefined };
+        const base = { q: p.q || undefined, minPrice: minEUR, maxPrice: maxEUR, sort: sortApi, origin: p.origins.length ? p.origins.join(',') : undefined, listed: p.listed || undefined };
 
         // Department and multi-brand filters are paged server-side when the
         // backend supports them (facets.capabilities). Older backends ignore
@@ -310,11 +310,11 @@ function CategoriesContent() {
         ...p.categories.map((c) => ({ label: c, clear: () => setParams({ category: p.categories.filter((x) => x !== c) }) })),
         ...p.brands.map((b) => ({ label: b, clear: () => setParams({ brand: p.brands.filter((x) => x !== b) }) })),
         ...(p.listed ? [{ label: `Listed: ${LISTED.find((l) => l.id === p.listed)!.label.toLowerCase()}`, clear: () => setParams({ listed: '' }) }] : []),
-        ...(p.origin ? [{ label: `Origin: ${p.origin}`, clear: () => setParams({ origin: '' }) }] : []),
+        ...p.origins.map((o) => ({ label: `Origin: ${o}`, clear: () => setParams({ origin: p.origins.filter((x) => x !== o) }) })),
         ...(p.min || p.max ? [{ label: `${p.min ? `${symbol}${p.min}` : 'Any'} – ${p.max ? `${symbol}${p.max}` : 'Any'}`, clear: () => setParams({ min: '', max: '' }) }] : []),
     ];
     // Clears filters only — the chosen sort and page size are view settings and stay.
-    const resetAll = () => setParams({ q: '', dept: '', category: [], brand: [], origin: '', listed: '', min: '', max: '' });
+    const resetAll = () => setParams({ q: '', dept: '', category: [], brand: [], origin: [], listed: '', min: '', max: '' });
 
     // CSV export of the current view (same per-case price as the cards).
     const [exporting, setExporting] = React.useState(false);
@@ -432,14 +432,17 @@ function CategoriesContent() {
                             {origins.map((o) => (
                                 <label key={o.value} className="flex items-center justify-between gap-2 px-1.5 py-1.5 rounded-lg hover:bg-surface-2 cursor-pointer">
                                     <span className="flex items-center gap-2.5">
-                                        <input type="radio" name="origin" checked={p.origin.toLowerCase() === o.value.toLowerCase()} onChange={() => setParams({ origin: o.value })} className="w-4 h-4 accent-[#0B1F3A]" />
+                                        <input type="checkbox" checked={p.origins.some((x) => x.toLowerCase() === o.value.toLowerCase())}
+                                            onChange={(e) => setParams({ origin: e.target.checked ? [...p.origins, o.value] : p.origins.filter((x) => x.toLowerCase() !== o.value.toLowerCase()) })}
+                                            className="w-4 h-4 rounded accent-[#0B1F3A]" />
                                         <span className="text-[14px] text-ink-2">{o.value}</span>
                                     </span>
                                     <span className="text-[12px] text-ink-4 tabular-nums">{o.count}</span>
                                 </label>
                             ))}
                         </div>
-                        {p.origin && <button type="button" onClick={() => setParams({ origin: '' })} className="mt-2 text-[13px] font-semibold text-teal">Any origin</button>}
+                        <p className="mt-2 text-[12px] text-ink-4">Where the product was made — not where it ships from.</p>
+                        {p.origins.length > 0 && <button type="button" onClick={() => setParams({ origin: [] })} className="mt-1 text-[13px] font-semibold text-teal">Any origin</button>}
                     </Section>
                 )}
             </div>
