@@ -50,8 +50,6 @@ function Warehouses() {
     React.useEffect(() => { load(); }, [load]);
 
     const hubs = data?.hubs ?? [];
-    const europe = hubs.filter((h) => h.region === 'europe');
-    const americas = hubs.filter((h) => h.region === 'americas');
         const hub = hubs.find((h) => h.id === selected) || null;
     const onSelect = React.useCallback((id: string | null) => setSelected(id), []);
     const loading = !data && !error;
@@ -60,13 +58,6 @@ function Warehouses() {
         ...(preview ? PREVIEW_POINTS : []),
     ];
     const previewPoint = preview ? PREVIEW_POINTS.find((p) => p.id === selected) || null : null;
-    const regionCard = (key: 'americas' | 'europe', title: string, list: PublicHub[]) => (
-        <button type="button" onClick={() => setFocus((f) => (f === key ? 'all' : key))} aria-pressed={focus === key}
-            className={cn('pointer-events-auto rounded-2xl bg-surface/90 backdrop-blur px-4 py-3 text-start ring-1 shadow-card transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]', focus === key ? 'ring-heading' : 'ring-line hover:ring-line-strong')}>
-            <span className="block text-[15px] font-semibold text-heading">{title}</span>
-            <span className="block text-small text-ink-3">{loading ? 'Loading…' : list.length ? `${list.length} verified hub${list.length === 1 ? '' : 's'}` : 'No verified hub yet'}</span>
-        </button>
-    );
 
     return (
         <main className="min-h-screen bg-surface text-start">
@@ -90,34 +81,33 @@ function Warehouses() {
                     <SectionHeader id="maps-title" eyebrow="Hub map" title="North America and Europe, one map" lead="Tinted countries are Atlantis’s target markets — where we work with buyers and suppliers — not places where we have warehouses. Hubs appear as markers only once verified." />
                     {preview && <p className="mt-6"><PreviewBadge /></p>}
 
-                    <Reveal className="mt-8 sm:mt-10">
-                        <div className="relative rounded-3xl ring-1 ring-line overflow-hidden bg-surface">
-                            <AtlanticMap points={points} routes={preview ? PREVIEW_ROUTES : []} focus={focus} selected={selected} onSelect={onSelect} loading={loading} failed={error} />
-                            {/* Region cards: North America on the left, Europe on the right */}
-                            <div className="pointer-events-none absolute inset-x-5 top-5 hidden sm:flex justify-between gap-3">
-                                {regionCard('americas', 'North America', americas)}
-                                {regionCard('europe', 'Europe & UK', europe)}
-                            </div>
-                            {!loading && !error && hubs.length === 0 && !preview && (
-                                <p className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden sm:block max-w-[16rem] rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-card px-4 py-3 text-center text-small text-ink-2">
-                                    <span className="block text-[14px] font-semibold text-heading">No verified hubs yet</span>
-                                    Verified Atlantis hubs will appear here once confirmed.
-                                </p>
-                            )}
-                            {/* Focus tabs */}
-                            <div className="sm:absolute sm:inset-x-0 sm:bottom-5 flex justify-center px-3 py-3 sm:p-0 border-t border-line sm:border-0">
-                                <div role="tablist" aria-label="Map view" className="inline-flex rounded-full bg-surface/90 backdrop-blur ring-1 ring-line shadow-card p-1">
-                                    {FOCUS_TABS.map((t) => (
-                                        <button key={t.key} role="tab" type="button" aria-selected={focus === t.key} onClick={() => setFocus(t.key)}
-                                            className={cn('h-9 px-3 sm:px-4 rounded-full text-[13px] sm:text-[14px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]', focus === t.key ? 'bg-heading text-white' : 'text-ink-2 hover:text-heading')}>
-                                            <span className="hidden sm:inline">{t.label}</span><span className="sm:hidden whitespace-nowrap">{t.short}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
+                </Container>
+
+                {/* Full-width map — no frame, edges fade into the page */}
+                <Reveal className="relative mt-8 sm:mt-10 w-full">
+                    <div className="relative" style={{ maskImage: 'linear-gradient(to bottom, transparent 0, #000 6%, #000 94%, transparent 100%)', WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 6%, #000 94%, transparent 100%)' }}>
+                        <AtlanticMap points={points} routes={preview ? PREVIEW_ROUTES : []} focus={focus} selected={selected} onSelect={onSelect} loading={loading} failed={error} />
+                    </div>
+                    {!loading && !error && hubs.length === 0 && !preview && (
+                        <p className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden sm:block max-w-[16rem] rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-card px-4 py-3 text-center text-small text-ink-2">
+                            <span className="block text-[14px] font-semibold text-heading">No verified hubs yet</span>
+                            Verified Atlantis hubs will appear here once confirmed.
+                        </p>
+                    )}
+                    {/* Focus tabs */}
+                    <div className="sm:absolute sm:inset-x-0 sm:bottom-8 flex justify-center px-3 pt-3 sm:p-0">
+                        <div role="tablist" aria-label="Map view" className="inline-flex rounded-full bg-surface/90 backdrop-blur ring-1 ring-line shadow-card p-1">
+                            {FOCUS_TABS.map((t) => (
+                                <button key={t.key} role="tab" type="button" aria-selected={focus === t.key} onClick={() => setFocus(t.key)}
+                                    className={cn('h-9 px-3 sm:px-4 rounded-full text-[13px] sm:text-[14px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]', focus === t.key ? 'bg-heading text-white' : 'text-ink-2 hover:text-heading')}>
+                                    <span className="hidden sm:inline">{t.label}</span><span className="sm:hidden whitespace-nowrap">{t.short}</span>
+                                </button>
+                            ))}
                         </div>
-                        <p className="sm:hidden mt-3 text-small text-ink-3">North America: {loading ? '…' : americas.length ? `${americas.length} verified hub${americas.length === 1 ? '' : 's'}` : 'no verified hub yet'} · Europe & UK: {loading ? '…' : europe.length ? `${europe.length} verified hub${europe.length === 1 ? '' : 's'}` : 'no verified hub yet'}</p>
-                    </Reveal>
+                    </div>
+                </Reveal>
+
+                <Container>
 
                     <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_minmax(0,22rem)] items-start">
                         <ul aria-label="Map key" className="flex flex-wrap gap-x-6 gap-y-2 text-small text-ink-2">
