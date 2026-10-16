@@ -13,11 +13,15 @@ if (typeof window !== 'undefined') {
  * company's real pages; a profile without a URL is simply not shown (the
  * previously hard-coded links pointed to pages that don't exist).
  */
-export const SOCIAL_LINKS: { id: 'facebook' | 'instagram' | 'linkedin'; label: string; url: string | null }[] = [
-    { id: 'linkedin', label: 'LinkedIn', url: process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN || null },
-    { id: 'facebook', label: 'Facebook', url: process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK || null },
-    { id: 'instagram', label: 'Instagram', url: process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM || null },
+export const SOCIAL_LINKS: { id: 'facebook' | 'instagram' | 'linkedin' | 'x'; label: string; envVar: string; url: string | null }[] = [
+    { id: 'facebook', label: 'Facebook', envVar: 'NEXT_PUBLIC_SOCIAL_FACEBOOK', url: process.env.NEXT_PUBLIC_SOCIAL_FACEBOOK || null },
+    { id: 'linkedin', label: 'LinkedIn', envVar: 'NEXT_PUBLIC_SOCIAL_LINKEDIN', url: process.env.NEXT_PUBLIC_SOCIAL_LINKEDIN || null },
+    { id: 'instagram', label: 'Instagram', envVar: 'NEXT_PUBLIC_SOCIAL_INSTAGRAM', url: process.env.NEXT_PUBLIC_SOCIAL_INSTAGRAM || null },
+    { id: 'x', label: 'X', envVar: 'NEXT_PUBLIC_SOCIAL_X', url: process.env.NEXT_PUBLIC_SOCIAL_X || null },
 ];
+
+/** The verified company contact address (also used on /contact and in emails). */
+export const CONTACT_EMAIL = 'Info@atlantisfmcg.com';
 
 /**
  * Indicative arrival text for the cart (e.g. "approximately 1 week"). Not a

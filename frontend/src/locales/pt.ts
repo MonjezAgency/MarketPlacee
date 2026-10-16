@@ -247,6 +247,7 @@ export const pt: Messages = {
         trustReviewed: "Cada anúncio é analisado pela Atlantis antes de ser publicado",
         trustLoads: "Encomendas à caixa, à palete, ao camião completo e em carga mista",
         trustDelivery: "Entrega nos países abrangidos, com orçamento por encomenda",
+        emailAria: "Escreva à Atlantis para {email} (abre a sua aplicação de e-mail)",
         socialAria: "Atlantis nas redes sociais",
         socialLink: "Atlantis no {network} (abre num novo separador)",
         legalAria: "Informação legal"
@@ -758,7 +759,7 @@ export const pt: Messages = {
         homeAria: "Página inicial da Atlantis",
         marketplaceAria: "Mercado",
         newOffers: "Novas ofertas",
-        targets: "Preços-alvo",
+        targets: "Alvos",
         requests: "Pedidos",
         badgeNew: "Novo",
         all: "Todos",

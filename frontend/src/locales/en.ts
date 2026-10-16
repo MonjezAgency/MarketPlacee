@@ -245,6 +245,7 @@ export const en = {
         trustReviewed: "Every listing is reviewed by Atlantis before it goes live",
         trustLoads: "Case, pallet, truckload and mixed-load ordering",
         trustDelivery: "Delivery to supported countries, quoted per order",
+        emailAria: "Email Atlantis at {email} (opens your email app)",
         socialAria: "Atlantis on social media",
         socialLink: "Atlantis on {network} (opens in a new tab)",
         legalAria: "Legal"

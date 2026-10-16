@@ -247,6 +247,7 @@ export const fr: Messages = {
         trustReviewed: "Chaque annonce est vérifiée par Atlantis avant sa mise en ligne",
         trustLoads: "Commande au carton, à la palette, au camion complet et en chargement mixte",
         trustDelivery: "Livraison vers les pays desservis, sur devis pour chaque commande",
+        emailAria: "Écrire à Atlantis à {email} (ouvre votre messagerie)",
         socialAria: "Atlantis sur les réseaux sociaux",
         socialLink: "Atlantis sur {network} (s’ouvre dans un nouvel onglet)",
         legalAria: "Mentions légales"
@@ -758,7 +759,7 @@ export const fr: Messages = {
         homeAria: "Accueil Atlantis",
         marketplaceAria: "Place de marché",
         newOffers: "Nouvelles offres",
-        targets: "Prix cibles",
+        targets: "Cibles",
         requests: "Demandes",
         badgeNew: "Nouveau",
         all: "Tout",

@@ -1,138 +1,117 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Package, BarChart3, ShieldCheck, Zap, Globe, Tag, CheckCircle2 } from 'lucide-react';
+import { ArrowRight, Boxes, ChevronRight, ClipboardCheck, Layers, Package, Search, Truck } from 'lucide-react';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { DEPARTMENTS } from '@/lib/departments';
 
-const BENEFITS = [
-    { icon: Package, title: 'Tiered Bulk Pricing', desc: 'Every product in the Atlantis catalog offers quantity-based pricing tiers. The more you order, the lower your unit cost — automatically applied at checkout.', color: 'text-primary bg-primary/10' },
-    { icon: ShieldCheck, title: 'Curated by Atlantis', desc: 'Every product is sourced and quality-checked by the Atlantis team before listing. Buy in bulk with confidence.', color: 'text-emerald-500 bg-emerald-500/10' },
-    { icon: Globe, title: 'Europe & Gulf Distribution', desc: 'FMCG, beverages, personal care and more — sold and shipped by Atlantis across Europe and the Gulf, all in one place.', color: 'text-blue-500 bg-blue-500/10' },
-    { icon: ShieldCheck, title: 'Confirmed Before You Pay', desc: 'Every order is confirmed by the supplier and approved by Atlantis before payment details are sent. Changes need your acceptance.', color: 'text-purple-500 bg-purple-500/10' },
-    { icon: BarChart3, title: 'Financial Reporting', desc: 'Download invoices automatically for every order. Full purchase history with exportable records for your accounting team.', color: 'text-teal bg-teal-soft' },
-    { icon: Zap, title: 'Fast Reordering', desc: 'Repeat your most common orders with a single click from your order history. Build a long-term wholesale relationship with Atlantis.', color: 'text-amber-500 bg-amber-500/10' },
-];
+/**
+ * /wholesale — the "Source wholesale at B2B prices" landing page (footer:
+ * "Pallets, trucks & mixed loads"; in the sitemap). It explains how volumes
+ * work on Atlantis and sends buyers into the real catalog. Every statement
+ * matches what the platform does (see CLAUDE.md product rules): no invented
+ * price tiers, discounts or guarantees.
+ */
+export default function WholesaleClient() {
+    const { t } = useLanguage();
+    const tw = (k: string) => t('wholesalePage', k);
 
-const CATEGORIES = [
-    'FMCG & Consumer Goods',
-    'Beverages & Soft Drinks',
-    'Personal Care & Beauty',
-    'Health & Nutrition',
-    'Household Products',
-    'Food & Grocery',
-];
+    const volumes = [
+        { icon: Package, title: tw('caseTitle'), desc: tw('caseDesc') },
+        { icon: Boxes, title: tw('palletTitle'), desc: tw('palletDesc') },
+        { icon: Truck, title: tw('truckTitle'), desc: tw('truckDesc') },
+    ];
+    const steps = ['step1', 'step2', 'step3', 'step4'];
 
-export default function WholesalePage() {
     return (
-        <main className="min-h-screen bg-background">
-            <div className="container mx-auto px-6 py-16 max-w-5xl">
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                    <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
-                        <ArrowLeft size={16} /> Back to Home
-                    </Link>
-
-                    {/* Hero */}
-                    <div className="mb-20">
-                        <div className="flex items-center gap-3 mb-6">
-                            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                                <Tag size={18} className="text-primary" />
-                            </div>
-                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Bulk & Wholesale</p>
-                        </div>
-                        <h1 className="text-4xl md:text-5xl font-black leading-tight mb-6">
-                            Source Wholesale at<br />
-                            <span className="text-primary">B2B Prices</span>
-                        </h1>
-                        <p className="text-lg text-muted-foreground leading-relaxed max-w-2xl mb-8">
-                            Atlantis is purpose-built for B2B wholesale sourcing. Browse thousands of FMCG and consumer goods products with quantity-based pricing, minimum order quantities, and supplier-confirmed orders — all sold and shipped directly by Atlantis.
+        <main className="min-h-screen bg-surface text-start" data-no-translate>
+            <section className="border-b border-line">
+                <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-4 pb-12 sm:pb-16">
+                    <nav aria-label={tw('breadcrumbAria')} className="flex items-center gap-1.5 text-[13px] text-ink-3">
+                        <Link href="/" className="hover:text-heading">{tw('home')}</Link>
+                        <ChevronRight size={13} className="rtl:rotate-180" />
+                        <span className="text-ink font-medium">{tw('crumb')}</span>
+                    </nav>
+                    <div className="mt-10 max-w-3xl">
+                        <p className="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-teal-soft text-[12px] font-semibold text-teal">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6]" /> {tw('eyebrow')}
                         </p>
-                        <div className="flex items-center gap-4 flex-wrap">
-                            <Link href="/auth/register" className="h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors flex items-center gap-2 text-sm">
-                                Create Free Buyer Account <ArrowRight size={16} />
+                        <h1 className="font-sans mt-4 text-[32px] sm:text-[42px] font-bold tracking-tight text-heading leading-[1.1]">{tw('title')}</h1>
+                        <p className="mt-4 text-[16px] sm:text-[17px] text-ink-2 leading-relaxed">{tw('lead')}</p>
+                        <div className="mt-7 flex flex-wrap gap-3">
+                            <Link href="/categories" className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14px] font-semibold transition-colors">
+                                {tw('browse')} <ArrowRight size={16} className="rtl:rotate-180" />
                             </Link>
-                            <Link href="/categories" className="h-12 px-10 border border-border bg-card font-black rounded-2xl hover:bg-muted transition-colors text-sm">
-                                Browse Products
+                            <Link href="/auth/register?role=CUSTOMER" className="inline-flex items-center h-11 px-5 rounded-xl bg-surface ring-1 ring-line hover:ring-ink text-heading text-[14px] font-semibold transition-colors">
+                                {tw('register')}
                             </Link>
                         </div>
                     </div>
+                </div>
+            </section>
 
-                    {/* Categories */}
-                    <section className="mb-20">
-                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Product Categories</p>
-                        <h2 className="text-3xl font-black mb-8">What You Can Source</h2>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                            {CATEGORIES.map((cat) => (
-                                <Link key={cat} href="/categories" className="flex items-center gap-3 p-4 bg-card border border-border/50 rounded-xl hover:border-primary/50 transition-colors">
-                                    <CheckCircle2 size={16} className="text-primary shrink-0" />
-                                    <span className="text-sm font-bold">{cat}</span>
-                                </Link>
-                            ))}
+            <section aria-labelledby="ws-volumes" className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16">
+                <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-teal">{tw('volumesEyebrow')}</p>
+                <h2 id="ws-volumes" className="font-sans mt-2 text-[24px] sm:text-[28px] font-bold tracking-tight text-heading">{tw('volumesTitle')}</h2>
+                <p className="mt-2 text-[15px] text-ink-2 max-w-2xl leading-relaxed">{tw('volumesLead')}</p>
+                <div className="mt-8 grid gap-4 md:grid-cols-3">
+                    {volumes.map((v) => (
+                        <div key={v.title} className="rounded-2xl bg-surface ring-1 ring-line p-5">
+                            <span className="w-10 h-10 rounded-xl bg-teal-soft text-teal flex items-center justify-center"><v.icon size={19} /></span>
+                            <h3 className="font-sans mt-4 text-[16px] font-bold text-heading">{v.title}</h3>
+                            <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed">{v.desc}</p>
                         </div>
-                    </section>
+                    ))}
+                </div>
+                <div className="mt-4 rounded-2xl bg-surface-2 ring-1 ring-line p-5 flex gap-4 items-start">
+                    <span className="w-10 h-10 shrink-0 rounded-xl bg-surface ring-1 ring-line text-teal flex items-center justify-center"><Layers size={19} /></span>
+                    <div>
+                        <h3 className="font-sans text-[16px] font-bold text-heading">{tw('mixedTitle')}</h3>
+                        <p className="mt-1.5 text-[14px] text-ink-2 leading-relaxed max-w-3xl">{tw('mixedDesc')}</p>
+                    </div>
+                </div>
+            </section>
 
-                    {/* Benefits */}
-                    <section className="mb-20">
-                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Why Atlantis for Wholesale</p>
-                        <h2 className="text-3xl font-black mb-10">Built for Bulk Buyers</h2>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-                            {BENEFITS.map((b) => {
-                                const Icon = b.icon;
-                                return (
-                                    <div key={b.title} className="p-6 bg-card border border-border/50 rounded-2xl hover:border-primary/30 transition-colors">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${b.color}`}>
-                                            <Icon size={18} />
-                                        </div>
-                                        <h3 className="font-black mb-2 text-sm">{b.title}</h3>
-                                        <p className="text-xs text-muted-foreground leading-relaxed">{b.desc}</p>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </section>
+            <section aria-labelledby="ws-order" className="bg-surface-2 border-y border-line">
+                <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16">
+                    <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-teal">{tw('orderEyebrow')}</p>
+                    <h2 id="ws-order" className="font-sans mt-2 text-[24px] sm:text-[28px] font-bold tracking-tight text-heading">{tw('orderTitle')}</h2>
+                    <ol className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                        {steps.map((s, i) => (
+                            <li key={s} className="rounded-2xl bg-surface ring-1 ring-line p-5">
+                                <span className="w-8 h-8 rounded-full bg-cta text-cta-fg text-[13px] font-bold flex items-center justify-center tabular-nums">{i + 1}</span>
+                                <h3 className="font-sans mt-4 text-[15px] font-bold text-heading">{tw(`${s}Title`)}</h3>
+                                <p className="mt-1.5 text-[13.5px] text-ink-2 leading-relaxed">{tw(`${s}Desc`)}</p>
+                            </li>
+                        ))}
+                    </ol>
+                    <p className="mt-5 text-[13px] text-ink-3 flex items-center gap-2"><ClipboardCheck size={15} className="text-teal shrink-0" /> <span>{tw('orderNote')} <Link href="/how-it-works" className="font-medium text-teal hover:underline">{tw('howLink')}</Link></span></p>
+                </div>
+            </section>
 
-                    {/* How Tiered Pricing Works */}
-                    <section className="mb-20 bg-card border border-border/50 rounded-3xl p-10">
-                        <p className="text-xs font-black uppercase tracking-widest text-muted-foreground mb-4">Example</p>
-                        <h2 className="text-2xl font-black mb-8">How Bulk Pricing Tiers Work</h2>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b border-border/50">
-                                        <th className="text-left py-3 pr-6 font-bold text-foreground/80">Order Quantity</th>
-                                        <th className="text-left py-3 pr-6 font-bold text-foreground/80">Unit Price</th>
-                                        <th className="text-left py-3 font-bold text-foreground/80">You Save</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {[
-                                        { qty: '10 – 49 pcs (MOQ)', price: '€12.50 / unit', save: 'Standard price' },
-                                        { qty: '50 – 199 pcs', price: '€10.80 / unit', save: '14% off' },
-                                        { qty: '200 – 499 pcs', price: '€9.20 / unit', save: '26% off' },
-                                        { qty: '500+ pcs', price: '€7.50 / unit', save: '40% off' },
-                                    ].map((row) => (
-                                        <tr key={row.qty} className="border-b border-border/30 last:border-0">
-                                            <td className="py-3 pr-6 font-bold">{row.qty}</td>
-                                            <td className="py-3 pr-6 text-muted-foreground">{row.price}</td>
-                                            <td className="py-3 text-emerald-500 font-bold text-xs">{row.save}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-6">Pricing tiers are set individually by each supplier. The applicable tier is automatically calculated at checkout based on your order quantity.</p>
-                    </section>
-
-                    {/* CTA */}
-                    <div className="bg-primary/5 border border-primary/20 rounded-3xl p-12 text-center space-y-6">
-                        <h2 className="text-3xl font-black">Start sourcing wholesale today</h2>
-                        <p className="text-muted-foreground max-w-md mx-auto">Create a free buyer account. No subscription fees — Atlantis is free to use for buyers.</p>
-                        <Link href="/auth/register" className="inline-flex items-center gap-2 h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors text-sm">
-                            Create Free Account <ArrowRight size={16} />
+            <section aria-labelledby="ws-cats" className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 py-14 sm:py-16">
+                <h2 id="ws-cats" className="font-sans text-[24px] sm:text-[28px] font-bold tracking-tight text-heading">{tw('catsTitle')}</h2>
+                <div className="mt-6 flex flex-wrap gap-2">
+                    {DEPARTMENTS.map((d) => (
+                        <Link key={d.slug} href={`/categories?dept=${d.slug}`} className="h-10 px-4 inline-flex items-center rounded-full bg-surface ring-1 ring-line hover:ring-ink text-[14px] font-medium text-ink-2 hover:text-ink transition-colors">
+                            {t('departments', d.slug) || d.label}
                         </Link>
-                        <p className="text-xs text-muted-foreground">Are you a supplier? <Link href="/auth/register" className="text-primary hover:underline font-bold">Register as a supplier →</Link></p>
+                    ))}
+                </div>
+                <div className="mt-12 rounded-3xl bg-cta text-cta-fg p-7 sm:p-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                    <div className="max-w-xl">
+                        <h2 className="font-sans text-[22px] sm:text-[26px] font-bold tracking-tight">{tw('ctaTitle')}</h2>
+                        <p className="mt-2 text-[15px] opacity-80 leading-relaxed">{tw('ctaDesc')}</p>
                     </div>
-                </motion.div>
-            </div>
+                    <div className="flex flex-wrap gap-3">
+                        <Link href="/requests" className="inline-flex items-center gap-2 h-11 px-5 rounded-xl bg-surface text-heading text-[14px] font-semibold hover:bg-surface-2 transition-colors">
+                            <Search size={16} /> {tw('ctaRequest')}
+                        </Link>
+                        <Link href="/contact" className="inline-flex items-center h-11 px-5 rounded-xl ring-1 ring-white/30 text-[14px] font-semibold hover:ring-white/60 transition-colors">{tw('ctaContact')}</Link>
+                    </div>
+                </div>
+            </section>
         </main>
     );
 }

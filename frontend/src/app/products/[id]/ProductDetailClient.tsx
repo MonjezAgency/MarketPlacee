@@ -1404,19 +1404,21 @@ export default function ProductDetailClient() {
                 {/* ── Other offers for the same barcode (renders only when they exist) ── */}
                 <OfferComparison productId={product.id} />
 
-                {/* ── Price intelligence: listed-price history beside the rating summary ── */}
-                <div className="mt-2 pt-8 border-t border-line grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] items-start">
-                    <PriceHistorySection productId={product.id} isLoggedIn={isLoggedIn}
-                        currentOffer={offerPct > 0 && showPrices ? (() => { const c = packOptions.find((o) => o.key === 'carton'); return c ? { percent: offerPct, casePrice: round2(c.rawPerCase * (1 - offerPct / 100)) } : null; })() : null} />
-                    <RatingSummary productId={product.id} refreshKey={`${localReviewsCount}-${localRating}`} onWrite={goToReviews} />
+                {/* ── Reviews: rating summary beside the full list ─────────────── */}
+                <div id="pdp-reviews" className="mt-2 pt-8 border-t border-line scroll-mt-[112px] grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px] items-start">
+                    <div className="min-w-0 order-2 lg:order-1">
+                        <ReviewSection
+                            productId={product.id}
+                            onReviewSubmitted={(newRating, newCount) => { setLocalRating(newRating); setLocalReviewsCount(newCount); }}
+                        />
+                    </div>
+                    <div className="order-1 lg:order-2"><RatingSummary productId={product.id} refreshKey={`${localReviewsCount}-${localRating}`} onWrite={goToReviews} /></div>
                 </div>
 
-                {/* ── Reviews: the full list, right below the summary ─────────── */}
-                <div id="pdp-reviews" className="mt-8 pt-8 border-t border-line scroll-mt-[112px]">
-                    <ReviewSection
-                        productId={product.id}
-                        onReviewSubmitted={(newRating, newCount) => { setLocalRating(newRating); setLocalReviewsCount(newCount); }}
-                    />
+                {/* ── Price intelligence: recorded listed-price history, after details and reviews ── */}
+                <div className="mt-8 pt-8 border-t border-line">
+                    <PriceHistorySection productId={product.id} isLoggedIn={isLoggedIn}
+                        currentOffer={offerPct > 0 && showPrices ? (() => { const c = packOptions.find((o) => o.key === 'carton'); return c ? { percent: offerPct, casePrice: round2(c.rawPerCase * (1 - offerPct / 100)) } : null; })() : null} />
                 </div>
 
                 {/* ── Related products (same category, real catalog) ───────── */}

@@ -2,12 +2,22 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Facebook, Instagram, Linkedin, Mail, ShieldCheck, Boxes, Truck } from 'lucide-react';
+import { Mail } from 'lucide-react';
 import NewsletterSignup from '@/components/newsletter/NewsletterSignup';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { SOCIAL_LINKS } from '@/lib/config';
+import { CONTACT_EMAIL, SOCIAL_LINKS } from '@/lib/config';
 
-const SOCIAL_ICONS = { facebook: Facebook, instagram: Instagram, linkedin: Linkedin } as const;
+/** Brand marks drawn from the networks' own simple glyphs (24×24, currentColor). */
+const SOCIAL_ICONS: Record<'facebook' | 'instagram' | 'linkedin' | 'x', React.ReactNode> = {
+    facebook: <path d="M13.5 21v-7.5h2.5l.4-3h-2.9V8.6c0-.9.3-1.5 1.5-1.5h1.5V4.4c-.3 0-1.2-.1-2.2-.1-2.2 0-3.7 1.3-3.7 3.8v2.4H8v3h2.6V21h2.9z" />,
+    linkedin: <path d="M6.94 8.5H3.56V20h3.38V8.5zM5.25 3a1.97 1.97 0 1 0 0 3.94 1.97 1.97 0 0 0 0-3.94zM20.44 13.45c0-3.08-1.64-4.52-3.84-4.52-1.77 0-2.56.98-3 1.66V8.5h-3.38c.05.96 0 11.5 0 11.5h3.38v-6.42c0-.34.02-.69.13-.93.27-.69.89-1.4 1.94-1.4 1.37 0 1.92 1.05 1.92 2.58V20h3.38l-.53-6.55z" />,
+    instagram: <><rect x="3.5" y="3.5" width="17" height="17" rx="5" fill="none" stroke="currentColor" strokeWidth="1.8" /><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" strokeWidth="1.8" /><circle cx="17.3" cy="6.7" r="1.1" /></>,
+    x: <path d="M17.75 3h3.05l-6.67 7.62L22 21h-6.15l-4.81-6.3L5.53 21H2.47l7.13-8.15L2 3h6.3l4.35 5.75L17.75 3zm-1.07 16.17h1.69L7.4 4.73H5.58l11.1 14.44z" />,
+};
+
+/** Footer link: an accent line draws in under the text from the reading start (left in LTR, right in RTL). */
+const footerLink = 'relative inline-block py-0.5 text-ink-2 hover:text-ink focus-visible:text-ink transition-colors outline-none rounded-sm focus-visible:ring-2 focus-visible:ring-[#2EC4B6] focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2 after:absolute after:start-0 after:bottom-0 after:h-[1.5px] after:w-full after:rounded-full after:bg-[#2EC4B6] after:scale-x-0 after:origin-left rtl:after:origin-right after:transition-transform after:duration-300 after:ease-out hover:after:scale-x-100 focus-visible:after:scale-x-100 motion-reduce:after:transition-none';
+const iconBtn = 'w-9 h-9 rounded-full ring-1 ring-line bg-surface flex items-center justify-center text-ink-2 hover:text-teal hover:ring-[#2EC4B6] transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] focus-visible:ring-offset-2 focus-visible:ring-offset-surface-2';
 
 export default function Footer() {
     const { t, locale, meta } = useLanguage();
@@ -41,7 +51,12 @@ export default function Footer() {
             { href: '/terms', label: t('footer', 'terms') },
         ] },
     ];
+    // Only profiles configured with their real URL are shown; nothing is linked to a guessed page.
     const socials = SOCIAL_LINKS.filter((s) => s.url);
+    React.useEffect(() => {
+        const missing = SOCIAL_LINKS.filter((s) => !s.url).map((s) => s.envVar);
+        if (missing.length && process.env.NODE_ENV !== 'production') console.info(`[footer] Social profiles not configured (hidden): ${missing.join(', ')}`);
+    }, []);
 
     return (
         <footer data-no-translate className="bg-surface-2 text-ink-2 text-start border-t border-[#E6EAEE]">
@@ -65,34 +80,28 @@ export default function Footer() {
                             </span>
                         </Link>
                         <p className="mt-4 text-[14px] leading-relaxed max-w-xs">{t('footer', 'description')}</p>
-                        <ul className="mt-5 space-y-2 text-[13px] text-ink-3">
-                            <li className="flex items-center gap-2"><ShieldCheck size={15} className="text-teal shrink-0" /> {t('footer', 'trustReviewed')}</li>
-                            <li className="flex items-center gap-2"><Boxes size={15} className="text-teal shrink-0" /> {t('footer', 'trustLoads')}</li>
-                            <li className="flex items-center gap-2"><Truck size={15} className="text-teal shrink-0" /> {t('footer', 'trustDelivery')}</li>
+                        <a href={`mailto:${CONTACT_EMAIL}`} className={`${footerLink} mt-4 text-[14px] font-medium`}><bdi dir="ltr">{CONTACT_EMAIL}</bdi></a>
+                        <ul className="mt-5 flex flex-wrap items-center gap-2" aria-label={t('footer', 'socialAria')}>
+                            <li>
+                                <a href={`mailto:${CONTACT_EMAIL}`} aria-label={t('footer', 'emailAria', { email: CONTACT_EMAIL })} title={CONTACT_EMAIL} className={iconBtn}>
+                                    <Mail size={16} aria-hidden />
+                                </a>
+                            </li>
+                            {socials.map((s) => (
+                                <li key={s.id}>
+                                    <a href={s.url!} target="_blank" rel="noopener noreferrer" aria-label={t('footer', 'socialLink', { network: s.label })} title={s.label} className={iconBtn}>
+                                        <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden>{SOCIAL_ICONS[s.id]}</svg>
+                                    </a>
+                                </li>
+                            ))}
                         </ul>
-                        <a href="mailto:Info@atlantisfmcg.com" className="mt-5 inline-flex items-center gap-2 text-[14px] font-medium text-ink hover:text-teal"><Mail size={15} /> Info@atlantisfmcg.com</a>
-                        {socials.length > 0 && (
-                            <ul className="mt-4 flex items-center gap-2" aria-label={t('footer', 'socialAria')}>
-                                {socials.map((s) => {
-                                    const Icon = SOCIAL_ICONS[s.id];
-                                    return (
-                                        <li key={s.id}>
-                                            <a href={s.url!} target="_blank" rel="noopener noreferrer" aria-label={t('footer', 'socialLink', { network: s.label })}
-                                                className="w-9 h-9 rounded-full ring-1 ring-line bg-surface flex items-center justify-center text-ink-2 hover:text-teal hover:ring-teal transition-colors">
-                                                <Icon size={16} aria-hidden />
-                                            </a>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        )}
                     </div>
                     {cols.map((c) => (
                         <nav key={c.title} aria-label={c.title}>
                             <h3 className="font-sans text-[13px] font-semibold uppercase tracking-[0.12em] text-heading mb-4">{c.title}</h3>
                             <ul className="space-y-3 text-[14px]">
                                 {c.links.map((l) => (
-                                    <li key={l.href}><Link href={l.href} className="hover:text-teal transition-colors">{l.label}</Link></li>
+                                    <li key={l.href}><Link href={l.href} className={footerLink}>{l.label}</Link></li>
                                 ))}
                             </ul>
                         </nav>
@@ -106,9 +115,9 @@ export default function Footer() {
                         <span>{t('footer', 'developedBy')}</span>
                     </div>
                     <nav aria-label={t('footer', 'legalAria')} className="flex flex-wrap items-center gap-x-5 gap-y-1">
-                        <Link href="/terms" className="hover:text-teal">{t('footer', 'terms')}</Link>
-                        <Link href="/privacy-policy" className="hover:text-teal">{t('footer', 'privacy')}</Link>
-                        <Link href="/cookie-policy" className="hover:text-teal">{t('footer', 'cookies')}</Link>
+                        <Link href="/terms" className={footerLink}>{t('footer', 'terms')}</Link>
+                        <Link href="/privacy-policy" className={footerLink}>{t('footer', 'privacy')}</Link>
+                        <Link href="/cookie-policy" className={footerLink}>{t('footer', 'cookies')}</Link>
                         <span className="font-semibold text-ink-4" lang={locale}>{meta.name}</span>
                     </nav>
                 </div>

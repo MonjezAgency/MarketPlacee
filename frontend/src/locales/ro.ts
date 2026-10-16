@@ -247,6 +247,7 @@ export const ro: Messages = {
         trustReviewed: "Fiecare listare este verificată de Atlantis înainte de publicare",
         trustLoads: "Comenzi la bax, la palet, la camion complet și în încărcătură mixtă",
         trustDelivery: "Livrare în țările acoperite, cu ofertă de preț pentru fiecare comandă",
+        emailAria: "Scrieți-i Atlantis la {email} (deschide aplicația de e-mail)",
         socialAria: "Atlantis pe rețelele sociale",
         socialLink: "Atlantis pe {network} (se deschide într-o filă nouă)",
         legalAria: "Informații juridice"
@@ -758,7 +759,7 @@ export const ro: Messages = {
         homeAria: "Pagina principală Atlantis",
         marketplaceAria: "Piață online",
         newOffers: "Oferte noi",
-        targets: "Prețuri țintă",
+        targets: "Ținte",
         requests: "Cereri",
         badgeNew: "Nou",
         all: "Toate",

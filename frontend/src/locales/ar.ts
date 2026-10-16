@@ -244,6 +244,7 @@ export const ar: Messages = {
         trustReviewed: "كل منتج تراجعه أتلانتس قبل نشره",
         trustLoads: "الطلب بالكرتونة والمنصّة والشاحنة والحمولة المختلطة",
         trustDelivery: "توصيل إلى الدول المدعومة، بسعر يُحدَّد لكل طلب",
+        emailAria: "راسل أتلانتس على {email} (يفتح تطبيق البريد لديك)",
         socialAria: "أتلانتس على وسائل التواصل الاجتماعي",
         socialLink: "أتلانتس على {network} (يفتح في علامة تبويب جديدة)",
         legalAria: "قانوني"
@@ -755,7 +756,7 @@ export const ar: Messages = {
         homeAria: "الصفحة الرئيسية لأتلانتس",
         marketplaceAria: "السوق",
         newOffers: "عروض جديدة",
-        targets: "الأسعار المستهدفة",
+        targets: "طلب المشترين",
         requests: "الطلبات",
         badgeNew: "جديد",
         all: "الكل",
