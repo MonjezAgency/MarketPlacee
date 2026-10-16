@@ -2,9 +2,11 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { Warehouse, Factory, Globe2, ShieldCheck, X, MapPin } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Warehouse, Factory, Globe2, ShieldCheck, X, MapPin, Eye } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { ButtonLink, Container, CtaBand, Eyebrow, Faq, Pill, Reveal, Section, SectionHeader, TrustNav } from '@/components/ds';
-import { RegionMap } from '@/components/trust/RegionMap';
+import { AtlanticMap, PreviewBadge, type Focus, type MapPoint, type MapRoute } from '@/components/trust/AtlanticMap';
 import { HUB_SERVICE_LABEL, getPublicHubs, type PublicHub } from '@/lib/fulfillment';
 
 /**
@@ -13,6 +15,34 @@ import { HUB_SERVICE_LABEL, getPublicHubs, type PublicHub } from '@/lib/fulfillm
  * are a service area and are drawn as such, never as warehouses.
  */
 export default function WarehousesClient() {
+    return <React.Suspense fallback={null}><Warehouses /></React.Suspense>;
+}
+
+/**
+ * Design-preview samples, shown only with ?preview=1 so the map can be judged
+ * before real locations exist. Always labelled; never shown on the public page.
+ */
+const PREVIEW_POINTS: MapPoint[] = [
+    { id: 'pv-1', kind: 'preview', lng: -88, lat: 41.8, label: 'Sample location A', sub: 'Design preview' },
+    { id: 'pv-2', kind: 'preview', lng: -76.5, lat: 39.6, label: 'Sample location B', sub: 'Design preview' },
+    { id: 'pv-3', kind: 'preview', lng: -1.6, lat: 52.6, label: 'Sample location C', sub: 'Design preview' },
+    { id: 'pv-4', kind: 'preview', lng: 7.4, lat: 50.9, label: 'Sample location D', sub: 'Design preview' },
+    { id: 'pv-5', kind: 'preview', lng: 11.2, lat: 44.2, label: 'Sample supplier origin', sub: 'Design preview' },
+];
+const PREVIEW_ROUTES: MapRoute[] = [
+    { id: 'pr-1', kind: 'preview', from: [-88, 41.8], to: [-76.5, 39.6] },
+    { id: 'pr-2', kind: 'preview', from: [11.2, 44.2], to: [7.4, 50.9] },
+    { id: 'pr-3', kind: 'preview', from: [7.4, 50.9], to: [-1.6, 52.6] },
+];
+const FOCUS_TABS: { key: Focus; label: string; short: string }[] = [
+    { key: 'americas', label: 'North America', short: 'N. America' },
+    { key: 'all', label: 'Both regions', short: 'Both' },
+    { key: 'europe', label: 'Europe & UK', short: 'Europe & UK' },
+];
+
+function Warehouses() {
+    const preview = useSearchParams().get('preview') === '1';
+    const [focus, setFocus] = React.useState<Focus>('all');
     const [data, setData] = React.useState<{ hubs: PublicHub[]; deliveryCountries: { code: string; name: string }[] } | null>(null);
     const [error, setError] = React.useState(false);
     const [selected, setSelected] = React.useState<string | null>(null);
@@ -22,10 +52,21 @@ export default function WarehousesClient() {
     const hubs = data?.hubs ?? [];
     const europe = hubs.filter((h) => h.region === 'europe');
     const americas = hubs.filter((h) => h.region === 'americas');
-    const delivery = React.useMemo(() => new Set((data?.deliveryCountries ?? []).map((c) => c.code)), [data]);
-    const hub = hubs.find((h) => h.id === selected) || null;
-    const onSelect = React.useCallback((id: string) => setSelected((s) => (s === id ? null : id)), []);
+        const hub = hubs.find((h) => h.id === selected) || null;
+    const onSelect = React.useCallback((id: string | null) => setSelected(id), []);
     const loading = !data && !error;
+    const points: MapPoint[] = [
+        ...hubs.map((h) => ({ id: h.id, kind: 'hub' as const, lng: h.longitude, lat: h.latitude, label: h.name, sub: `${h.city}, ${h.countryName}` })),
+        ...(preview ? PREVIEW_POINTS : []),
+    ];
+    const previewPoint = preview ? PREVIEW_POINTS.find((p) => p.id === selected) || null : null;
+    const regionCard = (key: 'americas' | 'europe', title: string, list: PublicHub[]) => (
+        <button type="button" onClick={() => setFocus((f) => (f === key ? 'all' : key))} aria-pressed={focus === key}
+            className={cn('pointer-events-auto rounded-2xl bg-surface/90 backdrop-blur px-4 py-3 text-start ring-1 shadow-card transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]', focus === key ? 'ring-heading' : 'ring-line hover:ring-line-strong')}>
+            <span className="block text-[15px] font-semibold text-heading">{title}</span>
+            <span className="block text-small text-ink-3">{loading ? 'Loading…' : list.length ? `${list.length} verified hub${list.length === 1 ? '' : 's'}` : 'No verified hub yet'}</span>
+        </button>
+    );
 
     return (
         <main className="min-h-screen bg-surface text-start">
@@ -35,7 +76,7 @@ export default function WarehousesClient() {
                     <Reveal hero>
                         <Eyebrow pill>Warehouses</Eyebrow>
                         <h1 className="mt-6 font-sans text-display-sm sm:text-display text-heading">Where Atlantis handles your goods</h1>
-                        <p className="mt-5 text-body sm:text-lead text-ink-2">Verified Atlantis hubs in Europe and the Americas — where goods can be received, consolidated or inspected before they reach you. A location appears only once Atlantis has verified it.</p>
+                        <p className="mt-5 text-body sm:text-lead text-ink-2">Atlantis works with FMCG buyers and suppliers across Europe, the UK and North America. Verified Atlantis hubs — where goods can be received, consolidated or inspected — appear here only once confirmed.</p>
                         <div className="mt-8 flex flex-wrap justify-center gap-3">
                             <ButtonLink href="#hub-maps" arrow={false}>See the maps</ButtonLink>
                             <ButtonLink href="/contact" variant="secondary">Ask about a lane</ButtonLink>
@@ -46,21 +87,56 @@ export default function WarehousesClient() {
 
             <Section id="hub-maps" labelledBy="maps-title">
                 <Container>
-                    <SectionHeader id="maps-title" eyebrow="Hub map" title="Two regions, one standard" lead="Select a hub to see its address and services. Tinted countries are places Atlantis delivers to — a service area, not a warehouse." />
-                    <div className="mt-10 sm:mt-12 grid gap-8 lg:gap-6 lg:grid-cols-[1.39fr_1fr]">
-                        <Reveal><RegionMap region="europe" hubs={europe} deliveryCodes={delivery} selected={selected} onSelect={onSelect} loading={loading} /></Reveal>
-                        <Reveal delay={0.08}><RegionMap region="americas" hubs={americas} deliveryCodes={delivery} selected={selected} onSelect={onSelect} loading={loading} /></Reveal>
-                    </div>
+                    <SectionHeader id="maps-title" eyebrow="Hub map" title="North America and Europe, one map" lead="Tinted countries are Atlantis’s target markets — where we work with buyers and suppliers — not places where we have warehouses. Hubs appear as markers only once verified." />
+                    {preview && <p className="mt-6"><PreviewBadge /></p>}
+
+                    <Reveal className="mt-8 sm:mt-10">
+                        <div className="relative rounded-3xl ring-1 ring-line overflow-hidden bg-surface">
+                            <AtlanticMap points={points} routes={preview ? PREVIEW_ROUTES : []} focus={focus} selected={selected} onSelect={onSelect} loading={loading} failed={error} />
+                            {/* Region cards: North America on the left, Europe on the right */}
+                            <div className="pointer-events-none absolute inset-x-5 top-5 hidden sm:flex justify-between gap-3">
+                                {regionCard('americas', 'North America', americas)}
+                                {regionCard('europe', 'Europe & UK', europe)}
+                            </div>
+                            {!loading && !error && hubs.length === 0 && !preview && (
+                                <p className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden sm:block max-w-[16rem] rounded-2xl bg-surface/90 backdrop-blur ring-1 ring-line shadow-card px-4 py-3 text-center text-small text-ink-2">
+                                    <span className="block text-[14px] font-semibold text-heading">No verified hubs yet</span>
+                                    Verified Atlantis hubs will appear here once confirmed.
+                                </p>
+                            )}
+                            {/* Focus tabs */}
+                            <div className="sm:absolute sm:inset-x-0 sm:bottom-5 flex justify-center px-3 py-3 sm:p-0 border-t border-line sm:border-0">
+                                <div role="tablist" aria-label="Map view" className="inline-flex rounded-full bg-surface/90 backdrop-blur ring-1 ring-line shadow-card p-1">
+                                    {FOCUS_TABS.map((t) => (
+                                        <button key={t.key} role="tab" type="button" aria-selected={focus === t.key} onClick={() => setFocus(t.key)}
+                                            className={cn('h-9 px-3 sm:px-4 rounded-full text-[13px] sm:text-[14px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]', focus === t.key ? 'bg-heading text-white' : 'text-ink-2 hover:text-heading')}>
+                                            <span className="hidden sm:inline">{t.label}</span><span className="sm:hidden whitespace-nowrap">{t.short}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                        <p className="sm:hidden mt-3 text-small text-ink-3">North America: {loading ? '…' : americas.length ? `${americas.length} verified hub${americas.length === 1 ? '' : 's'}` : 'no verified hub yet'} · Europe & UK: {loading ? '…' : europe.length ? `${europe.length} verified hub${europe.length === 1 ? '' : 's'}` : 'no verified hub yet'}</p>
+                    </Reveal>
 
                     <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_minmax(0,22rem)] items-start">
                         <ul aria-label="Map key" className="flex flex-wrap gap-x-6 gap-y-2 text-small text-ink-2">
                             <li className="flex items-center gap-2"><span aria-hidden className="w-3.5 h-3.5 rounded-full bg-[#2EC4B6] ring-[3px] ring-white shadow-card" /> Verified Atlantis hub</li>
-                            <li className="flex items-center gap-2"><span aria-hidden className="w-4 h-3 rounded-sm bg-teal-soft ring-1 ring-teal/40" /> Delivery country (service area)</li>
-                            <li className="flex items-center gap-2"><span aria-hidden className="w-4 h-3 rounded-sm bg-surface ring-1 ring-line-strong" /> Other country</li>
-                            <li className="text-ink-3">Supplier dispatch locations aren’t plotted — they belong to suppliers, not Atlantis.</li>
+                            <li className="flex items-center gap-2"><span aria-hidden className="w-4 h-3 rounded-sm bg-teal-soft ring-1 ring-teal/40" /> Target market (Europe, UK, North America)</li>
+                            <li className="flex items-center gap-2"><span aria-hidden className="w-5 border-t-2 border-dotted border-teal" /> Supported route (shown once confirmed)</li>
+                            {preview && <li className="flex items-center gap-2"><span aria-hidden className="w-3.5 h-3.5 rounded-full border-2 border-dashed border-ink-3" /> Design-preview sample</li>}
+                            <li className="w-full text-ink-3">Supplier dispatch locations aren’t plotted — they belong to suppliers, not Atlantis.</li>
                         </ul>
                         <div aria-live="polite">
-                            {hub ? (
+                            {previewPoint ? (
+                                <div className="rounded-2xl ring-1 ring-[#FDE68A] bg-[#FFFBEB] p-5">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <p className="flex items-center gap-2 text-[15px] font-semibold text-[#B45309]"><Eye size={16} aria-hidden /> {previewPoint.label}</p>
+                                        <button type="button" onClick={() => setSelected(null)} aria-label="Close" className="w-8 h-8 shrink-0 rounded-lg flex items-center justify-center text-[#B45309] hover:bg-[#FEF3C7]"><X size={15} /></button>
+                                    </div>
+                                    <p className="mt-2 text-body text-[#78350F]">Design preview marker — not a real facility. A verified hub shows its name, address, services and verification date here.</p>
+                                </div>
+                            ) : hub ? (
                                 <div className="rounded-2xl ring-1 ring-line bg-surface shadow-card p-5">
                                     <div className="flex items-start justify-between gap-3">
                                         <div>
@@ -71,7 +147,7 @@ export default function WarehousesClient() {
                                         <button type="button" onClick={() => setSelected(null)} aria-label="Close hub details" className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center text-ink-3 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]"><X size={16} /></button>
                                     </div>
                                     {hub.address && <p className="mt-3 flex gap-2 text-body text-ink-2"><MapPin size={16} className="text-teal shrink-0 mt-1" aria-hidden /> {hub.address}</p>}
-                                    {hub.services.length > 0 && <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Services at this hub">{hub.services.map((s) => <li key={s}><Pill tone="teal">{HUB_SERVICE_LABEL[s] || s}</Pill></li>)}</ul>}
+                                    {hub.services.length > 0 && <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Services at this hub">{hub.services.map((sv) => <li key={sv}><Pill tone="teal">{HUB_SERVICE_LABEL[sv] || sv}</Pill></li>)}</ul>}
                                     {hub.verifiedAt && <p className="mt-4 text-small text-ink-3">Verified {new Date(hub.verifiedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>}
                                 </div>
                             ) : error ? (
@@ -79,14 +155,14 @@ export default function WarehousesClient() {
                             ) : hubs.length ? (
                                 <ul className="space-y-2" aria-label="Verified hubs">
                                     {hubs.map((h) => (
-                                        <li key={h.id}><button type="button" onClick={() => setSelected(h.id)} className="w-full text-start rounded-xl ring-1 ring-line px-4 py-3 hover:ring-[#2EC4B6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
+                                        <li key={h.id}><button type="button" onClick={() => { setSelected(h.id); if (h.region) setFocus(h.region); }} className="w-full text-start rounded-xl ring-1 ring-line px-4 py-3 hover:ring-[#2EC4B6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
                                             <span className="block text-[15px] font-semibold text-heading">{h.name}</span>
                                             <span className="block text-small text-ink-3">{h.city}, {h.countryName}</span>
                                         </button></li>
                                     ))}
                                 </ul>
                             ) : data ? (
-                                <p className="rounded-2xl ring-1 ring-line p-5 text-body text-ink-2">Atlantis hasn’t opened a verified hub yet. Today, orders are collected from the supplier’s dispatch location and delivered to you.</p>
+                                <p className="rounded-2xl ring-1 ring-line p-5 text-body text-ink-2">Atlantis hasn’t opened a verified hub yet. Today, orders are collected from the supplier’s dispatch location and delivered to you — not every order needs to pass through a hub.</p>
                             ) : null}
                         </div>
                     </div>
@@ -100,7 +176,7 @@ export default function WarehousesClient() {
                         {[
                             { icon: Warehouse, t: 'Atlantis hub', d: 'A physical location Atlantis has verified, with the services it actually offers (for example consolidation or inspection). Shown as a marker.', tag: 'On the map' },
                             { icon: Factory, t: 'Supplier dispatch location', d: 'Where a supplier’s goods leave from — the EXW location on each product page. It belongs to the supplier, not Atlantis.', tag: 'On product pages' },
-                            { icon: Globe2, t: 'Delivery country', d: 'A country Atlantis delivers to. Delivering somewhere doesn’t mean there is a warehouse there.', tag: 'Tinted on the map' },
+                            { icon: Globe2, t: 'Target market and delivery country', d: 'Target markets are where Atlantis works with buyers and suppliers; delivery countries are checked at checkout. Neither means there is a warehouse there.', tag: 'Tinted on the map' },
                         ].map((c, i) => (
                             <Reveal as="li" key={c.t} delay={i * 0.08} className="rounded-2xl bg-surface ring-1 ring-line p-6">
                                 <span className="w-11 h-11 rounded-2xl bg-teal-soft text-teal flex items-center justify-center"><c.icon size={20} aria-hidden /></span>
@@ -132,7 +208,8 @@ export default function WarehousesClient() {
                     <Faq className="mt-10" items={[
                         { q: 'Does my order go through a hub?', a: 'Only if the supplier’s delivery method uses one. Your order page shows the delivery method; “Atlantis arranges collection” goes straight from the supplier’s dispatch location to you.' },
                         { q: 'Why isn’t a location I know shown?', a: 'Only hubs Atlantis has verified are shown. Supplier warehouses and partner sites that aren’t verified Atlantis hubs are never presented as Atlantis warehouses.' },
-                        { q: 'Why is the Americas map empty?', a: 'Atlantis shows a region as soon as it has a verified hub there. Until then the map stays empty rather than suggesting coverage that doesn’t exist.' },
+                        { q: 'Why are there no markers yet?', a: 'A marker appears only for a hub Atlantis has verified. Until then the map shows target markets, not facilities, rather than suggesting coverage that doesn’t exist.' },
+                        { q: 'Does every order pass through an Atlantis hub?', a: 'No. Fulfilment depends on where the supplier ships from and where you are — a buyer in London and a buyer in Milan may get different options. Many orders go straight from the supplier’s dispatch location.' },
                         { q: 'Can a supplier deliver to a hub?', a: 'Yes, once a verified hub exists. Suppliers choose this in Shipping & Fulfilment; their net price stays the same and their freight to the hub is shown separately.' },
                         { q: 'Can goods be inspected at a hub?', a: <>Where a hub lists inspection as a service. See <Link href="/goods-inspection" className="font-medium text-teal hover:underline">Goods Inspection</Link>.</> },
                     ]} />
