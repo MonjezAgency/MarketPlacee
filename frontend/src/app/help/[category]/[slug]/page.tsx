@@ -31,7 +31,7 @@ export default function ArticlePage({ params }: { params: { category: string; sl
     const prev = siblings[idx - 1], next = siblings[idx + 1];
     const related = (a.related || []).map(findRef).filter(Boolean) as typeof ARTICLES;
     const toc = a.blocks.filter((b): b is { h2: string } => 'h2' in b).map((b) => ({ id: headingId(b.h2), text: b.h2 }));
-    const supportHref = a.audience === 'supplier' ? '/supplier/support' : '/dashboard/support';
+    const supportHref = a.audience === 'supplier' ? '/supplier/support' : '/dashboard/customer/support';
 
     return (
         <HelpShell crumbs={[{ label: 'Help Center', href: '/help' }, { label: cat.title, href: `/help/${cat.id}` }, { label: a.title }]} aside={<TableOfContents items={toc} />}>

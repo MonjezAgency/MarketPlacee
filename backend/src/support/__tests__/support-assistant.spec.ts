@@ -148,13 +148,36 @@ describe('Support context — scoped to the signed-in user', () => {
     });
 });
 
-describe('Chat security fixes', () => {
-    const svc = (order: any, supplies = 0) => new ChatService({ order: { findUnique: jest.fn(async () => order) }, orderItem: { count: jest.fn(async () => supplies) } } as any, {} as any);
-    it('order chat: only the buyer, a supplier in the order, or staff', async () => {
-        const o = { customerId: 'b1', supplierId: null };
-        await expect(svc(o).assertOrderChatAccess('o1', 'b1', 'CUSTOMER')).resolves.toBeUndefined();
-        await expect(svc(o).assertOrderChatAccess('o1', 'b2', 'CUSTOMER')).rejects.toThrow('Not your order.');
-        await expect(svc(o, 1).assertOrderChatAccess('o1', 's1', 'SUPPLIER')).resolves.toBeUndefined();
-        await expect(svc(o).assertOrderChatAccess('o1', 'x', 'SUPPORT')).resolves.toBeUndefined();
+describe('Order threads', () => {
+    const svc = (order: any, supplies = 0, extra: any = {}) => new ChatService({ order: { findUnique: jest.fn(async () => order) }, orderItem: { count: jest.fn(async () => supplies) }, ...extra } as any, {} as any);
+    const o = { id: 'o1', customerId: 'b1', supplierId: null };
+    it('each participant gets only their own thread; outsiders get none', async () => {
+        await expect(svc(o).resolveOrderThread('o1', 'b1', 'CUSTOMER')).resolves.toMatchObject({ partyId: 'b1', kind: 'buyer', isStaff: false });
+        await expect(svc(o).resolveOrderThread('o1', 'b2', 'CUSTOMER')).rejects.toThrow('Not your order.');
+        await expect(svc(o, 1).resolveOrderThread('o1', 's1', 'SUPPLIER')).resolves.toMatchObject({ partyId: 's1', kind: 'supplier' });
+        await expect(svc(o, 0).resolveOrderThread('o1', 's9', 'SUPPLIER')).rejects.toThrow('Not your order.');
+        // a non-staff caller can't pick someone else's thread
+        await expect(svc(o, 1).resolveOrderThread('o1', 's1', 'SUPPLIER', 'b1')).resolves.toMatchObject({ partyId: 's1' });
+    });
+    it('staff default to the buyer thread and may open a supplier thread on the order', async () => {
+        await expect(svc(o).resolveOrderThread('o1', 'x', 'SUPPORT')).resolves.toMatchObject({ partyId: 'b1', kind: 'buyer', isStaff: true });
+        await expect(svc(o, 1).resolveOrderThread('o1', 'x', 'ADMIN', 's1')).resolves.toMatchObject({ partyId: 's1', kind: 'supplier' });
+        await expect(svc(o, 0).resolveOrderThread('o1', 'x', 'ADMIN', 'stranger')).rejects.toThrow(/isn’t a buyer or supplier/);
+    });
+    it('a supplier never reads the buyer thread, and the buyer never reads a supplier thread', async () => {
+        const findMany = jest.fn(async (_args: any) => [] as any[]);
+        const s = svc(o, 1, { supportMessage: { findMany } });
+        await s.getOrderMessages('o1', await s.resolveOrderThread('o1', 's1', 'SUPPLIER'));
+        expect((findMany.mock.calls[0] as any)[0].where).toEqual({ orderId: 'o1', partyId: 's1' });
+        await s.getOrderMessages('o1', await s.resolveOrderThread('o1', 'b1', 'CUSTOMER'));
+        expect((findMany.mock.calls[1] as any)[0].where).toEqual({ orderId: 'o1', OR: [{ partyId: null }, { partyId: 'b1' }] });
+    });
+    it('messages are stored in the sender’s thread and must have content', async () => {
+        const create = jest.fn(async ({ data }: any) => ({ ...data, sender: { name: 'S' } }));
+        const s = svc(o, 1, { supportMessage: { create }, user: { findMany: jest.fn(async () => []) }, notification: { create: jest.fn(async () => ({})) } });
+        const t = await s.resolveOrderThread('o1', 's1', 'SUPPLIER');
+        await expect(s.sendOrderMessage('s1', 'o1', '   ', t)).rejects.toThrow('Write a message first.');
+        await s.sendOrderMessage('s1', 'o1', ' Stock ready on Friday ', t);
+        expect(create.mock.calls[0][0].data).toMatchObject({ orderId: 'o1', partyId: 's1', content: 'Stock ready on Friday' });
     });
 });

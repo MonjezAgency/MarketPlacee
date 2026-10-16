@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, Package, ListChecks, Settings, Target } from 'lucide-react';
+import { LayoutGrid, Package, ListChecks, Settings, Target, LifeBuoy } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 
@@ -11,6 +11,7 @@ const TABS = [
     { href: '/dashboard/customer/orders', label: 'Orders & tracking', icon: Package },
     { href: '/dashboard/customer/lists', label: 'My lists', icon: ListChecks },
     { href: '/dashboard/customer/targets', label: 'Target prices', icon: Target },
+    { href: '/dashboard/customer/support', label: 'Support', icon: LifeBuoy },
     { href: '/dashboard/customer/settings', label: 'Settings', icon: Settings },
 ];
 

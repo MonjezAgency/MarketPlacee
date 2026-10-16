@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Request, Param, Patch } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Request, Param, Patch, Query } from '@nestjs/common';
 import { ChatService } from './chat.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -55,28 +55,26 @@ export class ChatController {
 
   // ─── Order-linked chat ────────────────────────────────────────────────────
 
-  /** Send (or start) a message in an order's dedicated chat thread */
+  /** Send a message in the caller's own thread for this order (staff pick the thread with partyId). */
   @Post('order/:orderId/send')
-  async sendOrderMessage(
-    @Param('orderId') orderId: string,
-    @Body('content') content: string,
-    @Request() req,
-  ) {
-    await this.chatService.assertOrderChatAccess(orderId, req.user.sub, req.user.role);
-    return this.chatService.sendOrderMessage(req.user.sub, orderId, content);
+  async sendOrderMessage(@Param('orderId') orderId: string, @Body('content') content: string, @Body('partyId') partyId: string, @Request() req) {
+    const thread = await this.chatService.resolveOrderThread(orderId, req.user.sub, req.user.role, partyId);
+    return this.chatService.sendOrderMessage(req.user.sub, orderId, content, thread);
   }
 
-  /** Get all messages for an order's chat thread */
+  /** Messages of the caller's own thread for this order (staff: ?party=<userId>, default the buyer). */
   @Get('order/:orderId/messages')
-  async getOrderMessages(@Param('orderId') orderId: string, @Request() req) {
-    await this.chatService.assertOrderChatAccess(orderId, req.user.sub, req.user.role);
-    return this.chatService.getOrderMessages(orderId);
+  async getOrderMessages(@Param('orderId') orderId: string, @Query('party') party: string, @Request() req) {
+    const thread = await this.chatService.resolveOrderThread(orderId, req.user.sub, req.user.role, party);
+    return this.chatService.getOrderMessages(orderId, thread);
   }
 
-  /** Customer: list all their orders that have active chat conversations */
+  /** Buyer or supplier: their own order threads. */
   @Get('my-order-chats')
   async getMyOrderChats(@Request() req) {
-    return this.chatService.getCustomerOrderChats(req.user.sub);
+    return String(req.user.role || '').toUpperCase() === 'SUPPLIER'
+      ? this.chatService.getSupplierOrderChats(req.user.sub)
+      : this.chatService.getCustomerOrderChats(req.user.sub);
   }
 
   /** Admin/Support: list all orders with active chat conversations */

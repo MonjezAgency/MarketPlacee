@@ -1,6 +1,8 @@
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { BotService } from './bot.service';
+
+const ORDER_CHAT_STAFF = ['ADMIN', 'SUPPORT', 'OWNER', 'LOGISTICS', 'DEVELOPER'];
 
 @Injectable()
 export class ChatService {
@@ -186,15 +188,6 @@ export class ChatService {
   }
 
   /** Order chat: the order's buyer, a supplier with products in it, or support staff. */
-  async assertOrderChatAccess(orderId: string, userId: string, role?: string) {
-    if (['ADMIN', 'SUPPORT', 'OWNER', 'LOGISTICS', 'DEVELOPER'].includes(String(role || '').toUpperCase())) return;
-    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { customerId: true, supplierId: true } });
-    if (!order) throw new NotFoundException('Order not found');
-    if (order.customerId === userId || order.supplierId === userId) return;
-    const supplies = await this.prisma.orderItem.count({ where: { orderId, product: { supplierId: userId } } });
-    if (!supplies) throw new ForbiddenException('Not your order.');
-  }
-
   async markAsRead(messageIds: string[], userId?: string, isStaff = false) {
     return this.prisma.supportMessage.updateMany({
       // Users mark only messages addressed to them; staff mark messages sent to support.
@@ -207,148 +200,149 @@ export class ChatService {
   // ORDER-LINKED CHAT — dedicated per-order conversation between admin & buyer
   // ─────────────────────────────────────────────────────────────────────────
 
-  /** Admin initiates or continues a conversation tied to a specific order */
-  async sendOrderMessage(senderId: string, orderId: string, content: string) {
-    // Resolve the order so we can notify the other party
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: { id: true, customerId: true, supplierId: true, totalAmount: true, status: true },
-    });
-    if (!order) throw new Error('Order not found');
+  // Order threads: one per participant (the buyer, or one supplier on the order),
+  // each between that participant and the Atlantis team. A participant only ever
+  // sees their own thread; staff see every thread. partyId null = the buyer
+  // (messages written before supplier threads existed).
 
-    const sender = await this.prisma.user.findUnique({
-      where: { id: senderId },
-      select: { id: true, name: true, role: true },
-    });
+  /** Which thread of this order the caller is in (staff may pick one). Throws if they have none. */
+  async resolveOrderThread(orderId: string, userId: string, role?: string, requestedParty?: string | null) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId }, select: { id: true, customerId: true, supplierId: true, status: true } });
+    if (!order) throw new NotFoundException('Order not found');
+    const isStaff = ORDER_CHAT_STAFF.includes(String(role || '').toUpperCase());
+    const supplies = async (id: string) => order.supplierId === id || (await this.prisma.orderItem.count({ where: { orderId, product: { supplierId: id } } })) > 0;
+    if (isStaff) {
+      const party = requestedParty || order.customerId;
+      if (party === order.customerId) return { order, partyId: order.customerId, kind: 'buyer' as const, isStaff };
+      if (await supplies(party)) return { order, partyId: party, kind: 'supplier' as const, isStaff };
+      throw new BadRequestException('That person isn’t a buyer or supplier on this order.');
+    }
+    if (order.customerId === userId) return { order, partyId: userId, kind: 'buyer' as const, isStaff };
+    if (await supplies(userId)) return { order, partyId: userId, kind: 'supplier' as const, isStaff };
+    throw new ForbiddenException('Not your order.');
+  }
 
+  private threadWhere(orderId: string, kind: 'buyer' | 'supplier', partyId: string) {
+    return kind === 'buyer'
+      ? { orderId, OR: [{ partyId: null }, { partyId }] }
+      : { orderId, partyId };
+  }
+
+  async sendOrderMessage(senderId: string, orderId: string, contentIn: string, thread: Awaited<ReturnType<ChatService['resolveOrderThread']>>) {
+    const content = String(contentIn || '').trim();
+    if (!content) throw new BadRequestException('Write a message first.');
+    if (content.length > 4000) throw new BadRequestException('Messages can be up to 4,000 characters.');
+    const ref = `#${orderId.slice(-8).toUpperCase()}`;
     const message = await this.prisma.supportMessage.create({
-      data: {
-        senderId,
-        orderId,
-        content,
-        receiverId: null,   // null = "general"; orderId carries the thread context
-      },
+      data: { senderId, orderId, partyId: thread.partyId, content, receiverId: null },
       include: { sender: { select: { id: true, name: true, role: true } } },
     });
-
-    // Determine who to notify
-    const isStaff = ['ADMIN', 'OWNER', 'SUPPORT', 'LOGISTICS'].includes(sender?.role || '');
-    const notifyUserId = isStaff ? order.customerId : null;
-
-    if (notifyUserId) {
+    if (thread.isStaff) {
+      // Atlantis wrote: tell the participant of this thread only.
       await this.prisma.notification.create({
         data: {
-          userId: notifyUserId,
-          title: 'New message about your order',
-          message: `You have a new message about order #${orderId.slice(-8).toUpperCase()}: "${content.substring(0, 60)}${content.length > 60 ? '…' : ''}"`,
+          userId: thread.partyId,
+          title: thread.kind === 'supplier' ? `Atlantis wrote about order ${ref}` : 'New message about your order',
+          message: `You have a new message about order ${ref}: "${content.substring(0, 60)}${content.length > 60 ? '…' : ''}"`,
           type: 'INFO',
+          data: { orderId, link: thread.kind === 'supplier' ? '/supplier/support?tab=orders' : '/dashboard/support?tab=orders' },
         },
       }).catch(() => {});
-    } else if (!isStaff) {
-      // Customer sent — notify admins
-      const admins = await this.prisma.user.findMany({
-        where: { role: { in: ['ADMIN', 'SUPPORT', 'OWNER'] } },
-        select: { id: true },
-        take: 5,
-      });
-      await Promise.all(admins.map(a =>
-        this.prisma.notification.create({
-          data: {
-            userId: a.id,
-            title: 'Customer replied on order',
-            message: `${sender?.name} replied on order #${orderId.slice(-8).toUpperCase()}: "${content.substring(0, 60)}"`,
-            type: 'INFO',
-          },
-        }).catch(() => {}),
-      ));
+    } else {
+      const admins = await this.prisma.user.findMany({ where: { role: { in: ['ADMIN', 'SUPPORT', 'OWNER'] } }, select: { id: true }, take: 5 });
+      const who = thread.kind === 'supplier' ? 'Supplier' : 'Customer';
+      await Promise.all(admins.map((a) => this.prisma.notification.create({
+        data: { userId: a.id, title: `${who} wrote on order ${ref}`, message: `${message.sender?.name || who} wrote on order ${ref}: "${content.substring(0, 60)}"`, type: 'INFO' },
+      }).catch(() => {})));
     }
-
     return message;
   }
 
-  /** Get all messages for a specific order's chat thread */
-  async getOrderMessages(orderId: string) {
+  async getOrderMessages(orderId: string, thread: Awaited<ReturnType<ChatService['resolveOrderThread']>>) {
     return this.prisma.supportMessage.findMany({
-      where: { orderId },
+      where: this.threadWhere(orderId, thread.kind, thread.partyId),
       include: { sender: { select: { id: true, name: true, role: true, avatar: true } } },
       orderBy: { createdAt: 'asc' },
     });
   }
 
-  /** Customer: get a list of orders that have chat messages (for "Order Conversations" tab) */
+  /** Buyer: orders with a thread (their own thread only). */
   async getCustomerOrderChats(customerId: string) {
-    // Find all orders belonging to this customer that have any chat message
+    const mine = { OR: [{ partyId: null }, { partyId: customerId }] };
     const orders = await this.prisma.order.findMany({
-      where: {
-        customerId,
-        chatMessages: { some: {} },
-      },
+      where: { customerId, chatMessages: { some: mine } },
       select: {
-        id: true,
-        status: true,
-        totalAmount: true,
-        createdAt: true,
-        chatMessages: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: { content: true, createdAt: true, sender: { select: { name: true, role: true } } },
-        },
-        items: {
-          take: 1,
-          select: { product: { select: { name: true, images: true } } },
-        },
+        id: true, status: true, totalAmount: true, createdAt: true,
+        chatMessages: { where: mine, orderBy: { createdAt: 'desc' }, take: 1, select: { content: true, createdAt: true, sender: { select: { name: true, role: true } } } },
+        items: { take: 1, select: { productNameSnapshot: true, product: { select: { name: true, images: true } } } },
       },
       orderBy: { updatedAt: 'desc' },
     });
-
-    return orders.map(o => ({
-      orderId: o.id,
-      status: o.status,
-      total: o.totalAmount,
-      createdAt: o.createdAt,
-      firstProduct: o.items[0]?.product?.name ?? null,
+    return orders.map((o: any) => ({
+      orderId: o.id, status: o.status, total: o.totalAmount, createdAt: o.createdAt,
+      firstProduct: o.items[0]?.product?.name ?? o.items[0]?.productNameSnapshot ?? null,
       firstImage: o.items[0]?.product?.images?.[0] ?? null,
-      lastMessage: o.chatMessages[0]?.content ?? null,
-      lastMessageAt: o.chatMessages[0]?.createdAt ?? null,
+      lastMessage: o.chatMessages[0]?.content ?? null, lastMessageAt: o.chatMessages[0]?.createdAt ?? null,
       lastMessageSender: o.chatMessages[0]?.sender?.name ?? null,
+      lastFromStaff: ORDER_CHAT_STAFF.includes(String(o.chatMessages[0]?.sender?.role || '')),
     }));
   }
 
-  /** Admin: get all orders that have chat messages */
-  async getAdminOrderChats() {
+  /** Supplier: orders with their own thread. Only their own lines; never the buyer total. */
+  async getSupplierOrderChats(supplierId: string) {
+    const mine = { partyId: supplierId };
     const orders = await this.prisma.order.findMany({
-      where: { chatMessages: { some: {} } },
+      where: { chatMessages: { some: mine } },
       select: {
-        id: true,
-        status: true,
-        totalAmount: true,
-        createdAt: true,
-        customer: { select: { id: true, name: true, email: true } },
-        chatMessages: {
-          orderBy: { createdAt: 'desc' },
-          take: 1,
-          select: {
-            content: true,
-            createdAt: true,
-            isRead: true,
-            sender: { select: { name: true, role: true } },
-          },
-        },
+        id: true, status: true, createdAt: true,
+        chatMessages: { where: mine, orderBy: { createdAt: 'desc' }, take: 1, select: { content: true, createdAt: true, sender: { select: { name: true, role: true } } } },
+        items: { where: { product: { supplierId } }, take: 1, select: { productNameSnapshot: true, product: { select: { name: true, images: true } } } },
       },
       orderBy: { updatedAt: 'desc' },
     });
-
-    return orders.map(o => ({
-      orderId: o.id,
-      status: o.status,
-      total: o.totalAmount,
-      createdAt: o.createdAt,
-      customer: o.customer,
-      lastMessage: o.chatMessages[0]?.content ?? null,
-      lastMessageAt: o.chatMessages[0]?.createdAt ?? null,
+    return orders.map((o: any) => ({
+      orderId: o.id, status: o.status, createdAt: o.createdAt,
+      firstProduct: o.items[0]?.product?.name ?? o.items[0]?.productNameSnapshot ?? null,
+      firstImage: o.items[0]?.product?.images?.[0] ?? null,
+      lastMessage: o.chatMessages[0]?.content ?? null, lastMessageAt: o.chatMessages[0]?.createdAt ?? null,
       lastMessageSender: o.chatMessages[0]?.sender?.name ?? null,
-      unread: o.chatMessages[0]?.isRead === false ? 1 : 0,
+      lastFromStaff: ORDER_CHAT_STAFF.includes(String(o.chatMessages[0]?.sender?.role || '')),
     }));
+  }
+
+  /** Staff: every order thread (one row per order and participant). */
+  async getAdminOrderChats() {
+    const rows = await this.prisma.supportMessage.findMany({
+      where: { orderId: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      take: 2000,
+      select: { orderId: true, partyId: true, content: true, createdAt: true, isRead: true, sender: { select: { name: true, role: true } } },
+    });
+    const orderIds = [...new Set(rows.map((r) => r.orderId as string))];
+    const orders = await this.prisma.order.findMany({ where: { id: { in: orderIds } }, select: { id: true, status: true, totalAmount: true, createdAt: true, customerId: true, customer: { select: { id: true, name: true, email: true } } } });
+    const byId = new Map(orders.map((o) => [o.id, o]));
+    const threads = new Map<string, any>();
+    for (const r of rows) {
+      const o = byId.get(r.orderId as string);
+      if (!o) continue;
+      const party = r.partyId || o.customerId;
+      const key = `${o.id}|${party}`;
+      if (!threads.has(key)) threads.set(key, { o, party, last: r });
+    }
+    const partyIds = [...new Set([...threads.values()].map((t) => t.party).filter((p) => p))];
+    const people = await this.prisma.user.findMany({ where: { id: { in: partyIds } }, select: { id: true, name: true, companyName: true, role: true } });
+    const who = new Map(people.map((u) => [u.id, u]));
+    return [...threads.values()].map(({ o, party, last }) => {
+      const p = who.get(party);
+      const kind = party === o.customerId ? 'buyer' : 'supplier';
+      return {
+        orderId: o.id, status: o.status, total: o.totalAmount, createdAt: o.createdAt,
+        customer: o.customer,
+        partyId: party, partyKind: kind, partyName: p?.companyName || p?.name || (kind === 'buyer' ? 'Customer' : 'Supplier'),
+        lastMessage: last.content ?? null, lastMessageAt: last.createdAt ?? null, lastMessageSender: last.sender?.name ?? null,
+        unread: last.isRead === false && !ORDER_CHAT_STAFF.includes(String(last.sender?.role || '')) ? 1 : 0,
+      };
+    });
   }
 
   /**

@@ -275,7 +275,7 @@ export const buyers: Article[] = [
         keywords: ['support', 'messages', 'chat', 'contact', 'help', 'assistant'],
         blocks: [
             { h2: 'Support pages' },
-            { p: 'Buyers use [Support](/dashboard/support); suppliers use [Support](/supplier/support) in the Supplier Hub. Each has two parts:' },
+            { p: 'Buyers use [Support](/dashboard/customer/support); suppliers use [Support](/supplier/support) in the Supplier Hub. Each has two parts:' },
             { list: [
                 '**Assistant:** answers questions about using Atlantis and checks facts from your own account, such as your orders, cart or products.',
                 '**Order conversations:** messages between you and the Atlantis team about a specific order. The Atlantis team starts these threads.',

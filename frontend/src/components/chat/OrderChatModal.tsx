@@ -19,6 +19,8 @@ interface Props {
     orderId: string;
     orderTotal?: number;
     customerName?: string;
+    /** Staff only: which thread of the order (a supplier's id); default = the buyer's thread. */
+    partyId?: string | null;
     /** If true — shown from admin side; false — shown from customer side */
     isAdmin?: boolean;
     onClose: () => void;
@@ -26,7 +28,7 @@ interface Props {
 
 const STAFF_ROLES = new Set(['ADMIN', 'OWNER', 'SUPPORT', 'LOGISTICS', 'MODERATOR']);
 
-export default function OrderChatModal({ orderId, orderTotal, customerName, isAdmin = false, onClose }: Props) {
+export default function OrderChatModal({ orderId, orderTotal, customerName, partyId, isAdmin = false, onClose }: Props) {
     const { user } = useAuth();
     const [messages, setMessages] = useState<OrderMessage[]>([]);
     const [input, setInput] = useState('');
@@ -51,7 +53,7 @@ export default function OrderChatModal({ orderId, orderTotal, customerName, isAd
             // every time and the operator opened a thread that already
             // had messages and saw the empty "Start a conversation"
             // state. Parse the body here.
-            const res = await apiFetch(`/chat/order/${orderId}/messages`);
+            const res = await apiFetch(`/chat/order/${orderId}/messages${isAdmin && partyId ? `?party=${encodeURIComponent(partyId)}` : ''}`);
             if (!res.ok) {
                 if (!silent) console.warn(`Order chat fetch failed: HTTP ${res.status}`);
                 return;
@@ -82,7 +84,7 @@ export default function OrderChatModal({ orderId, orderTotal, customerName, isAd
         try {
             const res = await apiFetch(`/chat/order/${orderId}/send`, {
                 method: 'POST',
-                body: JSON.stringify({ content: text }),
+                body: JSON.stringify({ content: text, partyId: isAdmin ? partyId || undefined : undefined }),
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             await fetchMessages(true);

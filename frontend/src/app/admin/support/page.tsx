@@ -119,6 +119,7 @@ function SupportHQContent() {
     const [openOrderChatId, setOpenOrderChatId] = React.useState<string | null>(null);
     const [openOrderChatTotal, setOpenOrderChatTotal] = React.useState<number>(0);
     const [openOrderChatCustomer, setOpenOrderChatCustomer] = React.useState<string>('');
+    const [openOrderChatParty, setOpenOrderChatParty] = React.useState<string | null>(null);
     const searchParams = useSearchParams();
     const initialSearch = searchParams.get('search') || '';
     const [searchTerm, setSearchTerm] = React.useState(initialSearch);
@@ -344,9 +345,11 @@ function SupportHQContent() {
                                 // order-linked → OrderChatModal).
                                 const taggedSupport = conversations.map(c => ({ ...c, kind: 'support' as const }));
                                 const taggedOrders = orderChats.map(o => ({
-                                    id: `order-${o.orderId}`,
-                                    userId: o.customer?.id || null,
-                                    name: o.customer?.name || 'Customer',
+                                    // One row per order thread: the buyer's, or a supplier's.
+                                    id: `order-${o.orderId}-${o.partyId || 'buyer'}`,
+                                    userId: o.partyId || o.customer?.id || null,
+                                    partyId: o.partyId || null,
+                                    name: o.partyKind === 'supplier' ? `${o.partyName} (supplier)` : (o.partyName || o.customer?.name || 'Customer'),
                                     lastMessage: o.lastMessage,
                                     lastMessageAt: o.lastMessageAt,
                                     orderId: o.orderId,
@@ -394,6 +397,7 @@ function SupportHQContent() {
                                                     setOpenOrderChatId(conv.orderId);
                                                     setOpenOrderChatTotal(conv.orderTotal || 0);
                                                     setOpenOrderChatCustomer(conv.name);
+                                                    setOpenOrderChatParty(conv.partyId || null);
                                                 } else {
                                                     setSelectedUser(conv);
                                                 }
@@ -628,6 +632,7 @@ function SupportHQContent() {
                         orderId={openOrderChatId}
                         orderTotal={openOrderChatTotal}
                         customerName={openOrderChatCustomer}
+                        partyId={openOrderChatParty}
                         isAdmin={true}
                         onClose={() => { setOpenOrderChatId(null); fetchAll(true); }}
                     />

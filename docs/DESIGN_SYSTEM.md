@@ -120,6 +120,21 @@ Use the shared primitive if it exists; add to `components/ds` rather than restyl
 | Navigation / footer | `components/layout/Navbar.tsx` / `Footer.tsx`. New public pages get a footer link only if they are part of the buyer or supplier journey. |
 | Illustrations | `<Frame>` panels built from real UI pieces (cards, pills, barcodes) in Atlantis colours, or simple vector shapes. |
 
+### Conversation UI (Support and order threads)
+
+Shared in `frontend/src/components/support` (`messages.tsx`, `Composer.tsx`); don't build another chat style.
+
+| Part | Rule |
+|---|---|
+| Workspace | One panel with a fixed height that fits the viewport; only the message list scrolls; the composer stays anchored at the bottom. No page scroll on desktop. |
+| Tabs | Underline tabs inside the panel (Assistant / Order conversations), `aria-selected`, arrow keys switch. |
+| Incoming | Assistant: Atlantis mark, `bg-surface-2` bubble. Team: person icon, white bubble with a teal start border and a "Team" label. Max width ≈ 40rem. |
+| Outgoing | Navy (`bg-heading`) bubble, right-aligned, max ≈ 34rem, time or state (Sending… / Not sent + Retry) underneath. |
+| Day groups | `DayDivider` (Today / Yesterday / date). Times are small `text-ink-4`. |
+| Composer | `Composer`: 40 px controls, `rounded-xl`, Enter sends, Shift+Enter adds a line; attachment and dictation only where they actually work. |
+| Status | Show only what the server reports (e.g. "AI assistant on/off", "Atlantis team in your conversation"). Never a generic "available" dot. |
+| States | Skeleton while loading, inline error with Retry, a useful empty state that says what will appear there. |
+
 ## 5. Motion
 
 | Token | Value | Use |

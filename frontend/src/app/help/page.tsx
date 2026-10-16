@@ -105,7 +105,7 @@ export default function HelpHome() {
                         <p className="mt-1 text-[14px] text-ink-3">Signed-in buyers and suppliers can ask the Support Assistant, which checks your own orders, products and cart. You can also write to us.</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Link href="/dashboard/support" className="h-10 px-4 rounded-xl bg-heading text-white text-[14px] font-semibold inline-flex items-center gap-2"><MessageSquare size={16} /> Buyer support</Link>
+                        <Link href="/dashboard/customer/support" className="h-10 px-4 rounded-xl bg-heading text-white text-[14px] font-semibold inline-flex items-center gap-2"><MessageSquare size={16} /> Buyer support</Link>
                         <Link href="/supplier/support" className="h-10 px-4 rounded-xl ring-1 ring-line-strong text-[14px] font-semibold text-heading inline-flex items-center gap-2"><MessageSquare size={16} /> Supplier support</Link>
                         <Link href="/contact" className="h-10 px-4 rounded-xl ring-1 ring-line-strong text-[14px] font-semibold text-heading inline-flex items-center gap-2"><Mail size={16} /> Contact us</Link>
                     </div>

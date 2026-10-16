@@ -766,12 +766,16 @@ model SupportMessage {
   // Order-linked chat — set when this message belongs to a specific order conversation
   orderId      String?
   orderContext Order?   @relation("OrderChat", fields: [orderId], references: [id], onDelete: SetNull)
+  // Order threads are one per participant: the buyer, or one supplier on the
+  // order. null = the order's buyer (messages written before suppliers had threads).
+  partyId      String?
 
   createdAt    DateTime @default(now())
 
   @@index([senderId])
   @@index([receiverId])
   @@index([orderId])
+  @@index([orderId, partyId])
   @@index([createdAt])
 }
 
