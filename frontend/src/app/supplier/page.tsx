@@ -107,7 +107,7 @@ export default function SupplierOverviewPage() {
 
             {error && <div className="mb-4"><ErrorState message={error} onRetry={load} /></div>}
 
-            <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
+            <div data-tour="supplier-overview" className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
                 <Stat label={tr('statSales')} icon={<Euro size={17} />} tone="brand" loading={first}
                     value={eur(t?.sales)} delta={t && p ? pctDelta(t.sales, p.sales, tr('deltaNew'), fmt) : null} hint={t ? (t.estimated ? tr('hintEstimated') : tr('hintConfirmed')) : undefined} />
                 <Stat label={tr('statOrders')} icon={<ShoppingCart size={17} />} loading={first} href="/supplier/orders?view=all"

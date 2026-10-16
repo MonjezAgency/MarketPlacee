@@ -29,7 +29,8 @@ import { UserMenu } from '@/components/dashboard/UserMenu';
 import { apiFetch } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LOCALES, LOCALE_META } from '@/locales/config';
-import { GuidedTour } from '@/components/ui/GuidedTour';
+import { ProductTour } from '@/components/onboarding/ProductTour';
+import { SUPPLIER_TOUR } from '@/components/onboarding/tours';
 import NotificationBell from '@/components/ui/NotificationBell';
 import { ConfirmProvider } from '@/components/supplier/ui';
 
@@ -40,14 +41,15 @@ const SUPPLIER_LANGUAGES = LOCALES.map((code) => ({ code, name: LOCALE_META[code
 // old links keep working): Analytics (its useful metrics now live on the
 // Business Overview), Wholesale Offers, Offers & Ads, Payment Methods.
 // `labelKey` is a key of the supplierShell dictionary, translated at render time.
-const SUPPLIER_LINKS: { labelKey: string; href: string; icon: any; key?: string; locked?: boolean }[] = [
+// `tour` is the data-tour target used by the first-login tour (components/onboarding/tours.ts).
+const SUPPLIER_LINKS: { labelKey: string; href: string; icon: any; key?: string; locked?: boolean; tour?: string }[] = [
     { labelKey: 'navOverview', href: '/supplier', icon: LayoutDashboard },
-    { labelKey: 'navProducts', href: '/supplier/products', icon: Package, key: 'products' },
-    { labelKey: 'navInventory', href: '/supplier/inventory', icon: Warehouse },
-    { labelKey: 'navOrders', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
+    { labelKey: 'navProducts', href: '/supplier/products', icon: Package, key: 'products', tour: 'supplier-nav-products' },
+    { labelKey: 'navInventory', href: '/supplier/inventory', icon: Warehouse, tour: 'supplier-nav-inventory' },
+    { labelKey: 'navOrders', href: '/supplier/orders', icon: ShoppingCart, key: 'orders', tour: 'supplier-nav-orders' },
     { labelKey: 'navFulfillment', href: '/supplier/fulfillment', icon: Truck },
     { labelKey: 'navSettings', href: '/supplier/settings', icon: Settings },
-    { labelKey: 'navSupport', href: '/supplier/support', icon: LifeBuoy },
+    { labelKey: 'navSupport', href: '/supplier/support', icon: LifeBuoy, tour: 'supplier-nav-support' },
 ];
 
 /** Overview matches only itself; other items also match their sub-pages. */
@@ -63,7 +65,6 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     const router = useRouter();
     const { t, dir, fmt } = useLanguage();
     const tr = (key: string, vars?: Record<string, string | number>) => t('supplierShell', key, vars);
-    const [showTour, setShowTour] = React.useState(false);
     const [pendingCounts, setPendingCounts] = React.useState<Record<string, number>>({
         orders: 0,
         products: 0
@@ -94,30 +95,6 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
             }
         }
     }, [isAuthReady, user, router]);
-
-    // Tour Logic
-    React.useEffect(() => {
-        if (!user?.id) return;
-        const tourKey = `atlantis-tour-supplier-${user.id}`;
-        const hasSeenTour = localStorage.getItem(tourKey);
-        if (!hasSeenTour && user?.status === 'ACTIVE') {
-            const timer = setTimeout(() => setShowTour(true), 2000);
-            return () => clearTimeout(timer);
-        }
-    }, [user]);
-
-    const tourSteps = [
-        {
-            targetId: 'tour-inventory',
-            title: tr('tourInventoryTitle'),
-            description: tr('tourInventoryDesc')
-        },
-        {
-            targetId: 'tour-revenue',
-            title: tr('tourRevenueTitle'),
-            description: tr('tourRevenueDesc')
-        }
-    ];
 
     // (A header stats poll of /dashboard/supplier used to run here every 60 s; its result was never
     // shown and the response carries buyer-price revenue — see the gap register, SUP findings.)
@@ -204,6 +181,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             <Link
                                 key={link.href}
                                 href={link.href}
+                                data-tour={link.tour}
                                 aria-current={isActive ? 'page' : undefined}
                                 title={isOpen ? undefined : label}
                                 className={cn(
@@ -361,18 +339,8 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 )}
             </AnimatePresence>
 
-            {/* Guided Tour Component */}
-            {showTour && <GuidedTour 
-                steps={tourSteps} 
-                onDismiss={() => {
-                    if (user?.id) localStorage.setItem(`atlantis-tour-supplier-${user.id}`, 'true');
-                    setShowTour(false);
-                }}
-                onComplete={() => {
-                    if (user?.id) localStorage.setItem(`atlantis-tour-supplier-${user.id}`, 'true');
-                    setShowTour(false);
-                }} 
-            />}
+            {/* First-login tour (server-persisted; shows only on /supplier for eligible accounts). */}
+            <ProductTour tour={SUPPLIER_TOUR} />
         </div>
     );
 }

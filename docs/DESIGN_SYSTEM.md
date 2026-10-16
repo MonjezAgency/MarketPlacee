@@ -118,6 +118,7 @@ Use the shared primitive if it exists; add to `components/ds` rather than restyl
 | Inputs | `inputCls` / `selectCls` from `components/supplier/ui` (40 px, `rounded-lg`, `ring-line-strong`, teal focus ring). Every input has a visible `<label>`. |
 | Modals | `Dialog` from `components/supplier/ui`: focus trapped, Esc closes, returns focus. No modal on marketing pages. |
 | Navigation / footer | `components/layout/Navbar.tsx` / `Footer.tsx`. New public pages get a footer link only if they are part of the buyer or supplier journey. |
+| Product tours | `components/onboarding/ProductTour` only (steps in `tours.ts`, text in the `productTour` section). Steps point at real elements via `data-tour="…"` and describe only what the page really does. State is server-side (`/users/me/tours`); if it can't load, no tour. Spotlight + card positioned from `getBoundingClientRect`, so its coordinates are physical `left/top` — the one allowed exception to the logical-properties rule, because they come from measured geometry, not from layout direction (the side preference still flips in RTL). Bottom sheet below 640 px; centred card when a target is hidden. `GuidedTour` is legacy (admin only). |
 | Illustrations | `<Frame>` panels built from real UI pieces (cards, pills, barcodes) in Atlantis colours, or simple vector shapes. |
 
 ### Conversation UI (Support and order threads)
