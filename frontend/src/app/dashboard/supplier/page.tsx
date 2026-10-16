@@ -104,7 +104,7 @@ export default function SupplierDashboard() {
     }, []);
 
     const handleNewProduct = () => {
-        router.push('/dashboard/supplier/products/new');
+        router.push('/supplier/products/new');
     };
 
     const handleEditProduct = (product: any) => {

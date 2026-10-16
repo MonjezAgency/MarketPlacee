@@ -25,7 +25,8 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
 
 ## Routes worth knowing
 
-- Supplier entry point after sign-in: `/dashboard/supplier`; the supplier tools live under `/supplier/*`.
+- Supplier entry point after sign-in: `/supplier` (business overview); the supplier tools live under `/supplier/*`.
+  The old `/dashboard/supplier` and `/dashboard/supplier/*` URLs permanently redirect (308) to `/supplier` in `frontend/src/middleware.ts`.
 - Buyer area: `/dashboard/customer/*`. Staff: `/admin/*`.
 - Unauthenticated requests to protected routes are sent to `/auth/login?redirect=<path>` (see `frontend/src/middleware.ts`).
 

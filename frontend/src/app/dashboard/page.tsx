@@ -38,7 +38,7 @@ export default function DashboardIndex() {
         if (['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'].includes(role || '')) {
             router.replace('/admin');
         } else if (role === 'SUPPLIER') {
-            router.replace('/dashboard/supplier');
+            router.replace('/supplier');
         } else if (role === 'CUSTOMER' || role === 'BUYER') {
             router.replace('/dashboard/customer');
         } else {

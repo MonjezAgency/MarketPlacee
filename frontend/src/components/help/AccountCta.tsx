@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { LayoutDashboard, LogIn, UserPlus } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 
-const SUPPLIER_DASHBOARD = '/dashboard/supplier';
+const SUPPLIER_DASHBOARD = '/supplier';
 const BUYER_DASHBOARD = '/dashboard/customer';
 const TEAM = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
 

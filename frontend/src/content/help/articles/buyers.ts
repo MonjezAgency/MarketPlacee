@@ -199,14 +199,14 @@ export const buyers: Article[] = [
             ] },
             { h2: 'Step 2: Review order' },
             { steps: [
-                'Check the lines, delivery details and total.',
+                'Check the lines, delivery details and total. Where Atlantis has a rate for your route, the delivery charge is included; otherwise the total excludes delivery, which is quoted after you order.',
                 'Enter a **promo code** if you have one. It takes a percentage off the subtotal.',
                 'Select **Confirm Order**. If two-step verification is on, enter your authenticator code and the code we email you.',
             ] },
             { h2: 'After you confirm' },
             { list: [
                 'You see **Order Received!** with your order reference, for example `#7F3A9C21`.',
-                'The order is **Awaiting confirmation** while the supplier confirms quantities and availability. The ordered cases are reserved for you.',
+                'The order is **Awaiting confirmation** while every supplier on it accepts the terms and Atlantis approves them. The ordered cases are reserved for you.',
                 'The Atlantis team contacts you to finalise payment and delivery. See [How payment works](/help/payment-invoicing/how-payment-works).',
             ] },
             { note: 'Prices are recalculated when you confirm. If anything changed since you opened the cart, you will see the new total and confirm again. See [Prices were updated](/help/troubleshooting/price-changed).', tone: 'info' },

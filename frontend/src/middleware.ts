@@ -7,8 +7,25 @@ const PROTECTED_PATHS = [
 ];
 const AUTH_PATHS = ['/auth/login', '/auth/register'];
 
+// The supplier area moved from /dashboard/supplier to /supplier. Old bookmarks,
+// sent emails and stored notification links keep working through a permanent
+// redirect; the query string is kept. This runs before the sign-in check, so a
+// signed-out visitor is then sent to /auth/login?redirect=/supplier… as usual.
+const LEGACY_SUPPLIER = '/dashboard/supplier';
+
+export function legacySupplierTarget(pathname: string): string | null {
+  if (pathname !== LEGACY_SUPPLIER && !pathname.startsWith(LEGACY_SUPPLIER + '/')) return null;
+  const rest = pathname.slice(LEGACY_SUPPLIER.length).replace(/\/+$/, '');
+  return '/supplier' + rest;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const legacyTarget = legacySupplierTarget(pathname);
+  if (legacyTarget) {
+    return NextResponse.redirect(new URL(legacyTarget + request.nextUrl.search, request.url), 308);
+  }
 
   const isProtectedRoute = PROTECTED_PATHS.some(path => pathname.startsWith(path));
   const isAuthRoute = AUTH_PATHS.some(path => pathname.startsWith(path));

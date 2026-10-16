@@ -75,12 +75,8 @@ export const metadata: Metadata = {
     },
     alternates: {
         canonical: '/',
-        languages: {
-            'en': '/en',
-            'ar': '/ar',
-            'fr': '/fr',
-            'ro': '/ro',
-        },
+        // No per-language alternates: the interface language is chosen in the
+        // app, not in the URL, so /en, /ar… don't exist (they used to 404).
     },
     openGraph: {
         type: 'website',
