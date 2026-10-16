@@ -13,7 +13,8 @@ import {
     AlertCircle,
     Loader2,
     ExternalLink,
-    Landmark
+    Landmark,
+    ArrowRight
 } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
@@ -21,15 +22,21 @@ import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Suspense } from 'react';
+import { useLanguage } from '@/contexts/LanguageContext';
+
+const KYC_KEYS: Record<string, string> = { UNVERIFIED: 'kycUNVERIFIED', PENDING: 'kycPENDING', VERIFIED: 'kycVERIFIED', REJECTED: 'kycREJECTED' };
 
 function PayoutSettingsContent() {
     const { user } = useAuth();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { t } = useLanguage();
+    const tr = (key: string, vars?: Record<string, string | number>) => t('supplierMoney', key, vars);
     
     const [isLoading, setIsLoading] = React.useState(false);
     const [isOnboarding, setIsOnboarding] = React.useState(false);
-    const [status, setStatus] = React.useState<{ type: 'success' | 'error', msg: string } | null>(() => {
+    // `key` is a supplierMoney dictionary key; `text` is a message from the server.
+    const [status, setStatus] = React.useState<{ type: 'success' | 'error', key?: string, text?: string } | null>(() => {
         return null;
     });
 
@@ -38,9 +45,9 @@ function PayoutSettingsContent() {
         const successParam = searchParams.get('success');
         const refreshParam = searchParams.get('refresh');
         if (successParam === 'true') {
-            setStatus({ type: 'success', msg: 'Stripe account connected successfully! You can now receive payouts.' });
+            setStatus({ type: 'success', key: 'poConnectedOk' });
         } else if (refreshParam === 'true') {
-            setStatus({ type: 'error', msg: 'Stripe onboarding session expired. Please try connecting again.' });
+            setStatus({ type: 'error', key: 'poExpired' });
         }
     }, [searchParams]);
 
@@ -84,16 +91,16 @@ function PayoutSettingsContent() {
         try {
             const res = await apiFetch('/payments/connect/onboard', { method: 'POST' });
             if (res.status === 403) {
-                setStatus({ type: 'error', msg: 'Complete KYC verification first' });
+                setStatus({ type: 'error', key: 'poKycFirst' });
                 return;
             }
             if (!res.ok) {
-                throw new Error('Connection failed');
+                throw new Error();
             }
             const { url } = await res.json();
             window.location.href = url;
         } catch (err: any) {
-            setStatus({ type: 'error', msg: err.message || 'Failed to connect. Try again.' });
+            setStatus({ type: 'error', key: 'poConnectFailed' });
         } finally {
             setIsOnboarding(false);
         }
@@ -108,31 +115,31 @@ function PayoutSettingsContent() {
                 body: JSON.stringify(formData),
             });
             if (res.ok) {
-                setStatus({ type: 'success', msg: 'Payout settings updated securely.' });
+                setStatus({ type: 'success', key: 'poSavedOk' });
             } else {
                 const err = await res.json();
-                setStatus({ type: 'error', msg: err.message || 'Update failed.' });
+                setStatus(err?.message ? { type: 'error', text: String(err.message) } : { type: 'error', key: 'poUpdateFailed' });
             }
         } catch (err) {
-            setStatus({ type: 'error', msg: 'Connection error.' });
+            setStatus({ type: 'error', key: 'connectionError' });
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <div className="max-w-4xl mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="max-w-4xl mx-auto space-y-10 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700" data-no-translate>
             {/* Header */}
             <div className="space-y-4">
                 <Link 
                     href="/supplier/settings" 
                     className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors text-xs font-black uppercase tracking-widest"
                 >
-                    <ArrowLeft size={14} /> Back to Settings
+                    <ArrowLeft size={14} className="rtl:rotate-180" /> {tr('poBack')}
                 </Link>
                 <div className="space-y-1">
-                    <h1 className="text-3xl font-black text-foreground tracking-tight">Payout & Financials</h1>
-                    <p className="text-muted-foreground font-medium">Configure how you receive payments and manage your Stripe Connect account.</p>
+                    <h1 className="text-3xl font-black text-foreground tracking-tight">{tr('poTitle')}</h1>
+                    <p className="text-muted-foreground font-medium">{tr('poSubtitle')}</p>
                 </div>
             </div>
 
@@ -146,7 +153,7 @@ function PayoutSettingsContent() {
                     )}
                 >
                     {status.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-                    <p className="text-xs font-black uppercase tracking-widest">{status.msg}</p>
+                    <p className="text-xs font-black uppercase tracking-widest">{status.key ? tr(status.key) : status.text}</p>
                 </motion.div>
             )}
 
@@ -161,14 +168,14 @@ function PayoutSettingsContent() {
                                 <span className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
                                     <CreditCard size={16} className="text-indigo-500" />
                                 </span>
-                                Stripe Connect Status
+                                {tr('poStripeStatus')}
                             </h3>
                             
                             <div className="p-6 bg-muted/30 rounded-2xl border border-border/50 flex flex-col md:flex-row md:items-center justify-between gap-6">
                                 <div className="space-y-1">
                                     <div className="flex items-center gap-2">
                                         <p className="font-black text-foreground uppercase text-xs tracking-widest">
-                                            {stripeStatus?.connected ? (stripeStatus.onboarded ? 'Connected & Verified' : 'Connection Pending') : 'Not Connected'}
+                                            {stripeStatus?.connected ? (stripeStatus.onboarded ? tr('poConnectedVerified') : tr('poPending')) : tr('poNotConnected')}
                                         </p>
                                         {stripeStatus?.onboarded ? (
                                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -180,8 +187,8 @@ function PayoutSettingsContent() {
                                     </div>
                                     <p className="text-xs text-muted-foreground max-w-sm">
                                         {stripeStatus?.onboarded 
-                                            ? `Your Stripe account (${stripeStatus.accountId}) is active.` 
-                                            : "Connect your bank account via Stripe Express. Payout timing and terms are agreed with the Atlantis team."}
+                                            ? tr('poActiveAccount', { id: `\u2066${stripeStatus.accountId ?? ''}\u2069` })
+                                            : tr('poConnectHint')}
                                     </p>
                                 </div>
                                 
@@ -196,7 +203,7 @@ function PayoutSettingsContent() {
                                     )}
                                 >
                                     {isOnboarding ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-                                    {stripeStatus?.connected ? 'Manage Account' : 'Connect Stripe →'}
+                                    {stripeStatus?.connected ? tr('poManage') : <>{tr('poConnect')} <ArrowRight size={12} className="rtl:rotate-180" /></>}
                                 </button>
                             </div>
                         </div>
@@ -208,63 +215,63 @@ function PayoutSettingsContent() {
                              <span className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                                 <Landmark size={16} className="text-emerald-500" />
                             </span>
-                            Direct Bank Transfer (Manual Fallback)
+                            {tr('poBankTitle')}
                         </h3>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">Account Holder Name</label>
+                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">{tr('poHolder')}</label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.accountHolderName}
                                     onChange={e => setFormData({...formData, accountHolderName: e.target.value})}
                                     className="w-full h-14 bg-background rounded-2xl border border-border px-6 outline-none focus:border-primary/50 text-card-foreground font-medium"
-                                    placeholder="Full Legal Name"
+                                    placeholder={tr('poHolderPh')}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">Bank Name</label>
+                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">{tr('poBankName')}</label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.bankName}
                                     onChange={e => setFormData({...formData, bankName: e.target.value})}
                                     className="w-full h-14 bg-background rounded-2xl border border-border px-6 outline-none focus:border-primary/50 text-card-foreground font-medium"
-                                    placeholder="e.g. HSBC"
+                                    placeholder={tr('egExample', { example: 'HSBC' })}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">IBAN</label>
+                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">{tr('ibanLabel')}</label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.iban}
                                     onChange={e => setFormData({...formData, iban: e.target.value.toUpperCase()})}
                                     className="w-full h-14 bg-background rounded-2xl border border-border px-6 outline-none focus:border-primary/50 text-card-foreground font-medium"
-                                    placeholder="EU40 0000 ..."
+                                    placeholder={tr('egExample', { example: 'EU40 0000 …' })}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">SWIFT / BIC</label>
+                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">{tr('swiftLabel')}</label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.swiftCode}
                                     onChange={e => setFormData({...formData, swiftCode: e.target.value.toUpperCase()})}
                                     className="w-full h-14 bg-background rounded-2xl border border-border px-6 outline-none focus:border-primary/50 text-card-foreground font-medium"
-                                    placeholder="CHAS US 33"
+                                    placeholder={tr('egExample', { example: 'CHAS US 33' })}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">VAT Number / Tax ID</label>
+                                <label className="text-[11px] font-black text-muted-foreground uppercase tracking-widest ms-1">{tr('poVat')}</label>
                                 <input
                                     type="text"
                                     required
                                     value={formData.vatNumber}
                                     onChange={e => setFormData({...formData, vatNumber: e.target.value})}
                                     className="w-full h-14 bg-background rounded-2xl border border-border px-6 outline-none focus:border-primary/50 text-card-foreground font-medium"
-                                    placeholder="GB12345678"
+                                    placeholder={tr('egExample', { example: 'GB12345678' })}
                                 />
                             </div>
                         </div>
@@ -277,7 +284,7 @@ function PayoutSettingsContent() {
                                 className="h-12 px-8 bg-primary text-primary-foreground font-black text-[11px] uppercase tracking-widest rounded-xl hover:scale-[1.02] transition-all disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed flex items-center gap-2"
                             >
                                 {isLoading ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
-                                Update Payout Settings
+                                {tr('poSubmit')}
                             </button>
                         </div>
                     </form>
@@ -292,14 +299,14 @@ function PayoutSettingsContent() {
                         <div className="bg-card shadow-premium border border-border rounded-[32px] p-8 space-y-6">
                             <h3 className="text-sm font-black text-card-foreground uppercase tracking-widest flex items-center gap-2">
                                 <ShieldCheck size={18} className="text-emerald-500" />
-                                KYC Status
+                                {tr('poKycStatus')}
                             </h3>
                             <div className={cn(
                                 "p-4 rounded-2xl border space-y-2",
                                 user?.kycStatus === 'VERIFIED' ? "bg-emerald-500/5 border-emerald-500/20" : "bg-amber-500/5 border-amber-500/20"
                             )}>
                                 <div className="flex items-center justify-between">
-                                    <p className="text-[10px] font-black uppercase tracking-widest text-foreground">Identity Check</p>
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-foreground">{tr('poIdentityCheck')}</p>
                                     {user?.kycStatus === 'VERIFIED' ? (
                                         <CheckCircle2 size={14} className="text-emerald-500" />
                                     ) : (
@@ -307,16 +314,16 @@ function PayoutSettingsContent() {
                                     )}
                                 </div>
                                 <p className="text-[11px] font-bold text-foreground">
-                                    {user?.kycStatus || 'UNVERIFIED'}
+                                    {tr(KYC_KEYS[String(user?.kycStatus || 'UNVERIFIED')] || 'kycUNVERIFIED')}
                                 </p>
                             </div>
                             {user?.kycStatus !== 'VERIFIED' && (
                                 <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl">
                                     <p className="text-[10px] text-amber-600 font-black uppercase leading-relaxed">
-                                        Financial laws require identity verification before we can process payouts. Please complete KYC first.
+                                        {tr('poKycBody')}
                                     </p>
                                     <Link href="/dashboard/kyc" className="inline-block mt-3 text-[10px] font-black text-amber-700 underline underline-offset-4">
-                                        GO TO VERIFICATION
+                                        {tr('poKycLink')}
                                     </Link>
                                 </div>
                             )}

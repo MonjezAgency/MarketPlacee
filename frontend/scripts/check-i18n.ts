@@ -16,6 +16,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { LOCALES, LOCALE_META, type Locale } from '../src/locales/config';
 import { parsePlural, variablesOf } from '../src/locales/format';
+import { SECTIONS } from '../src/locales/sections';
 
 type Dict = Record<string, unknown>;
 const errors: string[] = [];
@@ -78,6 +79,18 @@ async function main() {
         const dict = mod[code];
         if (!dict || typeof dict !== 'object') { errors.push(`${code}: src/locales/${code}.ts must export const ${code}`); continue; }
         dicts[code] = flatten(dict);
+    }
+    // Area sections (src/locales/sections) join the same flattened dictionaries.
+    const sectionNames = new Set<string>();
+    for (const sec of SECTIONS) {
+        if (sectionNames.has(sec.name)) errors.push(`sections: duplicate section name "${sec.name}"`);
+        sectionNames.add(sec.name);
+        if (dicts.en && sec.name in (dicts.en as Record<string, unknown>)) errors.push(`sections: "${sec.name}" clashes with a section in en.ts`);
+        for (const code of LOCALES) {
+            const d = sec.dict[code] || {};
+            for (const [k, v] of Object.entries(d)) (dicts[code] = dicts[code] || {})[`${sec.name}.${k}`] = v;
+            for (const [k, why] of Object.entries(sec.sameAsEnglish?.[code] || {})) if (why) (IDENTICAL_OK[code] = IDENTICAL_OK[code] || {})[`${sec.name}.${k}`] = why;
+        }
     }
     const en = dicts.en;
     if (!en || Object.keys(en).length < 100) { console.error('❌ en.ts failed to load or is suspiciously small'); process.exit(1); }
@@ -143,6 +156,7 @@ async function main() {
         'src/app/dashboard/kyc/page.tsx',
         'src/app/dashboard/customer/orders/[id]/track/page.tsx',
     ];
+    for (const sec of SECTIONS) for (const f of sec.files) if (!SCOPE.includes(f)) SCOPE.push(f);
     const ALLOWED_TEXT = /^(ATLAN|TIS\.|·|—|–|\/|\+|×|#|Info@atlantisfmcg\.com|\d+\/\d+)$/;
     for (const rel of SCOPE) {
         const file = path.join(__dirname, '..', rel);
@@ -157,6 +171,8 @@ async function main() {
             }
             // Literal user-facing attributes and dialogs
             for (const m of Array.from(line.matchAll(/\b(placeholder|aria-label|title|alt|label)="([^"]*[A-Za-z]{2,}[^"]*)"/g))) errors.push(`${rel}:${i + 1} hard-coded ${m[1]}="${m[2].slice(0, 50)}"`);
+            // Every literal t('section', 'key') must exist in English.
+            for (const m of Array.from(line.matchAll(/\bt\(\s*'(\w+)'\s*,\s*'([\w.]+)'/g))) if (!(`${m[1]}.${m[2]}` in en)) errors.push(`${rel}:${i + 1} t('${m[1]}', '${m[2]}') has no English key`);
             for (const m of Array.from(line.matchAll(/\b(confirm|alert)\(\s*['"`]([^'"`]*[A-Za-z]{2,})/g))) errors.push(`${rel}:${i + 1} hard-coded ${m[1]}("${m[2].slice(0, 50)}")`);
         });
     }

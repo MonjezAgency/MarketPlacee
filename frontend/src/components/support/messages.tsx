@@ -4,22 +4,30 @@ import * as React from 'react';
 import Link from 'next/link';
 import { AlertCircle, ArrowRight, RotateCcw, UserRound } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 /** Shared message pieces for the Support workspace (assistant and order threads). */
 
-export const clock = (s: string | Date) => new Date(s).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-export function dayLabel(s: string | Date) {
-    const d = new Date(s), now = new Date();
-    const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
-    if (same(d, now)) return 'Today';
-    const y = new Date(now); y.setDate(now.getDate() - 1);
-    if (same(d, y)) return 'Yesterday';
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+/** Locale-aware times and day labels for message lists (display only). */
+export function useWhen() {
+    const { t, fmt } = useLanguage();
+    return React.useMemo(() => {
+        const clock = (s: string | Date) => fmt.date(s, { hour: '2-digit', minute: '2-digit' });
+        const dayLabel = (s: string | Date) => {
+            const d = new Date(s), now = new Date();
+            const same = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+            if (same(d, now)) return t('support', 'today');
+            const y = new Date(now); y.setDate(now.getDate() - 1);
+            if (same(d, y)) return t('support', 'yesterday');
+            return fmt.date(d, { day: 'numeric', month: 'short', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+        };
+        const shortWhen = (s: string | Date) => {
+            const d = new Date(s);
+            return d.toDateString() === new Date().toDateString() ? clock(d) : fmt.date(d, { day: 'numeric', month: 'short' });
+        };
+        return { clock, dayLabel, shortWhen };
+    }, [t, fmt]);
 }
-export const shortWhen = (s: string | Date) => {
-    const d = new Date(s);
-    return d.toDateString() === new Date().toDateString() ? clock(d) : d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-};
 export const orderRef = (id: string) => `#${id.slice(-8).toUpperCase()}`;
 
 /* Safe rich text: paragraphs, lists, **bold**, internal links, and order refs (#ABC12345). */
@@ -31,7 +39,7 @@ function inline(text: string): React.ReactNode[] {
         if (m.index > last) out.push(text.slice(last, m.index));
         if (m[1]) out.push(<strong key={k++} className="font-semibold text-heading">{m[1]}</strong>);
         else if (m[2]) out.push(<Link key={k++} href={m[3]} className="font-medium text-teal underline underline-offset-2 decoration-teal/40 hover:decoration-teal">{m[2]}</Link>);
-        else out.push(<span key={k++} className="font-mono text-[0.92em] px-1 py-px rounded bg-surface-3 text-heading">{m[4]}</span>);
+        else out.push(<span key={k++} dir="ltr" className="font-mono text-[0.92em] px-1 py-px rounded bg-surface-3 text-heading">{m[4]}</span>);
         last = re.lastIndex;
     }
     if (last < text.length) out.push(text.slice(last));
@@ -78,6 +86,8 @@ export function DayDivider({ label }: { label: string }) {
 
 /** Atlantis side: the assistant (plain, with mark) or a person from the team (teal accent). */
 export function IncomingMessage({ from, name, text, at, imageUrl }: { from: 'assistant' | 'team'; name?: string; text: string; at?: string; imageUrl?: string | null }) {
+    const { t } = useLanguage();
+    const { clock } = useWhen();
     const { body, links } = splitLinks(text);
     const team = from === 'team';
     return (
@@ -85,20 +95,20 @@ export function IncomingMessage({ from, name, text, at, imageUrl }: { from: 'ass
             {team ? <span className="w-8 h-8 rounded-lg bg-teal-soft text-teal flex items-center justify-center shrink-0" aria-hidden><UserRound size={16} /></span> : <AtlantisMark />}
             <div className="min-w-0 max-w-[min(100%,40rem)]">
                 <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] leading-5">
-                    <span className="font-semibold text-heading">{team ? (name || 'Atlantis team') : 'Atlantis assistant'}</span>
-                    {team && <span className="text-[11px] font-semibold uppercase tracking-wide text-teal">Team</span>}
+                    <span className="font-semibold text-heading">{team ? (name || t('support', 'atlantisTeam')) : t('support', 'atlantisAssistant')}</span>
+                    {team && <span className="text-[11px] font-semibold uppercase tracking-wide text-teal">{t('support', 'teamBadge')}</span>}
                     {at && <time dateTime={new Date(at).toISOString()} className="text-ink-4">{clock(at)}</time>}
                 </p>
-                <div className={cn('mt-1 text-[14.5px] leading-[1.6] text-ink', team ? 'rounded-xl rounded-tl-sm bg-surface ring-1 ring-line border-s-[3px] border-[#2EC4B6] px-4 py-2.5' : 'rounded-xl rounded-tl-sm bg-surface-2 px-4 py-2.5')}>
+                <div className={cn('mt-1 text-[14.5px] leading-[1.6] text-ink', team ? 'rounded-xl rounded-ss-sm bg-surface ring-1 ring-line border-s-[3px] border-[#2EC4B6] px-4 py-2.5' : 'rounded-xl rounded-ss-sm bg-surface-2 px-4 py-2.5')}>
                     {imageUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={imageUrl} alt="Attached image" className="mb-2 max-h-56 rounded-lg ring-1 ring-line" />
+                        <img src={imageUrl} alt={t('support', 'attachedImageAlt')} className="mb-2 max-h-56 rounded-lg ring-1 ring-line" />
                     )}
                     <RichText text={body} />
                 </div>
                 {links.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                        {links.map((l) => <Link key={l.href} href={l.href} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg ring-1 ring-line bg-surface text-[13px] font-medium text-heading hover:ring-[#2EC4B6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">{l.label} <ArrowRight size={13} aria-hidden /></Link>)}
+                        {links.map((l) => <Link key={l.href} href={l.href} className="inline-flex items-center gap-1 h-8 px-3 rounded-lg ring-1 ring-line bg-surface text-[13px] font-medium text-heading hover:ring-[#2EC4B6] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">{l.label} <ArrowRight size={13} className="rtl:rotate-180" aria-hidden /></Link>)}
                     </div>
                 )}
             </div>
@@ -108,19 +118,21 @@ export function IncomingMessage({ from, name, text, at, imageUrl }: { from: 'ass
 
 /** The signed-in user's own message (right-aligned). */
 export function OutgoingMessage({ text, imageUrl, at, state, error, onRetry }: { text: string; imageUrl?: string | null; at?: string; state?: 'sending' | 'failed-send' | 'failed-answer'; error?: string; onRetry?: () => void }) {
+    const { t } = useLanguage();
+    const { clock } = useWhen();
     return (
         <div className="flex flex-col items-end">
-            <div className={cn('max-w-[min(85%,34rem)] rounded-xl rounded-tr-sm bg-heading text-white px-4 py-2.5 text-[14.5px] leading-[1.6]', state === 'sending' && 'opacity-70')}>
+            <div className={cn('max-w-[min(85%,34rem)] rounded-xl rounded-se-sm bg-heading text-white px-4 py-2.5 text-[14.5px] leading-[1.6]', state === 'sending' && 'opacity-70')}>
                 {imageUrl && (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={imageUrl} alt="Attached image" className="mb-2 max-h-56 rounded-lg bg-white/10" />
+                    <img src={imageUrl} alt={t('support', 'attachedImageAlt')} className="mb-2 max-h-56 rounded-lg bg-white/10" />
                 )}
                 {text && <p className="whitespace-pre-wrap break-words">{text}</p>}
             </div>
             <p className="mt-1 text-[12px] text-ink-4" aria-live="polite">
-                {state === 'sending' ? 'Sending…' : state ? (
-                    <span className="inline-flex flex-wrap items-center gap-1.5 text-[#B91C1C]"><AlertCircle size={13} aria-hidden /> {error || (state === 'failed-send' ? 'Not sent' : 'No answer yet')}
-                        {onRetry && <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 font-semibold underline underline-offset-2"><RotateCcw size={12} aria-hidden /> Retry</button>}</span>
+                {state === 'sending' ? t('support', 'sending') : state ? (
+                    <span className="inline-flex flex-wrap items-center gap-1.5 text-[#B91C1C]"><AlertCircle size={13} aria-hidden /> {error || (state === 'failed-send' ? t('support', 'notSent') : t('support', 'noAnswer'))}
+                        {onRetry && <button type="button" onClick={onRetry} className="inline-flex items-center gap-1 font-semibold underline underline-offset-2"><RotateCcw size={12} aria-hidden /> {t('support', 'retry')}</button>}</span>
                 ) : at ? <time dateTime={new Date(at).toISOString()}>{clock(at)}</time> : null}
             </p>
         </div>

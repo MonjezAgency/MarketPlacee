@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import { Bot, Package, UserRound } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { AssistantPanel, type AssistantSession } from './AssistantPanel';
 import { OrderThreads } from './OrderThreads';
 
@@ -20,15 +21,16 @@ export default function SupportCenter({ role, heightClass }: { role: 'supplier' 
 function Center({ role, heightClass }: { role: 'supplier' | 'buyer'; heightClass: string }) {
     const sp = useSearchParams();
     const { user } = useAuth();
+    const { t } = useLanguage();
     const [tab, setTab] = React.useState<'assistant' | 'orders'>(sp.get('tab') === 'orders' ? 'orders' : 'assistant');
     const [session, setSession] = React.useState<AssistantSession | null>(null);
     const [orderCount, setOrderCount] = React.useState<number | null>(null);
     const onSession = React.useCallback((s: AssistantSession | null) => setSession(s), []);
 
-    const select = (t: 'assistant' | 'orders') => {
-        setTab(t);
+    const select = (next: 'assistant' | 'orders') => {
+        setTab(next);
         const url = new URL(window.location.href);
-        if (t === 'orders') url.searchParams.set('tab', 'orders'); else url.searchParams.delete('tab');
+        if (next === 'orders') url.searchParams.set('tab', 'orders'); else url.searchParams.delete('tab');
         window.history.replaceState(null, '', url.toString());
     };
     const onKeyTabs = (e: React.KeyboardEvent) => {
@@ -37,23 +39,23 @@ function Center({ role, heightClass }: { role: 'supplier' | 'buyer'; heightClass
 
     // Status reflects what the server reports: whether the AI assistant is switched on, and whether a person is in the conversation.
     const status = !session ? null : session.mode === 'team'
-        ? { dot: 'bg-[#2EC4B6]', text: 'Atlantis team in your conversation', title: 'A person from the Atlantis team has joined; replies appear in the Assistant tab.' }
+        ? { dot: 'bg-[#2EC4B6]', text: t('support', 'statusTeam'), title: t('support', 'statusTeamTitle') }
         : session.assistant.available
-            ? { dot: 'bg-[#10B981]', text: 'AI assistant on', title: 'The assistant answers from your own account data. If it can’t answer, your message is kept for the team.' }
-            : { dot: 'bg-ink-4', text: 'AI assistant off — the team replies', title: 'The AI assistant isn’t switched on. Messages are saved for the Atlantis team.' };
+            ? { dot: 'bg-[#10B981]', text: t('support', 'statusAiOn'), title: t('support', 'statusAiOnTitle') }
+            : { dot: 'bg-ink-4', text: t('support', 'statusAiOff'), title: t('support', 'statusAiOffTitle') };
 
     const tabs = [
-        { key: 'assistant' as const, label: 'Assistant', short: 'Assistant', icon: Bot, badge: null as number | null },
-        { key: 'orders' as const, label: 'Order conversations', short: 'Orders', icon: Package, badge: orderCount },
+        { key: 'assistant' as const, label: t('support', 'tabAssistant'), short: t('support', 'tabAssistant'), icon: Bot, badge: null as number | null },
+        { key: 'orders' as const, label: t('support', 'tabOrders'), short: t('support', 'tabOrdersShort'), icon: Package, badge: orderCount },
     ];
 
     return (
-        <div className="text-start">
+        <div className="text-start" data-no-translate>
             <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div className="min-w-0">
-                    <h1 className="font-sans text-[24px] leading-tight font-semibold tracking-tight text-heading">Support</h1>
+                    <h1 className="font-sans text-[24px] leading-tight font-semibold tracking-tight text-heading">{t('support', 'title')}</h1>
                     <p className="mt-1 max-w-[70ch] text-[14px] text-ink-3">
-                        {role === 'supplier' ? 'Get answers about your listings, stock, prices and orders, or write to the Atlantis team about a specific order.' : 'Get answers about your orders, cart and account, or write to the Atlantis team about a specific order.'}
+                        {role === 'supplier' ? t('support', 'introSupplier') : t('support', 'introBuyer')}
                     </p>
                 </div>
                 {status && (
@@ -63,22 +65,22 @@ function Center({ role, heightClass }: { role: 'supplier' | 'buyer'; heightClass
                 )}
             </header>
 
-            <section className={cn('flex flex-col rounded-2xl ring-1 ring-line bg-surface overflow-hidden', heightClass)} aria-label="Support workspace">
-                <div role="tablist" aria-label="Support" onKeyDown={onKeyTabs} className="shrink-0 flex items-end gap-1 px-2 sm:px-3 border-b border-line overflow-x-auto scrollbar-hide">
-                    {tabs.map((t) => {
-                        const on = tab === t.key;
+            <section className={cn('flex flex-col rounded-2xl ring-1 ring-line bg-surface overflow-hidden', heightClass)} aria-label={t('support', 'workspaceAria')}>
+                <div role="tablist" aria-label={t('support', 'title')} onKeyDown={onKeyTabs} className="shrink-0 flex items-end gap-1 px-2 sm:px-3 border-b border-line overflow-x-auto scrollbar-hide">
+                    {tabs.map((tb) => {
+                        const on = tab === tb.key;
                         return (
-                            <button key={t.key} role="tab" id={`support-tab-${t.key}`} aria-selected={on} aria-controls={`support-panel-${t.key}`} tabIndex={on ? 0 : -1} type="button" onClick={() => select(t.key)}
+                            <button key={tb.key} role="tab" id={`support-tab-${tb.key}`} aria-selected={on} aria-controls={`support-panel-${tb.key}`} tabIndex={on ? 0 : -1} type="button" onClick={() => select(tb.key)}
                                 className={cn('relative h-12 px-3 sm:px-4 inline-flex items-center gap-2 whitespace-nowrap text-[14px] font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#2EC4B6] rounded-t-lg',
                                     on ? 'text-heading' : 'text-ink-3 hover:text-ink')}>
-                                <t.icon size={16} aria-hidden /> <span className="hidden sm:inline">{t.label}</span><span className="sm:hidden">{t.short}</span>
-                                {t.badge != null && t.badge > 0 && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-surface-3 text-[12px] font-semibold text-ink-2 inline-flex items-center justify-center">{t.badge}</span>}
+                                <tb.icon size={16} aria-hidden /> <span className="hidden sm:inline">{tb.label}</span><span className="sm:hidden">{tb.short}</span>
+                                {tb.badge != null && tb.badge > 0 && <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-surface-3 text-[12px] font-semibold text-ink-2 inline-flex items-center justify-center">{tb.badge}</span>}
                                 <span aria-hidden className={cn('absolute inset-x-2 -bottom-px h-0.5 rounded-full transition-colors duration-150', on ? 'bg-heading' : 'bg-transparent')} />
                             </button>
                         );
                     })}
                     {session?.mode === 'team' && tab === 'assistant' && (
-                        <span className="ms-auto mb-3 hidden sm:inline-flex items-center gap-1.5 text-[12.5px] text-ink-3"><UserRound size={14} className="text-teal" aria-hidden /> A person is helping you</span>
+                        <span className="ms-auto mb-3 hidden sm:inline-flex items-center gap-1.5 text-[12.5px] text-ink-3"><UserRound size={14} className="text-teal" aria-hidden /> {t('support', 'personHelping')}</span>
                     )}
                 </div>
 

@@ -29,7 +29,6 @@ import { UserMenu } from '@/components/dashboard/UserMenu';
 import { apiFetch } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LOCALES, LOCALE_META } from '@/locales/config';
-import { formatPrice } from '@/lib/currency';
 import { GuidedTour } from '@/components/ui/GuidedTour';
 import NotificationBell from '@/components/ui/NotificationBell';
 import { ConfirmProvider } from '@/components/supplier/ui';
@@ -40,14 +39,15 @@ const SUPPLIER_LANGUAGES = LOCALES.map((code) => ({ code, name: LOCALE_META[code
 // Supplier navigation. Removed from the menu (pages and APIs still exist, so
 // old links keep working): Analytics (its useful metrics now live on the
 // Business Overview), Wholesale Offers, Offers & Ads, Payment Methods.
-const SUPPLIER_LINKS: { label: string; href: string; icon: any; key?: string; locked?: boolean }[] = [
-    { label: 'Business Overview', href: '/supplier', icon: LayoutDashboard },
-    { label: 'Inventory & Products', href: '/supplier/products', icon: Package, key: 'products' },
-    { label: 'Stock & Reservations', href: '/supplier/inventory', icon: Warehouse },
-    { label: 'Orders', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
-    { label: 'Shipping & Fulfilment', href: '/supplier/fulfillment', icon: Truck },
-    { label: 'Settings', href: '/supplier/settings', icon: Settings },
-    { label: 'Support', href: '/supplier/support', icon: LifeBuoy },
+// `labelKey` is a key of the supplierShell dictionary, translated at render time.
+const SUPPLIER_LINKS: { labelKey: string; href: string; icon: any; key?: string; locked?: boolean }[] = [
+    { labelKey: 'navOverview', href: '/supplier', icon: LayoutDashboard },
+    { labelKey: 'navProducts', href: '/supplier/products', icon: Package, key: 'products' },
+    { labelKey: 'navInventory', href: '/supplier/inventory', icon: Warehouse },
+    { labelKey: 'navOrders', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
+    { labelKey: 'navFulfillment', href: '/supplier/fulfillment', icon: Truck },
+    { labelKey: 'navSettings', href: '/supplier/settings', icon: Settings },
+    { labelKey: 'navSupport', href: '/supplier/support', icon: LifeBuoy },
 ];
 
 /** Overview matches only itself; other items also match their sub-pages. */
@@ -61,6 +61,8 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     const { user, logout, isAuthReady } = useAuth();
     const { theme, setTheme } = useTheme();
     const router = useRouter();
+    const { t, dir, fmt } = useLanguage();
+    const tr = (key: string, vars?: Record<string, string | number>) => t('supplierShell', key, vars);
     const [showTour, setShowTour] = React.useState(false);
     const [pendingCounts, setPendingCounts] = React.useState<Record<string, number>>({
         orders: 0,
@@ -107,13 +109,13 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     const tourSteps = [
         {
             targetId: 'tour-inventory',
-            title: 'Inventory Control',
-            description: 'Manage your product catalog, update prices, and monitor stock levels across all your distribution centers.'
+            title: tr('tourInventoryTitle'),
+            description: tr('tourInventoryDesc')
         },
         {
             targetId: 'tour-revenue',
-            title: 'Financial Insights',
-            description: 'Track your month-to-date revenue and active order volume. All figures are automatically converted to your preferred currency.'
+            title: tr('tourRevenueTitle'),
+            description: tr('tourRevenueDesc')
         }
     ];
 
@@ -165,7 +167,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     return (
         <div className="flex h-[100dvh] overflow-hidden bg-[#F8FAFC] font-sans selection:bg-[#0EA5A4]/10">
             {/* Sidebar (Desktop) */}
-            <aside className={cn(
+            <aside data-no-translate className={cn(
                 "hidden md:flex flex-col h-full bg-[#0F172A] transition-all duration-300 ease-in-out shrink-0 text-start",
                 isOpen ? "w-[260px]" : "w-[80px]"
             )}>
@@ -173,17 +175,17 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 <div className="h-16 flex items-center px-6 border-b border-white/5">
                     <Link href="/" className="flex items-center gap-3 overflow-hidden">
                         <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0">
-                            <img src="/brand/atlantis-mark.png" alt="Atlantis" className="w-6 h-6 object-contain" />
+                            <img src="/brand/atlantis-mark.png" alt={'Atlantis'} className="w-6 h-6 object-contain" />
                         </div>
                         <AnimatePresence>
                             {isOpen && (
                                 <motion.span 
-                                    initial={{ opacity: 0, x: -10 }}
+                                    initial={{ opacity: 0, x: dir === 'rtl' ? 10 : -10 }}
                                     animate={{ opacity: 1, x: 0 }}
-                                    exit={{ opacity: 0, x: -10 }}
+                                    exit={{ opacity: 0, x: dir === 'rtl' ? 10 : -10 }}
                                     className="font-black text-lg tracking-tighter text-white uppercase"
                                 >
-                                    Atlan<span className="text-[#0EA5A4]">tis.</span>
+                                    Atlan<span className="text-[#0EA5A4]">tis.</span>{/* i18n-ignore: brand wordmark */}
                                 </motion.span>
                             )}
                         </AnimatePresence>
@@ -191,10 +193,11 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 </div>
 
                 {/* Sidebar Navigation */}
-                <nav aria-label="Supplier navigation" className="flex-1 py-5 px-3 space-y-0.5 overflow-y-auto no-scrollbar">
-                    {isOpen && <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">Workspace</p>}
+                <nav aria-label={tr('navAria')} className="flex-1 py-5 px-3 space-y-0.5 overflow-y-auto no-scrollbar">
+                    {isOpen && <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">{tr('workspace')}</p>}
                     {SUPPLIER_LINKS.map((link) => {
                         const Icon = link.icon;
+                        const label = tr(link.labelKey);
                         const isActive = isLinkActive(pathname, link.href);
                         const badgeCount = link.key ? pendingCounts[link.key] : 0;
                         return (
@@ -202,7 +205,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                 key={link.href}
                                 href={link.href}
                                 aria-current={isActive ? 'page' : undefined}
-                                title={isOpen ? undefined : link.label}
+                                title={isOpen ? undefined : label}
                                 className={cn(
                                     "relative flex items-center gap-3 h-10 px-3 rounded-lg transition-colors group outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]",
                                     isActive ? "bg-white/[0.08] text-white" : "text-[#A3B1C6] hover:text-white hover:bg-white/[0.04]",
@@ -210,10 +213,10 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             >
                                 {isActive && <span aria-hidden className="absolute start-0 top-2 bottom-2 w-[3px] rounded-full bg-[#2EC4B6]" />}
                                 <Icon size={18} strokeWidth={1.9} className={cn("shrink-0", isActive ? "text-[#2EC4B6]" : "text-[#7C8BA1] group-hover:text-white")} />
-                                {isOpen && <span className="text-[13.5px] font-medium flex-1 truncate">{link.label}</span>}
+                                {isOpen && <span className="text-[13.5px] font-medium flex-1 truncate">{label}</span>}
                                 {badgeCount > 0 && (
-                                    <span className={cn("min-w-[20px] h-5 px-1.5 rounded-full bg-[#F59E0B] text-[#111827] text-[11px] font-bold flex items-center justify-center", !isOpen && "absolute top-0.5 end-0.5 min-w-[16px] h-4 text-[10px]")} aria-label={`${badgeCount} need attention`}>
-                                        {badgeCount}
+                                    <span className={cn("min-w-[20px] h-5 px-1.5 rounded-full bg-[#F59E0B] text-[#111827] text-[11px] font-bold flex items-center justify-center", !isOpen && "absolute top-0.5 end-0.5 min-w-[16px] h-4 text-[10px]")} aria-label={tr('needAttention', { count: badgeCount })}>
+                                        {fmt.number(badgeCount)}
                                     </span>
                                 )}
                             </Link>
@@ -225,17 +228,20 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                 <div className="p-3 border-t border-white/5">
                     <button 
                         onClick={() => setIsOpen(!isOpen)}
+                        aria-label={isOpen ? tr('collapseMenu') : tr('expandMenu')}
+                        aria-expanded={isOpen}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[#94A3B8] hover:text-white hover:bg-[#1E293B] transition-all"
                     >
                         <Menu size={20} />
-                        {isOpen && <span className="text-[14px] font-medium">Collapse Menu</span>}
+                        {isOpen && <span className="text-[14px] font-medium">{tr('collapseMenu')}</span>}
                     </button>
                     <button
                         onClick={async () => { await logout(); window.location.href = '/auth/login'; }}
+                        aria-label={isOpen ? undefined : tr('signOut')}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-[#94A3B8] hover:text-[#EF4444] hover:bg-[#EF4444]/10 transition-all"
                     >
                         <LogOut size={20} />
-                        {isOpen && <span className="text-[14px] font-medium">Sign Out</span>}
+                        {isOpen && <span className="text-[14px] font-medium">{tr('signOut')}</span>}
                     </button>
                 </div>
             </aside>
@@ -243,16 +249,17 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
             {/* Main Wrapper */}
             <div className="flex-1 flex flex-col min-w-0 h-full">
                 {/* Top Header */}
-                <header className="h-16 bg-white border-b border-[#E2E8F0] flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 shrink-0 z-30 text-start">
+                <header data-no-translate className="h-16 bg-white border-b border-[#E2E8F0] flex items-center justify-between gap-3 px-4 sm:px-6 lg:px-8 shrink-0 z-30 text-start">
                     <div className="flex items-center gap-4">
                         {/* Mobile Menu Trigger */}
                         <button 
                             className="md:hidden p-2 text-[#64748B] hover:bg-slate-50 rounded-lg"
                             onClick={() => setIsMobileOpen(true)}
+                            aria-label={tr('openMenu')}
                         >
                             <Menu size={24} />
                         </button>
-                        <h1 className="text-[17px] sm:text-[20px] font-semibold text-[#0F172A] tracking-tight whitespace-nowrap">Business Hub</h1>
+                        <h1 className="text-[17px] sm:text-[20px] font-semibold text-[#0F172A] tracking-tight whitespace-nowrap">{tr('businessHub')}</h1>
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-4">
@@ -263,7 +270,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                 : user?.kycStatus === 'PENDING' ? 'bg-amber-50 text-amber-800 ring-amber-200'
                                     : 'bg-slate-100 text-slate-600 ring-slate-200')}>
                             <span className={cn('w-1.5 h-1.5 rounded-full', user?.kycStatus === 'VERIFIED' ? 'bg-emerald-500' : user?.kycStatus === 'PENDING' ? 'bg-amber-500' : 'bg-slate-400')} />
-                            {user?.kycStatus === 'VERIFIED' ? 'Verified supplier' : user?.kycStatus === 'PENDING' ? 'Verification in review' : user?.kycStatus === 'REJECTED' ? 'Verification declined' : 'Not verified yet'}
+                            {tr(user?.kycStatus === 'VERIFIED' ? 'kycVerified' : user?.kycStatus === 'PENDING' ? 'kycPending' : user?.kycStatus === 'REJECTED' ? 'kycRejected' : 'kycNone')}
                         </Link>
 
                         {/* Language picker — supplier can switch to their
@@ -275,7 +282,8 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                         {/* Theme Toggle */}
                         <button
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                            aria-label="Toggle dark mode"
+                            aria-label={theme === 'dark' ? tr('switchToLight') : tr('switchToDark')}
+                            title={theme === 'dark' ? tr('switchToLight') : tr('switchToDark')}
                             className="hidden sm:flex w-10 h-10 rounded-full hover:bg-slate-50 items-center justify-center text-[#64748B] transition-all"
                         >
                             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -289,8 +297,8 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                         {/* User Profile */}
                         <div className="flex items-center gap-3 ps-2">
                             <div className="flex flex-col items-end hidden sm:flex">
-                                <span className="text-[13px] font-bold text-[#0F172A]">{user?.name || 'Monjez Vendor'}</span>
-                                <span className="text-[11px] font-medium text-[#94A3B8] uppercase tracking-wider">{user?.role}</span>
+                                <span className="text-[13px] font-bold text-[#0F172A]">{user?.name || tr('fallbackName')}</span>
+                                <span className="text-[11px] font-medium text-[#94A3B8] uppercase tracking-wider">{user?.role?.toUpperCase() === 'SUPPLIER' ? tr('roleSupplier') : user?.role}</span>
                             </div>
                             <UserMenu role="supplier" />
                         </div>
@@ -313,7 +321,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
             {/* Mobile Overlay Sidebar */}
             <AnimatePresence>
                 {isMobileOpen && (
-                    <div className="fixed inset-0 z-[100] md:hidden">
+                    <div data-no-translate className="fixed inset-0 z-[100] md:hidden">
                         <motion.div 
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
@@ -322,16 +330,16 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             onClick={() => setIsMobileOpen(false)} 
                         />
                         <motion.aside 
-                            initial={{ x: -260 }}
+                            initial={{ x: dir === 'rtl' ? 260 : -260 }}
                             animate={{ x: 0 }}
-                            exit={{ x: -260 }}
-                            className="absolute top-0 left-0 h-full w-[260px] bg-[#0F172A] flex flex-col shadow-2xl text-start"
+                            exit={{ x: dir === 'rtl' ? 260 : -260 }}
+                            className="absolute top-0 start-0 h-full w-[260px] bg-[#0F172A] flex flex-col shadow-2xl text-start"
                         >
                             <div className="h-16 flex items-center justify-between px-6 border-b border-white/5">
-                                <span className="font-black text-lg text-white uppercase">Atlan<span className="text-[#0EA5A4]">tis.</span></span>
-                                <button onClick={() => setIsMobileOpen(false)} className="text-white/60"><X size={20} /></button>
+                                <span className="font-black text-lg text-white uppercase">Atlan<span className="text-[#0EA5A4]">tis.</span></span>{/* i18n-ignore: brand wordmark */}
+                                <button onClick={() => setIsMobileOpen(false)} aria-label={tr('closeMenu')} className="text-white/60"><X size={20} /></button>
                             </div>
-                            <nav className="flex-1 p-4 space-y-1">
+                            <nav aria-label={tr('navAria')} className="flex-1 p-4 space-y-1">
                                 {SUPPLIER_LINKS.map((link) => {
                                     const active = isLinkActive(pathname, link.href);
                                     return (
@@ -343,7 +351,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                             className={cn("flex items-center gap-3 h-11 px-3 rounded-lg transition-colors", active ? "bg-white/[0.08] text-white" : "text-[#A3B1C6] hover:text-white")}
                                         >
                                             <link.icon size={18} className={active ? "text-[#2EC4B6]" : undefined} />
-                                            <span className="text-[14px] font-medium">{link.label}</span>
+                                            <span className="text-[14px] font-medium">{tr(link.labelKey)}</span>
                                         </Link>
                                     );
                                 })}
@@ -373,7 +381,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
 // ─── Supplier-side language picker ─────────────────────────────────────────
 
 function SupplierLanguagePicker() {
-    const { locale, setLocale } = useLanguage();
+    const { locale, setLocale, t } = useLanguage();
     const [isOpen, setIsOpen] = React.useState(false);
     const ref = React.useRef<HTMLDivElement>(null);
     const current = SUPPLIER_LANGUAGES.find(l => l.code === locale) || SUPPLIER_LANGUAGES[0];
@@ -390,7 +398,9 @@ function SupplierLanguagePicker() {
         <div ref={ref} className="relative">
             <button
                 onClick={() => setIsOpen(o => !o)}
-                title="Change language"
+                title={t('supplierShell', 'changeLanguage')}
+                aria-label={t('supplierShell', 'changeLanguage')}
+                aria-expanded={isOpen}
                 className="h-10 px-3 rounded-full hover:bg-slate-50 flex items-center gap-2 text-[#475569] transition-all border border-transparent hover:border-[#E2E8F0]"
             >
                 <span className="text-[12px] font-bold uppercase tracking-wider">{current.flag}</span>

@@ -5,9 +5,11 @@ import { motion } from 'framer-motion';
 import { Bell, CheckCheck, Calendar, Info, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 export default function NotificationsPage() {
     const { notifications, unreadCount, markRead, markAllRead } = useNotifications();
+    const { t, fmt } = useLanguage();
 
     const getIcon = (type: string) => {
         switch (type) {
@@ -19,18 +21,18 @@ export default function NotificationsPage() {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-700">
+        <div className="space-y-8 animate-in fade-in duration-700" data-no-translate>
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold text-heading tracking-tight">Notifications</h1>
-                    <p className="text-sm text-ink-3 font-medium mt-1">Stay updated with your latest order activities and account alerts.</p>
+                    <h1 className="text-3xl font-bold text-heading tracking-tight">{t('buyerAccount', 'nTitle')}</h1>
+                    <p className="text-sm text-ink-3 font-medium mt-1">{t('buyerAccount', 'nDesc')}</p>
                 </div>
                 {unreadCount > 0 && (
                     <button 
                         onClick={markAllRead}
                         className="flex items-center gap-2 px-4 py-2 bg-surface-2 border border-line rounded-xl text-xs font-bold text-ink-2 hover:bg-surface-3 transition-all"
                     >
-                        <CheckCheck size={16} /> Mark all as read
+                        <CheckCheck size={16} /> {t('buyerAccount', 'nMarkAll')}
                     </button>
                 )}
             </div>
@@ -42,8 +44,8 @@ export default function NotificationsPage() {
                             <Bell size={48} />
                         </div>
                         <div className="text-center space-y-1">
-                            <h3 className="text-lg font-bold text-heading">All clear!</h3>
-                            <p className="text-sm text-ink-3 font-medium">You don't have any notifications right now.</p>
+                            <h3 className="text-lg font-bold text-heading">{t('buyerAccount', 'nEmptyTitle')}</h3>
+                            <p className="text-sm text-ink-3 font-medium">{t('buyerAccount', 'nEmptyText')}</p>
                         </div>
                     </div>
                 ) : (
@@ -65,13 +67,13 @@ export default function NotificationsPage() {
                                     {getIcon(n.type)}
                                 </div>
                                 <div className="flex-1 space-y-1">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between gap-3">
                                         <h4 className={cn("text-sm font-bold tracking-tight", !n.read ? "text-heading" : "text-ink-2")}>
                                             {n.title}
                                         </h4>
-                                        <span className="text-[10px] font-bold text-ink-4 uppercase tracking-widest flex items-center gap-1.5">
+                                        <span className="text-[10px] font-bold text-ink-4 uppercase tracking-widest flex items-center gap-1.5 shrink-0">
                                             <Calendar size={12} />
-                                            {new Date(n.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                            {fmt.date(n.createdAt, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                         </span>
                                     </div>
                                     <p className={cn("text-sm leading-relaxed", !n.read ? "text-ink-2 font-medium" : "text-ink-3")}>
@@ -82,7 +84,7 @@ export default function NotificationsPage() {
                                             onClick={() => markRead(n.id)}
                                             className="mt-3 text-[10px] font-bold text-teal-600 uppercase tracking-widest hover:underline"
                                         >
-                                            Mark as read
+                                            {t('buyerAccount', 'nMarkRead')}
                                         </button>
                                     )}
                                 </div>

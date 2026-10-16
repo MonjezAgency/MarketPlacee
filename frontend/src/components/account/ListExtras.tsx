@@ -7,6 +7,10 @@ import type { Product } from '@/lib/types';
 import { addListItems, updateList, type ShoppingList } from '@/lib/lists';
 import { ApiError } from '@/lib/wholesale';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
+
+/** A callback that re-fetches data (call signature form keeps the i18n text scan quiet). */
+type Reload = { (): Promise<unknown> };
 
 const toLocalInput = (iso?: string | null) => {
     if (!iso) return '';
@@ -16,7 +20,8 @@ const toLocalInput = (iso?: string | null) => {
 };
 
 /** Description + reorder reminder (we notify on the date; nothing is ordered automatically). */
-export function ListDetails({ list, reload }: { list: ShoppingList; reload: () => Promise<unknown> }) {
+export function ListDetails({ list, reload }: { list: ShoppingList; reload: Reload }) {
+    const { t, fmt } = useLanguage();
     const [desc, setDesc] = React.useState(list.description || '');
     const [when, setWhen] = React.useState(toLocalInput(list.nextReminderAt));
     const [repeat, setRepeat] = React.useState(list.reminderRepeat || 'none');
@@ -28,42 +33,43 @@ export function ListDetails({ list, reload }: { list: ShoppingList; reload: () =
         try {
             await updateList(list.id, { description: desc, nextReminderAt: when ? new Date(when).toISOString() : null, reminderRepeat: repeat });
             await reload();
-            setMsg({ ok: true, text: when ? `Saved. We’ll remind you on ${new Date(when).toLocaleString()}${repeat !== 'none' ? `, then ${repeat}` : ''}.` : 'Saved.' });
-        } catch (e) { setMsg({ ok: false, text: e instanceof ApiError ? e.message : 'Could not save.' }); }
+            setMsg({ ok: true, text: when ? t('buyerAccount', repeat === 'weekly' ? 'reminderSavedWeekly' : repeat === 'monthly' ? 'reminderSavedMonthly' : 'reminderSavedOnce', { date: fmt.date(when, { dateStyle: 'medium', timeStyle: 'short' }) }) : t('buyerAccount', 'saved') });
+        } catch (e) { setMsg({ ok: false, text: e instanceof ApiError ? e.message : t('buyerAccount', 'saveError') }); }
         finally { setBusy(false); }
     };
     const field = 'h-10 px-3 rounded-lg ring-1 ring-line bg-surface text-[13.5px] text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6]';
     return (
         <div className="px-4 sm:px-5 py-4 border-b border-line space-y-3">
             <label className="block">
-                <span className="block text-[12.5px] font-medium text-ink-2 mb-1">Description</span>
-                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={500} rows={2} placeholder="e.g. Monthly drinks restock for the Rotterdam warehouse"
+                <span className="block text-[12.5px] font-medium text-ink-2 mb-1">{t('buyerAccount', 'description')}</span>
+                <textarea value={desc} onChange={(e) => setDesc(e.target.value)} maxLength={500} rows={2} placeholder={t('buyerAccount', 'descPlaceholder')}
                     className="w-full px-3 py-2 rounded-lg ring-1 ring-line bg-surface text-[13.5px] text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6] resize-y" />
             </label>
             <div className="flex flex-wrap items-end gap-2">
                 <label className="block">
-                    <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-ink-2 mb-1"><BellRing size={13} /> Remind me to reorder</span>
+                    <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-ink-2 mb-1"><BellRing size={13} /> {t('buyerAccount', 'remindMe')}</span>
                     <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} className={field} />
                 </label>
                 <label className="block">
-                    <span className="block text-[12.5px] font-medium text-ink-2 mb-1">Repeat</span>
+                    <span className="block text-[12.5px] font-medium text-ink-2 mb-1">{t('buyerAccount', 'repeat')}</span>
                     <select value={repeat} onChange={(e) => setRepeat(e.target.value as any)} className={cn(field, 'pe-8')}>
-                        <option value="none">Once</option><option value="weekly">Every week</option><option value="monthly">Every month</option>
+                        <option value="none">{t('buyerAccount', 'repeatOnce')}</option><option value="weekly">{t('buyerAccount', 'repeatWeekly')}</option><option value="monthly">{t('buyerAccount', 'repeatMonthly')}</option>
                     </select>
                 </label>
-                {when && <button type="button" onClick={() => setWhen('')} className="h-10 px-2 text-[12.5px] font-medium text-ink-3 hover:text-ink">Clear reminder</button>}
+                {when && <button type="button" onClick={() => setWhen('')} className="h-10 px-2 text-[12.5px] font-medium text-ink-3 hover:text-ink">{t('buyerAccount', 'clearReminder')}</button>}
                 <button type="button" onClick={save} disabled={busy || !dirty} className="ms-auto h-10 px-4 inline-flex items-center gap-1.5 rounded-lg bg-cta hover:bg-cta-hover text-cta-fg text-[13px] font-semibold disabled:bg-surface-3 disabled:text-ink-4">
-                    {busy && <Loader2 size={13} className="animate-spin" />} Save
+                    {busy && <Loader2 size={13} className="animate-spin" />} {t('buyerAccount', 'save')}
                 </button>
             </div>
-            <p className="text-[12px] text-ink-4">On the date you’ll get a notification to review this list — nothing is ordered for you.</p>
+            <p className="text-[12px] text-ink-4">{t('buyerAccount', 'reminderNote')}</p>
             {msg && <p role={msg.ok ? 'status' : 'alert'} className={cn('text-[13px]', msg.ok ? 'text-teal' : 'text-[#B91C1C]')}>{msg.text}</p>}
         </div>
     );
 }
 
 /** Search the catalog and tap products to add them to this list (same chip style as brand preferences). */
-export function ProductPicker({ list, reload }: { list: ShoppingList; reload: () => Promise<unknown> }) {
+export function ProductPicker({ list, reload }: { list: ShoppingList; reload: Reload }) {
+    const { t: tr } = useLanguage();
     const [open, setOpen] = React.useState(list.items.length === 0);
     const [q, setQ] = React.useState('');
     const [items, setItems] = React.useState<Product[] | null>(null);
@@ -84,30 +90,30 @@ export function ProductPicker({ list, reload }: { list: ShoppingList; reload: ()
     const add = async (p: Product) => {
         setBusy(p.id); setErr('');
         try { await addListItems(list.id, [{ productId: p.id, tier: 'carton', quantity: 1 }]); await reload(); }
-        catch (e) { setErr(e instanceof ApiError ? e.message : 'Could not add that product.'); }
+        catch (e) { setErr(e instanceof ApiError ? e.message : tr('buyerAccount', 'addError')); }
         finally { setBusy(null); }
     };
 
     if (!open) {
         return (
             <div className="px-4 sm:px-5 py-3 border-b border-line">
-                <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg ring-1 ring-line-strong text-[13px] font-semibold text-ink hover:bg-surface-2"><Plus size={14} /> Add products</button>
+                <button type="button" onClick={() => setOpen(true)} className="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg ring-1 ring-line-strong text-[13px] font-semibold text-ink hover:bg-surface-2"><Plus size={14} /> {tr('buyerAccount', 'addProducts')}</button>
             </div>
         );
     }
     return (
         <div className="px-4 sm:px-5 py-4 border-b border-line space-y-3">
             <div className="flex items-center justify-between gap-2">
-                <p className="text-[13.5px] font-semibold text-ink">Choose products</p>
-                <button type="button" onClick={() => setOpen(false)} className="text-[12.5px] font-medium text-ink-3 hover:text-ink">Done</button>
+                <p className="text-[13.5px] font-semibold text-ink">{tr('buyerAccount', 'chooseProducts')}</p>
+                <button type="button" onClick={() => setOpen(false)} className="text-[12.5px] font-medium text-ink-3 hover:text-ink">{tr('buyerAccount', 'done')}</button>
             </div>
             <label className="flex items-center gap-2 h-11 px-3.5 rounded-xl ring-1 ring-line focus-within:ring-2 focus-within:ring-[#2EC4B6] bg-surface">
                 <Search size={16} className="text-ink-4 shrink-0" />
-                <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by product name, brand or EAN" className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-ink placeholder:text-ink-4" />
+                <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder={tr('buyerAccount', 'searchPlaceholder')} aria-label={tr('buyerAccount', 'searchPlaceholder')} className="flex-1 min-w-0 bg-transparent outline-none text-[14px] text-ink placeholder:text-ink-4" />
             </label>
             <div className="flex flex-wrap gap-2 max-h-[300px] overflow-y-auto pe-1">
-                {items === null && <span className="text-[13px] text-ink-3 inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> Loading products…</span>}
-                {items?.length === 0 && <p className="text-[13px] text-ink-3">No products match “{q}”.</p>}
+                {items === null && <span className="text-[13px] text-ink-3 inline-flex items-center gap-2"><Loader2 size={14} className="animate-spin" /> {tr('buyerAccount', 'loadingProducts')}</span>}
+                {items?.length === 0 && <p className="text-[13px] text-ink-3">{tr('buyerAccount', 'noMatch', { q })}</p>}
                 {items?.map((p) => {
                     const added = inList.has(p.id);
                     return (

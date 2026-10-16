@@ -68,7 +68,7 @@ export function UserMenu({ role }: UserMenuProps) {
     ];
 
     return (
-        <div className="relative" ref={menuRef}>
+        <div data-no-translate className="relative" ref={menuRef}>
             <button
                 onClick={() => setIsOpen(!isOpen)}
                 className={cn(
@@ -167,7 +167,7 @@ export function UserMenu({ role }: UserMenuProps) {
                                 }}
                                 className="flex items-center gap-3 px-4 py-2.5 w-full rounded-lg text-[#C40000] hover:bg-red-50 transition-all group"
                             >
-                                <LogOut size={18} className="group-hover:translate-x-1 transition-transform" />
+                                <LogOut size={18} className="group-hover:translate-x-1 rtl:group-hover:-translate-x-1 rtl:rotate-180 transition-transform" />
                                 <span className="text-sm font-bold">{t('userMenu', 'signOut')}</span>
                             </button>
                         </div>

@@ -54,6 +54,7 @@ import { COUNTRIES } from '@/lib/countries';
 import { CATEGORIES_LIST } from '@/lib/products';
 import { ProductStatus } from '@/lib/types';
 import type { Product } from '@/lib/types';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // ---------------------------------------------------------------
 //  Public props
@@ -77,12 +78,35 @@ interface ProductEditorModalProps {
     onDelete?: (id: string) => void;
 }
 
+// `value` is what the API stores; `labelKey` is the legacySupplier dictionary key shown to the user.
 const UNIT_TYPES = [
-    { value: 'Piece', label: 'Piece', icon: '📦' },
-    { value: 'Case', label: 'Case', icon: '📦' },
-    { value: 'Pallet', label: 'Pallet', icon: '🏗️' },
-    { value: 'Truck', label: 'Truck', icon: '🚛' },
+    { value: 'Piece', labelKey: 'unitPiece', icon: '📦' },
+    { value: 'Case', labelKey: 'unitCase', icon: '📦' },
+    { value: 'Pallet', labelKey: 'unitPallet', icon: '🏗️' },
+    { value: 'Truck', labelKey: 'unitTruck', icon: '🚛' },
 ];
+
+/** Category values (stored in English by the API) → legacySupplier dictionary keys for display. */
+export const CATEGORY_LABEL_KEYS: Record<string, string> = {
+    'Beverages': 'catBeverages', 'Soft Drinks': 'catSoftDrinks', 'Energy Drinks': 'catEnergyDrinks',
+    'Coffee & Tea': 'catCoffeeTea', 'Snacks & Biscuits': 'catSnacksBiscuits', 'Chocolates & Sweets': 'catChocolatesSweets',
+    'Confectionery': 'catConfectionery', 'Dairy & Eggs': 'catDairyEggs', 'Frozen Food': 'catFrozenFood',
+    'Bakery & Bread': 'catBakeryBread', 'Pantry & Grains': 'catPantryGrains', 'Canned & Jarred Food': 'catCannedJarred',
+    'Spices & Condiments': 'catSpicesCondiments', 'Meat & Poultry': 'catMeatPoultry', 'Seafood': 'catSeafood',
+    'Personal Care': 'catPersonalCare', 'Beauty & Makeup': 'catBeautyMakeup', 'Fragrances & Perfumes': 'catFragrances',
+    'Hair Care': 'catHairCare', 'Skincare': 'catSkincare', 'Oral Care': 'catOralCare', 'Health & Wellness': 'catHealthWellness',
+    'Baby Care': 'catBabyCare', 'Pet Care': 'catPetCare', 'Household & Cleaning': 'catHouseholdCleaning',
+    'Laundry & Detergents': 'catLaundry', 'Paper & Plastic': 'catPaperPlastic', 'Home & Kitchen': 'catHomeKitchen',
+    'Electronics & Accessories': 'catElectronics', 'Office & Stationery': 'catOffice', 'Tobacco & Accessories': 'catTobacco',
+    'Toys & Games': 'catToys', 'Other': 'catOther', 'Snacks': 'catSnacks', 'Dairy': 'catDairy',
+};
+
+/** Display label for a stored category value; unknown values are shown as stored. */
+export function categoryLabel(t: (section: 'legacySupplier', key: string) => string, value?: string | null): string {
+    if (!value) return '';
+    const key = CATEGORY_LABEL_KEYS[value];
+    return key ? t('legacySupplier', key) : value;
+}
 
 // ---------------------------------------------------------------
 //  Component
@@ -96,6 +120,18 @@ export default function ProductEditorModal({
     onDelete,
 }: ProductEditorModalProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const { t, fmt, meta } = useLanguage();
+    const L = (key: string, vars?: Record<string, string | number>) => t('legacySupplier', key, vars);
+    const regionNames = (() => {
+        try { return new Intl.DisplayNames([meta.intl], { type: 'region' }); } catch { return null; }
+    })();
+    const countryLabel = (iso: string, fallback: string) => {
+        try { return regionNames?.of(iso) || fallback; } catch { return fallback; }
+    };
+    const unitLabel = (value?: string) => {
+        const u = UNIT_TYPES.find((x) => x.value === value);
+        return u ? L(u.labelKey) : value || L('unitCase');
+    };
 
     // active display currency — synced with the rest of the app
     const [activeCurrency, setActiveCurrency] = useState(() => {
@@ -251,18 +287,18 @@ export default function ProductEditorModal({
     if (!isOpen) return null;
 
     const verifiedDate = product?.createdAt
-        ? new Date(product.createdAt).toLocaleDateString(undefined, {
+        ? fmt.date(product.createdAt, {
               year: 'numeric',
               month: 'long',
               day: 'numeric',
-          })
+          }) || '—'
         : '—';
-    const shortId = product?.id ? `MOD ${product.id.slice(0, 6)}` : 'NEW';
+    const shortId = product?.id ? `MOD ${product.id.slice(0, 6)}` : null;
 
     const modal = (
         <AnimatePresence>
             {isOpen && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-6">
+                <div data-no-translate className="fixed inset-0 z-[100] flex items-center justify-center p-2 sm:p-6">
                     <motion.div
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
@@ -282,16 +318,16 @@ export default function ProductEditorModal({
                         <div className="shrink-0 px-8 py-6 bg-white border-b border-slate-200 flex items-center justify-between">
                             <div>
                                 <h2 className="text-2xl font-bold text-slate-900 tracking-tight">
-                                    {product ? 'Edit Product' : 'Add Product'}
+                                    {product ? L('edTitleEdit') : L('edTitleAdd')}
                                 </h2>
                                 <p className="text-sm text-slate-500 mt-1">
-                                    Update your product details and settings
+                                    {L('edSubtitle')}
                                 </p>
                             </div>
                             <button
                                 type="button"
                                 onClick={onClose}
-                                aria-label="Close"
+                                aria-label={L('close')}
                                 className="w-10 h-10 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
                             >
                                 <X size={22} />
@@ -311,10 +347,10 @@ export default function ProductEditorModal({
                                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
                                         <div>
                                             <h3 className="text-base font-bold text-slate-900">
-                                                Product Image
+                                                {L('edImageTitle')}
                                             </h3>
                                             <p className="text-xs text-slate-500 mt-0.5">
-                                                Upload a clear image of your product
+                                                {L('edImageHint')}
                                             </p>
                                         </div>
 
@@ -323,7 +359,7 @@ export default function ProductEditorModal({
                                                 <>
                                                     <img
                                                         src={formData.images[0]}
-                                                        alt={formData.name || 'Product image'}
+                                                        alt={formData.name || L('edImageTitle')}
                                                         referrerPolicy="no-referrer"
                                                         onError={(e) => {
                                                             (e.target as HTMLImageElement).style.display = 'none';
@@ -333,8 +369,9 @@ export default function ProductEditorModal({
                                                     <button
                                                         type="button"
                                                         onClick={() => removeImage(0)}
-                                                        className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 hover:bg-red-50 text-slate-500 hover:text-red-600 flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        title="Remove image"
+                                                        className="absolute top-2 end-2 w-8 h-8 rounded-full bg-white/90 hover:bg-red-50 text-slate-500 hover:text-red-600 flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity"
+                                                        title={L('edRemoveImage')}
+                                                        aria-label={L('edRemoveImage')}
                                                     >
                                                         <Trash2 size={14} />
                                                     </button>
@@ -343,7 +380,7 @@ export default function ProductEditorModal({
                                                 <div className="flex flex-col items-center text-slate-400">
                                                     <ImageIcon size={36} strokeWidth={1.5} />
                                                     <span className="text-xs mt-2">
-                                                        No image yet
+                                                        {L('edNoImage')}
                                                     </span>
                                                 </div>
                                             )}
@@ -356,13 +393,15 @@ export default function ProductEditorModal({
                                             className="w-full h-11 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 text-sm font-semibold flex items-center justify-center gap-2 transition-colors disabled:opacity-50"
                                         >
                                             <Upload size={15} />
-                                            {isUploading ? 'Uploading…' : 'Change Image'}
+                                            {isUploading ? L('uploading') : L('edChangeImage')}
                                         </button>
 
                                         <div className="flex items-center gap-2">
                                             <input
                                                 type="url"
-                                                placeholder="Or paste an image URL…"
+                                                placeholder={L('edImageUrlPlaceholder')}
+                                                aria-label={L('edImageUrlPlaceholder')}
+                                                dir="ltr"
                                                 onKeyDown={(e) => {
                                                     if (e.key === 'Enter') {
                                                         e.preventDefault();
@@ -375,7 +414,7 @@ export default function ProductEditorModal({
                                         </div>
 
                                         <p className="text-[11px] text-slate-400 text-center">
-                                            JPG, PNG or WEBP. Max size 5MB.
+                                            {L('edImageFormats')}
                                         </p>
 
                                         <input
@@ -393,28 +432,28 @@ export default function ProductEditorModal({
                                         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-4">
                                             <div className="flex items-center justify-between">
                                                 <h3 className="text-base font-bold text-slate-900">
-                                                    Product Status
+                                                    {L('edStatusTitle')}
                                                 </h3>
                                                 <div className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold">
                                                     <ShieldCheck size={13} />
-                                                    Verified
+                                                    {L('edVerified')}
                                                 </div>
                                             </div>
                                             <p className="text-xs text-slate-500">
-                                                This product is verified by Atlantis
+                                                {L('edVerifiedBy')}
                                             </p>
                                             <div className="space-y-3 pt-2 border-t border-slate-100">
                                                 <div>
                                                     <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
-                                                        Product ID
+                                                        {L('edProductId')}
                                                     </p>
                                                     <p className="text-sm font-bold text-slate-900 mt-1">
-                                                        {shortId}
+                                                        {shortId ? <bdi dir="ltr">{shortId}</bdi> : L('newLabel')}
                                                     </p>
                                                 </div>
                                                 <div>
                                                     <p className="text-[11px] uppercase tracking-wider text-slate-400 font-semibold">
-                                                        Added on
+                                                        {L('edAddedOn')}
                                                     </p>
                                                     <p className="text-sm font-semibold text-slate-700 mt-1">
                                                         {verifiedDate}
@@ -436,13 +475,13 @@ export default function ProductEditorModal({
                                                     <Euro size={18} />
                                                 </div>
                                                 <h3 className="text-sm font-bold text-slate-900">
-                                                    Currency & Price per Case
+                                                    {L('edPriceTitle')}
                                                 </h3>
                                             </div>
                                             <div className="grid grid-cols-2 gap-3">
                                                 <div className="space-y-1.5">
                                                     <label className="text-[11px] font-medium text-slate-500">
-                                                        Currency
+                                                        {L('edCurrency')}
                                                     </label>
                                                     <select
                                                         value={activeCurrency}
@@ -460,10 +499,10 @@ export default function ProductEditorModal({
                                                 </div>
                                                 <div className="space-y-1.5">
                                                     <label className="text-[11px] font-medium text-slate-500">
-                                                        Price per Case
+                                                        {L('edPricePerCase')}
                                                     </label>
                                                     <div className="relative">
-                                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">
+                                                        <span className="absolute start-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">
                                                             {symbol}
                                                         </span>
                                                         <input
@@ -477,7 +516,7 @@ export default function ProductEditorModal({
                                                                     price: parseFloat(e.target.value) || 0,
                                                                 })
                                                             }
-                                                            className="w-full h-11 rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-base font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+                                                            className="w-full h-11 rounded-xl border border-slate-200 bg-white ps-8 pe-3 text-base font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                                         />
                                                     </div>
                                                 </div>
@@ -492,19 +531,19 @@ export default function ProductEditorModal({
                                                         <Box size={18} />
                                                     </div>
                                                     <h3 className="text-sm font-bold text-slate-900">
-                                                        Stock Level (Cases)
+                                                        {L('edStockTitle')}
                                                     </h3>
                                                 </div>
                                                 {(formData.stock ?? 0) > 0 && (
                                                     <span className="inline-flex items-center gap-1 h-6 px-2.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
                                                         <Check size={11} />
-                                                        In Stock
+                                                        {L('edInStock')}
                                                     </span>
                                                 )}
                                             </div>
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-medium text-slate-500">
-                                                    Available Stock
+                                                    {L('edAvailableStock')}
                                                 </label>
                                                 <div className="flex items-end gap-2">
                                                     <input
@@ -521,7 +560,7 @@ export default function ProductEditorModal({
                                                         className="w-24 h-11 rounded-xl border border-slate-200 bg-white px-3 text-2xl font-bold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                                     />
                                                     <span className="text-sm text-slate-500 pb-2.5">
-                                                        cases
+                                                        {L('edCasesUnit')}
                                                     </span>
                                                 </div>
                                             </div>
@@ -531,18 +570,18 @@ export default function ProductEditorModal({
                                     {/* Product Details */}
                                     <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 space-y-5">
                                         <h3 className="text-base font-bold text-slate-900">
-                                            Product Details
+                                            {L('edDetailsTitle')}
                                         </h3>
 
                                         {/* Product name — full width */}
                                         <div className="space-y-1.5">
                                             <label className="text-[11px] font-medium text-slate-500">
-                                                Product Name <span className="text-red-500">*</span>
+                                                {L('edName')} <span className="text-red-500">*</span>
                                             </label>
                                             <input
                                                 type="text"
                                                 required
-                                                placeholder="e.g. Lavazza Crema e Gusto Espresso 250g"
+                                                placeholder={L('edNamePlaceholder')}
                                                 value={formData.name || ''}
                                                 onChange={(e) =>
                                                     setFormData({ ...formData, name: e.target.value })
@@ -554,7 +593,7 @@ export default function ProductEditorModal({
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-medium text-slate-500">
-                                                    Unit Type <span className="text-red-500">*</span>
+                                                    {L('edUnitType')} <span className="text-red-500">*</span>
                                                 </label>
                                                 <select
                                                     value={formData.unit || 'Piece'}
@@ -565,14 +604,14 @@ export default function ProductEditorModal({
                                                 >
                                                     {UNIT_TYPES.map((u) => (
                                                         <option key={u.value} value={u.value}>
-                                                            {u.icon} {u.label}
+                                                            {u.icon} {L(u.labelKey)}
                                                         </option>
                                                     ))}
                                                 </select>
                                             </div>
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-medium text-slate-500">
-                                                    Minimum Order ({formData.unit || 'Cases'}) <span className="text-red-500">*</span>
+                                                    {L('edMinOrder', { unit: unitLabel(formData.unit) })} <span className="text-red-500">*</span>
                                                 </label>
                                                 <input
                                                     type="number"
@@ -592,12 +631,12 @@ export default function ProductEditorModal({
 
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-medium text-slate-500">
-                                                    Weight per Unit (kg) <span className="text-red-500">*</span>
+                                                    {L('edWeight')} <span className="text-red-500">*</span>
                                                 </label>
                                                 <input
                                                     type="number"
                                                     step="0.001"
-                                                    placeholder="e.g. 0.330"
+                                                    placeholder={L('edWeightPlaceholder')}
                                                     value={formData.weight || ''}
                                                     onChange={(e) =>
                                                         setFormData({
@@ -608,16 +647,16 @@ export default function ProductEditorModal({
                                                     className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                                 />
                                                 <p className="text-[11px] text-slate-400">
-                                                    Enter weight per single unit
+                                                    {L('edWeightHint')}
                                                 </p>
                                             </div>
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-medium text-slate-500">
-                                                    BBD (Best Before Date) <span className="text-red-500">*</span>
+                                                    {L('edBbd')} <span className="text-red-500">*</span>
                                                 </label>
                                                 <input
                                                     type="text"
-                                                    placeholder="YYYYMMDD"
+                                                    placeholder={L('edBbdPlaceholder')}
                                                     value={formData.shelfLife || ''}
                                                     onChange={(e) =>
                                                         setFormData({
@@ -628,7 +667,7 @@ export default function ProductEditorModal({
                                                     className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                                                 />
                                                 <p className="text-[11px] text-slate-400">
-                                                    Format: YYYYMMDD
+                                                    {L('edBbdHint')}
                                                 </p>
                                             </div>
                                         </div>
@@ -637,7 +676,7 @@ export default function ProductEditorModal({
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-medium text-slate-500">
-                                                    Category <span className="text-red-500">*</span>
+                                                    {L('colCategory')} <span className="text-red-500">*</span>
                                                 </label>
                                                 <select
                                                     value={formData.category || ''}
@@ -648,14 +687,14 @@ export default function ProductEditorModal({
                                                 >
                                                     {CATEGORIES_LIST.map((c) => (
                                                         <option key={c} value={c}>
-                                                            {c}
+                                                            {categoryLabel(t, c)}
                                                         </option>
                                                     ))}
                                                 </select>
                                             </div>
                                             <div className="space-y-1.5">
                                                 <label className="text-[11px] font-medium text-slate-500">
-                                                    Country of Origin <span className="text-red-500">*</span>
+                                                    {L('edOrigin')} <span className="text-red-500">*</span>
                                                 </label>
                                                 <select
                                                     value={formData.origin || ''}
@@ -664,15 +703,15 @@ export default function ProductEditorModal({
                                                     }
                                                     className="w-full h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100 appearance-none"
                                                 >
-                                                    <option value="">Select country…</option>
+                                                    <option value="">{L('edSelectCountry')}</option>
                                                     {COUNTRIES.map((c) => (
                                                         <option key={c.iso} value={c.name}>
-                                                            {c.flag} {c.name}
+                                                            {c.flag} {countryLabel(c.iso, c.name)}
                                                         </option>
                                                     ))}
                                                 </select>
                                                 <p className="text-[11px] text-slate-400">
-                                                    Where the product is manufactured
+                                                    {L('edOriginHint')}
                                                 </p>
                                             </div>
                                         </div>
@@ -690,7 +729,7 @@ export default function ProductEditorModal({
                                         onClick={() => onDelete(product.id)}
                                         className="h-11 px-5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 text-sm font-semibold flex items-center gap-2 transition-colors"
                                     >
-                                        <Trash2 size={15} /> Delete Product
+                                        <Trash2 size={15} /> {L('edDelete')}
                                     </button>
                                 )}
                             </div>
@@ -700,14 +739,14 @@ export default function ProductEditorModal({
                                     onClick={onClose}
                                     className="h-11 px-6 rounded-xl bg-white border border-slate-300 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors"
                                 >
-                                    Cancel
+                                    {L('cancel')}
                                 </button>
                                 <button
                                     type="submit"
                                     form="product-editor-form"
                                     className="h-11 px-6 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold flex items-center gap-2 transition-colors shadow-lg shadow-slate-900/20"
                                 >
-                                    <Save size={15} /> Save Changes
+                                    <Save size={15} /> {L('edSave')}
                                 </button>
                             </div>
                         </div>

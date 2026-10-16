@@ -1,14 +1,14 @@
 'use client';
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { translations, LOCALE_META, DEFAULT_LOCALE, isLocale, type Locale, type LocaleMeta, type Messages } from '../locales';
+import { translations, LOCALE_META, DEFAULT_LOCALE, isLocale, type Locale, type LocaleMeta, type Messages, type SectionName } from '../locales';
 import { formatMessage, type Vars } from '../locales/format';
 import { setAutoTranslateLocale } from '../lib/auto-translate';
 
 /** Where the chosen language is kept (read again before first paint by the script in app/layout.tsx). */
 export const LOCALE_STORAGE_KEY = 'app-locale';
 
-type Section = keyof Messages;
+type Section = keyof Messages | SectionName;
 
 interface LanguageContextType {
     locale: Locale;
@@ -73,9 +73,9 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
     const meta = LOCALE_META[locale];
 
     const t = useCallback((section: Section, key?: string, vars?: Vars) => {
-        const dict = translations[locale];
-        if (!key) return (dict[section] as unknown as string) || '';
-        const msg = resolve(dict[section], key) ?? resolve(translations.en[section], key);
+        const dict = translations[locale] as unknown as Record<string, unknown>;
+        if (!key) return (dict[section] as string) || '';
+        const msg = resolve(dict[section], key) ?? resolve((translations.en as unknown as Record<string, unknown>)[section], key);
         if (msg === undefined) {
             if (process.env.NODE_ENV !== 'production') console.warn(`[i18n] missing key ${String(section)}.${key}`);
             return '';

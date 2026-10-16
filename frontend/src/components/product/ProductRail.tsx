@@ -3,6 +3,7 @@
 import * as React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 /**
  * Scrolling is native overflow-x: no wheel handlers, so trackpad and touch
@@ -27,6 +28,7 @@ export function ProductRail({ title, subtitle, viewAll, children, className, arr
     snap?: boolean;
     trackClassName?: string;
 }) {
+    const { t, dir } = useLanguage();
     const ref = React.useRef<HTMLDivElement>(null);
     const [edges, setEdges] = React.useState({ start: true, end: true });
     const drag = React.useRef<{ x: number; left: number; moved: boolean } | null>(null);
@@ -34,7 +36,9 @@ export function ProductRail({ title, subtitle, viewAll, children, className, arr
     const update = React.useCallback(() => {
         const el = ref.current;
         if (!el) return;
-        setEdges({ start: el.scrollLeft <= 2, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 2 });
+        // scrollLeft is 0 → negative in right-to-left layouts; measure distance from the start edge.
+        const fromStart = Math.abs(el.scrollLeft);
+        setEdges({ start: fromStart <= 2, end: fromStart + el.clientWidth >= el.scrollWidth - 2 });
     }, []);
     React.useEffect(() => {
         update();
@@ -45,9 +49,11 @@ export function ProductRail({ title, subtitle, viewAll, children, className, arr
         return () => ro.disconnect();
     }, [update, children]);
 
+    const rtl = dir === 'rtl';
     const page = (dir: 1 | -1) => {
         const el = ref.current;
-        if (el) el.scrollBy({ left: dir * Math.max(240, el.clientWidth * 0.85), behavior: 'smooth' });
+        // In RTL "forward" is towards the left (negative scrollLeft).
+        if (el) el.scrollBy({ left: (rtl ? -dir : dir) * Math.max(240, el.clientWidth * 0.85), behavior: 'smooth' });
     };
 
     // Mouse drag-to-scroll (touch and trackpads already scroll natively).
@@ -77,17 +83,17 @@ export function ProductRail({ title, subtitle, viewAll, children, className, arr
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     {viewAll && (viewAll.href
-                        ? <a href={viewAll.href} className="text-[12.5px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? 'View all'}</a>
-                        : <button type="button" onClick={viewAll.onClick} className="text-[12.5px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? 'View all'}</button>)}
+                        ? <a href={viewAll.href} className="text-[12.5px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? t('landing', 'viewAll')}</a>
+                        : <button type="button" onClick={viewAll.onClick} className="text-[12.5px] font-semibold text-teal hover:underline me-1">{viewAll.label ?? t('landing', 'viewAll')}</button>)}
                     {arrows && <>
-                        <button type="button" aria-label="Scroll left" onClick={() => page(-1)} disabled={edges.start} className={arrow}><ChevronLeft size={16} /></button>
-                        <button type="button" aria-label="Scroll right" onClick={() => page(1)} disabled={edges.end} className={arrow}><ChevronRight size={16} /></button>
+                        <button type="button" aria-label={t('landing', 'railPrevious')} onClick={() => page(-1)} disabled={edges.start} className={arrow}><ChevronLeft size={16} className="rtl:rotate-180" /></button>
+                        <button type="button" aria-label={t('landing', 'railNext')} onClick={() => page(1)} disabled={edges.end} className={arrow}><ChevronRight size={16} className="rtl:rotate-180" /></button>
                     </>}
                 </div>
             </div>
             <div className="relative">
-            {!arrows && !edges.start && <span aria-hidden className="pointer-events-none absolute inset-y-0 start-0 w-8 bg-gradient-to-r from-surface to-transparent z-10" />}
-            {!arrows && !edges.end && <span aria-hidden className="pointer-events-none absolute inset-y-0 end-0 w-10 bg-gradient-to-l from-surface to-transparent z-10" />}
+            {!arrows && !edges.start && <span aria-hidden className="pointer-events-none absolute inset-y-0 start-0 w-8 bg-gradient-to-r rtl:bg-gradient-to-l from-surface to-transparent z-10" />}
+            {!arrows && !edges.end && <span aria-hidden className="pointer-events-none absolute inset-y-0 end-0 w-10 bg-gradient-to-l rtl:bg-gradient-to-r from-surface to-transparent z-10" />}
             <div
                 ref={ref}
                 onScroll={update}

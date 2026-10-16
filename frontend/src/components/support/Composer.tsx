@@ -3,13 +3,15 @@
 import * as React from 'react';
 import { ArrowUp, ImagePlus, Loader2, Mic, MicOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 /** Browser dictation — offered only where the browser actually supports it. */
 export function useSpeech(onText: (t: string, final: boolean) => void) {
+    const { t } = useLanguage();
     const recRef = React.useRef<any>(null);
     const [supported, setSupported] = React.useState(false);
     const [listening, setListening] = React.useState(false);
-    const [error, setError] = React.useState<string | null>(null);
+    const [error, setError] = React.useState<'speechBlocked' | 'speechNoSpeech' | 'speechStopped' | null>(null);
     React.useEffect(() => { setSupported(typeof window !== 'undefined' && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)); }, []);
     const start = () => {
         const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -19,12 +21,12 @@ export function useSpeech(onText: (t: string, final: boolean) => void) {
         rec.lang = document.documentElement.lang === 'ar' ? 'ar-EG' : navigator.language || 'en-US';
         rec.interimResults = true; rec.continuous = false;
         rec.onresult = (e: any) => { let t = ''; let fin = false; for (let i = e.resultIndex; i < e.results.length; i++) { t += e.results[i][0].transcript; fin = fin || e.results[i].isFinal; } onText(t, fin); };
-        rec.onerror = (e: any) => setError(e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'Microphone access is blocked — allow it in your browser to dictate.' : e.error === 'no-speech' ? 'No speech heard. Try again.' : 'Voice input stopped. You can type instead.');
+        rec.onerror = (e: any) => setError(e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'speechBlocked' : e.error === 'no-speech' ? 'speechNoSpeech' : 'speechStopped');
         rec.onend = () => setListening(false);
         recRef.current = rec; rec.start(); setListening(true);
     };
     const stop = () => recRef.current?.stop();
-    return { supported, listening, error, start, stop };
+    return { supported, listening, error: error ? t('support', error) : null, start, stop };
 }
 
 /**
@@ -40,6 +42,7 @@ export const Composer = React.forwardRef<HTMLTextAreaElement, {
     speech?: { supported: boolean; listening: boolean; start: () => void; stop: () => void };
     disabled?: boolean;
 }>(function Composer({ id, value, onChange, onSend, canSend, busy, placeholder, hint, onAttach, attachDisabled, attachmentSlot, onPasteImage, speech, disabled }, ref) {
+    const { t } = useLanguage();
     const inner = React.useRef<HTMLTextAreaElement>(null);
     React.useImperativeHandle(ref, () => inner.current as HTMLTextAreaElement);
     React.useEffect(() => { const el = inner.current; if (!el) return; el.style.height = 'auto'; el.style.height = `${Math.min(el.scrollHeight, 144)}px`; }, [value]);
@@ -49,8 +52,8 @@ export const Composer = React.forwardRef<HTMLTextAreaElement, {
             <div className={cn('rounded-xl ring-1 ring-line-strong bg-surface transition-shadow duration-150 focus-within:ring-2 focus-within:ring-[#2EC4B6]', disabled && 'opacity-60')}>
                 {attachmentSlot}
                 <div className="flex items-end gap-1 p-1.5">
-                    {onAttach && <button type="button" aria-label="Attach a screenshot" title="Attach a screenshot (JPEG, PNG or WebP, up to 6 MB)" disabled={attachDisabled || disabled} onClick={onAttach} className={iconBtn}><ImagePlus size={18} /></button>}
-                    <label htmlFor={id} className="sr-only">Message</label>
+                    {onAttach && <button type="button" aria-label={t('support', 'attachAria')} title={t('support', 'attachTitle')} disabled={attachDisabled || disabled} onClick={onAttach} className={iconBtn}><ImagePlus size={18} /></button>}
+                    <label htmlFor={id} className="sr-only">{t('support', 'messageLabel')}</label>
                     <textarea id={id} ref={inner} rows={1} value={value} disabled={disabled}
                         onChange={(e) => onChange(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); if (canSend) onSend(); } }}
@@ -58,13 +61,13 @@ export const Composer = React.forwardRef<HTMLTextAreaElement, {
                         placeholder={placeholder}
                         className="flex-1 min-w-0 resize-none bg-transparent px-2 py-2.5 text-[14.5px] leading-[1.45] text-ink placeholder:text-ink-4 outline-none max-h-36" />
                     {speech?.supported && (
-                        <button type="button" aria-label={speech.listening ? 'Stop dictation' : 'Dictate your message'} title={speech.listening ? 'Stop dictation' : 'Dictate (you can edit before sending)'} disabled={busy || disabled}
+                        <button type="button" aria-label={speech.listening ? t('support', 'stopDictation') : t('support', 'dictateAria')} title={speech.listening ? t('support', 'stopDictation') : t('support', 'dictateTitle')} disabled={busy || disabled}
                             onClick={() => (speech.listening ? speech.stop() : speech.start())}
                             className={cn(iconBtn, speech.listening && 'bg-[#FEF2F2] text-[#B91C1C] ring-1 ring-[#FECACA] hover:bg-[#FEF2F2] hover:text-[#B91C1C]')}>
                             {speech.listening ? <MicOff size={18} /> : <Mic size={18} />}
                         </button>
                     )}
-                    <button type="button" aria-label="Send message" disabled={!canSend} onClick={onSend}
+                    <button type="button" aria-label={t('support', 'sendAria')} disabled={!canSend} onClick={onSend}
                         className="w-10 h-10 shrink-0 rounded-lg bg-cta hover:bg-cta-hover text-cta-fg flex items-center justify-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] focus-visible:ring-offset-2 disabled:bg-surface-3 disabled:text-ink-4">
                         {busy ? <Loader2 size={17} className="animate-spin" /> : <ArrowUp size={18} />}
                     </button>

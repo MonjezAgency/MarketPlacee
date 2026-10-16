@@ -23,6 +23,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { cn } from '@/lib/utils';
+import { Trans } from '@/components/i18n/Trans';
+import { useLanguage } from '@/contexts/LanguageContext';
+
+const S = 'supplierOps';
+/** Offer tier (API value) → label key. */
+const TIER_LABEL: Record<string, string> = { truck: 'woTierTruck', pallet: 'woTierPallet', carton: 'woTierCarton' };
 
 type Status = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
 type Tier = 'truck' | 'pallet' | 'carton';
@@ -49,6 +55,9 @@ const asArray = (raw: any): any[] => {
 };
 
 export default function SupplierOffersPage() {
+    const { t, fmt, meta } = useLanguage();
+    const eur = (n: number) => fmt.number(Number(n) || 0, { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const list = (items: string[]) => { try { return new Intl.ListFormat(meta.intl, { style: 'long', type: 'conjunction' }).format(items); } catch { return items.join(', '); } };
     const [offers, setOffers] = React.useState<Offer[]>([]);
     const [products, setProducts] = React.useState<any[]>([]);
     // Discount percentage the supplier picked. Stored as a 0-90 integer.
@@ -138,12 +147,12 @@ export default function SupplierOffersPage() {
             if (res.ok) {
                 const data = await res.json();
                 setOfferImageUrl(data?.url || '');
-                toast.success('Image uploaded');
+                toast.success(t(S, 'woImageUploaded'));
             } else {
-                toast.error('Upload failed');
+                toast.error(t(S, 'woUploadFailed'));
             }
         } catch {
-            toast.error('Network error');
+            toast.error(t(S, 'woNetworkError'));
         } finally {
             setIsUploadingOfferImg(false);
             if (offerImgRef.current) offerImgRef.current.value = '';
@@ -187,37 +196,37 @@ export default function SupplierOffersPage() {
                       )
                     : undefined,
         };
-        if (!payload.productId) return toast.error('Pick a product from the catalog');
-        if (!(payload.pricePerUnit > 0)) return toast.error('Enter a valid price');
-        if (!(payload.quantity > 0)) return toast.error('Enter a valid quantity');
+        if (!payload.productId) return toast.error(t(S, 'woPickProduct'));
+        if (!(payload.pricePerUnit > 0)) return toast.error(t(S, 'woInvalidPrice'));
+        if (!(payload.quantity > 0)) return toast.error(t(S, 'woInvalidQty'));
         // Frontend pre-validation — backend re-checks. Friendlier UX.
         const missing: string[] = [];
-        if (!payload.productNameSnap) missing.push('Product name');
-        if (!payload.bbd) missing.push('BBD');
-        if (!payload.eanCode) missing.push('EAN code');
-        if (!payload.unitsPerCase) missing.push('Pcs per case');
-        if (!payload.casesPerPallet) missing.push('Cases per pallet');
-        if (!payload.exwLocation) missing.push('EXW location');
-        if (!payload.leadTime) missing.push('Lead time');
-        if (!payload.origin) missing.push('Origin');
-        if (!payload.offerImageUrl) missing.push('Product picture');
+        if (!payload.productNameSnap) missing.push(t(S, 'woFieldProductName'));
+        if (!payload.bbd) missing.push(t(S, 'woBbd'));
+        if (!payload.eanCode) missing.push(t(S, 'woEan'));
+        if (!payload.unitsPerCase) missing.push(t(S, 'woPcsPerCase'));
+        if (!payload.casesPerPallet) missing.push(t(S, 'woCasesPerPallet'));
+        if (!payload.exwLocation) missing.push(t(S, 'woExwLocation'));
+        if (!payload.leadTime) missing.push(t(S, 'woLeadTime'));
+        if (!payload.origin) missing.push(t(S, 'woFieldOrigin'));
+        if (!payload.offerImageUrl) missing.push(t(S, 'woPicture'));
         if (missing.length > 0) {
-            return toast.error(`Required: ${missing.join(', ')}`);
+            return toast.error(t(S, 'woRequired', { fields: list(missing) }));
         }
         try {
             const res = await apiFetch('/offers', { method: 'POST', body: JSON.stringify(payload) });
             if (res.ok) {
-                toast.success('Offer submitted — waiting for admin approval');
+                toast.success(t(S, 'woSubmitted'));
                 setIsAddOpen(false);
                 setPickedProductId('');
                 setOfferImageUrl('');
                 fetchAll();
             } else {
                 const err = await res.json().catch(() => ({}));
-                toast.error(err.message || 'Failed to create offer');
+                toast.error(err.message || t(S, 'woCreateFailed'));
             }
         } catch {
-            toast.error('Network error');
+            toast.error(t(S, 'woNetworkError'));
         }
     };
 
@@ -233,14 +242,14 @@ export default function SupplierOffersPage() {
             if (res.ok) {
                 const report = await res.json();
                 setUploadReport(report);
-                toast.success(`Uploaded ${report.created} offer(s) — waiting for admin approval`);
+                toast.success(t(S, 'woBulkUploaded', { count: Number(report.created) || 0 }));
                 fetchAll();
             } else {
                 const err = await res.json().catch(() => ({}));
-                toast.error(err.message || 'Upload failed');
+                toast.error(err.message || t(S, 'woUploadFailed'));
             }
         } catch {
-            toast.error('Network error');
+            toast.error(t(S, 'woNetworkError'));
         } finally {
             setIsUploading(false);
             if (fileRef.current) fileRef.current.value = '';
@@ -248,52 +257,53 @@ export default function SupplierOffersPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('Delete this offer?')) return;
+        if (!confirm(t(S, 'woDeleteConfirm'))) return;
         try {
             const res = await apiFetch(`/offers/${id}`, { method: 'DELETE' });
             if (res.ok) {
-                toast.success('Offer removed');
+                toast.success(t(S, 'woRemoved'));
                 fetchAll();
             } else {
-                toast.error('Delete failed');
+                toast.error(t(S, 'woDeleteFailed'));
             }
         } catch {
-            toast.error('Network error');
+            toast.error(t(S, 'woNetworkError'));
         }
     };
 
+    // label = dictionary key
     const STATUS_STYLE: Record<Status, { label: string; cls: string; icon: any }> = {
-        PENDING:  { label: 'Pending review', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
-        APPROVED: { label: 'Approved · live',cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
-        REJECTED: { label: 'Rejected',       cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: XCircle },
-        EXPIRED:  { label: 'Expired',        cls: 'bg-slate-100 text-slate-600 border-slate-200', icon: Clock },
+        PENDING:  { label: 'woStatusPending', cls: 'bg-amber-50 text-amber-700 border-amber-200', icon: Clock },
+        APPROVED: { label: 'woStatusApproved', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: CheckCircle2 },
+        REJECTED: { label: 'woStatusRejected', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: XCircle },
+        EXPIRED:  { label: 'woStatusExpired', cls: 'bg-slate-100 text-slate-600 border-slate-200', icon: Clock },
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-700 pb-16">
+        <div data-no-translate className="space-y-6 animate-in fade-in duration-700 pb-16">
             <input ref={fileRef} type="file" accept=".csv,.xls,.xlsx" onChange={handleBulkUpload} className="hidden" />
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#2EC4B6]">Wholesale</p>
-                    <h1 className="text-[28px] font-black tracking-tight text-[#0F172A]">My Offers</h1>
-                    <p className="text-[13px] text-slate-500 mt-1 max-w-xl">Post a price-and-quantity offer on a product that's already on Atlantis. Once approved, it goes out to every active client on the platform.</p>
+                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-[#2EC4B6] rtl:tracking-normal">{t(S, 'woEyebrow')}</p>
+                    <h1 className="text-[28px] font-black tracking-tight text-[#0F172A]">{t(S, 'woTitle')}</h1>
+                    <p className="text-[13px] text-slate-500 mt-1 max-w-xl">{t(S, 'woIntro')}</p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                     <button
                         onClick={() => setIsUploadInfoOpen(true)}
                         disabled={isUploading}
-                        className="h-11 px-5 bg-white border border-slate-200 hover:border-[#2EC4B6] rounded-xl text-[12px] font-black uppercase tracking-widest flex items-center gap-2 transition-all disabled:opacity-50"
+                        className="h-11 px-5 bg-white border border-slate-200 hover:border-[#2EC4B6] rounded-xl text-[12px] font-black uppercase tracking-widest rtl:tracking-normal flex items-center gap-2 transition-all disabled:opacity-50"
                     >
                         {isUploading ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
-                        Upload Sheet
+                        {t(S, 'woUploadSheet')}
                     </button>
                     <button
                         onClick={() => setIsAddOpen(true)}
-                        className="h-11 px-6 bg-[#0F172A] hover:bg-[#2EC4B6] text-white rounded-xl text-[12px] font-black uppercase tracking-widest flex items-center gap-2 transition-all shadow"
+                        className="h-11 px-6 bg-[#0F172A] hover:bg-[#2EC4B6] text-white rounded-xl text-[12px] font-black uppercase tracking-widest rtl:tracking-normal flex items-center gap-2 transition-all shadow"
                     >
-                        <Plus size={16} /> Add Offer
+                        <Plus size={16} /> {t(S, 'woAddOffer')}
                     </button>
                 </div>
             </div>
@@ -303,20 +313,20 @@ export default function SupplierOffersPage() {
                 <div className="bg-white border border-emerald-200 rounded-2xl p-5 flex items-start gap-4">
                     <CheckCircle2 size={22} className="text-emerald-500 mt-0.5" />
                     <div className="flex-1 text-[13px]">
-                        <p className="font-black mb-1">Upload finished</p>
-                        <p><span className="font-bold text-emerald-600">{uploadReport.created} created</span> · <span className="font-bold text-amber-600">{uploadReport.errors?.length || 0} skipped</span> · {uploadReport.totalRows} rows total</p>
+                        <p className="font-black mb-1">{t(S, 'woUploadFinished')}</p>
+                        <p><span className="font-bold text-emerald-600">{t(S, 'woCreated', { count: Number(uploadReport.created) || 0 })}</span> · <span className="font-bold text-amber-600">{t(S, 'woSkipped', { count: uploadReport.errors?.length || 0 })}</span> · {t(S, 'woRowsTotal', { count: Number(uploadReport.totalRows) || 0 })}</p>
                         {uploadReport.errors?.length > 0 && (
                             <details className="mt-2">
-                                <summary className="cursor-pointer text-amber-700 font-bold">{uploadReport.errors.length} skipped row(s) — click to see why</summary>
-                                <ul className="mt-2 ml-4 list-disc text-[12px] text-slate-600 space-y-0.5 max-h-[180px] overflow-y-auto">
+                                <summary className="cursor-pointer text-amber-700 font-bold">{t(S, 'woSkippedDetails', { count: uploadReport.errors.length })}</summary>
+                                <ul className="mt-2 ms-4 list-disc text-[12px] text-slate-600 space-y-0.5 max-h-[180px] overflow-y-auto">
                                     {uploadReport.errors.slice(0, 50).map((e: any, i: number) => (
-                                        <li key={i}>Row {e.row}: {e.reason}</li>
+                                        <li key={i}>{t(S, 'woRowReason', { row: e.row })} <span lang="en">{e.reason}</span></li>
                                     ))}
                                 </ul>
                             </details>
                         )}
                     </div>
-                    <button onClick={() => setUploadReport(null)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
+                    <button onClick={() => setUploadReport(null)} aria-label={t(S, 'woClose')} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
                 </div>
             )}
 
@@ -327,18 +337,18 @@ export default function SupplierOffersPage() {
                 ) : offers.length === 0 ? (
                     <div className="py-20 text-center text-slate-400">
                         <Tag size={32} className="mx-auto mb-3 opacity-40" />
-                        <p className="font-bold text-slate-500">No offers yet</p>
-                        <p className="text-[13px] mt-1">Click <span className="text-[#0F172A] font-bold">Add Offer</span> to post your first wholesale offer.</p>
+                        <p className="font-bold text-slate-500">{t(S, 'woEmptyTitle')}</p>
+                        <p className="text-[13px] mt-1"><Trans text={t(S, 'woEmptyBody')} tags={{ b: (c) => <span className="text-[#0F172A] font-bold">{c}</span> }} /></p>
                     </div>
                 ) : (
                     <table className="w-full">
                         <thead>
                             <tr className="bg-slate-50/50 border-b border-slate-100">
-                                <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Product</th>
-                                <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Tier</th>
-                                <th className="px-5 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-500">Price / unit</th>
-                                <th className="px-5 py-3 text-right text-[10px] font-black uppercase tracking-widest text-slate-500">Qty</th>
-                                <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-widest text-slate-500">Status</th>
+                                <th className="px-5 py-3 text-start text-[10px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woColProduct')}</th>
+                                <th className="px-5 py-3 text-start text-[10px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woColTier')}</th>
+                                <th className="px-5 py-3 text-end text-[10px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woColPrice')}</th>
+                                <th className="px-5 py-3 text-end text-[10px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woColQty')}</th>
+                                <th className="px-5 py-3 text-start text-[10px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woColStatus')}</th>
                                 <th className="px-5 py-3 w-10"></th>
                             </tr>
                         </thead>
@@ -346,7 +356,7 @@ export default function SupplierOffersPage() {
                             {offers.map(o => {
                                 const St = STATUS_STYLE[o.status]?.icon || Clock;
                                 const stClass = STATUS_STYLE[o.status]?.cls || '';
-                                const stLabel = STATUS_STYLE[o.status]?.label || o.status;
+                                const stLabel = STATUS_STYLE[o.status] ? t(S, STATUS_STYLE[o.status].label) : o.status;
                                 return (
                                     <tr key={o.id} className="hover:bg-slate-50/60">
                                         <td className="px-5 py-4">
@@ -362,9 +372,9 @@ export default function SupplierOffersPage() {
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="px-5 py-4 text-[12px] font-bold capitalize">{o.unit}</td>
-                                        <td className="px-5 py-4 text-right font-mono text-[13px] font-bold">€ {Number(o.pricePerUnit).toFixed(2)}</td>
-                                        <td className="px-5 py-4 text-right text-[13px] font-bold">{o.quantity}</td>
+                                        <td className="px-5 py-4 text-[12px] font-bold capitalize">{TIER_LABEL[o.unit] ? t(S, TIER_LABEL[o.unit]) : o.unit}</td>
+                                        <td className="px-5 py-4 text-end font-mono text-[13px] font-bold tabular-nums">{eur(o.pricePerUnit)}</td>
+                                        <td className="px-5 py-4 text-end text-[13px] font-bold tabular-nums">{fmt.number(o.quantity)}</td>
                                         <td className="px-5 py-4">
                                             <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-[11px] font-bold', stClass)}>
                                                 <St size={12} /> {stLabel}
@@ -373,8 +383,8 @@ export default function SupplierOffersPage() {
                                                 <p className="text-[11px] text-slate-500 mt-1 italic">{o.adminNotes}</p>
                                             )}
                                         </td>
-                                        <td className="px-5 py-4 text-right">
-                                            <button onClick={() => handleDelete(o.id)} className="text-slate-400 hover:text-rose-500"><Trash2 size={16} /></button>
+                                        <td className="px-5 py-4 text-end">
+                                            <button onClick={() => handleDelete(o.id)} aria-label={t(S, 'woDelete')} title={t(S, 'woDelete')} className="text-slate-400 hover:text-rose-500"><Trash2 size={16} /></button>
                                         </td>
                                     </tr>
                                 );
@@ -398,25 +408,26 @@ export default function SupplierOffersPage() {
                             <div className="flex items-start gap-3">
                                 <div className="w-11 h-11 rounded-xl bg-[#2EC4B6]/10 flex items-center justify-center text-[#2EC4B6] shrink-0"><Info size={20} /></div>
                                 <div className="flex-1">
-                                    <h2 className="text-[18px] font-black text-[#0F172A]">Before you upload</h2>
-                                    <p className="text-[13px] text-slate-500 mt-1">A few rules so your offers land cleanly:</p>
+                                    <h2 className="text-[18px] font-black text-[#0F172A]">{t(S, 'woBeforeUpload')}</h2>
+                                    <p className="text-[13px] text-slate-500 mt-1">{t(S, 'woRulesIntro')}</p>
                                 </div>
-                                <button onClick={() => setIsUploadInfoOpen(false)} className="p-1 hover:bg-slate-100 rounded"><X size={20} /></button>
+                                <button onClick={() => setIsUploadInfoOpen(false)} aria-label={t(S, 'woClose')} className="p-1 hover:bg-slate-100 rounded"><X size={20} /></button>
                             </div>
 
                             <ul className="space-y-3 text-[13px]">
-                                <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span><strong>You can only post offers on YOUR own approved products.</strong> Each row's product name is matched against your catalog (and only your catalog) — rows that don't resolve are skipped.</span></li>
-                                <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span><strong>Required columns:</strong> <code className="bg-slate-100 px-1.5 py-0.5 rounded">Product</code> · <code className="bg-slate-100 px-1.5 py-0.5 rounded">Price</code> · <code className="bg-slate-100 px-1.5 py-0.5 rounded">Quantity</code></span></li>
-                                <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span><strong>Optional columns:</strong> <code className="bg-slate-100 px-1.5 py-0.5 rounded">Unit</code> (truck / pallet / carton — defaults to carton) · <code className="bg-slate-100 px-1.5 py-0.5 rounded">ValidUntil</code> · <code className="bg-slate-100 px-1.5 py-0.5 rounded">Notes</code></span></li>
-                                <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span>One row = one offer. If you have 20 offers, send 20 rows.</span></li>
-                                <li className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span>Every offer is reviewed by an Atlantis admin before going out — you'll see "Approved" once it goes live.</span></li>
+                                {['woRuleOwn', 'woRuleRequired', 'woRuleOptional', 'woRuleOneRow', 'woRuleReview'].map((key) => (
+                                    <li key={key} className="flex items-start gap-3"><span className="text-[#2EC4B6] mt-0.5">●</span><span><Trans text={t(S, key)} tags={{
+                                        b: (c) => <strong>{c}</strong>,
+                                        code: (c) => <code dir="ltr" className="bg-slate-100 px-1.5 py-0.5 rounded">{c}</code>,
+                                    }} /></span></li>
+                                ))}
                             </ul>
 
                             <button
                                 onClick={() => { setIsUploadInfoOpen(false); fileRef.current?.click(); }}
-                                className="w-full h-12 bg-[#0F172A] hover:bg-[#2EC4B6] text-white rounded-xl font-black uppercase text-[13px] tracking-widest transition-all flex items-center justify-center gap-2"
+                                className="w-full h-12 bg-[#0F172A] hover:bg-[#2EC4B6] text-white rounded-xl font-black uppercase text-[13px] tracking-widest rtl:tracking-normal transition-all flex items-center justify-center gap-2"
                             >
-                                <Upload size={16} /> Choose File
+                                <Upload size={16} /> {t(S, 'woChooseFile')}
                             </button>
                         </motion.div>
                     </div>
@@ -442,15 +453,15 @@ export default function SupplierOffersPage() {
 
                             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                                 <div>
-                                    <h2 className="text-[18px] font-black text-[#0F172A]">New offer</h2>
-                                    <p className="text-[11px] text-slate-500">All fields are required for the admin review.</p>
+                                    <h2 className="text-[18px] font-black text-[#0F172A]">{t(S, 'woNewOffer')}</h2>
+                                    <p className="text-[11px] text-slate-500">{t(S, 'woAllRequired')}</p>
                                 </div>
-                                <button type="button" onClick={() => setIsAddOpen(false)} className="p-1 hover:bg-slate-100 rounded"><X size={20} /></button>
+                                <button type="button" onClick={() => setIsAddOpen(false)} aria-label={t(S, 'woClose')} className="p-1 hover:bg-slate-100 rounded"><X size={20} /></button>
                             </div>
 
                             <div className="p-6 space-y-5 overflow-y-auto flex-1">
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Product *</label>
+                                    <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woProduct')} *</label>
                                     <select
                                         required
                                         name="productId"
@@ -458,28 +469,28 @@ export default function SupplierOffersPage() {
                                         onChange={e => setPickedProductId(e.target.value)}
                                         className="w-full h-12 px-4 bg-slate-50 border-2 border-transparent rounded-xl text-[14px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]"
                                     >
-                                        <option value="">— Pick from your approved products —</option>
+                                        <option value="">{t(S, 'woPickPlaceholder')}</option>
                                         {products.map(p => (
                                             <option key={p.id} value={p.id}>{p.name}{p.brand ? ` · ${p.brand}` : ''}</option>
                                         ))}
                                     </select>
                                     <p className="text-[11px] text-slate-400">
                                         {products.length === 0
-                                            ? 'You have no approved products yet. Upload a product from /supplier/products and wait for admin approval before posting offers.'
-                                            : 'Pre-fills batch fields below — you can override any of them per offer.'}
+                                            ? t(S, 'woNoApproved')
+                                            : t(S, 'woPrefillHint')}
                                     </p>
                                 </div>
 
                                 {/* 1. Product name + weight (g/kg). Pre-filled from picked product. */}
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Product name (with weight, g/kg) *</label>
+                                    <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woProductNameLabel')} *</label>
                                     <input
                                         required
                                         name="productNameSnap"
                                         type="text"
                                         defaultValue={pickedProduct?.name ? `${pickedProduct.name}${pickedProduct.weight ? ` ${pickedProduct.weight}` : ''}` : ''}
                                         key={`pname-${pickedProductId}`}
-                                        placeholder="e.g. KitKat Chunky 40g"
+                                        placeholder={t(S, 'woEg', { example: 'KitKat Chunky 40g' })}
                                         className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]"
                                     />
                                 </div>
@@ -493,22 +504,22 @@ export default function SupplierOffersPage() {
                                 {pickedProduct && (
                                     <div className="rounded-xl bg-slate-50 border border-slate-200 p-4 grid grid-cols-3 gap-4">
                                         <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current price (per case)</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-400">{t(S, 'woCurrentPrice')}</p>
                                             <p className="text-[18px] font-bold text-slate-900 mt-1 tabular-nums">
-                                                € {Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0).toFixed(2)}
+                                                {eur(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0))}
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">EXW · Currently In</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-400">{t(S, 'woExwCurrently')}</p>
                                             <p className="text-[14px] font-bold text-slate-900 mt-1 truncate">
                                                 {pickedProduct.exwLocation || '—'}
                                             </p>
                                         </div>
                                         <div>
-                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">In stock</p>
+                                            <p className="text-[10px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-400">{t(S, 'woInStock')}</p>
                                             <p className="text-[14px] font-bold text-slate-900 mt-1">
-                                                {pickedProduct.stock ?? 0}
-                                                <span className="text-[11px] text-slate-400 font-medium ml-1">cases</span>
+                                                {fmt.number(Number(pickedProduct.stock ?? 0))}
+                                                <span className="text-[11px] text-slate-400 font-medium ms-1">{t(S, 'woCasesWord', { count: Number(pickedProduct.stock ?? 0) })}</span>
                                             </p>
                                         </div>
                                     </div>
@@ -517,11 +528,11 @@ export default function SupplierOffersPage() {
                                 {/* Tier / Discount picker / Qty */}
                                 <div className="grid grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Tier *</label>
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woColTier')} *</label>
                                         <select required name="unit" defaultValue="carton" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]">
-                                            <option value="truck">🚛 Truck</option>
-                                            <option value="pallet">📦 Pallet</option>
-                                            <option value="carton">🗃️ Case</option>
+                                            <option value="truck">🚛 {t(S, 'woTierTruck')}</option>
+                                            <option value="pallet">📦 {t(S, 'woTierPallet')}</option>
+                                            <option value="carton">🗃️ {t(S, 'woTierCarton')}</option>
                                         </select>
                                     </div>
                                     {/* Discount % picker — operator-requested.
@@ -549,13 +560,13 @@ export default function SupplierOffersPage() {
                                     */}
                                     <div className="space-y-2 col-span-2">
                                         <div className="flex items-center justify-between">
-                                            <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                                                Discount % *
+                                            <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">
+                                                {t(S, 'woDiscount')} *
                                             </label>
                                             <div className="inline-flex items-center gap-2">
-                                                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">Selected</span>
+                                                <span className="text-[10px] font-bold uppercase tracking-widest rtl:tracking-normal text-slate-400">{t(S, 'woSelected')}</span>
                                                 <span className="inline-flex items-center h-7 px-3 rounded-full bg-[#2EC4B6] text-white text-[13px] font-black tabular-nums">
-                                                    -{discountPct}%
+                                                    <bdi dir="ltr">-{discountPct}%</bdi>
                                                 </span>
                                             </div>
                                         </div>
@@ -572,13 +583,13 @@ export default function SupplierOffersPage() {
                                                             : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100 hover:border-slate-200',
                                                     )}
                                                 >
-                                                    -{p}%
+                                                    <bdi dir="ltr">-{p}%</bdi>
                                                 </button>
                                             ))}
                                         </div>
                                         <div className="flex items-center gap-2 pt-1">
                                             <label className="text-[11px] font-bold text-slate-500 whitespace-nowrap">
-                                                Or custom %:
+                                                {t(S, 'woCustom')}
                                             </label>
                                             <input
                                                 type="number"
@@ -598,19 +609,15 @@ export default function SupplierOffersPage() {
                                                         : 'bg-[#2EC4B6]/10 border-[#2EC4B6] text-[#0F766E] focus:bg-white',
                                                 )}
                                             />
-                                            <span className="text-[11px] font-bold text-slate-400">(1–90)</span>
+                                            <span className="text-[11px] font-bold text-slate-400" dir="ltr">(1–90)</span>
                                         </div>
                                         {pickedProduct && (
                                             <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                                                Offer price will be{' '}
-                                                <strong className="text-[#2EC4B6]">
-                                                    € {(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0) * (1 - discountPct / 100)).toFixed(2)}
-                                                </strong>{' '}
-                                                per case (
-                                                <s className="text-slate-400">€ {Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0).toFixed(2)}</s>{' '}
-                                                — saving customers €{' '}
-                                                {(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0) * (discountPct / 100)).toFixed(2)}
-                                                ).
+                                                <Trans text={t(S, 'woOfferPriceLine', {
+                                                    price: eur(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0) * (1 - discountPct / 100)),
+                                                    old: eur(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0)),
+                                                    saving: eur(Number(pickedProduct.basePrice ?? pickedProduct.price ?? 0) * (discountPct / 100)),
+                                                })} tags={{ b: (c) => <strong className="text-[#2EC4B6]">{c}</strong>, s: (c) => <s className="text-slate-400">{c}</s> }} />
                                             </p>
                                         )}
                                     </div>
@@ -625,10 +632,10 @@ export default function SupplierOffersPage() {
                                     <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 space-y-3">
                                         <div>
                                             <p className="text-[12px] font-black text-[#0F172A]">
-                                                This product has {variantSignatures.length} variants
+                                                {t(S, 'woVariantsCount', { count: variantSignatures.length })}
                                             </p>
                                             <p className="text-[11px] text-slate-500 mt-0.5">
-                                                Should the -{discountPct}% apply to all of them, or do you want a different discount per variant?
+                                                {t(S, 'woVariantsQuestion', { discount: `\u2066-${discountPct}%\u2069` })}
                                             </p>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
@@ -642,7 +649,7 @@ export default function SupplierOffersPage() {
                                                         : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300',
                                                 )}
                                             >
-                                                Same -{discountPct}% for all variants
+                                                {t(S, 'woSameForAll', { discount: `\u2066-${discountPct}%\u2069` })}
                                             </button>
                                             <button
                                                 type="button"
@@ -654,7 +661,7 @@ export default function SupplierOffersPage() {
                                                         : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300',
                                                 )}
                                             >
-                                                Different % per variant
+                                                {t(S, 'woDifferentPerVariant')}
                                             </button>
                                         </div>
                                         {perVariantMode === 'different' && (
@@ -692,8 +699,8 @@ export default function SupplierOffersPage() {
                                 {/* Quantity */}
                                 <div className="grid grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">
-                                            Quantity * <span className="text-slate-400 font-medium normal-case tracking-normal">— max {pickedProduct?.stock ?? '?'} in stock</span>
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">
+                                            {t(S, 'woQuantity')} * <span className="text-slate-400 font-medium normal-case tracking-normal">{t(S, 'woMaxInStock', { count: pickedProduct?.stock ?? '?' })}</span>
                                         </label>
                                         <input
                                             required
@@ -710,55 +717,55 @@ export default function SupplierOffersPage() {
                                 {/* 2. BBD + 3. EAN code */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">BBD *</label>
-                                        <input required name="bbd" type="text" defaultValue={pickedProduct?.shelfLife || ''} key={`bbd-${pickedProductId}`} placeholder="e.g. 12/2026 or 18 months" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
-                                        <p className="text-[10px] text-slate-400">Best-before date or shelf life of THIS batch.</p>
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woBbd')} *</label>
+                                        <input required name="bbd" type="text" defaultValue={pickedProduct?.shelfLife || ''} key={`bbd-${pickedProductId}`} placeholder={t(S, 'woBbdPlaceholder')} className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <p className="text-[10px] text-slate-400">{t(S, 'woBbdHint')}</p>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">EAN code *</label>
-                                        <input required name="eanCode" type="text" defaultValue={pickedProduct?.ean || ''} key={`ean-${pickedProductId}`} placeholder="e.g. 5449000000996" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-mono tracking-wider outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woEan')} *</label>
+                                        <input required name="eanCode" type="text" defaultValue={pickedProduct?.ean || ''} key={`ean-${pickedProductId}`} placeholder={t(S, 'woEg', { example: '5449000000996' })} className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-mono tracking-wider outline-none focus:bg-white focus:border-[#2EC4B6]" />
                                     </div>
                                 </div>
 
                                 {/* 4. Pcs per case + 5. Cases per pallet */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Pcs per case *</label>
-                                        <input required name="unitsPerCase" type="number" min="1" defaultValue={pickedProduct?.unitsPerCase || ''} key={`upc-${pickedProductId}`} placeholder="e.g. 24" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woPcsPerCase')} *</label>
+                                        <input required name="unitsPerCase" type="number" min="1" defaultValue={pickedProduct?.unitsPerCase || ''} key={`upc-${pickedProductId}`} placeholder={t(S, 'woEg', { example: '24' })} className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Cases per pallet *</label>
-                                        <input required name="casesPerPallet" type="number" min="1" defaultValue={pickedProduct?.casesPerPallet || ''} key={`cpp-${pickedProductId}`} placeholder="e.g. 60" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woCasesPerPallet')} *</label>
+                                        <input required name="casesPerPallet" type="number" min="1" defaultValue={pickedProduct?.casesPerPallet || ''} key={`cpp-${pickedProductId}`} placeholder={t(S, 'woEg', { example: '60' })} className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
                                     </div>
                                 </div>
 
                                 {/* 6. EXW + 7. Lead time */}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">EXW location *</label>
-                                        <input required name="exwLocation" type="text" defaultValue={pickedProduct?.exwLocation || ''} key={`exw-${pickedProductId}`} placeholder="e.g. Hamburg, Germany" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
-                                        <p className="text-[10px] text-slate-400">Where this batch sits today.</p>
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woExwLocation')} *</label>
+                                        <input required name="exwLocation" type="text" defaultValue={pickedProduct?.exwLocation || ''} key={`exw-${pickedProductId}`} placeholder={t(S, 'woExwPlaceholder')} className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <p className="text-[10px] text-slate-400">{t(S, 'woExwHint')}</p>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Lead time *</label>
-                                        <input required name="leadTime" type="text" placeholder="e.g. 5 working days" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
-                                        <p className="text-[10px] text-slate-400">How soon you can ship after PO.</p>
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woLeadTime')} *</label>
+                                        <input required name="leadTime" type="text" placeholder={t(S, 'woLeadTimePlaceholder')} className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <p className="text-[10px] text-slate-400">{t(S, 'woLeadTimeHint')}</p>
                                     </div>
                                 </div>
 
                                 {/* 8. Origin */}
                                 <div className="space-y-1.5">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Origin (country) *</label>
-                                    <input required name="origin" type="text" defaultValue={pickedProduct?.origin || ''} key={`org-${pickedProductId}`} placeholder="e.g. Germany / EU / Turkey" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                    <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woOrigin')} *</label>
+                                    <input required name="origin" type="text" defaultValue={pickedProduct?.origin || ''} key={`org-${pickedProductId}`} placeholder={t(S, 'woOriginPlaceholder')} className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
                                 </div>
 
                                 {/* 9. Picture of product */}
                                 <div className="space-y-2">
-                                    <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Product picture *</label>
+                                    <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woPicture')} *</label>
                                     <div className="flex items-start gap-3">
                                         <div className="w-24 h-24 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center overflow-hidden shrink-0">
                                             {(offerImageUrl || pickedProduct?.images?.[0]) ? (
-                                                <img src={offerImageUrl || pickedProduct?.images?.[0]} alt="preview" className="w-full h-full object-cover" />
+                                                <img src={offerImageUrl || pickedProduct?.images?.[0]} alt={t(S, 'woPreviewAlt')} className="w-full h-full object-cover" />
                                             ) : (
                                                 <Package size={28} className="text-slate-400" />
                                             )}
@@ -771,14 +778,14 @@ export default function SupplierOffersPage() {
                                                 className="w-full h-10 rounded-lg border border-dashed border-slate-300 bg-slate-50 hover:bg-white hover:border-[#2EC4B6] text-[12px] font-bold text-slate-600 flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                                             >
                                                 {isUploadingOfferImg ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                                                {isUploadingOfferImg ? 'Uploading…' : 'Upload batch photo'}
+                                                {isUploadingOfferImg ? t(S, 'woUploading') : t(S, 'woUploadBatchPhoto')}
                                             </button>
                                             <p className="text-[10px] text-slate-400">
                                                 {offerImageUrl
-                                                    ? '✅ New batch photo uploaded.'
+                                                    ? `✅ ${t(S, 'woPhotoUploaded')}`
                                                     : pickedProduct?.images?.[0]
-                                                        ? 'Using the product\'s catalog photo. Click above to replace it with a batch-specific photo.'
-                                                        : 'Required — upload a clear photo of the actual product/batch.'}
+                                                        ? t(S, 'woUsingCatalogPhoto')
+                                                        : t(S, 'woPhotoRequired')}
                                             </p>
                                         </div>
                                     </div>
@@ -787,19 +794,19 @@ export default function SupplierOffersPage() {
                                 {/* Optional fields */}
                                 <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-100">
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Valid until <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woValidUntil')} <span className="text-slate-400 normal-case font-normal">{t(S, 'woOptional')}</span></label>
                                         <input name="validUntil" type="date" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">Notes <span className="text-slate-400 normal-case font-normal">(optional)</span></label>
-                                        <input name="notes" type="text" placeholder="e.g. Mixed pallet OK" className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
+                                        <label className="text-[11px] font-black uppercase tracking-widest rtl:tracking-normal text-slate-500">{t(S, 'woNotes')} <span className="text-slate-400 normal-case font-normal">{t(S, 'woOptional')}</span></label>
+                                        <input name="notes" type="text" placeholder={t(S, 'woNotesPlaceholder')} className="w-full h-12 px-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] font-bold outline-none focus:bg-white focus:border-[#2EC4B6]" />
                                     </div>
                                 </div>
                             </div>
 
                             <div className="p-5 border-t border-slate-100 bg-slate-50/50">
-                                <button type="submit" className="w-full h-12 bg-[#0F172A] hover:bg-[#2EC4B6] text-white rounded-xl font-black uppercase text-[13px] tracking-widest transition-all flex items-center justify-center gap-2">
-                                    <Plus size={16} /> Submit for review
+                                <button type="submit" className="w-full h-12 bg-[#0F172A] hover:bg-[#2EC4B6] text-white rounded-xl font-black uppercase text-[13px] tracking-widest rtl:tracking-normal transition-all flex items-center justify-center gap-2">
+                                    <Plus size={16} /> {t(S, 'woSubmit')}
                                 </button>
                             </div>
                         </motion.form>

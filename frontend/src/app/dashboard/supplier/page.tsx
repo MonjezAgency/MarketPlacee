@@ -12,7 +12,9 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
-import ProductEditorModal from './ProductEditorModal';
+import ProductEditorModal, { categoryLabel } from './ProductEditorModal';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Trans } from '@/components/i18n/Trans';
 import { useAuth } from '@/lib/auth';
 import { formatPrice } from '@/lib/currency';
 import { useTheme } from 'next-themes';
@@ -29,6 +31,16 @@ interface UploadReport {
 
 export default function SupplierDashboard() {
     const { user } = useAuth();
+    const { t, fmt, meta } = useLanguage();
+    const L = (key: string, vars?: Record<string, string | number>) => t('legacySupplier', key, vars);
+    const STATUS_KEYS: Record<string, string> = {
+        PENDING: 'statusPending', PENDING_APPROVAL: 'statusPendingApproval', APPROVED: 'statusApproved',
+        REJECTED: 'statusRejected', BLOCKED: 'statusBlocked', ACTIVE: 'statusActive', INACTIVE: 'statusInactive',
+    };
+    const statusLabel = (s?: string) => (s && STATUS_KEYS[s] ? L(STATUS_KEYS[s]) : s || '');
+    const listJoin = (items: string[]) => {
+        try { return new (Intl as any).ListFormat(meta.intl, { style: 'narrow', type: 'unit' }).format(items); } catch { return items.join(', '); }
+    };
     const router = useRouter();
     const { theme, setTheme } = useTheme();
     const [mounted, setMounted] = useState(false);
@@ -146,11 +158,11 @@ export default function SupplierDashboard() {
                 }
             } else {
                 const errData = await res.json().catch(() => ({}));
-                alert(`Failed to save product: ${errData.message || 'Unknown error'}`);
+                alert(L('saveFailed', { message: errData.message || L('unknownError') }));
             }
         } catch (err) {
             console.error('Failed to save product:', err);
-            alert('Failed to save product. Check your connection.');
+            alert(L('saveFailedConnection'));
         }
         setIsProductModalOpen(false);
     };
@@ -199,15 +211,15 @@ export default function SupplierDashboard() {
                     }));
                     accumulatedResults.results.push(...fileResults);
                 } else {
-                    let errMsg = 'Upload failed';
+                    let errMsg = L('uploadFailed');
                     try {
                         const data = await res.json();
                         errMsg = data.message || errMsg;
                     } catch (_e) {
                         const text = await res.text().catch(() => '');
-                        errMsg = text || `Server error (${res.status})`;
+                        errMsg = text || L('serverError', { status: res.status });
                     }
-                    throw new Error(`Failed on file ${file.name}: ${errMsg}`);
+                    throw new Error(L('uploadFailedOnFile', { file: file.name, message: errMsg }));
                 }
             }
             
@@ -223,7 +235,7 @@ export default function SupplierDashboard() {
 
         } catch (err: any) {
             console.error('Bulk upload error:', err);
-            alert(`${err.message || 'Upload failed. Check your connection.'}`);
+            alert(err.message || L('uploadFailedConnection'));
         } finally {
             setIsUploading(false);
             if (bulkFileRef.current) bulkFileRef.current.value = '';
@@ -243,11 +255,11 @@ export default function SupplierDashboard() {
     const openOrders = dashboardStats?.openOrders ?? 0;
 
     return (
-        <div className="space-y-8 animate-fade-in">
+        <div data-no-translate className="space-y-8 animate-fade-in">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-poppins font-black tracking-tight">Overview</h1>
-                    <p className="text-foreground/60">Manage your wholesale distribution and operations.</p>
+                    <h1 className="text-3xl font-poppins font-black tracking-tight">{L('pageTitle')}</h1>
+                    <p className="text-foreground/60">{L('pageSubtitle')}</p>
                 </div>
                 <div className="flex gap-3">
                     <input
@@ -265,17 +277,18 @@ export default function SupplierDashboard() {
                         disabled={isUploading}
                     >
                         {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                        {isUploading ? 'Uploading...' : 'Bulk Upload'}
+                        {isUploading ? L('uploading') : L('bulkUpload')}
                     </Button>
                     <Button onClick={handleNewProduct} className="rounded-full gap-2 shadow-xl shadow-primary/20">
                         <Plus className="w-4 h-4" />
-                        New Product
+                        {L('newProduct')}
                     </Button>
                     {mounted && (
                         <Button
                             variant="outline"
                             className="rounded-full w-10 h-10 p-0 border-foreground/10"
                             onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                            aria-label={theme === 'dark' ? L('themeToLight') : L('themeToDark')}
                         >
                             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
                         </Button>
@@ -289,23 +302,23 @@ export default function SupplierDashboard() {
                     <div className="flex items-center justify-between">
                         <h3 className="font-bold flex items-center gap-2">
                             <FileSpreadsheet className="w-5 h-5 text-primary" />
-                            Upload Report
+                            {L('reportTitle')}
                         </h3>
-                        <button onClick={() => setUploadReport(null)} className="text-muted-foreground hover:text-foreground">
+                        <button onClick={() => setUploadReport(null)} aria-label={L('reportClose')} className="text-muted-foreground hover:text-foreground">
                             <XCircle size={18} />
                         </button>
                     </div>
                     <div className="flex gap-6 text-sm">
-                        <span className="font-bold">Total Rows: <span className="text-foreground">{uploadReport.totalRows}</span></span>
-                        <span className="font-bold text-green-500 flex items-center gap-1"><CheckCircle2 size={14} /> {uploadReport.successCount} Success</span>
-                        <span className="font-bold text-red-500 flex items-center gap-1"><XCircle size={14} /> {uploadReport.errorCount} Errors</span>
+                        <span className="font-bold"><Trans text={L('reportTotalRows', { count: fmt.number(uploadReport.totalRows) })} tags={{ num: (c) => <span className="text-foreground">{c}</span> }} /></span>
+                        <span className="font-bold text-green-500 flex items-center gap-1"><CheckCircle2 size={14} /> {L('reportSuccess', { count: uploadReport.successCount })}</span>
+                        <span className="font-bold text-red-500 flex items-center gap-1"><XCircle size={14} /> {L('errorsCount', { count: uploadReport.errorCount })}</span>
                     </div>
                     {uploadReport.results.filter(r => !r.success).length > 0 && (
                         <div className="space-y-2 max-h-48 overflow-y-auto">
                             {uploadReport.results.filter(r => !r.success).map((r, i) => (
                                 <div key={i} className="flex items-start gap-2 text-xs bg-red-500/10 text-red-400 rounded-lg px-3 py-2">
                                     <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-                                    <span>Row {r.rowNumber}: {r.errors?.join(', ')}</span>
+                                    <span>{L('reportRowError', { row: r.rowNumber, errors: r.errors?.join(', ') ?? '' })}</span>
                                 </div>
                             ))}
                         </div>
@@ -317,30 +330,30 @@ export default function SupplierDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="bg-primary rounded-[2.5rem] p-8 text-primary-foreground relative overflow-hidden group shadow-2xl shadow-primary/20">
                     <div className="absolute top-0 end-0 w-32 h-32 bg-white/10 rounded-full -me-10 -mt-10 blur-2xl group-hover:scale-150 transition-transform duration-700" />
-                    <p className="text-sm font-bold opacity-80 uppercase tracking-widest mb-2">Total Products</p>
+                    <p className="text-sm font-bold opacity-80 uppercase tracking-widest mb-2">{L('statTotalProducts')}</p>
                     <div className="flex items-end justify-between">
-                        <h3 className="text-5xl font-black">{products.length}</h3>
+                        <h3 className="text-5xl font-black">{fmt.number(products.length)}</h3>
                         <div className="flex items-center gap-1 text-xs font-black bg-white/20 px-3 py-1 rounded-full mb-1">
-                            Active
+                            {L('statusActive')}
                         </div>
                     </div>
-                    <p className="mt-8 text-sm opacity-80">{products.filter(p => p.status === 'APPROVED').length} Approved · {products.filter(p => p.status === 'PENDING').length} Pending</p>
+                    <p className="mt-8 text-sm opacity-80">{L('statApprovedPending', { approved: fmt.number(products.filter(p => p.status === 'APPROVED').length), pending: fmt.number(products.filter(p => p.status === 'PENDING').length) })}</p>
                 </div>
 
                 <div className="bg-surface border border-border/50 rounded-[2.5rem] p-8 group hover:shadow-xl transition-shadow">
-                    <p className="text-sm font-bold text-foreground/40 uppercase tracking-widest mb-2">Active Placements</p>
+                    <p className="text-sm font-bold text-foreground/40 uppercase tracking-widest mb-2">{L('statActivePlacements')}</p>
                     <div className="flex items-end justify-between">
-                        <h3 className="text-5xl font-black">{activePlacements}</h3>
+                        <h3 className="text-5xl font-black">{fmt.number(activePlacements)}</h3>
                     </div>
-                    <p className="mt-8 text-sm text-foreground/60">Managed through the Placements tab</p>
+                    <p className="mt-8 text-sm text-foreground/60">{L('statPlacementsHint')}</p>
                 </div>
 
                 <div className="bg-surface border border-border/50 rounded-[2.5rem] p-8 group hover:shadow-xl transition-shadow">
-                    <p className="text-sm font-bold text-foreground/40 uppercase tracking-widest mb-2">Open Orders</p>
+                    <p className="text-sm font-bold text-foreground/40 uppercase tracking-widest mb-2">{L('statOpenOrders')}</p>
                     <div className="flex items-end justify-between">
-                        <h3 className="text-5xl font-black">{openOrders}</h3>
+                        <h3 className="text-5xl font-black">{fmt.number(openOrders)}</h3>
                     </div>
-                    <p className="mt-8 text-sm text-foreground/60">Track orders from the Orders tab</p>
+                    <p className="mt-8 text-sm text-foreground/60">{L('statOrdersHint')}</p>
                 </div>
             </div>
 
@@ -351,7 +364,7 @@ export default function SupplierDashboard() {
                         <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
                             <TrendingUp className="w-5 h-5" />
                         </div>
-                        <h2 className="text-xl font-bold">Top 5 Best-Selling Products</h2>
+                        <h2 className="text-xl font-bold">{L('topTitle')}</h2>
                     </div>
                 </div>
 
@@ -359,9 +372,9 @@ export default function SupplierDashboard() {
                     <table className="w-full text-start">
                         <thead>
                             <tr className="bg-muted/30">
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Product</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Total Sold</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Revenue generated</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">{L('colProduct')}</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">{L('colTotalSold')}</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">{L('colRevenue')}</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
@@ -375,7 +388,7 @@ export default function SupplierDashboard() {
                             {(!dashboardStats?.topProducts || dashboardStats.topProducts.length === 0) && (
                                 <tr>
                                     <td colSpan={3} className="px-8 py-10 text-center text-muted-foreground text-sm font-bold">
-                                        No sales data available yet.
+                                        {L('noSalesData')}
                                     </td>
                                 </tr>
                             )}
@@ -397,12 +410,12 @@ export default function SupplierDashboard() {
                                     </td>
                                     <td className="px-8 py-6">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-black text-primary">{product.totalSold}</span>
-                                            <span className="text-xs text-foreground/40 uppercase">Units</span>
+                                            <span className="font-black text-primary">{fmt.number(product.totalSold)}</span>
+                                            <span className="text-xs text-foreground/40 uppercase">{L('units')}</span>
                                         </div>
                                     </td>
                                     <td className="px-8 py-6 font-bold text-green-500">
-                                        {formatPrice(product.totalRevenue)}
+                                        {formatPrice(product.totalRevenue, undefined, meta.intl)}
                                     </td>
                                 </tr>
                             ))}
@@ -418,13 +431,14 @@ export default function SupplierDashboard() {
                         <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center text-secondary">
                             <Package className="w-5 h-5" />
                         </div>
-                        <h2 className="text-xl font-bold">Inventory Management</h2>
+                        <h2 className="text-xl font-bold">{L('inventoryTitle')}</h2>
                     </div>
                     <div className="relative w-full md:w-80">
                         <Search className="absolute start-4 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/40" />
                         <input
                             className="w-full h-12 rounded-full border border-border/50 ps-11 pe-6 focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all bg-background"
-                            placeholder="Search products..."
+                            placeholder={L('searchPlaceholder')}
+                            aria-label={L('searchPlaceholder')}
                             value={searchTerm}
                             onChange={(e) => setSearchTerm(e.target.value)}
                         />
@@ -435,13 +449,13 @@ export default function SupplierDashboard() {
                     <table className="w-full text-start">
                         <thead>
                             <tr className="bg-muted/30">
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Product</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Status</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40 text-center">Data Health</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Category</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Price</th>
-                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">Stock</th>
-                                <th className="px-8 py-4"></th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">{L('colProduct')}</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">{L('colStatus')}</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40 text-center">{L('colDataHealth')}</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">{L('colCategory')}</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">{L('colPrice')}</th>
+                                <th className="px-8 py-4 text-xs font-bold uppercase tracking-widest text-foreground/40">{L('colStock')}</th>
+                                <th className="px-8 py-4"><span className="sr-only">{L('colActions')}</span></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-border/50">
@@ -455,19 +469,19 @@ export default function SupplierDashboard() {
                             {!isLoading && filteredProducts.length === 0 && (
                                 <tr>
                                     <td colSpan={6} className="px-8 py-10 text-center text-muted-foreground text-sm font-bold">
-                                        {searchTerm ? 'No products match your search.' : 'No products yet. Click "New Product" to get started.'}
+                                        {searchTerm ? L('noSearchMatch') : L('noProductsYet')}
                                     </td>
                                 </tr>
                             )}
                             {paginatedProducts.map((product) => {
                                 const missingFields: string[] = [];
-                                if (!product.description || product.description.trim() === '' || product.description === 'No description') missingFields.push('Description');
-                                if (!product.images || product.images.length === 0) missingFields.push('Image');
+                                if (!product.description || product.description.trim() === '' || product.description === 'No description') missingFields.push(L('fieldDescription'));
+                                if (!product.images || product.images.length === 0) missingFields.push(L('fieldImage'));
                                 if (!product.ean) missingFields.push('EAN');
-                                if (!product.weight) missingFields.push('Weight');
-                                if (!product.shelfLife) missingFields.push('BBD');
-                                if (!product.origin) missingFields.push('Origin');
-                                if (!product.unitsPerPallet) missingFields.push('Pallet Units');
+                                if (!product.weight) missingFields.push(L('fieldWeight'));
+                                if (!product.shelfLife) missingFields.push(L('fieldBbd'));
+                                if (!product.origin) missingFields.push(L('fieldOrigin'));
+                                if (!product.unitsPerPallet) missingFields.push(L('fieldPalletUnits'));
 
                                 return (
                                     <tr key={product.id} className="hover:bg-muted/20 transition-colors group">
@@ -484,7 +498,7 @@ export default function SupplierDashboard() {
                                                     <p className="font-bold">{product.name}</p>
                                                     {missingFields.length > 0 && (
                                                         <p className="text-[10px] text-amber-500 font-bold flex items-center gap-1 mt-0.5">
-                                                            <AlertTriangle size={10} /> Missing: {missingFields.join(', ')}
+                                                            <AlertTriangle size={10} /> {L('missingList', { fields: listJoin(missingFields) })}
                                                         </p>
                                                     )}
                                                 </div>
@@ -495,32 +509,32 @@ export default function SupplierDashboard() {
                                                 product.status === 'APPROVED' ? 'success' :
                                                     product.status === 'PENDING' ? 'accent' : 'destructive'
                                             }>
-                                                {product.status}
+                                                {statusLabel(product.status)}
                                             </Badge>
                                         </td>
                                         <td className="px-8 py-6">
                                             <div className="flex justify-center">
                                                 {missingFields.length === 0 ? (
                                                     <div className="flex items-center gap-1 text-[10px] font-black text-emerald-500 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full">
-                                                        <CheckCircle2 size={12} /> Complete
+                                                        <CheckCircle2 size={12} /> {L('healthComplete')}
                                                     </div>
                                                 ) : (
                                                     <div className="flex items-center gap-1 text-[10px] font-black text-amber-500 uppercase tracking-widest bg-amber-500/10 px-3 py-1 rounded-full border border-amber-500/20">
-                                                        <AlertTriangle size={12} /> {missingFields.length} Missing
+                                                        <AlertTriangle size={12} /> {L('healthMissing', { count: fmt.number(missingFields.length) })}
                                                     </div>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-8 py-6 text-sm text-foreground/60">{product.category}</td>
-                                        <td className="px-8 py-6 font-bold">{formatPrice(product.basePrice ?? product.price)}</td>
+                                        <td className="px-8 py-6 text-sm text-foreground/60">{categoryLabel(t, product.category)}</td>
+                                        <td className="px-8 py-6 font-bold">{formatPrice(product.basePrice ?? product.price, undefined, meta.intl)}</td>
                                         <td className="px-8 py-6">
                                             <div className="flex items-center gap-2">
-                                                <span className="font-black">{product.stock}</span>
-                                                <span className="text-xs text-foreground/40 uppercase">Units</span>
+                                                <span className="font-black">{fmt.number(product.stock ?? 0)}</span>
+                                                <span className="text-xs text-foreground/40 uppercase">{L('units')}</span>
                                             </div>
                                         </td>
                                         <td className="px-8 py-6 text-end">
-                                            <Button onClick={() => handleEditProduct(product)} variant="ghost" size="sm" className="rounded-full w-10 h-10 p-0 text-foreground/40 hover:text-foreground">
+                                            <Button onClick={() => handleEditProduct(product)} aria-label={L('editProductAria', { name: product.name })} variant="ghost" size="sm" className="rounded-full w-10 h-10 p-0 text-foreground/40 hover:text-foreground">
                                                 <MoreHorizontal className="w-5 h-5" />
                                             </Button>
                                         </td>
@@ -535,7 +549,7 @@ export default function SupplierDashboard() {
                 {totalPages > 1 && (
                     <div className="flex items-center justify-between p-4 border-t border-border/50 bg-muted/10">
                         <span className="text-sm text-foreground/60">
-                            Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
+                            {L('showingRange', { from: fmt.number(((currentPage - 1) * ITEMS_PER_PAGE) + 1), to: fmt.number(Math.min(currentPage * ITEMS_PER_PAGE, filteredProducts.length)), total: fmt.number(filteredProducts.length) })}
                         </span>
                         <div className="flex gap-2">
                             <Button
@@ -543,19 +557,21 @@ export default function SupplierDashboard() {
                                 size="sm"
                                 disabled={currentPage === 1}
                                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                                aria-label={L('prevPage')}
                             >
-                                <ChevronLeft className="w-4 h-4" />
+                                <ChevronLeft className="w-4 h-4 rtl:rotate-180" />
                             </Button>
                             <span className="flex items-center px-4 text-sm font-black text-foreground">
-                                Page {currentPage} of {totalPages}
+                                {L('pageOf', { page: fmt.number(currentPage), total: fmt.number(totalPages) })}
                             </span>
                             <Button
                                 variant="outline"
                                 size="sm"
                                 disabled={currentPage === totalPages}
                                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                aria-label={L('nextPage')}
                             >
-                                <ChevronRight className="w-4 h-4" />
+                                <ChevronRight className="w-4 h-4 rtl:rotate-180" />
                             </Button>
                         </div>
                     </div>

@@ -15,6 +15,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { translateText } from '@/lib/translator';
 import { getDisplayCategory } from '@/lib/product-utils';
+import { Trans } from '@/components/i18n/Trans';
 
 export default function ProductCard({ product, index = 0 }: { product: Product; index?: number }) {
     const { currency } = useCurrency();
@@ -22,7 +23,8 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const reduceMotion = useReducedMotion();
     const { addItem } = useCart();
     const { user, isLoggedIn } = useAuth();
-    const { locale } = useLanguage();
+    const { locale, t, meta } = useLanguage();
+    const tl = (key: string, vars?: Record<string, string | number>) => t('landing', key, vars);
 
     const [translatedName, setTranslatedName] = useState(product.name);
     const isOutOfStock = product.inStock === false || (product.stock !== undefined && product.stock <= 0);
@@ -84,7 +86,6 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
     // Per-case price at the cheapest reachable tier — see lib/card-pricing.
     const cardPrice = computeCardPrice(product, markups, isOwnProduct);
-    const cardUnit = 'case';
 
     const rating = product.rating || 0;
     const reviews = product.reviewsCount || 0;
@@ -109,8 +110,8 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
     // MOQ in its real unit (moq + moqUnit), never a made-up "pcs".
     const moqN = Number(product.moq) || 0;
-    const moqUnitWord = ({ PIECE: 'pc', CASE: 'case', PALLET: 'pallet', TRUCK: 'truck' } as Record<string, string>)[String(product.moqUnit || 'PIECE').toUpperCase()] || 'pc';
-    const moqText = moqN > 0 ? `${moqN.toLocaleString('en-GB')} ${moqUnitWord}${moqN === 1 ? '' : 's'}` : null;
+    const moqUnitKey = ({ PIECE: 'moqPieces', CASE: 'moqCases', PALLET: 'moqPallets', TRUCK: 'moqTrucks' } as Record<string, string>)[String(product.moqUnit || 'PIECE').toUpperCase()] || 'moqPieces';
+    const moqText = moqN > 0 ? tl(moqUnitKey, { count: moqN }) : null;
 
     return (
         // Card animation tuning: short fade-up, delay capped at ~0.18 s so
@@ -152,7 +153,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                 <div aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5 bg-gradient-to-t from-[#0B1F3A]/[0.07] to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                 {/* Image index dots (when multiple images and hovering) */}
                 {allImages && isHoveringImg && (
-                    <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1 z-10">
+                    <div className="absolute bottom-3 inset-x-0 flex justify-center gap-1 z-10">
                         {allImages.map((_, i) => (
                             <div key={i} className={cn('w-1.5 h-1.5 rounded-full transition-all duration-300', i === imgIndex ? 'bg-cta scale-125' : 'bg-[#CBD5E1]')} />
                         ))}
@@ -162,28 +163,28 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                 {/* Floating badges */}
                 <div className="absolute top-3 start-3 flex flex-col items-start gap-1.5">
                     {isBestSeller && (
-                        <span className="inline-flex items-center gap-1 bg-[#FFF4E5] text-[#B45309] border border-[#FDE3BF] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">
-                            <Star className="w-2.5 h-2.5 fill-current" /> Top Rated
+                        <span className="inline-flex items-center gap-1 bg-[#FFF4E5] text-[#B45309] border border-[#FDE3BF] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide rtl:tracking-normal">
+                            <Star className="w-2.5 h-2.5 fill-current" /> {tl('topRated')}
                         </span>
                     )}
                     {product.bulkSave && (
-                        <span className="bg-[#ECFDF5] dark:bg-emerald-500/15 text-[#047857] border border-[#BBF7D0] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide">
-                            Bulk Save
+                        <span className="bg-[#ECFDF5] dark:bg-emerald-500/15 text-[#047857] border border-[#BBF7D0] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide rtl:tracking-normal">
+                            {tl('bulkSave')}
                         </span>
                     )}
                 </div>
 
                 {/* "Your listing" — only the owning supplier sees this pill. */}
                 {isOwnProduct && (
-                    <span className="absolute top-3 end-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cta text-cta-fg text-[10px] font-bold uppercase tracking-wide shadow-sm">
+                    <span className="absolute top-3 end-3 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-cta text-cta-fg text-[10px] font-bold uppercase tracking-wide rtl:tracking-normal shadow-sm">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                        Your listing
+                        {tl('yourListing')}
                     </span>
                 )}
 
                 {isOutOfStock && (
                     <div className="absolute inset-0 bg-media/75 backdrop-blur-[1px] flex items-center justify-center z-10">
-                        <span className="bg-cta text-cta-fg px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest">Out of Stock</span>
+                        <span className="bg-cta text-cta-fg px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest rtl:tracking-normal">{tl('outOfStock')}</span>
                     </div>
                 )}
             </Link>
@@ -196,7 +197,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                         <span className="text-[12px] font-bold text-ink truncate">{product.brand}</span>
                     ) : (
                         <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-ink-2">
-                            <ShieldCheck className="w-3.5 h-3.5 text-[#2EC4B6]" /> Sold by Atlantis
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#2EC4B6]" /> {tl('soldByAtlantis')}
                         </span>
                     )}
                     {rating > 0 && (
@@ -216,7 +217,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
 
                 {/* Barcode (link code) — always one line, so every card in a row lines up. */}
                 <p className="mt-1 h-[18px] text-[12px] leading-[18px] text-ink-3 tabular-nums tracking-wide truncate" title={product.ean || undefined}>
-                    {product.ean || 'No link code'}
+                    {product.ean ? <bdi dir="ltr">{product.ean}</bdi> : tl('noLinkCode')}
                 </p>
 
                 {/* Price & Min Order */}
@@ -228,21 +229,21 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                         {!isLoggedIn || product.pricesHidden ? (
                             <Link href={`/auth/login?redirect=${encodeURIComponent(`/products/${product.id}`)}`} onClick={(e) => e.stopPropagation()}
                                 className="text-[13px] font-semibold text-teal hover:underline">
-                                Sign in for price
+                                {tl('signInForPrice')}
                             </Link>
                         ) : cardPrice > 0 ? (
                             <div className="flex items-baseline gap-1 min-w-0">
                                 <span className="text-[17px] font-bold text-ink tabular-nums tracking-tight">
-                                    {formatPrice(cardPrice, currency)}
+                                    <bdi>{formatPrice(cardPrice, currency, meta.intl)}</bdi>
                                 </span>
-                                <span className="text-[12px] text-ink-3 font-medium">/ {cardUnit}</span>
+                                <span className="text-[12px] text-ink-3 font-medium">{tl('perCase')}</span>
                             </div>
                         ) : (
                             // No list price on file — never show €0.00.
-                            <span className="text-[14px] font-semibold text-ink-2">Price on request</span>
+                            <span className="text-[14px] font-semibold text-ink-2">{tl('priceOnRequest')}</span>
                         )}
                         <span className="text-[11px] text-ink-3 shrink-0 pb-0.5">
-                            {moqText ? <>MOQ <span className="font-semibold text-ink">{moqText}</span></> : 'No MOQ'}
+                            {moqText ? <Trans text={tl('moq', { qty: moqText })} tags={{ b: (c) => <span className="font-semibold text-ink">{c}</span> }} /> : tl('noMoq')}
                         </span>
                     </div>
 
@@ -262,7 +263,7 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                             <Check size={15} className="animate-in zoom-in duration-300" />
                         ) : (
                             <>
-                                <ShoppingCart size={15} /> Add to Cart
+                                <ShoppingCart size={15} /> {tl('addToCart')}
                             </>
                         )}
                     </button>

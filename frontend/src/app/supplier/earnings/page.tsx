@@ -19,10 +19,17 @@ import {
 import { apiFetch } from '@/lib/api';
 import { formatPrice } from '@/lib/currency';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Ltr } from '@/components/orders/order-ui';
+
+const TX_STATUS_KEYS: Record<string, string> = { HOLDING: 'txHOLDING', CAPTURED: 'txCAPTURED', RELEASED: 'txRELEASED', REFUNDED: 'txREFUNDED', DISPUTED: 'txDISPUTED' };
 
 export default function SupplierEarningsPage() {
     const [data, setData] = React.useState<any>(null);
     const [isLoading, setIsLoading] = React.useState(true);
+    const { t, fmt, meta } = useLanguage();
+    const tr = (key: string, vars?: Record<string, string | number>) => t('supplierMoney', key, vars);
+    const price = (n: number) => formatPrice(n, undefined, meta.intl);
 
     const fetchEarnings = React.useCallback(async () => {
         setIsLoading(true);
@@ -45,39 +52,41 @@ export default function SupplierEarningsPage() {
 
     const stats = data ? [
         {
-            label: 'Total Earned',
-            value: formatPrice(data.totalEarned),
+            label: tr('earnTotalEarned'),
+            value: price(data.totalEarned),
             icon: DollarSign,
             color: 'emerald',
-            sub: 'Payouts sent to your account'
+            sub: tr('earnTotalEarnedSub')
         },
         {
-            label: 'Pending',
-            value: formatPrice(data.pendingEscrow),
+            label: tr('earnPending'),
+            value: price(data.pendingEscrow),
             icon: Clock,
             color: 'amber',
-            sub: 'Not yet paid out'
+            sub: tr('earnPendingSub')
         },
         {
-            label: 'Marketplace Fees',
-            value: formatPrice(data.totalPlatformFees),
+            label: tr('earnFees'),
+            value: price(data.totalPlatformFees),
             icon: ShieldCheck,
             color: 'blue',
-            sub: 'Total platform deductions'
+            sub: tr('earnFeesSub')
         }
     ] : [];
 
     return (
-        <div className="space-y-10 max-w-7xl mx-auto pb-20">
+        <div className="space-y-10 max-w-7xl mx-auto pb-20" data-no-translate>
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="space-y-1">
-                    <h1 className="text-3xl font-black text-foreground tracking-tight">Earnings & Settlements</h1>
-                    <p className="text-muted-foreground font-medium">Track your marketplace revenue, pending funds, and financial history.</p>
+                    <h1 className="text-3xl font-black text-foreground tracking-tight">{tr('earnTitle')}</h1>
+                    <p className="text-muted-foreground font-medium">{tr('earnSubtitle')}</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <button 
                         onClick={fetchEarnings}
+                        aria-label={tr('refresh')}
+                        title={tr('refresh')}
                         className="p-2.5 rounded-xl bg-card border border-border hover:bg-muted transition-colors text-muted-foreground"
                     >
                         <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
@@ -88,13 +97,13 @@ export default function SupplierEarningsPage() {
             {isLoading ? (
                 <div className="flex flex-col items-center justify-center py-32 space-y-4">
                     <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                    <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Hydrating Financial Data...</p>
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">{tr('earnLoading')}</p>
                 </div>
             ) : !data ? (
                 <div className="bg-card rounded-[32px] border border-border p-20 flex flex-col items-center text-center space-y-4">
                     <Wallet size={48} className="text-muted-foreground opacity-20" />
-                    <h3 className="text-xl font-black text-foreground">No Financial History</h3>
-                    <p className="text-muted-foreground max-w-xs mx-auto text-sm font-medium">Start selling to see your earnings and escrow balance here.</p>
+                    <h3 className="text-xl font-black text-foreground">{tr('earnEmptyTitle')}</h3>
+                    <p className="text-muted-foreground max-w-xs mx-auto text-sm font-medium">{tr('earnEmptyBody')}</p>
                 </div>
             ) : (
                 <>
@@ -124,7 +133,7 @@ export default function SupplierEarningsPage() {
                                         )}>
                                             <Icon size={24} />
                                         </div>
-                                        <ArrowUpRight size={16} className="text-muted-foreground opacity-50" />
+                                        <ArrowUpRight size={16} className="text-muted-foreground opacity-50 rtl:-scale-x-100" />
                                     </div>
                                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{stat.label}</p>
                                     <p className="text-3xl font-black text-foreground tracking-tight mt-1">{stat.value}</p>
@@ -138,9 +147,9 @@ export default function SupplierEarningsPage() {
                     <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 flex items-start gap-3">
                         <Info size={18} className="text-primary shrink-0 mt-0.5" />
                         <div className="space-y-1">
-                            <p className="text-xs font-black text-primary uppercase tracking-widest">How Payouts Work</p>
+                            <p className="text-xs font-black text-primary uppercase tracking-widest">{tr('earnHowTitle')}</p>
                             <p className="text-[11px] text-primary/80 font-medium leading-relaxed">
-                                Payouts are arranged by the Atlantis team under the confirmed terms of each order. Atlantis doesn’t hold payments in escrow, and nothing is released automatically. Contact the team about a specific payout.
+                                {tr('earnHowBody')}
                             </p>
                         </div>
                     </div>
@@ -149,7 +158,7 @@ export default function SupplierEarningsPage() {
                     <div className="bg-card rounded-[32px] border border-border overflow-hidden shadow-sm">
                         <div className="px-8 py-6 border-b border-border flex items-center justify-between">
                             <h3 className="text-lg font-black text-foreground flex items-center gap-2">
-                                <History size={20} className="text-primary" /> Recent Settlements
+                                <History size={20} className="text-primary" /> {tr('earnRecent')}
                             </h3>
                         </div>
                         
@@ -157,29 +166,29 @@ export default function SupplierEarningsPage() {
                             <table className="w-full text-start">
                                 <thead>
                                     <tr className="bg-muted/30">
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Order ID</th>
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Date</th>
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-center">Status</th>
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-end">Gross Amount</th>
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-end">Platform Fee</th>
-                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-end">Your Payout</th>
+                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-start">{tr('earnColOrder')}</th>
+                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-start">{tr('earnColDate')}</th>
+                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-center">{tr('earnColStatus')}</th>
+                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-end">{tr('earnColGross')}</th>
+                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-end">{tr('earnColFee')}</th>
+                                        <th className="px-8 py-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-end">{tr('earnColPayout')}</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border/50">
                                     {data.transactions.length === 0 ? (
                                         <tr>
                                             <td colSpan={6} className="px-8 py-12 text-center text-muted-foreground text-sm font-medium">
-                                                No transactions found for this period.
+                                                {tr('earnNoTx')}
                                             </td>
                                         </tr>
                                     ) : (
                                         data.transactions.map((tx: any) => (
                                             <tr key={tx.id} className="hover:bg-muted/20 transition-colors group">
                                                 <td className="px-8 py-6">
-                                                    <p className="font-black text-foreground text-xs uppercase tracking-tighter">#{tx.orderId.slice(-8)}</p>
+                                                    <p className="font-black text-foreground text-xs uppercase tracking-tighter"><Ltr>#{tx.orderId.slice(-8)}</Ltr></p>
                                                 </td>
                                                 <td className="px-8 py-6">
-                                                    <p className="text-xs font-bold text-muted-foreground">{new Date(tx.createdAt).toLocaleDateString()}</p>
+                                                    <p className="text-xs font-bold text-muted-foreground">{fmt.date(tx.createdAt)}</p>
                                                 </td>
                                                 <td className="px-8 py-6">
                                                     <div className="flex justify-center">
@@ -189,22 +198,22 @@ export default function SupplierEarningsPage() {
                                                             tx.status === 'CAPTURED' ? "bg-blue-500/10 text-blue-500 border-blue-500/20" :
                                                             "bg-amber-500/10 text-amber-500 border-amber-500/20"
                                                         )}>
-                                                            {tx.status}
+                                                            {TX_STATUS_KEYS[tx.status] ? tr(TX_STATUS_KEYS[tx.status]) : tx.status}
                                                         </span>
                                                     </div>
                                                 </td>
                                                 <td className="px-8 py-6 text-end">
-                                                    <p className="text-xs font-bold text-muted-foreground">{formatPrice(tx.amount)}</p>
+                                                    <p className="text-xs font-bold text-muted-foreground">{price(tx.amount)}</p>
                                                 </td>
                                                 <td className="px-8 py-6 text-end">
-                                                    <p className="text-xs font-bold text-red-500 opacity-60">-{formatPrice(tx.platformFee)}</p>
+                                                    <p className="text-xs font-bold text-red-500 opacity-60"><bdi>-{price(tx.platformFee)}</bdi></p>
                                                 </td>
                                                 <td className="px-8 py-6 text-end">
                                                     <div className="flex flex-col items-end">
-                                                        <p className="text-sm font-black text-emerald-500">{formatPrice(tx.supplierAmount)}</p>
+                                                        <p className="text-sm font-black text-emerald-500">{price(tx.supplierAmount)}</p>
                                                         {tx.status === 'RELEASED' && (
                                                             <p className="text-[9px] font-black text-emerald-500/50 uppercase flex items-center gap-1 mt-0.5">
-                                                                <ArrowDownToLine size={8} /> Settled
+                                                                <ArrowDownToLine size={8} /> {tr('earnSettled')}
                                                             </p>
                                                         )}
                                                     </div>

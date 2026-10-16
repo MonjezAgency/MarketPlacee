@@ -6,7 +6,9 @@ import { apiFetch } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { toServerItem } from '@/lib/wholesale';
 import { cn } from '@/lib/utils';
-import { AtlantisMark, DayDivider, IncomingMessage, OutgoingMessage, TypingIndicator, dayLabel } from './messages';
+import { Trans } from '@/components/i18n/Trans';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { AtlantisMark, DayDivider, IncomingMessage, OutgoingMessage, TypingIndicator, useWhen } from './messages';
 import { Composer, Kbd, useSpeech } from './Composer';
 
 type From = 'user' | 'assistant' | 'team';
@@ -17,25 +19,27 @@ interface Attachment { file: File; preview: string; progress: number; url?: stri
 const MAX_IMAGE = 6 * 1024 * 1024;
 const TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-/** Starting points, grouped by what people actually need. Each one sends a real question. */
+/** Starting points, grouped by what people actually need. Each one sends a real question (in the reader's language). Values are dictionary keys. */
 const TOPICS: Record<'supplier' | 'buyer', { icon: React.ElementType; title: string; questions: string[] }[]> = {
     supplier: [
-        { icon: Eye, title: 'Listings & visibility', questions: ['Why isn’t my product appearing in the marketplace?', 'Which of my products need changes before they go live?'] },
-        { icon: Boxes, title: 'Inventory & stock', questions: ['Help me update my inventory.', 'Which of my products are low on stock?'] },
-        { icon: Tags, title: 'Pricing', questions: ['Why is my product price incorrect?', 'How are my prices converted to EUR?'] },
-        { icon: Package, title: 'Orders', questions: ['Help me understand my orders.', 'Which orders are waiting for my confirmation?'] },
-        { icon: CircleUserRound, title: 'Account', questions: ['How do I get my company verified?', 'How do I change which emails I receive?'] },
+        { icon: Eye, title: 'topicListings', questions: ['qListing1', 'qListing2'] },
+        { icon: Boxes, title: 'topicInventory', questions: ['qStock1', 'qStock2'] },
+        { icon: Tags, title: 'topicPricing', questions: ['qPrice1', 'qPrice2'] },
+        { icon: Package, title: 'topicOrders', questions: ['qOrders1', 'qOrders2'] },
+        { icon: CircleUserRound, title: 'topicAccount', questions: ['qVerify', 'qEmails'] },
     ],
     buyer: [
-        { icon: Truck, title: 'Orders & delivery', questions: ['Where is my order?', 'When is the delivery charge confirmed?'] },
-        { icon: ShoppingCart, title: 'Cart & checkout', questions: ['Why can’t I complete checkout?', 'Why does my cart say a line is below the minimum?'] },
-        { icon: ReceiptText, title: 'Products & prices', questions: ['Help me compare supplier offers.', 'Why are prices shown without VAT?'] },
-        { icon: CircleUserRound, title: 'Account', questions: ['How long does account approval take?', 'I have a problem with a product.'] },
+        { icon: Truck, title: 'topicDelivery', questions: ['qWhere', 'qDeliveryCharge'] },
+        { icon: ShoppingCart, title: 'topicCheckout', questions: ['qCheckout', 'qMinimum'] },
+        { icon: ReceiptText, title: 'topicProducts', questions: ['qCompare', 'qVat'] },
+        { icon: CircleUserRound, title: 'topicAccount', questions: ['qApproval', 'qProblem'] },
     ],
 };
 
 export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession | null, failed: boolean) => void }) {
     const { items: cartItems } = useCart();
+    const { t } = useLanguage();
+    const { dayLabel } = useWhen();
     const [session, setSession] = React.useState<AssistantSession | null>(null);
     const [loadError, setLoadError] = React.useState(false);
     const [turns, setTurns] = React.useState<Turn[]>([]);
@@ -52,7 +56,7 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
     const inputRef = React.useRef<HTMLTextAreaElement>(null);
     const fileRef = React.useRef<HTMLInputElement>(null);
     const dictBase = React.useRef('');
-    const speech = useSpeech((t, final) => { const v = `${dictBase.current}${dictBase.current && !dictBase.current.endsWith(' ') ? ' ' : ''}${t}`; setDraft(v); if (final) dictBase.current = v; });
+    const speech = useSpeech((heard, final) => { const v = `${dictBase.current}${dictBase.current && !dictBase.current.endsWith(' ') ? ' ' : ''}${heard}`; setDraft(v); if (final) dictBase.current = v; });
 
     const load = React.useCallback(async () => {
         try {
@@ -85,8 +89,8 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
     /* Attachments (private upload, then sent with the message) */
     const pick = (file: File | undefined | null) => {
         if (!file) return;
-        if (!TYPES.includes(file.type)) { setNotice({ tone: 'error', text: 'Attach a JPEG, PNG or WebP image.' }); return; }
-        if (file.size > MAX_IMAGE) { setNotice({ tone: 'error', text: 'Images can be up to 6 MB.' }); return; }
+        if (!TYPES.includes(file.type)) { setNotice({ tone: 'error', text: t('support', 'errAttachType') }); return; }
+        if (file.size > MAX_IMAGE) { setNotice({ tone: 'error', text: t('support', 'errAttachSize') }); return; }
         setNotice(null);
         const a: Attachment = { file, preview: URL.createObjectURL(file), progress: 0 };
         setAttachment(a); upload(a);
@@ -99,9 +103,9 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
         xhr.upload.onprogress = (e) => { if (e.lengthComputable) setAttachment((c) => (c && c.file === a.file ? { ...c, progress: Math.round((e.loaded / e.total) * 100) } : c)); };
         xhr.onload = () => {
             let body: any = null; try { body = JSON.parse(xhr.responseText); } catch { /* not json */ }
-            setAttachment((c) => (c && c.file === a.file ? (xhr.status < 300 && body?.url ? { ...c, progress: 100, url: body.url, error: undefined } : { ...c, error: typeof body?.message === 'string' ? body.message : 'Upload failed. Try again.' }) : c));
+            setAttachment((c) => (c && c.file === a.file ? (xhr.status < 300 && body?.url ? { ...c, progress: 100, url: body.url, error: undefined } : { ...c, error: typeof body?.message === 'string' ? body.message : t('support', 'errUploadFailed') }) : c));
         };
-        xhr.onerror = () => setAttachment((c) => (c && c.file === a.file ? { ...c, error: 'Upload failed — check your connection.' } : c));
+        xhr.onerror = () => setAttachment((c) => (c && c.file === a.file ? { ...c, error: t('support', 'errUploadConnection') } : c));
         xhr.send(fd);
     };
     const removeAttachment = () => { if (attachment) URL.revokeObjectURL(attachment.preview); setAttachment(null); };
@@ -115,7 +119,7 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
             return;
         }
         const saved = body?.userMessage;
-        const msg = typeof body?.message === 'string' ? body.message : res.status === 429 ? 'You’re sending messages too fast — wait a moment.' : 'Something went wrong. Try again.';
+        const msg = typeof body?.message === 'string' ? body.message : res.status === 429 ? t('support', 'errTooFast') : t('support', 'errGeneric');
         if (saved) {
             if (body?.code === 'AI_NOT_CONFIGURED') {
                 // No assistant to retry: the message is simply saved for the team (explained once, above the composer).
@@ -127,7 +131,7 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
     const send = async (textIn?: string) => {
         const text = (textIn ?? draft).trim();
         if (busy || (!text && !attachment?.url)) return;
-        if (attachment && !attachment.url) { setNotice({ tone: 'error', text: attachment.error ? 'Remove or re-attach the image that failed.' : 'Wait for the image to finish uploading.' }); return; }
+        if (attachment && !attachment.url) { setNotice({ tone: 'error', text: attachment.error ? t('support', 'errRemoveFailedImage') : t('support', 'errWaitUpload') }); return; }
         if (speech.listening) speech.stop();
         const tempId = `tmp-${Date.now()}`;
         const imageUrl = attachment?.url || null;
@@ -137,18 +141,18 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
             const res = await apiFetch('/support-assistant/message', { method: 'POST', body: JSON.stringify({ content: text, imageUrl: imageUrl || undefined, cart: cart() }) });
             handleResult(res, await res.json().catch(() => null), tempId);
         } catch {
-            setTurns((cur) => cur.map((t) => (t.id === tempId ? { ...t, state: 'failed-send', error: 'Couldn’t reach Atlantis — check your connection.' } : t)));
+            setTurns((cur) => cur.map((x) => (x.id === tempId ? { ...x, state: 'failed-send', error: t('support', 'errConnection') } : x)));
         } finally { setBusy(false); inputRef.current?.focus(); }
     };
-    const retry = async (t: Turn) => {
+    const retry = async (turn: Turn) => {
         if (busy) return;
-        if (t.state === 'failed-send') { setTurns((cur) => cur.filter((x) => x.id !== t.id)); return send(t.text); }
+        if (turn.state === 'failed-send') { setTurns((cur) => cur.filter((x) => x.id !== turn.id)); return send(turn.text); }
         setBusy(true);
-        setTurns((cur) => cur.map((x) => (x.id === t.id ? { ...x, state: 'sending', error: undefined } : x)));
+        setTurns((cur) => cur.map((x) => (x.id === turn.id ? { ...x, state: 'sending', error: undefined } : x)));
         try {
-            const res = await apiFetch(`/support-assistant/message/${t.id}/retry`, { method: 'POST', body: JSON.stringify({ cart: cart() }) });
-            handleResult(res, await res.json().catch(() => null), t.id);
-        } catch { setTurns((cur) => cur.map((x) => (x.id === t.id ? { ...x, state: 'failed-answer', error: 'Couldn’t reach Atlantis — check your connection.' } : x))); }
+            const res = await apiFetch(`/support-assistant/message/${turn.id}/retry`, { method: 'POST', body: JSON.stringify({ cart: cart() }) });
+            handleResult(res, await res.json().catch(() => null), turn.id);
+        } catch { setTurns((cur) => cur.map((x) => (x.id === turn.id ? { ...x, state: 'failed-answer', error: t('support', 'errConnection') } : x))); }
         finally { setBusy(false); }
     };
     const escalate = async () => {
@@ -156,39 +160,39 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
         try {
             const res = await apiFetch('/support-assistant/escalate', { method: 'POST', body: JSON.stringify({}) });
             const b = await res.json().catch(() => null);
-            if (!res.ok) throw new Error(typeof b?.message === 'string' ? b.message : 'Couldn’t contact the team. Try again.');
+            if (!res.ok) throw new Error(typeof b?.message === 'string' ? b.message : t('support', 'errEscalate'));
             setEscalated(true);
-            setNotice({ tone: 'info', text: 'The Atlantis team has been asked to join. A person will reply in this conversation, and you’ll get a notification.' });
+            setNotice({ tone: 'info', text: t('support', 'noticeEscalated') });
         } catch (e: any) { setNotice({ tone: 'error', text: e.message }); }
         finally { setEscalating(false); }
     };
 
     const role: 'supplier' | 'buyer' = session?.role === 'supplier' ? 'supplier' : 'buyer';
     const topics = TOPICS[role];
-    const started = turns.some((t) => t.from === 'user');
+    const started = turns.some((x) => x.from === 'user');
     const canSend = !busy && (!!draft.trim() || !!attachment?.url) && !(attachment && !attachment.url);
     const aiOn = !!session?.assistant.available;
 
     // Messages grouped by day.
     const rows: React.ReactNode[] = [];
     let lastDay = '';
-    for (const t of turns) {
-        const d = dayLabel(t.createdAt);
-        if (d !== lastDay) { rows.push(<DayDivider key={`d-${t.id}`} label={d} />); lastDay = d; }
-        rows.push(t.from === 'user'
-            ? <OutgoingMessage key={t.id} text={t.text} imageUrl={t.imageUrl} at={t.createdAt} state={t.state} error={t.error} onRetry={() => retry(t)} />
-            : <IncomingMessage key={t.id} from={t.from} text={t.text} at={t.createdAt} imageUrl={t.imageUrl} />);
+    for (const turn of turns) {
+        const d = dayLabel(turn.createdAt);
+        if (d !== lastDay) { rows.push(<DayDivider key={`d-${turn.id}`} label={d} />); lastDay = d; }
+        rows.push(turn.from === 'user'
+            ? <OutgoingMessage key={turn.id} text={turn.text} imageUrl={turn.imageUrl} at={turn.createdAt} state={turn.state} error={turn.error} onRetry={() => retry(turn)} />
+            : <IncomingMessage key={turn.id} from={turn.from} text={turn.text} at={turn.createdAt} imageUrl={turn.imageUrl} />);
     }
 
     const Topics = ({ compact }: { compact?: boolean }) => (
         <div className={cn('grid gap-2', compact ? 'grid-cols-1' : 'sm:grid-cols-2')}>
             {topics.map((g) => (
                 <div key={g.title} className="rounded-xl ring-1 ring-line bg-surface p-3">
-                    <p className="flex items-center gap-2 text-[13px] font-semibold text-heading"><span className="w-7 h-7 rounded-lg bg-teal-soft text-teal flex items-center justify-center" aria-hidden><g.icon size={15} /></span>{g.title}</p>
+                    <p className="flex items-center gap-2 text-[13px] font-semibold text-heading"><span className="w-7 h-7 rounded-lg bg-teal-soft text-teal flex items-center justify-center" aria-hidden><g.icon size={15} /></span>{t('support', g.title)}</p>
                     <ul className="mt-2 space-y-0.5">
                         {g.questions.map((q) => (
-                            <li key={q}><button type="button" disabled={busy || !session} onClick={() => send(q)}
-                                className="w-full text-start rounded-md px-2 py-1.5 text-[13px] leading-snug text-ink-2 hover:bg-surface-2 hover:text-heading transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] disabled:opacity-50">{q}</button></li>
+                            <li key={q}><button type="button" disabled={busy || !session} onClick={() => send(t('support', q))}
+                                className="w-full text-start rounded-md px-2 py-1.5 text-[13px] leading-snug text-ink-2 hover:bg-surface-2 hover:text-heading transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] disabled:opacity-50">{t('support', q)}</button></li>
                         ))}
                     </ul>
                 </div>
@@ -203,46 +207,46 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
                 onDragOver={(e) => { if (e.dataTransfer.types.includes('Files')) { e.preventDefault(); setDragging(true); } }}
                 onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
                 onDrop={(e) => { e.preventDefault(); setDragging(false); pick(e.dataTransfer.files?.[0]); }}>
-                {dragging && <div className="absolute inset-0 z-20 m-3 rounded-xl border-2 border-dashed border-[#2EC4B6] bg-teal-soft/80 flex items-center justify-center text-[14px] font-semibold text-heading pointer-events-none">Drop a screenshot to attach it</div>}
+                {dragging && <div className="absolute inset-0 z-20 m-3 rounded-xl border-2 border-dashed border-[#2EC4B6] bg-teal-soft/80 flex items-center justify-center text-[14px] font-semibold text-heading pointer-events-none">{t('support', 'dropToAttach')}</div>}
 
                 <div className="relative flex-1 min-h-0 flex flex-col">
-                <div ref={scrollRef} onScroll={onScroll} className="flex-1 min-h-0 overflow-y-auto overscroll-contain" role="log" aria-live="polite" aria-label="Support conversation">
+                <div ref={scrollRef} onScroll={onScroll} className="flex-1 min-h-0 overflow-y-auto overscroll-contain" role="log" aria-live="polite" aria-label={t('support', 'conversationAria')}>
                     <div className="mx-auto w-full max-w-3xl px-4 sm:px-6 py-5 space-y-5">
                         {loadError && !session ? (
                             <div className="rounded-xl ring-1 ring-[#FECACA] bg-[#FEF2F2] p-4 text-[14px] text-[#991B1B] flex flex-wrap items-center gap-3">
-                                <AlertCircle size={17} aria-hidden /> Support couldn’t be loaded.
-                                <button type="button" onClick={load} className="font-semibold underline underline-offset-2">Try again</button>
+                                <AlertCircle size={17} aria-hidden /> {t('support', 'loadFailed')}
+                                <button type="button" onClick={load} className="font-semibold underline underline-offset-2">{t('support', 'tryAgain')}</button>
                             </div>
                         ) : !session ? (
-                            <div className="space-y-4" aria-label="Loading conversation">{[64, 40, 56].map((w, i) => <div key={i} className="h-12 rounded-xl bg-surface-2 animate-pulse motion-reduce:animate-none" style={{ width: `${w}%`, marginInlineStart: i === 1 ? 'auto' : undefined }} />)}</div>
+                            <div className="space-y-4" aria-label={t('support', 'loadingAria')}>{[64, 40, 56].map((w, i) => <div key={i} className="h-12 rounded-xl bg-surface-2 animate-pulse motion-reduce:animate-none" style={{ width: `${w}%`, marginInlineStart: i === 1 ? 'auto' : undefined }} />)}</div>
                         ) : (
                             <>
                                 {!started && (
-                                    <section aria-label="Getting started" className="rounded-2xl ring-1 ring-line bg-surface-2/60 p-4 sm:p-5">
+                                    <section aria-label={t('support', 'gettingStartedAria')} className="rounded-2xl ring-1 ring-line bg-surface-2/60 p-4 sm:p-5">
                                         <div className="flex items-start gap-3">
                                             <AtlantisMark size={36} />
                                             <div className="min-w-0">
-                                                <h2 className="font-sans text-[16px] font-semibold text-heading">Hi{session.firstName ? ` ${session.firstName}` : ''} — how can we help?</h2>
+                                                <h2 className="font-sans text-[16px] font-semibold text-heading">{session.firstName ? t('support', 'greetingNamed', { name: session.firstName }) : t('support', 'greeting')}</h2>
                                                 <p className="mt-1 text-[14px] leading-relaxed text-ink-2">
                                                     {aiOn
-                                                        ? `Ask about your ${role === 'supplier' ? 'listings, stock, prices or orders' : 'orders, cart or account'}. The assistant answers from your own account data; if it can’t solve it, the Atlantis team can take over here.`
-                                                        : 'The AI assistant isn’t switched on right now. Write your question and ask the Atlantis team — a person will reply here.'}
+                                                        ? t('support', role === 'supplier' ? 'introAiSupplier' : 'introAiBuyer')
+                                                        : t('support', 'introAiOff')}
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="mt-4 xl:hidden"><Topics /></div>
-                                        <p className="mt-4 hidden xl:block text-[13px] text-ink-3">Pick a topic on the right, or describe the problem below.</p>
+                                        <p className="mt-4 hidden xl:block text-[13px] text-ink-3">{t('support', 'pickTopicHint')}</p>
                                     </section>
                                 )}
                                 {rows}
-                                {busy && <TypingIndicator label={mode === 'team' ? 'Sending to the Atlantis team…' : 'Checking your account…'} />}
+                                {busy && <TypingIndicator label={mode === 'team' ? t('support', 'typingTeam') : t('support', 'typingAssistant')} />}
                             </>
                         )}
                     </div>
                 </div>
 
                 {!atBottom && (
-                    <button type="button" onClick={() => { scrollToEnd(); setAtBottom(true); }} className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-8 px-3 rounded-full bg-heading text-white text-[12.5px] font-medium shadow-float inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]"><ArrowDown size={13} aria-hidden /> Latest</button>
+                    <button type="button" onClick={() => { scrollToEnd(); setAtBottom(true); }} className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 h-8 px-3 rounded-full bg-heading text-white text-[12.5px] font-medium shadow-float inline-flex items-center gap-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]"><ArrowDown size={13} aria-hidden /> {t('support', 'latest')}</button>
                 )}
                 </div>
 
@@ -252,21 +256,21 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
                         {(notice || speech.error) && (
                             <p className={cn('mb-2 flex items-start gap-1.5 text-[13px]', notice?.tone === 'error' || speech.error ? 'text-[#B91C1C]' : 'text-ink-2')} role="status">
                                 <AlertCircle size={15} className="mt-0.5 shrink-0" aria-hidden /> <span className="flex-1">{notice?.text || speech.error}</span>
-                                {notice && <button type="button" aria-label="Dismiss" onClick={() => setNotice(null)} className="text-ink-4 hover:text-ink"><X size={14} /></button>}
+                                {notice && <button type="button" aria-label={t('support', 'dismiss')} onClick={() => setNotice(null)} className="text-ink-4 hover:text-ink"><X size={14} /></button>}
                             </p>
                         )}
                         {/* Hand-off below xl, where the rail is hidden */}
                         {session && mode !== 'team' && (
                             <div className="xl:hidden mb-2 flex items-center justify-between gap-3 text-[13px]">
-                                <span className="text-ink-3">{escalated ? 'The Atlantis team has been asked to join.' : 'Need a person?'}</span>
-                                {!escalated && <button type="button" onClick={escalate} disabled={!started || escalating} className="font-semibold text-teal hover:underline disabled:opacity-50 disabled:no-underline">{escalating ? 'Asking…' : 'Ask the Atlantis team'}</button>}
+                                <span className="text-ink-3">{escalated ? t('support', 'escalatedShort') : t('support', 'needPerson')}</span>
+                                {!escalated && <button type="button" onClick={escalate} disabled={!started || escalating} className="font-semibold text-teal hover:underline disabled:opacity-50 disabled:no-underline">{escalating ? t('support', 'asking') : t('support', 'askTeam')}</button>}
                             </div>
                         )}
                         <input ref={fileRef} type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ''; }} />
                         <Composer id="support-input" ref={inputRef} value={draft}
                             onChange={(v) => { setDraft(v); dictBase.current = v; }}
                             onSend={() => send()} canSend={canSend} busy={busy} disabled={!session}
-                            placeholder={speech.listening ? 'Listening… speak now' : mode === 'team' ? 'Write to the Atlantis team…' : 'Describe the problem…'}
+                            placeholder={speech.listening ? t('support', 'placeholderListening') : mode === 'team' ? t('support', 'placeholderTeam') : t('support', 'placeholderAssistant')}
                             onAttach={() => fileRef.current?.click()} attachDisabled={busy || !!attachment}
                             onPasteImage={(f) => { if (!attachment) pick(f); }}
                             speech={{ supported: speech.supported, listening: speech.listening, start: () => { dictBase.current = draft; speech.start(); }, stop: speech.stop }}
@@ -274,44 +278,44 @@ export function AssistantPanel({ onSession }: { onSession?: (s: AssistantSession
                                 <div className="flex items-center gap-3 px-3 pt-3">
                                     <span className="relative w-12 h-12 rounded-lg overflow-hidden ring-1 ring-line bg-surface-2 shrink-0">
                                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={attachment.preview} alt="Attachment preview" className="w-full h-full object-cover" />
+                                        <img src={attachment.preview} alt={t('support', 'attachmentPreviewAlt')} className="w-full h-full object-cover" />
                                     </span>
                                     <div className="min-w-0 flex-1 text-[13px]">
                                         <p className="truncate text-ink">{attachment.file.name}</p>
                                         {attachment.error ? <p className="text-[#B91C1C]">{attachment.error}</p>
-                                            : attachment.url ? <p className="text-ink-3">Ready to send{session?.assistant.vision ? ' — the assistant will look at it' : ''}</p>
-                                                : <div className="mt-1.5 h-1 rounded-full bg-surface-3 overflow-hidden" role="progressbar" aria-valuenow={attachment.progress} aria-valuemin={0} aria-valuemax={100} aria-label="Upload progress"><div className="h-full bg-[#2EC4B6] transition-all" style={{ width: `${attachment.progress}%` }} /></div>}
+                                            : attachment.url ? <p className="text-ink-3">{session?.assistant.vision ? t('support', 'readyToSendVision') : t('support', 'readyToSend')}</p>
+                                                : <div className="mt-1.5 h-1 rounded-full bg-surface-3 overflow-hidden" role="progressbar" aria-valuenow={attachment.progress} aria-valuemin={0} aria-valuemax={100} aria-label={t('support', 'uploadProgressAria')}><div className="h-full bg-[#2EC4B6] transition-all" style={{ width: `${attachment.progress}%` }} /></div>}
                                     </div>
-                                    {attachment.error && <button type="button" onClick={() => { setAttachment({ ...attachment, error: undefined, progress: 0 }); upload(attachment); }} className="text-[13px] font-semibold text-teal">Retry</button>}
-                                    <button type="button" aria-label="Remove attachment" onClick={removeAttachment} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:bg-surface-2 hover:text-ink"><X size={15} /></button>
+                                    {attachment.error && <button type="button" onClick={() => { setAttachment({ ...attachment, error: undefined, progress: 0 }); upload(attachment); }} className="text-[13px] font-semibold text-teal">{t('support', 'retry')}</button>}
+                                    <button type="button" aria-label={t('support', 'removeAttachment')} onClick={removeAttachment} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:bg-surface-2 hover:text-ink"><X size={15} /></button>
                                 </div>
                             )}
-                            hint={<>Mention the product or order if you can · <Kbd>Enter</Kbd> send · <Kbd>Shift</Kbd>+<Kbd>Enter</Kbd> new line</>}
+                            hint={<Trans text={t('support', 'hintAssistant')} tags={{ k: (c) => <Kbd>{c}</Kbd> }} />}
                         />
                     </div>
                 </div>
             </div>
 
             {/* Right rail (desktop): topics and the human hand-off */}
-            <aside aria-label="Help topics" className="hidden xl:flex min-h-0 flex-col border-s border-line bg-surface-2/40">
+            <aside aria-label={t('support', 'topicsAria')} className="hidden xl:flex min-h-0 flex-col border-s border-line bg-surface-2/40">
                 <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-4">
                     <div>
-                        <p className="text-eyebrow uppercase text-ink-3 mb-2">Ask about</p>
+                        <p className="text-eyebrow uppercase text-ink-3 mb-2">{t('support', 'askAbout')}</p>
                         <Topics compact />
                     </div>
                 </div>
                 <div className="shrink-0 border-t border-line p-4">
-                    <p className="flex items-center gap-2 text-[13.5px] font-semibold text-heading"><UserRound size={15} className="text-teal" aria-hidden /> Talk to a person</p>
+                    <p className="flex items-center gap-2 text-[13.5px] font-semibold text-heading"><UserRound size={15} className="text-teal" aria-hidden /> {t('support', 'talkToPerson')}</p>
                     {mode === 'team' ? (
-                        <p className="mt-1 text-[13px] text-ink-2">The Atlantis team is in this conversation. Replies appear here.</p>
+                        <p className="mt-1 text-[13px] text-ink-2">{t('support', 'teamInConversation')}</p>
                     ) : escalated ? (
-                        <p className="mt-1 text-[13px] text-ink-2">The team has been asked to join. You’ll get a notification when they reply.</p>
+                        <p className="mt-1 text-[13px] text-ink-2">{t('support', 'teamAsked')}</p>
                     ) : (
                         <>
-                            <p className="mt-1 text-[13px] text-ink-2">{started ? 'Hand this conversation to the Atlantis team.' : 'Describe the problem first, then hand it to the team.'}</p>
+                            <p className="mt-1 text-[13px] text-ink-2">{started ? t('support', 'handOver') : t('support', 'describeFirst')}</p>
                             <button type="button" onClick={escalate} disabled={!started || escalating}
                                 className="mt-3 w-full h-10 rounded-lg ring-1 ring-line-strong bg-surface text-[13.5px] font-semibold text-heading hover:ring-ink transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] disabled:opacity-50 disabled:hover:ring-line-strong">
-                                {escalating ? 'Asking the team…' : 'Ask the Atlantis team'}
+                                {escalating ? t('support', 'askingTeam') : t('support', 'askTeam')}
                             </button>
                         </>
                     )}

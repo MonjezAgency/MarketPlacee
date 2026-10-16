@@ -39,3 +39,41 @@ Romanian: always comma-below ș ț (U+0219, U+021B), never cedilla ş ţ.
 Portuguese (Portugal): receção, ecrã, utilizador, telemóvel, registar, equipa, contacto, facto.
 Plurals use ICU syntax: "{count, plural, one {# palette} other {# palettes}}".
 Required forms: fr/it/es/pt: one, other · ro: one, few, other · ar: zero, one, two, few, many, other.
+
+## Arabic (ar) — Modern Standard Arabic, professional B2B tone
+
+| English | Arabic |
+|---|---|
+| order / orders | الطلب / الطلبات |
+| supplier | المورّد |
+| buyer | المشتري |
+| carton / case | كرتونة (كراتين) |
+| pallet | منصّة (منصّات) |
+| truck / truckload | شاحنة / شاحنة كاملة |
+| mixed load | حمولة مختلطة |
+| delivery | التوصيل |
+| shipped / dispatched | تم الشحن |
+| inspection | الفحص |
+| dispute | نزاع |
+| refund | استرداد |
+| cart | السلة |
+| sign in / sign out | تسجيل الدخول / تسجيل الخروج |
+| dashboard | لوحة التحكم |
+| products / catalog | المنتجات / الكتالوج |
+| inventory / stock | المخزون |
+| price / prices | السعر / الأسعار |
+| unit (piece) | وحدة |
+| business days | أيام عمل |
+| settings | الإعدادات |
+| support | الدعم |
+| earnings | الأرباح |
+| payout | الدفعات المستحقة |
+| listing | المنتج المعروض |
+
+Arabic plurals need zero, one, two, few, many, other. Wrap numeric ranges (48–72, {min}–{max}) in U+2066 … U+2069 so they don't reverse in RTL.
+
+## What stays in English (all languages)
+
+Keep as-is: product names, brand names, model names, EAN/barcodes, SKUs, order ids, invoice numbers, tracking numbers, email addresses, URLs, currency codes (EUR), Incoterms (EXW), file formats (CSV, XLSX, PDF), API/code values and enum values sent to the server. Wrap them in `<bdi dir="ltr">` (or the `Ltr` helper) inside Arabic text.
+
+Everything else that a user reads — labels, headings, buttons, helper text, statuses, empty states, errors — is translated, even when it sits next to an English product name. "Dashboard", "Orders", "Settings", "Track" as interface labels are translated (لوحة التحكم، الطلبات، الإعدادات، تتبّع الطلب). Only keep an English term when it is a product or brand name in that exact context.

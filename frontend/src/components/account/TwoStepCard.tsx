@@ -5,10 +5,13 @@ import Link from 'next/link';
 import { ShieldAlert, ShieldCheck, ArrowRight } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 /** Two-step status at a glance: red until it's on, green when it is. */
 export function TwoStepCard() {
     const [on, setOn] = React.useState<boolean | null>(null);
+    const { t } = useLanguage();
+    const tr = (key: string) => t('supplierMoney', key);
     React.useEffect(() => {
         apiFetch('/auth/2fa/status').then((r) => (r.ok ? r.json() : null)).then((d) => setOn(d ? !!d.twoFactorEnabled : null)).catch(() => setOn(null));
     }, []);
@@ -22,17 +25,17 @@ export function TwoStepCard() {
                 </span>
                 <div className="flex-1 min-w-0">
                     <h2 className="text-[16px] font-semibold text-heading flex flex-wrap items-center gap-2">
-                        Two-step verification
-                        {on !== null && <span className={cn('text-[11.5px] font-semibold px-2 py-0.5 rounded-md', on ? 'bg-[#0E7C74] text-white' : 'bg-[#DC2626] text-white')}>{on ? 'On' : 'Off'}</span>}
+                        {tr('tsTitle')}
+                        {on !== null && <span className={cn('text-[11.5px] font-semibold px-2 py-0.5 rounded-md', on ? 'bg-[#0E7C74] text-white' : 'bg-[#DC2626] text-white')}>{on ? tr('tsOn') : tr('tsOff')}</span>}
                     </h2>
                     <p className={cn('text-[13px]', off ? 'text-[#991B1B] dark:text-red-300' : 'text-ink-3')}>
-                        {on ? 'Your account asks for an authenticator code at sign-in, and to confirm orders, password and email changes.'
-                            : off ? 'Not protected yet. Turn it on so sign-ins, orders and account changes need a code from your phone.'
-                                : 'Add a code from an authenticator app when you sign in.'}
+                        {on ? tr('tsOnBody')
+                            : off ? tr('tsOffBody')
+                                : tr('tsUnknownBody')}
                     </p>
                     <Link href="/dashboard/security" className={cn('mt-3 inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-[13px] font-semibold',
                         off ? 'bg-[#DC2626] hover:bg-[#B91C1C] text-white' : 'ring-1 ring-line-strong text-ink hover:bg-surface')}>
-                        {off ? 'Turn on two-step verification' : 'Manage two-step verification'} <ArrowRight size={14} />
+                        {off ? tr('tsTurnOn') : tr('tsManage')} <ArrowRight size={14} className="rtl:rotate-180" />
                     </Link>
                 </div>
             </div>

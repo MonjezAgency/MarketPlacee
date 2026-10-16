@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, ChevronLeft, X, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 interface Step {
     targetId: string;
@@ -23,6 +24,8 @@ export function GuidedTour({ steps, onComplete, onDismiss, show = true }: Guided
     const [currentStep, setCurrentStep] = useState(0);
     const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
     const [isMounted, setIsMounted] = useState(false);
+    const { t, fmt } = useLanguage();
+    const tr = (key: string, vars?: Record<string, string | number>) => t('supplierShell', key, vars);
 
     useEffect(() => {
         setIsMounted(true);
@@ -77,7 +80,7 @@ export function GuidedTour({ steps, onComplete, onDismiss, show = true }: Guided
     };
 
     return (
-        <div className="fixed inset-0 z-[100] pointer-events-none">
+        <div data-no-translate className="fixed inset-0 z-[100] pointer-events-none">
             {/* Backdrop with Hole */}
             <div 
                 className="absolute inset-0 bg-black/60 pointer-events-auto"
@@ -114,7 +117,7 @@ export function GuidedTour({ steps, onComplete, onDismiss, show = true }: Guided
                     initial={{ opacity: 0, y: 10, scale: 0.95 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute bg-white rounded-2xl shadow-2xl p-6 w-[320px] pointer-events-auto border border-[#E5E7EB]"
+                    className="absolute bg-white rounded-2xl shadow-2xl p-6 w-[320px] pointer-events-auto border border-[#E5E7EB] text-start"
                     style={{
                         top: targetRect.bottom + 24,
                         left: Math.min(window.innerWidth - 344, Math.max(24, targetRect.left + (targetRect.width / 2) - 160)),
@@ -138,7 +141,7 @@ export function GuidedTour({ steps, onComplete, onDismiss, show = true }: Guided
                             <Sparkles size={16} className="text-[#F59E0B]" />
                             {step.title}
                         </h4>
-                        <button onClick={onDismiss} className="text-[#6B7280] hover:text-[#111827]">
+                        <button onClick={onDismiss} aria-label={tr('tourClose')} className="text-[#6B7280] hover:text-[#111827]">
                             <X size={18} />
                         </button>
                     </div>
@@ -149,7 +152,7 @@ export function GuidedTour({ steps, onComplete, onDismiss, show = true }: Guided
 
                     <div className="flex items-center justify-between">
                         <span className="text-[11px] font-black text-[#94A3B8] uppercase tracking-widest">
-                            Step {currentStep + 1} of {steps.length}
+                            {tr('tourStep', { current: fmt.number(currentStep + 1), total: fmt.number(steps.length) })}
                         </span>
                         <div className="flex items-center gap-2">
                             {currentStep > 0 && (
@@ -157,20 +160,20 @@ export function GuidedTour({ steps, onComplete, onDismiss, show = true }: Guided
                                     onClick={prev}
                                     className="h-9 px-3 rounded-lg border border-[#E5E7EB] text-[12px] font-bold hover:bg-[#F8FAFC] transition-all flex items-center gap-1"
                                 >
-                                    <ChevronLeft size={14} /> Back
+                                    <ChevronLeft size={14} className="rtl:rotate-180" /> {tr('tourBack')}
                                 </button>
                             )}
                             <button 
                                 onClick={onDismiss}
-                                className="h-9 px-3 text-[11px] font-bold text-[#94A3B8] hover:text-[#EF4444] uppercase tracking-wider transition-colors mr-1"
+                                className="h-9 px-3 text-[11px] font-bold text-[#94A3B8] hover:text-[#EF4444] uppercase tracking-wider transition-colors me-1"
                             >
-                                Skip Tour
+                                {tr('tourSkip')}
                             </button>
                             <button 
                                 onClick={next}
                                 className="h-9 px-4 rounded-lg bg-[#14B8A6] text-white text-[12px] font-bold hover:bg-[#0D9488] transition-all flex items-center gap-1 shadow-lg shadow-[#14B8A6]/20"
                             >
-                                {currentStep === steps.length - 1 ? 'Finish' : 'Next'} <ChevronRight size={14} />
+                                {currentStep === steps.length - 1 ? tr('tourFinish') : tr('tourNext')} <ChevronRight size={14} className="rtl:rotate-180" />
                             </button>
                         </div>
                     </div>

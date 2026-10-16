@@ -20,6 +20,7 @@ interface SidebarItem {
     icon: any;
     href: string;
     badge?: string;
+    badgeTone?: 'error';
 }
 
 export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'buyer' | 'admin' }) {
@@ -82,12 +83,12 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                             if (unreadErrors.length > 0) {
                                 setSupplierItems(prev => prev.map(item =>
                                     item.href === '/supplier/products'
-                                        ? { ...item, badge: `${unreadErrors.length} Errors` }
+                                        ? { ...item, badge: t('legacySupplier', 'errorsCount', { count: unreadErrors.length }), badgeTone: 'error' as const }
                                         : item
                                 ));
                             } else {
                                 setSupplierItems(prev => prev.map(item =>
-                                    item.href === '/supplier/products' ? { ...item, badge: undefined } : item
+                                    item.href === '/supplier/products' ? { ...item, badge: undefined, badgeTone: undefined } : item
                                 ));
                             }
                         }
@@ -97,11 +98,11 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                         if (unreadSupport.length > 0) {
                             if (role === 'supplier') {
                                 setSupplierItems(prev => prev.map(item =>
-                                    item.href === '/supplier/support' ? { ...item, badge: 'New' } : item
+                                    item.href === '/supplier/support' ? { ...item, badge: t('legacySupplier', 'newLabel') } : item
                                 ));
                             } else {
                                 setBuyerItems(prev => prev.map(item =>
-                                    item.href === '/dashboard/support' ? { ...item, badge: 'New' } : item
+                                    item.href === '/dashboard/support' ? { ...item, badge: t('legacySupplier', 'newLabel') } : item
                                 ));
                             }
                         } else {
@@ -125,9 +126,15 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
             const interval = setInterval(fetchNotifications, 30000);
             return () => clearInterval(interval);
         }
-    }, [role, user?.id]);
+    }, [role, user?.id, t]);
 
     const items = role === 'admin' ? ADMIN_ITEMS : role === 'buyer' ? buyerItems : supplierItems;
+
+    const roleKey: Record<string, string> = { SUPPLIER: 'roleSupplier', BUYER: 'roleBuyer', CUSTOMER: 'roleBuyer', ADMIN: 'roleAdmin' };
+    const roleLabel = (r?: string) => {
+        const key = r ? roleKey[r.toUpperCase()] : undefined;
+        return key ? t('legacySupplier', key) : r;
+    };
 
     const portalLabel = role === 'admin' 
         ? t('sidebar', 'adminPortal') 
@@ -136,19 +143,19 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
             : t('sidebar', 'supplierPortal');
 
     return (
-        <aside style={{ backgroundColor: '#0A1A2F', color: '#F5F7FA' }} className="w-72 border-e border-border min-h-screen hidden md:flex flex-col flex-shrink-0 sticky top-0 h-screen overflow-hidden group/sidebar transition-all duration-300">
+        <aside data-no-translate style={{ backgroundColor: '#0A1A2F', color: '#F5F7FA' }} className="w-72 border-e border-border min-h-screen hidden md:flex flex-col flex-shrink-0 sticky top-0 h-screen overflow-hidden group/sidebar transition-all duration-300">
             {/* Branding Header */}
             <div className="p-6 flex items-center gap-4 border-b border-white/10 bg-white/[0.02]">
                 <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center shadow-2xl overflow-hidden border-2 border-white/10 group-hover/sidebar:scale-110 transition-transform">
                     <img 
                         src="/icon.png" 
-                        alt="Atlantis" 
+                        alt="Atlantis" /* i18n-ignore: brand name */
                         className="w-full h-full object-contain p-1" 
                     />
                 </div>
                 <div className="flex flex-col">
                     <h2 className="text-xl font-poppins font-black tracking-tighter text-white leading-none">
-                        Atlan<span className="text-teal-400">tis.</span>
+                        Atlan<span className="text-teal-400">tis.</span> {/* i18n-ignore: brand wordmark */}
                     </h2>
                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-teal-400/50 mt-1">{portalLabel}</span>
                 </div>
@@ -159,7 +166,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                 {items.map((item) => {
                     const isActive = pathname === item.href;
                     // Check if badge is an error string
-                    const isErrorBadge = item.badge?.includes('Error');
+                    const isErrorBadge = item.badgeTone === 'error';
 
                     return (
                         <Link
@@ -168,7 +175,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                             className={`
                 flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group
                 ${isActive
-                                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 bg-gradient-to-r from-primary to-primary/90'
+                                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20 bg-gradient-to-r rtl:bg-gradient-to-l from-primary to-primary/90'
                                     : 'text-white/60 hover:bg-white/10 hover:text-white'
                                 }
               `}
@@ -202,7 +209,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                         </div>
                         <div className="flex flex-col min-w-0">
                             <p className="text-xs font-bold text-white truncate">{user.name}</p>
-                            <p className="text-[9px] text-teal-500 font-black uppercase tracking-widest">{user.role}</p>
+                            <p className="text-[9px] text-teal-500 font-black uppercase tracking-widest">{roleLabel(user.role)}</p>
                         </div>
                     </div>
                 )}

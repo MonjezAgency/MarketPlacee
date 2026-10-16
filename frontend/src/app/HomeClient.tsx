@@ -18,6 +18,7 @@ import {
 import { apiFetch } from '@/lib/api';
 import ProductCard from '@/components/product/ProductCard';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 // =====================================================================
 // Atlantis homepage — FMCG wholesale first.
@@ -32,22 +33,11 @@ const unsplash = (id: string, w: number) =>
 // Hero copy rotates through three stories; imagery rotates independently
 // through ten professional FMCG-wholesale photographs (Unsplash licence),
 // cross-fading slowly with a gentle drift.
+// Dictionary keys (landing section) — text is resolved with t() at render time.
 const HERO_SLIDES = [
-    {
-        title: 'Wholesale FMCG,',
-        accent: 'sourced at scale',
-        desc: 'Beverages, snacks, confectionery, personal care and household brands — priced per case, pallet or truck, and shipped by Atlantis.',
-    },
-    {
-        title: 'Every shelf category,',
-        accent: 'one trusted partner',
-        desc: 'Source the brands your stores and distributors move every week, from a single supplier with transparent per-case pricing.',
-    },
-    {
-        title: 'From factory to warehouse,',
-        accent: 'across borders',
-        desc: 'Consolidated logistics across Europe, with supplier-confirmed orders and documentation handled for you.',
-    },
+    { title: 'hero1Title', accent: 'hero1Accent', desc: 'hero1Desc' },
+    { title: 'hero2Title', accent: 'hero2Accent', desc: 'hero2Desc' },
+    { title: 'hero3Title', accent: 'hero3Accent', desc: 'hero3Desc' },
 ];
 
 const HERO_IMAGES = [
@@ -64,20 +54,20 @@ const HERO_IMAGES = [
 ].map((id) => unsplash(id, 2000));
 
 const HERO_HIGHLIGHTS = [
-    { icon: ShieldCheck, title: 'Sold & shipped by Atlantis' },
-    { icon: Layers, title: 'Case, pallet & truck pricing' },
-    { icon: CircleDollarSign, title: 'Confirmed before you pay' },
-    { icon: Truck, title: 'Delivery across Europe' },
+    { icon: ShieldCheck, title: 'highlightSoldShipped' },
+    { icon: Layers, title: 'highlightTiers' },
+    { icon: CircleDollarSign, title: 'highlightConfirmed' },
+    { icon: Truck, title: 'highlightDelivery' },
 ];
 
-// FMCG departments — slugs match lib/departments.ts (catalog ?dept=…).
+// FMCG departments (title/sub are landing dictionary keys) — slugs match lib/departments.ts (catalog ?dept=…).
 const TOP_CATEGORIES = [
-    { title: 'Beverages', sub: 'Soft drinks, energy, coffee & tea', dept: 'beverages', image: unsplash('1661781224922-a45d5ccc1639', 900) },
-    { title: 'Confectionery', sub: 'Chocolate bars, sweets & gum', dept: 'confectionery', image: unsplash('1621939514649-280e2ee25f60', 900) },
-    { title: 'Snacks', sub: 'Crisps, biscuits & savoury snacks', dept: 'snacks', image: unsplash('1688217170693-e821c6e18d72', 900) },
-    { title: 'Packaged Food', sub: 'Pantry, dairy, frozen & cereals', dept: 'food', image: unsplash('1534723452862-4c874018d66d', 900) },
-    { title: 'Personal Care', sub: 'Hair, skin, oral care & hygiene', dept: 'personal-care', image: unsplash('1749137315928-bc96451fa4c0', 900) },
-    { title: 'Household', sub: 'Cleaning, laundry & home essentials', dept: 'household', image: unsplash('1626379481874-3dc5678fa8ca', 900) },
+    { title: 'catBeverages', sub: 'catBeveragesSub', dept: 'beverages', image: unsplash('1661781224922-a45d5ccc1639', 900) },
+    { title: 'catConfectionery', sub: 'catConfectionerySub', dept: 'confectionery', image: unsplash('1621939514649-280e2ee25f60', 900) },
+    { title: 'catSnacks', sub: 'catSnacksSub', dept: 'snacks', image: unsplash('1688217170693-e821c6e18d72', 900) },
+    { title: 'catFood', sub: 'catFoodSub', dept: 'food', image: unsplash('1534723452862-4c874018d66d', 900) },
+    { title: 'catPersonalCare', sub: 'catPersonalCareSub', dept: 'personal-care', image: unsplash('1749137315928-bc96451fa4c0', 900) },
+    { title: 'catHousehold', sub: 'catHouseholdSub', dept: 'household', image: unsplash('1626379481874-3dc5678fa8ca', 900) },
 ];
 
 // Brand marks: vector (SVG) where an official vector exists, otherwise the
@@ -131,11 +121,11 @@ function logoBox(b: Brand) {
 }
 
 const WHY_ATLANTIS = [
-    { title: 'Built for FMCG wholesale', sub: 'Case, pallet and truck tiers on every listing — buy the way your business moves stock.', icon: Boxes },
-    { title: 'Transparent pricing', sub: 'Per-case prices in your currency, with volume tiers shown before you commit.', icon: CircleDollarSign },
-    { title: 'Reliable logistics', sub: 'Consolidated shipping across Europe, tracked from warehouse to your door.', icon: Truck },
-    { title: 'Dedicated account support', sub: 'A team that knows FMCG sourcing, from first quote to repeat orders.', icon: Headphones },
-    { title: 'Secure transactions', sub: 'Every order is confirmed by the supplier and approved by Atlantis before you pay.', icon: ShieldCheck },
+    { title: 'whyBuiltTitle', sub: 'whyBuiltSub', icon: Boxes },
+    { title: 'whyPricingTitle', sub: 'whyPricingSub', icon: CircleDollarSign },
+    { title: 'whyLogisticsTitle', sub: 'whyLogisticsSub', icon: Truck },
+    { title: 'whySupportTitle', sub: 'whySupportSub', icon: Headphones },
+    { title: 'whySecureTitle', sub: 'whySecureSub', icon: ShieldCheck },
 ];
 
 /** Shared section header for consistent rhythm across the page. */
@@ -143,12 +133,12 @@ function SectionHeader({ eyebrow, title, link }: { eyebrow?: string; title: stri
     return (
         <div className="flex items-end justify-between gap-4 mb-6 sm:mb-8">
             <div>
-                {eyebrow && <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-teal mb-2">{eyebrow}</p>}
-                <h2 className="font-sans text-[24px] sm:text-[28px] font-bold tracking-tight text-heading leading-tight">{title}</h2>
+                {eyebrow && <p className="text-[12px] font-semibold uppercase tracking-[0.14em] rtl:tracking-normal text-teal mb-2">{eyebrow}</p>}
+                <h2 className="font-sans text-[24px] sm:text-[28px] font-bold tracking-tight rtl:tracking-normal text-heading leading-tight">{title}</h2>
             </div>
             {link && (
                 <Link href={link.href} className="hidden sm:inline-flex items-center gap-1.5 text-[14px] font-semibold text-heading hover:text-teal transition-colors whitespace-nowrap no-underline">
-                    {link.label} <ArrowRight size={15} />
+                    {link.label} <ArrowRight size={15} className="rtl:rotate-180" />
                 </Link>
             )}
         </div>
@@ -156,6 +146,9 @@ function SectionHeader({ eyebrow, title, link }: { eyebrow?: string; title: stri
 }
 
 export default function HomePage() {
+    const { t, dir } = useLanguage();
+    const tl = (key: string, vars?: Record<string, string | number>) => t('landing', key, vars);
+    const rtl = dir === 'rtl';
     const [slide, setSlide] = React.useState(0);
     const [products, setProducts] = React.useState<any[]>([]);
     const [loading, setLoading] = React.useState(true);
@@ -211,7 +204,7 @@ export default function HomePage() {
     }, [slide]);
 
     return (
-        <div className="bg-surface font-sans text-ink text-start">
+        <div data-no-translate className="bg-surface font-sans text-ink text-start">
             {/* ============================================================
                  HERO — cross-fading FMCG imagery with a slow drift
             ============================================================ */}
@@ -239,29 +232,34 @@ export default function HomePage() {
                 ))}
                 {/* Readability: navy wash strongest behind the copy, fading right */}
                 <div className="absolute inset-0 bg-[#0B1F3A]/20" />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#0B1F3A]/95 via-[#0B1F3A]/75 to-[#0B1F3A]/10" />
+                <div className="absolute inset-0 bg-gradient-to-r rtl:bg-gradient-to-l from-[#0B1F3A]/95 via-[#0B1F3A]/75 to-[#0B1F3A]/10" />
                 <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-[#0B1F3A]/50 to-transparent" />
 
                 <div className="relative z-10 w-full max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-20 sm:py-0 flex flex-col justify-center">
                     <h1 className="sr-only">
-                        Atlantis — B2B FMCG wholesale marketplace for beverages, snacks, confectionery, personal care and household brands across Europe
+                        {tl('srHeading')}
                     </h1>
                     <div className="max-w-[620px]">
-                        <p className="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-white/10 border border-white/15 text-[12px] font-semibold tracking-wide text-[#9BE7DF] backdrop-blur-sm">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6]" /> FMCG wholesale · Europe
+                        <p className="inline-flex items-center gap-2 h-7 px-3 rounded-full bg-white/10 border border-white/15 text-[12px] font-semibold tracking-wide rtl:tracking-normal text-[#9BE7DF] backdrop-blur-sm">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6]" /> {tl('heroEyebrow')}
                         </p>
                         {/* Rotating heading — h2-equivalent; the stable h1 is above. */}
                         <div
                             key={slide % HERO_SLIDES.length}
                             role="heading"
                             aria-level={2}
-                            className="mt-5 text-white font-bold leading-[1.06] tracking-tight text-[34px] sm:text-[44px] lg:text-[54px] animate-hero-copy"
+                            className={cn(
+                                'mt-5 text-white font-bold text-[34px] sm:text-[44px] lg:text-[54px] animate-hero-copy text-start [text-wrap:balance]',
+                                // Arabic: taller line-height for the script, no negative tracking (it breaks letter joining).
+                                rtl ? 'leading-[1.25] tracking-normal' : 'leading-[1.06] tracking-tight'
+                            )}
                         >
-                            {current.title}{' '}
-                            <span className="text-[#2EC4B6]">{current.accent}</span>
+                            {/* Title and accent are always two designed lines. */}
+                            <span className="block">{tl(current.title)}</span>
+                            <span className="block text-[#2EC4B6]">{tl(current.accent)}</span>
                         </div>
                         <p key={`d-${slide % HERO_SLIDES.length}`} className="mt-5 text-[#D3DCEB] text-[15px] sm:text-[17px] leading-relaxed max-w-[540px] animate-hero-copy [animation-delay:120ms]">
-                            {current.desc}
+                            {tl(current.desc)}
                         </p>
 
                         <ul className="mt-7 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3 max-w-[520px]">
@@ -270,7 +268,7 @@ export default function HomePage() {
                                     <span className="w-7 h-7 rounded-lg bg-[#2EC4B6]/15 text-[#2EC4B6] flex items-center justify-center shrink-0">
                                         <h.icon size={15} />
                                     </span>
-                                    {h.title}
+                                    {tl(h.title)}
                                 </li>
                             ))}
                         </ul>
@@ -280,13 +278,13 @@ export default function HomePage() {
                                 href="/categories"
                                 className="inline-flex items-center gap-2 h-12 px-7 bg-[#2EC4B6] hover:bg-[#25AFA2] text-heading rounded-xl text-[15px] font-bold transition-colors no-underline"
                             >
-                                Start sourcing <ArrowRight size={17} />
+                                {tl('ctaStartSourcing')} <ArrowRight size={17} className="rtl:rotate-180" />
                             </Link>
                             <Link
                                 href="/requests"
                                 className="inline-flex items-center gap-2 h-12 px-6 bg-white/10 hover:bg-white/15 text-white border border-white/20 rounded-xl text-[15px] font-semibold backdrop-blur-sm transition-colors no-underline"
                             >
-                                Request a quote
+                                {tl('ctaRequestQuote')}
                             </Link>
                         </div>
                     </div>
@@ -298,7 +296,7 @@ export default function HomePage() {
                         <button
                             key={i}
                             onClick={() => setSlide(i)}
-                            aria-label={`Show slide ${i + 1}`}
+                            aria-label={tl('slideAria', { n: i + 1 })}
                             aria-current={slide === i}
                             className={cn('h-1.5 rounded-full transition-all duration-500', slide === i ? 'w-8 bg-[#2EC4B6]' : 'w-1.5 bg-white/40 hover:bg-white/70')}
                         />
@@ -311,11 +309,12 @@ export default function HomePage() {
             ============================================================ */}
             <section aria-labelledby="brands-heading" className="py-12 sm:py-14 border-b border-line">
                 <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
-                    <p id="brands-heading" className="text-center text-[13px] font-semibold uppercase tracking-[0.14em] text-ink-3">
-                        Global FMCG brands we source
+                    <p id="brands-heading" className="text-center text-[13px] font-semibold uppercase tracking-[0.14em] rtl:tracking-normal text-ink-3">
+                        {tl('brandsLabel')}
                     </p>
                 </div>
-                <div className="brand-strip relative mt-8 overflow-hidden dark:bg-media dark:rounded-2xl motion-reduce:overflow-x-auto">
+                {/* Logo marquee runs left-to-right in every language (the loop animation is LTR). */}
+                <div dir="ltr" className="brand-strip relative mt-8 overflow-hidden dark:bg-media dark:rounded-2xl motion-reduce:overflow-x-auto">
                     <div className="pointer-events-none absolute inset-y-0 left-0 w-16 sm:w-32 bg-gradient-to-r from-surface dark:from-media to-transparent z-10" />
                     <div className="pointer-events-none absolute inset-y-0 right-0 w-16 sm:w-32 bg-gradient-to-l from-surface dark:from-media to-transparent z-10" />
                     <ul className="flex w-max items-center animate-brand-loop">
@@ -347,9 +346,9 @@ export default function HomePage() {
             <section className="py-16 sm:py-20">
                 <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
                     <SectionHeader
-                        eyebrow="Shop by department"
-                        title="Top FMCG categories for your business"
-                        link={{ href: '/categories', label: 'View full catalog' }}
+                        eyebrow={tl('categoriesEyebrow')}
+                        title={tl('categoriesTitle')}
+                        link={{ href: '/categories', label: tl('viewFullCatalog') }}
                     />
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                         {TOP_CATEGORIES.map((c) => (
@@ -368,18 +367,18 @@ export default function HomePage() {
                                 <div className="absolute inset-0 bg-gradient-to-t from-[#0B1F3A]/85 via-[#0B1F3A]/25 to-transparent" />
                                 <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 flex items-end justify-between gap-4">
                                     <div>
-                                        <h3 className="font-sans text-[20px] sm:text-[22px] font-bold text-white leading-tight">{c.title}</h3>
-                                        <p className="mt-1 text-[13px] sm:text-[14px] text-white/80">{c.sub}</p>
+                                        <h3 className="font-sans text-[20px] sm:text-[22px] font-bold text-white leading-tight">{tl(c.title)}</h3>
+                                        <p className="mt-1 text-[13px] sm:text-[14px] text-white/80">{tl(c.sub)}</p>
                                     </div>
                                     <span className="w-10 h-10 rounded-full bg-white/15 backdrop-blur-sm border border-white/25 text-white flex items-center justify-center shrink-0 transition-colors group-hover:bg-[#2EC4B6] group-hover:border-[#2EC4B6] group-hover:text-heading">
-                                        <ArrowUpRight size={18} />
+                                        <ArrowUpRight size={18} className="rtl:-scale-x-100" />
                                     </span>
                                 </div>
                             </Link>
                         ))}
                     </div>
                     <Link href="/categories" className="sm:hidden mt-6 inline-flex items-center gap-1.5 text-[14px] font-semibold text-heading no-underline">
-                        View full catalog <ArrowRight size={15} />
+                        {tl('viewFullCatalog')} <ArrowRight size={15} className="rtl:rotate-180" />
                     </Link>
                 </div>
             </section>
@@ -390,36 +389,37 @@ export default function HomePage() {
             <section className="py-16 sm:py-20 bg-[#F7F8FA]">
                 <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
                     <SectionHeader
-                        eyebrow="In demand"
-                        title="Popular wholesale products"
-                        link={{ href: '/categories', label: 'View all products' }}
+                        eyebrow={tl('productsEyebrow')}
+                        title={tl('productsTitle')}
+                        link={{ href: '/categories', label: tl('viewAllProducts') }}
                     />
 
                     <div className="relative">
                         {productsTotalPages > 1 && (
-                            <div className="hidden lg:flex absolute -top-14 right-0 items-center gap-2">
-                                <span className="text-[13px] text-ink-3 tabular-nums me-2">Page {productsPage} of {productsTotalPages}</span>
+                            <div className="hidden lg:flex absolute -top-14 end-0 items-center gap-2">
+                                <span className="text-[13px] text-ink-3 tabular-nums me-2">{tl('pageOf', { page: productsPage, total: productsTotalPages })}</span>
                                 <button
                                     onClick={() => scrollProducts('left')}
-                                    aria-label="Previous page"
+                                    aria-label={tl('previousPage')}
                                     disabled={productsPage <= 1}
                                     className="w-10 h-10 flex items-center justify-center bg-surface border border-line rounded-full hover:border-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                 >
-                                    <ChevronLeft size={18} />
+                                    <ChevronLeft size={18} className="rtl:rotate-180" />
                                 </button>
                                 <button
                                     onClick={() => scrollProducts('right')}
-                                    aria-label="Next page"
+                                    aria-label={tl('nextPage')}
                                     disabled={productsPage >= productsTotalPages}
                                     className="w-10 h-10 flex items-center justify-center bg-surface border border-line rounded-full hover:border-ink disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                                 >
-                                    <ChevronRight size={18} />
+                                    <ChevronRight size={18} className="rtl:rotate-180" />
                                 </button>
                             </div>
                         )}
 
                         {loading ? (
-                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                            <div role="status" className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                <span className="sr-only">{tl('loadingProducts')}</span>
                                 {[...Array(6)].map((_, i) => (
                                     <div key={i} className="animate-pulse">
                                         <div className="aspect-square bg-surface-3 rounded-2xl" />
@@ -433,10 +433,10 @@ export default function HomePage() {
                                 <div className="w-14 h-14 rounded-2xl bg-teal-soft flex items-center justify-center text-teal">
                                     <Package size={26} />
                                 </div>
-                                <h3 className="font-sans text-[16px] font-bold text-ink">Products are on their way</h3>
-                                <p className="text-[14px] text-ink-3 max-w-sm">We&apos;re adding new FMCG listings — browse the catalog or tell us what you need.</p>
+                                <h3 className="font-sans text-[16px] font-bold text-ink">{tl('productsEmptyTitle')}</h3>
+                                <p className="text-[14px] text-ink-3 max-w-sm">{tl('productsEmptyBody')}</p>
                                 <Link href="/requests" className="mt-2 inline-flex items-center gap-1.5 text-[14px] font-semibold text-teal no-underline">
-                                    Request a quote <ArrowRight size={14} />
+                                    {tl('ctaRequestQuote')} <ArrowRight size={14} className="rtl:rotate-180" />
                                 </Link>
                             </div>
                         ) : (
@@ -462,8 +462,8 @@ export default function HomePage() {
                 <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
                     {/* Centered: five short pillars read as one balanced row. */}
                     <div className="text-center mb-8 sm:mb-10">
-                        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] text-teal mb-2">Why Atlantis</p>
-                        <h2 className="font-sans text-[24px] sm:text-[28px] font-bold tracking-tight text-heading leading-tight">Wholesale infrastructure for FMCG trade</h2>
+                        <p className="text-[12px] font-semibold uppercase tracking-[0.14em] rtl:tracking-normal text-teal mb-2">{tl('whyEyebrow')}</p>
+                        <h2 className="font-sans text-[24px] sm:text-[28px] font-bold tracking-tight rtl:tracking-normal text-heading leading-tight">{tl('whyTitle')}</h2>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-x-8 gap-y-10">
                         {WHY_ATLANTIS.map((w) => (
@@ -471,8 +471,8 @@ export default function HomePage() {
                                 <div className="mx-auto w-11 h-11 rounded-xl bg-teal-soft flex items-center justify-center text-teal">
                                     <w.icon size={20} />
                                 </div>
-                                <h3 className="font-sans mt-4 text-[16px] font-bold text-ink">{w.title}</h3>
-                                <p className="mt-1.5 text-[14px] text-ink-3 leading-relaxed">{w.sub}</p>
+                                <h3 className="font-sans mt-4 text-[16px] font-bold text-ink">{tl(w.title)}</h3>
+                                <p className="mt-1.5 text-[14px] text-ink-3 leading-relaxed">{tl(w.sub)}</p>
                             </div>
                         ))}
                     </div>
@@ -488,11 +488,11 @@ export default function HomePage() {
                         <div aria-hidden className="absolute -right-24 -top-24 w-80 h-80 rounded-full bg-[#2EC4B6]/15 blur-3xl" />
                         <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-8">
                             <div className="max-w-[620px]">
-                                <h2 className="font-sans text-[24px] sm:text-[30px] font-bold tracking-tight text-heading leading-tight">
-                                    Order by the pallet. Save by the truck.
+                                <h2 className="font-sans text-[24px] sm:text-[30px] font-bold tracking-tight rtl:tracking-normal text-heading leading-tight">
+                                    {tl('bulkTitle')}
                                 </h2>
                                 <p className="mt-3 text-[15px] sm:text-[16px] text-ink-2 leading-relaxed">
-                                    Unlock volume-tier pricing, dedicated account support and consolidated shipping for your FMCG range.
+                                    {tl('bulkBody')}
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-3 shrink-0">
@@ -500,13 +500,13 @@ export default function HomePage() {
                                     href="/auth/register?role=customer"
                                     className="inline-flex items-center justify-center gap-2 h-12 px-7 bg-cta hover:bg-cta-hover text-cta-fg rounded-xl text-[15px] font-semibold transition-colors no-underline"
                                 >
-                                    Become a buyer <ArrowRight size={16} />
+                                    {tl('becomeBuyer')} <ArrowRight size={16} className="rtl:rotate-180" />
                                 </Link>
                                 <Link
                                     href="/contact"
                                     className="inline-flex items-center justify-center h-12 px-6 bg-surface border border-[#D7DEE7] hover:border-ink text-heading rounded-xl text-[15px] font-semibold transition-colors no-underline"
                                 >
-                                    Contact sales
+                                    {tl('contactSales')}
                                 </Link>
                             </div>
                         </div>

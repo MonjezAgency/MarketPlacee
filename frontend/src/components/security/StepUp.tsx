@@ -4,6 +4,7 @@ import * as React from 'react';
 import { ShieldCheck, Loader2, Mail, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 /**
  * Step-up confirmation for sensitive actions. When the server answers
@@ -21,12 +22,13 @@ function ask(required: string[], message: string) {
     });
 }
 
-export async function withStepUp(doFetch: (headers: Record<string, string>) => Promise<Response>): Promise<Response> {
+export async function withStepUp(doFetch: (headers: Record<string, string>) => Promise<Response>): Promise<Response> { // i18n-ignore (TypeScript generic, not text)
     let res = await doFetch({});
     for (let attempt = 0; attempt < 4 && res.status === 403; attempt++) {
         const body = await res.clone().json().catch(() => null);
         if (body?.code !== 'STEP_UP_REQUIRED') return res;
-        const codes = await ask(body.required || ['totp'], body.message || 'Confirm this action.');
+        // The server's message is shown as sent; without one the dialog shows its own translated prompt.
+        const codes = await ask(body.required || ['totp'], typeof body.message === 'string' ? body.message : '');
         if (!codes) return res;
         res = await doFetch({ 'x-2fa-code': codes.totp, ...(codes.email ? { 'x-email-code': codes.email } : {}) });
     }
@@ -36,6 +38,8 @@ export async function withStepUp(doFetch: (headers: Record<string, string>) => P
 /** Mounted once in the root layout. */
 export function StepUpDialog() {
     const [a, setA] = React.useState<Ask | null>(null);
+    const { t } = useLanguage();
+    const tr = (key: string) => t('supplierMoney', key);
     const [totp, setTotp] = React.useState('');
     const [email, setEmail] = React.useState('');
     const [sending, setSending] = React.useState(false);
@@ -47,45 +51,45 @@ export function StepUpDialog() {
     const sendEmail = async () => {
         setSending(true); setSent('');
         const r = await apiFetch('/auth/email-otp/send', { method: 'POST' }).catch(() => null);
-        setSent(r?.ok ? 'Code sent — check your inbox.' : 'Couldn’t send the code. Try again in a minute.');
+        setSent(r?.ok ? 'suSent' : 'suSendFailed');
         setSending(false);
     };
     const ready = totp.trim().length >= 6 && (!needEmail || /^\d{6}$/.test(email.trim()));
     const input = 'w-full h-11 px-3.5 rounded-xl ring-1 ring-line bg-surface text-[16px] tracking-[0.25em] font-semibold text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6] text-center';
     return (
-        <div className="fixed inset-0 z-[400] flex items-end sm:items-center justify-center p-0 sm:p-4 text-start" role="dialog" aria-modal="true" aria-labelledby="stepup-title">
-            <button type="button" aria-label="Cancel" onClick={() => close(null)} className="absolute inset-0 bg-[rgba(15,23,42,0.5)]" />
+        <div className="fixed inset-0 z-[400] flex items-end sm:items-center justify-center p-0 sm:p-4 text-start" data-no-translate role="dialog" aria-modal="true" aria-labelledby="stepup-title">
+            <button type="button" aria-label={tr('cancel')} onClick={() => close(null)} className="absolute inset-0 bg-[rgba(15,23,42,0.5)]" />
             <form onSubmit={(e) => { e.preventDefault(); if (ready) close({ totp: totp.trim(), email: needEmail ? email.trim() : undefined }); }}
                 className="relative w-full sm:max-w-[420px] rounded-t-2xl sm:rounded-2xl bg-surface ring-1 ring-line shadow-[0_24px_60px_rgba(15,23,42,0.25)] p-5">
                 <div className="flex items-start gap-3">
                     <span className="w-10 h-10 shrink-0 rounded-xl bg-teal-soft text-teal flex items-center justify-center"><ShieldCheck size={19} /></span>
                     <div className="flex-1 min-w-0">
-                        <h2 id="stepup-title" className="text-[16px] font-semibold text-heading">Confirm it’s you</h2>
-                        <p className="text-[13px] text-ink-3">{a.message}</p>
+                        <h2 id="stepup-title" className="text-[16px] font-semibold text-heading">{tr('suTitle')}</h2>
+                        <p className="text-[13px] text-ink-3">{a.message || tr('suDefault')}</p>
                     </div>
-                    <button type="button" onClick={() => close(null)} aria-label="Cancel" className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:bg-surface-2"><X size={16} /></button>
+                    <button type="button" onClick={() => close(null)} aria-label={tr('cancel')} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-3 hover:bg-surface-2"><X size={16} /></button>
                 </div>
                 <div className="mt-4 space-y-3">
                     <label className="block">
-                        <span className="block text-[13px] font-medium text-ink-2 mb-1.5">Authenticator app code</span>
+                        <span className="block text-[13px] font-medium text-ink-2 mb-1.5">{tr('suTotp')}</span>
                         <input autoFocus value={totp} onChange={(e) => setTotp(e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 8))} inputMode="numeric" autoComplete="one-time-code" placeholder="123456" className={input} />
-                        <span className="block mt-1 text-[11.5px] text-ink-4">Or one of your 8-character backup codes.</span>
+                        <span className="block mt-1 text-[11.5px] text-ink-4">{tr('suBackup')}</span>
                     </label>
                     {needEmail && (
                         <label className="block">
-                            <span className="flex items-center justify-between text-[13px] font-medium text-ink-2 mb-1.5">Email code
+                            <span className="flex items-center justify-between text-[13px] font-medium text-ink-2 mb-1.5">{tr('suEmailCode')}
                                 <button type="button" onClick={sendEmail} disabled={sending} className="inline-flex items-center gap-1 text-[12.5px] font-semibold text-teal hover:underline disabled:opacity-50">
-                                    {sending ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} Send code
+                                    {sending ? <Loader2 size={12} className="animate-spin" /> : <Mail size={12} />} {tr('ceSendCode')}
                                 </button>
                             </span>
                             <input value={email} onChange={(e) => setEmail(e.target.value.replace(/\D/g, '').slice(0, 6))} inputMode="numeric" placeholder="123456" className={input} />
-                            {sent && <span className="block mt-1 text-[12px] text-ink-3">{sent}</span>}
+                            {sent && <span className="block mt-1 text-[12px] text-ink-3">{tr(sent)}</span>}
                         </label>
                     )}
                 </div>
                 <div className="mt-5 flex gap-2">
-                    <button type="button" onClick={() => close(null)} className="h-11 px-4 rounded-xl ring-1 ring-line-strong text-[14px] font-semibold text-ink hover:bg-surface-2">Cancel</button>
-                    <button type="submit" disabled={!ready} className={cn('flex-1 h-11 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14px] font-semibold disabled:opacity-50')}>Confirm</button>
+                    <button type="button" onClick={() => close(null)} className="h-11 px-4 rounded-xl ring-1 ring-line-strong text-[14px] font-semibold text-ink hover:bg-surface-2">{tr('cancel')}</button>
+                    <button type="submit" disabled={!ready} className={cn('flex-1 h-11 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14px] font-semibold disabled:opacity-50')}>{tr('confirm')}</button>
                 </div>
             </form>
         </div>
