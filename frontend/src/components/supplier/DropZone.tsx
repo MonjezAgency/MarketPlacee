@@ -3,15 +3,17 @@
 import * as React from 'react';
 import { UploadCloud } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 /** Spreadsheet drop zone: drag and drop, click, or keyboard. */
 export function DropZone({ onFile, busy, file, hint, busyText }: { onFile: (f: File) => void; busy: boolean; file: File | null; hint?: string; busyText?: string }) {
+    const { t } = useLanguage();
     const input = React.useRef<HTMLInputElement>(null);
     const [over, setOver] = React.useState(false);
     const depth = React.useRef(0);
     return (
         <div
-            role="button" tabIndex={0} aria-label="Upload a spreadsheet: drop a file here or press Enter to choose one"
+            role="button" tabIndex={0} aria-label={t('supplierCatalog', 'dropAria')}
             onClick={() => !busy && input.current?.click()}
             onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !busy) { e.preventDefault(); input.current?.click(); } }}
             onDragEnter={(e) => { e.preventDefault(); depth.current++; setOver(true); }}
@@ -24,9 +26,9 @@ export function DropZone({ onFile, busy, file, hint, busyText }: { onFile: (f: F
             <input ref={input} type="file" accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv" hidden
                 onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onFile(f); }} />
             <span className="w-11 h-11 rounded-xl bg-surface ring-1 ring-line flex items-center justify-center text-teal">{busy ? <span className="w-5 h-5 border-2 border-teal border-t-transparent rounded-full animate-spin" /> : <UploadCloud size={21} />}</span>
-            {busy ? <p className="text-[14px] font-medium text-heading">{busyText ?? `Reading ${file?.name}…`}</p> : (<>
-                <p className="text-[14px] font-semibold text-heading">{over ? 'Drop to upload' : 'Drag a spreadsheet here, or click to choose'}</p>
-                <p className="text-[12.5px] text-ink-3">{hint ?? '.xlsx or .csv · up to 5 MB · up to 1,000 rows'}</p>
+            {busy ? <p className="text-[14px] font-medium text-heading">{busyText ?? t('supplierCatalog', 'readingFile', { file: file?.name ?? '' })}</p> : (<>
+                <p className="text-[14px] font-semibold text-heading">{over ? t('supplierCatalog', 'dropToUpload') : t('supplierCatalog', 'dragOrClick')}</p>
+                <p className="text-[12.5px] text-ink-3">{hint ?? t('supplierCatalog', 'dropDefaultHint')}</p>
             </>)}
         </div>
     );

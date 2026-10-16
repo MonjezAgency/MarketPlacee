@@ -13,10 +13,13 @@ import MapStep, { mappingProblems, type MapState } from '@/components/supplier/i
 import ReviewStep from '@/components/supplier/import/ReviewStep';
 import ImportStep, { type Progress } from '@/components/supplier/import/ImportStep';
 import { expandReview, type Analysis, type CommitResult, type FieldDef, type Review, type ReviewRow } from '@/components/supplier/import/types';
+import { Trans } from '@/components/i18n/Trans';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 type Step = 'upload' | 'map' | 'review' | 'import';
-const STEPS: [Step, string][] = [['upload', 'Upload'], ['map', 'Match columns'], ['review', 'Review'], ['import', 'Confirm & import']];
+/** Step ids and their supplierCatalog dictionary keys. */
+const STEPS: [Step, string][] = [['upload', 'stepUpload'], ['map', 'stepMap'], ['review', 'stepReview'], ['import', 'stepImport']];
 /** Uploads pass through a proxy that accepts at most ~4.5 MB per request. */
 const MAX_UPLOAD = 4 * 1024 * 1024;
 const MAX_PHOTO_IN_REQUEST = 3.5 * 1024 * 1024;
@@ -27,6 +30,8 @@ const MAX_PHOTO_IN_REQUEST = 3.5 * 1024 * 1024;
  * against the original cells → confirm → import in batches with a report.
  */
 export default function ImportProductsPage() {
+    const { t, fmt } = useLanguage();
+    const tc = (k: string, v?: Record<string, string | number>) => t('supplierCatalog', k, v);
     const [schema, setSchema] = React.useState<any | null>(null);
     const [prefCurrency, setPrefCurrency] = React.useState('EUR');
     const [step, setStep] = React.useState<Step>('upload');
@@ -76,11 +81,11 @@ export default function ImportProductsPage() {
     const readFile = async (f: File) => {
         setError(null);
         const ext = (f.name.split('.').pop() || '').toLowerCase();
-        if (!['xlsx', 'xls', 'csv'].includes(ext)) { setError(`“${f.name}” isn’t a spreadsheet. Upload an .xlsx, .xls or .csv file.`); return; }
+        if (!['xlsx', 'xls', 'csv'].includes(ext)) { setError(tc('errNotSpreadsheet', { file: f.name })); return; }
         reset(); setFile(f); setBusy('analyse');
         try {
             const prep = await prepareWorkbook(f);
-            if (prep.upload.size > MAX_UPLOAD) throw new Error(`Without its pictures this file is still ${(prep.upload.size / 1048576).toFixed(1)} MB; the limit is 4 MB. Split it into smaller files${ext !== 'xlsx' ? ' or save it as .xlsx' : ''}.`);
+            if (prep.upload.size > MAX_UPLOAD) throw new Error(tc(ext !== 'xlsx' ? 'errFileTooLargeXlsx' : 'errFileTooLarge', { size: fmt.number(prep.upload.size / 1048576, { minimumFractionDigits: 1, maximumFractionDigits: 1 }) }));
             const a: Analysis = await supplierApi.importAnalyse(prep.upload, prep.uploadName);
             setPrepared(prep); setAnalysis(a); setMap(initialMap(a, prefCurrency)); setStep('map');
         } catch (e: any) { setError(e.message); setFile(null); }
@@ -126,7 +131,7 @@ export default function ImportProductsPage() {
             setResults(all);
         } catch (e: any) {
             setResults(all);
-            setError(`${e.message} ${all.length ? `${all.length} row${all.length === 1 ? ' was' : 's were'} saved before this; ` : ''}upload the same file again to continue — rows already imported are recognised and not duplicated.`);
+            setError(`${e.message} ${all.length ? tc('errImportStoppedSaved', { count: all.length }) : tc('errImportStopped')}`);
         } finally { setBusy(null); setProgress(null); }
     };
 
@@ -134,7 +139,7 @@ export default function ImportProductsPage() {
         setBusy('template');
         try {
             const res = await apiFetch(`/supplier-catalog/import/template?format=${format}`);
-            if (!res.ok) throw new Error('Couldn’t download the template.');
+            if (!res.ok) throw new Error(tc('errTemplateDownload'));
             const blob = await res.blob();
             const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `atlantis-product-template.${format}`; a.click();
             setTimeout(() => URL.revokeObjectURL(a.href), 2000);
@@ -148,19 +153,19 @@ export default function ImportProductsPage() {
     const multi = (analysis?.sheets.length ?? 0) > 1;
 
     return (
-        <div ref={top} className="min-h-[calc(100dvh-64px-48px)] flex flex-col">
-            <PageHeader eyebrow={<Link href="/supplier/products" className="inline-flex items-center gap-1 hover:text-ink"><ChevronLeft size={14} />Inventory &amp; products</Link>}
-                title="Bulk upload"
-                description={analysis ? <span className="inline-flex items-center gap-1.5"><FileSpreadsheet size={15} className="text-teal" />{analysis.fileName} · {analysis.totalRows.toLocaleString()} product rows{multi ? ` in ${analysis.sheets.length} sheets` : ''}{prepared?.photos.size ? ` · ${prepared.photos.size.toLocaleString()} pictures` : ''}</span> : 'Upload your own product sheet — any layout, English or Arabic column names. You check everything before anything is saved.'}
-                actions={analysis && !busy ? <Button variant="ghost" onClick={reset}>Start over</Button> : undefined} />
+        <div ref={top} className="min-h-[calc(100dvh-64px-48px)] flex flex-col" data-no-translate>
+            <PageHeader eyebrow={<Link href="/supplier/products" className="inline-flex items-center gap-1 hover:text-ink"><ChevronLeft size={14} className="rtl:rotate-180" />{tc('inventoryAndProducts')}</Link>}
+                title={tc('bulkUpload')}
+                description={analysis ? <span className="inline-flex items-center gap-1.5"><FileSpreadsheet size={15} className="text-teal" /><bdi>{analysis.fileName}</bdi> · {tc('productRowsCount', { count: analysis.totalRows })}{multi ? ` · ${tc('sheetsCount', { count: analysis.sheets.length })}` : ''}{prepared?.photos.size ? ` · ${tc('picturesCount', { count: prepared.photos.size })}` : ''}</span> : tc('importPageDesc')}
+                actions={analysis && !busy ? <Button variant="ghost" onClick={reset}>{tc('startOver')}</Button> : undefined} />
 
-            <ol className="flex flex-wrap items-center gap-2 mb-5 text-[13px]" aria-label="Progress">
+            <ol className="flex flex-wrap items-center gap-2 mb-5 text-[13px]" aria-label={tc('progress')}>
                 {STEPS.map(([s, l], i) => {
                     const at = STEPS.findIndex(([x]) => x === step);
                     return (
                         <li key={s} className="flex items-center gap-2" aria-current={i === at ? 'step' : undefined}>
-                            <span className={cn('w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold', i < at || (step === 'import' && results) ? 'bg-teal text-white' : i === at ? 'bg-heading text-white' : 'ring-1 ring-line-strong text-ink-4')}>{i + 1}</span>
-                            <span className={cn(i === at ? 'font-semibold text-heading' : 'text-ink-3')}>{l}</span>
+                            <span className={cn('w-6 h-6 rounded-full flex items-center justify-center text-[12px] font-semibold', i < at || (step === 'import' && results) ? 'bg-teal text-white' : i === at ? 'bg-heading text-white' : 'ring-1 ring-line-strong text-ink-4')}>{fmt.number(i + 1)}</span>
+                            <span className={cn(i === at ? 'font-semibold text-heading' : 'text-ink-3')}>{tc(l)}</span>
                             {i < STEPS.length - 1 && <span className="w-8 h-px bg-line-strong" aria-hidden />}
                         </li>
                     );
@@ -172,30 +177,24 @@ export default function ImportProductsPage() {
             {step === 'upload' && (
                 <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
                     <div className="space-y-4 min-w-0">
-                        <DropZone busy={busy === 'analyse'} file={file} onFile={readFile} busyText={`Reading ${file?.name ?? 'your file'} — columns, sheets and pictures…`}
-                            hint=".xlsx, .xls or .csv · product photos inside the workbook are kept · up to 2,500 rows" />
-                        <Card title="How it works">
+                        <DropZone busy={busy === 'analyse'} file={file} onFile={readFile} busyText={file?.name ? tc('readingFileDetail', { file: file.name }) : tc('readingYourFile')}
+                            hint={tc('importDropHint')} />
+                        <Card title={tc('howItWorks')}>
                             <ol className="space-y-2 text-[13.5px] text-ink-2 list-decimal ps-5">
-                                <li><b>Upload</b> your offer as it is. Several sheets, two-row headers, brand headings and photos placed in cells are all read.</li>
-                                <li><b>Match columns.</b> Each of your columns is shown with the Atlantis field it fits, and why. Unclear ones — like a plain “Price” — are left for you to choose.</li>
-                                <li><b>Review</b> every row next to the cell it came from: errors, warnings, drafts, and exactly what changes for products you already have.</li>
-                                <li><b>Confirm & import.</b> Nothing is saved before this. You get a report of what was actually saved.</li>
+                                {['how1', 'how2', 'how3', 'how4'].map((k) => <li key={k}><Trans text={tc(k)} tags={{ b: (c) => <b>{c}</b> }} /></li>)}
                             </ol>
                         </Card>
                     </div>
                     <aside className="space-y-3">
-                        <Card title="Starting from scratch?" description="The template has every column in the right format, with an example row and an Instructions sheet.">
+                        <Card title={tc('fromScratchTitle')} description={tc('fromScratchDesc')}>
                             <div className="flex flex-wrap gap-2">
-                                <Button size="sm" variant="secondary" icon={<Download size={14} />} loading={busy === 'template'} onClick={() => downloadTemplate('xlsx')}>Excel template</Button>
-                                <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => downloadTemplate('csv')}>CSV</Button>
+                                <Button size="sm" variant="secondary" icon={<Download size={14} />} loading={busy === 'template'} onClick={() => downloadTemplate('xlsx')}>{tc('excelTemplate')}</Button>
+                                <Button size="sm" variant="ghost" icon={<Download size={14} />} onClick={() => downloadTemplate('csv')}>CSV</Button>{/* i18n-ignore: file format name, same in every language */}
                             </div>
                         </Card>
-                        <Card title="What is never done">
+                        <Card title={tc('neverDoneTitle')}>
                             <ul className="space-y-1 text-[13px] text-ink-3 list-disc ps-4">
-                                <li>Guessing what an unclear column means.</li>
-                                <li>Inventing a missing value — the product is saved as a draft instead.</li>
-                                <li>Duplicating a barcode already in your catalog.</li>
-                                <li>Letting a row with an error touch a saved product.</li>
+                                {['never1', 'never2', 'never3', 'never4'].map((k) => <li key={k}>{tc(k)}</li>)}
                             </ul>
                         </Card>
                     </aside>
@@ -222,24 +221,24 @@ export default function ImportProductsPage() {
                 <div className="sticky bottom-0 z-30 mt-auto -mx-4 sm:-mx-6 lg:-mx-8 -mb-6 border-t border-line bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/85">
                     <div className="px-4 sm:px-6 lg:px-8 py-3 flex flex-wrap items-center gap-3">
                         {step === 'map' && <>
-                            <Button variant="ghost" icon={<ArrowLeft size={15} />} onClick={reset}>Choose another file</Button>
-                            <span className="flex-1 text-[12.5px] text-ink-3 text-end hidden sm:block">{!nameMapped ? 'Map the product-name column to continue.' : problems?.unresolved.length ? 'Choose what the highlighted columns mean.' : problems?.conflicts.size ? 'Two columns are set to the same field.' : problems?.ambiguousDecimal.length ? 'Choose how numbers are written.' : 'Nothing is saved yet.'}</span>
-                            <Button variant="primary" loading={busy === 'review'} disabled={blockMap} onClick={() => runReview()}>Review {map?.selected.size ? analysis!.sheets.filter((s) => map.selected.has(s.name)).reduce((n, s) => n + s.rows.length, 0).toLocaleString() : 0} rows <ArrowRight size={15} /></Button>
+                            <Button variant="ghost" icon={<ArrowLeft size={15} className="rtl:rotate-180" />} onClick={reset}>{tc('chooseAnotherFile')}</Button>
+                            <span className="flex-1 text-[12.5px] text-ink-3 text-end hidden sm:block">{!nameMapped ? tc('mapNameToContinue') : problems?.unresolved.length ? tc('chooseHighlighted') : problems?.conflicts.size ? tc('twoColumnsSameField') : problems?.ambiguousDecimal.length ? tc('chooseNumberFormat') : tc('nothingSavedYet')}</span>
+                            <Button variant="primary" loading={busy === 'review'} disabled={blockMap} onClick={() => runReview()}>{tc('reviewNRows', { count: map?.selected.size ? analysis!.sheets.filter((s) => map.selected.has(s.name)).reduce((n, s) => n + s.rows.length, 0) : 0 })} <ArrowRight size={15} className="rtl:rotate-180" /></Button>
                         </>}
                         {step === 'review' && <>
-                            <Button variant="ghost" icon={<ArrowLeft size={15} />} onClick={() => setStep('map')}>Back to columns</Button>
-                            <span className="flex-1 text-[12.5px] text-ink-3 text-end hidden sm:block">Nothing is saved yet.</span>
-                            <Button variant="primary" disabled={!importable || busy === 'review'} onClick={() => { setStep('import'); setError(null); }}>Continue with {importable.toLocaleString()} row{importable === 1 ? '' : 's'} <ArrowRight size={15} /></Button>
+                            <Button variant="ghost" icon={<ArrowLeft size={15} className="rtl:rotate-180" />} onClick={() => setStep('map')}>{tc('backToColumns')}</Button>
+                            <span className="flex-1 text-[12.5px] text-ink-3 text-end hidden sm:block">{tc('nothingSavedYet')}</span>
+                            <Button variant="primary" disabled={!importable || busy === 'review'} onClick={() => { setStep('import'); setError(null); }}>{tc('continueWithNRows', { count: importable })} <ArrowRight size={15} className="rtl:rotate-180" /></Button>
                         </>}
                         {step === 'import' && !results && <>
-                            <Button variant="ghost" icon={<ArrowLeft size={15} />} disabled={busy === 'commit'} onClick={() => setStep('review')}>Back to review</Button>
+                            <Button variant="ghost" icon={<ArrowLeft size={15} className="rtl:rotate-180" />} disabled={busy === 'commit'} onClick={() => setStep('review')}>{tc('backToReview')}</Button>
                             <span className="flex-1" />
-                            <Button variant="primary" loading={busy === 'commit'} disabled={!confirmed || !importable} onClick={runImport}>Import {importable.toLocaleString()} product{importable === 1 ? '' : 's'}</Button>
+                            <Button variant="primary" loading={busy === 'commit'} disabled={!confirmed || !importable} onClick={runImport}>{tc('importNProducts', { count: importable })}</Button>
                         </>}
                         {step === 'import' && results && <>
-                            <Button variant="secondary" onClick={reset}>Upload another file</Button>
+                            <Button variant="secondary" onClick={reset}>{tc('uploadAnotherFile')}</Button>
                             <span className="flex-1" />
-                            <Link href="/supplier/products"><Button variant="primary">Go to my products</Button></Link>
+                            <Link href="/supplier/products"><Button variant="primary">{tc('goToMyProducts')}</Button></Link>
                         </>}
                     </div>
                 </div>

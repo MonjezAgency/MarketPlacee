@@ -1,5 +1,8 @@
 /** Shapes returned by /supplier-catalog/import/* (see backend import-analysis.ts and supplier-import.service.ts). */
 
+import { CATEGORIES_LIST } from '@/lib/products';
+import { UNIT_TYPES, digitsOnly } from '@/lib/catalog-rules';
+
 export type Confidence = 'high' | 'medium' | 'low' | 'none';
 
 export interface SheetColumn { index: number; letter: string; key: string; header: string; parent?: string }
@@ -85,31 +88,37 @@ export interface CommitResult {
     productId?: string; status?: string; missing?: string[]; imageMissing?: boolean; reasons?: string[]; notes?: string[]; changes?: string[];
 }
 
-/** Fields shown in the "what Atlantis needs" checklist, in order, and which value sources each can use. */
+/** Fields shown in the "what Atlantis needs" checklist, in order, and which value sources each can use. `label` is a supplierCatalog dictionary key. */
 export const NEEDS: { key: string; label: string; also?: string[]; sources: Source['kind'][] }[] = [
-    { key: 'name', label: 'Product name', sources: [] },
-    { key: 'ean', label: 'Barcode (EAN/GTIN)', also: ['eanPair'], sources: [] },
-    { key: 'brand', label: 'Brand', sources: ['section', 'sheetName', 'fromName', 'constant'] },
-    { key: 'category', label: 'Category', sources: ['constant', 'section', 'sheetName'] },
-    { key: 'price', label: 'Price', also: ['piecePrice', 'displayPrice'], sources: [] },
-    { key: 'unitsPerCase', label: 'Pieces per case', sources: ['constant'] },
-    { key: 'casesPerPallet', label: 'Cases per pallet', sources: ['constant'] },
-    { key: 'stock', label: 'Stock (cases)', also: ['stockPieces'], sources: ['constant'] },
-    { key: 'moq', label: 'Minimum order (MOQ)', sources: ['constant'] },
-    { key: 'weight', label: 'Weight per piece', sources: ['fromName', 'constant'] },
-    { key: 'origin', label: 'Country of origin', sources: ['constant', 'section', 'sheetName'] },
-    { key: 'exwLocation', label: 'EXW location', sources: ['constant'] },
+    { key: 'name', label: 'needName', sources: [] },
+    { key: 'ean', label: 'needEan', also: ['eanPair'], sources: [] },
+    { key: 'brand', label: 'needBrand', sources: ['section', 'sheetName', 'fromName', 'constant'] },
+    { key: 'category', label: 'needCategory', sources: ['constant', 'section', 'sheetName'] },
+    { key: 'price', label: 'needPrice', also: ['piecePrice', 'displayPrice'], sources: [] },
+    { key: 'unitsPerCase', label: 'needUnitsPerCase', sources: ['constant'] },
+    { key: 'casesPerPallet', label: 'needCasesPerPallet', sources: ['constant'] },
+    { key: 'stock', label: 'needStock', also: ['stockPieces'], sources: ['constant'] },
+    { key: 'moq', label: 'needMoq', sources: ['constant'] },
+    { key: 'weight', label: 'needWeight', sources: ['fromName', 'constant'] },
+    { key: 'origin', label: 'needOrigin', sources: ['constant', 'section', 'sheetName'] },
+    { key: 'exwLocation', label: 'needExw', sources: ['constant'] },
 ];
 
+/** supplierCatalog dictionary keys for each value source. */
 export const SOURCE_LABEL: Record<Source['kind'], string> = {
-    constant: 'One value for every row',
-    section: 'The section headings in the sheet',
-    sheetName: 'The sheet name',
-    fromName: 'Read from the product name',
+    constant: 'sourceConstant',
+    section: 'sourceSection',
+    sheetName: 'sourceSheetName',
+    fromName: 'sourceFromName',
 };
 
-export const fieldLabel = (fields: FieldDef[], key: string) => fields.find((f) => f.key === key)?.header ?? key;
-export const where = (r: { sheet: string; row: number }, multi: boolean) => (multi ? `${r.sheet} · row ${r.row}` : `Row ${r.row}`);
+/** The `t` from useLanguage(), narrowed to what these helpers need. */
+export type TFn = (section: 'supplierCatalog', key: string, vars?: Record<string, string | number | null | undefined>) => string;
+
+/** Import fields the dictionary has a label for (the server's English header is the fallback for anything new). */
+const FIELD_KEYS = new Set(['name', 'brand', 'category', 'ean', 'price', 'piecePrice', 'currency', 'stock', 'stockPieces', 'unitsPerCase', 'moq', 'moqUnit', 'origin', 'exwLocation', 'weight', 'unit', 'description', 'shelfLife', 'casesPerPallet', 'palletsPerShipment', 'leadTime', 'imageUrl', 'variants', 'eanPair', 'displayPrice', 'supplierSku', 'caseEan', 'displayEan', 'unitsPerDisplay', 'displaysPerCase', 'casesPerLayer', 'layersPerPallet', 'totalShelfLife', 'rowNumber', 'orderQty']);
+export const fieldLabel = (fields: FieldDef[], key: string, t: TFn) => (FIELD_KEYS.has(key) ? t('supplierCatalog', `field_${key}`) : fields.find((f) => f.key === key)?.header ?? key);
+export const where = (r: { sheet: string; row: number }, multi: boolean, t: TFn) => (multi ? t('supplierCatalog', 'whereSheetRow', { sheet: r.sheet, row: r.row }) : t('supplierCatalog', 'whereRow', { row: r.row }));
 
 /** The server sends repeated text once (see backend compactReview); expand it back. */
 export function expandReview(raw: any): Review {
@@ -124,3 +133,31 @@ export function expandReview(raw: any): Review {
         })),
     };
 }
+
+// ── Display labels shared by the supplier catalog screens (values sent to the API never change) ──
+
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+const CATEGORY_SLUGS = new Set(CATEGORIES_LIST.map(slug));
+/** Catalog category name for display; categories outside the standard list are shown as stored. */
+export const categoryLabel = (c: string | null | undefined, t: TFn) => (c && CATEGORY_SLUGS.has(slug(c)) && CATEGORIES_LIST.includes(c) ? t('supplierCatalog', `cat_${slug(c)}`) : c || '');
+/** Product review status (DRAFT, PENDING, NEEDS_CHANGES, APPROVED, REJECTED). */
+export const statusLabel = (s: string, t: TFn) => (['DRAFT', 'PENDING', 'NEEDS_CHANGES', 'APPROVED', 'REJECTED'].includes(s) ? t('supplierCatalog', `status_${s}`) : s);
+/** What one piece is (piece, bottle, can…). */
+export const unitLabel = (u: string, t: TFn) => ((UNIT_TYPES as readonly string[]).includes(u) ? t('supplierCatalog', `unit_${u}`) : u);
+/** MOQ unit (PIECE, CASE, PALLET, TRUCK) as a plural noun for selects ("cases"). */
+export const moqUnitsLabel = (u: string, t: TFn) => (['PIECE', 'CASE', 'PALLET', 'TRUCK'].includes(u.toUpperCase()) ? t('supplierCatalog', `moqUnits_${u.toUpperCase()}`) : u.toLowerCase());
+/** "12 cases" for an MOQ value and unit. */
+export const moqAmount = (n: number, u: string, t: TFn) => (['PIECE', 'CASE', 'PALLET', 'TRUCK'].includes(u.toUpperCase()) ? t('supplierCatalog', `moqCount_${u.toUpperCase()}`, { count: n }) : `${n} ${u.toLowerCase()}`);
+/** Translates a gtinProblem() message (lib/catalog-rules) for display. */
+export const gtinText = (problem: string | null, raw: string, t: TFn) => {
+    if (!problem) return null;
+    if (problem.startsWith('Barcode is required')) return t('supplierCatalog', 'gtinRequired');
+    if (problem.startsWith('Digits only')) return t('supplierCatalog', 'gtinDigits');
+    if (problem.startsWith('Use 8')) return t('supplierCatalog', 'gtinLength', { count: digitsOnly(raw).length });
+    return t('supplierCatalog', 'gtinCheckDigit');
+};
+/** Label of a field reported by missingFields() (lib/catalog-rules) or by the server. */
+const MISSING_KEYS = new Set(['name', 'brand', 'category', 'ean', 'origin', 'exwLocation', 'weight', 'price', 'stock', 'unitsPerCase', 'casesPerPallet', 'unit', 'moq', 'images']);
+export const missingLabel = (m: { field: string; label: string }, t: TFn) => (MISSING_KEYS.has(m.field) ? t('supplierCatalog', `missing_${m.field}`) : m.label);
+/** Joins a list the way the current language does ("a, b and c"). */
+export const listJoin = (items: string[], intl: string) => { try { return new Intl.ListFormat(intl, { type: 'conjunction' }).format(items); } catch { return items.join(', '); } };
