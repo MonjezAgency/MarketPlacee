@@ -10,6 +10,7 @@ export const suppliers: Article[] = [
         keywords: ['supplier dashboard', 'hub', 'overview', 'navigation', 'sales'],
         prerequisites: ['An approved supplier account.'],
         blocks: [
+            { p: 'After you sign in, open your [supplier dashboard](/dashboard/supplier). Every section below is one click away from it.' },
             { h2: 'Sections' },
             { table: { head: ['Section', 'Use it to'], rows: [
                 ['[Business Overview](/supplier)', 'See sales, orders, what needs your attention, and stock alerts'],

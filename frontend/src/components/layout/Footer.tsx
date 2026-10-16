@@ -29,9 +29,9 @@ export default function Footer() {
             { href: '/help', label: t('footer', 'helpCenter') },
         ] },
         { title: 'For suppliers', links: [
-            // Supplier onboarding is invite-only — suppliers apply via contact.
-            { href: '/contact', label: 'Become a supplier' },
-            { href: '/auth/login?redirect=/supplier', label: 'Supplier sign in' },
+            // Suppliers register like buyers (Supplier preselected) and are approved by Atlantis.
+            { href: '/auth/register?role=supplier', label: 'Become a supplier' },
+            { href: '/auth/login?redirect=/dashboard/supplier', label: 'Supplier sign in' },
             { href: '/targets', label: 'Buyer sourcing requests' },
         ] },
         { title: 'Company', links: [

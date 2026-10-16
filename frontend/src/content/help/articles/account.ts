@@ -14,7 +14,7 @@ export const account: Article[] = [
             { p: 'Have these ready: your work email, your company name, your business type, your country and a business phone number. City and website are optional.' },
             { h2: 'Register' },
             { steps: [
-                'Open the [registration page](/auth/register).',
+                'Open the [registration page](/auth/register). Suppliers can use the [supplier registration](/auth/register?role=supplier), with **Supplier** already selected.',
                 '**Account:** enter your full name, work email and a password, and confirm the password.',
                 '**Business:** choose **Buyer** or **Supplier**, then enter your company name, business type, country and business phone (the country code plus 6 to 14 digits).',
                 '**Review:** check the details and submit.',
@@ -81,7 +81,7 @@ export const account: Article[] = [
             { h2: 'Account statuses' },
             { table: { head: ['Status', 'What it means', 'What you can do'], rows: [
                 ['Awaiting approval', 'The Atlantis team hasn\'t reviewed the account yet.', 'Wait for the approval email. Questions: Info@atlantisfmcg.com'],
-                ['Active', 'Approved. You can sign in and use the platform.', 'Buyers start in the catalog; suppliers in the Supplier Hub.'],
+                ['Active', 'Approved. You can sign in and use the platform.', 'Buyers start in the catalog; suppliers in their [supplier dashboard](/dashboard/supplier).'],
                 ['Rejected', 'The application wasn\'t accepted.', 'You receive an email. Contact Info@atlantisfmcg.com to discuss it.'],
                 ['Blocked', 'Access has been suspended.', 'Contact Info@atlantisfmcg.com.'],
             ] } },

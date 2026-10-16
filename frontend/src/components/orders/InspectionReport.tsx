@@ -21,7 +21,7 @@ export function InspectionReport({ inspection: i }: { inspection: Inspection }) 
                 <div className="flex items-center gap-2.5">
                     <span className="w-9 h-9 rounded-xl bg-teal-soft text-teal flex items-center justify-center"><ClipboardCheck size={17} /></span>
                     <div>
-                        <h3 className="text-[15px] font-semibold text-heading">Inspection report</h3>
+                        <h3 className="font-sans text-[15px] font-semibold text-heading">Inspection report</h3>
                         <p className="text-[12.5px] text-ink-3">
                             {i.inspectedAt ? `Inspected ${new Date(i.inspectedAt).toLocaleDateString()}` : 'Not inspected yet'}{i.inspectorName ? ` · ${i.inspectorName}` : ''}
                         </p>

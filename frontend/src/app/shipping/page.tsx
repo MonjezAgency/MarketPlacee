@@ -5,12 +5,12 @@ const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.atlantisfmcg.
 
 export const metadata: Metadata = {
     title: 'Shipping & Logistics | Atlantis B2B Wholesale Marketplace — Europe & Gulf',
-    description: 'Shipping policy, delivery zones, and logistics partners for Atlantis bulk orders. Lead times, customs, pallet & truck delivery across Romania, the EU, and the Gulf region.',
+    description: 'How delivery works on Atlantis: delivery countries, how delivery charges are priced, typical transit times by zone, customs and duties, and what to do if something goes wrong.',
     alternates: { canonical: `${SITE_URL}/shipping` },
     openGraph: {
         type: 'website',
         title: 'Shipping & Logistics | Atlantis Marketplace',
-        description: 'Delivery zones, customs handling, lead times — wholesale logistics across Europe and the Gulf.',
+        description: 'Delivery countries, delivery pricing, transit estimates and customs for Atlantis wholesale orders.',
         url: `${SITE_URL}/shipping`,
     },
 };

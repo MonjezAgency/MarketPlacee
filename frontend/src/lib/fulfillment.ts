@@ -33,10 +33,10 @@ export interface SupplierPreview {
 export const previewSupplierFulfillment = (q: { productId: string; tier: string; quantity: number; destination?: string; draft?: Partial<SupplierSettings> }) =>
     call<SupplierPreview>('/fulfillment/supplier/preview', { method: 'POST', body: JSON.stringify(q) });
 
-export interface PublicHub { id: string; name: string; city: string; country: string; countryName: string; address: string | null; latitude: number; longitude: number; services: string[]; verifiedAt: string | null }
+export interface PublicHub { id: string; name: string; city: string; country: string; countryName: string; address: string | null; latitude: number; longitude: number; region: 'europe' | 'americas' | null; services: string[]; verifiedAt: string | null }
 export const getPublicHubs = () => call<{ hubs: PublicHub[]; deliveryCountries: { code: string; name: string }[] }>('/fulfillment/hubs');
 
-export interface AdminHub extends Omit<PublicHub, 'countryName'> { verified: boolean; active: boolean; notes: string | null; createdAt: string }
+export interface AdminHub extends Omit<PublicHub, 'countryName' | 'region'> { verified: boolean; active: boolean; notes: string | null; createdAt: string }
 export interface AdminRate { id: string; method: 'ATLANTIS_COLLECTION' | 'HUB_TO_BUYER'; originCountry: string; destinationCountry: string; hubId: string | null; unit: 'CASE' | 'PALLET' | 'TRUCK'; amountEur: number; minTransitDays: number | null; maxTransitDays: number | null; active: boolean; note: string | null }
 export const getFulfillmentAdmin = () => call<{ hubs: AdminHub[]; rates: AdminRate[]; services: string[] }>('/fulfillment/admin');
 export const saveHub = (body: any, id?: string) => call<AdminHub>(id ? `/fulfillment/admin/hubs/${id}` : '/fulfillment/admin/hubs', { method: id ? 'PATCH' : 'POST', body: JSON.stringify(body) });

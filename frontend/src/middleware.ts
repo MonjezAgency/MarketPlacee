@@ -16,7 +16,11 @@ export function middleware(request: NextRequest) {
 
   // Not logged in + protected route → redirect to login
   if (isProtectedRoute && !token) {
-    return NextResponse.redirect(new URL('/auth/login', request.url));
+    // Keep where the visitor was going, so signing in lands on that page
+    // (the login page only accepts same-site paths; see safeRedirect there).
+    const login = new URL('/auth/login', request.url);
+    login.searchParams.set('redirect', pathname + request.nextUrl.search);
+    return NextResponse.redirect(login);
   }
 
   // Logged in + trying to visit login/register → redirect to dashboard

@@ -430,7 +430,11 @@ html.dark .shadow-2xl { box-shadow: 0 25px 60px rgba(0,0,0,0.5) !important; }
 @media (prefers-reduced-motion: reduce) {
     .animate-hero-copy,
     .animate-hero-drift,
-    .animate-brand-loop { animation: none; }
+    .animate-brand-loop,
+    .animate-atl-rise,
+    .animate-atl-scan-clip,
+    .animate-atl-scan-line,
+    .animate-atl-pulse-ring { animation: none; }
 }
 
 /* ── Storefront theme tokens ──────────────────────────────────────────────

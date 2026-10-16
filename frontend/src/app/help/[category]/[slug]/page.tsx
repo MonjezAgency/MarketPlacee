@@ -6,6 +6,7 @@ import { ARTICLES, articleHref, articlesIn, categoryById, findRef, getArticle, h
 import HelpShell from '@/components/help/HelpShell';
 import ArticleBody, { Inline } from '@/components/help/ArticleBody';
 import { TableOfContents } from '@/components/help/HelpUI';
+import AccountCta from '@/components/help/AccountCta';
 
 const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || 'https://www.atlantisfmcg.com').replace(/\/+$/, '');
 const AUDIENCE = { buyer: 'Buyers', supplier: 'Suppliers', both: 'Buyers and suppliers' } as const;
@@ -51,6 +52,8 @@ export default function ArticlePage({ params }: { params: { category: string; sl
                 </header>
 
                 <ArticleBody blocks={a.blocks} />
+
+                <AccountCta audience={a.audience} />
 
                 {related.length > 0 && (
                     <section aria-labelledby="related" className="mt-12 pt-6 border-t border-line">

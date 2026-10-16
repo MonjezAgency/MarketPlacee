@@ -62,7 +62,43 @@ const config: Config = {
                 md: "calc(var(--radius) - 2px)",
                 sm: "calc(var(--radius) - 4px)",
             },
+            // ── Atlantis design system (docs/DESIGN_SYSTEM.md) ──
+            // Named type scale: use these for marketing / trust / policy pages
+            // instead of arbitrary text-[Npx] values.
+            fontSize: {
+                "display": ["3rem", { lineHeight: "1.05", letterSpacing: "-0.025em", fontWeight: "700" }],      // 48
+                "display-sm": ["2.25rem", { lineHeight: "1.1", letterSpacing: "-0.02em", fontWeight: "700" }],  // 36
+                "title": ["2rem", { lineHeight: "1.15", letterSpacing: "-0.02em", fontWeight: "700" }],         // 32
+                "title-sm": ["1.625rem", { lineHeight: "1.2", letterSpacing: "-0.015em", fontWeight: "700" }],  // 26
+                "subtitle": ["1.25rem", { lineHeight: "1.35", letterSpacing: "-0.01em", fontWeight: "600" }],   // 20
+                "lead": ["1.125rem", { lineHeight: "1.6" }],                                                     // 18
+                "body": ["0.9375rem", { lineHeight: "1.65" }],                                                   // 15
+                "small": ["0.8125rem", { lineHeight: "1.5" }],                                                   // 13
+                "eyebrow": ["0.75rem", { lineHeight: "1.3", letterSpacing: "0.14em", fontWeight: "600" }],      // 12
+            },
+            maxWidth: {
+                page: "80rem",     // 1280 — page container
+                content: "68rem",  // 1088 — feature sections
+                prose: "42rem",    // 672 — running text
+            },
+            transitionTimingFunction: {
+                atl: "cubic-bezier(0.22, 1, 0.36, 1)",
+            },
+            keyframes: {
+                "atl-rise": { from: { transform: "translateY(0)" }, to: { transform: "translateY(-50%)" } },
+                "atl-pulse-ring": { "0%": { transform: "scale(0.6)", opacity: "0.55" }, "100%": { transform: "scale(2.2)", opacity: "0" } },
+                "atl-scan-clip": { "0%, 100%": { clipPath: "inset(58% 0 0 0)" }, "50%": { clipPath: "inset(30% 0 0 0)" } },
+                "atl-scan-line": { "0%, 100%": { top: "58%" }, "50%": { top: "30%" } },
+            },
+            animation: {
+                "atl-rise": "atl-rise 28s linear infinite",
+                "atl-pulse-ring": "atl-pulse-ring 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite",
+                "atl-scan-clip": "atl-scan-clip 7s cubic-bezier(0.65, 0, 0.35, 1) infinite",
+                "atl-scan-line": "atl-scan-line 7s cubic-bezier(0.65, 0, 0.35, 1) infinite",
+            },
             boxShadow: {
+                card: "0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05)",
+                float: "0 2px 6px rgba(15, 23, 42, 0.05), 0 24px 48px -12px rgba(15, 23, 42, 0.14)",
                 premium: "0 8px 30px rgba(0, 0, 0, 0.04)",
                 "premium-dark": "0 8px 30px rgba(0, 0, 0, 0.2)",
                 glow: "0 0 15px hsl(var(--ring) / 0.5)",

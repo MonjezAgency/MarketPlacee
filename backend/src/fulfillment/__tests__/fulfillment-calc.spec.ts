@@ -75,3 +75,15 @@ describe('fulfilment calculation', () => {
         expect(validateRate({ method: 'HUB_TO_BUYER', unit: 'PALLET', amountEur: 1 })).toMatchObject({ ok: false, error: expect.stringMatching(/hub/) });
     });
 });
+
+describe('hub regions', () => {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { hubRegion } = require('../fulfillment.service');
+    it('places hubs on the Europe or Americas map, and nowhere else', () => {
+        expect(hubRegion(51.37, 6.17)).toBe('europe');        // Venlo
+        expect(hubRegion(40.71, -74.0)).toBe('americas');     // New York
+        expect(hubRegion(-23.55, -46.63)).toBe('americas');   // São Paulo
+        expect(hubRegion(30.04, 31.24)).toBeNull();           // Cairo
+        expect(hubRegion(25.2, 55.27)).toBeNull();            // Dubai
+    });
+});

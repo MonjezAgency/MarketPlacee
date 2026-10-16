@@ -108,7 +108,7 @@ export const welcome: Article[] = [
                 '**Signing up with Google always creates a buyer account.** To register as a supplier, sign up with your email and a password.',
                 'Both account types are reviewed by the Atlantis team before they become active.',
             ] },
-            { note: 'Want to supply Atlantis? Choose **Supplier** on the [registration page](/auth/register). You can also use the "Supplier Registration" topic on the [contact form](/contact) if you have questions first.', tone: 'tip' },
+            { note: 'Want to supply Atlantis? Open the [supplier registration](/auth/register?role=supplier) — **Supplier** is already selected. You can also use the "Supplier Registration" topic on the [contact form](/contact) if you have questions first.', tone: 'tip' },
         ],
         related: ['account/create-an-account', 'account/sign-in-with-google', 'account/account-approval'],
     },

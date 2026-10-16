@@ -115,8 +115,8 @@ function HubDialog({ hub, services, onClose, onSaved }: { hub: Partial<AdminHub>
                     </select>
                 </Field>
                 <Field label="Address" htmlFor="hub-address" optional><input id="hub-address" className={inputCls} value={f.address} onChange={(e) => set('address', e.target.value)} /></Field>
-                <Field label="Latitude" htmlFor="hub-lat" required hint="Europe only (34 to 72)"><input id="hub-lat" type="number" step="0.0001" className={inputCls} value={f.latitude} onChange={(e) => set('latitude', e.target.value)} /></Field>
-                <Field label="Longitude" htmlFor="hub-lng" required hint="−25 to 45"><input id="hub-lng" type="number" step="0.0001" className={inputCls} value={f.longitude} onChange={(e) => set('longitude', e.target.value)} /></Field>
+                <Field label="Latitude" htmlFor="hub-lat" required hint="Europe 34 to 72 · Americas −56 to 72"><input id="hub-lat" type="number" step="0.0001" className={inputCls} value={f.latitude} onChange={(e) => set('latitude', e.target.value)} /></Field>
+                <Field label="Longitude" htmlFor="hub-lng" required hint="Europe −25 to 45 · Americas −170 to −30"><input id="hub-lng" type="number" step="0.0001" className={inputCls} value={f.longitude} onChange={(e) => set('longitude', e.target.value)} /></Field>
             </div>
             <fieldset className="mt-4">
                 <legend className="text-[13px] font-medium text-ink-2">Services actually offered at this hub</legend>

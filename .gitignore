@@ -81,7 +81,6 @@ replace-urls.js
 test-connection.js
 prisma_studio.log
 Website_Screenshots/
-CLAUDE.md
 
 # Local env files
 .env

@@ -9,6 +9,13 @@ import {
 const HUB_SERVICES = ['INSPECTION', 'CONSOLIDATION', 'STORAGE', 'CROSS_DOCK', 'COLLECTION'];
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** Which map a hub belongs on (null = outside the regions Atlantis shows). */
+export function hubRegion(lat: number, lng: number): 'europe' | 'americas' | null {
+    if (lat >= 34 && lat <= 72 && lng >= -25 && lng <= 45) return 'europe';
+    if (lat >= -56 && lat <= 72 && lng >= -170 && lng <= -30) return 'americas';
+    return null;
+}
+
 /** A cart / order line as priceCart produces it. */
 export interface QuoteLine { productId: string | null; mixedLoadId?: string | null; supplierId?: string | null; tier: string; quantity: number; name: string; mixComposition?: any[] }
 
@@ -171,7 +178,7 @@ export class FulfillmentService {
             loadDeliveryCountries(this.prisma),
         ]);
         return {
-            hubs: hubs.map((h) => ({ id: h.id, name: h.name, city: h.city, country: h.country, countryName: countryName(h.country), address: h.address, latitude: h.latitude, longitude: h.longitude, services: h.services, verifiedAt: h.verifiedAt })),
+            hubs: hubs.map((h) => ({ id: h.id, name: h.name, city: h.city, country: h.country, countryName: countryName(h.country), address: h.address, latitude: h.latitude, longitude: h.longitude, region: hubRegion(h.latitude, h.longitude), services: h.services, verifiedAt: h.verifiedAt })),
             deliveryCountries: countries.map((c) => ({ code: c, name: countryName(c) })),
         };
     }
@@ -190,7 +197,7 @@ export class FulfillmentService {
         const lat = Number(body?.latitude), lng = Number(body?.longitude);
         if (name.length < 2 || city.length < 2) throw new BadRequestException('Give the hub a name and city.');
         if (!country) throw new BadRequestException('Choose a valid country.');
-        if (!Number.isFinite(lat) || lat < 34 || lat > 72 || !Number.isFinite(lng) || lng < -25 || lng > 45) throw new BadRequestException('Coordinates must be inside Europe (latitude 34–72, longitude −25–45).');
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || !hubRegion(lat, lng)) throw new BadRequestException('Coordinates must be in Europe (latitude 34–72, longitude −25–45) or the Americas (latitude −56–72, longitude −170 to −30).');
         const services = (Array.isArray(body?.services) ? body.services : []).map((s: any) => String(s).toUpperCase()).filter((s: string) => HUB_SERVICES.includes(s));
         const verified = body?.verified === true;
         const data: any = { name, city, country, address: body?.address ? String(body.address).slice(0, 300) : null, latitude: lat, longitude: lng, services, active: body?.active !== false, notes: body?.notes ? String(body.notes).slice(0, 1000) : null };
