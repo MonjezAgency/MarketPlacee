@@ -99,6 +99,12 @@ model User {
   // visual interrupts. Missing keys default to true (subscribed)
   // so legacy rows behave exactly as before.
   notificationPrefs    Json?
+  // First-login dashboard tours (UI onboarding only — unrelated to
+  // `onboardingCompleted`, which means "business profile completed").
+  // Shape: { "<tourId>": { "status": "started" | "completed" | "skipped",
+  //          "step": number, "at": ISO string } }. Null = no tour seen yet.
+  // Read/written only via GET/PATCH /users/me/tours (src/users/product-tours.ts).
+  productTours         Json?
   // Supplier's chosen currency for entering prices (ISO code). Null = suggest from country.
   defaultCurrency      String?
   targetPriceRequests  TargetPriceRequest[] @relation("TargetPriceBuyer")

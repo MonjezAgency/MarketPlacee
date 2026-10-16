@@ -1,6 +1,7 @@
 import { Controller, Get, UseGuards, Post, Patch, Param, Body, Query, Delete, UseInterceptors, ClassSerializerInterceptor, Request, Res, StreamableFile, UploadedFile, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { cleanProfile, cleanBrands, ProfileFieldError } from './profile-fields';
 import { missingProfileFields, REQUIRED_PROFILE_FIELDS } from './profile-completion';
+import { toursView, parseTourUpdate, applyTourUpdate, TourInputError } from './product-tours';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { PrismaService } from '../common/prisma.service';
@@ -68,6 +69,30 @@ export class UsersController {
     async getBrandPrefs(@Request() req) {
         const u = await this.prisma.user.findUnique({ where: { id: req.user.sub }, select: { preferredBrands: true } as any });
         return { brands: ((u as any)?.preferredBrands as string[]) ?? [] };
+    }
+
+    // ─── First-login dashboard tours (rules: ./product-tours.ts) ──────────
+
+    /** Tours that apply to the caller's role, with eligibility and the saved step. */
+    @Get('me/tours')
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
+    async getTours(@Request() req) {
+        const u = await this.prisma.user.findUnique({ where: { id: req.user.sub }, select: { role: true, createdAt: true, productTours: true } as any });
+        return { tours: u ? toursView(u as any) : {} };
+    }
+
+    /** Saves progress for one tour. Completed/skipped is final: the stored state is returned unchanged. */
+    @Patch('me/tours/:tourId')
+    @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS, Role.OWNER)
+    async setTour(@Request() req, @Param('tourId') tourId: string, @Body() body: Record<string, unknown>) {
+        const u: any = await this.prisma.user.findUnique({ where: { id: req.user.sub }, select: { role: true, createdAt: true, productTours: true } as any });
+        if (!u) throw new ForbiddenException();
+        let update: ReturnType<typeof parseTourUpdate>;
+        try { update = parseTourUpdate(u.role, tourId, body); }
+        catch (e) { if (e instanceof TourInputError) throw new BadRequestException(e.message); throw e; }
+        const res = applyTourUpdate(u.productTours, tourId, update);
+        if (res.changed) await this.prisma.user.update({ where: { id: req.user.sub }, data: { productTours: res.json } as any });
+        return { tourId, ...toursView({ ...u, productTours: res.json })[tourId] };
     }
 
     @Patch('me/brand-preferences')

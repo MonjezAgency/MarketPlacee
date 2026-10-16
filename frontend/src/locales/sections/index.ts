@@ -6,7 +6,8 @@ import supplierMoney from './supplierMoney';
 import buyerAccount from './buyerAccount';
 import support from './support';
 import legacySupplier from './legacySupplier';
+import productTour from './productTour';
 
 /** Every area dictionary (see define.ts). Order doesn't matter; names must be unique. */
-export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier] as const;
+export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, productTour] as const;
 export type SectionName = (typeof SECTIONS)[number]['name'];

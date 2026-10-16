@@ -6,14 +6,17 @@ import { LayoutGrid, Package, ListChecks, Settings, Target, LifeBuoy, Receipt } 
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { ProductTour } from '@/components/onboarding/ProductTour';
+import { BUYER_TOUR } from '@/components/onboarding/tours';
 
-const TABS = [
+// `tour` is the data-tour target used by the first-login tour (components/onboarding/tours.ts).
+const TABS: { href: string; label: string; icon: typeof LayoutGrid; exact?: boolean; tour?: string }[] = [
     { href: '/dashboard/customer', label: 'overview', icon: LayoutGrid, exact: true },
-    { href: '/dashboard/customer/orders', label: 'orders', icon: Package },
-    { href: '/dashboard/customer/payments', label: 'payments', icon: Receipt },
-    { href: '/dashboard/customer/lists', label: 'lists', icon: ListChecks },
+    { href: '/dashboard/customer/orders', label: 'orders', icon: Package, tour: 'buyer-nav-orders' },
+    { href: '/dashboard/customer/payments', label: 'payments', icon: Receipt, tour: 'buyer-nav-payments' },
+    { href: '/dashboard/customer/lists', label: 'lists', icon: ListChecks, tour: 'buyer-nav-lists' },
     { href: '/dashboard/customer/targets', label: 'targets', icon: Target },
-    { href: '/dashboard/customer/support', label: 'support', icon: LifeBuoy },
+    { href: '/dashboard/customer/support', label: 'support', icon: LifeBuoy, tour: 'buyer-nav-support' },
     { href: '/dashboard/customer/settings', label: 'settings', icon: Settings },
 ];
 
@@ -30,7 +33,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
                         <p className="text-[12.5px] text-ink-3">{t('account', 'myAccount')}</p>
                         <h1 className="font-sans text-[22px] sm:text-[24px] font-semibold text-heading truncate">{(user as any)?.companyName || user?.name || t('account', 'yourAccount')}</h1>
                     </div>
-                    <Link href="/categories" data-no-translate className="h-10 px-4 inline-flex items-center rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold">{t('account', 'startOrder')}</Link>
+                    <Link href="/categories" data-no-translate data-tour="buyer-start-order" className="h-10 px-4 inline-flex items-center rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold">{t('account', 'startOrder')}</Link>
                 </div>
                 <div className="mt-6 lg:grid lg:grid-cols-[216px_minmax(0,1fr)] lg:gap-8 items-start">
                     {/* Side tabs on desktop; a scrollable tab row on phones/tablets. */}
@@ -41,7 +44,7 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
                                 const Icon = tab.icon;
                                 return (
                                     <li key={tab.href}>
-                                        <Link href={tab.href} aria-current={active ? 'page' : undefined}
+                                        <Link href={tab.href} data-tour={tab.tour} aria-current={active ? 'page' : undefined}
                                             className={cn('relative flex items-center gap-2.5 h-11 px-3 text-[14px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] rounded-t-md lg:rounded-xl',
                                                 active ? 'text-heading lg:bg-surface-2' : 'text-ink-3 hover:text-ink lg:hover:bg-surface-2/60')}>
                                             <Icon size={17} /> {t('account', tab.label)}
@@ -55,6 +58,8 @@ export default function CustomerLayout({ children }: { children: React.ReactNode
                     <div className="pt-6 lg:pt-0 min-w-0">{children}</div>
                 </div>
             </div>
+            {/* First-login tour (server-persisted; shows only on /dashboard/customer for eligible buyers). */}
+            <ProductTour tour={BUYER_TOUR} />
         </div>
     );
 }
