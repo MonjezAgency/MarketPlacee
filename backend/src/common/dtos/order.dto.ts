@@ -33,4 +33,12 @@ export class OrderDto {
 
     @Expose()
     createdAt: Date;
+
+    // Order terms and the delivery calculation carry supplier ids and supplier
+    // net prices; they never leave the server through this DTO (buyer, supplier
+    // or admin list responses). Each party gets its own view from the service.
+    @Exclude() submittedTerms?: unknown;
+    @Exclude() termsSnapshot?: unknown;
+    @Exclude() fulfillment?: unknown;
+    @Exclude() reviewedById?: unknown;
 }

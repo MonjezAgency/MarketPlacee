@@ -20,6 +20,7 @@ import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
+import { DeliveryBreakdown } from '@/components/orders/DeliveryBreakdown';
 import { quoteCart, toServerItem, listDestinations, checkDestination, type CartQuote, type DestinationCheck } from '@/lib/wholesale';
 
 
@@ -186,10 +187,13 @@ export default function CheckoutPage() {
 
     React.useEffect(() => {
         if (!items.length) return;
-        quoteCart(items, couponApplied || undefined)
+        // The destination lets the server price delivery with the same calculation the order uses.
+        quoteCart(items, couponApplied || undefined, destCheck?.supported ? destCheck.code || undefined : undefined)
             .then((q) => { setQuote(q); setQuoteError(q.ready ? '' : 'Some cart lines need attention — return to the cart to fix them.'); })
             .catch((e) => { if (e?.code === 'NOT_DEPLOYED') setLegacyPricing(true); else setQuoteError(e?.message || 'Could not price your order.'); });
-    }, [items, couponApplied]);
+    }, [items, couponApplied, destCheck?.code, destCheck?.supported]);
+    const delivery = quote?.fulfillment ?? null;
+    const freight = delivery?.status === 'priced' ? delivery.freightTotal : null;
 
     const discountAmount = quote ? quote.discount : total * (couponDiscount / 100);
     const grandTotal = quote ? quote.total : total - discountAmount; // Shipping is TBD and handled manually now
@@ -443,7 +447,7 @@ export default function CheckoutPage() {
                                                 <div>
                                                     <p className="text-xs font-bold text-foreground">Delivery isn’t charged at checkout</p>
                                                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                                                        Atlantis quotes freight for your destination after the order is confirmed. Nothing is added to this total until you accept that quote.
+                                                        Where Atlantis has a configured rate for your route, the delivery charge is shown on the next step. Otherwise Atlantis quotes it after the order, and nothing is added until you accept that quote.
                                                     </p>
                                                 </div>
                                             </div>
@@ -575,13 +579,22 @@ export default function CheckoutPage() {
                                                 <span className="font-bold">{selectedShipping?.name || 'Atlantis chooses'}</span>
                                             </div>
                                             <div className="flex justify-between text-sm">
-                                                <span className="text-muted-foreground">Shipping cost</span>
-                                                <span className="font-bold text-secondary uppercase tracking-widest text-xs">{t('cart', 'manualQuote')}</span>
+                                                <span className="text-muted-foreground">Delivery</span>
+                                                {freight != null
+                                                    ? <span className="font-bold">{formatPrice(freight, currency)}</span>
+                                                    : <span className="font-bold text-secondary uppercase tracking-widest text-xs">{t('cart', 'manualQuote')}</span>}
                                             </div>
                                             <div className="flex justify-between text-base font-bold pt-2 border-t border-border/50">
-                                                <span>Total Due</span>
-                                                <span className="text-secondary">{formatPrice(grandTotal, currency)}</span>
+                                                <span>Order total <span className="text-xs font-medium text-muted-foreground">excl. VAT{freight == null ? ' and delivery' : ''}</span></span>
+                                                <span className="text-secondary">{formatPrice(grandTotal + (freight ?? 0), currency)}</span>
                                             </div>
+                                        </div>
+
+                                        {delivery && <DeliveryBreakdown quote={delivery} />}
+
+                                        <div className="rounded-2xl ring-1 ring-line p-4 text-[13px] text-ink-2 space-y-1">
+                                            <p className="font-semibold text-ink">What happens when you place the order</p>
+                                            <p>Placing the order sends a request — nothing is charged. Each supplier confirms availability, quantities and price; Atlantis then approves the order and sends you the confirmed terms and payment details. If anything changes, you’re asked to accept the new terms first. <Link href="/protected-payments" className="text-teal font-medium hover:underline">How it works</Link></p>
                                         </div>
 
                                         {quoteError && <p role="alert" className="mb-3 text-[13px] text-[#B91C1C]">{quoteError}</p>}

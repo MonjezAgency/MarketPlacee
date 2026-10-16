@@ -36,7 +36,7 @@ export const PRODUCT_STATUS: Record<string, { label: string; tone: Tone }> = {
 };
 
 export const ORDER_STATUS: Record<string, { label: string; tone: Tone }> = {
-    PENDING: { label: 'Awaiting your confirmation', tone: 'warning' },
+    PENDING: { label: 'Awaiting confirmation', tone: 'warning' },
     PAID: { label: 'Paid · awaiting confirmation', tone: 'warning' },
     PROCESSING: { label: 'Confirmed · preparing', tone: 'brand' },
     SHIPPED: { label: 'Shipped', tone: 'info' },

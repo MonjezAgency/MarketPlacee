@@ -747,7 +747,7 @@ function RequestsContent() {
                         {skuCount !== null && <span className="w-px h-4 bg-surface-3" aria-hidden />}
                         <span className="inline-flex items-center gap-2">Your requests <span className="px-2 h-6 inline-flex items-center rounded-md bg-cta text-cta-fg text-[12px] font-semibold tabular-nums">{openCount}</span></span>
                         <span className="w-px h-4 bg-surface-3" aria-hidden />
-                        <span className="inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-[#2EC4B6]" /> Escrow-protected</span>
+                        <span className="inline-flex items-center gap-1.5"><ShieldCheck size={14} className="text-[#2EC4B6]" /> Confirmed before you pay</span>
                     </div>
                     <p className="mt-3 text-[12px] text-ink-4">Tip: paste lines like “33 pallets Red Bull 250ml” or “Ariel Pods – 200 cartons”.</p>
 
@@ -885,7 +885,7 @@ function RequestsContent() {
                                     </button>
                                     <p className="flex items-start gap-2 text-[12px] text-ink-3 leading-relaxed">
                                         <ShieldCheck size={14} className="text-[#2EC4B6] shrink-0 mt-0.5" />
-                                        Nothing is committed until you approve the quote. Payments are escrow-protected.
+                                        Nothing is committed until you approve the quote.
                                     </p>
                                 </div>
                             </div>

@@ -26,6 +26,9 @@ import { apiFetch } from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { cn, prettifyVariantSignature } from '@/lib/utils';
 import OrderChatModal from '@/components/chat/OrderChatModal';
+import { AdminWorkflowPanel } from '@/components/orders/AdminWorkflowPanel';
+import { DeliveryBreakdown } from '@/components/orders/DeliveryBreakdown';
+import type { AdminWorkflow, Inspection } from '@/lib/order-workflow';
 
 type AdminOrderItem = {
     id: string;
@@ -95,6 +98,10 @@ type AdminOrder = {
     };
     shippingAddress?: string;
     items?: AdminOrderItem[];
+    /** Confirmation workflow (null for orders placed before it existed). */
+    workflow?: AdminWorkflow | null;
+    inspections?: Inspection[];
+    destinationCountry?: string | null;
 };
 
 const STEPS = [
@@ -179,6 +186,8 @@ export default function AdminOrderDetailPage() {
         }
     };
 
+    const [reloadKey, setReloadKey] = React.useState(0);
+    const reload = React.useCallback(() => setReloadKey((k) => k + 1), []);
     React.useEffect(() => {
         if (!params?.id) return;
         let cancelled = false;
@@ -199,7 +208,7 @@ export default function AdminOrderDetailPage() {
             }
         })();
         return () => { cancelled = true; };
-    }, [params?.id]);
+    }, [params?.id, reloadKey]);
 
     const setStatus = async (next: string) => {
         if (!order) return;
@@ -214,8 +223,11 @@ export default function AdminOrderDetailPage() {
                 const updated = await res.json();
                 setOrder(prev => prev ? { ...prev, status: updated.status } : prev);
                 toast.success(`Order marked as ${next}`);
+                reload();
             } else {
-                toast.error('Could not update status');
+                // The server explains refusals (e.g. approval or buyer acceptance missing).
+                const err = await res.json().catch(() => null);
+                toast.error(typeof err?.message === 'string' ? err.message : 'Could not update status');
             }
         } catch {
             toast.error('Network error');
@@ -344,6 +356,17 @@ export default function AdminOrderDetailPage() {
 
                 {/* LEFT — products + tracking */}
                 <div className="lg:col-span-2 space-y-6">
+
+                    {order.workflow && (
+                        <AdminWorkflowPanel orderId={order.id} status={order.status} workflow={order.workflow} inspections={order.inspections || []} onChange={reload}
+                            items={(order.items || []).map((i) => ({ id: i.id, quantity: i.quantity, unitPrice: i.unitPrice, product: i.product ? { name: i.product.name } : null }))} />
+                    )}
+                    {order.workflow?.terms?.fulfillment && (
+                        <section className="text-start bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
+                            <h2 className="text-[15px] font-semibold text-slate-900 mb-3">Delivery (calculated at order){order.destinationCountry ? ` · to ${order.destinationCountry}` : ''}</h2>
+                            <DeliveryBreakdown quote={order.workflow.terms.fulfillment} setByAtlantis={order.workflow.terms.freight?.status === 'set_by_atlantis' && order.workflow.terms.freight.amount != null ? order.workflow.terms.freight : null} />
+                        </section>
+                    )}
 
                     {/* Items */}
                     <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
@@ -786,14 +809,22 @@ export default function AdminOrderDetailPage() {
 
                         {/* Status actions */}
                         <div className="flex flex-wrap items-center gap-2 mt-5">
-                            {order.status === 'PENDING' && (
+                            {/* Workflow orders are confirmed only by approval (panel above). */}
+                            {order.status === 'PENDING' && !order.workflow && (
                                 <button onClick={() => setStatus('PAID')} disabled={updating}
                                     className="h-10 px-5 bg-teal-600 text-white rounded-xl text-[13px] font-semibold hover:bg-teal-700 transition-all disabled:opacity-50">
                                     Mark as Paid
                                 </button>
                             )}
-                            {order.status === 'PAID' && (
-                                <button onClick={() => setStatus('SHIPPED')} disabled={updating}
+                            {order.status === 'PAID' && !order.workflow && (
+                                <button onClick={() => setStatus('PROCESSING')} disabled={updating}
+                                    className="h-10 px-5 bg-teal-600 text-white rounded-xl text-[13px] font-semibold hover:bg-teal-700 transition-all disabled:opacity-50">
+                                    Mark as Confirmed
+                                </button>
+                            )}
+                            {order.status === 'PROCESSING' && (
+                                <button onClick={() => setStatus('SHIPPED')} disabled={updating || !!order.workflow?.buyerMustAccept}
+                                    title={order.workflow?.buyerMustAccept ? 'The buyer must accept the changed terms first' : undefined}
                                     className="h-10 px-5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700 transition-all disabled:opacity-50">
                                     Mark as Shipped
                                 </button>
@@ -826,11 +857,13 @@ export default function AdminOrderDetailPage() {
                             </div>
                             <div className="flex justify-between text-[13px] text-slate-600">
                                 <span>Shipping</span>
-                                <span className="font-semibold text-teal-600">Free</span>
+                                {order.shippingCost != null
+                                    ? <span className="font-semibold">{fmtMoney(order.shippingCost)}</span>
+                                    : <span className="font-semibold text-amber-700">Not quoted yet</span>}
                             </div>
                             <div className="border-t border-slate-100 pt-2.5 flex justify-between">
-                                <span className="text-[14px] font-bold text-slate-900">Total</span>
-                                <span className="text-[16px] font-bold text-teal-600">{fmtMoney(order.total)}</span>
+                                <span className="text-[14px] font-bold text-slate-900">Total <span className="text-[12px] font-medium text-slate-500">excl. VAT</span></span>
+                                <span className="text-[16px] font-bold text-teal-600">{fmtMoney(order.total + (order.shippingCost ?? 0))}</span>
                             </div>
                         </div>
                     </section>

@@ -17,10 +17,12 @@ function makeDb() {
         loads: new Map<string, any>(),
         coupons: new Map<string, any>([['SAVE10', { code: 'SAVE10', discountPercent: 10, isActive: true, expirationDate: new Date(Date.now() + 864e5) }]]),
         offers: [] as any[],
+        confirmations: [] as any[],
     };
     const db: any = {
         state,
         appConfig: { findUnique: jest.fn(async () => null) },
+        orderSupplierConfirmation: { createMany: jest.fn(async ({ data }: any) => { state.confirmations.push(...data); return { count: data.length }; }) },
         offer: { findMany: jest.fn(async () => state.offers ?? []) },
         coupon: { findUnique: jest.fn(async ({ where }: any) => state.coupons.get(where.code) ?? null) },
         product: {
@@ -87,6 +89,23 @@ describe('OrdersService.create — server-side pricing', () => {
         // Stock is kept in cases: 2 pallets × 132 cases come off stock and are recorded on the line.
         expect(db.state.products.get('prime').stock).toBe(500 - 264);
         expect(order.items[0].stockCases).toBe(264);
+    });
+    it('a new order waits for supplier acceptance and Atlantis approval — the buyer’s submit confirms nothing', async () => {
+        const db = makeDb(), svc = makeService(db);
+        db.state.products.get('prime').stock = 500;
+        const order: any = await svc.create('buyer', undefined as any, [{ productId: 'prime', tier: 'pallet', quantity: 1 }]);
+        expect(order.status).toBe('PENDING');
+        expect(order.reviewStatus).toBe('PENDING_REVIEW');
+        expect(order.termsVersion).toBe(1);
+        expect(order.submittedTerms.lines[0]).toMatchObject({ productId: 'prime', quantity: 1, unitPrice: 1914, supplierId: 'sup-a' });
+        // No fulfilment service in this test → freight is quoted after the order, never invented.
+        expect(order.shippingCost).toBeNull();
+        expect(order.submittedTerms.freight).toEqual({ amount: null, status: 'quote_required' });
+        expect(db.state.confirmations).toEqual([expect.objectContaining({ orderId: order.id, supplierId: 'sup-a', termsVersion: 1, deadline: expect.any(Date) })]);
+        // 72 hours by default
+        const hours = (db.state.confirmations[0].deadline.getTime() - Date.now()) / 3600_000;
+        expect(hours).toBeGreaterThan(71.9);
+        expect(hours).toBeLessThanOrEqual(72);
     });
     it('refuses when the client total disagrees with the server (PRICE_CHANGED)', async () => {
         const db = makeDb(), svc = makeService(db);

@@ -11,6 +11,8 @@ export interface BuyerOrder {
     paymentStatus?: string | null;
     items: BuyerOrderItem[];
     shipment?: { trackingNumber: string | null; carrier: string | null; status: string | null; expectedDelivery: string | null } | null;
+    /** Confirmation workflow summary (null for orders placed before it existed). */
+    workflow?: { reviewStatus: string; termsVersion: number; party: { key: string; buyer: string } | null; buyerMustAccept: boolean } | null;
 }
 
 export const fetchMyOrders = (limit = 100) => call<{ data: BuyerOrder[]; total: number }>(`/orders/my-orders?limit=${limit}`);
@@ -18,10 +20,16 @@ export const fetchMyOrders = (limit = 100) => call<{ data: BuyerOrder[]; total: 
 export const orderRef = (id: string) => `#${id.slice(-8).toUpperCase()}`;
 
 /**
- * Status from what the server actually records. There is no per-line supplier
- * confirmation yet, so PENDING honestly reads "awaiting confirmation".
+ * Status from what the server actually records (supplier confirmation and
+ * Atlantis approval for workflow orders).
  */
 export function orderStatus(o: BuyerOrder): { label: string; tone: 'wait' | 'ok' | 'move' | 'done' | 'off'; note: string } {
+    // Workflow orders: the server's own wording for where the order stands.
+    if (o.workflow?.buyerMustAccept) return { label: 'Your acceptance needed', tone: 'wait', note: 'The confirmed terms changed — review and accept them on the order page.' };
+    if (o.workflow?.party && o.status === 'PENDING') {
+        const k = o.workflow.party.key;
+        return { label: k === 'AWAITING_APPROVAL' ? 'Supplier confirmed' : k === 'SUPPLIER_REJECTED' ? 'In review' : 'Awaiting confirmation', tone: 'wait', note: o.workflow.party.buyer };
+    }
     switch (o.status) {
         case 'PENDING': return { label: 'Awaiting confirmation', tone: 'wait', note: 'Quantities and availability are being confirmed with the supplier.' };
         case 'PAID': return { label: 'Paid', tone: 'ok', note: 'Payment received; awaiting dispatch.' };

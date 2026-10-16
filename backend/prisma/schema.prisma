@@ -251,6 +251,8 @@ model Product {
                               // can estimate transport cost from origin warehouse.
   previousPrice      Float?  // Last price before the most recent change (in EGP base) — used for price-change ticker
   priceChangedAt     DateTime? // Timestamp of the most recent price change
+  /// Per-product override of the supplier's default fulfilment method (null = use the default).
+  fulfillmentMethod String?
   readyForDispatch Boolean @default(true)
   leadTime       Int?     @default(0) // Preparation time in days if not ready for dispatch
 
@@ -373,11 +375,131 @@ model Order {
 
   escrow    EscrowTransaction?
 
+  // ── Confirmation workflow (orders/order-workflow.ts) ──────────────
+  /// LEGACY (placed before the workflow existed) | PENDING_REVIEW | APPROVED | REJECTED
+  reviewStatus   String    @default("LEGACY")
+  reviewedAt     DateTime?
+  reviewedById   String?
+  reviewNote     String?
+  /// Version of the commercial terms; increases on every material change.
+  termsVersion   Int       @default(1)
+  /// The terms as the buyer submitted them (lines, prices, fulfillment, destination).
+  submittedTerms Json?
+  /// The terms Atlantis approved — frozen; what payment and fulfilment follow.
+  termsSnapshot  Json?
+  /// Set when the buyer accepted terms that differ from what they submitted.
+  buyerAcceptedVersion Int?
+  buyerAcceptedAt      DateTime?
+  /// How each supplier's goods move, priced at checkout (fulfillment/fulfillment-calc.ts).
+  fulfillment    Json?
+  confirmations  OrderSupplierConfirmation[]
+  inspections    OrderInspection[]
+
   @@index([customerId])
   @@index([supplierId])
   @@index([status])
   @@index([createdAt])
   @@index([paymentStatus])
+  @@index([reviewStatus])
+}
+
+/// One supplier's explicit decision on one version of an order's terms.
+model OrderSupplierConfirmation {
+  id           String    @id @default(uuid())
+  orderId      String
+  order        Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  supplierId   String
+  termsVersion Int
+  /// PENDING | ACCEPTED | REJECTED | EXPIRED | SUPERSEDED
+  status       String    @default("PENDING")
+  requestedAt  DateTime  @default(now())
+  deadline     DateTime?
+  decidedAt    DateTime?
+  decidedById  String?
+  note         String?
+
+  @@unique([orderId, supplierId, termsVersion])
+  @@index([supplierId, status])
+}
+
+/// An inspection Atlantis staff performed on an order's goods (recorded, not simulated).
+model OrderInspection {
+  id             String    @id @default(uuid())
+  orderId        String
+  order          Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  hubId          String?
+  /// SCHEDULED | PASSED | PASSED_WITH_FINDINGS | FAILED
+  status         String    @default("SCHEDULED")
+  inspectedAt    DateTime?
+  inspectorName  String?
+  /// [{ itemId, ordered, received, unit }]
+  lines          Json?
+  /// [{ type: BARCODE|QUANTITY|DATE|CONDITION|OTHER, itemId?, note }]
+  findings       Json?
+  photos         String[]  @default([])
+  /// PENDING | ACCEPTED | ACCEPTED_WITH_DISCOUNT | PARTIALLY_ACCEPTED | REJECTED
+  resolution     String?
+  resolutionNote String?
+  createdById    String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([orderId])
+}
+
+/// An Atlantis-operated or contracted hub. Shown publicly only when verified and active.
+model AtlantisHub {
+  id           String    @id @default(uuid())
+  name         String
+  city         String
+  /// ISO 3166-1 alpha-2
+  country      String
+  address      String?
+  latitude     Float
+  longitude    Float
+  /// INSPECTION | CONSOLIDATION | STORAGE | CROSS_DOCK | COLLECTION
+  services     String[]  @default([])
+  verified     Boolean   @default(false)
+  verifiedAt   DateTime?
+  verifiedById String?
+  notes        String?
+  active       Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+/// A freight rate Atlantis configured. No rate → the route is "quote required", never estimated.
+model FreightRate {
+  id                 String   @id @default(uuid())
+  /// ATLANTIS_COLLECTION (supplier warehouse → buyer) | HUB_TO_BUYER (Atlantis hub → buyer)
+  method             String
+  /// ISO2 of the dispatch point (supplier EXW country, or the hub's country)
+  originCountry      String
+  destinationCountry String
+  hubId              String?
+  /// CASE | PALLET | TRUCK
+  unit               String
+  amountEur          Float
+  minTransitDays     Int?
+  maxTransitDays     Int?
+  active             Boolean  @default(true)
+  note               String?
+  createdById        String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([method, originCountry, destinationCountry])
+}
+
+/// A supplier's fulfilment defaults. Their net price never changes with the method.
+model SupplierFulfillment {
+  supplierId          String   @id
+  /// ATLANTIS_COLLECTION | SUPPLIER_TO_HUB | SUPPLIER_DIRECT
+  defaultMethod       String   @default("ATLANTIS_COLLECTION")
+  /// What the supplier charges (EUR) to bring one pallet to the chosen hub — passed through, never marked up.
+  hubFreightPerPallet Float?
+  hubId               String?
+  updatedAt           DateTime @updatedAt
 }
 
 model OrderStatusHistory {

@@ -18,7 +18,8 @@ import {
     Moon,
     Sun,
     Star,
-    Settings
+    Settings,
+    Truck
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -59,6 +60,7 @@ const SUPPLIER_LINKS: { label: string; href: string; icon: any; key?: string; lo
     { label: 'Inventory & Products', href: '/supplier/products', icon: Package, key: 'products' },
     { label: 'Stock & Reservations', href: '/supplier/inventory', icon: Warehouse },
     { label: 'Orders', href: '/supplier/orders', icon: ShoppingCart, key: 'orders' },
+    { label: 'Shipping & Fulfilment', href: '/supplier/fulfillment', icon: Truck },
     { label: 'Settings', href: '/supplier/settings', icon: Settings },
     { label: 'Support', href: '/supplier/support', icon: LifeBuoy },
 ];

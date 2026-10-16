@@ -85,14 +85,18 @@ export const ordersCart: Article[] = [
         audience: 'both',
         keywords: ['status', 'awaiting confirmation', 'confirmed', 'shipped', 'delivered', 'cancelled', 'pending', 'processing'],
         blocks: [
+            { p: 'Placing an order sends a request. It is confirmed only after every supplier on it accepts the exact terms and Atlantis approves them. See [Protected Payments](/protected-payments).' },
             { table: { head: ['Buyer sees', 'Supplier sees', 'Meaning'], rows: [
-                ['Awaiting confirmation', 'Placed — awaiting your confirmation', 'Order received; the supplier is confirming quantities and availability'],
-                ['Paid', 'Paid', 'Payment recorded by Atlantis'],
-                ['Confirmed', 'Confirmed — preparing', 'The supplier confirmed; goods are being prepared'],
+                ['Waiting for supplier confirmation', 'Your confirmation is needed', 'The request is with the supplier(s), who have a deadline to accept or reject it'],
+                ['Supplier confirmed — Atlantis is approving', 'Accepted — awaiting Atlantis approval', 'Every supplier accepted the exact terms; Atlantis does a final review'],
+                ['Being reviewed by Atlantis', 'You rejected these terms', 'A supplier couldn\'t supply as requested; Atlantis proposes changed terms or cancels'],
+                ['Confirmed', 'Confirmed — preparing', 'Approved by Atlantis; payment details are sent and goods are prepared'],
+                ['Your acceptance needed', 'Approved — waiting for the buyer', 'The terms changed after you ordered (for example a delivery charge); nothing ships until the buyer accepts'],
                 ['Shipped', 'Shipped', 'On the way; tracking appears when the carrier reference is added'],
                 ['Delivered', 'Delivered', 'The buyer confirmed delivery'],
                 ['Cancelled', 'Cancelled', 'The order won\'t be fulfilled; reserved stock is released'],
             ] } },
+            { p: 'Orders placed before supplier confirmation was introduced keep their earlier statuses.' },
             { p: 'Buyers receive an email and a notification at each status change, unless order update emails are turned off.' },
         ],
         related: ['buyers/track-orders', 'suppliers/handle-orders', 'orders-cart/cancellations'],
@@ -107,7 +111,7 @@ export const ordersCart: Article[] = [
         blocks: [
             { list: [
                 '**Buyers** can\'t cancel from the order page. Contact Atlantis as early as possible with **Email Atlantis about this order**, or at Info@atlantisfmcg.com.',
-                '**Suppliers** can decline an order they can\'t fulfil, with a reason. See [Confirm or decline orders](/help/suppliers/handle-orders).',
+                '**Suppliers** can reject the terms of an order they can\'t fulfil, with a reason. See [Confirm or decline orders](/help/suppliers/handle-orders).',
                 'The **Atlantis team** can cancel orders.',
             ] },
             { p: 'When an order is cancelled, the reserved cases go back to the supplier\'s stock and the buyer is notified.' },

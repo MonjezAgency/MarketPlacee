@@ -42,7 +42,7 @@ export default function ReturnsPage() {
 
                     <div className="bg-purple-500/5 border border-purple-500/20 rounded-2xl p-6 mb-12">
                         <p className="text-sm leading-relaxed">
-                            Atlantis uses an escrow payment system — your payment is held securely and only released to the supplier once you confirm delivery. This gives you strong protection. If there is a problem with your order, do not confirm delivery and open a dispute.
+                            Every Atlantis order is confirmed by the supplier and approved by Atlantis before you pay, and the confirmed terms are saved on your order. Atlantis doesn’t hold payments in escrow. If there is a problem with your order, do not confirm delivery and open a dispute.
                         </p>
                     </div>
 
@@ -50,14 +50,14 @@ export default function ReturnsPage() {
                         <section className="border-b border-border/50 pb-10">
                             <h2 className="text-lg font-black mb-5">How Returns Work on Atlantis</h2>
                             <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                                Because Atlantis is a B2B marketplace, returns are handled through our dispute resolution process rather than a traditional return flow. The escrow system protects you throughout:
+                                Because Atlantis is a B2B marketplace, returns are handled through our dispute resolution process rather than a traditional return flow:
                             </p>
                             <div className="space-y-4">
                                 {[
-                                    { step: '1', title: 'Do not confirm delivery', desc: 'If goods are wrong, damaged, or missing — do not press "Confirm Delivery". The escrow funds remain held.' },
+                                    { step: '1', title: 'Do not confirm delivery', desc: 'If goods are wrong, damaged, or missing — do not press "Confirm Delivery". Your report is the basis for the resolution.' },
                                     { step: '2', title: 'Open a dispute', desc: 'Go to Dashboard → My Orders → Select the order → "Open Dispute". You have 7 days from the expected delivery date.' },
                                     { step: '3', title: 'Provide evidence', desc: 'Upload photos, describe the issue clearly, and submit the dispute. The supplier will also be contacted.' },
-                                    { step: '4', title: 'Resolution', desc: 'Our team reviews within 48-72 hours. If resolved in your favor, a full or partial refund is issued. If the dispute is rejected, escrow is released to the supplier.' },
+                                    { step: '4', title: 'Resolution', desc: 'Our team reviews within 48-72 hours. If resolved in your favor, the team arranges a full or partial refund or a price adjustment under the confirmed terms. Refunds are arranged by the team, not automatically.' },
                                 ].map((item) => (
                                     <div key={item.step} className="flex gap-4 p-5 bg-card border border-border/50 rounded-xl">
                                         <span className="w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-black flex items-center justify-center shrink-0">{item.step}</span>

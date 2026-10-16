@@ -20,6 +20,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
+import { FulfillmentService } from '../fulfillment/fulfillment.service';
 import { OrdersService } from './orders.service';
 import { ExcelService } from '../admin/excel.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -29,6 +30,9 @@ import { Roles } from '../auth/roles.decorator';
 import { CheckOwnership } from '../auth/check-ownership.decorator';
 import { Role, OrderStatus } from '@prisma/client';
 import { OrderDto } from '../common/dtos/order.dto';
+
+/** What a supplier gets back after answering: never the buyer total (it includes the Atlantis margin). */
+const supplierResult = (o: any) => ({ id: o?.id, status: o?.status, reviewStatus: o?.reviewStatus, accepted: o?.accepted, rejected: o?.rejected });
 import { plainToInstance } from 'class-transformer';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { PrismaService } from '../common/prisma.service';
@@ -118,8 +122,8 @@ export class OrdersController {
     @Post('quote')
     @Roles(Role.CUSTOMER, Role.ADMIN, Role.OWNER, Role.SUPPLIER)
     async quote(@Body() data: any, @Request() req) {
-        const q = await this.ordersService.priceCart(req.user.sub, data?.items, data?.couponCode, undefined, { lenient: true });
-        return { subtotal: q.subtotal, discountPercent: q.discountPercent, discount: q.discount, coupon: q.coupon, total: q.total, lines: q.lines.map((l: any) => ({ productId: l.productId, mixedLoadId: l.mixedLoadId ?? null, tier: l.tier, quantity: l.quantity, price: l.price, lineTotal: l.lineTotal, perCase: l.perCase ?? null, casesTotal: l.casesTotal ?? null, unitsTotal: l.unitsTotal ?? null, minUnits: l.minUnits ?? null, minimum: l.minimum ?? null, offerPercent: l.offerPercent ?? null, info: l.info ?? null, error: l.error ?? null })), ready: q.lines.every((l: any) => !l.error) };
+        const q = await this.ordersService.priceCart(req.user.sub, data?.items, data?.couponCode, undefined, { lenient: true, destination: typeof data?.destination === 'string' ? data.destination : null });
+        return { subtotal: q.subtotal, discountPercent: q.discountPercent, discount: q.discount, coupon: q.coupon, total: q.total, lines: q.lines.map((l: any) => ({ productId: l.productId, mixedLoadId: l.mixedLoadId ?? null, tier: l.tier, quantity: l.quantity, price: l.price, lineTotal: l.lineTotal, perCase: l.perCase ?? null, casesTotal: l.casesTotal ?? null, unitsTotal: l.unitsTotal ?? null, minUnits: l.minUnits ?? null, minimum: l.minimum ?? null, offerPercent: l.offerPercent ?? null, info: l.info ?? null, error: l.error ?? null })), ready: q.lines.every((l: any) => !l.error), fulfillment: q.fulfillment ? FulfillmentService.forBuyer(q.fulfillment) : null };
     }
 
     @Get('stats')
@@ -210,14 +214,14 @@ export class OrdersController {
     @Post(':id/supplier-accept')
     @Roles(Role.SUPPLIER)
     async supplierAccept(@Param('id') id: string, @Request() req) {
-        return plainToInstance(OrderDto, await this.ordersService.supplierAccept(id, req.user.sub));
+        return supplierResult(await this.ordersService.supplierAccept(id, req.user.sub));
     }
 
     /** Supplier declines an order awaiting them, with a reason for the buyer. */
     @Post(':id/supplier-decline')
     @Roles(Role.SUPPLIER)
     async supplierDecline(@Param('id') id: string, @Body('reason') reason: string, @Request() req) {
-        return plainToInstance(OrderDto, await this.ordersService.supplierReject(id, req.user.sub, reason));
+        return supplierResult(await this.ordersService.supplierReject(id, req.user.sub, reason));
     }
 
     @Patch(':id/status')
@@ -241,7 +245,7 @@ export class OrdersController {
                     'Suppliers can only confirm orders (PENDING → PROCESSING). Shipping and delivery transitions are handled by admin/logistics.',
                 );
             }
-            return plainToInstance(OrderDto, await this.ordersService.supplierAccept(id, req.user.sub));
+            return supplierResult(await this.ordersService.supplierAccept(id, req.user.sub));
         }
         // reason is optional, service handles default
         const order = await this.ordersService.updateStatus(
@@ -266,8 +270,61 @@ export class OrdersController {
     async setShipping(
         @Param('id') id: string,
         @Body() body: { shippingCompany?: string | null; shippingCost?: number | null; trackingNumber?: string | null },
+        @Request() req,
     ) {
-        return this.ordersService.setShipping(id, body.shippingCompany, body.shippingCost, body.trackingNumber);
+        return this.ordersService.setShipping(id, body.shippingCompany, body.shippingCost, body.trackingNumber, req.user.sub);
+    }
+
+    // ─── Confirmation workflow ───────────────────────────────────────
+
+    /** Atlantis approval — only after every supplier accepted the current terms. */
+    @Post(':id/approve')
+    @Roles(Role.ADMIN, Role.OWNER)
+    approve(@Param('id') id: string, @Body('note') note: string, @Request() req) {
+        return this.ordersService.approveOrder(id, req.user.sub, note);
+    }
+
+    @Post(':id/reject')
+    @Roles(Role.ADMIN, Role.OWNER)
+    reject(@Param('id') id: string, @Body('reason') reason: string, @Request() req) {
+        return this.ordersService.rejectOrder(id, req.user.sub, reason);
+    }
+
+    @Post(':id/request-confirmation')
+    @Roles(Role.ADMIN, Role.OWNER)
+    requestConfirmation(@Param('id') id: string, @Request() req) {
+        return this.ordersService.requestReconfirmation(id, req.user.sub);
+    }
+
+    @Post(':id/amend')
+    @Roles(Role.ADMIN, Role.OWNER)
+    amend(@Param('id') id: string, @Body() body: any, @Request() req) {
+        return this.ordersService.amendOrder(id, req.user.sub, body);
+    }
+
+    @Get(':id/workflow')
+    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT, Role.MODERATOR, Role.LOGISTICS)
+    workflow(@Param('id') id: string) {
+        return this.ordersService.workflowForAdmin(id);
+    }
+
+    /** The buyer accepts confirmed terms that differ from what they submitted. */
+    @Post(':id/accept-terms')
+    @Roles(Role.CUSTOMER)
+    acceptTerms(@Param('id') id: string, @Body('version') version: number, @Request() req) {
+        return this.ordersService.buyerAcceptTerms(id, req.user.sub, version);
+    }
+
+    @Post(':id/inspections')
+    @Roles(Role.ADMIN, Role.OWNER, Role.LOGISTICS)
+    createInspection(@Param('id') id: string, @Body() body: any, @Request() req) {
+        return this.ordersService.saveInspection(id, req.user.sub, body);
+    }
+
+    @Patch(':id/inspections/:inspectionId')
+    @Roles(Role.ADMIN, Role.OWNER, Role.LOGISTICS)
+    updateInspection(@Param('id') id: string, @Param('inspectionId') inspectionId: string, @Body() body: any, @Request() req) {
+        return this.ordersService.saveInspection(id, req.user.sub, body, inspectionId);
     }
 
     @Patch('bulk-status')

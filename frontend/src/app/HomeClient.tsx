@@ -46,7 +46,7 @@ const HERO_SLIDES = [
     {
         title: 'From factory to warehouse,',
         accent: 'across borders',
-        desc: 'Consolidated logistics across Europe, with escrow-protected payments and documentation handled for you.',
+        desc: 'Consolidated logistics across Europe, with supplier-confirmed orders and documentation handled for you.',
     },
 ];
 
@@ -66,7 +66,7 @@ const HERO_IMAGES = [
 const HERO_HIGHLIGHTS = [
     { icon: ShieldCheck, title: 'Sold & shipped by Atlantis' },
     { icon: Layers, title: 'Case, pallet & truck pricing' },
-    { icon: CircleDollarSign, title: 'Escrow-protected payments' },
+    { icon: CircleDollarSign, title: 'Confirmed before you pay' },
     { icon: Truck, title: 'Delivery across Europe' },
 ];
 
@@ -135,7 +135,7 @@ const WHY_ATLANTIS = [
     { title: 'Transparent pricing', sub: 'Per-case prices in your currency, with volume tiers shown before you commit.', icon: CircleDollarSign },
     { title: 'Reliable logistics', sub: 'Consolidated shipping across Europe, tracked from warehouse to your door.', icon: Truck },
     { title: 'Dedicated account support', sub: 'A team that knows FMCG sourcing, from first quote to repeat orders.', icon: Headphones },
-    { title: 'Secure transactions', sub: 'Escrow-protected payments — funds released only when goods arrive.', icon: ShieldCheck },
+    { title: 'Secure transactions', sub: 'Every order is confirmed by the supplier and approved by Atlantis before you pay.', icon: ShieldCheck },
 ];
 
 /** Shared section header for consistent rhythm across the page. */

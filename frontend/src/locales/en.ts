@@ -383,6 +383,7 @@ export const en = {
     admin: {
         targetPriceRequests: "Target Prices",
         deliveryCountries: "Delivery Countries",
+        hubsRates: "Hubs & Freight Rates",
         emailSetup: "Email Setup & Preview",
         groupControlPanel: "Control Panel",
         panelTitle: "Control Panel",

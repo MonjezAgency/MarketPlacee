@@ -92,6 +92,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             { label: 'Global Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
             { label: 'Target Prices', translationKey: 'targetPriceRequests', href: '/admin/target-prices', icon: Target },
             { label: 'Delivery Countries', translationKey: 'deliveryCountries', href: '/admin/delivery', icon: Globe2 },
+            { label: 'Hubs & Freight Rates', translationKey: 'hubsRates', href: '/admin/fulfillment', icon: Truck },
             { label: 'Supply Chain', translationKey: 'suppliers', href: '/admin/suppliers', icon: Store },
             { label: 'B2B Customers', translationKey: 'buyers', href: '/admin/buyers', icon: Users },
             { label: 'Finance & Logistics', translationKey: 'groupFinance', href: '/admin/finance', icon: DollarSign },

@@ -46,7 +46,7 @@ export const metadata: Metadata = {
         default: "Atlantis | B2B Wholesale Distributor — Europe & Gulf",
         template: "%s | Atlantis Marketplace",
     },
-    description: "Buy bulk FMCG, beverages, electronics, and industrial products direct from Atlantis. Escrow-protected payments. EUR pricing. Built for Romania, Europe, and the Gulf.",
+    description: "Buy bulk FMCG, beverages, electronics, and industrial products direct from Atlantis. Supplier-confirmed orders. EUR pricing. Built for Romania, Europe, and the Gulf.",
     keywords: [
         "B2B marketplace",
         "wholesale platform",
@@ -86,7 +86,7 @@ export const metadata: Metadata = {
         type: 'website',
         siteName: 'Atlantis Marketplace',
         title: 'Atlantis | B2B Wholesale Distributor — Europe & Gulf',
-        description: 'Wholesale catalog sold and shipped by Atlantis. Escrow-protected payments. EUR pricing. The B2B wholesale distributor built for Europe and the Gulf.',
+        description: 'Wholesale catalog sold and shipped by Atlantis. Supplier-confirmed orders. EUR pricing. The B2B wholesale distributor built for Europe and the Gulf.',
         url: `${SITE_URL}/`,
         locale: 'en_US',
         alternateLocale: ['ar_EG', 'fr_FR', 'ro_RO'],
@@ -108,7 +108,7 @@ export const metadata: Metadata = {
     twitter: {
         card: 'summary_large_image',
         title: 'Atlantis | B2B Wholesale Distributor — Europe & Gulf',
-        description: 'Sold and shipped by Atlantis. Escrow-protected payments. EUR pricing. Source FMCG, electronics, industrial goods at scale.',
+        description: 'Sold and shipped by Atlantis. Supplier-confirmed orders. EUR pricing. Source FMCG, electronics, industrial goods at scale.',
         images: ['/og-image.png'],
     },
     robots: {
@@ -161,7 +161,7 @@ export default function RootLayout({
                             legalName: 'Atlantis Marketplace (operated by Monjez Company)',
                             url: `${SITE_URL}/`,
                             logo: `${SITE_URL}/icon.png`,
-                            description: 'B2B wholesale distributor selling FMCG, beverages and consumer goods directly to business buyers across Europe and the Gulf. EUR-native pricing, escrow-protected payments.',
+                            description: 'B2B wholesale distributor selling FMCG, beverages and consumer goods directly to business buyers across Europe and the Gulf. EUR-native pricing, supplier-confirmed orders.',
                             // sameAs populated so the entity is discoverable by AI
                             // search engines — the GEO audit flagged the empty
                             // array as one of the biggest brand-signal misses.

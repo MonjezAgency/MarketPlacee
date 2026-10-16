@@ -8,7 +8,7 @@ const STATS = [
     { value: 'EUR', label: 'Primary Currency', desc: 'Built for the European market' },
     { value: 'B2B', label: 'Exclusive Focus', desc: 'Business-to-business only' },
     { value: 'Atlantis', label: 'Direct Seller', desc: 'Sourced & shipped by us' },
-    { value: 'Escrow', label: 'Secure Payments', desc: 'Funds held until delivery confirmed' },
+    { value: 'Confirmed', label: 'Before You Pay', desc: 'Supplier-confirmed, Atlantis-approved terms' },
 ];
 
 const VALUES = [
@@ -39,7 +39,7 @@ const VALUES = [
     {
         icon: BarChart3,
         title: 'Transparency',
-        desc: 'Clear commission structure, real-time escrow status, and complete financial audit trails. No hidden fees, no surprises.',
+        desc: 'Clear pricing, versioned order terms and complete audit trails. No hidden fees, no surprises.',
         color: 'text-purple-500 bg-purple-500/10',
     },
     {
@@ -98,7 +98,7 @@ export default function AboutPage() {
                                         Traditional B2B sourcing involves endless email chains, PDF catalogs, wire transfers with no protection, and vendor relationships built on nothing more than hope.
                                     </p>
                                     <p>
-                                        We built Atlantis to change that. Developed by Monjez Company, our platform sells a curated wholesale catalog directly to business buyers in a secure, escrow-protected experience where every transaction is tracked and every payment is held until delivery is confirmed.
+                                        We built Atlantis to change that. Developed by Monjez Company, our platform sells a curated wholesale catalog directly to business buyers in a process where every order is confirmed by the supplier and approved by Atlantis before payment, and every change needs the buyer’s acceptance.
                                     </p>
                                     <p>
                                         Headquartered with a focus on Romania and the broader European market, we understand the regulatory requirements, currency considerations, and trust dynamics that make EU B2B commerce unique.
@@ -111,10 +111,10 @@ export default function AboutPage() {
                                     <span className="font-black text-sm">How we protect your money</span>
                                 </div>
                                 {[
-                                    'Customer pays → funds held in Stripe Escrow',
-                                    'Atlantis ships → customer gets a carrier tracking number',
-                                    'Customer confirms delivery → escrow releases',
-                                    'Funds settle to Atlantis → order closed',
+                                    'Buyer places an order request — nothing is charged',
+                                    'Supplier explicitly accepts the exact terms',
+                                    'Atlantis approves → buyer receives confirmed terms and payment details',
+                                    'Goods ship → buyer confirms delivery or reports an issue',
                                     'Dispute? Our team reviews and resolves fairly',
                                 ].map((step, i) => (
                                     <div key={i} className="flex items-start gap-3">

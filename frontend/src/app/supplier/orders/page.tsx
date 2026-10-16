@@ -8,6 +8,7 @@ import { apiFetch } from '@/lib/api';
 import { supplierApi } from '@/lib/supplier-api';
 import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Notice, PageHeader, Skeleton, Stat, StatusBadge, Thumb, eur, int, inputCls, shortDate, useConfirm } from '@/components/supplier/ui';
 import { cn } from '@/lib/utils';
+import type { SupplierWorkflow } from '@/lib/order-workflow';
 
 const VIEWS = [
     { id: 'action', label: 'Needs your action', match: (o: any) => o.needsAction },
@@ -19,7 +20,7 @@ const VIEWS = [
 ] as const;
 const TIER: Record<string, string> = { carton: 'case', case: 'case', pallet: 'pallet', truck: 'truck' };
 const ref = (id: string) => `#${id.slice(-8).toUpperCase()}`;
-const ORDER_STATUS_LABEL: Record<string, string> = { PENDING: 'Placed — awaiting your confirmation', PAID: 'Paid', PROCESSING: 'Confirmed — preparing', SHIPPED: 'Shipped', DELIVERED: 'Delivered', CANCELLED: 'Cancelled' };
+const ORDER_STATUS_LABEL: Record<string, string> = { PENDING: 'Placed — awaiting confirmation', PAID: 'Paid', PROCESSING: 'Confirmed — preparing', SHIPPED: 'Shipped', DELIVERED: 'Delivered', CANCELLED: 'Cancelled' };
 
 /** Orders — orders containing this supplier's products, with confirm / decline. */
 export default function SupplierOrdersPage() {
@@ -110,8 +111,18 @@ function OrderRow({ o, onChanged, onDecline }: { o: any; onChanged: () => void; 
     const [busy, setBusy] = React.useState(false);
     const [expanded, setExpanded] = React.useState(o.needsAction);
 
+    const wf = o.workflow as SupplierWorkflow | null;
     const accept = async () => {
-        const ok = await confirm({
+        const ok = wf ? await confirm({
+            title: `Accept the terms for order ${ref(o.id)}?`,
+            body: <>
+                <p>You confirm you can supply exactly these lines at these net prices, and dispatch within the lead time on your listing{wf.terms?.fulfillment ? ` (${wf.terms.fulfillment.label.toLowerCase()})` : ''}.</p>
+                <ul className="mt-2 list-disc ps-5 text-[13px]">{(wf.terms?.lines || []).map((l, n) => <li key={n}>{l.quantity} × {TIER[l.tier || ''] || 'case'} — {l.name}{l.unitNet != null ? ` at ${eur(l.unitNet)}` : ''}</li>)}</ul>
+                {wf.terms && <p className="mt-2 text-[13px] font-semibold text-ink">Your net total: {eur(wf.terms.netTotal)}</p>}
+                <p className="mt-2 text-ink-3 text-[13px]">This doesn’t confirm the order yet: Atlantis approves it once every supplier on it has accepted. If the terms change, you’ll be asked again.</p>
+            </>,
+            confirm: `Accept terms v${wf.termsVersion}`,
+        }) : await confirm({
             title: `Confirm order ${ref(o.id)}?`,
             body: <>
                 <p>You’re confirming you can supply these lines. The stock for them was already reserved when the buyer ordered, so nothing more is deducted.</p>
@@ -122,7 +133,7 @@ function OrderRow({ o, onChanged, onDecline }: { o: any; onChanged: () => void; 
         });
         if (!ok) return;
         setBusy(true);
-        try { await supplierApi.acceptOrder(o.id); toast.success(`Order ${ref(o.id)} confirmed`); onChanged(); }
+        try { await supplierApi.acceptOrder(o.id); toast.success(wf ? `Terms accepted — Atlantis will approve order ${ref(o.id)}` : `Order ${ref(o.id)} confirmed`); onChanged(); }
         catch (e: any) { toast.error(e.message); onChanged(); }
         finally { setBusy(false); }
     };
@@ -137,6 +148,7 @@ function OrderRow({ o, onChanged, onDecline }: { o: any; onChanged: () => void; 
                             <span className="font-semibold text-heading tabular-nums group-hover:underline">Order {ref(o.id)}</span>
                             <StatusBadge kind="order" status={o.status} />
                             {o.sharedOrder && <Badge tone="neutral">Includes other suppliers</Badge>}
+                            {wf?.label && <Badge tone={wf.myConfirmation?.status === 'PENDING' ? 'warning' : wf.myConfirmation?.status === 'REJECTED' || wf.myConfirmation?.status === 'EXPIRED' ? 'danger' : 'neutral'}>{wf.label}</Badge>}
                         </span>
                         <span className="block mt-0.5 text-[12.5px] text-ink-3">{shortDate(o.createdAt)} · buyer {o.buyer?.name || 'Customer'} · {o.items.length} line{o.items.length === 1 ? '' : 's'} · {int(o.items.reduce((s: number, i: any) => s + (i.cases || 0), 0))} cases</span>
                     </span>
@@ -146,9 +158,12 @@ function OrderRow({ o, onChanged, onDecline }: { o: any; onChanged: () => void; 
                     <p className="text-[12px] text-ink-3">{o.valueEstimated ? 'estimated · your price' : 'your price'}</p>
                 </div>
                 {o.needsAction && (
-                    <div className="flex gap-2 w-full sm:w-auto">
-                        <Button variant="secondary" icon={<X size={14} />} onClick={onDecline} disabled={busy}>Decline</Button>
-                        <Button variant="primary" icon={<Check size={14} />} loading={busy} onClick={accept}>Confirm</Button>
+                    <div className="flex flex-col items-stretch sm:items-end gap-1 w-full sm:w-auto">
+                        <div className="flex gap-2">
+                            <Button variant="secondary" icon={<X size={14} />} onClick={onDecline} disabled={busy}>{wf ? 'Reject' : 'Decline'}</Button>
+                            <Button variant="primary" icon={<Check size={14} />} loading={busy} onClick={accept}>{wf ? 'Accept terms' : 'Confirm'}</Button>
+                        </div>
+                        {wf?.myConfirmation?.deadline && <p className="text-[12px] text-ink-3">Answer by {new Date(wf.myConfirmation.deadline).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>}
                     </div>
                 )}
             </div>
@@ -200,6 +215,14 @@ function OrderRow({ o, onChanged, onDecline }: { o: any; onChanged: () => void; 
                         </ol>
                     )}
                     {o.valueEstimated && <p className="text-[12px] text-ink-3">This order was placed before your price was recorded on each line, so its value is estimated from your current price.</p>}
+                    {wf?.terms?.fulfillment && (
+                        <div className="rounded-lg bg-surface-2/60 p-3 text-[12.5px]">
+                            <p className="font-medium text-ink">{wf.terms.fulfillment.label}{wf.terms.fulfillment.status !== 'priced' ? <span className="font-normal text-ink-3"> · freight quoted by Atlantis</span> : null}</p>
+                            <p className="text-ink-3 mt-0.5">{wf.terms.fulfillment.handover}</p>
+                            {wf.terms.fulfillment.supplierCharges.map((c, n) => <p key={n} className="text-ink-2 mt-0.5">{c.label} — {c.basis}: <span className="tabular-nums">{eur(c.amount)}</span> (paid to you on top of your net price)</p>)}
+                        </div>
+                    )}
+                    {wf?.myConfirmation?.status === 'EXPIRED' && <Notice tone="warning">The time to answer passed. Atlantis can ask you again — contact support if you can still supply this order.</Notice>}
                     {o.status === 'PROCESSING' && <p className="text-[12.5px] text-ink-3">Next: Atlantis books transport and marks the order shipped. Prepare the goods at your EXW location.</p>}
                     {['PROCESSING', 'SHIPPED', 'DELIVERED'].includes(o.status) && <InvoiceAttachment orderId={o.id} initial={o.supplierInvoiceUrl} />}
                 </div>
@@ -217,16 +240,18 @@ function DeclineDialog({ order, onClose, onDone }: { order: any | null; onClose:
     const submit = async () => {
         if (reason.trim().length < 5) { setErr('Give the buyer a short reason (at least 5 characters).'); return; }
         setBusy(true); setErr(null);
-        try { await supplierApi.declineOrder(order.id, reason.trim()); toast.success(`Order ${ref(order.id)} declined — stock returned.`); onDone(); }
+        try { await supplierApi.declineOrder(order.id, reason.trim()); toast.success(order.workflow && order.sharedOrder ? `Rejection sent to Atlantis for order ${ref(order.id)}.` : `Order ${ref(order.id)} declined — stock returned.`); onDone(); }
         catch (e: any) { setErr(e.message); }
         finally { setBusy(false); }
     };
     return (
-        <Dialog open={!!order} onClose={onClose} title={`Decline order ${ref(order.id)}?`} size="sm"
+        <Dialog open={!!order} onClose={onClose} title={order.workflow ? `Reject the terms for order ${ref(order.id)}?` : `Decline order ${ref(order.id)}?`} size="sm"
             footer={order.canDecline ? <><Button variant="secondary" onClick={onClose}>Keep order</Button><Button variant="danger" loading={busy} onClick={submit}>Decline order</Button></> : <Button variant="primary" onClick={onClose}>OK</Button>}>
             {order.canDecline ? (
                 <div className="space-y-3">
-                    <p className="text-[13.5px] text-ink-2">The order is cancelled, the reserved cases go back to your stock, and the buyer is told why.</p>
+                    <p className="text-[13.5px] text-ink-2">{order.workflow && order.sharedOrder
+                        ? 'Atlantis is told what you can’t supply and decides with the buyer — the order may be changed (you’d be asked again) or cancelled.'
+                        : 'The order is cancelled, the reserved cases go back to your stock, and the buyer is told why.'}</p>
                     <label htmlFor="decline-reason" className="block text-[13px] font-medium text-ink-2">Reason for the buyer <span className="text-red-600">*</span></label>
                     <textarea id="decline-reason" data-autofocus value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={500} className={cn(inputCls, 'h-auto py-2')} placeholder="e.g. This batch sold out; next availability in 3 weeks." />
                     {err && <p role="alert" className="text-[12.5px] text-red-700">{err}</p>}

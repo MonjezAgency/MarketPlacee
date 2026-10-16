@@ -1,5 +1,5 @@
 import { missingProfileFields } from '../users/profile-completion';
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException, ConflictException, Optional } from '@nestjs/common';
 import { OrderStatus } from '@prisma/client';
 import { PrismaService } from '../common/prisma.service';
 import { EmailService } from '../email/email.service';
@@ -12,6 +12,8 @@ import { checkDestination, loadDeliveryCountries } from '../shipping/delivery-po
 import { PricingError, basePerCase, casesInUnit, normaliseTier, offerFactor, priceLine, priceLoad, round2 } from './pricing';
 import { casesForItem, supplierLineValue } from '../products/stock-ledger';
 import { minOrderCases } from '../common/markups';
+import { FulfillmentService } from '../fulfillment/fulfillment.service';
+import { DEFAULT_CONFIRM_HOURS, answeredVersion, approvalBlocker, buyerMustAccept, confirmationState, partyStatus, supplierView, termsHash, workflowBlocker, type Terms } from './order-workflow';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
     PENDING: 'Pending',
@@ -74,6 +76,8 @@ export class OrdersService {
         private escrowService: EscrowService,
         private appConfigService: AppConfigService,
         private mixedLoads: MixedLoadsService,
+        /** Optional so unit tests can build the service without it; then delivery is always "quoted after the order". */
+        @Optional() private fulfillment?: FulfillmentService,
     ) { }
 
     /**
@@ -93,6 +97,7 @@ export class OrdersService {
         shippingCompany?: string | null,
         shippingCost?: number | null,
         trackingNumber?: string | null,
+        actorId?: string,
     ) {
         // 1. Order-level fields
         const orderData: any = {};
@@ -102,7 +107,33 @@ export class OrdersService {
                 : Number(shippingCost) >= 0 ? Number(shippingCost) : null;
         }
         if (Object.keys(orderData).length > 0) {
-            await this.prisma.order.update({ where: { id: orderId }, data: orderData });
+            const current: any = await this.prisma.order.findUnique({ where: { id: orderId }, select: { shippingCost: true, reviewStatus: true, termsVersion: true, status: true, customerId: true } });
+            if (!current) throw new NotFoundException('Order not found');
+            // The delivery charge is a material term: on a workflow order a new value is a new terms
+            // version, which the buyer must accept before the order ships (suppliers are unaffected).
+            const freightChanged = 'shippingCost' in orderData && (orderData.shippingCost ?? null) !== (current.shippingCost ?? null);
+            if (freightChanged && ['PENDING_REVIEW', 'APPROVED'].includes(current.reviewStatus)) {
+                if (['SHIPPED', 'DELIVERED', 'CANCELLED'].includes(current.status)) throw new ConflictException({ code: 'TERMS_LOCKED', message: 'The delivery charge can’t change after the order has shipped or was cancelled.' });
+                const version = current.termsVersion + 1;
+                orderData.termsVersion = version;
+                await this.prisma.$transaction(async (tx) => {
+                    await tx.order.update({ where: { id: orderId }, data: orderData });
+                    if (current.reviewStatus === 'PENDING_REVIEW') {
+                        // Suppliers' answers carry over: their part of the terms didn't change.
+                        const prev = await tx.orderSupplierConfirmation.findMany({ where: { orderId, termsVersion: current.termsVersion } });
+                        for (const c of prev) await tx.orderSupplierConfirmation.create({ data: { orderId, supplierId: c.supplierId, termsVersion: version, status: c.status === 'SUPERSEDED' ? 'PENDING' : c.status, deadline: c.deadline, decidedAt: c.decidedAt, decidedById: c.decidedById, note: c.note } });
+                        await tx.orderSupplierConfirmation.updateMany({ where: { orderId, termsVersion: current.termsVersion }, data: { status: 'SUPERSEDED' } });
+                    } else {
+                        const o: any = await tx.order.findUnique({ where: { id: orderId }, include: { items: { include: { product: { select: { supplierId: true, name: true } } } } } });
+                        const terms = this.termsFromOrder(o);
+                        await tx.order.update({ where: { id: orderId }, data: { termsSnapshot: { ...terms, hash: termsHash(terms), approvedAt: (o.termsSnapshot as any)?.approvedAt ?? null, amendedAt: new Date().toISOString() } as any } });
+                    }
+                    await tx.orderStatusHistory.create({ data: { orderId, previousStatus: current.status, newStatus: current.status, changedById: actorId || current.customerId, reason: `Delivery charge ${orderData.shippingCost == null ? 'cleared' : `set to €${Number(orderData.shippingCost).toFixed(2)}`} — terms v${version}, buyer acceptance needed` } });
+                });
+                this.notificationsService.create(current.customerId, `Order #${orderId.slice(-8).toUpperCase()}: delivery charge ${orderData.shippingCost == null ? 'removed' : 'quoted'}`, 'Review the updated terms and accept them on the order page.', 'INFO', { orderId }).catch(() => {});
+            } else {
+                await this.prisma.order.update({ where: { id: orderId }, data: orderData });
+            }
         }
 
         // 2. Shipment-level fields (tracking + carrier)
@@ -161,7 +192,7 @@ export class OrdersService {
      * (pack sizes, markups, MOQ, mixed-load capacity) — client prices are
      * never trusted. Used by POST /orders/quote and by create().
      */
-    async priceCart(customerId: string, items: any[], couponCode?: string | null, db: any = this.prisma, opts: { lenient?: boolean } = {}) {
+    async priceCart(customerId: string, items: any[], couponCode?: string | null, db: any = this.prisma, opts: { lenient?: boolean; destination?: string | null } = {}) {
         if (!Array.isArray(items) || items.length === 0) throw new BadRequestException({ code: 'EMPTY_CART', message: 'Your cart is empty.' });
         if (items.length > 200) throw new BadRequestException({ code: 'TOO_MANY_LINES', message: 'Too many cart lines in one order.' });
         const markups = await this.mixedLoads.markups();
@@ -255,7 +286,15 @@ export class OrdersService {
             appliedCoupon = c.code;
         }
         const discount = round2(subtotal * discountPercent / 100);
-        return { lines, subtotal, discountPercent, discount, coupon: appliedCoupon, total: round2(subtotal - discount), markups };
+        // Delivery for the priced lines, from the one shared calculation (no rate → quoted after the order).
+        let fulfillment: any = null;
+        if (this.fulfillment) {
+            const ok = lines.filter((l) => !l.error);
+            const extra = ok.flatMap((l) => (Array.isArray(l.mixComposition) ? l.mixComposition.map((c: any) => c.productId) : [])).filter((id: string) => id && !products.has(id));
+            const all = extra.length ? new Map([...products, ...(await this.mixedLoads.loadProducts(extra, db))]) : products;
+            fulfillment = ok.length ? await this.fulfillment.forQuote(ok, all, opts.destination ?? null) : null;
+        }
+        return { lines, subtotal, discountPercent, discount, coupon: appliedCoupon, total: round2(subtotal - discount), markups, fulfillment };
     }
 
     /** Deepest approved, unexpired offer per product (same rule the product page uses). */
@@ -308,7 +347,7 @@ export class OrdersService {
         const dest = checkDestination(address.country, countries);
         if (!dest.supported) throw new BadRequestException({ code: 'DESTINATION_UNSUPPORTED', message: dest.message, country: dest.code });
 
-        const quote = await this.priceCart(customerId, items, opts.couponCode);
+        const quote = await this.priceCart(customerId, items, opts.couponCode, this.prisma, { destination: dest.code });
         // The buyer must have seen the server price. If the client total
         // disagrees (prices / markups changed since the cart was built),
         // refuse and return the server figures so the UI can refresh.
@@ -340,8 +379,13 @@ export class OrdersService {
                         totalAmount: quote.total,
                         shippingCompany: shippingCompany ?? null,
                         customerShippingCompany: shippingCompany ?? null,
-                        // Freight is quoted by Atlantis after the order; a client figure is never stored as the cost.
-                        shippingCost: null,
+                        // Freight comes only from the server's fulfilment calculation (all routes priced);
+                        // otherwise Atlantis quotes it after the order. A client figure is never stored.
+                        shippingCost: quote.fulfillment?.status === 'priced' ? quote.fulfillment.freightTotal : null,
+                        fulfillment: quote.fulfillment ?? undefined,
+                        reviewStatus: 'PENDING_REVIEW',
+                        termsVersion: 1,
+                        submittedTerms: this.termsFromQuote(quote, 1, dest.code) as any,
                         shippingAddress: { ...address, country: dest.name },
                         destinationCountry: dest.code,
                         status: OrderStatus.PENDING,
@@ -363,6 +407,10 @@ export class OrdersService {
                     },
                     include: { items: true, history: true, customer: { select: { email: true, name: true } } },
                 });
+                // Every supplier on the order must explicitly accept these exact terms before Atlantis can approve.
+                const deadline = new Date(Date.now() + (await this.confirmHours()) * 3600_000);
+                const supplierIds = [...new Set(quote.lines.map((l: any) => l.supplierId).filter(Boolean))] as string[];
+                if (supplierIds.length) await tx.orderSupplierConfirmation.createMany({ data: supplierIds.map((supplierId) => ({ orderId: created.id, supplierId, termsVersion: 1, deadline })) });
                 // Lock each mixed load to this order; if another submit got there first, roll back.
                 for (const l of quote.lines) {
                     if (!l.mixedLoadId) continue;
@@ -570,6 +618,7 @@ export class OrdersService {
                         },
                     },
                     shipment: { select: { trackingNumber: true, carrier: true, status: true, expectedDelivery: true } },
+                    confirmations: { select: { supplierId: true, termsVersion: true, status: true, deadline: true } },
                 },
                 orderBy: { createdAt: 'desc' },
                 skip,
@@ -577,7 +626,14 @@ export class OrdersService {
             }),
             this.prisma.order.count({ where: { customerId, deletedByCustomer: false } }),
         ]);
-        return { data: orders, total, page, limit, totalPages: Math.ceil(total / limit) };
+        // Raw terms carry supplier ids and supplier prices — buyers get only their own status.
+        const data = orders.map((o: any) => {
+            const { submittedTerms, termsSnapshot, fulfillment, confirmations, reviewedById, ...safe } = o;
+            void submittedTerms; void termsSnapshot; void fulfillment; void reviewedById;
+            const state = confirmationState(confirmations || [], answeredVersion(confirmations || [], o.termsVersion), [...new Set<string>((confirmations || []).map((c: any) => c.supplierId))]);
+            return { ...safe, workflow: o.reviewStatus === 'LEGACY' ? null : { reviewStatus: o.reviewStatus, termsVersion: o.termsVersion, party: partyStatus(o, state), buyerMustAccept: buyerMustAccept(o) } };
+        });
+        return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
     }
 
     async findByIdForBuyer(orderId: string, customerId: string) {
@@ -611,14 +667,22 @@ export class OrdersService {
                         expectedDelivery: true,
                     },
                 },
+                confirmations: { select: { supplierId: true, termsVersion: true, status: true, deadline: true, decidedAt: true } },
+                inspections: { orderBy: { createdAt: 'desc' } },
             },
         });
         if (!order) throw new NotFoundException('Order not found');
+        const workflow = this.workflowForBuyer(order);
+        // Raw terms carry supplier ids and supplier prices — only the buyer view leaves the server.
+        const { submittedTerms, termsSnapshot, fulfillment, confirmations, inspections, reviewedById, ...safe } = order as any;
+        void submittedTerms; void termsSnapshot; void fulfillment; void confirmations; void reviewedById;
 
         // Flatten shipment fields into the response so the existing
         // `order.trackingNumber` / `order.carrier` UI keeps working.
         return {
-            ...order,
+            ...safe,
+            workflow,
+            inspections: (inspections || []).map((i: any) => this.inspectionView(i, order.items)),
             trackingNumber: order.shipment?.trackingNumber ?? null,
             carrier: order.shipment?.carrier ?? null,
             expectedDelivery: order.shipment?.expectedDelivery ?? null,
@@ -637,6 +701,7 @@ export class OrdersService {
                     include: { product: { select: { id: true, name: true, images: true, supplierId: true, ean: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, stock: true, basePrice: true } } },
                 },
                 history: { orderBy: { createdAt: 'asc' }, select: { reason: true, newStatus: true, previousStatus: true, createdAt: true } },
+                confirmations: { where: { supplierId } },
             },
             orderBy: { createdAt: 'desc' },
         });
@@ -663,15 +728,31 @@ export class OrdersService {
             const subtotal = Math.round(values.reduce((s: number, v) => s + v.total, 0) * 100) / 100;
             const hist = ((order as any).history || []) as any[];
             const lastReason = hist.length ? hist[hist.length - 1].reason : null;
+            const o: any = order;
+            const workflowOrder = o.reviewStatus !== 'LEGACY';
+            const mine = (o.confirmations || []).find((c: any) => c.termsVersion === answeredVersion(o.confirmations || [], o.termsVersion)) || null;
+            const mineStatus = mine ? (mine.status === 'PENDING' && mine.deadline && new Date(mine.deadline).getTime() < Date.now() ? 'EXPIRED' : mine.status) : null;
+            const terms = workflowOrder ? (o.termsSnapshot || o.submittedTerms) : null;
+            const awaitingMe = workflowOrder ? o.reviewStatus === 'PENDING_REVIEW' && AWAITING_SUPPLIER.includes(o.status) && mineStatus === 'PENDING' : AWAITING_SUPPLIER.includes(order.status as OrderStatus);
             return {
             id: order.id,
             status: order.status,
+            // Confirmation workflow, from this supplier's side only.
+            workflow: workflowOrder ? {
+                reviewStatus: o.reviewStatus, termsVersion: o.termsVersion, myConfirmation: mine ? { status: mineStatus, deadline: mine.deadline, decidedAt: mine.decidedAt, note: mine.note } : null,
+                label: mineStatus === 'ACCEPTED' && o.reviewStatus === 'PENDING_REVIEW' ? 'Accepted — awaiting Atlantis approval'
+                    : mineStatus === 'PENDING' && o.reviewStatus === 'PENDING_REVIEW' ? 'Your confirmation is needed'
+                        : mineStatus === 'EXPIRED' ? 'Confirmation time passed' : mineStatus === 'REJECTED' ? 'You rejected these terms'
+                            : o.reviewStatus === 'APPROVED' ? 'Approved by Atlantis' : o.reviewStatus === 'REJECTED' ? 'Rejected' : null,
+                terms: terms ? supplierView({ ...terms, version: o.termsVersion }, supplierId) : null,
+            } : null,
             // Value of THIS supplier's lines at the supplier's own prices (EUR).
             supplierSubtotal: subtotal,
             valueEstimated: values.some((v) => v.estimated),
             timeline: hist.map((h) => ({ status: h.newStatus, at: h.createdAt, note: h.reason ?? null })),
-            needsAction: AWAITING_SUPPLIER.includes(order.status as OrderStatus),
-            canDecline: AWAITING_SUPPLIER.includes(order.status as OrderStatus) && allMine,
+            needsAction: awaitingMe,
+            // Workflow orders: any supplier may reject their part; legacy orders only when the whole order is theirs.
+            canDecline: awaitingMe && (workflowOrder || allMine),
             sharedOrder: !allMine,
             lastStatusNote: lastReason,
             supplierInvoiceUrl: (order as any).supplierInvoiceUrl ?? null,
@@ -772,15 +853,23 @@ export class OrdersService {
     async supplierAccept(orderId: string, supplierId: string) {
         const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { items: { include: { product: { select: { supplierId: true, stock: true, name: true } } } } } });
         if (!order || !order.items.some((i: any) => i.product?.supplierId === supplierId)) throw new NotFoundException('Order not found');
-        // Stock for these lines was taken when the order was placed, so
-        // confirming never oversells; nothing more is deducted here.
-        return this.internalUpdateStatus(orderId, OrderStatus.PROCESSING, supplierId, 'Confirmed by supplier', AWAITING_SUPPLIER);
+        // Orders placed before the confirmation workflow keep the old behaviour.
+        if ((order as any).reviewStatus === 'LEGACY') {
+            return this.internalUpdateStatus(orderId, OrderStatus.PROCESSING, supplierId, 'Confirmed by supplier', AWAITING_SUPPLIER, { viaApproval: true });
+        }
+        const conf = await this.decide(order as any, supplierId, 'ACCEPTED');
+        const state = await this.stateOf(order as any);
+        await this.log(orderId, order.status, supplierId, `Supplier accepted terms v${(order as any).termsVersion}`);
+        if (state.allAccepted) {
+            this.notificationsService.notifyAdmins('Order ready for approval', `Order #${orderId.slice(-8).toUpperCase()}: every supplier accepted the terms. Review and approve it.`, 'INFO', { orderId }).catch(() => {});
+        }
+        return { id: orderId, status: order.status, reviewStatus: (order as any).reviewStatus, confirmation: conf, allSuppliersAccepted: state.allAccepted };
     }
 
     /**
-     * Supplier declines an order before confirming it. Only possible when every
-     * line on the order is theirs — otherwise other suppliers' goods would be
-     * cancelled too, so Atlantis handles it.
+     * Supplier rejects the current terms, with a reason. A single-supplier order
+     * is cancelled (stock returned); on a shared order the rejection is recorded
+     * and Atlantis decides — amend the order or reject it.
      */
     async supplierReject(orderId: string, supplierId: string, reason: string) {
         const text = String(reason || '').trim();
@@ -788,11 +877,339 @@ export class OrdersService {
         const order = await this.prisma.order.findUnique({ where: { id: orderId }, include: { items: { include: { product: { select: { supplierId: true } } } } } });
         if (!order || !order.items.some((i: any) => i.product?.supplierId === supplierId)) throw new NotFoundException('Order not found');
         const othersOnOrder = order.items.some((i: any) => i.product?.supplierId !== supplierId || i.mixedLoadId);
-        if (othersOnOrder) {
-            this.notificationsService.notifyAdmins('Supplier can’t fulfil part of an order', `Order #${orderId.slice(-8).toUpperCase()}: a supplier asked to decline their lines. Reason: ${text.slice(0, 300)}`, 'WARNING', { orderId, supplierId }).catch(() => {});
-            throw new ConflictException({ code: 'SHARED_ORDER', message: 'This order also contains other suppliers’ products, so it can’t be declined from here. We’ve told the Atlantis team — they will contact you.' });
+        if ((order as any).reviewStatus === 'LEGACY') {
+            if (othersOnOrder) {
+                this.notificationsService.notifyAdmins('Supplier can’t fulfil part of an order', `Order #${orderId.slice(-8).toUpperCase()}: a supplier asked to decline their lines. Reason: ${text.slice(0, 300)}`, 'WARNING', { orderId, supplierId }).catch(() => {});
+                throw new ConflictException({ code: 'SHARED_ORDER', message: 'This order also contains other suppliers’ products, so it can’t be declined from here. We’ve told the Atlantis team — they will contact you.' });
+            }
+            return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, supplierId, `Declined by supplier: ${text.slice(0, 500)}`, AWAITING_SUPPLIER);
         }
-        return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, supplierId, `Declined by supplier: ${text.slice(0, 500)}`, AWAITING_SUPPLIER);
+        await this.decide(order as any, supplierId, 'REJECTED', text.slice(0, 500));
+        if (!othersOnOrder) {
+            await this.prisma.order.update({ where: { id: orderId }, data: { reviewStatus: 'REJECTED', reviewNote: `Rejected by the supplier: ${text.slice(0, 500)}` } });
+            return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, supplierId, `Declined by supplier: ${text.slice(0, 500)}`, AWAITING_SUPPLIER);
+        }
+        await this.log(orderId, order.status, supplierId, `A supplier rejected terms v${(order as any).termsVersion}: ${text.slice(0, 300)}`);
+        this.notificationsService.notifyAdmins('Supplier rejected an order', `Order #${orderId.slice(-8).toUpperCase()}: a supplier rejected the terms. Reason: ${text.slice(0, 300)}. Amend the order or reject it.`, 'WARNING', { orderId, supplierId }).catch(() => {});
+        return { id: orderId, status: order.status, reviewStatus: (order as any).reviewStatus, rejected: true };
+    }
+
+    // ─── Confirmation workflow ───────────────────────────────────────
+
+    private async confirmHours(): Promise<number> {
+        const row = await this.prisma.appConfig.findUnique({ where: { key: 'ORDER_SUPPLIER_CONFIRM_HOURS' } }).catch(() => null);
+        const n = Number(row?.value);
+        return Number.isFinite(n) && n >= 1 && n <= 24 * 30 ? n : DEFAULT_CONFIRM_HOURS;
+    }
+
+    /** Terms as they stand: lines with buyer and supplier prices, freight, fulfilment, destination. */
+    termsFromQuote(quote: any, version: number, destinationCountry: string | null): Terms {
+        const lines = (quote.lines || []).filter((l: any) => !l.error).map((l: any) => ({
+            productId: l.productId ?? null, name: l.name, tier: l.tier ?? null, quantity: l.quantity, unitPrice: l.price, lineTotal: l.lineTotal,
+            supplierId: l.supplierId ?? null, supplierUnitPrice: typeof l.supplierUnitPrice === 'number' ? l.supplierUnitPrice : null,
+            selectedVariants: l.selectedVariants ?? null, mixedLoadId: l.mixedLoadId ?? null,
+        }));
+        const f = quote.fulfillment;
+        return {
+            version, currency: 'EUR', lines, goodsTotal: quote.total, coupon: quote.coupon ?? null,
+            freight: { amount: f?.status === 'priced' ? f.freightTotal : null, status: f?.status === 'priced' ? 'priced' : 'quote_required' },
+            fulfillment: f ?? null, destinationCountry,
+        };
+    }
+
+    /** Current terms rebuilt from the saved order (used after amendments and on approval). */
+    private termsFromOrder(order: any): Terms {
+        const prev = (order.termsSnapshot || order.submittedTerms || {}) as any;
+        const supplierOf = new Map<string, string | null>((prev.lines || []).map((l: any) => [l.mixedLoadId || l.productId, l.supplierId]));
+        const lines = (order.items || []).map((i: any) => ({
+            itemId: i.id, productId: i.productId, name: i.productNameSnapshot || i.product?.name || 'Product', tier: i.selectedTier ?? null,
+            quantity: i.quantity, unitPrice: i.price, lineTotal: round2(i.price * i.quantity),
+            supplierId: i.product?.supplierId ?? supplierOf.get(i.mixedLoadId || i.productId) ?? null,
+            supplierUnitPrice: typeof i.supplierUnitPrice === 'number' ? i.supplierUnitPrice : null,
+            selectedVariants: i.selectedVariants ?? null, mixedLoadId: i.mixedLoadId ?? null,
+        }));
+        return {
+            version: order.termsVersion, currency: 'EUR', lines, goodsTotal: order.totalAmount, coupon: prev.coupon ?? null,
+            freight: { amount: order.shippingCost ?? null, status: order.shippingCost != null ? (prev.freight?.status === 'priced' && prev.freight?.amount === order.shippingCost ? 'priced' : 'set_by_atlantis') : 'quote_required', carrier: order.shippingCompany ?? null },
+            fulfillment: order.fulfillment ?? null, destinationCountry: order.destinationCountry ?? null,
+        };
+    }
+
+    private async supplierIdsOf(orderId: string): Promise<string[]> {
+        const rows = await this.prisma.orderSupplierConfirmation.findMany({ where: { orderId }, select: { supplierId: true } });
+        return [...new Set(rows.map((r) => r.supplierId))];
+    }
+
+    private async stateOf(order: { id: string; termsVersion: number }) {
+        const confs = await this.prisma.orderSupplierConfirmation.findMany({ where: { orderId: order.id } });
+        return confirmationState(confs as any, order.termsVersion, [...new Set(confs.map((c) => c.supplierId))]);
+    }
+
+    /** Record one supplier's decision on the current terms version. */
+    private async decide(order: { id: string; status: string; reviewStatus: string; termsVersion: number }, supplierId: string, decision: 'ACCEPTED' | 'REJECTED', note?: string) {
+        if (order.reviewStatus !== 'PENDING_REVIEW' || !['PENDING', 'PAID'].includes(order.status)) {
+            throw new ConflictException({ code: 'NOT_AWAITING_SUPPLIER', message: order.reviewStatus === 'APPROVED' ? 'This order is already approved by Atlantis.' : 'This order isn’t waiting for your confirmation.' });
+        }
+        const conf = await this.prisma.orderSupplierConfirmation.findUnique({ where: { orderId_supplierId_termsVersion: { orderId: order.id, supplierId, termsVersion: order.termsVersion } } });
+        if (!conf) throw new ConflictException({ code: 'NO_CONFIRMATION', message: 'There is nothing for you to confirm on this order.' });
+        if (conf.status === 'PENDING' && conf.deadline && conf.deadline.getTime() < Date.now()) {
+            await this.prisma.orderSupplierConfirmation.update({ where: { id: conf.id }, data: { status: 'EXPIRED' } });
+            throw new ConflictException({ code: 'CONFIRMATION_EXPIRED', message: 'The time to confirm this order has passed. Atlantis will contact you if the buyer still wants it.' });
+        }
+        if (conf.status !== 'PENDING') throw new ConflictException({ code: 'ALREADY_DECIDED', message: `You already ${conf.status === 'ACCEPTED' ? 'accepted' : 'answered'} these terms.` });
+        // Only a still-pending row changes: a double click can't decide twice.
+        const res = await this.prisma.orderSupplierConfirmation.updateMany({ where: { id: conf.id, status: 'PENDING' }, data: { status: decision, decidedAt: new Date(), decidedById: supplierId, note: note ?? null } });
+        if (!res.count) throw new ConflictException({ code: 'ALREADY_DECIDED', message: 'You already answered these terms.' });
+        return { ...conf, status: decision, decidedAt: new Date(), note: note ?? null };
+    }
+
+    private async log(orderId: string, status: OrderStatus | string, actorId: string, reason: string) {
+        await this.prisma.orderStatusHistory.create({ data: { orderId, previousStatus: status as OrderStatus, newStatus: status as OrderStatus, changedById: actorId, reason: reason.slice(0, 1000) } }).catch(() => {});
+    }
+
+    private async loadForWorkflow(orderId: string) {
+        const order: any = await this.prisma.order.findUnique({ where: { id: orderId }, include: { items: { include: { product: { select: { supplierId: true, name: true } } } }, confirmations: true, customer: { select: { id: true, email: true, name: true } } } });
+        if (!order) throw new NotFoundException('Order not found');
+        return order;
+    }
+
+    /**
+     * Atlantis approves the order. Only possible when every supplier accepted
+     * the current terms in time. The approved terms are frozen; the order
+     * becomes Confirmed and the buyer gets the terms and payment instructions.
+     */
+    async approveOrder(orderId: string, adminId: string, note?: string) {
+        const order = await this.loadForWorkflow(orderId);
+        const state = confirmationState(order.confirmations, order.termsVersion, [...new Set<string>(order.confirmations.map((c: any) => c.supplierId))]);
+        const blocker = approvalBlocker(order, state);
+        if (blocker) throw new ConflictException({ code: 'CANNOT_APPROVE', message: blocker });
+        const terms = this.termsFromOrder(order);
+        const moved = await this.prisma.order.updateMany({ where: { id: orderId, reviewStatus: 'PENDING_REVIEW', termsVersion: order.termsVersion }, data: { reviewStatus: 'APPROVED', reviewedAt: new Date(), reviewedById: adminId, reviewNote: note ? String(note).slice(0, 1000) : null, termsSnapshot: { ...terms, hash: termsHash(terms), approvedAt: new Date().toISOString() } as any } });
+        if (!moved.count) throw new ConflictException({ code: 'ORDER_CHANGED', message: 'This order changed while you were reviewing it. Refresh and try again.' });
+        const updated = await this.internalUpdateStatus(orderId, OrderStatus.PROCESSING, adminId, `Approved by Atlantis (terms v${order.termsVersion})${note ? `: ${String(note).slice(0, 300)}` : ''}`, [OrderStatus.PENDING, OrderStatus.PAID], { viaApproval: true });
+        const needsBuyer = buyerMustAccept({ ...order, reviewStatus: 'APPROVED' });
+        if (order.customer?.id) {
+            this.notificationsService.create(order.customer.id, `Order #${orderId.slice(-8).toUpperCase()} confirmed`,
+                needsBuyer ? 'The confirmed terms differ from what you submitted (for example the delivery charge). Review and accept them on the order page.'
+                    : 'Every supplier confirmed and Atlantis approved your order. The Atlantis team will send payment details.',
+                'INFO', { orderId }).catch(() => {});
+        }
+        return updated;
+    }
+
+    /** Atlantis rejects the order (cancelled, stock returned, everyone told). */
+    async rejectOrder(orderId: string, adminId: string, reason: string) {
+        const text = String(reason || '').trim();
+        if (text.length < 5) throw new BadRequestException({ code: 'REASON_REQUIRED', message: 'Give a reason the buyer and suppliers will see (at least 5 characters).' });
+        const order = await this.loadForWorkflow(orderId);
+        if (order.reviewStatus === 'LEGACY') throw new ConflictException({ code: 'LEGACY_ORDER', message: 'Use the status controls for orders placed before confirmation existed.' });
+        if (!['PENDING', 'PAID'].includes(order.status)) throw new ConflictException({ code: 'CANNOT_REJECT', message: 'Only orders awaiting confirmation can be rejected; cancel a confirmed order instead.' });
+        await this.prisma.order.update({ where: { id: orderId }, data: { reviewStatus: 'REJECTED', reviewedAt: new Date(), reviewedById: adminId, reviewNote: text.slice(0, 1000) } });
+        await this.prisma.orderSupplierConfirmation.updateMany({ where: { orderId, status: 'PENDING' }, data: { status: 'SUPERSEDED' } });
+        return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, adminId, `Rejected by Atlantis: ${text.slice(0, 500)}`);
+    }
+
+    /** Ask suppliers again: pending or expired confirmations get a new deadline. */
+    async requestReconfirmation(orderId: string, adminId: string) {
+        const order = await this.loadForWorkflow(orderId);
+        if (order.reviewStatus !== 'PENDING_REVIEW' || !['PENDING', 'PAID'].includes(order.status)) throw new ConflictException({ code: 'NOT_AWAITING_SUPPLIER', message: 'This order isn’t waiting for suppliers.' });
+        const deadline = new Date(Date.now() + (await this.confirmHours()) * 3600_000);
+        const r = await this.prisma.orderSupplierConfirmation.updateMany({ where: { orderId, termsVersion: order.termsVersion, status: { in: ['PENDING', 'EXPIRED'] } }, data: { status: 'PENDING', deadline } });
+        const waiting = await this.prisma.orderSupplierConfirmation.findMany({ where: { orderId, termsVersion: order.termsVersion, status: 'PENDING' }, select: { supplierId: true } });
+        for (const w of waiting) this.notificationsService.create(w.supplierId, 'Please confirm an order', `Order #${orderId.slice(-8).toUpperCase()} is waiting for your confirmation.`, 'INFO', { orderId }).catch(() => {});
+        await this.log(orderId, order.status, adminId, `Atlantis asked ${r.count} supplier${r.count === 1 ? '' : 's'} to confirm again (deadline ${deadline.toISOString().slice(0, 16)}Z)`);
+        return { requested: r.count, deadline };
+    }
+
+    /**
+     * Atlantis changes material terms before approval: a line's quantity (down
+     * only — stock is returned) or buyer unit price. Creates a new terms
+     * version that the affected suppliers must accept again.
+     */
+    async amendOrder(orderId: string, adminId: string, body: { lines?: { itemId: string; quantity?: number; unitPrice?: number }[]; reason?: string }) {
+        const order = await this.loadForWorkflow(orderId);
+        if (order.reviewStatus !== 'PENDING_REVIEW' || !['PENDING', 'PAID'].includes(order.status)) throw new ConflictException({ code: 'CANNOT_AMEND', message: 'Only orders still awaiting confirmation can be amended. Cancel a confirmed order and place a new one instead.' });
+        const reason = String(body?.reason || '').trim();
+        if (reason.length < 5) throw new BadRequestException({ code: 'REASON_REQUIRED', message: 'Explain the change (at least 5 characters); suppliers and the buyer see it.' });
+        const changes = Array.isArray(body?.lines) ? body.lines : [];
+        if (!changes.length) throw new BadRequestException({ code: 'NO_CHANGES', message: 'Nothing to change.' });
+        const affected = new Set<string>();
+        let changed = false;
+        await this.prisma.$transaction(async (tx) => {
+            for (const c of changes) {
+                const it = order.items.find((i: any) => i.id === c.itemId);
+                if (!it) throw new BadRequestException({ code: 'UNKNOWN_LINE', message: 'A line in the change isn’t on this order.' });
+                if (it.mixedLoadId) throw new BadRequestException({ code: 'MIXED_LOAD', message: 'Mixed loads can’t be amended; reject the order instead.' });
+                const data: any = {};
+                if (c.quantity !== undefined) {
+                    const q = Number(c.quantity);
+                    if (!Number.isInteger(q) || q < 1 || q > it.quantity) throw new BadRequestException({ code: 'INVALID_QUANTITY', message: 'A quantity can only be lowered (to at least 1); remove a line by rejecting the order.' });
+                    if (q < it.quantity) {
+                        const perUnit = typeof it.stockCases === 'number' && it.quantity ? it.stockCases / it.quantity : 0;
+                        const back = Math.round(perUnit * (it.quantity - q));
+                        if (back > 0 && it.productId) await tx.product.update({ where: { id: it.productId }, data: { stock: { increment: back } } });
+                        data.quantity = q;
+                        if (typeof it.stockCases === 'number') data.stockCases = it.stockCases - back;
+                    }
+                }
+                if (c.unitPrice !== undefined) {
+                    const pr = Number(c.unitPrice);
+                    if (!Number.isFinite(pr) || pr <= 0) throw new BadRequestException({ code: 'INVALID_PRICE', message: 'Unit price must be above 0.' });
+                    data.price = round2(pr);
+                }
+                if (Object.keys(data).length) {
+                    await tx.orderItem.update({ where: { id: it.id }, data });
+                    changed = true;
+                    // A supplier confirms again only when their part changed (quantity); the buyer
+                    // price includes the Atlantis margin and never changes the supplier's net price.
+                    if (data.quantity !== undefined && it.product?.supplierId) affected.add(it.product.supplierId);
+                }
+            }
+            if (!changed) throw new BadRequestException({ code: 'NO_CHANGES', message: 'Nothing changed.' });
+            const items = await tx.orderItem.findMany({ where: { orderId } });
+            const goods = round2(items.reduce((s, i) => s + i.price * i.quantity, 0));
+            const version = order.termsVersion + 1;
+            await tx.order.update({ where: { id: orderId }, data: { totalAmount: goods, termsVersion: version } });
+            // The changed suppliers decide again; the others' acceptance carries over to the new version.
+            const prev = order.confirmations.filter((c: any) => c.termsVersion === order.termsVersion).map((c: any) => ({ ...c }));
+            await tx.orderSupplierConfirmation.updateMany({ where: { orderId, termsVersion: order.termsVersion }, data: { status: 'SUPERSEDED' } });
+            const deadline = new Date(Date.now() + (await this.confirmHours()) * 3600_000);
+            for (const c of prev) {
+                const again = affected.has(c.supplierId) || c.status !== 'ACCEPTED';
+                await tx.orderSupplierConfirmation.create({ data: { orderId, supplierId: c.supplierId, termsVersion: version, status: again ? 'PENDING' : 'ACCEPTED', deadline: again ? deadline : null, decidedAt: again ? null : c.decidedAt, decidedById: again ? null : c.decidedById, note: again ? null : 'Carried over: their lines did not change.' } });
+            }
+            await tx.orderStatusHistory.create({ data: { orderId, previousStatus: order.status, newStatus: order.status, changedById: adminId, reason: `Terms amended to v${version}: ${reason.slice(0, 500)}` } });
+        });
+        for (const sid of affected) this.notificationsService.create(sid, 'Order changed — please confirm again', `Order #${orderId.slice(-8).toUpperCase()} was changed: ${reason.slice(0, 200)}`, 'WARNING', { orderId }).catch(() => {});
+        if (order.customer?.id) this.notificationsService.create(order.customer.id, `Order #${orderId.slice(-8).toUpperCase()} changed`, `Atlantis changed your order before confirming it: ${reason.slice(0, 200)}. You’ll be asked to accept the new terms once the supplier confirms.`, 'WARNING', { orderId }).catch(() => {});
+        return this.workflowForAdmin(orderId);
+    }
+
+    /** The buyer accepts confirmed terms that differ from what they submitted. */
+    async buyerAcceptTerms(orderId: string, customerId: string, version: number) {
+        const order: any = await this.prisma.order.findFirst({ where: { id: orderId, customerId } });
+        if (!order) throw new NotFoundException('Order not found');
+        if (!buyerMustAccept(order)) throw new ConflictException({ code: 'NOTHING_TO_ACCEPT', message: 'There are no new terms to accept on this order.' });
+        if (Number(version) !== order.termsVersion) throw new ConflictException({ code: 'TERMS_CHANGED', message: 'The terms changed again. Refresh the page and review them.' });
+        const r = await this.prisma.order.updateMany({ where: { id: orderId, customerId, termsVersion: order.termsVersion }, data: { buyerAcceptedVersion: order.termsVersion, buyerAcceptedAt: new Date() } });
+        if (!r.count) throw new ConflictException({ code: 'TERMS_CHANGED', message: 'The terms changed again. Refresh the page and review them.' });
+        await this.log(orderId, order.status, customerId, `Buyer accepted terms v${order.termsVersion}`);
+        this.notificationsService.notifyAdmins('Buyer accepted updated terms', `Order #${orderId.slice(-8).toUpperCase()}: the buyer accepted terms v${order.termsVersion}.`, 'INFO', { orderId }).catch(() => {});
+        return { id: orderId, buyerAcceptedVersion: order.termsVersion };
+    }
+
+    /** Mark overdue supplier confirmations expired and tell Atlantis (run hourly; reads also check deadlines). */
+    async expireStaleConfirmations(now = new Date()) {
+        const stale = await this.prisma.orderSupplierConfirmation.findMany({ where: { status: 'PENDING', deadline: { lt: now }, order: { reviewStatus: 'PENDING_REVIEW' } }, select: { id: true, orderId: true } });
+        if (!stale.length) return 0;
+        await this.prisma.orderSupplierConfirmation.updateMany({ where: { id: { in: stale.map((s) => s.id) }, status: 'PENDING' }, data: { status: 'EXPIRED' } });
+        for (const orderId of new Set(stale.map((s) => s.orderId))) {
+            this.notificationsService.notifyAdmins('Supplier didn’t confirm in time', `Order #${orderId.slice(-8).toUpperCase()}: a supplier confirmation expired. Ask again or reject the order.`, 'WARNING', { orderId }).catch(() => {});
+        }
+        return stale.length;
+    }
+
+    /** Admin view of the workflow: every supplier's decision and what blocks approval. */
+    async workflowForAdmin(orderId: string) {
+        const order = await this.loadForWorkflow(orderId);
+        const suppliers = await this.prisma.user.findMany({ where: { id: { in: [...new Set<string>(order.confirmations.map((c: any) => c.supplierId))] } }, select: { id: true, name: true, companyName: true } });
+        const label = new Map(suppliers.map((u) => [u.id, u.companyName || u.name || 'Supplier']));
+        const state = confirmationState(order.confirmations, answeredVersion(order.confirmations, order.termsVersion), [...new Set<string>(order.confirmations.map((c: any) => c.supplierId))]);
+        return {
+            reviewStatus: order.reviewStatus, termsVersion: order.termsVersion, reviewedAt: order.reviewedAt, reviewNote: order.reviewNote,
+            buyerMustAccept: buyerMustAccept(order), buyerAcceptedVersion: order.buyerAcceptedVersion, buyerAcceptedAt: order.buyerAcceptedAt,
+            party: partyStatus(order, state),
+            approvalBlocker: order.reviewStatus === 'PENDING_REVIEW' ? approvalBlocker(order, state) : null,
+            suppliers: state.each.map((e) => ({ ...e, name: label.get(e.supplierId) || 'Supplier' })),
+            history: order.confirmations.sort((a: any, b: any) => a.termsVersion - b.termsVersion).map((c: any) => ({ supplier: label.get(c.supplierId) || 'Supplier', version: c.termsVersion, status: c.status, deadline: c.deadline, decidedAt: c.decidedAt, note: c.note })),
+            terms: order.termsSnapshot || this.termsFromOrder(order),
+            submittedTerms: order.submittedTerms,
+        };
+    }
+
+    /** Buyer view: never supplier identities or supplier prices. */
+    workflowForBuyer(order: any) {
+        if (!order || order.reviewStatus === 'LEGACY') return null;
+        const state = confirmationState(order.confirmations || [], answeredVersion(order.confirmations || [], order.termsVersion), [...new Set<string>((order.confirmations || []).map((c: any) => c.supplierId))]);
+        const t = (order.termsSnapshot || null) as any;
+        const strip = (terms: any) => terms && ({ version: terms.version, currency: terms.currency, goodsTotal: terms.goodsTotal, freight: terms.freight, destinationCountry: terms.destinationCountry, approvedAt: terms.approvedAt ?? null,
+            lines: (terms.lines || []).map((l: any) => ({ name: l.name, tier: l.tier, quantity: l.quantity, unitPrice: l.unitPrice, lineTotal: l.lineTotal, selectedVariants: l.selectedVariants })),
+            fulfillment: terms.fulfillment ? FulfillmentService.forBuyer(terms.fulfillment) : null });
+        return {
+            reviewStatus: order.reviewStatus, termsVersion: order.termsVersion, party: partyStatus(order, state),
+            suppliersConfirmed: state.each.filter((e) => e.status === 'ACCEPTED').length, suppliersTotal: state.each.length,
+            buyerMustAccept: buyerMustAccept(order), buyerAcceptedAt: order.buyerAcceptedAt ?? null,
+            approvedTerms: strip(t),
+            submittedTerms: strip(order.submittedTerms),
+            fulfillment: order.fulfillment ? FulfillmentService.forBuyer(order.fulfillment) : null,
+        };
+    }
+
+    // ─── Inspections (records of inspections Atlantis actually performed) ───
+
+    private static INSPECTION_STATUSES = ['SCHEDULED', 'PASSED', 'PASSED_WITH_FINDINGS', 'FAILED'];
+    private static RESOLUTIONS = ['PENDING', 'ACCEPTED', 'ACCEPTED_WITH_DISCOUNT', 'PARTIALLY_ACCEPTED', 'REJECTED'];
+    private static FINDING_TYPES = ['BARCODE', 'QUANTITY', 'DATE', 'CONDITION', 'OTHER'];
+
+    inspectionView(i: any, items: any[] = []) {
+        const name = (id: string) => { const it = items.find((x: any) => x.id === id); return it ? (it.productNameSnapshot || it.product?.name || 'Product') : 'Product'; };
+        return {
+            id: i.id, status: i.status, inspectedAt: i.inspectedAt, inspectorName: i.inspectorName, hubId: i.hubId,
+            lines: (Array.isArray(i.lines) ? i.lines : []).map((l: any) => ({ ...l, name: name(l.itemId) })),
+            findings: (Array.isArray(i.findings) ? i.findings : []).map((f: any) => ({ ...f, name: f.itemId ? name(f.itemId) : null })),
+            photos: i.photos || [], resolution: i.resolution, resolutionNote: i.resolutionNote, createdAt: i.createdAt, updatedAt: i.updatedAt,
+        };
+    }
+
+    /** Staff record (or update) an inspection they performed. Inputs are checked against the order's own lines. */
+    async saveInspection(orderId: string, actorId: string, body: any, inspectionId?: string) {
+        const order: any = await this.prisma.order.findUnique({ where: { id: orderId }, include: { items: true } });
+        if (!order) throw new NotFoundException('Order not found');
+        if (order.status === 'CANCELLED') throw new ConflictException({ code: 'ORDER_CANCELLED', message: 'This order was cancelled.' });
+        const status = String(body?.status || 'SCHEDULED').toUpperCase();
+        if (!OrdersService.INSPECTION_STATUSES.includes(status)) throw new BadRequestException('Unknown inspection status.');
+        const resolution = body?.resolution ? String(body.resolution).toUpperCase() : null;
+        if (resolution && !OrdersService.RESOLUTIONS.includes(resolution)) throw new BadRequestException('Unknown resolution.');
+        const itemIds = new Set(order.items.map((i: any) => i.id));
+        const lines = (Array.isArray(body?.lines) ? body.lines : []).map((l: any) => {
+            if (!itemIds.has(l?.itemId)) throw new BadRequestException('An inspected line isn’t on this order.');
+            const it = order.items.find((x: any) => x.id === l.itemId);
+            const received = Number(l.received);
+            if (!Number.isInteger(received) || received < 0) throw new BadRequestException('Received quantities must be whole numbers.');
+            return { itemId: l.itemId, ordered: it.quantity, received, unit: it.selectedTier || 'unit' };
+        });
+        const findings = (Array.isArray(body?.findings) ? body.findings : []).slice(0, 50).map((f: any) => {
+            const type = String(f?.type || '').toUpperCase();
+            if (!OrdersService.FINDING_TYPES.includes(type)) throw new BadRequestException('Unknown finding type.');
+            if (f?.itemId && !itemIds.has(f.itemId)) throw new BadRequestException('A finding refers to a line that isn’t on this order.');
+            const note = String(f?.note || '').trim();
+            if (note.length < 3) throw new BadRequestException('Describe each finding.');
+            return { type, itemId: f?.itemId || null, note: note.slice(0, 500) };
+        });
+        const photos = (Array.isArray(body?.photos) ? body.photos : []).map((u: any) => String(u)).filter((u: string) => /^https:\/\/\S+$/.test(u)).slice(0, 30);
+        if (['PASSED', 'PASSED_WITH_FINDINGS', 'FAILED'].includes(status)) {
+            if (!body?.inspectedAt || Number.isNaN(new Date(body.inspectedAt).getTime())) throw new BadRequestException('Give the inspection date.');
+            if (!String(body?.inspectorName || '').trim()) throw new BadRequestException('Give the inspector’s name.');
+            if (status !== 'PASSED' && !findings.length) throw new BadRequestException('Record what was found.');
+        }
+        const data: any = {
+            status, lines, findings, photos, resolution, resolutionNote: body?.resolutionNote ? String(body.resolutionNote).slice(0, 1000) : null,
+            inspectedAt: body?.inspectedAt ? new Date(body.inspectedAt) : null, inspectorName: body?.inspectorName ? String(body.inspectorName).slice(0, 120) : null,
+            hubId: body?.hubId ? String(body.hubId) : null,
+        };
+        if (data.hubId && !(await this.prisma.atlantisHub.findFirst({ where: { id: data.hubId } }))) throw new BadRequestException('Unknown hub.');
+        if (inspectionId) {
+            const existing = await this.prisma.orderInspection.findUnique({ where: { id: inspectionId }, select: { orderId: true } });
+            if (!existing || existing.orderId !== orderId) throw new NotFoundException('Inspection not found');
+        }
+        const saved = inspectionId
+            ? await this.prisma.orderInspection.update({ where: { id: inspectionId }, data })
+            : await this.prisma.orderInspection.create({ data: { ...data, orderId, createdById: actorId } });
+        await this.log(orderId, order.status, actorId, `Inspection ${inspectionId ? 'updated' : 'recorded'}: ${status.toLowerCase().replace(/_/g, ' ')}${resolution ? `, resolution ${resolution.toLowerCase().replace(/_/g, ' ')}` : ''}`);
+        if (['PASSED', 'PASSED_WITH_FINDINGS', 'FAILED'].includes(status)) {
+            this.notificationsService.create(order.customerId, `Order #${orderId.slice(-8).toUpperCase()}: inspection ${status === 'PASSED' ? 'passed' : status === 'FAILED' ? 'failed' : 'found issues'}`, 'The inspection report is on your order page.', status === 'PASSED' ? 'INFO' : 'WARNING', { orderId }).catch(() => {});
+        }
+        return this.inspectionView(saved, order.items);
     }
 
     // ─── Admin Stats ─────────────────────────────────────────────────
@@ -847,7 +1264,7 @@ export class OrdersService {
         return results;
     }
 
-    private async internalUpdateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string, expectFrom?: OrderStatus[]) {
+    private async internalUpdateStatus(orderId: string, status: OrderStatus, changedById: string, reason?: string, expectFrom?: OrderStatus[], opts: { viaApproval?: boolean } = {}) {
         const order = await this.prisma.order.findUnique({
             where: { id: orderId },
             include: {
@@ -871,6 +1288,9 @@ export class OrdersService {
             throw new ConflictException({ code: 'INVALID_TRANSITION', message: `This order is already ${STATUS_LABELS[previousStatus] || previousStatus}.`, status: previousStatus });
         }
         assertTransition(previousStatus, status);
+        // Workflow orders can't skip supplier acceptance, Atlantis approval or the buyer's acceptance of changed terms.
+        const blocked = workflowBlocker(order as any, status, opts);
+        if (blocked) throw new ConflictException({ code: 'APPROVAL_REQUIRED', message: blocked });
 
         // Status change, history and stock return happen in one transaction,
         // and only if the order is still in the status we read — a retried or
@@ -1161,10 +1581,15 @@ export class OrdersService {
         });
 
         if (!order) throw new NotFoundException('Order not found');
+        const wf: any = await this.prisma.order.findUnique({ where: { id: orderId }, select: { reviewStatus: true, shippingCost: true, shippingCompany: true, destinationCountry: true, inspections: { orderBy: { createdAt: 'desc' } } } });
 
         return {
             id: order.id,
             status: order.status,
+            workflow: wf?.reviewStatus && wf.reviewStatus !== 'LEGACY' ? await this.workflowForAdmin(orderId) : null,
+            inspections: (wf?.inspections || []).map((i: any) => this.inspectionView(i, order.items)),
+            shippingCost: wf?.shippingCost ?? null,
+            destinationCountry: wf?.destinationCountry ?? null,
             total: order.totalAmount,
             createdAt: order.createdAt.toISOString(),
             updatedAt: (order as any).updatedAt?.toISOString?.() ?? null,

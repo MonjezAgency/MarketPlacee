@@ -37,6 +37,8 @@ const PUBLIC_PATHS = [
   'products/price-ticker',
   // Delivery policy (where Atlantis delivers) — public information.
   'shipping/destinations',
+  // Verified Atlantis hubs (the Warehouses page) — public information.
+  'fulfillment/hubs',
   // Health endpoints — no auth so the operator can hit them from
   // the browser to verify Railway connectivity even when locked out.
   'health',

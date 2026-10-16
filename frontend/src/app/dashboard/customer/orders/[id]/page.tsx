@@ -15,6 +15,8 @@ import { formatPrice } from '@/lib/currency';
 import { SaveToListDialog } from '@/components/account/SaveToListDialog';
 import { orderStatus, orderRef, TONE_CLASS } from '@/lib/buyer-orders';
 import { ListPlus } from 'lucide-react';
+import { BuyerWorkflowPanel } from '@/components/orders/BuyerWorkflowPanel';
+import type { BuyerWorkflow, Inspection } from '@/lib/order-workflow';
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -57,6 +59,9 @@ interface OrderDetail {
         };
     }[];
     history: { id: string; previousStatus: string | null; newStatus: string; createdAt: string; reason: string | null }[];
+    /** Confirmation workflow (null for orders placed before it existed). */
+    workflow?: BuyerWorkflow | null;
+    inspections?: Inspection[];
 }
 
 const STEPS: { key: OrderStatus | 'CONFIRMED'; label: string; icon: React.ElementType; desc: string }[] = [
@@ -285,7 +290,7 @@ export default function OrderTrackingPage() {
                     {order.status === 'SHIPPED' && (
                         <button 
                             onClick={async () => {
-                                if (!window.confirm('Confirm that you have received all items in good condition? This will release the payment to the supplier.')) return;
+                                if (!window.confirm('Confirm that you received all items in the agreed quantity and condition? If anything is wrong, open an issue instead.')) return;
                                 setIsConfirming(true);
                                 try {
                                     const res = await apiFetch(`/orders/${id}/confirm-delivery`, { method: 'POST' });
@@ -399,8 +404,10 @@ export default function OrderTrackingPage() {
                 </motion.div>
             )}
 
-            {/* Progress Stepper */}
-            {!isCancelled ? (
+            {/* Confirmation workflow (orders placed since supplier confirmation exists) */}
+            {order.workflow ? (
+                <BuyerWorkflowPanel order={order as any} onChange={fetchOrder} />
+            ) : !isCancelled ? (
                 <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border/50 rounded-3xl p-8">
                     <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-8">Delivery Progress</p>
                     <div className="relative">

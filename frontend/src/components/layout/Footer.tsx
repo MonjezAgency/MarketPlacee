@@ -21,6 +21,9 @@ export default function Footer() {
         ] },
         { title: 'For buyers', links: [
             { href: '/how-it-works', label: t('footer', 'howItWorks') },
+            { href: '/protected-payments', label: 'Protected Payments' },
+            { href: '/goods-inspection', label: 'Goods Inspection' },
+            { href: '/warehouses', label: 'Warehouses' },
             { href: '/shipping', label: t('footer', 'shippingPolicy') },
             { href: '/returns', label: t('footer', 'returnsRefunds') },
             { href: '/help', label: t('footer', 'helpCenter') },

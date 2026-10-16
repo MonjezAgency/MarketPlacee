@@ -5,7 +5,7 @@ import { LoadKind, LoadLineInput, Markups, PricingError, PricingProduct, basePer
 
 const PRODUCT_PRICING_SELECT = {
     id: true, name: true, price: true, basePrice: true, unitsPerCase: true, casesPerPallet: true,
-    palletsPerShipment: true, moq: true, moqUnit: true, status: true, stock: true, supplierId: true, exwLocation: true,
+    palletsPerShipment: true, moq: true, moqUnit: true, status: true, stock: true, supplierId: true, exwLocation: true, fulfillmentMethod: true,
     variantPrices: true, variants: true, images: true, ean: true, brand: true, shelfLife: true, leadTime: true, readyForDispatch: true, origin: true,
     warehouse: { select: { id: true, city: true, country: true } },
 } as const;

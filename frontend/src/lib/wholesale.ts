@@ -66,10 +66,20 @@ export interface QuoteLine {
     } | null;
 }
 export interface LineMinimum { unit: 'piece' | 'case' | 'pallet' | 'truck'; required: number; have: number; remaining: number; percent: number; met: boolean }
-export interface CartQuote { subtotal: number; discountPercent: number; discount: number; coupon: string | null; total: number; lines: QuoteLine[]; ready: boolean }
+export interface CartQuote { subtotal: number; discountPercent: number; discount: number; coupon: string | null; total: number; lines: QuoteLine[]; ready: boolean; fulfillment?: DeliveryQuote | null }
 
-export const quoteCart = (items: CartItem[], couponCode?: string) =>
-    call<CartQuote>('/orders/quote', { method: 'POST', body: JSON.stringify({ items: items.map(toServerItem), couponCode: couponCode || undefined }) });
+/** Delivery for the cart, from the shared server calculation (never computed in the browser). */
+export interface DeliveryCharge { key: string; label: string; basis: string; amount: number; paidTo: string; source: string; line?: string }
+export interface DeliveryGroup {
+    supplier?: string; method: string; label: string; handover: string; steps: { who: string; what: string }[];
+    hub: { name: string; city: string; country: string } | null;
+    status: 'priced' | 'quote_required' | 'unavailable'; reasons: string[]; charges: DeliveryCharge[];
+    transitDays: { min: number; max: number } | null; total: number | null; lines: string[];
+}
+export interface DeliveryQuote { destination: string | null; status: 'priced' | 'quote_required' | 'unavailable'; freightTotal: number | null; groups: DeliveryGroup[] }
+
+export const quoteCart = (items: CartItem[], couponCode?: string, destination?: string) =>
+    call<CartQuote>('/orders/quote', { method: 'POST', body: JSON.stringify({ items: items.map(toServerItem), couponCode: couponCode || undefined, destination: destination || undefined }) });
 
 // ── Mixed pallets / truckloads ───────────────────────────────────────────
 export type LoadKind = 'PALLET' | 'TRUCK';
