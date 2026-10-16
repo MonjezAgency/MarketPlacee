@@ -20,8 +20,8 @@ update `docs/DESIGN_SYSTEM.md` in the same change and say why — don't add sile
 
 ## Known gaps
 
-Before changing orders, payments, refunds, permissions or policy pages, read `docs/marketplace-audit/`
-(gap register, boundary and roadmap). Transactional changes there need explicit owner approval.
+Before changing orders, payments, refunds, permissions or policy pages, read the Word documents in `docs/marketplace-audit/`
+(Marketplace_Gap_Register, Design_vs_Systems_Boundary, Implementation_Roadmap). Transactional changes there need explicit owner approval.
 
 ## Routes worth knowing
 

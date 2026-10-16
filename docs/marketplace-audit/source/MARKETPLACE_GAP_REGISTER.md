@@ -8,6 +8,24 @@ The master list of gaps found in the Atlantis marketplace audit (October 2026, b
 
 Related documents: [SYSTEMS_INVENTORY.md](SYSTEMS_INVENTORY.md) · [ORDER_PAYMENT_REFUND_GAPS.md](ORDER_PAYMENT_REFUND_GAPS.md) · [IMPLEMENTATION_ROADMAP.md](IMPLEMENTATION_ROADMAP.md) · [DESIGN_VS_SYSTEMS_BOUNDARY.md](DESIGN_VS_SYSTEMS_BOUNDARY.md)
 
+## Executive summary
+
+The audit read the whole marketplace (buyer, supplier, admin, payments, platform, content and the seven languages) and recorded **190 gaps: 18 critical, 47 high, 80 medium and 45 low.** Every gap is backed by a file path and line, the schema, or a recorded test.
+
+**What works today.** The catalogue and ordering work. The order confirmation workflow is enforced on the server (supplier accepts → Atlantis approves → buyer accepts changed terms). The server calculates delivery charges, staff record inspections, and buyers and suppliers have private support conversations per order.
+
+**What needs a decision first.**
+
+1. **Security.** Several money-related endpoints (finance, invoices) are open to any signed-in account. Two-step sign-in can be bypassed, and an admin can create an owner account. *Fix first; owner approval needed because permissions change.*
+2. **Price and identity privacy.** Buyers can receive supplier prices and ids in some responses, and suppliers can see buyer totals and margins. This breaks the marketplace's core rule.
+3. **Payments.** No code records that a buyer has paid, refunds cannot succeed, and the Terms promise an escrow that doesn't exist. *A business decision on the payment model is needed before building.*
+4. **Totals and invoices.** Pages, emails and invoices add totals differently; invoices are issued in USD with a flat 5% tax.
+5. **Policy promises.** Dispute windows, response times, carriers and coverage are stated in copy but not enforced or confirmed.
+
+**What has already been done (design phase, no business logic changed).** The order pages, the Payments & invoices view and the Returns & Refunds page were redesigned in seven languages. Fake features were removed (simulated identity check, mock tracking page) and false claims corrected. A cross-site scripting hole in the printable invoice was closed.
+
+The recommended order of work is in *Implementation_Roadmap.docx*.
+
 ## Consolidated root causes
 
 Several areas found the same problem independently. These are the root causes, in the order the
