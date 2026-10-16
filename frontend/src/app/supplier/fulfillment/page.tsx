@@ -233,7 +233,7 @@ function ComparePanel({ draft, methods }: { draft: Partial<SupplierSettings>; me
                             <option value="">Your default ({methods.find((m) => m.key === (draft.defaultMethod || 'ATLANTIS_COLLECTION'))?.label})</option>
                             {methods.filter((m) => m.key !== 'SUPPLIER_DIRECT').map((m) => <option key={m.key} value={m.key}>{m.label} (this product only)</option>)}
                         </select>
-                        <Link href={`/supplier/products/${preview.product.id}`} className="inline-flex items-center gap-1 text-teal font-medium hover:underline">Edit product <ArrowRight size={13} /></Link>
+                        <Link href={`/supplier/products/${preview.product.id}/edit`} className="inline-flex items-center gap-1 text-teal font-medium hover:underline">Edit product <ArrowRight size={13} /></Link>
                     </div>
                 </div>
             )}

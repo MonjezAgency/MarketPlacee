@@ -154,7 +154,7 @@ export default function MarketingPage() {
                     <div className="bg-primary/5 border border-primary/20 rounded-3xl p-12 text-center space-y-6">
                         <h2 className="text-3xl font-black">Ready to grow your reach?</h2>
                         <p className="text-muted-foreground max-w-md mx-auto">Log in to your supplier dashboard to manage placements and grow your reach.</p>
-                        <Link href="/supplier/placements" className="inline-flex items-center gap-2 h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors text-sm">
+                        <Link href="/supplier" className="inline-flex items-center gap-2 h-12 px-10 bg-primary text-primary-foreground font-black rounded-2xl hover:bg-primary/90 transition-colors text-sm">
                             Manage Placements <ArrowRight size={16} />
                         </Link>
                     </div>

@@ -32,7 +32,6 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
     const SUPPLIER_ITEMS: SidebarItem[] = [
         { name: t('sidebar', 'overview'), icon: LayoutDashboard, href: '/supplier' },
         { name: t('sidebar', 'myProducts'), icon: Package, href: '/supplier/products' },
-        { name: t('sidebar', 'placements'), icon: Star, href: '/supplier/placements', badge: 'New' },
         { name: t('sidebar', 'orders'), icon: ShoppingCart, href: '/supplier/orders' },
         { name: t('sidebar', 'earnings'), icon: DollarSign, href: '/supplier/earnings' },
         { name: t('sidebar', 'analytics'), icon: TrendingUp, href: '/supplier/analytics' },

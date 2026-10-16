@@ -11,6 +11,9 @@ import { notifyToast, toneOf } from '@/components/ui/NotifyToasts';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 function getNotificationLink(n: AppNotification): string | null {
+  // The server stores the destination with most notifications; use it when it is an internal path.
+  const stored = (n as any).data?.link;
+  if (typeof stored === 'string' && stored.startsWith('/') && !stored.startsWith('//')) return stored;
   switch (n.type) {
     case NOTIFICATION_TYPES.NEW_REGISTRATION:
     case NOTIFICATION_TYPES.GOOGLE_REGISTRATION:
@@ -18,7 +21,7 @@ function getNotificationLink(n: AppNotification): string | null {
     case NOTIFICATION_TYPES.NEW_REVIEW:
       return '/admin/reviews';
     case NOTIFICATION_TYPES.NEW_ORDER:
-      return '/dashboard/supplier/orders';
+      return '/supplier/orders';
     case NOTIFICATION_TYPES.KYC_SUBMITTED:
       return '/admin/kyc';
     case NOTIFICATION_TYPES.ERROR:

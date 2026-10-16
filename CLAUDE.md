@@ -18,6 +18,11 @@ update `docs/DESIGN_SYSTEM.md` in the same change and say why — don't add sile
 - Orders are requests until every supplier accepts and Atlantis approves (server-enforced, `backend/src/orders/order-workflow.ts`).
 - Delivery charges come only from the server calculation (`backend/src/fulfillment`); missing rates mean "quoted after the order".
 
+## Known gaps
+
+Before changing orders, payments, refunds, permissions or policy pages, read `docs/marketplace-audit/`
+(gap register, boundary and roadmap). Transactional changes there need explicit owner approval.
+
 ## Routes worth knowing
 
 - Supplier entry point after sign-in: `/dashboard/supplier`; the supplier tools live under `/supplier/*`.

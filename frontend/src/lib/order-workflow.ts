@@ -98,13 +98,15 @@ export function workflowSteps(o: { status: string; workflow: BuyerWorkflow | nul
     const approved = w.reviewStatus === 'APPROVED';
     const inspected = (o.inspections || []).some((i) => i.status !== 'SCHEDULED');
     type S = 'done' | 'current' | 'todo' | 'stopped';
-    const steps: { key: string; title: string; who: string; detail: string; state: S }[] = [
-        { key: 'submitted', title: 'Order submitted', who: 'You', detail: approved ? 'You sent the order request.' : 'Your order is a request — it isn’t confirmed yet.', state: 'done' },
-        { key: 'suppliers', title: 'Supplier confirmation', who: 'Supplier', detail: w.suppliersTotal ? `${w.suppliersConfirmed} of ${w.suppliersTotal} supplier${w.suppliersTotal === 1 ? '' : 's'} confirmed availability, quantities, price and lead time.` : 'Each supplier confirms availability, quantities, price and lead time.', state: approved || (w.suppliersTotal > 0 && w.suppliersConfirmed === w.suppliersTotal) ? 'done' : 'current' },
-        { key: 'approval', title: 'Atlantis approval', who: 'Atlantis', detail: approved ? 'Atlantis reviewed and approved the confirmed terms.' : 'Atlantis reviews the confirmed terms and approves the order.', state: approved ? 'done' : w.suppliersTotal > 0 && w.suppliersConfirmed === w.suppliersTotal ? 'current' : 'todo' },
-        { key: 'terms', title: 'Confirmed terms & payment details', who: w.buyerMustAccept ? 'You' : 'Atlantis', detail: w.buyerMustAccept ? 'The terms changed from what you submitted — review and accept them.' : 'You receive the confirmed terms; the Atlantis team sends payment details.', state: !approved ? 'todo' : w.buyerMustAccept ? 'current' : 'done' },
-        { key: 'fulfilment', title: 'Fulfilment & inspection', who: 'Atlantis & supplier', detail: inspected ? 'Goods were inspected — see the report below.' : 'Goods are collected or delivered; where an inspection is arranged, its report appears here.', state: !approved || w.buyerMustAccept ? 'todo' : o.status === 'DELIVERED' ? 'done' : 'current' },
-        { key: 'settlement', title: 'Settlement', who: 'Atlantis', detail: 'Payment is settled under the confirmed terms and any inspection outcome.', state: o.status === 'DELIVERED' ? 'current' : 'todo' },
+    // Keys of the `workflow` dictionary section; the state logic is unchanged.
+    const allConfirmed = w.suppliersTotal > 0 && w.suppliersConfirmed === w.suppliersTotal;
+    const steps: { key: string; title: string; who: string; detail: string; vars?: Record<string, number>; state: S }[] = [
+        { key: 'submitted', title: 'stepSubmitted', who: 'whoYou', detail: approved ? 'detailSubmittedApproved' : 'detailSubmittedPending', state: 'done' },
+        { key: 'suppliers', title: 'stepSuppliers', who: 'whoSupplier', detail: w.suppliersTotal ? 'detailSuppliersCount' : 'detailSuppliers', vars: { confirmed: w.suppliersConfirmed, total: w.suppliersTotal }, state: approved || allConfirmed ? 'done' : 'current' },
+        { key: 'approval', title: 'stepApproval', who: 'whoAtlantis', detail: approved ? 'detailApprovalDone' : 'detailApprovalPending', state: approved ? 'done' : allConfirmed ? 'current' : 'todo' },
+        { key: 'terms', title: 'stepTerms', who: w.buyerMustAccept ? 'whoYou' : 'whoAtlantis', detail: w.buyerMustAccept ? 'detailTermsAccept' : 'detailTermsSent', state: !approved ? 'todo' : w.buyerMustAccept ? 'current' : 'done' },
+        { key: 'fulfilment', title: 'stepFulfilment', who: 'whoBoth', detail: inspected ? 'detailFulfilmentInspected' : 'detailFulfilment', state: !approved || w.buyerMustAccept ? 'todo' : o.status === 'DELIVERED' ? 'done' : 'current' },
+        { key: 'settlement', title: 'stepSettlement', who: 'whoAtlantis', detail: 'detailSettlement', state: o.status === 'DELIVERED' ? 'current' : 'todo' },
     ];
     if (cancelled) {
         const firstOpen = steps.findIndex((s) => s.state !== 'done');

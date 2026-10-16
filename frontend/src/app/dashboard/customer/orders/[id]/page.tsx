@@ -1,22 +1,25 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import {
-    Package, Truck, CheckCircle2, Clock, XCircle,
-    ArrowLeft, Loader2, MapPin, RefreshCw,
-    Download, AlertTriangle, ChevronDown, ChevronUp, Send,
+    Package, Truck, CheckCircle2, XCircle, ArrowLeft, Loader2, RefreshCw, Download, AlertTriangle, ChevronDown,
+    Send, ListPlus, Mail, MessageSquare, Warehouse, FileText, ExternalLink, Layers, Barcode, PackageCheck, Building2,
 } from 'lucide-react';
 import { cn, prettifyVariantSignature } from '@/lib/utils';
 import { apiFetch } from '@/lib/api';
-import { formatPrice } from '@/lib/currency';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { SaveToListDialog } from '@/components/account/SaveToListDialog';
-import { orderStatus, orderRef, TONE_CLASS } from '@/lib/buyer-orders';
-import { ListPlus } from 'lucide-react';
 import { BuyerWorkflowPanel } from '@/components/orders/BuyerWorkflowPanel';
+import { OrderProgress, Ltr, withNode, SLOT, useMoney } from '@/components/orders/order-ui';
+import { Trans } from '@/components/i18n/Trans';
+import { MOTION } from '@/components/ds';
+import { statusKeys, lineLoad, orderRef, TONE_CLASS, type BuyerOrder } from '@/lib/buyer-orders';
+import { buildInvoiceHtml } from '@/lib/invoice-print';
 import type { BuyerWorkflow, Inspection } from '@/lib/order-workflow';
+import { DISPUTE_REASONS, disputeReasonKey } from '@/lib/disputes';
 
 type OrderStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
 
@@ -24,39 +27,23 @@ interface OrderDetail {
     id: string;
     status: OrderStatus;
     totalAmount: number;
+    paymentStatus?: string | null;
     shippingCompany: string | null;
     shippingCost: number | null;
     trackingNumber?: string | null;
     carrier?: string | null;
     expectedDelivery?: string | null;
-    invoiceNumber?: string | null;
     /** Supplier-uploaded invoice / receipt scan attached to the order. */
     supplierInvoiceUrl?: string | null;
     createdAt: string;
-    deliveredAt?: string | null;
-    shippedAt?: string | null;
-    customer?: {
-        id: string; name: string; email: string;
-        phone?: string | null; companyName?: string | null;
-        country?: string | null; vatNumber?: string | null;
-    };
+    customer?: { id: string; name: string; email: string; phone?: string | null; companyName?: string | null; country?: string | null; vatNumber?: string | null };
     items: {
-        id: string;
-        quantity: number;
-        price: number;
+        id: string; quantity: number; price: number; selectedTier?: string | null; productNameSnapshot?: string | null; mixedLoadId?: string | null;
+        selectedVariants?: Record<string, string> | null; mixComposition?: { signature: string; quantity: number }[] | null;
         product: {
-            id: string; name: string; images: string[];
-            brand?: string | null; category?: string | null;
-            ean?: string | null; shelfLife?: string | null;
-            /** EXW (Ex Works) — origin warehouse / country surfaced
-                to the buyer so they know where the goods leave from. */
-            exwLocation?: string | null;
-            origin?: string | null;
-            supplier: { name: string };
-            unit?: string;
-            unitsPerCase?: number; casesPerPallet?: number;
-            unitsPerPallet?: number; palletsPerShipment?: number;
-        };
+            id: string; name: string; images: string[]; brand?: string | null; category?: string | null; ean?: string | null; shelfLife?: string | null;
+            exwLocation?: string | null; unit?: string; unitsPerCase?: number | null; casesPerPallet?: number | null; unitsPerPallet?: number | null; palletsPerShipment?: number | null;
+        } | null;
     }[];
     history: { id: string; previousStatus: string | null; newStatus: string; createdAt: string; reason: string | null }[];
     /** Confirmation workflow (null for orders placed before it existed). */
@@ -64,783 +51,514 @@ interface OrderDetail {
     inspections?: Inspection[];
 }
 
-const STEPS: { key: OrderStatus | 'CONFIRMED'; label: string; icon: React.ElementType; desc: string }[] = [
-    { key: 'PENDING', label: 'Order Placed', icon: Clock, desc: 'Awaiting supplier confirmation' },
-    { key: 'PROCESSING', label: 'Confirmed', icon: CheckCircle2, desc: 'Supplier is processing your order' },
-    { key: 'SHIPPED', label: 'Shipped', icon: Truck, desc: 'On the way to your address' },
-    { key: 'DELIVERED', label: 'Delivered', icon: Package, desc: 'Order received successfully' },
-];
 
-const STATUS_ORDER: Record<string, number> = {
-    PENDING: 0, PROCESSING: 1, PAID: 1, SHIPPED: 2, DELIVERED: 3, CANCELLED: -1,
+const HISTORY_LABEL: Record<string, string> = {
+    PENDING: 'statusAwaitingConfirmation', PAID: 'statusPaid', PROCESSING: 'statusConfirmed', SHIPPED: 'statusShipped', DELIVERED: 'statusDelivered', CANCELLED: 'statusCancelled',
+};
+const PAYMENT_LABEL: Record<string, { key: string; tone: string }> = {
+    PAID: { key: 'paymentPaid', tone: 'bg-[#ECFDF5] text-[#047857] dark:bg-emerald-500/15 dark:text-emerald-300' },
+    PROCESSING: { key: 'paymentProcessing', tone: 'bg-surface-3 text-ink-2' },
+    FAILED: { key: 'paymentFailed', tone: 'bg-[#FEF2F2] text-[#B91C1C] dark:bg-red-500/15 dark:text-red-300' },
+    REFUNDED: { key: 'paymentRefunded', tone: 'bg-surface-3 text-ink-2' },
+};
+const DISPUTE_TONE: Record<string, string> = {
+    OPEN: 'bg-[#FFFBEB] text-[#B45309] dark:bg-amber-500/15 dark:text-amber-300',
+    UNDER_REVIEW: 'bg-[#EFF6FF] text-[#1D4ED8] dark:bg-blue-500/15 dark:text-blue-300',
+    RESOLVED_REFUND: 'bg-[#ECFDF5] text-[#047857] dark:bg-emerald-500/15 dark:text-emerald-300',
+    RESOLVED_NO_REFUND: 'bg-surface-3 text-ink-2',
+    CLOSED: 'bg-surface-3 text-ink-2',
 };
 
-const STATUS_COLORS: Record<OrderStatus, string> = {
-    PENDING: 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
-    PROCESSING: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
-    PAID: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
-    SHIPPED: 'text-primary bg-primary/10 border-primary/20',
-    DELIVERED: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20',
-    CANCELLED: 'text-red-400 bg-red-500/10 border-red-500/20',
-};
-
-const DISPUTE_REASONS = [
-    'Item not received',
-    'Wrong item delivered',
-    'Item arrived damaged',
-    'Item not as described',
-    'Missing items in order',
-    'Quality issue',
-    'Other',
-];
-
-function buildInvoiceHtml(invoice: any, order: OrderDetail): string {
-    const itemRows = order.items
-        .map(i => `<tr><td>${(i as any).product?.name || (i as any).productNameSnapshot || 'Mixed load'}</td><td>${i.quantity}</td><td>€${i.price.toFixed(2)}</td><td>€${(i.price * i.quantity).toFixed(2)}</td></tr>`)
-        .join('');
-
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"/>
-<title>Invoice ${invoice.invoiceNumber}</title>
-<style>
-body{font-family:'Segoe UI',sans-serif;margin:0;padding:40px;color:#0A1A2F;background:#fff}
-.header{background:#0A1A2F;color:#fff;padding:32px;border-radius:12px;margin-bottom:32px;display:flex;justify-content:space-between;align-items:center}
-.logo{font-size:26px;font-weight:900}.logo span{color:#1BC7C9}
-.meta{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:32px}
-.meta-box{background:#F2F4F7;padding:16px;border-radius:8px}
-.meta-box label{font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#667085;display:block;margin-bottom:4px}
-.meta-box p{margin:0;font-weight:700;font-size:14px}
-table{width:100%;border-collapse:collapse;margin-bottom:24px}
-th{text-align:left;font-size:10px;text-transform:uppercase;letter-spacing:2px;color:#667085;padding:8px 12px;border-bottom:2px solid #E5E7EB}
-td{padding:12px;border-bottom:1px solid #F2F4F7;font-size:14px}
-.totals{margin-left:auto;width:280px}
-.total-row{display:flex;justify-content:space-between;padding:8px 0;font-size:14px}
-.total-final{display:flex;justify-content:space-between;padding:16px 0;font-size:18px;font-weight:900;color:#1BC7C9;border-top:2px solid #0A1A2F;margin-top:8px}
-.footer{text-align:center;color:#667085;font-size:11px;margin-top:40px;padding-top:16px;border-top:1px solid #E5E7EB}
-</style></head><body>
-<div class="header">
-  <div><div class="logo">Atlan<span>tis</span></div></div>
-  <div style="text-align:right">
-    <div style="font-size:22px;font-weight:900">${invoice.invoiceNumber}</div>
-    <div style="font-size:12px;color:#B0BCCF;margin-top:4px">Issued: ${new Date(invoice.createdAt).toLocaleDateString()}</div>
-  </div>
-</div>
-<div class="meta">
-  <div class="meta-box"><label>Order Reference</label><p>#${order.id.slice(-8).toUpperCase()}</p></div>
-  <div class="meta-box"><label>Due Date</label><p>${new Date(invoice.dueDate).toLocaleDateString()}</p></div>
-  <div class="meta-box"><label>Payment Status</label><p>${invoice.status}</p></div>
-  <div class="meta-box"><label>Currency</label><p>${invoice.currency || 'EUR'}</p></div>
-</div>
-<h2 style="font-size:18px">Order Items</h2>
-<table>
-  <thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th></tr></thead>
-  <tbody>${itemRows}</tbody>
-</table>
-<div class="totals">
-  <div class="total-row"><span>Subtotal</span><span>€${invoice.amount.toFixed(2)}</span></div>
-  <div class="total-row"><span>Tax</span><span>€${invoice.tax.toFixed(2)}</span></div>
-  <div class="total-final"><span>Total</span><span>€${invoice.totalAmount.toFixed(2)}</span></div>
-</div>
-<div class="footer">© 2026 Atlantis Marketplace — atlantisfmcg.com</div>
-</body></html>`;
+/** The carrier's own tracking page where we know it; otherwise a web search for the reference. */
+function trackingUrl(num: string, carrier: string | null | undefined) {
+    const c = String(carrier || '').toUpperCase();
+    const n = encodeURIComponent(num);
+    if (c.includes('DHL')) return `https://www.dhl.com/en/express/tracking.html?AWB=${n}`;
+    if (c.includes('FEDEX')) return `https://www.fedex.com/apps/fedextrack/?tracknumbers=${n}`;
+    if (c.includes('UPS')) return `https://www.ups.com/track?tracknum=${n}`;
+    if (c.includes('ARAMEX')) return `https://www.aramex.com/track/results?ShipmentNumber=${n}`;
+    if (c.includes('TNT')) return `https://www.tnt.com/express/en_eg/site/shipping-tools/tracking.html?searchType=con&cons=${n}`;
+    if (c.includes('DPD')) return `https://tracking.dpd.de/status/en_DE/parcel/${n}`;
+    if (c.includes('GLS')) return `https://gls-group.com/track/${n}`;
+    return `https://www.google.com/search?q=${encodeURIComponent(`${carrier || 'shipment'} tracking ${num}`)}`;
 }
 
-export default function OrderTrackingPage() {
-    const { id } = useParams<{ id: string }>();
-    const router = useRouter();
-    const [order, setOrder] = React.useState<OrderDetail | null>(null);
-    const [isLoading, setIsLoading] = React.useState(true);
-    const [error, setError] = React.useState('');
-    const [isDownloading, setIsDownloading] = React.useState(false);
+const Card = ({ children, className, labelledBy, id }: { children: React.ReactNode; className?: string; labelledBy?: string; id?: string }) => (
+    <section id={id} aria-labelledby={labelledBy} className={cn('rounded-2xl ring-1 ring-line bg-surface', className)}>{children}</section>
+);
+const CardTitle = ({ id, children }: { id: string; children: React.ReactNode }) => (
+    <h3 id={id} className="font-sans text-[15px] font-semibold text-heading">{children}</h3>
+);
 
-    // Dispute state
+export default function OrderDetailPage() {
+    const { id } = useParams<{ id: string }>();
+    const { t, fmt } = useLanguage();
+    const money = useMoney();
+    const reduce = useReducedMotion();
+    const [order, setOrder] = React.useState<OrderDetail | null>(null);
+    const [state, setState] = React.useState<'loading' | 'ready' | 'notFound' | 'error'>('loading');
+    const [refreshing, setRefreshing] = React.useState(false);
+    const [notice, setNotice] = React.useState<{ tone: 'ok' | 'err'; text: string } | null>(null);
+    const [isDownloading, setIsDownloading] = React.useState(false);
+    const [invoice, setInvoice] = React.useState<any>(null);
+    const [existingDispute, setExistingDispute] = React.useState<any>(null);
     const [showDisputeForm, setShowDisputeForm] = React.useState(false);
     const [disputeReason, setDisputeReason] = React.useState('');
     const [disputeDescription, setDisputeDescription] = React.useState('');
     const [isSubmittingDispute, setIsSubmittingDispute] = React.useState(false);
     const [disputeSuccess, setDisputeSuccess] = React.useState(false);
     const [disputeError, setDisputeError] = React.useState('');
-    const [existingDispute, setExistingDispute] = React.useState<any>(null);
-    const [invoice, setInvoice] = React.useState<any>(null);
-
     const [isConfirming, setIsConfirming] = React.useState(false);
     const [saveOpen, setSaveOpen] = React.useState(false);
 
-    const fetchOrder = React.useCallback(async () => {
-        setIsLoading(true);
-        setError('');
+    const fetchOrder = React.useCallback(async (initial = false) => {
+        if (initial) setState('loading'); else setRefreshing(true);
         try {
             const [orderRes, disputesRes, invoicesRes] = await Promise.all([
                 apiFetch(`/orders/${id}`),
                 apiFetch(`/disputes/my`),
                 apiFetch(`/invoices/my`),
             ]);
-            if (!orderRes.ok) { setError('Order not found'); return; }
+            if (!orderRes.ok) { setState(orderRes.status === 404 || orderRes.status === 403 ? 'notFound' : 'error'); return; }
             setOrder(await orderRes.json());
-            if (disputesRes.ok) {
-                const disputes = await disputesRes.json();
-                const found = disputes.find((d: any) => d.orderId === id);
-                if (found) setExistingDispute(found);
-            }
-            if (invoicesRes.ok) {
-                const invoices: any[] = await invoicesRes.json();
-                const inv = invoices.find((i: any) => i.orderId === id);
-                if (inv) setInvoice(inv);
-            }
-        } catch (_e) { setError('Failed to load order'); }
-        finally { setIsLoading(false); }
+            if (disputesRes.ok) setExistingDispute((await disputesRes.json()).find((d: any) => d.orderId === id) || null);
+            if (invoicesRes.ok) setInvoice((await invoicesRes.json()).find((i: any) => i.orderId === id) || null);
+            setState('ready');
+        } catch { setState((s) => (s === 'ready' ? s : 'error')); }
+        finally { setRefreshing(false); }
     }, [id]);
 
-    React.useEffect(() => { fetchOrder(); }, [fetchOrder]);
+    React.useEffect(() => { fetchOrder(true); }, [fetchOrder]);
 
-    const handleDownloadInvoice = async () => {
-        if (!order) return;
+    // Deep link from the order list ("Report a problem") opens the dispute section.
+    React.useEffect(() => {
+        if (state !== 'ready' || typeof window === 'undefined' || window.location.hash !== '#dispute') return;
+        document.getElementById('dispute')?.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    }, [state, reduce]);
+
+    const printInvoice = () => {
+        if (!order || !invoice) return;
         setIsDownloading(true);
         try {
-            const res = await apiFetch(`/invoices/my`);
-            if (!res.ok) { alert('Invoice not available yet. It is generated after delivery.'); return; }
-            const invoices: any[] = await res.json();
-            const invoice = invoices.find((inv: any) => inv.orderId === order.id);
-            if (!invoice) { alert('Invoice not generated yet. It will be available after delivery.'); return; }
-
-            // Safe: use Blob URL instead of document.write
-            const html = buildInvoiceHtml(invoice, order);
-            const blob = new Blob([html], { type: 'text/html' });
+            const blob = new Blob([buildInvoiceHtml(invoice, order as any)], { type: 'text/html' });
             const url = URL.createObjectURL(blob);
             const win = window.open(url, '_blank');
-            if (win) {
-                win.addEventListener('load', () => {
-                    win.print();
-                    URL.revokeObjectURL(url);
-                });
-            }
+            if (!win) { setNotice({ tone: 'err', text: t('orderDetail', 'invoicePopupBlocked') }); URL.revokeObjectURL(url); return; }
+            win.addEventListener('load', () => { win.print(); URL.revokeObjectURL(url); });
         } finally { setIsDownloading(false); }
     };
 
-    const handleSubmitDispute = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!disputeReason || !disputeDescription.trim()) {
-            setDisputeError('Please select a reason and describe the issue.');
-            return;
-        }
-        setIsSubmittingDispute(true);
-        setDisputeError('');
+    const confirmReceipt = async () => {
+        if (!window.confirm(t('orderDetail', 'confirmPrompt'))) return;
+        setIsConfirming(true); setNotice(null);
         try {
-            const res = await apiFetch(`/disputes`, {
-                method: 'POST',
-                body: JSON.stringify({ orderId: id, reason: disputeReason, description: disputeDescription.trim() }),
-            });
-            if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                setDisputeError(err.message || 'Failed to open dispute');
-                return;
-            }
-            const dispute = await res.json();
-            setExistingDispute(dispute);
+            const res = await apiFetch(`/orders/${id}/confirm-delivery`, { method: 'POST' });
+            if (!res.ok) throw new Error('failed');
+            await fetchOrder();
+            setNotice({ tone: 'ok', text: t('orders', 'noteDelivered') });
+        } catch { setNotice({ tone: 'err', text: t('orderDetail', 'confirmFailed') }); }
+        finally { setIsConfirming(false); }
+    };
+
+    const submitDispute = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!disputeReason || !disputeDescription.trim()) { setDisputeError(t('orderDetail', 'disputeRequired')); return; }
+        setIsSubmittingDispute(true); setDisputeError('');
+        try {
+            const res = await apiFetch(`/disputes`, { method: 'POST', body: JSON.stringify({ orderId: id, reason: disputeReason, description: disputeDescription.trim() }) });
+            if (!res.ok) throw new Error('failed');
+            setExistingDispute(await res.json());
             setDisputeSuccess(true);
             setShowDisputeForm(false);
-        } catch (_e) { setDisputeError('Connection error. Please try again.'); }
+        } catch { setDisputeError(t('orderDetail', 'disputeFailed')); }
         finally { setIsSubmittingDispute(false); }
     };
 
-    if (isLoading) {
+    if (state === 'loading') {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <div role="status" aria-label={t('orderDetail', 'loading')} className="space-y-4">
+                <div className="h-16 rounded-2xl bg-surface-2 animate-pulse" />
+                <div className="h-28 rounded-2xl bg-surface-2 animate-pulse" />
+                <div className="grid gap-4 lg:grid-cols-3"><div className="lg:col-span-2 h-72 rounded-2xl bg-surface-2 animate-pulse" /><div className="h-72 rounded-2xl bg-surface-2 animate-pulse" /></div>
             </div>
         );
     }
 
-    if (error || !order) {
+    if (state !== 'ready' || !order) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-4 text-muted-foreground">
-                <XCircle className="w-12 h-12 opacity-20" />
-                <p className="font-bold">{error || 'Order not found'}</p>
-                <Link href="/dashboard/customer" className="text-primary text-sm font-bold hover:underline">Back to Dashboard</Link>
+            <div className="rounded-2xl ring-1 ring-line px-5 py-12 text-center" role="alert">
+                <span className="mx-auto w-12 h-12 rounded-2xl bg-surface-2 text-ink-3 flex items-center justify-center"><XCircle size={22} aria-hidden /></span>
+                <p className="mt-3 text-[15px] font-semibold text-ink">{state === 'notFound' ? t('orderDetail', 'notFound') : t('orderDetail', 'loadError')}</p>
+                <div className="mt-4 flex flex-wrap justify-center gap-2">
+                    {state === 'error' && <button type="button" onClick={() => fetchOrder(true)} className="h-10 px-4 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold">{t('orderDetail', 'retry')}</button>}
+                    <Link href="/dashboard/customer/orders" className="h-10 px-4 inline-flex items-center rounded-xl ring-1 ring-line-strong text-[13.5px] font-semibold text-ink">{t('orderDetail', 'back')}</Link>
+                </div>
             </div>
         );
     }
 
-    const currentStep = STATUS_ORDER[order.status] ?? 0;
-    const isCancelled = order.status === 'CANCELLED';
-    const canDispute = (['SHIPPED', 'DELIVERED'] as OrderStatus[]).includes(order.status) && !existingDispute;
+    // Shape the detail response like a list order for the shared status/progress logic.
+    const asListOrder = {
+        ...order,
+        workflow: order.workflow ? { reviewStatus: order.workflow.reviewStatus, termsVersion: order.workflow.termsVersion, party: order.workflow.party, buyerMustAccept: order.workflow.buyerMustAccept } : null,
+        inspection: order.inspections?.[0]?.status ?? null,
+        shipment: order.trackingNumber ? { trackingNumber: order.trackingNumber, carrier: order.carrier ?? null, status: null, expectedDelivery: order.expectedDelivery ?? null } : null,
+    } as unknown as BuyerOrder;
+    const st = statusKeys(asListOrder);
+    const ref = orderRef(order.id);
+    const cancelled = order.status === 'CANCELLED';
+    const canDispute = (order.status === 'SHIPPED' || order.status === 'DELIVERED') && !existingDispute;
+    const freight = order.shippingCost ?? null;
+    const payment = order.paymentStatus ? PAYMENT_LABEL[order.paymentStatus] : undefined;
+    const exw = Array.from(new Set(order.items.map((i) => i.product?.exwLocation?.trim()).filter(Boolean) as string[]));
+    const enter = (delay = 0) => (reduce ? {} : { initial: { opacity: 0, y: 10 }, animate: { opacity: 1, y: 0 }, transition: { duration: MOTION.base * 1.6, ease: MOTION.ease, delay } });
 
     return (
-        <div className="space-y-8">
+        <div data-no-translate className="space-y-5 text-start">
             {/* Header */}
-            <div className="flex items-center justify-between flex-wrap gap-4">
-                <div className="flex items-center gap-3">
-                    <Link href="/dashboard/customer/orders" aria-label="Back to orders" className="w-10 h-10 rounded-xl ring-1 ring-line bg-surface flex items-center justify-center text-ink-3 hover:text-ink hover:ring-line-strong">
-                        <ArrowLeft size={18} />
-                    </Link>
-                    <div>
-                        <h1 className="text-[20px] font-semibold text-heading">Order {orderRef(order.id)}</h1>
-                        <p className="text-[13px] text-ink-3">Placed {new Date(order.createdAt).toLocaleDateString()} · {orderStatus(order as any).note}</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className={cn('px-2.5 py-1 rounded-full text-[12px] font-semibold', TONE_CLASS[orderStatus(order as any).tone])}>
-                        {orderStatus(order as any).label}
-                    </span>
-                    {order.status !== 'CANCELLED' && (
-                        <button type="button" onClick={() => setSaveOpen(true)} className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-xl ring-1 ring-line-strong text-[13px] font-semibold text-ink hover:bg-surface-2">
-                            <ListPlus size={14} /> Save items to a list
-                        </button>
-                    )}
-                    <a href={`mailto:Info@atlantisfmcg.com?subject=${encodeURIComponent(`Order ${orderRef(order.id)} – question`)}`} className="h-9 px-3.5 inline-flex items-center rounded-xl text-[13px] font-semibold text-teal hover:underline">Email Atlantis about this order</a>
-                    {order.status === 'SHIPPED' && (
-                        <button 
-                            onClick={async () => {
-                                if (!window.confirm('Confirm that you received all items in the agreed quantity and condition? If anything is wrong, open an issue instead.')) return;
-                                setIsConfirming(true);
-                                try {
-                                    const res = await apiFetch(`/orders/${id}/confirm-delivery`, { method: 'POST' });
-                                    if (res.ok) {
-                                        await fetchOrder();
-                                        alert('Delivery confirmed. Thank you!');
-                                    } else {
-                                        const err = await res.json();
-                                        alert(err.message || 'Confirmation failed');
-                                    }
-                                } catch (err) {
-                                    alert('Failed to connect to server');
-                                } finally {
-                                    setIsConfirming(false);
-                                }
-                            }}
-                            disabled={isConfirming}
-                            className="h-9 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-bold text-xs rounded-xl border border-emerald-600 transition-all flex items-center gap-1.5 shadow-lg shadow-emerald-500/20 disabled:opacity-50"
-                        >
-                            {isConfirming ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />}
-                            Confirm Delivery
-                        </button>
-                    )}
-                    {order.status === 'DELIVERED' && (
-                        <button onClick={handleDownloadInvoice} disabled={isDownloading}
-                            className="h-9 px-4 bg-primary/10 hover:bg-primary/20 text-primary font-bold text-xs rounded-xl border border-primary/20 transition-all flex items-center gap-1.5 disabled:opacity-50">
-                            {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                            Invoice
-                        </button>
-                    )}
-                    <button onClick={fetchOrder} className="w-9 h-9 rounded-xl border border-border/50 bg-card flex items-center justify-center text-muted-foreground hover:text-primary transition-colors">
-                        <RefreshCw size={14} />
-                    </button>
-                </div>
-            </div>
-
-            {/* Order Reference Card - prominent for shipped/delivered orders */}
-            {(['SHIPPED', 'DELIVERED', 'PAID'] as OrderStatus[]).includes(order.status) && (
-                <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="bg-gradient-to-br from-primary/5 to-emerald-500/5 border border-primary/20 rounded-3xl p-6"
-                >
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Order Reference</p>
-                            <p className="text-base font-bold mt-1 font-mono">#AT-{order.id.slice(-8).toUpperCase()}</p>
-                        </div>
-                        <div>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Invoice Number</p>
-                            <p className="text-base font-bold mt-1 font-mono">
-                                {invoice?.invoiceNumber || 'Not issued yet'}
-                            </p>
-                        </div>
-                        {order.trackingNumber && (
-                            <div>
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Tracking #</p>
-                                {/* Operator request: tracking number should
-                                    be a deep link to the carrier's tracking
-                                    page so the customer doesn't have to copy
-                                    the number and paste it into Google.
-                                    Helper resolves the right URL per carrier;
-                                    falls back to a search engine when the
-                                    carrier name doesn't match a known one. */}
-                                {(() => {
-                                    const num = String(order.trackingNumber).trim();
-                                    const carrier = String(order.carrier || '').toUpperCase();
-                                    const url =
-                                        carrier.includes('DHL') ? `https://www.dhl.com/en/express/tracking.html?AWB=${encodeURIComponent(num)}` :
-                                        carrier.includes('FEDEX') ? `https://www.fedex.com/apps/fedextrack/?tracknumbers=${encodeURIComponent(num)}` :
-                                        carrier.includes('UPS') ? `https://www.ups.com/track?tracknum=${encodeURIComponent(num)}` :
-                                        carrier.includes('ARAMEX') ? `https://www.aramex.com/track/results?ShipmentNumber=${encodeURIComponent(num)}` :
-                                        carrier.includes('TNT') ? `https://www.tnt.com/express/en_eg/site/shipping-tools/tracking.html?searchType=con&cons=${encodeURIComponent(num)}` :
-                                        carrier.includes('DPD') ? `https://tracking.dpd.de/status/en_DE/parcel/${encodeURIComponent(num)}` :
-                                        carrier.includes('GLS') ? `https://gls-group.com/track/${encodeURIComponent(num)}` :
-                                        `https://www.google.com/search?q=${encodeURIComponent(`${order.carrier || 'shipment'} tracking ${num}`)}`;
-                                    return (
-                                        <a
-                                            href={url}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 text-base font-bold mt-1 font-mono text-primary hover:underline"
-                                            title="Open tracking on the carrier's website"
-                                        >
-                                            {num}
-                                            <span aria-hidden="true" className="text-[10px]">↗</span>
-                                        </a>
-                                    );
-                                })()}
-                                {order.carrier && <p className="text-[10px] text-muted-foreground font-medium">via {order.carrier}</p>}
-                            </div>
-                        )}
-                        <div>
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Total</p>
-                            <p className="text-base font-bold mt-1 text-primary">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</p>
-                        </div>
-                    </div>
-                    {(order.status === 'DELIVERED' && invoice) && (
-                        <div className="mt-4 pt-4 border-t border-primary/10 flex items-center justify-between">
-                            <div className="flex items-center gap-2 text-emerald-500">
-                                <CheckCircle2 size={16} />
-                                <span className="text-xs font-bold">Order delivered. Your invoice is ready.</span>
-                            </div>
-                            <button onClick={handleDownloadInvoice} disabled={isDownloading}
-                                className="h-9 px-4 bg-primary text-white font-bold text-xs rounded-xl flex items-center gap-2 hover:bg-primary/90 transition-all disabled:opacity-50">
-                                {isDownloading ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                                Download Invoice
-                            </button>
-                        </div>
-                    )}
-                </motion.div>
-            )}
-
-            {/* Confirmation workflow (orders placed since supplier confirmation exists) */}
-            {order.workflow ? (
-                <BuyerWorkflowPanel order={order as any} onChange={fetchOrder} />
-            ) : !isCancelled ? (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card border border-border/50 rounded-3xl p-8">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-8">Delivery Progress</p>
-                    <div className="relative">
-                        <div className="absolute top-6 start-6 end-6 h-0.5 bg-border/50" />
-                        <div className="absolute top-6 start-6 h-0.5 bg-primary transition-all duration-700"
-                            style={{ width: `${(currentStep / (STEPS.length - 1)) * 100}%` }} />
-                        <div className="flex justify-between relative z-10">
-                            {STEPS.map((step, i) => {
-                                const Icon = step.icon;
-                                const done = i <= currentStep;
-                                const active = i === currentStep;
-                                return (
-                                    <div key={step.key} className="flex flex-col items-center gap-3 w-24">
-                                        <div className={cn('w-12 h-12 rounded-full border-2 flex items-center justify-center transition-all',
-                                            done ? 'bg-primary border-primary text-white shadow-lg shadow-primary/30' : 'bg-card border-border/50 text-muted-foreground',
-                                            active && 'ring-4 ring-primary/20 scale-110')}>
-                                            <Icon size={20} />
-                                        </div>
-                                        <div className="text-center">
-                                            <p className={cn('text-[10px] font-bold uppercase tracking-wide', done ? 'text-foreground' : 'text-muted-foreground')}>{step.label}</p>
-                                            <p className="text-[9px] text-muted-foreground font-medium mt-0.5 leading-tight hidden md:block">{step.desc}</p>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </motion.div>
-            ) : (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-red-500/5 border border-red-500/20 rounded-3xl p-8 flex items-center gap-4">
-                    <XCircle className="text-red-400 w-10 h-10 shrink-0" />
-                    <div>
-                        <p className="font-bold text-red-400">Order Cancelled</p>
-                        <p className="text-sm text-muted-foreground mt-1">This order has been cancelled. Contact support if you have questions.</p>
-                    </div>
-                </motion.div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Order Items — spans 2 cols on desktop */}
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="lg:col-span-2 bg-card border border-border/50 rounded-3xl p-6 space-y-4">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Items ({order.items.length})</p>
-                    <div className="space-y-4">
-                        {order.items.map(item => {
-                            // Mixed pallet/truck lines (and deleted products) have no single product record.
-                            const p: any = item.product ?? { name: (item as any).productNameSnapshot || ((item as any).mixedLoadId ? 'Mixed load' : 'Product no longer listed') };
-                            const u = (p.unit || 'piece').toLowerCase();
-                            const ppc = p.unitsPerCase || 0;
-                            const cpp = p.casesPerPallet || 0;
-                            const ppp = p.unitsPerPallet || (ppc * cpp) || 0;
-                            const pps = p.palletsPerShipment || 0;
-                            let logistics = '';
-                            let totalPcs = 0;
-                            if (u === 'case' && ppc > 0) {
-                                totalPcs = item.quantity * ppc;
-                                logistics = `${item.quantity}×${ppc} = ${totalPcs.toLocaleString()} pcs`;
-                            } else if (u === 'pallet' && ppp > 0) {
-                                if (ppc > 0 && cpp > 0) {
-                                    totalPcs = item.quantity * cpp * ppc;
-                                    logistics = `${item.quantity}×${cpp}×${ppc} = ${totalPcs.toLocaleString()} pcs`;
-                                } else {
-                                    totalPcs = item.quantity * ppp;
-                                    logistics = `${item.quantity} × ${ppp} = ${totalPcs.toLocaleString()} pcs`;
-                                }
-                            } else if (u === 'truck' && pps > 0 && ppp > 0) {
-                                totalPcs = item.quantity * pps * ppp;
-                                logistics = `${item.quantity}×${pps}×${ppp} = ${totalPcs.toLocaleString()} pcs`;
-                            }
-                            return (
-                                <div key={item.id} className="p-4 bg-muted/30 rounded-2xl border border-border/30">
-                                    <div className="flex items-start gap-4">
-                                        {p.images?.[0] ? (
-                                            <img src={p.images[0]} alt={p.name} className="w-20 h-20 rounded-xl object-cover border border-border/50 shrink-0" />
-                                        ) : (
-                                            <div className="w-20 h-20 rounded-xl bg-muted flex items-center justify-center shrink-0">
-                                                <Package size={24} className="text-muted-foreground" />
-                                            </div>
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="font-bold text-base leading-tight">{p.name}</p>
-                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-[11px] text-muted-foreground">
-                                                {p.brand && <span className="font-bold text-foreground/70">{p.brand}</span>}
-                                                {p.category && <span>· {p.category}</span>}
-                                                <span>· Sold by <span className="font-bold text-foreground">Atlantis</span></span>
-                                            </div>
-                                            {(item as any).selectedVariants && Object.keys((item as any).selectedVariants).length > 0 && (
-                                                <div className="flex flex-wrap gap-1.5 mt-2">
-                                                    {Object.entries((item as any).selectedVariants as Record<string, string>)
-                                                        .filter(([k]) => !k.startsWith('__'))
-                                                        .map(([k, v]) => (
-                                                            <span key={k} className="inline-flex items-center h-5 px-2 rounded-md bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-bold">
-                                                                {k}: <span className="ml-1">{v}</span>
-                                                            </span>
-                                                        ))}
-                                                </div>
-                                            )}
-                                            {Array.isArray((item as any).mixComposition) && (item as any).mixComposition.length > 0 && (
-                                                <div className="mt-2 rounded-xl border border-line bg-teal-soft/50 px-3 py-2 text-[12px]">
-                                                    <p className="font-semibold text-teal text-[11.5px] mb-1">Mixed composition</p>
-                                                    <ul className="space-y-0.5 text-ink-2">
-                                                        {((item as any).mixComposition as Array<{ signature: string; quantity: number }>).map((c) => {
-                                                            const pretty = prettifyVariantSignature(c.signature) || 'Variant';
-                                                            return (
-                                                                <li key={c.signature} className="break-all">{c.quantity} × {pretty}</li>
-                                                            );
-                                                        })}
-                                                    </ul>
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="text-end shrink-0">
-                                            <p className="text-base font-bold text-primary">{formatPrice(item.price * item.quantity)}</p>
-                                            <p className="text-[10px] text-muted-foreground">{formatPrice(item.price)}/{u}</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-4 pt-4 border-t border-border/30">
-                                        <div>
-                                            <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Qty</p>
-                                            <p className="text-sm font-bold mt-0.5">{item.quantity} {u}{item.quantity > 1 ? 's' : ''}</p>
-                                        </div>
-                                        {logistics && (
-                                            <div>
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Total Pcs</p>
-                                                <p className="text-sm font-bold text-primary mt-0.5">{totalPcs.toLocaleString()}</p>
-                                            </div>
-                                        )}
-                                        {ppc > 0 && (
-                                            <div>
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Pcs / Case</p>
-                                                <p className="text-sm font-bold mt-0.5">{ppc}</p>
-                                            </div>
-                                        )}
-                                        {cpp > 0 && (
-                                            <div>
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Cases / Pallet</p>
-                                                <p className="text-sm font-bold mt-0.5">{cpp}</p>
-                                            </div>
-                                        )}
-                                        {ppp > 0 && (
-                                            <div>
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Pcs / Pallet</p>
-                                                <p className="text-sm font-bold mt-0.5">{ppp}</p>
-                                            </div>
-                                        )}
-                                        {pps > 0 && (
-                                            <div>
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Pallets / Truck</p>
-                                                <p className="text-sm font-bold mt-0.5">{pps}</p>
-                                            </div>
-                                        )}
-                                        {p.ean && (
-                                            <div>
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">EAN</p>
-                                                <p className="text-sm font-bold mt-0.5 font-mono">{p.ean}</p>
-                                            </div>
-                                        )}
-                                        {p.shelfLife && (
-                                            <div>
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">BBD</p>
-                                                <p className="text-sm font-bold mt-0.5">{p.shelfLife}</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </motion.div>
-
-                {/* Right rail: Buyer + Summary */}
-                <div className="space-y-6">
-                    {/* Buyer Info */}
-                    {order.customer && (
-                        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-3">
-                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Buyer</p>
-                            <div className="space-y-2 text-sm">
-                                <p className="font-bold">{order.customer.name}</p>
-                                {order.customer.companyName && (
-                                    <p className="text-xs text-muted-foreground">{order.customer.companyName}</p>
-                                )}
-                                {order.customer.email && (
-                                    <p className="text-xs text-muted-foreground">{order.customer.email}</p>
-                                )}
-                                {order.customer.phone && (
-                                    <p className="text-xs text-muted-foreground">{order.customer.phone}</p>
-                                )}
-                                {order.customer.country && (
-                                    <p className="text-xs text-muted-foreground">{order.customer.country}</p>
-                                )}
-                                {order.customer.vatNumber && (
-                                    <p className="text-[11px] text-muted-foreground font-mono">VAT: {order.customer.vatNumber}</p>
-                                )}
-                            </div>
-                            <div className="pt-3 border-t border-border/30 text-[11px] text-muted-foreground">
-                                <span className="font-bold">Handled by:</span>{' '}
-                                <span className="font-bold text-primary">Atlantis Marketplace</span>
-                            </div>
-                        </motion.div>
-                    )}
-
-                    {/* Financial Summary */}
-                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-4">
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Summary</p>
-                        <div className="space-y-3 text-sm">
-                            <div className="flex justify-between">
-                                <span className="text-muted-foreground">Subtotal</span>
-                                <span className="font-bold">{formatPrice(order.totalAmount)}</span>
-                            </div>
-                            {order.shippingCost != null && (
-                                <div className="flex justify-between">
-                                    <span className="text-muted-foreground flex items-center gap-1.5">
-                                        <Truck size={12} /> {order.shippingCompany || 'Shipping'}
-                                    </span>
-                                    <span className="font-bold">{formatPrice(order.shippingCost)}</span>
-                                </div>
-                            )}
-                            <div className="flex justify-between pt-3 border-t border-border/50">
-                                <span className="font-bold text-primary">Total</span>
-                                <span className="font-bold text-primary text-lg">{formatPrice(order.totalAmount + (order.shippingCost || 0))}</span>
-                            </div>
-                        </div>
-                        {order.shippingCompany && (
-                            <div className="pt-4 border-t border-border/50 flex items-center gap-2 text-sm text-muted-foreground">
-                                <MapPin size={14} className="text-primary shrink-0" />
-                                <span className="font-bold">{order.shippingCompany}</span>
-                            </div>
-                        )}
-
-                        {/* EXW — Ex Works locations for the items in this
-                            order. Surfaced to the buyer so they know which
-                            country / warehouse the goods leave from. The
-                            supplier sees the same list on their side; admin
-                            sees it too. */}
-                        {(() => {
-                            const exwSet = Array.from(
-                                new Set(
-                                    order.items
-                                        .map(i => i.product?.exwLocation)
-                                        .filter((v): v is string => !!v),
-                                ),
-                            );
-                            if (exwSet.length === 0) return null;
-                            return (
-                                <div className="pt-4 border-t border-border/50">
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">
-                                        EXW (Ex Works origin)
-                                    </p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {exwSet.map(loc => (
-                                            <span key={loc} className="inline-flex items-center gap-1.5 h-7 px-3 rounded-full bg-teal-50 text-teal-700 border border-teal-200 text-[11px] font-bold">
-                                                <MapPin size={11} /> EXW {loc}
-                                            </span>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })()}
-
-                        {/* Supplier invoice / receipt — when the supplier
-                            attaches a file from /supplier/orders, it shows
-                            here so the buyer can preview the paperwork
-                            directly. PDFs render as a clickable link, images
-                            render inline. */}
-                        {order.supplierInvoiceUrl && (
-                            <div className="pt-4 border-t border-border/50 space-y-2">
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                                    Invoice from supplier
-                                </p>
-                                {(/\.pdf(\?|$)/i.test(order.supplierInvoiceUrl)) ? (
-                                    <a
-                                        href={order.supplierInvoiceUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20 text-[12px] font-bold"
-                                    >
-                                        <Download size={13} /> Open invoice PDF
-                                    </a>
-                                ) : (
-                                    <a
-                                        href={order.supplierInvoiceUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block rounded-xl overflow-hidden border border-border/50 max-w-sm"
-                                    >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={order.supplierInvoiceUrl} alt="Supplier invoice" className="w-full h-auto" />
-                                    </a>
-                                )}
-                            </div>
-                        )}
-                    </motion.div>
-                </div>
-            </div>
-
-            {/* History Timeline */}
-            {order.history && order.history.length > 0 && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="bg-card border border-border/50 rounded-3xl p-6 space-y-4">
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Status History</p>
-                    <div className="space-y-3">
-                        {order.history.map(entry => (
-                            <div key={entry.id} className="flex items-start gap-3">
-                                <div className="w-2 h-2 rounded-full bg-primary mt-1.5 shrink-0" />
-                                <div className="flex-1">
-                                    <p className="text-xs font-bold">{entry.newStatus}</p>
-                                    {entry.reason && <p className="text-[11px] text-muted-foreground">{entry.reason}</p>}
-                                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">{new Date(entry.createdAt).toLocaleString()}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </motion.div>
-            )}
-
-            {/* Dispute Section */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="bg-card border border-border/50 rounded-3xl overflow-hidden">
-                <div className="p-6">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-[#FFFBEB] dark:bg-amber-500/10 flex items-center justify-center">
-                                <AlertTriangle size={18} className="text-[#B45309]" />
-                            </div>
-                            <div>
-                                <p className="font-bold text-sm">Problem with this order?</p>
-                                <p className="text-[11px] text-muted-foreground">Open a dispute and our support team will resolve it</p>
-                            </div>
-                        </div>
-                        {canDispute && !disputeSuccess && (
-                            <button onClick={() => setShowDisputeForm(v => !v)}
-                                className="flex items-center gap-1.5 h-9 px-4 ring-1 ring-line-strong hover:bg-surface-2 text-ink font-semibold text-xs rounded-xl  transition-all">
-                                {showDisputeForm ? <><ChevronUp size={12} /> Cancel</> : <><ChevronDown size={12} /> Open Dispute</>}
-                            </button>
-                        )}
-                    </div>
-
-                    {/* Existing dispute badge */}
-                    {existingDispute && (
-                        <div className={cn('mt-4 p-4 rounded-2xl border text-sm',
-                            existingDispute.status === 'OPEN' ? 'bg-yellow-500/5 border-yellow-500/20' :
-                            existingDispute.status === 'UNDER_REVIEW' ? 'bg-blue-500/5 border-blue-500/20' :
-                            existingDispute.status === 'RESOLVED_REFUND' ? 'bg-emerald-500/5 border-emerald-500/20' :
-                            'bg-muted/50 border-border/50'
-                        )}>
-                            <p className="font-bold">Dispute #{existingDispute.id.slice(-6).toUpperCase()}</p>
-                            <p className="text-muted-foreground mt-1">Reason: {existingDispute.reason}</p>
-                            <div className="flex items-center gap-2 mt-2 flex-wrap">
-                                <span className={cn('px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider',
-                                    existingDispute.status === 'OPEN' ? 'bg-yellow-500/20 text-yellow-500' :
-                                    existingDispute.status === 'UNDER_REVIEW' ? 'bg-blue-500/20 text-blue-500' :
-                                    existingDispute.status === 'RESOLVED_REFUND' ? 'bg-emerald-500/20 text-emerald-500' :
-                                    'bg-muted text-muted-foreground'
-                                )}>
-                                    {existingDispute.status.replace(/_/g, ' ')}
-                                </span>
-                                {existingDispute.resolution && (
-                                    <p className="text-[11px] text-muted-foreground">— {existingDispute.resolution}</p>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {disputeSuccess && !existingDispute && (
-                        <div className="mt-4 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-center gap-3">
-                            <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
-                            <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                                Dispute submitted. Our team will review it within 24–48 hours.
-                            </p>
-                        </div>
-                    )}
-
-                    {!canDispute && !existingDispute && !disputeSuccess && (
-                        <p className="mt-3 text-[11px] text-muted-foreground">
-                            Disputes are available once your order has been shipped or delivered.
+            <div>
+                <Link href="/dashboard/customer/orders" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-3 hover:text-ink">
+                    <ArrowLeft size={15} className="rtl:rotate-180" aria-hidden /> {t('orderDetail', 'back')}
+                </Link>
+                <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <h2 className="font-sans text-[22px] sm:text-[24px] font-semibold text-heading">{withNode(t('orderDetail', 'title', { ref: SLOT }), <Ltr>{ref}</Ltr>)}</h2>
+                        <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-ink-3">
+                            <span>{t('orderDetail', 'placed', { date: fmt.date(order.createdAt) })}</span>
+                            <span className={cn('h-6 px-2.5 inline-flex items-center rounded-full text-[12px] font-semibold', TONE_CLASS[st.tone])}>{t('orders', st.label)}</span>
+                            {payment && <span className={cn('h-6 px-2.5 inline-flex items-center rounded-full text-[12px] font-semibold', payment.tone)}>{t('orders', payment.key)}</span>}
                         </p>
-                    )}
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                        {!cancelled && (
+                            <button type="button" onClick={() => setSaveOpen(true)} className="h-9 px-3.5 inline-flex items-center gap-1.5 rounded-lg ring-1 ring-line-strong bg-surface text-[13px] font-semibold text-ink hover:ring-ink transition-colors">
+                                <ListPlus size={14} aria-hidden /> {t('orderDetail', 'saveToList')}
+                            </button>
+                        )}
+                        <Link href="/dashboard/customer/support?tab=orders" className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-ink-2 hover:text-ink hover:bg-surface-2">
+                            <MessageSquare size={14} aria-hidden /> {t('orderDetail', 'messageTeam')}
+                        </Link>
+                        <a href={`mailto:Info@atlantisfmcg.com?subject=${encodeURIComponent(t('orderDetail', 'emailSubject', { ref }))}`} className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-ink-2 hover:text-ink hover:bg-surface-2">
+                            <Mail size={14} aria-hidden /> {t('orderDetail', 'emailTeam')}
+                        </a>
+                        <button type="button" onClick={() => fetchOrder()} aria-label={t('orderDetail', 'refresh')} title={t('orderDetail', 'refresh')} className="w-9 h-9 rounded-lg ring-1 ring-line flex items-center justify-center text-ink-3 hover:text-ink">
+                            <RefreshCw size={14} className={cn(refreshing && 'animate-spin')} aria-hidden />
+                        </button>
+                    </div>
                 </div>
+                {notice && <p role={notice.tone === 'err' ? 'alert' : 'status'} className={cn('mt-3 text-[13px] font-medium', notice.tone === 'err' ? 'text-[#B91C1C]' : 'text-[#047857]')}>{notice.text}</p>}
+            </div>
 
-                {/* Dispute Form */}
-                <AnimatePresence>
-                    {showDisputeForm && (
-                        <motion.div
-                            initial={{ height: 0, opacity: 0 }}
-                            animate={{ height: 'auto', opacity: 1 }}
-                            exit={{ height: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="overflow-hidden border-t border-border/50"
-                        >
-                            <form onSubmit={handleSubmitDispute} className="p-6 space-y-4">
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                        Reason *
-                                    </label>
-                                    <select
-                                        value={disputeReason}
-                                        onChange={e => setDisputeReason(e.target.value)}
-                                        className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary/50"
-                                    >
-                                        <option value="">Select a reason...</option>
-                                        {DISPUTE_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
-                                    </select>
-                                </div>
-                                <div className="space-y-2">
-                                    <label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                                        Description *
-                                    </label>
-                                    <textarea
-                                        value={disputeDescription}
-                                        onChange={e => setDisputeDescription(e.target.value)}
-                                        placeholder="Describe what happened in detail..."
-                                        rows={4}
-                                        className="w-full bg-background border border-border rounded-xl px-4 py-3 text-sm outline-none focus:border-primary/50 resize-none"
-                                    />
-                                </div>
-                                {disputeError && (
-                                    <p className="text-xs text-red-500 font-bold flex items-center gap-1.5">
-                                        <AlertTriangle size={12} /> {disputeError}
-                                    </p>
-                                )}
-                                <button type="submit" disabled={isSubmittingDispute}
-                                    className="w-full py-3 bg-cta hover:bg-cta-hover text-cta-fg font-semibold text-sm rounded-xl transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                                    {isSubmittingDispute
-                                        ? <><Loader2 size={14} className="animate-spin" /> Submitting...</>
-                                        : <><Send size={14} /> Submit Dispute</>}
-                                </button>
-                            </form>
-                        </motion.div>
+            {/* Shipped: the one action that's the buyer's to take */}
+            {order.status === 'SHIPPED' && (
+                <motion.div {...enter()} className="rounded-2xl ring-1 ring-[#BFDBFE] bg-[#EFF6FF] dark:bg-blue-500/10 dark:ring-blue-500/30 p-4 sm:p-5 flex flex-wrap items-center gap-4">
+                    <span className="w-10 h-10 rounded-xl bg-surface text-[#1D4ED8] flex items-center justify-center shrink-0" aria-hidden><Truck size={18} /></span>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-[14.5px] font-semibold text-heading">{t('orderDetail', 'shippedTitle')}</p>
+                        <p className="mt-0.5 text-[13px] text-ink-2">{t('orderDetail', 'shippedBody')}</p>
+                    </div>
+                    <button type="button" onClick={confirmReceipt} disabled={isConfirming} className="h-10 px-4 inline-flex items-center gap-1.5 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[13.5px] font-semibold disabled:opacity-60">
+                        {isConfirming ? <Loader2 size={14} className="animate-spin" aria-hidden /> : <PackageCheck size={15} aria-hidden />} {t('orderDetail', 'confirmReceipt')}
+                    </button>
+                </motion.div>
+            )}
+
+            {/* Progress + key facts */}
+            <motion.div {...enter(0.04)}>
+                <Card className="p-5 sm:p-6" labelledBy="progress-title">
+                    <h3 id="progress-title" className="sr-only">{t('orderDetail', 'progressTitle')}</h3>
+                    {cancelled ? (
+                        <div className="flex items-start gap-3">
+                            <XCircle size={22} className="text-[#B91C1C] shrink-0" aria-hidden />
+                            <div>
+                                <p className="text-[15px] font-semibold text-heading">{t('orderDetail', 'cancelledTitle')}</p>
+                                <p className="mt-0.5 text-[13.5px] text-ink-2">{t('orderDetail', 'cancelledBody')}</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <>
+                            <OrderProgress o={asListOrder} />
+                            {st.note && <p className="mt-3 text-[13px] text-ink-2">{st.vars?.number ? withNode(t('orders', st.note, { ...st.vars, number: SLOT }), <Ltr>{st.vars.number}</Ltr>) : t('orders', st.note)}</p>}
+                        </>
                     )}
-                </AnimatePresence>
+                    <dl className="mt-5 pt-5 border-t border-line grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-4">
+                        <div className="min-w-0">
+                            <dt className="text-[12px] text-ink-3">{t('orderDetail', 'factReference')}</dt>
+                            <dd className="mt-0.5 text-[14px] font-semibold text-heading"><Ltr>{ref}</Ltr></dd>
+                        </div>
+                        <div className="min-w-0">
+                            <dt className="text-[12px] text-ink-3">{t('orderDetail', 'factInvoice')}</dt>
+                            <dd className="mt-0.5 text-[14px] font-semibold text-heading">{invoice?.invoiceNumber ? <Ltr>{invoice.invoiceNumber}</Ltr> : <span className="font-normal text-ink-3">{t('orderDetail', 'factInvoiceNone')}</span>}</dd>
+                        </div>
+                        <div className="min-w-0">
+                            <dt className="text-[12px] text-ink-3">{t('orderDetail', 'factTracking')}</dt>
+                            <dd className="mt-0.5 text-[14px] font-semibold text-heading">
+                                {order.trackingNumber ? (
+                                    <>
+                                        <a href={trackingUrl(String(order.trackingNumber).trim(), order.carrier)} target="_blank" rel="noopener noreferrer" title={t('orderDetail', 'openTracking')} className="inline-flex items-center gap-1 text-teal hover:underline">
+                                            <Ltr>{order.trackingNumber}</Ltr> <ExternalLink size={12} aria-hidden />
+                                        </a>
+                                        {order.carrier && <span className="block text-[12px] font-normal text-ink-3">{t('orderDetail', 'factTrackingVia', { carrier: order.carrier })}</span>}
+                                    </>
+                                ) : <span className="text-[13px] font-normal text-ink-3">{order.status === 'DELIVERED' || cancelled ? t('payments', 'noDate') : t('orderDetail', 'factTrackingNone')}</span>}
+                            </dd>
+                        </div>
+                        <div className="min-w-0">
+                            <dt className="text-[12px] text-ink-3">{freight != null ? t('orderDetail', 'totalWithDelivery') : t('orderDetail', 'goodsTotal')}</dt>
+                            <dd className="mt-0.5 text-[16px] font-semibold text-heading tabular-nums">{money(order.totalAmount + (freight ?? 0))}</dd>
+                        </div>
+                    </dl>
+                </Card>
             </motion.div>
 
-            <Link href="/dashboard/customer" className="inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-primary transition-colors">
-                <ArrowLeft size={14} />
-                Back to Dashboard
-            </Link>
+            <div className="grid gap-5 lg:grid-cols-3 items-start">
+                <div className="lg:col-span-2 space-y-5 min-w-0">
+                    {/* Products */}
+                    <motion.div {...enter(0.08)}>
+                        <Card labelledBy="products-title">
+                            <div className="flex items-center justify-between gap-3 px-5 sm:px-6 pt-5">
+                                <CardTitle id="products-title">{t('orderDetail', 'productsTitle')}</CardTitle>
+                                <span className="text-[12.5px] text-ink-3">{t('orderDetail', 'productsCount', { count: order.items.length })}</span>
+                            </div>
+                            <ul className="divide-y divide-line px-5 sm:px-6 pb-2">
+                                {order.items.map((item) => {
+                                    const p = item.product;
+                                    const load = lineLoad(item as any);
+                                    const mixed = !!item.mixedLoadId;
+                                    const name = p?.name || item.productNameSnapshot || (mixed ? t('orders', load.kind === 'truck' ? 'mixedTruck' : 'mixedPallet') : t('orders', 'productUnavailable'));
+                                    const qtyKey = load.kind === 'truck' ? 'lineTruck' : load.kind === 'pallet' ? 'linePallet' : 'lineCarton';
+                                    const priceKey = load.kind === 'truck' ? 'perTruck' : load.kind === 'pallet' ? 'perPallet' : 'perCarton';
+                                    const variants = item.selectedVariants ? Object.entries(item.selectedVariants).filter(([k]) => !k.startsWith('__')) : [];
+                                    const pack: [string, number | null | undefined][] = [
+                                        ['unitsPerCarton', p?.unitsPerCase], ['cartonsPerPallet', p?.casesPerPallet], ['palletsPerTruck', p?.palletsPerShipment],
+                                    ];
+                                    return (
+                                        <li key={item.id} className="py-4">
+                                            <div className="flex gap-3 sm:gap-4">
+                                                <span className="relative w-16 h-16 shrink-0 rounded-xl ring-1 ring-line bg-media overflow-clip">
+                                                    {p?.images?.[0]
+                                                        // eslint-disable-next-line @next/next/no-img-element
+                                                        ? <img src={p.images[0]} alt="" loading="lazy" className="absolute inset-0 m-auto max-w-[82%] max-h-[82%] object-contain mix-blend-multiply" />
+                                                        : <span className="absolute inset-0 flex items-center justify-center text-ink-4" aria-hidden>{mixed ? <Layers size={18} /> : <Package size={18} />}</span>}
+                                                </span>
+                                                <div className="min-w-0 flex-1 sm:flex sm:items-start sm:justify-between sm:gap-6">
+                                                    <div className="min-w-0">
+                                                        <p className="text-[14.5px] font-semibold text-heading leading-snug break-words">{name}</p>
+                                                        <p className="mt-0.5 flex flex-wrap gap-x-2 text-[12.5px] text-ink-3">
+                                                            {p?.brand && <span className="font-medium text-ink-2">{p.brand}</span>}
+                                                            {p?.category && <span>{p.category}</span>}
+                                                            <span>{t('orderDetail', 'soldBy')}</span>
+                                                        </p>
+                                                        <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-ink-3">
+                                                            {p?.ean && <span className="inline-flex items-center gap-1"><Barcode size={13} className="text-ink-4" aria-hidden /><span className="sr-only">{t('orderDetail', 'ean')} </span><Ltr>{p.ean}</Ltr></span>}
+                                                            <span>{t('orders', qtyKey, { count: item.quantity })}</span>
+                                                            {load.kind !== 'carton' && load.cartons != null && <span>{t('orders', 'cartons', { count: load.cartons })}</span>}
+                                                            <span>{load.perUnit != null ? t('orders', 'perUnit', { price: money(load.perUnit) }) : t('orders', priceKey, { price: money(item.price) })}</span>
+                                                        </p>
+                                                        {variants.length > 0 && (
+                                                            <p className="mt-2 flex flex-wrap gap-1.5">
+                                                                {variants.map(([k, v]) => <span key={k} className="inline-flex items-center h-6 px-2 rounded-md bg-surface-2 ring-1 ring-line text-[11.5px] text-ink-2">{k}: <span className="ms-1 font-semibold text-ink">{v}</span></span>)}
+                                                            </p>
+                                                        )}
+                                                        {Array.isArray(item.mixComposition) && item.mixComposition.length > 0 && (
+                                                            <div className="mt-2 rounded-xl ring-1 ring-line bg-teal-soft/50 px-3 py-2 text-[12px]">
+                                                                <p className="font-semibold text-teal text-[11.5px] mb-1">{t('orderDetail', 'mixedComposition')}</p>
+                                                                <ul className="space-y-0.5 text-ink-2">
+                                                                    {item.mixComposition.map((c) => <li key={c.signature} className="break-all">{fmt.number(c.quantity)} × {prettifyVariantSignature(c.signature) || t('orderDetail', 'variantFallback')}</li>)}
+                                                                </ul>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-1.5 sm:mt-0 sm:text-end shrink-0">
+                                                        <p className="text-[14.5px] font-semibold text-heading tabular-nums">{money(load.lineTotal)}</p>
+                                                        {load.units != null && <p className="text-[12.5px] text-ink-3">{t('orders', 'units', { count: load.units })}</p>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {(pack.some(([, v]) => !!v) || p?.shelfLife) && (
+                                                <dl className="mt-3 ms-0 sm:ms-20 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 rounded-xl bg-surface-2 px-3 py-2.5 text-[12px]">
+                                                    {pack.filter(([, v]) => !!v).map(([k, v]) => (
+                                                        <div key={k}><dt className="text-ink-3">{t('orderDetail', k)}</dt><dd className="font-semibold text-ink tabular-nums">{fmt.number(v as number)}</dd></div>
+                                                    ))}
+                                                    {/* Product shelf life from the listing — not a best-before date for this delivery. */}
+                                                    {p?.shelfLife && <div><dt className="text-ink-3">{t('orderDetail', 'shelfLife')}</dt><dd className="font-semibold text-ink">{p.shelfLife}</dd></div>}
+                                                </dl>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </Card>
+                    </motion.div>
+
+                    {/* Confirmation workflow (orders placed since supplier confirmation exists) */}
+                    {order.workflow && <BuyerWorkflowPanel order={order as any} onChange={() => fetchOrder()} />}
+
+                    {/* Status history */}
+                    {order.history?.length > 0 && (
+                        <Card className="p-5 sm:p-6" labelledBy="history-title">
+                            <CardTitle id="history-title">{t('orderDetail', 'historyTitle')}</CardTitle>
+                            <ol className="mt-4 relative space-y-4 before:absolute before:top-1.5 before:bottom-1.5 before:start-[3px] before:w-px before:bg-line">
+                                {order.history.map((entry) => (
+                                    <li key={entry.id} className="relative ps-5">
+                                        <span className="absolute start-0 top-1.5 w-[7px] h-[7px] rounded-full bg-[#2EC4B6]" aria-hidden />
+                                        <p className="text-[13.5px] font-semibold text-ink">{HISTORY_LABEL[entry.newStatus] ? t('orders', HISTORY_LABEL[entry.newStatus]) : entry.newStatus}</p>
+                                        {/* Reasons are written by staff or the system (English). */}
+                                        {entry.reason && <p className="text-[12.5px] text-ink-2" lang="en">{entry.reason}</p>}
+                                        <p className="text-[12px] text-ink-4"><time dateTime={entry.createdAt}>{fmt.date(entry.createdAt, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</time></p>
+                                    </li>
+                                ))}
+                            </ol>
+                        </Card>
+                    )}
+
+                    {/* Dispute */}
+                    <Card id="dispute" className="scroll-mt-32 overflow-clip" labelledBy="dispute-title">
+                        <div className="p-5 sm:p-6">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="flex items-start gap-3 min-w-0">
+                                    <span className="w-10 h-10 rounded-xl bg-[#FFFBEB] dark:bg-amber-500/10 text-[#B45309] flex items-center justify-center shrink-0" aria-hidden><AlertTriangle size={18} /></span>
+                                    <div className="min-w-0">
+                                        <CardTitle id="dispute-title">{t('orderDetail', 'disputeTitle')}</CardTitle>
+                                        <p className="mt-0.5 text-[13px] text-ink-2"><Trans text={t('orderDetail', 'disputeLead')} tags={{ link: (c) => <Link href="/returns" className="font-medium text-teal hover:underline">{c}</Link> }} /></p>
+                                    </div>
+                                </div>
+                                {canDispute && !disputeSuccess && (
+                                    <button type="button" onClick={() => setShowDisputeForm((v) => !v)} aria-expanded={showDisputeForm} aria-controls="dispute-form"
+                                        className="h-9 px-4 inline-flex items-center gap-1.5 rounded-lg ring-1 ring-line-strong bg-surface text-[13px] font-semibold text-ink hover:ring-ink">
+                                        {showDisputeForm ? t('orderDetail', 'disputeCancel') : t('orderDetail', 'disputeOpen')}
+                                        <ChevronDown size={14} className={cn('transition-transform', showDisputeForm && 'rotate-180')} aria-hidden />
+                                    </button>
+                                )}
+                            </div>
+
+                            {existingDispute && (
+                                <div className="mt-4 rounded-xl ring-1 ring-line p-4 text-[13px]">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <p className="font-semibold text-heading">{withNode(t('orderDetail', 'disputeRef', { ref: SLOT }), <Ltr>#{String(existingDispute.id).slice(-6).toUpperCase()}</Ltr>)}</p>
+                                        <span className={cn('h-6 px-2.5 inline-flex items-center rounded-full text-[12px] font-semibold', DISPUTE_TONE[existingDispute.status] || 'bg-surface-3 text-ink-2')}>
+                                            {t('disputes', `status${existingDispute.status}`) || existingDispute.status}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1.5 text-ink-2">{t('orderDetail', 'disputeReason')}: {disputeReasonKey(existingDispute.reason) ? t('disputes', disputeReasonKey(existingDispute.reason)!) : existingDispute.reason}</p>
+                                    {existingDispute.resolution && <p className="mt-1 text-ink-2" lang="en">{t('payments', 'resolution', { text: existingDispute.resolution })}</p>}
+                                </div>
+                            )}
+                            {disputeSuccess && (
+                                <p role="status" className="mt-4 flex items-center gap-2 rounded-xl bg-[#ECFDF5] dark:bg-emerald-500/10 px-4 py-3 text-[13px] font-medium text-[#047857] dark:text-emerald-300">
+                                    <CheckCircle2 size={16} className="shrink-0" aria-hidden /> {t('orderDetail', 'disputeSubmitted')}
+                                </p>
+                            )}
+                            {!canDispute && !existingDispute && !disputeSuccess && (
+                                <p className="mt-3 text-[12.5px] text-ink-3">{t('orderDetail', 'disputeNotYet')}</p>
+                            )}
+                        </div>
+                        <AnimatePresence initial={false}>
+                            {showDisputeForm && (
+                                <motion.form id="dispute-form" onSubmit={submitDispute} noValidate
+                                    initial={reduce ? false : { height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={reduce ? undefined : { height: 0, opacity: 0 }} transition={{ duration: 0.2 }}
+                                    className="overflow-hidden border-t border-line">
+                                    <div className="p-5 sm:p-6 space-y-4">
+                                        <div>
+                                            <label htmlFor="dispute-reason" className="block text-[13px] font-semibold text-ink">{t('orderDetail', 'disputeReason')}</label>
+                                            <select id="dispute-reason" value={disputeReason} onChange={(e) => setDisputeReason(e.target.value)} required
+                                                className="mt-1.5 w-full h-11 rounded-xl ring-1 ring-line-strong bg-surface px-3 text-[14px] text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6]">
+                                                <option value="">{t('orderDetail', 'disputeReasonPlaceholder')}</option>
+                                                {DISPUTE_REASONS.map((r) => <option key={r.value} value={r.value}>{t('disputes', r.key)}</option>)}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label htmlFor="dispute-description" className="block text-[13px] font-semibold text-ink">{t('orderDetail', 'disputeDescription')}</label>
+                                            <textarea id="dispute-description" value={disputeDescription} onChange={(e) => setDisputeDescription(e.target.value)} rows={4} required
+                                                placeholder={t('orderDetail', 'disputeDescriptionPlaceholder')}
+                                                className="mt-1.5 w-full rounded-xl ring-1 ring-line-strong bg-surface px-3 py-2.5 text-[14px] text-ink outline-none focus:ring-2 focus:ring-[#2EC4B6] resize-y" />
+                                        </div>
+                                        {disputeError && <p role="alert" className="flex items-center gap-1.5 text-[13px] font-medium text-[#B91C1C]"><AlertTriangle size={13} aria-hidden /> {disputeError}</p>}
+                                        <button type="submit" disabled={isSubmittingDispute} className="h-11 px-5 inline-flex items-center gap-2 rounded-xl bg-cta hover:bg-cta-hover text-cta-fg text-[14px] font-semibold disabled:opacity-60">
+                                            {isSubmittingDispute ? <><Loader2 size={14} className="animate-spin" aria-hidden /> {t('orderDetail', 'disputeSubmitting')}</> : <><Send size={14} className="rtl:-scale-x-100" aria-hidden /> {t('orderDetail', 'disputeSubmit')}</>}
+                                        </button>
+                                    </div>
+                                </motion.form>
+                            )}
+                        </AnimatePresence>
+                    </Card>
+                </div>
+
+                {/* Right rail */}
+                <div className="space-y-5 min-w-0">
+                    <Card className="p-5 sm:p-6" labelledBy="summary-title">
+                        <CardTitle id="summary-title">{t('orderDetail', 'summaryTitle')}</CardTitle>
+                        <dl className="mt-4 space-y-2.5 text-[13.5px]">
+                            <div className="flex justify-between gap-3"><dt className="text-ink-2">{t('orderDetail', 'goods')}</dt><dd className="font-semibold text-ink tabular-nums">{money(order.totalAmount)}</dd></div>
+                            <div className="flex justify-between gap-3">
+                                <dt className="text-ink-2">{t('orderDetail', 'delivery')}</dt>
+                                <dd className={cn('tabular-nums', freight != null ? 'font-semibold text-ink' : 'text-ink-3')}>{freight != null ? money(freight) : t('orderDetail', 'deliveryQuoted')}</dd>
+                            </div>
+                            <div className="flex justify-between gap-3 pt-3 border-t border-line">
+                                <dt className="font-semibold text-heading">{freight != null ? t('orderDetail', 'totalWithDelivery') : t('orderDetail', 'goodsTotal')}</dt>
+                                <dd className="text-[16px] font-semibold text-heading tabular-nums">{money(order.totalAmount + (freight ?? 0))}</dd>
+                            </div>
+                        </dl>
+                        <p className="mt-3 text-[12px] text-ink-3">{t('orderDetail', 'vatNote')}</p>
+                    </Card>
+
+                    {(exw.length > 0 || order.shippingCompany || order.carrier) && (
+                        <Card className="p-5 sm:p-6" labelledBy="delivery-title">
+                            <CardTitle id="delivery-title">{t('orderDetail', 'deliveryTitle')}</CardTitle>
+                            {exw.length > 0 && (
+                                <div className="mt-4">
+                                    <p className="text-[12px] text-ink-3">{t('orderDetail', 'exwTitle')}</p>
+                                    <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                                        {exw.map((loc) => <li key={loc} className="inline-flex items-center gap-1.5 min-h-7 px-2.5 rounded-full bg-teal-soft text-teal text-[12px] font-semibold"><Warehouse size={12} aria-hidden /> {loc}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                            {(order.carrier || order.shippingCompany) && (
+                                <div className="mt-4">
+                                    <p className="text-[12px] text-ink-3">{t('orderDetail', 'carrier')}</p>
+                                    <p className="mt-0.5 text-[13.5px] font-semibold text-ink inline-flex items-center gap-1.5"><Truck size={14} className="text-ink-4" aria-hidden /> {order.carrier || order.shippingCompany}</p>
+                                </div>
+                            )}
+                        </Card>
+                    )}
+
+                    <Card className="p-5 sm:p-6" labelledBy="documents-title">
+                        <CardTitle id="documents-title">{t('orderDetail', 'documentsTitle')}</CardTitle>
+                        <div className="mt-4 space-y-3">
+                            {invoice ? (
+                                <div className="flex items-center justify-between gap-3">
+                                    <p className="inline-flex items-center gap-2 text-[13.5px] text-ink min-w-0"><FileText size={15} className="text-ink-4 shrink-0" aria-hidden /> {withNode(t('orderDetail', 'invoiceNumber', { number: SLOT }), <Ltr>{invoice.invoiceNumber}</Ltr>)}</p>
+                                    <button type="button" onClick={printInvoice} disabled={isDownloading} className="h-8 px-3 inline-flex items-center gap-1.5 rounded-lg ring-1 ring-line-strong text-[12.5px] font-semibold text-ink hover:ring-ink disabled:opacity-60 shrink-0">
+                                        {isDownloading ? <Loader2 size={12} className="animate-spin" aria-hidden /> : <Download size={12} aria-hidden />} {t('orderDetail', 'invoicePrint')}
+                                    </button>
+                                </div>
+                            ) : <p className="text-[13px] text-ink-3">{t('orderDetail', 'invoiceNotIssued')}</p>}
+                            {order.supplierInvoiceUrl && (
+                                <a href={order.supplierInvoiceUrl} target="_blank" rel="noopener noreferrer" className="flex items-center justify-between gap-3 rounded-xl ring-1 ring-line px-3 py-2.5 text-[13.5px] text-ink hover:ring-line-strong">
+                                    <span className="inline-flex items-center gap-2"><FileText size={15} className="text-ink-4" aria-hidden /> {t('orderDetail', 'supplierInvoiceOpen')}</span>
+                                    <ExternalLink size={13} className="text-ink-4" aria-hidden />
+                                </a>
+                            )}
+                        </div>
+                    </Card>
+
+                    {order.customer && (
+                        <Card className="p-5 sm:p-6" labelledBy="details-title">
+                            <CardTitle id="details-title">{t('orderDetail', 'detailsTitle')}</CardTitle>
+                            <div className="mt-3 space-y-1 text-[13px] text-ink-2 break-words">
+                                <p className="text-[14px] font-semibold text-ink">{order.customer.companyName || order.customer.name}</p>
+                                {order.customer.companyName && <p>{order.customer.name}</p>}
+                                {order.customer.email && <p><Ltr>{order.customer.email}</Ltr></p>}
+                                {order.customer.phone && <p><Ltr>{order.customer.phone}</Ltr></p>}
+                                {order.customer.country && <p>{order.customer.country}</p>}
+                                {order.customer.vatNumber && <p>{withNode(t('orderDetail', 'vat', { number: SLOT }), <Ltr>{order.customer.vatNumber}</Ltr>)}</p>}
+                            </div>
+                            <p className="mt-3 pt-3 border-t border-line text-[12.5px] text-ink-3 inline-flex items-center gap-1.5"><Building2 size={13} aria-hidden /> {t('orderDetail', 'handledBy')}</p>
+                        </Card>
+                    )}
+                </div>
+            </div>
+
             <SaveToListDialog orderId={order.id} open={saveOpen} onClose={() => setSaveOpen(false)} />
         </div>
     );

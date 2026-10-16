@@ -4,12 +4,11 @@ import * as React from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Package, Search, AlertTriangle, Check, ChevronRight, ChevronDown, Loader2, PackageCheck, Warehouse, Boxes, Barcode, Truck, MessageSquare, ClipboardCheck, RotateCcw, Layers } from 'lucide-react';
-import { formatPrice } from '@/lib/currency';
 import { apiFetch } from '@/lib/api';
-import { useCurrency } from '@/contexts/CurrencyContext';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { fetchMyOrders, statusKeys, orderStages, lineLoad, orderRef, supplierCount, TONE_CLASS, type BuyerOrder, type BuyerOrderItem, type StageKey } from '@/lib/buyer-orders';
+import { fetchMyOrders, statusKeys, lineLoad, orderRef, supplierCount, TONE_CLASS, type BuyerOrder, type BuyerOrderItem } from '@/lib/buyer-orders';
 import { MOTION } from '@/components/ds';
+import { OrderProgress, Ltr, withNode, SLOT, useMoney } from '@/components/orders/order-ui';
 import { cn } from '@/lib/utils';
 
 const FILTERS = [
@@ -19,10 +18,6 @@ const FILTERS = [
     { id: 'cancelled', label: 'filterCancelled', match: (o: BuyerOrder) => o.status === 'CANCELLED' },
 ] as const;
 
-const STAGE_LABEL: Record<StageKey, string> = {
-    placed: 'stagePlaced', supplier: 'stageSupplier', approved: 'stageApproved', confirmed: 'stageConfirmed',
-    inspection: 'stageInspection', shipped: 'stageShipped', delivered: 'stageDelivered',
-};
 const INSPECTION_LABEL = { SCHEDULED: 'inspectionScheduled', PASSED: 'inspectionPassed', PASSED_WITH_FINDINGS: 'inspectionFindings', FAILED: 'inspectionFailed' } as const;
 const PAYMENT_LABEL: Record<string, { key: string; tone: string }> = {
     PAID: { key: 'paymentPaid', tone: 'bg-[#ECFDF5] text-[#047857] dark:bg-emerald-500/15 dark:text-emerald-300' },
@@ -33,63 +28,6 @@ const PAYMENT_LABEL: Record<string, { key: string; tone: string }> = {
 const LINES_SHOWN = 3;
 
 /** Text that must stay left-to-right inside Arabic layouts (EANs, order refs, tracking numbers). */
-/** Put a node (e.g. an LTR order ref) where a translation placed SLOT, keeping the language's word order. */
-const SLOT = '\u0000';
-function withNode(text: string, node: React.ReactNode) {
-    const [before, after = ''] = text.split(SLOT);
-    return <>{before}{node}{after}</>;
-}
-const Ltr = ({ children, className }: { children: React.ReactNode; className?: string }) => <bdi dir="ltr" className={cn('tabular-nums', className)}>{children}</bdi>;
-
-function useMoney() {
-    const { meta } = useLanguage();
-    useCurrency(); // re-render when the display currency changes
-    return React.useCallback((n: number) => formatPrice(n, undefined, meta.intl), [meta.intl]);
-}
-
-/* ── Progress ─────────────────────────────────────────────────────────── */
-
-function Progress({ o }: { o: BuyerOrder }) {
-    const { t } = useLanguage();
-    const reduce = useReducedMotion();
-    const stages = orderStages(o);
-    const cancelled = o.status === 'CANCELLED';
-    const currentIdx = stages.findIndex((s) => s.state === 'current');
-    const at = currentIdx === -1 ? (cancelled ? -1 : stages.length - 1) : currentIdx;
-    return (
-        <div>
-            <ol aria-label={t('orders', 'progressAria')} className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${stages.length}, minmax(0, 1fr))` }}>
-                {stages.map((s, i) => (
-                    <li key={s.key} aria-current={s.state === 'current' ? 'step' : undefined} className="min-w-0">
-                        <span className="block h-1.5 rounded-full bg-surface-3 overflow-hidden" aria-hidden>
-                            {(s.state === 'done' || s.state === 'current') && (
-                                <motion.span
-                                    className={cn('block h-full rounded-full origin-[left] rtl:origin-[right]', s.state === 'done' ? 'bg-[#0E7C74]' : 'bg-[#2EC4B6]')}
-                                    initial={reduce ? false : { scaleX: 0 }}
-                                    animate={{ scaleX: s.state === 'done' ? 1 : 0.5 }}
-                                    transition={{ duration: 0.5, ease: MOTION.ease, delay: reduce ? 0 : i * 0.08 }}
-                                />
-                            )}
-                        </span>
-                        <span className={cn('mt-2 hidden sm:flex items-start gap-1 text-[12px] leading-tight',
-                            s.state === 'done' ? 'text-ink-2' : s.state === 'current' ? 'text-heading font-semibold' : 'text-ink-4')}>
-                            {s.state === 'done' && <Check size={12} strokeWidth={2.5} className="mt-px shrink-0 text-[#0E7C74]" aria-hidden />}
-                            <span className="min-w-0 break-words">{t('orders', STAGE_LABEL[s.key])}</span>
-                            <span className="sr-only">{s.state === 'done' ? ' ✓' : ''}</span>
-                        </span>
-                    </li>
-                ))}
-            </ol>
-            {/* Phones: the stage labels don't fit under five segments — name the current one instead. */}
-            {!cancelled && at >= 0 && (
-                <p className="sm:hidden mt-2 text-[12.5px] text-ink-3">
-                    {t('orders', 'stepOf', { current: at + 1, total: stages.length })} · <span className="font-semibold text-heading">{t('orders', STAGE_LABEL[stages[at].key])}</span>
-                </p>
-            )}
-        </div>
-    );
-}
-
 /* ── One product row ──────────────────────────────────────────────────── */
 
 function LineRow({ i }: { i: BuyerOrderItem }) {
@@ -269,7 +207,7 @@ function OrderCard({ o, onChanged, index }: { o: BuyerOrder; onChanged: () => vo
 
             {/* Where it stands */}
             <div className="px-4 sm:px-6 pt-1 pb-4">
-                <Progress o={o} />
+                <OrderProgress o={o} />
                 {(st.note || o.inspection) && (
                     <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12.5px] text-ink-3">
                         {st.note && <span>{st.vars?.number ? withNode(t('orders', st.note, { ...st.vars, number: SLOT }), <Ltr>{st.vars.number}</Ltr>) : t('orders', st.note)}</span>}
@@ -285,7 +223,7 @@ function OrderCard({ o, onChanged, index }: { o: BuyerOrder; onChanged: () => vo
                     {t('orders', 'details')} <ChevronRight size={14} className="rtl:rotate-180" aria-hidden />
                 </Link>
                 {(o.status === 'SHIPPED' || o.status === 'DELIVERED') ? (
-                    <Link href="/dashboard/customer/support?tab=orders" className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors">
+                    <Link href={`/dashboard/customer/orders/${o.id}#dispute`} className="h-9 px-3 inline-flex items-center gap-1.5 rounded-lg text-[13px] font-semibold text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors">
                         <AlertTriangle size={14} aria-hidden /> {t('orders', 'reportProblem')}
                     </Link>
                 ) : o.status !== 'CANCELLED' && (

@@ -52,11 +52,11 @@ export default function SupplierEarningsPage() {
             sub: 'Payouts sent to your account'
         },
         {
-            label: 'Pending Escrow',
+            label: 'Pending',
             value: formatPrice(data.pendingEscrow),
             icon: Clock,
             color: 'amber',
-            sub: 'Funds held in secure escrow'
+            sub: 'Not yet paid out'
         },
         {
             label: 'Marketplace Fees',
@@ -81,9 +81,6 @@ export default function SupplierEarningsPage() {
                         className="p-2.5 rounded-xl bg-card border border-border hover:bg-muted transition-colors text-muted-foreground"
                     >
                         <RefreshCw size={18} className={isLoading ? 'animate-spin' : ''} />
-                    </button>
-                    <button className="px-6 py-2.5 bg-primary text-primary-foreground font-black text-xs uppercase tracking-widest rounded-xl hover:scale-105 transition-all shadow-lg shadow-primary/20 flex items-center gap-2">
-                        <Download size={14} /> Export CSV
                     </button>
                 </div>
             </div>
@@ -143,9 +140,7 @@ export default function SupplierEarningsPage() {
                         <div className="space-y-1">
                             <p className="text-xs font-black text-primary uppercase tracking-widest">How Payouts Work</p>
                             <p className="text-[11px] text-primary/80 font-medium leading-relaxed">
-                                Our platform uses a secure escrow system. When a buyer pays, funds are held by Stripe (Pending Escrow). 
-                                Once the order is marked as <span className="font-black underline px-1">DELIVERED</span>, 
-                                funds are automatically released to your connected Stripe account minus the platform fee.
+                                Payouts are arranged by the Atlantis team under the confirmed terms of each order. Atlantis doesn’t hold payments in escrow, and nothing is released automatically. Contact the team about a specific payout.
                             </p>
                         </div>
                     </div>
@@ -156,9 +151,6 @@ export default function SupplierEarningsPage() {
                             <h3 className="text-lg font-black text-foreground flex items-center gap-2">
                                 <History size={20} className="text-primary" /> Recent Settlements
                             </h3>
-                            <button className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors">
-                                <Filter size={14} /> Filter
-                            </button>
                         </div>
                         
                         <div className="overflow-x-auto">

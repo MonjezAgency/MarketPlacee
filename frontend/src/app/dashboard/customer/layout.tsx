@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { LayoutGrid, Package, ListChecks, Settings, Target, LifeBuoy } from 'lucide-react';
+import { LayoutGrid, Package, ListChecks, Settings, Target, LifeBuoy, Receipt } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -10,6 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 const TABS = [
     { href: '/dashboard/customer', label: 'overview', icon: LayoutGrid, exact: true },
     { href: '/dashboard/customer/orders', label: 'orders', icon: Package },
+    { href: '/dashboard/customer/payments', label: 'payments', icon: Receipt },
     { href: '/dashboard/customer/lists', label: 'lists', icon: ListChecks },
     { href: '/dashboard/customer/targets', label: 'targets', icon: Target },
     { href: '/dashboard/customer/support', label: 'support', icon: LifeBuoy },

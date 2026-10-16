@@ -180,8 +180,8 @@ function PayoutSettingsContent() {
                                     </div>
                                     <p className="text-xs text-muted-foreground max-w-sm">
                                         {stripeStatus?.onboarded 
-                                            ? `Your Stripe account (${stripeStatus.accountId}) is active. Platform takes 5% commission on all orders.` 
-                                            : "Connect your bank account via Stripe Express to receive automated payouts. Platform takes 5% commission."}
+                                            ? `Your Stripe account (${stripeStatus.accountId}) is active.` 
+                                            : "Connect your bank account via Stripe Express. Payout timing and terms are agreed with the Atlantis team."}
                                     </p>
                                 </div>
                                 
@@ -270,9 +270,7 @@ function PayoutSettingsContent() {
                         </div>
 
                         <div className="pt-4 border-t border-border flex justify-between items-center">
-                            <p className="text-[10px] text-muted-foreground max-w-[250px] font-medium leading-relaxed italic">
-                                * Payout details are encrypted with AES-256 before storage.
-                            </p>
+                            <span />
                             <button
                                 type="submit"
                                 disabled={isLoading}

@@ -47,9 +47,9 @@ const IDENTICAL_EVERYWHERE: Record<string, string> = {
     'ads.cocaColaTitle': 'brand name',
 };
 const IDENTICAL_OK: Partial<Record<Locale, Record<string, string>>> = {
-    fr: { 'orders.cartons': '"carton(s)" is the French word (glossary)', 'orders.lineCarton': '"carton(s)" is the French word (glossary)' },
+    fr: { 'orders.cartons': '"carton(s)" is the French word (glossary)', 'orders.lineCarton': '"carton(s)" is the French word (glossary)', 'workflow.unitCarton': '"carton" is the French word (glossary)', 'workflow.version': '"version" is the French word' },
     ro: { 'categories.unisex': 'standard Romanian word', 'userMenu.moderator': 'the Romanian word for the role' },
-    it: {},
+    it: { 'workflow.unitPallet': '"pallet" is the Italian term (glossary)' },
     es: { 'categories.unisex': 'standard Spanish word', 'cart.subtotal': 'standard Spanish checkout term' },
     pt: { 'cart.subtotal': 'standard Portuguese checkout term' },
 };
@@ -134,6 +134,14 @@ async function main() {
         'src/app/dashboard/customer/layout.tsx',
         'src/app/dashboard/customer/orders/page.tsx',
         'src/app/returns/ReturnsClient.tsx',
+        'src/app/dashboard/customer/orders/[id]/page.tsx',
+        'src/app/dashboard/customer/payments/page.tsx',
+        'src/components/orders/order-ui.tsx',
+        'src/components/orders/BuyerWorkflowPanel.tsx',
+        'src/components/orders/DeliveryBreakdown.tsx',
+        'src/components/orders/InspectionReport.tsx',
+        'src/app/dashboard/kyc/page.tsx',
+        'src/app/dashboard/customer/orders/[id]/track/page.tsx',
     ];
     const ALLOWED_TEXT = /^(ATLAN|TIS\.|·|—|–|\/|\+|×|#|Info@atlantisfmcg\.com|\d+\/\d+)$/;
     for (const rel of SCOPE) {

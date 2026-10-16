@@ -158,7 +158,7 @@ export function TrustNav({ current }: { current: 'inspection' | 'payments' | 'wa
             <Container size="content" className="grid gap-4 sm:grid-cols-2">
                 {pages.map((p) => (
                     <Link key={p.key} href={p.href} className="group rounded-2xl bg-surface ring-1 ring-line p-6 transition-shadow duration-200 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
-                        <p className="text-subtitle text-heading inline-flex items-center gap-2">{p.title} <ArrowRight size={16} className="text-teal transition-transform duration-200 group-hover:translate-x-1" aria-hidden /></p>
+                        <p className="text-subtitle text-heading inline-flex items-center gap-2">{p.title} <ArrowRight size={16} className="text-teal transition-transform duration-200 group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" aria-hidden /></p>
                         <p className="mt-1 text-body text-ink-3">{p.desc}</p>
                     </Link>
                 ))}

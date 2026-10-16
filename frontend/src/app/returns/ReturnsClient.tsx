@@ -11,9 +11,9 @@ import { cn } from '@/lib/utils';
 
 /**
  * Returns & Refunds policy. The wording keeps the policy's meaning (steps,
- * eligibility, timelines, fees); the only factual change is where problems
- * are reported — buyers report through Support → Order conversations, the
- * order-level channel that exists today.
+ * eligibility, timelines, fees). Disputes are opened from the order page
+ * (step 2, the existing POST /disputes form); questions go to Support →
+ * Order conversations.
  */
 const SUPPORT_ORDERS = '/dashboard/customer/support?tab=orders';
 
@@ -24,7 +24,7 @@ const FACTS = [
 ];
 const STEPS = [
     { icon: PackageX, t: 'step1Title', d: 'step1Body' },
-    { icon: MessageSquareWarning, t: 'step2Title', d: 'step2Body' },
+    { icon: MessageSquareWarning, t: 'step2Title', d: 'step2Body', href: '/dashboard/customer/orders' },
     { icon: Camera, t: 'step3Title', d: 'step3Body' },
     { icon: Scale, t: 'step4Title', d: 'step4Body' },
 ];
@@ -56,7 +56,7 @@ function StepRail() {
                         <p className="text-small font-semibold text-teal">{t('returns', 'stepLabel', { n: i + 1 })}</p>
                         <h3 className="mt-1 font-sans text-subtitle text-heading">{t('returns', s.t)}</h3>
                         <p className="mt-2 text-body text-ink-2">
-                            <Trans text={t('returns', s.d)} tags={{ link: inlineLink(SUPPORT_ORDERS) }} />
+                            <Trans text={t('returns', s.d)} tags={{ link: inlineLink((s as { href?: string }).href || SUPPORT_ORDERS) }} />
                         </p>
                     </div>
                 </Reveal>

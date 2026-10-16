@@ -61,7 +61,6 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     const { user, logout, isAuthReady } = useAuth();
     const { theme, setTheme } = useTheme();
     const router = useRouter();
-    const [stats, setStats] = React.useState<any>(null);
     const [showTour, setShowTour] = React.useState(false);
     const [pendingCounts, setPendingCounts] = React.useState<Record<string, number>>({
         orders: 0,
@@ -118,20 +117,8 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
         }
     ];
 
-    // Stats Polling
-    React.useEffect(() => {
-        const fetchStats = async () => {
-            try {
-                const res = await apiFetch(`/dashboard/supplier`);
-                if (res.ok) setStats(await res.json());
-            } catch (err) {
-                console.error('Failed to fetch header stats:', err);
-            }
-        };
-        fetchStats();
-        const interval = setInterval(fetchStats, 60000);
-        return () => clearInterval(interval);
-    }, []);
+    // (A header stats poll of /dashboard/supplier used to run here every 60 s; its result was never
+    // shown and the response carries buyer-price revenue — see the gap register, SUP findings.)
 
     // Counts Polling
     React.useEffect(() => {
