@@ -1,8 +1,10 @@
 import { defineSection } from './define';
 
 /**
- * Legacy supplier dashboard at /dashboard/supplier (overview, product editor,
- * product creation workspace) and the shared dashboard Sidebar.
+ * Legacy supplier dashboard pages under src/app/dashboard/supplier (overview,
+ * product editor, product creation workspace) and the shared dashboard Sidebar.
+ * Those URLs now redirect to /supplier (see src/middleware.ts), so the pages
+ * are unreachable; the strings stay until the files are removed.
  */
 export default defineSection('legacySupplier', [
     'src/app/dashboard/supplier/page.tsx',

@@ -31,7 +31,7 @@ export default function Footer() {
         { title: t('footer', 'colSuppliers'), links: [
             // Suppliers register like buyers (Supplier preselected) and are approved by Atlantis.
             { href: '/auth/register?role=supplier', label: t('footer', 'becomeSupplier') },
-            { href: '/auth/login?redirect=/dashboard/supplier', label: t('footer', 'supplierSignIn') },
+            { href: '/auth/login?redirect=/supplier', label: t('footer', 'supplierSignIn') },
             { href: '/targets', label: t('footer', 'sourcingRequests') },
         ] },
         { title: t('footer', 'colCompany'), links: [

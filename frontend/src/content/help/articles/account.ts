@@ -81,7 +81,7 @@ export const account: Article[] = [
             { h2: 'Account statuses' },
             { table: { head: ['Status', 'What it means', 'What you can do'], rows: [
                 ['Awaiting approval', 'The Atlantis team hasn\'t reviewed the account yet.', 'Wait for the approval email. Questions: Info@atlantisfmcg.com'],
-                ['Active', 'Approved. You can sign in and use the platform.', 'Buyers start in the catalog; suppliers in their [supplier dashboard](/dashboard/supplier).'],
+                ['Active', 'Approved. You can sign in and use the platform.', 'Buyers start in the catalog; suppliers in their [supplier dashboard](/supplier).'],
                 ['Rejected', 'The application wasn\'t accepted.', 'You receive an email. Contact Info@atlantisfmcg.com to discuss it.'],
                 ['Blocked', 'Access has been suspended.', 'Contact Info@atlantisfmcg.com.'],
             ] } },

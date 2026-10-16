@@ -429,8 +429,8 @@ export class EmailService {
     const isSupplier = role.toUpperCase() === 'SUPPLIER';
     
     // Supplier CTA → /supplier (the supplier hub, layout lives at
-    //   frontend/src/app/supplier/layout.tsx — NOT /dashboard/supplier
-    //   which 404s).
+    //   frontend/src/app/supplier/layout.tsx; the old dashboard URL only
+    //   redirects there).
     // Buyer CTA → / (homepage / catalog).
     const ctaUrl = isSupplier
       ? `${frontendUrl}/supplier`
@@ -686,7 +686,7 @@ export class EmailService {
           <p><strong>Company:</strong> ${companyName}</p>
           <p><strong>Email:</strong> ${userEmail}</p>
           <div style="margin-top: 25px; text-align: center;">
-            <a href="${frontendUrl}/admin/verifications" style="display: inline-block; background:#1BC7C9; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight: bold;">
+            <a href="${frontendUrl}/admin/users?status=PENDING_APPROVAL" style="display: inline-block; background:#1BC7C9; color:#fff; padding:12px 24px; border-radius:8px; text-decoration:none; font-weight: bold;">
               Review Application
             </a>
           </div>

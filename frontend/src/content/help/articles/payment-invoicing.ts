@@ -17,13 +17,13 @@ export const paymentInvoicing: Article[] = [
             ] },
             { h2: 'After you order' },
             { steps: [
-                'The supplier confirms the quantities and availability.',
+                'Every supplier on the order accepts the quantities, prices and availability, and Atlantis approves the order.',
                 'The Atlantis team contacts you to finalise payment and to confirm the delivery cost.',
                 'Payment details, timing and method are agreed with you directly by the Atlantis team.',
             ] },
             { note: 'Atlantis will never ask you to pay through a link from an unknown address. If you receive a payment request you are unsure about, check it with Info@atlantisfmcg.com before paying.', tone: 'warning' },
             { faq: [
-                { q: 'Why was I not asked to pay?', a: 'Freight depends on the destination and the final load, so the total is only complete after the order is confirmed. The Atlantis team agrees the payment with you at that point.' },
+                { q: 'Why was I not asked to pay?', a: 'Your order is a request until every supplier accepts it and Atlantis approves it. Freight may also still need a quote. The Atlantis team agrees the payment with you once the order is confirmed.' },
                 { q: 'Which currency will I pay in?', a: 'Orders are priced in EUR. Amounts shown in other currencies are estimates. See [Currencies](/help/payment-invoicing/currencies).' },
             ] },
         ],

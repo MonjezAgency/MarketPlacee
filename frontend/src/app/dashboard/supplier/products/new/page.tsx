@@ -124,7 +124,7 @@ export default function AddProductWorkspace() {
             });
 
             if (res.ok) {
-                router.push('/dashboard/supplier');
+                router.push('/supplier');
             } else {
                 const err = await res.json();
                 alert(L('npCreateFailed', { message: err.message || L('npCreateFailedDefault') }));
@@ -142,7 +142,7 @@ export default function AddProductWorkspace() {
             <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[#E5E7EB] px-6 py-4">
                 <div className="max-w-[1440px] mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/dashboard/supplier" aria-label={L('npBack')} className="w-10 h-10 flex items-center justify-center rounded-xl border border-[#E5E7EB] hover:bg-[#F1F5F9] transition-all">
+                        <Link href="/supplier" aria-label={L('npBack')} className="w-10 h-10 flex items-center justify-center rounded-xl border border-[#E5E7EB] hover:bg-[#F1F5F9] transition-all">
                             <ChevronLeft size={20} className="text-[#6B7280] rtl:rotate-180" />
                         </Link>
                         <div>

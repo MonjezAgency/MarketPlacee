@@ -10,7 +10,7 @@ export const suppliers: Article[] = [
         keywords: ['supplier dashboard', 'hub', 'overview', 'navigation', 'sales'],
         prerequisites: ['An approved supplier account.'],
         blocks: [
-            { p: 'After you sign in, open your [supplier dashboard](/dashboard/supplier). Every section below is one click away from it.' },
+            { p: 'After you sign in, open your [supplier dashboard](/supplier). Every section below is one click away from it.' },
             { h2: 'Sections' },
             { table: { head: ['Section', 'Use it to'], rows: [
                 ['[Business Overview](/supplier)', 'See sales, orders, what needs your attention, and stock alerts'],
@@ -28,7 +28,7 @@ export const suppliers: Article[] = [
                 '**Top products, Recent orders, Stock alerts, Products needing your input, Recent stock changes and Sales by category.**',
             ] },
             { note: 'All sales figures use **your** prices, before the Atlantis margin. You never see the price the buyer pays.', tone: 'info' },
-            { p: 'The Hub is available in 12 languages. Use the language switcher in the header.' },
+            { p: 'The Hub is available in seven languages: English, Arabic, French, Romanian, Italian, Spanish and Portuguese. Use the language switcher in the header.' },
         ],
         related: ['suppliers/create-a-product', 'suppliers/handle-orders', 'suppliers/what-buyers-and-suppliers-see'],
     },
@@ -251,7 +251,7 @@ export const suppliers: Article[] = [
             ] },
             { h2: 'After Atlantis approves' },
             { list: [
-                'Atlantis books the carrier and marks the order shipped and delivered. Suppliers don\'t change those statuses.',
+                'Atlantis books the carrier and marks the order shipped; the buyer (or Atlantis) then confirms delivery. Suppliers don\'t change those statuses.',
                 'Attach your own invoice (image or PDF, up to 10 MB) on confirmed, shipped or delivered orders. The buyer can see it.',
             ] },
         ],
