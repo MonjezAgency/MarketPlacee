@@ -1868,10 +1868,17 @@ export class ProductsService {
     }
 
     /** Keep the supplier's original spreadsheet row with the product (every column, as typed). */
-    async recordImportSource(productId: string, actorId: string, source: { file?: string; sheet: string; row: number; columns: Record<string, string> }) {
+    /** Licence / attribution of photos that aren't the supplier's own (merged with what is saved). */
+    async setImageCredits(productId: string, credits: Record<string, unknown>) {
+        const p: any = await this.prisma.product.findUnique({ where: { id: productId }, select: { imageCredits: true } as any });
+        const merged = { ...((p?.imageCredits as any) || {}), ...credits };
+        await this.prisma.product.update({ where: { id: productId }, data: { imageCredits: merged } as any });
+    }
+
+    async recordImportSource(productId: string, actorId: string, source: { file?: string; sheet: string; row: number; columns: Record<string, string>; [k: string]: unknown }) {
         const json = JSON.stringify(source);
         await this.prisma.productChangeLog.create({
-            data: { productId, actorId, field: 'import', oldValue: null, newValue: json.length > 8000 ? json.slice(0, 8000) : json, reason: `Imported from ${source.file || 'a supplier file'}, sheet “${source.sheet}”, row ${source.row}` },
+            data: { productId, actorId, field: 'import', oldValue: null, newValue: json.length > 8000 ? json.slice(0, 8000) : json, reason: `Imported from ${source.file || 'a supplier file'}, ${source.page ? `page ${source.page}, ` : ''}sheet “${source.sheet}”, row ${source.row}` },
         });
     }
 

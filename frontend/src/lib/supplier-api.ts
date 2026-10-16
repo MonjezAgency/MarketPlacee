@@ -70,6 +70,9 @@ export const supplierApi = {
     importParse: (file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/supplier-catalog/import/parse', { method: 'POST', body: fd }).then((r) => json<any>(r)); },
     importAnalyse: (file: Blob, name: string) => { const fd = new FormData(); fd.append('file', file, name); return apiFetch('/supplier-catalog/import/analyse', { method: 'POST', body: fd }).then((r) => json<any>(r)); },
     importValidate: (body: any) => post('/supplier-catalog/import/validate', body).then((r) => json<any>(r)),
+    /** Background search for photos by barcode (rows without a photo); poll photoLookupStatus. */
+    photoLookup: (items: { key: string; ean: string; name?: string; brand?: string; weight?: string; category?: string }[]) => post('/supplier-catalog/import/photo-lookup', { items }).then((r) => json<{ jobId: string; total: number; lookups: number; etaSeconds: number }>(r)),
+    photoLookupStatus: (jobId: string) => apiFetch(`/supplier-catalog/import/photo-lookup/${encodeURIComponent(jobId)}`, { cache: 'no-store' }).then((r) => json<{ done: boolean; total: number; completed: number; etaSeconds: number; results: any[]; failed: string | null }>(r)),
     /** One import batch: the rows as JSON plus that batch's photos (named by their path in the workbook). */
     importCommit: (payload: any, photos: { path: string; blob: Blob }[]) => {
         const fd = new FormData();

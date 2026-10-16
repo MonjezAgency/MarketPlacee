@@ -20,6 +20,8 @@ export interface ProductVariant {
 }
 
 export interface Product {
+    /** Photo URL → source, licence and attribution, for photos from an open product database. */
+    imageCredits?: Record<string, { source: string; license?: string; licenseUrl?: string; attribution?: string; sourceUrl?: string; barcode?: string }> | null;
     id: string;        // Required
     name: string;      // Required
     price: number;     // Required

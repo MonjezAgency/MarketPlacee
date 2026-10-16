@@ -4,6 +4,8 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { ALL_FIELDS, IMPORT_FIELDS, buildFromValues, labelOf, weightAmounts, weightFromName, type BuiltRow, type FieldKey } from './product-import';
 import { missingForPublish, realImages } from './catalog-rules';
+import { ImportEnrichmentService } from './import-enrichment.service';
+import { ImageLookupService } from './image-lookup.service';
 
 /** Where a field's value comes from when the file has no column for it. */
 export interface ImportSource {
@@ -17,7 +19,7 @@ export interface ImportRequest {
     sheets: {
         name: string;
         columns: { index: number; key: string; header: string; parent?: string }[];
-        rows: { row: number; cells: string[]; shown?: Record<string, string>; section?: string; images?: string[] }[];
+        rows: { row: number; cells: string[]; shown?: Record<string, string>; section?: string; images?: string[]; page?: number; source?: string; edited?: Record<string, string> }[];
     }[];
     /** Column key (normalised header) → field, or '' to leave the column out. */
     mapping: Record<string, FieldKey | '' | null>;
@@ -30,6 +32,13 @@ export interface ImportRequest {
         decimal?: Record<string, '.' | ','>;
     };
     onExisting?: 'skip' | 'update';
+    /** 'pdf' when the rows were read from a PDF (row numbers then count within the PDF table). */
+    format?: 'pdf' | 'sheet';
+    /**
+     * Photos the supplier chose from the barcode photo search, by row key.
+     * Only a photo the search returned for that row's barcode is accepted.
+     */
+    externalImages?: Record<string, { url: string }>;
     /** Commit only: when the whole import started, and whether this is its last batch. */
     startedAt?: string;
     last?: boolean;
@@ -73,7 +82,7 @@ const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); cons
 @Injectable()
 export class SupplierImportService {
     private readonly logger = new Logger(SupplierImportService.name);
-    constructor(private readonly products: ProductsService, private readonly notifications: NotificationsService, private readonly storage: SupabaseStorageService) {}
+    constructor(private readonly products: ProductsService, private readonly notifications: NotificationsService, private readonly storage: SupabaseStorageService, private readonly enrichment: ImportEnrichmentService, private readonly imageLookup: ImageLookupService) {}
 
     /** Reject malformed requests; return the mapping problems the supplier must fix first. */
     private checkRequest(req: ImportRequest, maxRows = MAX_IMPORT_ROWS_TOTAL) {
@@ -119,7 +128,7 @@ export class SupplierImportService {
             ? [...new Set([...(await this.products.knownBrands(supplierId)), ...req.sheets.map((s) => s.name.trim()), ...req.sheets.flatMap((s) => s.rows.map((r) => r.section || '').filter(Boolean))])]
             : [];
 
-        type Item = { sheet: string; key: string; built: BuiltRow; from: Partial<Record<FieldKey, { column: string; value: string }>>; images: string[]; original: Record<string, string> };
+        type Item = { sheet: string; key: string; built: BuiltRow; from: Partial<Record<FieldKey, { column: string; value: string }>>; images: string[]; original: Record<string, string>; page?: number; source?: string; edited?: Record<string, string>; external?: { url: string; credit: any } };
         const items: Item[] = [];
         for (const sh of req.sheets) {
             const cols = (sh.columns || []).filter((c) => mapping[c.key]);
@@ -163,11 +172,24 @@ export class SupplierImportService {
                 if (sources.brand?.kind === 'fromName' && !colFields.has('brand') && !values.brand) built.warnings.push('No brand found at the start of the name — add the brand before this product can be reviewed.');
                 const original: Record<string, string> = {};
                 (sh.columns || []).forEach((c) => { const v = cells[c.index]; if (v !== undefined && String(v).trim() !== '') original[c.parent ? `${c.parent} › ${c.header}` : c.header] = String(v); });
-                items.push({ sheet: sh.name, key: `${sh.name}!${r.row}`, built, from, images: (Array.isArray(r.images) ? r.images : []).filter((p) => typeof p === 'string').slice(0, 5), original });
+                const page = Number.isInteger(r.page) && r.page! > 0 ? r.page : undefined;
+                const edited = r.edited && typeof r.edited === 'object' ? Object.fromEntries(Object.entries(r.edited).slice(0, 40).map(([k, v]) => [String(k).slice(0, 80), String(v ?? '').slice(0, 300)])) : undefined;
+                items.push({ sheet: sh.name, key: `${sh.name}!${r.row}`, built, from, images: (Array.isArray(r.images) ? r.images : []).filter((p) => typeof p === 'string').slice(0, 5), original, page, source: typeof r.source === 'string' ? r.source.slice(0, 400) : undefined, edited });
             }
         }
-        const where = (it: Item) => (req.sheets.length > 1 ? `sheet “${it.sheet}” row ${it.built.row}` : `row ${it.built.row}`);
+        const where = (it: Item) => `${req.sheets.length > 1 ? `sheet “${it.sheet}” row ${it.built.row}` : `row ${it.built.row}`}${it.page ? ` (page ${it.page})` : ''}`;
 
+        // A photo chosen from the barcode search: only for rows without a photo of their own,
+        // and only a photo that search returned for this row's barcode.
+        for (const it of items) {
+            const pick = req.externalImages?.[it.key];
+            if (!pick?.url || it.built.product.images?.length || it.images.length || !it.built.product.ean) continue;
+            const cand = this.enrichment.candidateFor(it.built.product.ean, String(pick.url));
+            if (!cand) { it.built.warnings.push('The photo chosen from the barcode search can’t be used any more — search again or add your own photo.'); continue; }
+            it.external = { url: cand.url, credit: { source: cand.source, license: cand.license, licenseUrl: cand.licenseUrl, attribution: cand.attribution, sourceUrl: cand.sourceUrl, barcode: cand.barcode } };
+            it.built.missing = it.built.missing.filter((m) => m.field !== 'images');
+            it.built.notes.imageUrl = `Photo from ${cand.source} (${cand.license}), chosen by you`;
+        }
         // A picture placed on the row counts as the product photo when the file has no image link.
         for (const it of items) {
             if (it.images.length && !it.built.product.images?.length) {
@@ -237,10 +259,12 @@ export class SupplierImportService {
                         if (old && Math.abs(nw - old) / old > 0.5) b.warnings.push(`Price per case changes by ${nw > old ? '+' : ''}${Math.round(((nw - old) / old) * 100)}% (${Number(old).toFixed(2)} → ${Number(nw).toFixed(2)}). Check before updating.`);
                     }
                 }
+                // A photo chosen from the barcode search for a saved product that has none: proposed like any other change.
+                if (it.external && !realImages(ex.images).length) changes.push({ field: 'images', label: 'Photo', from: '—', to: it.external.credit.source });
                 if (ex.status === 'REJECTED') b.errors.push({ field: 'ean', label: 'Rejected listing', reason: 'This product was rejected and can’t be updated. Create a new listing that addresses the reason.' });
                 // An update fills in the saved product: judge completeness on the result, not on the row alone.
                 const filled = Object.fromEntries(Object.entries(p).filter(([, v]) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length)));
-                const merged: any = { ...ex, ...filled, images: realImages(ex.images).length ? ex.images : (p.images?.length ? p.images : it.images.length ? ['https://picture-from-file.invalid/'] : []) }; // marker for the completeness check only
+                const merged: any = { ...ex, ...filled, images: realImages(ex.images).length ? ex.images : (p.images?.length ? p.images : it.images.length || it.external ? ['https://picture-from-file.invalid/'] : []) }; // marker for the completeness check only
                 b.missing = missingForPublish({ ...merged, basePrice: filled.price ?? ex.basePrice }).filter((m) => !b.errors.some((e) => e.field === m.field));
             }
             const state = b.errors.length ? 'error' : ex ? (onExisting === 'skip' ? 'skip' : changes.length ? 'update' : 'unchanged') : b.missing.length ? 'draft' : 'ready';
@@ -251,10 +275,10 @@ export class SupplierImportService {
                 priceEur: p.price ?? null, supplierPrice: p.supplierPrice ?? null, supplierCurrency: p.supplierCurrency ?? null,
                 stock: p.stock ?? null, origin: p.origin, exwLocation: p.exwLocation, weight: p.weight,
                 unitsPerCase: p.unitsPerCase ?? null, casesPerPallet: p.casesPerPallet ?? null, moq: p.moq ?? null, moqUnit: p.moqUnit, shelfLife: p.shelfLife,
-                images: it.images, imageStatus: p.images?.length ? 'from_link' : it.images.length ? 'from_file' : 'missing',
+                images: it.images, imageStatus: p.images?.length ? 'from_link' : it.images.length ? 'from_file' : it.external ? 'from_lookup' : 'missing', externalImage: it.external?.url ?? null, page: it.page ?? null,
                 from: it.from, notes: b.notes, aux: b.aux,
                 errors: b.errors, missing: b.missing, warnings: b.warnings,
-                existing: ex ? { id: ex.id, name: ex.name, status: ex.status } : null, changes,
+                existing: ex ? { id: ex.id, name: ex.name, status: ex.status, hasPhoto: realImages(ex.images).length > 0 } : null, changes,
             };
         });
         const count = (s: string) => rows.filter((r) => r.state === s).length;
@@ -262,12 +286,13 @@ export class SupplierImportService {
             total: rows.length, ready: count('ready'), draft: count('draft'), update: count('update'), unchanged: count('unchanged'), skip: count('skip'), error: count('error'),
             create: count('ready') + count('draft'), withWarnings: rows.filter((r) => r.warnings.length).length,
             photosFromFile: rows.filter((r) => r.imageStatus === 'from_file').length, missingImages: rows.filter((r) => r.imageStatus === 'missing').length,
+            photosFromLookup: rows.filter((r) => r.imageStatus === 'from_lookup').length,
         };
         // What will be stored where — and what won't be stored at all.
         const usedKeys = new Set(req.sheets.flatMap((s) => (s.columns || []).map((c) => c.key)));
         const mappingReport = Object.entries(mapping).filter(([k]) => usedKeys.has(k)).map(([key, field]) => ({ key, field, label: labelOf(field), stored: STORED.has(field) }));
         const notProvided = IMPORT_FIELDS.filter((f) => f.required !== 'no' && !Object.values(mapping).includes(f.key) && !sources[f.key] && !(f.key === 'ean' && Object.values(mapping).includes('eanPair')))
-            .filter((f) => !(f.group === 'price' && Object.values(mapping).some((m) => PRICE_FIELDS.includes(m))) && !(f.group === 'stock' && (Object.values(mapping).includes('stock') || Object.values(mapping).includes('stockPieces') || sources.stock)))
+            .filter((f) => !(f.group === 'price' && Object.values(mapping).some((m) => PRICE_FIELDS.includes(m))) && !(f.group === 'stock' && (Object.values(mapping).includes('stock') || Object.values(mapping).includes('stockPieces') || Object.values(mapping).includes('stockPallets') || sources.stock)))
             .map((f) => f.header);
         return { rows, summary, mapping: mappingReport, notProvided: [...new Set(notProvided)], built: items };
     }
@@ -287,7 +312,7 @@ export class SupplierImportService {
         for (let i = 0; i < v.rows.length; i++) {
             const r = v.rows[i];
             const it = v.built[i];
-            const head = { key: r.key, sheet: r.sheet, row: r.row, name: r.name, ean: r.ean };
+            const head = { key: r.key, sheet: r.sheet, row: r.row, name: r.name, ean: r.ean, ...(r.page ? { page: r.page } : {}) };
             if (r.state === 'error') { results.push({ ...head, outcome: 'failed', reasons: r.errors.map((e: any) => e.reason) }); continue; }
             if (r.state === 'skip') { results.push({ ...head, outcome: 'skipped', productId: r.existing?.id, reasons: ['Already in your catalog (you chose to skip these).'] }); continue; }
             if (r.state === 'unchanged') { results.push({ ...head, outcome: 'unchanged', productId: r.existing?.id }); continue; }
@@ -303,6 +328,21 @@ export class SupplierImportService {
                         else images = await this.storePhotos(r.images, photos, notes);
                     } else images = await this.storePhotos(r.images, photos, notes);
                 }
+                let credits: Record<string, any> | null = null;
+                if (!images.length && it.external && (r.action === 'create' || r.action === 'update')) {
+                    const ex = r.action === 'update' ? await this.products.findOneRaw(r.existing!.id) : null;
+                    if (ex && realImages(ex.images).length) notes.push('Kept your current photos; the photo from the barcode search was not used.');
+                    else {
+                        try {
+                            const stored = await this.imageLookup.accept(it.external.url, ((u: any, i: any) => this.enrichment.imageQueue.fetch(String(u), i)) as typeof fetch);
+                            images = [stored.url];
+                            credits = { [stored.url]: { ...it.external.credit, addedAt: new Date().toISOString() } };
+                        } catch (e: any) {
+                            notes.push('The photo from the barcode search couldn’t be saved right now — the product is a draft; add a photo later.');
+                            this.logger.warn(`[import] lookup photo for ${r.key}: ${e?.message}`);
+                        }
+                    }
+                }
                 const product = { ...it.built.product, images };
                 let saved: any;
                 if (r.action === 'update') {
@@ -313,9 +353,10 @@ export class SupplierImportService {
                     saved = await this.products.create({ ...product, supplierId } as any, false, true, { submit: true, actorId: supplierId, noInference: true });
                     // What the saved product still lacks — after any photo upload, so a failed photo is counted.
                     const missing = missingForPublish({ ...product, basePrice: product.price }).map((m) => m.label);
-                    results.push({ ...head, outcome: 'created', productId: saved.id, status: saved.status, missing, imageMissing: !images.length, notes });
+                    results.push({ ...head, outcome: 'created', productId: saved.id, status: saved.status, missing, imageMissing: !images.length, photoFromLookup: !!credits, notes });
                 }
-                await this.products.recordImportSource(saved.id, supplierId, { file: req.fileName, sheet: r.sheet, row: r.row, columns: it.original })
+                if (credits) await this.products.setImageCredits(saved.id, credits).catch((e) => this.logger.warn(`[import] image credit for ${saved.id}: ${e?.message}`));
+                await this.products.recordImportSource(saved.id, supplierId, { file: req.fileName, sheet: r.sheet, row: r.row, columns: it.original, ...(it.page ? { page: it.page, extracted: it.source } : {}), ...(it.edited && Object.keys(it.edited).length ? { editedBySupplier: it.edited } : {}), ...(credits ? { imageCredits: credits } : {}) })
                     .catch((e) => this.logger.warn(`[import] source record for ${saved.id}: ${e?.message}`));
             } catch (e: any) {
                 const msg = e?.response?.message || e?.message || 'Could not save this row.';

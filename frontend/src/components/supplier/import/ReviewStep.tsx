@@ -6,7 +6,8 @@ import { Badge, Button, Card, Notice, type Tone } from '@/components/supplier/ui
 import { cn } from '@/lib/utils';
 import { Trans } from '@/components/i18n/Trans';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { categoryLabel, fieldLabel, listJoin, missingLabel, moqAmount, where, type FieldDef, type Review, type ReviewRow, type Source } from './types';
+import { categoryLabel, fieldLabel, listJoin, missingLabel, moqAmount, where, type FieldDef, type PhotoResult, type Review, type ReviewRow, type Source } from './types';
+import { PhotoChoice, PhotoSearchPanel, PhotoThumb, type PhotoSearchState } from './PhotoSearch';
 
 /** `label` values are supplierCatalog dictionary keys. */
 const STATE: Record<ReviewRow['state'], { tone: Tone; label: string; icon: React.ReactNode }> = {
@@ -23,10 +24,11 @@ const PAGE = 50;
 /** The rows a field's value can come from, in display order (price and barcode have alternatives). */
 const SOURCE_KEYS: Record<string, string[]> = { price: ['price', 'piecePrice', 'displayPrice'], ean: ['ean', 'eanPair'], stock: ['stock', 'stockPieces'] };
 
-export default function ReviewStep({ review, fields, multi, sources, photoUrl, onExisting, setOnExisting, onEditMapping, busy, headerOf }: {
+export default function ReviewStep({ review, fields, multi, sources, photoUrl, onExisting, setOnExisting, onEditMapping, busy, headerOf, photos, picks, onPick, onFindPhotos }: {
     review: Review; fields: FieldDef[]; multi: boolean; sources: Record<string, Source>; headerOf: (key: string) => string;
     photoUrl: (path: string) => string | undefined; onExisting: 'skip' | 'update'; setOnExisting: (v: 'skip' | 'update') => void;
     onEditMapping: () => void; busy: boolean;
+    photos: PhotoSearchState; picks: Map<string, PhotoResult>; onPick: (key: string, on: boolean) => void; onFindPhotos: () => void;
 }) {
     const { t, fmt, meta } = useLanguage();
     const tc = (k: string, v?: Record<string, string | number>) => t('supplierCatalog', k, v);
@@ -78,6 +80,8 @@ export default function ReviewStep({ review, fields, multi, sources, photoUrl, o
                 {review.notProvided.length > 0 && <p className="mt-1.5 text-[12.5px] text-amber-800"><Trans text={tc('notProvided', { fields: listJoin(review.notProvided, meta.intl) })} tags={{ b: (c) => <b>{c}</b> }} /></p>}
             </Card>
 
+            <PhotoSearchPanel review={review} state={photos} picks={picks} onStart={onFindPhotos} updateExisting={onExisting === 'update'} />
+
             {existingCount > 0 && (
                 <div className="rounded-xl ring-1 ring-line p-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
                     <span className="text-ink-2"><Trans text={tc('existingMatch', { count: existingCount, n: fmt.number(existingCount) })} tags={{ b: (c) => <b>{c}</b> }} /></span>
@@ -120,10 +124,12 @@ export default function ReviewStep({ review, fields, multi, sources, photoUrl, o
                                             {(r.errors.length > 0 || r.warnings.length > 0) && <span className="block mt-1 text-[11.5px] text-ink-3">{r.errors.length ? tc('errorsCount', { count: r.errors.length }) : ''}{r.errors.length && r.warnings.length ? ' · ' : ''}{r.warnings.length ? tc('warningsCount', { count: r.warnings.length }) : ''}</span>}
                                         </td>
                                         <td className="px-1 py-1.5">
-                                            <span className="w-10 h-10 rounded-lg bg-white ring-1 ring-line overflow-hidden flex items-center justify-center">
-                                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                                {thumb ? <img src={thumb} alt="" className="max-w-full max-h-full object-contain" loading="lazy" /> : <ImageIcon size={15} className="text-ink-4" />}
-                                            </span>
+                                            {!thumb && photos.results.get(r.key)?.candidate && !r.images.length && r.imageStatus !== 'from_link'
+                                                ? <PhotoThumb result={photos.results.get(r.key)} picked={picks.has(r.key)} />
+                                                : <span className="w-10 h-10 rounded-lg bg-white ring-1 ring-line overflow-hidden flex items-center justify-center">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    {thumb ? <img src={thumb} alt="" className="max-w-full max-h-full object-contain" loading="lazy" /> : <ImageIcon size={15} className="text-ink-4" />}
+                                                </span>}
                                         </td>
                                         <td className="px-3 py-2 min-w-[220px] max-w-[300px]">
                                             <span className={cn('block line-clamp-2 font-medium text-ink', bad('name'))}>{r.name || tc('missingName')}</span>
@@ -138,7 +144,7 @@ export default function ReviewStep({ review, fields, multi, sources, photoUrl, o
                                         <td className="px-3 py-2 max-w-[140px] truncate">{val(categoryLabel(r.category, t), 'category')}</td>
                                         <td className="px-2 py-2 text-ink-4"><ChevronDown size={15} className={cn('transition-transform', isOpen && 'rotate-180')} /></td>
                                     </tr>
-                                    {isOpen && <tr className="bg-surface-2/30"><td colSpan={12} className="px-3 sm:px-5 pb-4 pt-1"><RowDetail r={r} label={label} photoUrl={photoUrl} money={money} /></td></tr>}
+                                    {isOpen && <tr className="bg-surface-2/30"><td colSpan={12} className="px-3 sm:px-5 pb-4 pt-1"><RowDetail r={r} label={label} photoUrl={photoUrl} money={money} photo={<PhotoChoice result={photos.results.get(r.key)} picked={picks.has(r.key)} onToggle={(on) => onPick(r.key, on)} ownPhoto={r.images.length > 0 || r.imageStatus === 'from_link' || !!r.existing?.hasPhoto} />} /></td></tr>}
                                     {!isOpen && (r.errors.length > 0 || r.warnings.length > 0) && (
                                         <tr className="bg-surface-2/20">
                                             <td />
@@ -172,7 +178,7 @@ export default function ReviewStep({ review, fields, multi, sources, photoUrl, o
 }
 
 /** Every imported field next to the column and cell it came from. */
-function RowDetail({ r, label, photoUrl, money }: { r: ReviewRow; label: (k: string) => string; photoUrl: (p: string) => string | undefined; money: (n: number, digits?: number) => string }) {
+function RowDetail({ r, label, photoUrl, money, photo }: { r: ReviewRow; label: (k: string) => string; photoUrl: (p: string) => string | undefined; money: (n: number, digits?: number) => string; photo?: React.ReactNode }) {
     const { t, meta } = useLanguage();
     const tc = (k: string, v?: Record<string, string | number>) => t('supplierCatalog', k, v);
     const show: [string, string, React.ReactNode][] = [
@@ -217,12 +223,13 @@ function RowDetail({ r, label, photoUrl, money }: { r: ReviewRow; label: (k: str
                 {r.changes.length > 0 && (
                     <div className="mt-3">
                         <p className="text-[12.5px] font-semibold text-heading">{tc('changesTo', { name: r.existing?.name ?? '' })}</p>
-                        <ul className="mt-1 text-[12.5px] space-y-0.5">{r.changes.map((c) => <li key={c.field}><span className="text-ink-3">{label(c.field)}:</span> <bdi className="line-through text-ink-4">{c.from}</bdi> <span className="inline-block rtl:rotate-180">→</span> <b><bdi>{c.to}</bdi></b></li>)}</ul>
+                        <ul className="mt-1 text-[12.5px] space-y-0.5">{r.changes.map((c) => <li key={c.field}><span className="text-ink-3">{c.field === 'images' ? t('catalogImport', 'changePhoto') : label(c.field)}:</span> <bdi className="line-through text-ink-4">{c.from}</bdi> <span className="inline-block rtl:rotate-180">→</span> <b><bdi>{c.to}</bdi></b></li>)}</ul>
                     </div>
                 )}
                 {r.state === 'unchanged' && <p className="mt-2 text-[12.5px] text-ink-3">{tc('unchangedNote')}</p>}
             </div>
             <div className="space-y-2 text-[12.5px]">
+                {photo}
                 {r.images.length > 0 && (
                     <div>
                         <p className="text-ink-3 mb-1">{r.notes.imageUrl || tc('photoFromFile')}</p>

@@ -84,6 +84,8 @@ function mapProduct(item: any): Product {
         moqUnit: item.moqUnit ?? null,
         image: (item.images && item.images.length > 0) ? item.images[0] : '',
         images: item.images || [],
+        // Licence and source of photos that aren't the supplier's own (shown with the photo on the PDP).
+        imageCredits: item.imageCredits ?? null,
         // Videos array — short product demo clips. Falls through to []
         // for legacy rows that don't carry the field.
         videos: item.videos || [],

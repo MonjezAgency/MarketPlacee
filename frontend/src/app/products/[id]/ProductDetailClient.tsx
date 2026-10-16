@@ -833,6 +833,17 @@ export default function ProductDetailClient() {
                             </div>
                         )}
                         <p className="mt-2 text-[12px] text-ink-3">Pictures are for illustration only. Trust the barcode, not the image.</p>
+                        {(() => {
+                            // Photos from an open product database carry their licence: credit is shown with the photo (CC BY-SA).
+                            const credit = product.imageCredits?.[selectedImage];
+                            if (!credit?.source) return null;
+                            return (
+                                <p className="mt-1 text-[11.5px] text-ink-4">
+                                    Photo: {credit.sourceUrl ? <a href={credit.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-ink-2">{credit.attribution || credit.source}</a> : (credit.attribution || credit.source)}
+                                    {credit.license ? <>, {credit.licenseUrl ? <a href={credit.licenseUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-ink-2">{credit.license}</a> : credit.license}</> : null}
+                                </p>
+                            );
+                        })()}
                         {Array.isArray(product.videos) && product.videos.length > 0 && (
                             <div className="mt-4 space-y-2">
                                 {product.videos.map((vid, i) => (

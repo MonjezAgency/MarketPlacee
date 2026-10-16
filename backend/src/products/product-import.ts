@@ -9,7 +9,7 @@ import * as XLSX from 'xlsx';
 import { TO_EUR, MOQ_UNITS, UNIT_TYPES, barcodeProblem, invalidValues, missingForPublish, normaliseBarcode, normaliseWeight, type Missing } from './catalog-rules';
 
 export type FieldKey =
-    | 'name' | 'brand' | 'category' | 'ean' | 'price' | 'piecePrice' | 'currency' | 'stock' | 'stockPieces'
+    | 'name' | 'brand' | 'category' | 'ean' | 'price' | 'piecePrice' | 'currency' | 'stock' | 'stockPieces' | 'stockPallets'
     | 'unitsPerCase' | 'moq' | 'moqUnit' | 'origin' | 'exwLocation' | 'weight'
     | 'unit' | 'description' | 'shelfLife' | 'casesPerPallet' | 'palletsPerShipment' | 'leadTime' | 'imageUrl' | 'variants'
     | AuxKey;
@@ -22,7 +22,8 @@ export type FieldKey =
  */
 export type AuxKey =
     | 'eanPair' | 'displayPrice' | 'supplierSku' | 'caseEan' | 'displayEan' | 'unitsPerDisplay' | 'displaysPerCase'
-    | 'casesPerLayer' | 'layersPerPallet' | 'totalShelfLife' | 'rowNumber' | 'orderQty';
+    | 'casesPerLayer' | 'layersPerPallet' | 'totalShelfLife' | 'rowNumber' | 'orderQty'
+    | 'manufacturer' | 'unitsPerPallet' | 'caseWeight' | 'eanCheck';
 
 export interface ImportField {
     key: FieldKey;
@@ -38,15 +39,16 @@ export interface ImportField {
 
 export const IMPORT_FIELDS: ImportField[] = [
     { key: 'name', header: 'Product Name', required: 'yes', description: 'Full product name as buyers should see it.', example: 'Nutella Hazelnut Spread 400 g', aliases: ['name', 'product name', 'product title', 'title', 'item name', 'item description', 'product', 'item', 'designation', 'article designation', 'product designation', 'article name', 'article description', 'اسم المنتج', 'الاسم', 'المنتج', 'اسم الصنف', 'الصنف'] },
-    { key: 'brand', header: 'Brand', required: 'yes', description: 'Brand printed on the pack.', example: 'Nutella', aliases: ['brand', 'brand name', 'manufacturer', 'العلامة التجارية', 'الماركة', 'البراند', 'العلامه التجاريه'] },
+    { key: 'brand', header: 'Brand', required: 'yes', description: 'Brand printed on the pack.', example: 'Nutella', aliases: ['brand', 'brand name', 'trade mark', 'trademark', 'marke', 'marque', 'marca', 'brand trade mark', 'العلامة التجارية', 'الماركة', 'البراند', 'العلامه التجاريه'] },
     { key: 'category', header: 'Category', required: 'yes', description: 'Catalog category, e.g. Chocolates & Sweets, Beverages.', example: 'Spreads & Breakfast', aliases: ['category', 'product category', 'categories', 'الفئة', 'التصنيف', 'القسم', 'الفئه'] },
-    { key: 'ean', header: 'EAN', required: 'yes', description: 'Barcode — EAN-13, EAN-8, UPC-A (12) or GTIN-14, digits only. Format the column as Text so leading zeros are kept.', example: '3017620422003', aliases: ['ean', 'barcode', 'bar code', 'ean code', 'ean13', 'ean 13', 'ean8', 'gtin', 'gtin13', 'gtin 13', 'upc', 'upc code', 'unit ean', 'ean unit', 'ean piece', 'piece ean', 'ean pce', 'ean pc', 'consumer unit ean', 'cu ean', 'ean cu', 'item ean', 'single ean', 'الباركود', 'رمز الباركود', 'باركود'] },
+    { key: 'ean', header: 'EAN', required: 'yes', description: 'Barcode — EAN-13, EAN-8, UPC-A (12) or GTIN-14, digits only. Format the column as Text so leading zeros are kept.', example: '3017620422003', aliases: ['ean', 'barcode', 'bar code', 'ean code', 'ean13', 'ean 13', 'ean8', 'gtin', 'gtin13', 'gtin 13', 'upc', 'upc code', 'unit ean', 'ean unit', 'ean piece', 'piece ean', 'ean pce', 'ean pc', 'consumer unit ean', 'cu ean', 'ean cu', 'item ean', 'single ean', 'pcs ean', 'ean pcs', 'ean pieces', 'ean code piece', 'الباركود', 'رمز الباركود', 'باركود'] },
     { key: 'price', header: 'Price per Case', required: 'one-of', group: 'price', description: 'Your price for one case (carton), in the file currency.', example: '36.00', aliases: ['price per case', 'case price', 'price case', 'price per carton', 'carton price', 'price carton', 'سعر الكرتونة', 'سعر الكرتونه', 'سعر الكرتون'] },
     { key: 'piecePrice', header: 'Price per Piece', required: 'one-of', group: 'price', description: 'Your price for one piece. Multiplied by Pieces per Case to get the case price. Use this OR Price per Case.', example: '2.40', aliases: ['price per piece', 'piece price', 'unit price', 'price per unit', 'price unit', 'price piece', 'price pce', 'price per pce', 'price pc', 'price per pc', 'pce price', 'price each', 'سعر القطعة', 'سعر القطعه', 'سعر الوحدة'] },
     { key: 'currency', header: 'Currency', required: 'no', description: `ISO code for this row (${Object.keys(TO_EUR).join(', ')}). Empty = the currency you pick when uploading. Stored in EUR.`, example: 'EUR', aliases: ['currency', 'curr', 'currency code', 'العملة', 'العمله'] },
     { key: 'stock', header: 'Stock (cases)', required: 'one-of', group: 'stock', description: 'Cases available to sell now.', example: '120', aliases: ['stock cases', 'stock', 'cases in stock', 'available cases', 'stock case', 'available stock', 'stock qty', 'المخزون', 'المخزون بالكرتونة', 'عدد الكراتين'] },
     { key: 'stockPieces', header: 'Stock (pieces)', required: 'one-of', group: 'stock', description: 'Pieces available. Converted to whole cases using Pieces per Case. Use this OR Stock (cases).', example: '', aliases: ['stock pieces', 'pieces in stock', 'units in stock', 'stock units', 'المخزون بالقطعة'] },
-    { key: 'unitsPerCase', header: 'Pieces per Case', required: 'yes', description: 'Pieces in one case.', example: '15', aliases: ['pieces per case', 'units per case', 'pcs per case', 'pcs case', 'pieces case', 'qty per case', 'case qty', 'units case', 'unitspercase', 'case count', 'units per carton', 'pieces per carton', 'pcs per carton', 'pcs ctn', 'units ctn', 'pcs carton', 'case size', 'carton size', 'عدد القطع في الكرتونة', 'قطع في الكرتونة', 'عدد القطع بالكرتونة'] },
+    { key: 'stockPallets', header: 'Stock (pallets)', required: 'one-of', group: 'stock', description: 'Full pallets available. Converted to cases using Cases per Pallet. Use this OR Stock (cases).', example: '', aliases: ['stock pallets', 'pallets available', 'available pallets', 'pallets in stock', 'quantity pallets', 'qty pallets'] },
+    { key: 'unitsPerCase', header: 'Pieces per Case', required: 'yes', description: 'Pieces in one case.', example: '15', aliases: ['pieces per case', 'units per case', 'pcs per case', 'pcs case', 'pieces case', 'qty per case', 'case qty', 'units case', 'unitspercase', 'case count', 'units per carton', 'pieces per carton', 'pcs per carton', 'pcs ctn', 'units ctn', 'pcs carton', 'case size', 'carton size', 'pieces carton', 'pcs box', 'pcs per box', 'pieces per box', 'pcs in box', 'units per box', 'bottles per case', 'n of bottles per case', 'cans per case', 'pcs per crt', 'pcs per carton', 'pieces per crt', 'عدد القطع في الكرتونة', 'قطع في الكرتونة', 'عدد القطع بالكرتونة'] },
     { key: 'moq', header: 'MOQ', required: 'yes', description: 'Minimum order quantity, counted in the MOQ Unit.', example: '10', aliases: ['moq', 'minimum order', 'minimum order quantity', 'min order', 'min order qty', 'min qty', 'minorder', 'الحد الأدنى للطلب', 'الحد الادنى للطلب', 'أقل كمية'] },
     { key: 'moqUnit', header: 'MOQ Unit', required: 'no', description: 'piece, case, pallet or truck. Empty = the MOQ unit you pick when uploading (default: case).', example: 'case', aliases: ['moq unit', 'min order unit', 'minimum order unit', 'وحدة الحد الأدنى'] },
     { key: 'origin', header: 'Country of Origin', required: 'yes', description: 'Where the product was made.', example: 'France', aliases: ['country of origin', 'origin', 'made in', 'coo', 'origin country', 'بلد المنشأ', 'المنشأ', 'بلد الصنع'] },
@@ -54,8 +56,8 @@ export const IMPORT_FIELDS: ImportField[] = [
     { key: 'weight', header: 'Weight per Piece', required: 'yes', description: 'Net weight or volume of one piece, with unit: g, kg, ml, cl, L, oz or lb.', example: '400 g', aliases: ['weight per piece', 'weight', 'net weight', 'unit weight', 'piece weight', 'volume', 'net content', 'weight per unit', 'net weight per piece', 'content', 'الوزن', 'الوزن الصافي', 'الحجم'] },
     { key: 'unit', header: 'Unit Type', required: 'no', description: `What one piece is: ${UNIT_TYPES.slice(0, 10).join(', ')}. Empty = the unit type you pick when uploading.`, example: 'jar', aliases: ['unit type', 'unit', 'uom', 'unit of measure', 'packaging type', 'نوع الوحدة', 'الوحدة'] },
     { key: 'description', header: 'Description', required: 'no', description: 'Optional product description.', example: 'Hazelnut spread with cocoa, 400 g jar.', aliases: ['description', 'product description', 'details', 'الوصف', 'وصف المنتج'] },
-    { key: 'shelfLife', header: 'BBD / Shelf Life', required: 'no', description: 'Best-before date or remaining shelf life, e.g. 2027-03-31 or 9 months.', example: '9 months', aliases: ['bbd', 'best before', 'best before date', 'shelf life', 'expiry', 'expiry date', 'exp date', 'min shelf life', 'minimum shelf life', 'remaining shelf life', 'min shelf life upon arrival', 'shelf life on arrival', 'shelf life days', 'تاريخ الانتهاء', 'الصلاحية', 'مدة الصلاحية'] },
-    { key: 'casesPerPallet', header: 'Cases per Pallet', required: 'yes', description: 'Cases on one pallet.', example: '84', aliases: ['cases per pallet', 'cartons per pallet', 'cs per pallet', 'case per pallet', 'casesperpallet', 'كراتين في البالتة', 'عدد الكراتين في البالتة'] },
+    { key: 'shelfLife', header: 'BBD / Shelf Life', required: 'no', description: 'Best-before date or remaining shelf life, e.g. 2027-03-31 or 9 months.', example: '9 months', aliases: ['bbd', 'best before', 'best before date', 'shelf life', 'expiry', 'expiry date', 'exp date', 'min shelf life', 'minimum shelf life', 'remaining shelf life', 'rsl', 'min shelf life upon arrival', 'shelf life on arrival', 'shelf life days', 'تاريخ الانتهاء', 'الصلاحية', 'مدة الصلاحية'] },
+    { key: 'casesPerPallet', header: 'Cases per Pallet', required: 'yes', description: 'Cases on one pallet.', example: '84', aliases: ['cases per pallet', 'cartons per pallet', 'cartons pallet', 'cases pallet', 'box plt', 'boxes plt', 'box per plt', 'boxes per plt', 'boxes per pallet', 'box per pallet', 'boxes in pallet', 'carton per pal', 'cartons per pal', 'crt per pal', 'case per pal', 'cs per pallet', 'case per pallet', 'casesperpallet', 'كراتين في البالتة', 'عدد الكراتين في البالتة'] },
     { key: 'palletsPerShipment', header: 'Pallets per Truck', required: 'no', description: 'Needed to offer full-truck prices.', example: '33', aliases: ['pallets per truck', 'pallets per shipment', 'pallets per container', 'pallets truck', 'palletspershipment', 'بالتات في الشاحنة', 'عدد البالتات في الشاحنة'] },
     { key: 'leadTime', header: 'Lead Time (days)', required: 'no', description: 'Days you need to prepare the order. 0 = ready to dispatch.', example: '0', aliases: ['lead time', 'lead time days', 'preparation time', 'مدة التجهيز'] },
     { key: 'imageUrl', header: 'Image URL', required: 'no', description: 'Optional https link(s) to product photos, separated by |. Without a photo the product is saved as a draft; you can then find one by barcode or upload it.', example: '', aliases: ['image url', 'image', 'images', 'image link', 'photo', 'picture', 'photo url', 'product image', 'product photo', 'صورة', 'رابط الصورة', 'الصورة'] },
@@ -67,14 +69,18 @@ export const AUX_FIELDS: ImportField[] = [
     { key: 'eanPair', header: 'Barcode: piece / case', required: 'no', stored: false, description: 'One cell with the piece barcode and the case barcode, e.g. "4017100370007 / 4017100037009". The piece barcode becomes the product barcode; the case barcode is kept in the import record.', example: '4017100370007 / 4017100037009', aliases: ['ean piece ean case', 'ean pce ean case', 'ean unit ean case', 'unit ean case ean', 'piece ean case ean', 'ean piece case', 'ean cu ean tu'] },
     { key: 'displayPrice', header: 'Price per Display', required: 'no', stored: false, description: 'Price for one display (inner pack). Converted to a case price with Displays per Case.', example: '', aliases: ['price per display', 'display price', 'price display'] },
     { key: 'supplierSku', header: 'Your article code', required: 'no', stored: false, description: 'Your own article / SKU code. Kept in the import record.', example: '', aliases: ['article code', 'article no', 'article number', 'art no', 'art nr', 'item code', 'item no', 'item number', 'sku', 'product code', 'material code', 'material no', 'supplier code', 'ref', 'reference'] },
-    { key: 'caseEan', header: 'Case barcode', required: 'no', stored: false, description: 'Barcode printed on the case. Checked and kept in the import record.', example: '', aliases: ['case ean', 'ean case', 'carton ean', 'ean carton', 'outer ean', 'ean outer', 'ean ctn', 'ctn ean', 'tu ean', 'ean tu', 'dun14', 'dun 14', 'itf14', 'itf 14', 'case barcode'] },
+    { key: 'caseEan', header: 'Case barcode', required: 'no', stored: false, description: 'Barcode printed on the case. Checked and kept in the import record.', example: '', aliases: ['case ean', 'ean case', 'box ean', 'ean box', 'carton ean', 'ean carton', 'outer ean', 'ean outer', 'ean ctn', 'ctn ean', 'tu ean', 'ean tu', 'dun14', 'dun 14', 'itf14', 'itf 14', 'case barcode'] },
     { key: 'displayEan', header: 'Display barcode', required: 'no', stored: false, description: 'Barcode of the display / inner pack. Kept in the import record.', example: '', aliases: ['display ean', 'ean display', 'inner ean', 'ean inner', 'display barcode'] },
     { key: 'unitsPerDisplay', header: 'Pieces per Display', required: 'no', stored: false, description: 'Used to cross-check Pieces per Case.', example: '', aliases: ['unit per display', 'units per display', 'pieces per display', 'pcs per display'] },
     { key: 'displaysPerCase', header: 'Displays per Case', required: 'no', stored: false, description: 'Used to cross-check Pieces per Case and to convert a display price.', example: '', aliases: ['display per case', 'displays per case', 'displays per carton', 'display per carton'] },
     { key: 'casesPerLayer', header: 'Cases per Layer', required: 'no', stored: false, description: 'Used to convert an MOQ of "full layers" and to cross-check Cases per Pallet.', example: '', aliases: ['cases per layer', 'case per layer', 'cartons per layer', 'cs per layer', 'ctn per layer'] },
-    { key: 'layersPerPallet', header: 'Layers per Pallet', required: 'no', stored: false, description: 'Used to cross-check Cases per Pallet.', example: '', aliases: ['layers per pallet', 'layer per pallet'] },
-    { key: 'totalShelfLife', header: 'Total shelf life', required: 'no', stored: false, description: 'Total days from production to best-before. Kept in the import record.', example: '', aliases: ['total number of days to bbd', 'total days to bbd', 'total shelf life', 'shelf life total', 'total shelf life days'] },
-    { key: 'rowNumber', header: 'Row number', required: 'no', stored: false, description: 'A running number in your file. Not imported.', example: '', aliases: ['n s', 'no', 'nr', 'pos', 'line no', 's no', 'sr no', 'sl no', 'row'] },
+    { key: 'layersPerPallet', header: 'Layers per Pallet', required: 'no', stored: false, description: 'Used to cross-check Cases per Pallet.', example: '', aliases: ['layers per pallet', 'layer per pallet', 'rows per pallet', 'n of rows per pallet'] },
+    { key: 'totalShelfLife', header: 'Total shelf life', required: 'no', stored: false, description: 'Total days from production to best-before. Kept in the import record.', example: '', aliases: ['total number of days to bbd', 'bbd from production', 'days to bbd', 'total days to bbd', 'total shelf life', 'shelf life total', 'total shelf life days'] },
+    { key: 'manufacturer', header: 'Manufacturer', required: 'no', stored: false, description: 'The company that makes the product. Kept in the import record. If it is also the brand printed on the pack, map it to Brand instead.', example: '', aliases: ['manufacturer', 'producer', 'maker', 'manufacturer name'] },
+    { key: 'unitsPerPallet', header: 'Pieces per Pallet', required: 'no', stored: false, description: 'Used to cross-check Pieces per Case × Cases per Pallet.', example: '', aliases: ['pieces per pallet', 'pieces pallet', 'pcs per pallet', 'pcs pallet', 'pcs plt', 'pcs per plt', 'units per pallet', 'units pallet', 'bottles per pallet', 'n of bottle per pallet', 'n of bottles per pallet'] },
+    { key: 'caseWeight', header: 'Case weight', required: 'no', stored: false, description: 'Weight of a full case (not of one piece). Kept in the import record.', example: '', aliases: ['case weight', 'carton weight', 'box weight', 'box weight gross', 'gross weight', 'gross weight per case', 'net weight per case', 'net weight per cse', 'net weight per cse kg', 'gross weight per cse', 'gross weight per cse kg', 'case weight kg', 'weight per case', 'weight per carton'] },
+    { key: 'eanCheck', header: 'Barcode (second column)', required: 'no', stored: false, description: 'A second column with the same piece barcode. Compared with the Barcode column row by row; rows where they differ are blocked until you fix the file.', example: '', aliases: [] },
+    { key: 'rowNumber', header: 'Row number', required: 'no', stored: false, description: 'A running number in your file. Not imported.', example: '', aliases: ['n s', 's n', 'no', 'nr', 'pos', 'line no', 's no', 'sr no', 'sl no', 'row'] },
     { key: 'orderQty', header: 'Order quantity', required: 'no', stored: false, description: 'A column for buyers to fill in. Not imported.', example: '', aliases: ['place your order', 'your order', 'order qty', 'order quantity', 'qty ordered'] },
 ];
 
@@ -84,7 +90,7 @@ export const ALL_FIELDS: ImportField[] = [...IMPORT_FIELDS, ...AUX_FIELDS];
 /** Header names that could mean two different things; the supplier must choose. */
 export const AMBIGUOUS: Record<string, FieldKey[]> = {
     'price': ['price', 'piecePrice'], 'السعر': ['price', 'piecePrice'], 'cost': ['price', 'piecePrice'], 'wholesale price': ['price', 'piecePrice'], 'supplier price': ['price', 'piecePrice'], 'net price': ['price', 'piecePrice'],
-    'quantity': ['stock', 'stockPieces'], 'qty': ['stock', 'stockPieces'], 'الكمية': ['stock', 'stockPieces'], 'الكميه': ['stock', 'stockPieces'],
+    'quantity': ['stock', 'stockPieces'], 'quantity pieces': ['stockPieces', 'moq'], 'quantity pcs': ['stockPieces', 'moq'], 'quantity cartons': ['stock', 'moq'], 'quantity crt': ['stock', 'moq'], 'quantity cases': ['stock', 'moq'], 'qty': ['stock', 'stockPieces'], 'الكمية': ['stock', 'stockPieces'], 'الكميه': ['stock', 'stockPieces'],
 };
 
 export function normaliseHeader(h: unknown): string {
@@ -314,7 +320,7 @@ export function buildFromValues(input: Partial<Record<FieldKey, string>>, rowNum
         if (parts.length > 2) warnings.push(`Barcode cell “${values.eanPair}” has more than two codes; the first is used as the product barcode.`);
         notes.ean = `First code of “${values.eanPair}”`;
     }
-    for (const k of ['supplierSku', 'caseEan', 'displayEan', 'unitsPerDisplay', 'displaysPerCase', 'casesPerLayer', 'layersPerPallet', 'totalShelfLife'] as AuxKey[]) if (values[k]) aux[k] = values[k];
+    for (const k of ['supplierSku', 'caseEan', 'displayEan', 'unitsPerDisplay', 'displaysPerCase', 'casesPerLayer', 'layersPerPallet', 'totalShelfLife', 'manufacturer', 'unitsPerPallet', 'caseWeight', 'eanCheck'] as AuxKey[]) if (values[k]) aux[k] = values[k];
     const bc = readBarcode(eanRaw);
     if (bc.problem) err('ean', 'Barcode (EAN/GTIN)', bc.problem);
     const ean = bc.code;
@@ -322,9 +328,27 @@ export function buildFromValues(input: Partial<Record<FieldKey, string>>, rowNum
     if (/^\d{11}$/.test(ean) && !barcodeProblem(`0${ean}`)) {
         err('ean', 'Barcode (EAN/GTIN)', `Barcode ${ean} has 11 digits — probably a UPC whose leading 0 was dropped by the spreadsheet. 0${ean} has a valid check digit; correct it in your file (format the column as Text) and upload again.`);
     }
+    // A second barcode column must agree with the first; which one is right can't be decided here.
+    if (values.eanCheck && ean) {
+        const other = normaliseBarcode(values.eanCheck);
+        if (other && other !== ean) err('ean', 'Barcode (EAN/GTIN)', `The two barcode columns disagree on this row (${ean} and ${other}). Correct the file so both show the same piece barcode.`);
+    }
+    // GTIN-14 with an indicator digit 1–8 identifies a case or outer pack, not the piece buyers scan.
+    if (/^[1-8]\d{13}$/.test(ean) && !barcodeProblem(ean)) {
+        warnings.push(`Barcode ${ean} has 14 digits and starts with ${ean[0]} — that usually identifies the case, not the piece. Use the piece barcode (EAN-13/UPC) if you have it.`);
+    }
     if (aux.caseEan) {
         const cp = barcodeProblem(normaliseBarcode(aux.caseEan));
         if (cp) warnings.push(`Case barcode ${aux.caseEan}: ${cp.charAt(0).toLowerCase()}${cp.slice(1)} (kept in the import record only).`);
+    }
+
+    // A price cell that names its currency must agree with the import's currency ("€ 1.19" in a RON import).
+    const CUR_SIGNS: [RegExp, string][] = [[/€|\beur(o|os)?\b/i, 'EUR'], [/\$|\busd\b/i, 'USD'], [/£|\bgbp\b/i, 'GBP'], [/\bron\b|\blei\b/i, 'RON']];
+    for (const f of ['price', 'piecePrice', 'displayPrice'] as FieldKey[]) {
+        const raw = values[f];
+        if (!raw || values.currency) continue;
+        const named = CUR_SIGNS.find(([re]) => re.test(raw))?.[1];
+        if (named && rate && named !== currency) err(f, labelOf(f), `The price “${raw}” is in ${named}, but this import is set to ${currency}. Choose ${named} as the currency of the file (or fix the cell).`);
     }
 
     // Price: per case, per piece or per display — always stored per case.
@@ -349,13 +373,18 @@ export function buildFromValues(input: Partial<Record<FieldKey, string>>, rowNum
     }
 
     let stock: number | undefined;
-    const sc = n('stock'), sp = n('stockPieces');
+    const sc = n('stock'), sp = n('stockPieces'), spl = n('stockPallets');
     if (sc !== undefined) {
         if (Number.isNaN(sc) || sc < 0 || !Number.isInteger(sc)) err('stock', 'Stock (cases)', `“${values.stock}” must be a whole number of cases.`); else stock = sc;
     } else if (sp !== undefined) {
         if (Number.isNaN(sp) || sp < 0) err('stockPieces', 'Stock (pieces)', `“${values.stockPieces}” isn’t a valid quantity.`);
         else if (!upc || Number.isNaN(upc)) err('stockPieces', 'Stock (pieces)', 'Stock in pieces needs Pieces per Case to convert to cases.');
         else { stock = Math.floor(sp / upc); if (sp % upc) warnings.push(`${sp} pieces = ${stock} full cases; ${sp % upc} loose pieces not counted.`); }
+    } else if (spl !== undefined) {
+        const cppS = n('casesPerPallet');
+        if (Number.isNaN(spl) || spl < 0 || !Number.isInteger(spl)) err('stockPallets', 'Stock (pallets)', `“${values.stockPallets}” must be a whole number of pallets.`);
+        else if (!cppS || Number.isNaN(cppS)) err('stockPallets', 'Stock (pallets)', 'Stock in pallets needs Cases per Pallet to convert to cases.');
+        else { stock = spl * cppS; notes.stock = `${spl} pallet${spl === 1 ? '' : 's'} × ${cppS} cases`; }
     }
 
     // MOQ: a number in the MOQ unit, or text such as "full pallets" / "full layers".
@@ -373,7 +402,7 @@ export function buildFromValues(input: Partial<Record<FieldKey, string>>, rowNum
     const unitType = (UNIT_TYPES as readonly string[]).includes(u0) ? u0 : (UNIT_TYPES.find((t) => u0 === `${t}s` || u0 === `${t}es`) ?? u0);
     if (!(UNIT_TYPES as readonly string[]).includes(unitType)) err('unit', 'Unit Type', `“${values.unit}” isn’t a supported unit type (${UNIT_TYPES.join(', ')}).`);
     const ex = (k: FieldKey) => IMPORT_FIELDS.find((f) => f.key === k)!.example;
-    if (ean === ex('ean') && (values.name || '') === ex('name')) err('name', 'Example row', 'This is the template’s example row — delete it from your file.');
+    if ((ean === ex('ean') && (values.name || '') === ex('name')) || (EXAMPLE_ROWS.some((r) => r.ean === ean) && /^example /i.test(values.name || ''))) err('name', 'Example row', 'This is the template’s example row — delete it from your file.');
 
     // Weight: as written, or a bare number with the unit from the header ("Unit Weight (G)").
     let weight = '';
@@ -412,6 +441,12 @@ export function buildFromValues(input: Partial<Record<FieldKey, string>>, rowNum
         warnings.push(`Cases per pallet (${cpp}) ≠ cases per layer × layers (${cpl} × ${lpp} = ${cpl * lpp}). Check which is right.`);
     }
 
+    // Pieces per pallet, when the file gives it: "2,376" can only be a whole number of pieces.
+    if (values.unitsPerPallet && upc && cpp && !Number.isNaN(upc) && !Number.isNaN(cpp)) {
+        const digits = values.unitsPerPallet.replace(/[\s.,']/g, '');
+        const raw = /^\d+$/.test(digits) ? Number(digits) : NaN;
+        if (Number.isFinite(raw) && raw !== upc * cpp) warnings.push(`Pieces per pallet in the file (${values.unitsPerPallet}) ≠ pieces per case × cases per pallet (${upc} × ${cpp} = ${upc * cpp}). Check which is right.`);
+    }
     const images = (values.imageUrl || '').split(/[|\n]+/).map((s) => s.trim()).filter(Boolean);
     const badImg = images.filter((u) => !/^https:\/\/[^\s]+$/i.test(u));
     if (badImg.length) err('imageUrl', 'Image URL', `Image links must start with https:// (${badImg[0].slice(0, 40)}).`);
@@ -470,17 +505,31 @@ export function parseVariants(raw?: string): { name: string; values: string[] }[
 
 // ─── Template ──────────────────────────────────────────────────────────
 
-export function buildTemplate(format: 'xlsx' | 'csv'): Buffer {
+/** GS1 prefix 200–299 is for in-store use only, so these example barcodes can never be a real product. */
+const exampleEan = (body12: string) => {
+    const d = body12.split('').map(Number);
+    const sum = d.reverse().reduce((s, x, i) => s + x * (i % 2 === 0 ? 3 : 1), 0);
+    return body12 + ((10 - (sum % 10)) % 10);
+};
+
+/** Illustrative rows for the completed example: one per common way suppliers state price, stock and MOQ. */
+const EXAMPLE_ROWS: Partial<Record<FieldKey, string>>[] = [
+    { name: 'Example Hazelnut Spread 400 g', brand: 'Example Brand', category: 'Pantry & Grains', ean: exampleEan('200000000001'), price: '36.00', currency: 'EUR', stock: '120', unitsPerCase: '15', moq: '10', moqUnit: 'case', origin: 'Italy', exwLocation: 'Bucharest, Romania', weight: '400 g', unit: 'jar', description: 'Example row — replace with your product.', shelfLife: '2027-03-31', casesPerPallet: '84', palletsPerShipment: '33', leadTime: '0' },
+    { name: 'Example Cola 24 x 330 ml', brand: 'Example Brand', category: 'Soft Drinks', ean: exampleEan('200000000002'), piecePrice: '0.35', currency: 'EUR', stockPieces: '23760', unitsPerCase: '24', moq: '1', moqUnit: 'pallet', origin: 'Poland', exwLocation: 'Warsaw, Poland', weight: '330 ml', unit: 'can', shelfLife: '9 months', casesPerPallet: '99', palletsPerShipment: '26', leadTime: '3' },
+    { name: 'Example Chocolate Bar 100 g', brand: 'Example Brand', category: 'Chocolates & Sweets', ean: exampleEan('200000000003'), price: '21.60', currency: 'EUR', stockPallets: '4', unitsPerCase: '24', moq: '5', moqUnit: 'case', origin: 'Germany', exwLocation: 'Hamburg, Germany', weight: '100 g', unit: 'bar', shelfLife: 'min. 180 days', casesPerPallet: '120', leadTime: '0' },
+];
+
+export function buildTemplate(format: 'xlsx' | 'csv', variant: 'blank' | 'example' = 'blank'): Buffer {
     const fields = IMPORT_FIELDS;
     const headers = fields.map((f) => f.header);
     const need = fields.map((f) => (f.required === 'yes' ? 'Required' : f.required === 'one-of' ? 'One of (see guide)' : 'Optional'));
-    const example = fields.map((f) => f.example);
+    const rows = variant === 'example' ? EXAMPLE_ROWS.map((r) => fields.map((f) => r[f.key] ?? '')) : [];
     if (format === 'csv') {
         const esc = (v: string) => (/[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-        return Buffer.from('﻿' + [headers, example].map((r) => r.map(esc).join(',')).join('\n') + '\n', 'utf8');
+        return Buffer.from('﻿' + [headers, ...rows].map((r) => r.map(esc).join(',')).join('\n') + '\n', 'utf8');
     }
     const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.aoa_to_sheet([headers, need, example]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, need, ...rows]);
     // Keep barcodes as text so leading zeros survive.
     const eanCol = headers.indexOf('EAN');
     for (let r = 1; r <= 200; r++) {
@@ -490,10 +539,27 @@ export function buildTemplate(format: 'xlsx' | 'csv'): Buffer {
     ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: 200, c: headers.length - 1 } });
     ws['!cols'] = headers.map((h) => ({ wch: Math.max(14, h.length + 2) }));
     XLSX.utils.book_append_sheet(wb, ws, 'Products');
+    const formats: string[][] = [
+        ['EAN', 'The barcode on one piece (the unit buyers scan): EAN-13, EAN-8, UPC-A (12 digits) or GTIN-14. Digits only, with a valid check digit. Format the column as Text so Excel keeps leading zeros and doesn’t turn it into 4.0E+12. A 14-digit code starting with 1–8 is usually the case barcode — put that in a separate “Case EAN” column.'],
+        ['Product Name', 'As printed on the pack, including size: “Brand Product Variant 400 g”. One product per row; flavours of one product can share a row with Varieties.'],
+        ['Brand', 'The brand on the pack (e.g. Milka), not the manufacturer (e.g. Mondelez). A “Manufacturer” column is kept in the import record.'],
+        ['Country of Origin', 'Where the product was made (e.g. Poland). Not the warehouse location — that is EXW Location.'],
+        ['Price', 'Fill ONE of Price per Case or Price per Piece. A column called just “Price” or “Price at €” must be confirmed as per case or per piece during upload; Atlantis never assumes it. Use a dot or comma for decimals consistently.'],
+        ['Currency', 'ISO code (EUR, USD, GBP, RON …). Prices are converted to EUR for the marketplace; your original price and currency are kept.'],
+        ['Pieces per Case', 'Pieces in one case/carton (e.g. 24). Needed to convert a piece price or a piece stock.'],
+        ['Cases per Pallet', 'Cases on one full pallet. Optional cross-check: a “Pieces per Pallet” column is compared with Pieces per Case × Cases per Pallet.'],
+        ['Stock', 'Fill ONE of Stock (cases), Stock (pieces) or Stock (pallets). Pieces are converted to whole cases; pallets to cases using Cases per Pallet.'],
+        ['MOQ / MOQ Unit', 'Minimum order: a number plus its unit (piece, case, pallet, truck). Text such as “1 pallet” or “full layers” (with Cases per Layer) is understood.'],
+        ['Weight per Piece', 'Net weight or volume of one piece with its unit: 400 g, 1.5 L, 6 x 330 ml. Not the case weight.'],
+        ['PDF price lists', 'You can also upload a PDF price list. Atlantis reads the table, shows every row with its page number for you to check and correct, and imports nothing until you confirm. Scanned PDFs (pictures of pages) can’t be read.'],
+    ];
     const guide = [['Column', 'Required', 'What to enter', 'Example', 'Also accepted as'],
         ...fields.map((f) => [f.header, f.required === 'yes' ? 'Required' : f.required === 'one-of' ? `One of: ${fields.filter((x) => x.group === f.group).map((x) => x.header).join(' / ')}` : 'Optional', f.description, f.example, f.aliases.slice(0, 6).join(', ')]),
-        [], ['Delete row 2 (Required / Optional) and the example row before uploading, or keep them — the importer skips the helper row.'],
-        ['Price is stored in EUR per case. Stock is counted in cases. Weight is per piece.']];
+        [], ['Formats that matter'], ...formats,
+        [], [variant === 'example'
+            ? 'The rows in “Products” are EXAMPLES with made-up products (their barcodes start with 2, which is reserved for in-store use and never a real product). Replace them with your products before uploading.'
+            : 'Row 2 (Required / Optional) can stay — the importer skips it.'],
+        ['Price is stored in EUR per case. Stock is counted in cases. Weight is per piece. Missing required values make a product a draft you can finish later; nothing is invented to fill them.']];
     const gs = XLSX.utils.aoa_to_sheet(guide);
     gs['!cols'] = [{ wch: 22 }, { wch: 30 }, { wch: 70 }, { wch: 22 }, { wch: 50 }];
     XLSX.utils.book_append_sheet(wb, gs, 'Instructions');

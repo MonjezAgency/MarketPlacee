@@ -1,3 +1,4 @@
+import { fakes } from './import-fakes';
 import * as XLSX from 'xlsx';
 import { analyseWorkbook, decimalOf, readPictures, scoreHeader } from '../import-analysis';
 import { ALL_FIELDS, buildFromValues, headerUnit, normaliseHeader, parseMoq, weightFromName } from '../product-import';
@@ -200,21 +201,6 @@ describe('brand from the product name', () => {
 
 // ─── Service: validate & commit ─────────────────────────────────────────
 
-function fakes(existing: any[] = [], opts: { storageDown?: boolean } = {}) {
-    const created: any[] = [], updated: any[] = [], sources: any[] = [], uploads: any[] = [];
-    const products: any = {
-        findMineForImport: jest.fn(async () => existing),
-        knownBrands: jest.fn(async () => ['Crunchy']),
-        findOneRaw: jest.fn(async (id: string) => existing.find((e) => e.id === id) || null),
-        countPendingSince: jest.fn(async () => 2),
-        create: jest.fn(async (p: any) => { if (p.name === 'Explode') throw new Error('Database is down'); const id = `p${created.length + 1}`; created.push({ id, ...p }); return { id, status: p.images?.length && p.stock !== undefined ? 'PENDING' : 'DRAFT' }; }),
-        supplierUpdate: jest.fn(async (id: string, _s: string, patch: any) => { updated.push({ id, patch }); return { id, status: 'APPROVED' }; }),
-        recordImportSource: jest.fn(async (...a: any[]) => { sources.push(a); }),
-    };
-    const notifications: any = { notifyAdmins: jest.fn(async () => undefined) };
-    const storage: any = { uploadProductImage: jest.fn(async (buf: Buffer, name: string) => { if (opts.storageDown) throw new Error('Image upload failed: fetch failed. Check Supabase bucket "product-images" exists'); uploads.push(name); return `https://cdn.example.com/${name}`; }) };
-    return { svc: new SupplierImportService(products, notifications, storage), products, notifications, storage, created, updated, sources, uploads };
-}
 
 function requestFrom(buf: Buffer, file: string, extra: Partial<ImportRequest> = {}): ImportRequest {
     const a = analyseWorkbook(buf, file);

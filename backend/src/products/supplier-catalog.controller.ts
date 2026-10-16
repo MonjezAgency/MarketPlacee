@@ -8,6 +8,8 @@ import { Roles } from '../auth/roles.decorator';
 import { ProductsService } from './products.service';
 import { MAX_COMMIT_ROWS, MAX_IMPORT_ROWS_TOTAL, SupplierImportService, compactReview, type ImportRequest } from './supplier-import.service';
 import { analyseWorkbook } from './import-analysis';
+import { MAX_PDF_BYTES, MAX_PDF_PAGES, analysePdf } from './pdf-import';
+import { ImportEnrichmentService, MAX_ENRICH_ITEMS, type EnrichItem } from './import-enrichment.service';
 import { ImageLookupService } from './image-lookup.service';
 import { SupplierUpdatesService, type UpdateRequest } from './supplier-updates.service';
 import { SupplierOverviewService } from './supplier-overview.service';
@@ -30,6 +32,7 @@ export class SupplierCatalogController {
         private readonly overviewSvc: SupplierOverviewService,
         private readonly prisma: PrismaService,
         private readonly updates: SupplierUpdatesService,
+        private readonly enrich: ImportEnrichmentService,
     ) {}
 
     @Get('overview')
@@ -78,15 +81,16 @@ export class SupplierCatalogController {
 
     @Get('import/schema')
     schema() {
-        return { fields: IMPORT_FIELDS, allFields: ALL_FIELDS.map((f) => ({ ...f, stored: f.stored !== false })), currencies: Object.keys(TO_EUR), rates: TO_EUR, moqUnits: MOQ_UNITS, unitTypes: UNIT_TYPES, maxRows: MAX_IMPORT_ROWS_TOTAL, commitRows: MAX_COMMIT_ROWS, maxBytes: MAX_IMPORT_BYTES, formats: ['.xlsx', '.xls', '.csv'] };
+        return { fields: IMPORT_FIELDS, allFields: ALL_FIELDS.map((f) => ({ ...f, stored: f.stored !== false })), currencies: Object.keys(TO_EUR), rates: TO_EUR, moqUnits: MOQ_UNITS, unitTypes: UNIT_TYPES, maxRows: MAX_IMPORT_ROWS_TOTAL, commitRows: MAX_COMMIT_ROWS, maxBytes: MAX_IMPORT_BYTES, formats: ['.xlsx', '.xls', '.csv', '.pdf'], pdf: { maxBytes: MAX_PDF_BYTES, maxPages: MAX_PDF_PAGES, ocr: false }, photoLookup: { maxItems: MAX_ENRICH_ITEMS, sources: this.enrich.providers.map((p) => ({ id: p.id, label: p.label, license: p.license })) } };
     }
 
     @Get('import/template')
-    template(@Query('format') format: string, @Res() res: any) {
+    template(@Query('format') format: string, @Query('variant') variant: string, @Res() res: any) {
         const f = format === 'csv' ? 'csv' : 'xlsx';
-        const buf = buildTemplate(f);
+        const example = variant === 'example';
+        const buf = buildTemplate(f, example ? 'example' : 'blank');
         res.setHeader('Content-Type', f === 'csv' ? 'text/csv; charset=utf-8' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', `attachment; filename="atlantis-product-template.${f}"`);
+        res.setHeader('Content-Disposition', `attachment; filename="${example ? 'atlantis-product-import-example' : 'atlantis-product-template'}.${f}"`);
         res.send(buf);
     }
 
@@ -98,8 +102,12 @@ export class SupplierCatalogController {
      */
     @Post('import/analyse')
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_IMPORT_BYTES } }))
-    analyse(@UploadedFile() file: any) {
+    async analyse(@UploadedFile() file: any) {
         if (!file?.buffer?.length) throw new BadRequestException('Choose a file to upload.');
+        const name = String(file.originalname || 'upload').slice(0, 200);
+        // PDFs are recognised by their content, not the name or the browser's type.
+        const isPdf = file.buffer.slice(0, 1024).indexOf('%PDF-') >= 0;
+        if (isPdf || /\.pdf$/i.test(name)) return analysePdf(file.buffer, name);
         try {
             return analyseWorkbook(file.buffer, String(file.originalname || 'upload').slice(0, 200));
         } catch (e: any) {
@@ -179,7 +187,23 @@ export class SupplierCatalogController {
             if (ean && ean.replace(/\D/g, '') !== String(p.ean).replace(/\D/g, '')) throw new BadRequestException('You changed the barcode. Save the product first, then search with the new barcode.');
             ean = p.ean;
         }
-        return this.images.lookup(ean, body?.name, body?.brand, fetch, body?.weight);
+        return this.images.lookup(ean, body?.name, body?.brand, ((u: any, i: any) => this.enrich.queue.fetch(String(u), i)) as typeof fetch, body?.weight);
+    }
+
+    /**
+     * Find photos by barcode for import rows without one (optional, read-only).
+     * Starts a background search; poll its status. Nothing is stored.
+     */
+    @Post('import/photo-lookup')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    photoLookup(@Request() req, @Body() body: { items: EnrichItem[] }) {
+        return this.enrich.start(req.user.sub, Array.isArray(body?.items) ? body.items : []);
+    }
+
+    @Get('import/photo-lookup/:id')
+    @Throttle({ default: { limit: 120, ttl: 60_000 } })
+    photoLookupStatus(@Request() req, @Param('id') id: string) {
+        return this.enrich.status(req.user.sub, id);
     }
 
     /** Copy an accepted candidate into Atlantis storage; returns the stored URL. */

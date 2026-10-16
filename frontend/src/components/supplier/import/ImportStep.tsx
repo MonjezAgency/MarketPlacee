@@ -31,6 +31,7 @@ export default function ImportStep({ review, onExisting, confirmed, setConfirmed
                         {(s.skip + s.unchanged) > 0 && <li>{b(tc('sumUnchanged', { count: s.skip + s.unchanged, n: fmt.number(s.skip + s.unchanged) }))}</li>}
                         {s.error > 0 && <li className="text-red-700">{b(tc('sumErrors', { count: s.error, n: fmt.number(s.error) }))}</li>}
                         {s.photosFromFile > 0 && <li>{b(tc('sumPhotos', { count: s.photosFromFile, n: fmt.number(s.photosFromFile) }))}</li>}
+                        {(s.photosFromLookup ?? 0) > 0 && <li>{b(t('catalogImport', 'sumLookupPhotos', { count: s.photosFromLookup!, n: fmt.number(s.photosFromLookup!) }))}</li>}
                     </ul>
                     <label className="mt-4 flex items-start gap-2.5 text-[13.5px] rounded-lg ring-1 ring-line p-3 bg-surface-2/40 cursor-pointer">
                         <input type="checkbox" className="mt-0.5 accent-[#0E7C74]" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} />

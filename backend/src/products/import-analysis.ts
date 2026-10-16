@@ -23,6 +23,10 @@ export interface CellRow {
     section?: string;                     // nearest section heading above (e.g. "CHUPA CHUPS")
     /** Pictures placed on this row in the workbook (paths inside the file, e.g. "xl/media/image3.png"). */
     images?: string[];
+    /** PDF only: the page the row was read from, how it was read, and the words as they appear on the page. */
+    page?: number;
+    flags?: { code: string; [k: string]: unknown }[];
+    source?: string;
 }
 export interface SheetColumn { index: number; letter: string; key: string; header: string; parent?: string }
 export interface Hint { field: FieldKey; value: string; source: string }
@@ -138,6 +142,15 @@ export function analyseWorkbook(buf: Buffer, fileName: string): WorkbookAnalysis
     }
     if (!sheets.length) throw new Error('No product rows found. The file needs a header row (column names) and at least one row of products.');
 
+    // File-name hint (e.g. "PERFETTI OFFER EXW BELGIUM.xlsx").
+    const hints: Hint[] = [];
+    const exwFromName = extractExw(fileName.replace(/[_]+/g, ' '));
+    if (exwFromName) hints.push({ field: 'exwLocation', value: exwFromName, source: `file name “${fileName}”` });
+    return finishAnalysis(fileName, sheets, hints);
+}
+
+/** Row limit, hints and column suggestions — shared by spreadsheets and PDFs (pdf-import.ts). */
+export function finishAnalysis(fileName: string, sheets: SheetData[], hints: Hint[] = []): WorkbookAnalysis {
     const notices: string[] = [];
     let totalRows = sheets.reduce((s, x) => s + x.rows.length, 0);
     if (totalRows > MAX_ANALYSE_ROWS) {
@@ -147,10 +160,6 @@ export function analyseWorkbook(buf: Buffer, fileName: string): WorkbookAnalysis
         totalRows = MAX_ANALYSE_ROWS;
     }
 
-    // File-name hint (e.g. "PERFETTI OFFER EXW BELGIUM.xlsx").
-    const hints: Hint[] = [];
-    const exwFromName = extractExw(fileName.replace(/[_]+/g, ' '));
-    if (exwFromName) hints.push({ field: 'exwLocation', value: exwFromName, source: `file name “${fileName}”` });
     for (const s of sheets) for (const h of s.hints) if (!hints.some((x) => x.field === h.field && x.value === h.value)) hints.push(h);
 
     const columns = suggestColumns(sheets);
@@ -276,7 +285,7 @@ function readSheet(ws: XLSX.WorkSheet, name: string, pictures: Picture[] = []): 
 
 const CURRENCY_WORDS: Record<string, string> = { eur: 'EUR', euro: 'EUR', euros: 'EUR', '€': 'EUR', usd: 'USD', '$': 'USD', gbp: 'GBP', '£': 'GBP', aed: 'AED', sar: 'SAR', egp: 'EGP', ron: 'RON', try: 'TRY', kwd: 'KWD', qar: 'QAR', inr: 'INR' };
 const PRICE_FIELDS: FieldKey[] = ['price', 'piecePrice', 'displayPrice'];
-const NUMERIC_FIELDS: FieldKey[] = ['price', 'piecePrice', 'displayPrice', 'stock', 'stockPieces', 'unitsPerCase', 'casesPerPallet', 'palletsPerShipment', 'leadTime', 'unitsPerDisplay', 'displaysPerCase', 'casesPerLayer', 'layersPerPallet'];
+const NUMERIC_FIELDS: FieldKey[] = ['price', 'piecePrice', 'displayPrice', 'stock', 'stockPieces', 'stockPallets', 'unitsPerPallet', 'unitsPerCase', 'casesPerPallet', 'palletsPerShipment', 'leadTime', 'unitsPerDisplay', 'displaysPerCase', 'casesPerLayer', 'layersPerPallet'];
 const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 
 function suggestColumns(sheets: SheetData[]): ColumnSuggestion[] {
@@ -319,7 +328,7 @@ function suggestColumns(sheets: SheetData[]): ColumnSuggestion[] {
         } else if (field === 'eanPair' && pairs / n < 0.5) {
             field = 'ean'; confidence = 'medium'; reason = 'Column name mentions two barcodes, but cells hold one.';
         }
-        if (['ean', 'caseEan', 'displayEan'].includes(String(field))) {
+        if (['ean', 'caseEan', 'displayEan', 'eanCheck'].includes(String(field))) {
             checks.push(`${pct(validEan, n)}% valid barcodes`);
             if (validEan / n < 0.5) { confidence = 'low'; reason += ' Most cells are not valid barcodes — check.'; }
         }
@@ -331,6 +340,11 @@ function suggestColumns(sheets: SheetData[]): ColumnSuggestion[] {
             candidates = [...candidates, 'displayPrice'];
             reason = `“${e.col.header.trim()}” could mean ${candidates.map(labelOf).join(', ').replace(/, ([^,]*)$/, ' or $1')} — the file doesn’t say.`;
         }
+        // A "Product image" column in a PDF or a pasted sheet holds no links — nothing to import from it.
+        if (field === 'imageUrl') {
+            const links = vals.filter((v) => /^https?:\/\//i.test(v)).length;
+            if (links / n < 0.5) { field = null; confidence = 'none'; reason = 'Column name says image, but the cells hold no image links.'; }
+        }
         if (field === 'weight') {
             const ok = vals.filter((v) => normaliseWeight(v) || /^(\d+\s*[x×]\s*)?\d+([.,]\d+)?$/i.test(v)).length;
             checks.push(`${pct(ok, n)}% read as weights`);
@@ -340,7 +354,9 @@ function suggestColumns(sheets: SheetData[]): ColumnSuggestion[] {
 
         // Currency from the header ("Price / pce. in EUR") or the cells' format ("€ 1.15").
         let currency: ColumnSuggestion['currency'];
-        if (field && PRICE_FIELDS.includes(field) || candidates.some((c) => PRICE_FIELDS.includes(c))) {
+        // Price columns, or any column whose cells carry a currency sign (a price column without a header).
+        const signed = e.values.filter((x) => /[€$£]/.test(x.shown || x.v)).length / n >= 0.8;
+        if (field && PRICE_FIELDS.includes(field) || candidates.some((c) => PRICE_FIELDS.includes(c)) || (!field && signed)) {
             const toks = normaliseHeader(e.col.header).split(' ');
             const hw = toks.find((t) => CURRENCY_WORDS[t]) || (e.col.header.match(/[€$£]/) || [])[0];
             if (hw) currency = { code: CURRENCY_WORDS[hw], source: `column name “${e.col.header.trim()}”` };
@@ -370,11 +386,15 @@ function suggestColumns(sheets: SheetData[]): ColumnSuggestion[] {
                 const uniq = new Set(vals.map((v) => v.toLowerCase())).size / vals.length;
                 const len = vals.reduce((s, v) => s + v.length, 0) / vals.length;
                 const ww = vals.filter((v) => weightFromName(v)).length / vals.length;
-                return uniq >= 0.8 && len >= 5 && len <= 120 && ww >= 0.3 && vals.filter(isNumericText).length / vals.length < 0.2;
+                // Sizes may sit in their own Weight column, so a name without one still counts then.
+                const weightCol = out.some((o) => o.field === 'weight');
+                return uniq >= 0.8 && len >= 5 && len <= 120 && (ww >= 0.3 || weightCol) && vals.filter(isNumericText).length / vals.length < 0.2;
             });
         if (cand) {
             cand.c.field = 'name'; cand.c.confidence = 'medium';
-            cand.c.reason = 'No product-name column; this one holds short, unique names with pack sizes — check it is the name buyers should see.';
+            cand.c.reason = out.some((o) => o.field === 'weight')
+                ? 'No product-name column; this one holds short, unique names (sizes are in the weight column) — check it is the name buyers should see.'
+                : 'No product-name column; this one holds short, unique names with pack sizes — check it is the name buyers should see.';
         }
     }
     // Two columns proposed for the same field: keep the more certain one, flag the other.
@@ -384,6 +404,11 @@ function suggestColumns(sheets: SheetData[]): ColumnSuggestion[] {
         const rivals = out.filter((o) => o !== c && o.field === c.field && o.sheets.some((s) => c.sheets.includes(s)));
         for (const o of rivals) {
             if (rank[o.confidence] > rank[c.confidence] || (rank[o.confidence] === rank[c.confidence] && out.indexOf(o) < out.indexOf(c))) {
+                if (c.field === 'ean' && c.checks.some((x) => /^(\d+)% valid barcodes/.test(x) && Number(x.match(/^(\d+)/)![1]) >= 50)) {
+                    c.field = 'eanCheck'; c.confidence = 'medium';
+                    c.reason = `A second barcode column. It will be compared with “${o.header}” row by row; rows where they differ are blocked.`;
+                    break;
+                }
                 c.reason = `Could be ${labelOf(c.field)}, but “${o.header}” already matches it better — choose if needed.`;
                 c.candidates = [c.field]; c.field = null; c.confidence = 'low';
                 break;

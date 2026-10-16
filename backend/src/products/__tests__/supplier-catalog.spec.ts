@@ -120,16 +120,22 @@ describe('import rows', () => {
 
 describe('spreadsheet files', () => {
     it('xlsx template round-trips: headers match the schema and the example row is valid apart from being the example', () => {
-        const buf = buildTemplate('xlsx');
-        const sheet = parseSpreadsheet(buf, 'template.xlsx');
+        // Blank template: headers and the helper row only.
+        expect(() => parseSpreadsheet(buildTemplate('xlsx'), 'template.xlsx')).toThrow('no product rows');
+        const sheet = parseSpreadsheet(buildTemplate('xlsx', 'example'), 'example.xlsx');
         expect(sheet.headers).toEqual(IMPORT_FIELDS.map((f) => f.header));
-        expect(sheet.rows).toHaveLength(1); // helper row skipped
+        expect(sheet.rows).toHaveLength(3); // helper row skipped
         const matches = matchHeaders(sheet.headers);
         expect(matches.every((m) => m.status === 'matched')).toBe(true);
         const mapping = Object.fromEntries(matches.map((m) => [String(m.index), m.field]));
-        const r = buildRow(sheet.rows[0], 3, mapping as any, { currency: 'EUR', moqUnit: 'CASE' });
-        expect(r.errors.map((e) => e.label)).toEqual(['Example row']);
-        expect(r.missing.map((m) => m.field)).toEqual(['images']);
+        for (const [i, row] of sheet.rows.entries()) {
+            const r = buildRow(row, 3 + i, mapping as any, { currency: 'EUR', moqUnit: 'CASE' });
+            // Each example is complete apart from a photo — and blocked as an example.
+            expect(r.errors.map((e) => e.label)).toEqual(['Example row']);
+            expect(r.missing.map((m) => m.field)).toEqual(['images']);
+            expect(r.product.price).toBeGreaterThan(0);
+            expect(r.product.stock).toBeGreaterThan(0);
+        }
     });
     it('csv keeps leading zeros and decimals as typed', () => {
         const csv = 'Name,EAN,Price per Case\nA,0012345678905,13.55\n';

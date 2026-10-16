@@ -196,6 +196,10 @@ model Product {
   stock       Int           @default(0)
   category    String
   images      String[]
+  /// Where a photo came from when it isn't the supplier's own (licence and attribution to show with it). Shape:
+  ///   { "<image url>": { "source": "Open Food Facts", "license": "CC BY-SA 3.0", "licenseUrl": "…", "attribution": "Open Food Facts contributors", "sourceUrl": "…", "barcode": "…", "addedAt": "ISO date" } }
+  /// Null / missing key = the supplier's own photo.
+  imageCredits Json?
   // Short product demo videos — same array shape as images. Each
   // entry is a public URL: an uploaded MP4/WebM/MOV under /uploads,
   // or an https direct-link the supplier pasted. NOT YouTube/Vimeo
