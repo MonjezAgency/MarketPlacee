@@ -380,6 +380,7 @@ export const ar = {
     admin: {
         targetPriceRequests: "الأسعار المستهدفة",
         deliveryCountries: "دول التوصيل",
+        hubsRates: "المستودعات وأسعار الشحن",
         emailSetup: "إعداد ومعاينة البريد",
         groupControlPanel: "لوحة التحكم",
         panelTitle: "لوحة التحكم",
