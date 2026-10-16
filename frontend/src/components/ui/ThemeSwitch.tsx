@@ -4,11 +4,12 @@ import * as React from 'react';
 import { useTheme } from 'next-themes';
 import { Monitor, Sun, Moon } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const OPTIONS = [
-    { value: 'system', label: 'System', icon: Monitor },
-    { value: 'light', label: 'Light', icon: Sun },
-    { value: 'dark', label: 'Dark', icon: Moon },
+    { value: 'system', label: 'system', icon: Monitor },
+    { value: 'light', label: 'light', icon: Sun },
+    { value: 'dark', label: 'dark', icon: Moon },
 ] as const;
 
 /**
@@ -18,13 +19,14 @@ const OPTIONS = [
  */
 export function ThemeSwitch({ className }: { className?: string }) {
     const { theme, setTheme } = useTheme();
+    const { t } = useLanguage();
     const [mounted, setMounted] = React.useState(false);
     React.useEffect(() => setMounted(true), []);
     const current = mounted ? theme ?? 'light' : undefined;
     return (
         <div className={className}>
-            <p className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-4">Theme</p>
-            <div role="radiogroup" aria-label="Theme" className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-surface-3">
+            <p className="px-1 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-4">{t('theme', 'title')}</p>
+            <div role="radiogroup" aria-label={t('theme', 'title')} className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-surface-3">
                 {OPTIONS.map(({ value, label, icon: Icon }) => {
                     const on = current === value;
                     return (
@@ -39,7 +41,7 @@ export function ThemeSwitch({ className }: { className?: string }) {
                                 on ? 'bg-surface text-ink shadow-sm ring-1 ring-line' : 'text-ink-3 hover:text-ink'
                             )}
                         >
-                            <Icon size={14} /> {label}
+                            <Icon size={14} /> {t('theme', label)}
                         </button>
                     );
                 })}

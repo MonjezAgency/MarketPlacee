@@ -151,14 +151,15 @@ export function setActiveCurrency(code: string): void {
  * currency's own decimal precision (e.g. JPY 0, KWD 3). If the currency has
  * no valid rate, the EUR amount is formatted as EUR — never relabelled.
  */
-export function formatPrice(amountEUR: number, currencyCode?: string): string {
+/** `intlLocale` formats for the interface language (e.g. "1.234,50 €" in Portuguese); defaults to the currency's own locale. */
+export function formatPrice(amountEUR: number, currencyCode?: string, intlLocale?: string): string {
     const safeAmount = Number.isFinite(amountEUR) ? amountEUR : 0;
     let code = currencyCode || getActiveCurrency();
     let value = convertFromBaseStrict(safeAmount, code);
     if (value === null) { code = BASE_CURRENCY; value = safeAmount; }
     const info = SUPPORTED_CURRENCIES.find((c) => c.code === code);
     try {
-        return new Intl.NumberFormat(info?.locale ?? 'en-IE', { style: 'currency', currency: code }).format(value);
+        return new Intl.NumberFormat(intlLocale ?? info?.locale ?? 'en-IE', { style: 'currency', currency: code }).format(value);
     } catch {
         return `${info?.symbol ?? code} ${value.toFixed(2)}`;
     }

@@ -198,6 +198,11 @@ export default function RootLayout({
                         }),
                     }}
                 />
+                {/* Chosen language before first paint, so Arabic opens right-to-left without a jump
+                    (contexts/LanguageContext.tsx keeps it in sync afterwards). */}
+                <script dangerouslySetInnerHTML={{
+                    __html: `try{var l=localStorage.getItem('app-locale');if(['ar','fr','ro','it','es','pt'].indexOf(l)>-1){document.documentElement.lang=l;document.documentElement.dir=l==='ar'?'rtl':'ltr';}}catch(e){}`
+                }} />
                 {/* Service worker: production only. In dev it would cache
                     hot-reloaded assets, so we unregister any leftover worker
                     instead. Registration failures are non-fatal — always
@@ -219,7 +224,7 @@ export default function RootLayout({
                 }} />
             </head>
             <body className={cn(
-                'min-h-screen bg-surface text-ink font-sans antialiased text-end',
+                'min-h-screen bg-surface text-ink font-sans antialiased text-start',
                 inter.variable,
                 cairo.variable,
                 poppins.variable // Keep poppins variable if it's still needed for other elements

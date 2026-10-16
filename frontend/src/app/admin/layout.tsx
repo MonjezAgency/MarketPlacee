@@ -59,7 +59,7 @@ import { cn } from '@/lib/utils';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { useTheme } from 'next-themes';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { Locale } from '@/locales';
+import { LOCALES, LOCALE_META, type Locale } from '@/locales/config';
 import { GuidedTour } from '@/components/ui/GuidedTour';
 import { WorldClock } from '@/components/dashboard/WorldClock';
 
@@ -571,13 +571,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                             onChange={(e) => setLocale(e.target.value as Locale)}
                             className="bg-transparent dark:bg-transparent text-xs font-bold outline-none cursor-pointer text-[#555] dark:text-[#999] hover:text-[#0F1111] dark:hover:text-white border border-[#DDD] dark:border-white/10 rounded-md px-2 py-1.5 transition-all"
                         >
-                            <option value="en" className="text-black bg-white">EN</option>
-                            <option value="ar" className="text-black bg-white">عربي</option>
-                            <option value="fr" className="text-black bg-white">FR</option>
-                            <option value="de" className="text-black bg-white">DE</option>
-                            <option value="es" className="text-black bg-white">ES</option>
-                            <option value="pt" className="text-black bg-white">PT</option>
-                            <option value="ro" className="text-black bg-white">RO</option>
+                            {LOCALES.map((code) => <option key={code} value={code} className="text-black bg-white">{LOCALE_META[code].name}</option>)}
                         </select>
 
                         {/* Theme Toggle */}

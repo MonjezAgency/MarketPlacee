@@ -242,6 +242,20 @@ describe('order workflow service', () => {
         expect(JSON.stringify(view)).not.toMatch(/sup-a|supplierUnitPrice|900/);
         expect(view).toMatchObject({ reviewStatus: 'APPROVED', suppliersConfirmed: 1, suppliersTotal: 1, buyerMustAccept: false });
     });
+    it('the buyer order list carries a delivery summary and inspection status, never supplier ids, charges or raw terms', async () => {
+        const db = makeDb(); const order = seed(db, ['sup-a']);
+        order.fulfillment = { destination: 'DE', status: 'priced', freightTotal: 240, groups: [{ supplierId: 'sup-a', method: 'ATLANTIS_COLLECTION', label: 'Atlantis arranges collection', status: 'priced', total: 240, transitDays: { min: 3, max: 5 }, hub: null, charges: [{ key: 'collection', label: 'Collection', amount: 240, paidTo: 'Atlantis' }], lines: ['it-sup-a'] }] };
+        (order as any).submittedTerms = { lines: [{ supplierId: 'sup-a', supplierUnitPrice: 900 }] };
+        db.t.inspections.push({ id: 'insp-1', orderId: 'ord-1', status: 'SCHEDULED' });
+        db.order.findMany = jest.fn(async () => db.t.orders.map((o: any) => ({ ...o, items: db.t.items.filter((i: any) => i.orderId === o.id), confirmations: db.t.confs.filter((c: any) => c.orderId === o.id), inspections: db.t.inspections.filter((i: any) => i.orderId === o.id) })));
+        db.order.count = jest.fn(async () => db.t.orders.length);
+        const { svc } = makeService(db);
+        const { data } = await svc.findByBuyer('buyer');
+        expect(data[0]).toMatchObject({ inspection: 'SCHEDULED', delivery: { status: 'priced', freightTotal: 240, methods: [{ method: 'ATLANTIS_COLLECTION', total: 240, transitDays: { min: 3, max: 5 }, hub: null }] } });
+        const json = JSON.stringify(data[0].delivery) + JSON.stringify(Object.keys(data[0]));
+        expect(json).not.toMatch(/sup-a|charges|supplierUnitPrice|submittedTerms|termsSnapshot|"fulfillment"|"inspections"/);
+    });
+
     it('inspections are recorded against the order’s own lines, with findings required for a failure', async () => {
         const db = makeDb(); seed(db, ['sup-a']);
         const { svc } = makeService(db);

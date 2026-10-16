@@ -1,158 +1,211 @@
 'use client';
 
-import { motion } from 'framer-motion';
+import * as React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, RotateCcw, CheckCircle2, XCircle, Clock, AlertCircle, MessageSquare } from 'lucide-react';
+import { motion, useReducedMotion, useScroll, useTransform } from 'framer-motion';
+import { ShieldCheck, Landmark, AlertOctagon, PackageX, MessageSquareWarning, Camera, Scale, CheckCircle2, XCircle, Clock3, Banknote, Wallet, AlertTriangle, ArrowRight, Mail, Truck, ClipboardCheck } from 'lucide-react';
+import { ButtonLink, Container, CtaBand, Eyebrow, Reveal, Section, SectionHeader } from '@/components/ds';
+import { Trans } from '@/components/i18n/Trans';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { cn } from '@/lib/utils';
 
-const ELIGIBLE = [
-    'Goods that are significantly not as described in the listing',
-    'Damaged goods on arrival (with photographic evidence)',
-    'Missing items from the order (partial delivery)',
-    'Incorrect products shipped (wrong SKU, size, or variant)',
-    'Expired goods delivered (FMCG products)',
+/**
+ * Returns & Refunds policy. The wording keeps the policy's meaning (steps,
+ * eligibility, timelines, fees); the only factual change is where problems
+ * are reported — buyers report through Support → Order conversations, the
+ * order-level channel that exists today.
+ */
+const SUPPORT_ORDERS = '/dashboard/customer/support?tab=orders';
+
+const FACTS = [
+    { icon: ShieldCheck, t: 'factConfirmedTitle', d: 'factConfirmedBody' },
+    { icon: Landmark, t: 'factEscrowTitle', d: 'factEscrowBody' },
+    { icon: AlertOctagon, t: 'factReportTitle', d: 'factReportBody' },
+];
+const STEPS = [
+    { icon: PackageX, t: 'step1Title', d: 'step1Body' },
+    { icon: MessageSquareWarning, t: 'step2Title', d: 'step2Body' },
+    { icon: Camera, t: 'step3Title', d: 'step3Body' },
+    { icon: Scale, t: 'step4Title', d: 'step4Body' },
+];
+const TIMES = [
+    { icon: Clock3, t: 'time1Title', v: 'time1Value', d: 'time1Body' },
+    { icon: Banknote, t: 'time2Title', v: 'time2Value', d: 'time2Body' },
+    { icon: Wallet, t: 'time3Title', v: 'time3Value', d: 'time3Body' },
 ];
 
-const NOT_ELIGIBLE = [
-    'Change of mind after delivery is confirmed',
-    'Goods that match the product description but were not what the buyer expected',
-    'Damage caused after delivery by the buyer',
-    'Orders for which delivery has been confirmed in the platform without raising an issue',
-    'Disputes raised more than 7 days after delivery confirmation',
-];
+const inlineLink = (href: string) => (c: React.ReactNode) => <Link href={href} className="font-medium text-teal underline decoration-teal/30 underline-offset-2 hover:decoration-teal">{c}</Link>;
 
-export default function ReturnsPage() {
+/** The four steps on a rail that fills as the reader scrolls through them. */
+function StepRail() {
+    const { t } = useLanguage();
+    const reduce = useReducedMotion();
+    const ref = React.useRef<HTMLOListElement>(null);
+    const { scrollYProgress } = useScroll({ target: ref, offset: ['start 75%', 'end 55%'] });
+    const fill = useTransform(scrollYProgress, [0, 1], [0, 1]);
     return (
-        <main className="min-h-screen bg-background">
-            <div className="container mx-auto px-6 py-16 max-w-4xl">
-                <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-                    <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
-                        <ArrowLeft size={16} /> Back to Home
-                    </Link>
-
-                    <div className="flex items-center gap-4 mb-4">
-                        <div className="w-12 h-12 rounded-2xl bg-purple-500/10 flex items-center justify-center">
-                            <RotateCcw size={22} className="text-purple-500" />
-                        </div>
-                        <div>
-                            <p className="text-xs font-black uppercase tracking-widest text-muted-foreground">Policies</p>
-                            <h1 className="text-3xl font-black">Returns & Refunds</h1>
-                        </div>
-                    </div>
-                    <p className="text-muted-foreground mb-12">Last updated: April 2026</p>
-
-                    <div className="bg-purple-500/5 border border-purple-500/20 rounded-2xl p-6 mb-12">
-                        <p className="text-sm leading-relaxed">
-                            Every Atlantis order is confirmed by the supplier and approved by Atlantis before you pay, and the confirmed terms are saved on your order. Atlantis doesn’t hold payments in escrow. If there is a problem with your order, do not confirm delivery and open a dispute.
+        <ol ref={ref} className="relative mt-12 space-y-4">
+            <span aria-hidden className="absolute top-6 bottom-6 start-[27px] w-px bg-line hidden sm:block" />
+            {!reduce && <motion.span aria-hidden style={{ scaleY: fill }} className="absolute top-6 bottom-6 start-[27px] w-px bg-[#2EC4B6] origin-top hidden sm:block" />}
+            {STEPS.map((s, i) => (
+                <Reveal as="li" key={s.t} delay={i * 0.06} className="relative grid grid-cols-[56px_minmax(0,1fr)] gap-4 sm:gap-6">
+                    <span className="relative z-10 w-14 h-14 rounded-2xl bg-surface ring-1 ring-line flex items-center justify-center text-teal shadow-card">
+                        <s.icon size={22} aria-hidden />
+                    </span>
+                    <div className="rounded-2xl ring-1 ring-line bg-surface p-5 sm:p-6">
+                        <p className="text-small font-semibold text-teal">{t('returns', 'stepLabel', { n: i + 1 })}</p>
+                        <h3 className="mt-1 font-sans text-subtitle text-heading">{t('returns', s.t)}</h3>
+                        <p className="mt-2 text-body text-ink-2">
+                            <Trans text={t('returns', s.d)} tags={{ link: inlineLink(SUPPORT_ORDERS) }} />
                         </p>
                     </div>
+                </Reveal>
+            ))}
+        </ol>
+    );
+}
 
-                    <div className="space-y-10">
-                        <section className="border-b border-border/50 pb-10">
-                            <h2 className="text-lg font-black mb-5">How Returns Work on Atlantis</h2>
-                            <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                                Because Atlantis is a B2B marketplace, returns are handled through our dispute resolution process rather than a traditional return flow:
-                            </p>
-                            <div className="space-y-4">
-                                {[
-                                    { step: '1', title: 'Do not confirm delivery', desc: 'If goods are wrong, damaged, or missing — do not press "Confirm Delivery". Your report is the basis for the resolution.' },
-                                    { step: '2', title: 'Open a dispute', desc: 'Go to Dashboard → My Orders → Select the order → "Open Dispute". You have 7 days from the expected delivery date.' },
-                                    { step: '3', title: 'Provide evidence', desc: 'Upload photos, describe the issue clearly, and submit the dispute. The supplier will also be contacted.' },
-                                    { step: '4', title: 'Resolution', desc: 'Our team reviews within 48-72 hours. If resolved in your favor, the team arranges a full or partial refund or a price adjustment under the confirmed terms. Refunds are arranged by the team, not automatically.' },
-                                ].map((item) => (
-                                    <div key={item.step} className="flex gap-4 p-5 bg-card border border-border/50 rounded-xl">
-                                        <span className="w-8 h-8 rounded-full bg-primary/10 text-primary text-sm font-black flex items-center justify-center shrink-0">{item.step}</span>
-                                        <div>
-                                            <p className="font-bold text-sm mb-1">{item.title}</p>
-                                            <p className="text-xs text-muted-foreground leading-relaxed">{item.desc}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </section>
+export default function ReturnsClient() {
+    const { t } = useLanguage();
+    const eligible = [1, 2, 3, 4, 5].map((n) => t('returns', `eligible${n}`));
+    const notEligible = [1, 2, 3, 4, 5].map((n) => t('returns', `notEligible${n}`));
 
-                        <section className="border-b border-border/50 pb-10">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                <div>
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <CheckCircle2 size={18} className="text-emerald-500" />
-                                        <h2 className="font-black">Eligible for Dispute / Refund</h2>
-                                    </div>
-                                    <ul className="space-y-3">
-                                        {ELIGIBLE.map((item) => (
-                                            <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                                <CheckCircle2 size={14} className="text-emerald-500 shrink-0 mt-0.5" />
-                                                {item}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                                <div>
-                                    <div className="flex items-center gap-2 mb-4">
-                                        <XCircle size={18} className="text-red-500" />
-                                        <h2 className="font-black">Not Eligible</h2>
-                                    </div>
-                                    <ul className="space-y-3">
-                                        {NOT_ELIGIBLE.map((item) => (
-                                            <li key={item} className="flex items-start gap-2 text-sm text-muted-foreground">
-                                                <XCircle size={14} className="text-red-400 shrink-0 mt-0.5" />
-                                                {item}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </div>
-                        </section>
+    return (
+        <main data-no-translate className="min-h-screen bg-surface text-start">
+            {/* Hero */}
+            <Section size="md" className="border-b border-line">
+                <Container size="content">
+                    <Reveal hero className="max-w-2xl">
+                        <Eyebrow pill>{t('returns', 'eyebrow')}</Eyebrow>
+                        <h1 className="mt-5 font-sans text-display-sm sm:text-display text-heading">{t('returns', 'title')}</h1>
+                        <p className="mt-5 text-body sm:text-lead text-ink-2">{t('returns', 'lead')}</p>
+                    </Reveal>
+                    <ul className="mt-12 grid gap-4 md:grid-cols-3">
+                        {FACTS.map((f, i) => (
+                            <Reveal hero as="li" key={f.t} delay={0.1 + i * 0.06} className="rounded-2xl ring-1 ring-line p-5 sm:p-6">
+                                <span className="w-10 h-10 rounded-xl bg-teal-soft text-teal flex items-center justify-center"><f.icon size={18} aria-hidden /></span>
+                                <h2 className="font-sans mt-4 text-[16px] leading-snug font-semibold text-heading">{t('returns', f.t)}</h2>
+                                <p className="mt-1.5 text-body text-ink-2">{t('returns', f.d)}</p>
+                            </Reveal>
+                        ))}
+                    </ul>
+                </Container>
+            </Section>
 
-                        <section className="border-b border-border/50 pb-10">
-                            <div className="flex items-center gap-3 mb-5">
-                                <Clock size={18} className="text-primary" />
-                                <h2 className="text-lg font-black">Refund Timelines</h2>
-                            </div>
-                            <div className="space-y-4 text-sm text-muted-foreground">
-                                <p><strong>Dispute decision:</strong> 48-72 business hours after submission</p>
-                                <p><strong>Refund processing:</strong> 1-3 business days after decision</p>
-                                <p><strong>Funds in your account:</strong> 5-10 business days depending on your bank</p>
-                                <p className="text-xs mt-4">Stripe processing fees (typically 1.4%-2.9% + €0.25) may be non-refundable for orders that were partially fulfilled or where the dispute is partially upheld. Fully cancelled orders before processing are refunded in full.</p>
-                            </div>
-                        </section>
+            {/* How it works */}
+            <Section labelledBy="how-title">
+                <Container size="content">
+                    <SectionHeader id="how-title" eyebrow={t('returns', 'howEyebrow')} title={t('returns', 'howTitle')} lead={t('returns', 'howLead')} />
+                    <StepRail />
+                </Container>
+            </Section>
 
-                        <section className="border-b border-border/50 pb-10">
-                            <div className="flex items-center gap-3 mb-5">
-                                <AlertCircle size={18} className="text-amber-500" />
-                                <h2 className="text-lg font-black">Physical Returns</h2>
-                            </div>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                                In some cases, the dispute resolution process may require you to return goods to the supplier. If a physical return is required, Atlantis will coordinate with both parties. Return shipping costs are typically borne by the party at fault as determined by the dispute outcome. Do not return goods without written confirmation from Atlantis that a return has been authorized.
-                            </p>
-                        </section>
-
-                        <section>
-                            <div className="flex items-center gap-3 mb-5">
-                                <MessageSquare size={18} className="text-primary" />
-                                <h2 className="text-lg font-black">Need Help?</h2>
-                            </div>
-                            <p className="text-sm text-muted-foreground leading-relaxed">
-                                For questions about a specific order, open a dispute in your dashboard or contact us at <a href="mailto:Info@atlantisfmcg.com" className="text-primary hover:underline font-bold">Info@atlantisfmcg.com</a>. Include your order number and a description of the issue for the fastest response.
-                            </p>
-                        </section>
+            {/* Eligibility */}
+            <Section tone="muted" labelledBy="eligible-title">
+                <Container size="content">
+                    <SectionHeader id="eligible-title" eyebrow={t('returns', 'eligibleEyebrow')} title={t('returns', 'eligibleTitle')} lead={t('returns', 'eligibleLead')} />
+                    <div className="mt-10 grid gap-4 md:grid-cols-2">
+                        {[
+                            { heading: t('returns', 'eligibleHeading'), items: eligible, ok: true },
+                            { heading: t('returns', 'notEligibleHeading'), items: notEligible, ok: false },
+                        ].map((col, ci) => (
+                            <Reveal key={col.heading} delay={ci * 0.08} className="rounded-2xl bg-surface ring-1 ring-line p-6 sm:p-7">
+                                <h3 className="font-sans flex items-center gap-2.5 text-subtitle text-heading">
+                                    <span className={cn('w-8 h-8 rounded-lg flex items-center justify-center', col.ok ? 'bg-[#ECFDF5] text-[#047857] dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-[#FEF2F2] text-[#B91C1C] dark:bg-red-500/15 dark:text-red-300')}>
+                                        {col.ok ? <CheckCircle2 size={17} aria-hidden /> : <XCircle size={17} aria-hidden />}
+                                    </span>
+                                    {col.heading}
+                                </h3>
+                                <ul className="mt-5 divide-y divide-line">
+                                    {col.items.map((item) => (
+                                        <li key={item} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0 text-body text-ink-2">
+                                            {col.ok
+                                                ? <CheckCircle2 size={16} className="mt-1 shrink-0 text-[#059669]" aria-hidden />
+                                                : <XCircle size={16} className="mt-1 shrink-0 text-[#DC2626]" aria-hidden />}
+                                            <span>{item}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </Reveal>
+                        ))}
                     </div>
+                </Container>
+            </Section>
 
-                    <div className="mt-16 p-8 bg-card border border-border/50 rounded-2xl text-center space-y-4">
-                        <p className="text-sm font-bold">Have an order issue right now?</p>
-                        <div className="flex items-center justify-center gap-4 flex-wrap">
-                            <Link href="/dashboard" className="inline-flex items-center gap-2 h-11 px-8 bg-primary text-primary-foreground text-sm font-black rounded-xl hover:bg-primary/90 transition-colors">
-                                Go to My Orders
+            {/* Timelines */}
+            <Section labelledBy="time-title">
+                <Container size="content">
+                    <SectionHeader id="time-title" eyebrow={t('returns', 'timelineEyebrow')} title={t('returns', 'timelineTitle')} lead={t('returns', 'timelineLead')} />
+                    <ol className="mt-10 grid gap-4 md:grid-cols-3">
+                        {TIMES.map((x, i) => (
+                            <Reveal as="li" key={x.t} delay={i * 0.08} className="relative rounded-2xl ring-1 ring-line p-6">
+                                <div className="flex items-center justify-between">
+                                    <span className="w-10 h-10 rounded-xl bg-teal-soft text-teal flex items-center justify-center"><x.icon size={18} aria-hidden /></span>
+                                    <span className="text-small font-semibold text-ink-4 tabular-nums">{i + 1}/3</span>
+                                </div>
+                                <p className="mt-5 text-small text-ink-3">{t('returns', x.t)}</p>
+                                <p className="mt-1 font-sans text-[22px] sm:text-[24px] leading-tight font-semibold text-heading">{t('returns', x.v)}</p>
+                                <p className="mt-1 text-body text-ink-2">{t('returns', x.d)}</p>
+                                {i < TIMES.length - 1 && <ArrowRight size={18} aria-hidden className="hidden md:block absolute top-1/2 -end-[19px] -translate-y-1/2 z-10 text-ink-4 bg-surface rtl:rotate-180" />}
+                            </Reveal>
+                        ))}
+                    </ol>
+                    <Reveal className="mt-6 rounded-2xl bg-surface-2 p-5 text-small text-ink-3 leading-relaxed">
+                        {t('returns', 'feesNote')}
+                    </Reveal>
+                </Container>
+            </Section>
+
+            {/* Physical returns + help */}
+            <Section tone="muted">
+                <Container size="content" className="grid gap-4 lg:grid-cols-2">
+                    <Reveal className="rounded-2xl bg-surface ring-1 ring-line p-6 sm:p-7">
+                        <Eyebrow>{t('returns', 'physicalEyebrow')}</Eyebrow>
+                        <h2 className="mt-3 font-sans text-title-sm text-heading">{t('returns', 'physicalTitle')}</h2>
+                        <p className="mt-3 text-body text-ink-2">{t('returns', 'physicalBody')}</p>
+                        <p className="mt-5 flex gap-3 rounded-xl ring-1 ring-[#FDE68A] bg-[#FFFBEB] dark:bg-amber-500/10 dark:ring-amber-500/30 p-4 text-body text-[#78350F] dark:text-amber-200">
+                            <AlertTriangle size={18} className="mt-0.5 shrink-0 text-[#B45309] dark:text-amber-300" aria-hidden />
+                            <span className="font-medium">{t('returns', 'physicalWarning')}</span>
+                        </p>
+                    </Reveal>
+                    <Reveal delay={0.08} className="rounded-2xl bg-surface ring-1 ring-line p-6 sm:p-7">
+                        <Eyebrow>{t('returns', 'helpEyebrow')}</Eyebrow>
+                        <h2 className="mt-3 font-sans text-title-sm text-heading">{t('returns', 'helpTitle')}</h2>
+                        <p className="mt-3 text-body text-ink-2">
+                            <Trans text={t('returns', 'helpBody')} tags={{
+                                link: inlineLink(SUPPORT_ORDERS),
+                                email: (c) => <a href="mailto:Info@atlantisfmcg.com" className="inline-flex items-center gap-1 font-semibold text-heading hover:text-teal"><Mail size={14} aria-hidden /><bdi dir="ltr">{c}</bdi></a>,
+                            }} />
+                        </p>
+                    </Reveal>
+                </Container>
+            </Section>
+
+            {/* Related policies */}
+            <Section size="sm">
+                <Container size="content">
+                    <h2 className="font-sans text-subtitle text-heading">{t('returns', 'relatedTitle')}</h2>
+                    <div className="mt-5 grid gap-4 sm:grid-cols-2">
+                        {[
+                            { href: '/shipping', icon: Truck, title: t('returns', 'relatedShipping'), desc: t('returns', 'relatedShippingDesc') },
+                            { href: '/goods-inspection', icon: ClipboardCheck, title: t('returns', 'relatedInspection'), desc: t('returns', 'relatedInspectionDesc') },
+                        ].map((r) => (
+                            <Link key={r.href} href={r.href} className="group flex gap-4 rounded-2xl ring-1 ring-line p-5 transition-shadow duration-200 hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
+                                <span className="w-10 h-10 shrink-0 rounded-xl bg-teal-soft text-teal flex items-center justify-center"><r.icon size={18} aria-hidden /></span>
+                                <span className="min-w-0">
+                                    <span className="flex items-center gap-2 text-[16px] font-semibold text-heading">{r.title} <ArrowRight size={15} className="text-teal transition-transform duration-200 group-hover:translate-x-1 rtl:rotate-180 rtl:group-hover:-translate-x-1" aria-hidden /></span>
+                                    <span className="mt-1 block text-body text-ink-3">{r.desc}</span>
+                                </span>
                             </Link>
-                            <Link href="/contact" className="inline-flex items-center h-11 px-8 border border-border bg-card text-sm font-black rounded-xl hover:bg-muted transition-colors">
-                                Contact Support
-                            </Link>
-                        </div>
-                        <div className="flex items-center justify-center gap-6 text-xs text-muted-foreground pt-2">
-                            <Link href="/shipping" className="hover:text-foreground transition-colors">Shipping Policy</Link>
-                        </div>
+                        ))}
                     </div>
-                </motion.div>
-            </div>
+                </Container>
+            </Section>
+
+            <CtaBand title={t('returns', 'ctaTitle')} lead={t('returns', 'ctaLead')}>
+                <ButtonLink href="/dashboard/customer/orders">{t('returns', 'ctaOrders')}</ButtonLink>
+                <ButtonLink href="/contact" variant="secondary">{t('returns', 'ctaSupport')}</ButtonLink>
+            </CtaBand>
         </main>
     );
 }

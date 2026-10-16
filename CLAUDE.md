@@ -26,6 +26,6 @@ update `docs/DESIGN_SYSTEM.md` in the same change and say why — don't add sile
 
 ## Before you finish
 
-- `frontend`: `npx tsc --noEmit` and `npm run build` (runs `check:i18n` — every key added to `locales/en.ts` must also be in `locales/ar.ts`).
+- `frontend`: `npx tsc --noEmit` and `npm run build` (runs `check:i18n` — every key added to `locales/en.ts` must be translated in all seven locale files; see `locales/GLOSSARY.md`).
 - `backend`: `npx tsc --noEmit` and `npx jest`.
 - Schema changes must be additive (production runs `prisma db push`).

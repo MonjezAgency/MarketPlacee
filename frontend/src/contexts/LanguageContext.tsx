@@ -1,123 +1,106 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { translations, Locale } from '../locales';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { translations, LOCALE_META, DEFAULT_LOCALE, isLocale, type Locale, type LocaleMeta, type Messages } from '../locales';
+import { formatMessage, type Vars } from '../locales/format';
 import { setAutoTranslateLocale } from '../lib/auto-translate';
+
+/** Where the chosen language is kept (read again before first paint by the script in app/layout.tsx). */
+export const LOCALE_STORAGE_KEY = 'app-locale';
+
+type Section = keyof Messages;
 
 interface LanguageContextType {
     locale: Locale;
+    meta: LocaleMeta;
     setLocale: (locale: Locale) => void;
-    t: (section: keyof typeof translations['en'], key?: string) => string;
+    /** t('orders', 'card.placed', { date }) — dictionary text for the current language, English if a key is ever missing. */
+    t: (section: Section, key?: string, vars?: Vars) => string;
     dir: 'ltr' | 'rtl';
+    /** Locale-aware formatting; values are never changed, only displayed. */
+    fmt: {
+        date: (d: string | number | Date, opts?: Intl.DateTimeFormatOptions) => string;
+        number: (n: number, opts?: Intl.NumberFormatOptions) => string;
+    };
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+function resolve(dict: unknown, path: string): string | undefined {
+    let cur: any = dict;
+    for (const part of path.split('.')) {
+        if (cur && typeof cur === 'object' && part in cur) cur = cur[part];
+        else return undefined;
+    }
+    return typeof cur === 'string' ? cur : undefined;
+}
+
+function applyDocument(locale: Locale) {
+    try {
+        document.documentElement.dir = LOCALE_META[locale].dir;
+        document.documentElement.lang = locale;
+    } catch { /* not in a browser */ }
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-    const [locale, setLocaleState] = useState<Locale>('en');
+    const [locale, setLocaleState] = useState<Locale>(DEFAULT_LOCALE);
 
     useEffect(() => {
-        const applyLocale = (initial: Locale) => {
-            if (initial !== locale) setLocaleState(initial);
-            try {
-                document.documentElement.dir = initial === 'ar' ? 'rtl' : 'ltr';
-                document.documentElement.lang = initial;
-            } catch {}
-            setTimeout(() => {
-                try { setAutoTranslateLocale(initial); } catch (err) {
-                    console.warn('[i18n] auto-translate boot failed:', err);
-                }
-            }, 0);
+        const boot = (initial: Locale) => {
+            setLocaleState(initial);
+            applyDocument(initial);
+            // Pages outside the dictionaries still use the runtime translator; dictionary-rendered
+            // regions opt out with data-no-translate.
+            setTimeout(() => { try { setAutoTranslateLocale(initial); } catch (err) { console.warn('[i18n] auto-translate boot failed:', err); } }, 0);
         };
-
+        let initial: Locale = DEFAULT_LOCALE;
         try {
-            let initial: Locale = 'en';
-            try {
-                const saved = localStorage.getItem('app-locale') as Locale;
-                if (saved && translations[saved]) initial = saved;
-            } catch {}
-            applyLocale(initial);
-        } catch (err) {
-            console.warn('[i18n] init failed:', err);
-        }
-
-        // Listen for the auth-change event the cart context already
-        // dispatches. When a different user logs in we reset locale
-        // to English so a previous browser session's choice doesn't
-        // bleed into the new user's experience. The new user can
-        // still pick their language from the navbar dropdown — and
-        // their choice persists to localStorage from that point.
-        const onAuthChanged = () => {
-            try {
-                const saved = localStorage.getItem('app-locale') as Locale;
-                // We only reset when there's NO explicit pref saved.
-                // Because the user picker writes to localStorage on
-                // every change, "no saved value" effectively means
-                // "fresh session / different user".
-                if (!saved || !translations[saved]) {
-                    applyLocale('en');
-                }
-            } catch {}
-        };
-        window.addEventListener('bev-auth-changed', onAuthChanged);
-        return () => window.removeEventListener('bev-auth-changed', onAuthChanged);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+            const saved = localStorage.getItem(LOCALE_STORAGE_KEY);
+            if (isLocale(saved)) initial = saved;
+            else if (saved) localStorage.removeItem(LOCALE_STORAGE_KEY); // a language we no longer offer
+        } catch { /* storage blocked */ }
+        boot(initial);
     }, []);
 
-    const setLocale = (newLocale: Locale) => {
-        setLocaleState(newLocale);
-        try { localStorage.setItem('app-locale', newLocale); } catch {}
-        try {
-            document.documentElement.dir = newLocale === 'ar' ? 'rtl' : 'ltr';
-            document.documentElement.lang = newLocale;
-        } catch {}
-        try { setAutoTranslateLocale(newLocale); } catch (err) {
-            console.warn('[i18n] locale switch failed:', err);
+    const setLocale = useCallback((next: Locale) => {
+        if (!isLocale(next)) return;
+        setLocaleState(next);
+        try { localStorage.setItem(LOCALE_STORAGE_KEY, next); } catch { /* storage blocked */ }
+        applyDocument(next);
+        try { setAutoTranslateLocale(next); } catch (err) { console.warn('[i18n] locale switch failed:', err); }
+    }, []);
+
+    const meta = LOCALE_META[locale];
+
+    const t = useCallback((section: Section, key?: string, vars?: Vars) => {
+        const dict = translations[locale];
+        if (!key) return (dict[section] as unknown as string) || '';
+        const msg = resolve(dict[section], key) ?? resolve(translations.en[section], key);
+        if (msg === undefined) {
+            if (process.env.NODE_ENV !== 'production') console.warn(`[i18n] missing key ${String(section)}.${key}`);
+            return '';
         }
-    };
+        return formatMessage(msg, vars, meta.intl);
+    }, [locale, meta.intl]);
 
-    const t = (section: keyof typeof translations['en'], key?: string) => {
-        const dict = translations[locale] || translations['en'];
-        const sectionDict = dict[section] as Record<string, unknown>;
-        if (!key) return (sectionDict as unknown as string) || '';
+    const fmt = useMemo(() => ({
+        date: (d: string | number | Date, opts: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' }) => {
+            const v = new Date(d);
+            if (Number.isNaN(v.getTime())) return '';
+            try { return new Intl.DateTimeFormat(meta.intl, opts).format(v); } catch { return v.toDateString(); }
+        },
+        number: (n: number, opts?: Intl.NumberFormatOptions) => {
+            try { return new Intl.NumberFormat(meta.intl, opts).format(n); } catch { return String(n); }
+        },
+    }), [meta.intl]);
 
-        const resolveKey = (d: Record<string, unknown>, k: string): string | undefined => {
-            const parts = k.split('.');
-            let current: any = d;
-            for (const part of parts) {
-                if (current && typeof current === 'object' && part in current) {
-                    current = current[part];
-                } else {
-                    return undefined;
-                }
-            }
-            return typeof current === 'string' ? current : undefined;
-        };
+    useEffect(() => { applyDocument(locale); }, [locale]);
 
-        const result = resolveKey(sectionDict, key);
-        if (result !== undefined) return result;
-
-        const fallbackResult = resolveKey(translations['en'][section], key);
-        return fallbackResult !== undefined ? fallbackResult : key;
-    };
-
-    const dir = locale === 'ar' ? 'rtl' : 'ltr';
-
-    // Keep the <html> root in sync so global CSS hooks (Tailwind's
-    // ms-/me-/ps-/pe- + custom logical-direction selectors) see the
-    // correct direction without relying on a wrapping div. This avoids
-    // bugs where fixed-position elements (modals, drawers) ignored the
-    // direction because they were portaled out of the wrapping <div>.
-    useEffect(() => {
-        if (typeof document !== 'undefined') {
-            document.documentElement.setAttribute('dir', dir);
-            document.documentElement.setAttribute('lang', locale);
-        }
-    }, [dir, locale]);
+    const value = useMemo(() => ({ locale, meta, setLocale, t, dir: meta.dir, fmt }), [locale, meta, setLocale, t, fmt]);
 
     return (
-        <LanguageContext.Provider value={{ locale, setLocale, t, dir }}>
-            <div dir={dir} lang={locale}>
+        <LanguageContext.Provider value={value}>
+            <div dir={meta.dir} lang={locale}>
                 {children}
             </div>
         </LanguageContext.Provider>

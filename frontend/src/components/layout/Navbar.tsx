@@ -31,26 +31,11 @@ import { useCart } from '@/lib/cart';
 import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
 import NotificationBell from '@/components/ui/NotificationBell';
 import { DEPARTMENTS } from '@/lib/departments';
+import { LOCALES, LOCALE_META } from '@/locales/config';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 
-// Codes match locales/index.ts keys AND the auto-translate
-// LANGUAGE_NAMES map on the backend. Adding a new entry here is
-// enough to make a new language fully usable — the runtime
-// translator handles every string on every page.
-const LANGUAGES = [
-    { code: 'en', name: 'English', flag: '🇬🇧' },
-    { code: 'ar', name: 'العربية', flag: '🇪🇬' },
-    { code: 'fr', name: 'Français', flag: '🇫🇷' },
-    { code: 'ro', name: 'Română', flag: '🇷🇴' },
-    { code: 'el', name: 'Ελληνικά', flag: '🇬🇷' },
-    { code: 'it', name: 'Italiano', flag: '🇮🇹' },
-    { code: 'es', name: 'Español', flag: '🇪🇸' },
-    { code: 'de', name: 'Deutsch', flag: '🇩🇪' },
-    { code: 'pt', name: 'Português', flag: '🇵🇹' },
-    { code: 'nl', name: 'Nederlands', flag: '🇳🇱' },
-    { code: 'pl', name: 'Polski', flag: '🇵🇱' },
-    { code: 'tr', name: 'Türkçe', flag: '🇹🇷' },
-];
+// The supported languages (locales/config.ts) — each has a complete dictionary.
+const LANGUAGES = LOCALES.map((code) => LOCALE_META[code]);
 
 // Currencies come from lib/currency (single source of truth for live rates).
 const CURRENCIES = SUPPORTED_CURRENCIES;
@@ -58,9 +43,9 @@ const CURRENCIES = SUPPORTED_CURRENCIES;
 // Primary marketplace navigation (Parallel-style): workflow links first,
 // then FMCG departments (lib/departments.ts).
 const NAV_PRIMARY = [
-    { key: 'new', name: 'New offers', href: '/categories?sort=newest' },
-    { key: 'targets', name: 'Targets', href: '/targets' },
-    { key: 'requests', name: 'Requests', href: '/requests', badge: 'New' },
+    { key: 'new', name: 'newOffers', href: '/categories?sort=newest' },
+    { key: 'targets', name: 'targets', href: '/targets' },
+    { key: 'requests', name: 'requests', href: '/requests', badge: true },
 ];
 
 const navItemClass = (active: boolean) => cn(
@@ -75,6 +60,7 @@ const navItemClass = (active: boolean) => cn(
 function MarketNav() {
     const pathname = usePathname() || '/';
     const searchParams = useSearchParams();
+    const { t } = useLanguage();
     const onCatalog = pathname === '/categories';
     const dept = onCatalog ? searchParams.get('dept') : null;
     const category = onCatalog ? searchParams.get('category') : null;
@@ -86,57 +72,53 @@ function MarketNav() {
         (key === 'requests' && pathname === '/requests');
 
     return (
-        <nav aria-label="Marketplace" className="h-9 flex items-center overflow-x-auto scrollbar-hide -mx-3">
+        <nav aria-label={t('nav', 'marketplaceAria')} className="h-9 flex items-center overflow-x-auto scrollbar-hide -mx-3">
             {NAV_PRIMARY.map((item) => (
                 <Link key={item.key} href={item.href} className={navItemClass(isPrimaryActive(item.key))}>
-                    {item.name}
+                    {t('nav', item.name)}
                     {item.badge && (
                         <span className="px-1.5 py-[1px] rounded-full bg-teal-soft text-teal border border-[#B9ECE6] text-[10px] font-bold leading-4">
-                            {item.badge}
+                            {t('nav', 'badgeNew')}
                         </span>
                     )}
                 </Link>
             ))}
             <span className="mx-2 w-px h-5 bg-surface-3 shrink-0" aria-hidden />
-            <Link href="/categories" className={navItemClass(onCatalog && !category && !sort && !dept)}>All</Link>
+            <Link href="/categories" className={navItemClass(onCatalog && !category && !sort && !dept)}>{t('nav', 'all')}</Link>
             {DEPARTMENTS.map((d) => (
                 <Link key={d.slug} href={`/categories?dept=${d.slug}`} className={navItemClass(dept === d.slug)}>
-                    {d.label}
+                    {t('departments', d.slug) || d.label}
                 </Link>
             ))}
             <div className="ms-auto flex items-center h-full ps-4">
                 <Link href="/deals" className={cn(navItemClass(pathname === '/deals'), '!text-[#DC2626] hover:!text-[#B91C1C]')}>
-                    <Flame size={14} /> Deals
+                    <Flame size={14} /> {t('nav', 'deals')}
                 </Link>
                 <Link href="/sponsored-highlights" className={navItemClass(pathname === '/sponsored-highlights')}>
-                    Sponsored
+                    {t('nav', 'sponsored')}
                 </Link>
             </div>
         </nav>
     );
 }
 
-// Country code → flag emoji + label
-const COUNTRY_INFO: Record<string, { flag: string; label: string }> = {
-    EG: { flag: '🇪🇬', label: 'Egypt' },
-    SA: { flag: '🇸🇦', label: 'Saudi Arabia' },
-    AE: { flag: '🇦🇪', label: 'UAE' },
-    US: { flag: '🇺🇸', label: 'United States' },
-    GB: { flag: '🇬🇧', label: 'United Kingdom' },
-    DE: { flag: '🇩🇪', label: 'Germany' },
-    FR: { flag: '🇫🇷', label: 'France' },
-    IT: { flag: '🇮🇹', label: 'Italy' },
-    ES: { flag: '🇪🇸', label: 'Spain' },
-    TR: { flag: '🇹🇷', label: 'Turkey' },
-    CN: { flag: '🇨🇳', label: 'China' },
-};
-
-function getCountryDisplay(rawCountry?: string): { flag: string; label: string } {
+/** Country code → flag emoji + the country's name in the interface language. */
+function getCountryDisplay(rawCountry: string | undefined, intl: string): { flag: string; label: string } {
     if (!rawCountry) return { flag: '🌍', label: '' };
-    const upper = rawCountry.toUpperCase();
-    if (COUNTRY_INFO[upper]) return COUNTRY_INFO[upper];
-    // Fallback if it's already a name
+    const upper = rawCountry.trim().toUpperCase();
+    if (/^[A-Z]{2}$/.test(upper)) {
+        const flag = String.fromCodePoint(0x1f1e6 + upper.charCodeAt(0) - 65, 0x1f1e6 + upper.charCodeAt(1) - 65);
+        let label = upper;
+        try { label = new Intl.DisplayNames([intl], { type: 'region' }).of(upper) || upper; } catch { /* keep code */ }
+        return { flag, label };
+    }
+    // Already a name (older accounts)
     return { flag: '🌍', label: rawCountry };
+}
+
+/** Currency name in the interface language, e.g. "euro" / "يورو". */
+function currencyName(code: string, intl: string, fallback: string) {
+    try { return new Intl.DisplayNames([intl], { type: 'currency' }).of(code) || fallback; } catch { return fallback; }
 }
 
 /** Circular avatar: uploaded photo, else initials, else a neutral person glyph. */
@@ -162,7 +144,7 @@ function Avatar({ src, name, size = 32 }: { src?: string | null; name?: string |
 export default function Navbar() {
     const { user, logout } = useAuth();
     const { items } = useCart();
-    const { locale, setLocale, t } = useLanguage();
+    const { locale, setLocale, t, meta, fmt } = useLanguage();
     const { currency, preferredCurrency, setCurrency, isAvailable, ratesUpdatedAt, ratesSource } = useCurrency();
     const router = useRouter();
     const [searchQuery, setSearchQuery] = React.useState('');
@@ -268,8 +250,8 @@ export default function Navbar() {
             setShowQuickEdit(true);
             setAddressInput(savedAddress);
         };
-        if (!('geolocation' in navigator)) return fail('Your browser doesn\u2019t support location detection. Enter your address below.');
-        if (!window.isSecureContext) return fail('Location detection needs a secure (HTTPS) connection. Enter your address below.');
+        if (!('geolocation' in navigator)) return fail(t('nav', 'gpsUnsupported'));
+        if (!window.isSecureContext) return fail(t('nav', 'gpsInsecure'));
         setIsGpsLoading(true);
         navigator.geolocation.getCurrentPosition(
             async (pos) => {
@@ -284,7 +266,7 @@ export default function Navbar() {
                     const a = data.address || {};
                     const city = a.city || a.town || a.village || a.municipality || a.county || '';
                     const formatted = [city, a.state || a.region || '', a.country || ''].filter(Boolean).join(', ');
-                    if (!formatted) return fail('We found your position but couldn\u2019t match it to an address. Enter it below.');
+                    if (!formatted) return fail(t('nav', 'gpsNoMatch'));
                     localStorage.setItem('atl_delivery_address', formatted);
                     setSavedAddress(formatted);
                     window.dispatchEvent(new Event('atl:address-changed'));
@@ -292,13 +274,13 @@ export default function Navbar() {
                     setIsLocationOpen(false);
                     setShowQuickEdit(false);
                 } catch {
-                    fail('We couldn\u2019t look up an address for your location. Enter it below.');
+                    fail(t('nav', 'gpsLookupFailed'));
                 }
             },
             (err) => {
-                if (err.code === err.PERMISSION_DENIED) fail('Location permission was denied. Enter your address below, or allow location in your browser settings.');
-                else if (err.code === err.TIMEOUT) fail('Locating took too long. Try again or enter your address below.');
-                else fail('Your location is unavailable right now. Enter your address below.');
+                if (err.code === err.PERMISSION_DENIED) fail(t('nav', 'gpsDenied'));
+                else if (err.code === err.TIMEOUT) fail(t('nav', 'gpsTimeout'));
+                else fail(t('nav', 'gpsUnavailable'));
             },
             { timeout: 10000, maximumAge: 300000 }
         );
@@ -329,10 +311,10 @@ export default function Navbar() {
         } catch { /* noop */ }
     };
 
-    const country = getCountryDisplay(user?.country);
+    const country = getCountryDisplay(user?.country, meta.intl);
     const displayCity = savedAddress
         ? savedAddress.split(',')[0].trim().slice(0, 18)
-        : (user ? 'Set address' : 'Set address');
+        : t('nav', 'setAddress');
 
     let dashboardLink = '/auth/login';
     let settingsLink = '/dashboard/customer/settings';
@@ -349,7 +331,7 @@ export default function Navbar() {
     const menuItem = 'flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-2 text-[13px] font-medium text-ink-2 hover:text-ink transition-colors no-underline';
 
     return (
-        <header className="bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/90 border-b border-line sticky top-0 z-[100] w-full text-start">
+        <header data-no-translate className="bg-surface/95 backdrop-blur supports-[backdrop-filter]:bg-surface/90 border-b border-line sticky top-0 z-[100] w-full text-start">
             {/* Trust line + How it works / Help / Contact live in the footer — the
                 header stays one compact row plus the marketplace nav. */}
 
@@ -357,9 +339,9 @@ export default function Navbar() {
             <div className="max-w-[1280px] mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="h-14 flex items-center gap-3 sm:gap-4 lg:gap-5">
                     {/* Logo */}
-                    <Link href="/" className="flex items-center gap-2.5 shrink-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60 focus-visible:ring-offset-2" aria-label="Atlantis home">
+                    <Link href="/" className="flex items-center gap-2.5 shrink-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60 focus-visible:ring-offset-2" aria-label={t('nav', 'homeAria')}>
                         <img src="/brand/atlantis-mark.png" alt="" width={32} height={32} className="w-8 h-8 object-contain rounded-lg" />
-                        <span className="text-[18px] font-black tracking-tighter uppercase hidden sm:inline">
+                        <span dir="ltr" className="text-[18px] font-black tracking-tighter uppercase hidden sm:inline">
                             <span className="text-heading">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
                         </span>
                     </Link>
@@ -373,18 +355,18 @@ export default function Navbar() {
                                 type="search"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                placeholder={t('navbar', 'searchPlaceholder') || 'Search products, brands, suppliers...'}
-                                aria-label="Search products"
+                                placeholder={t('nav', 'searchPlaceholder')}
+                                aria-label={t('nav', 'searchAria')}
                                 className="flex-1 min-w-0 h-full px-2.5 text-[13px] text-ink outline-none bg-transparent placeholder:text-ink-4 [&::-webkit-search-cancel-button]:hidden"
                             />
-                            <span className="hidden lg:block me-3 text-[12px] text-ink-4 group-focus-within/search:hidden" aria-hidden>Press /</span>
+                            <span className="hidden xl:block me-3 text-[12px] text-ink-4 whitespace-nowrap group-focus-within/search:hidden" aria-hidden>{t('nav', 'pressSlash')}</span>
                             <button
                                 type="submit"
                                 className="me-1 h-7 w-7 sm:w-auto sm:px-3 rounded-md bg-cta hover:bg-cta-hover text-cta-fg text-[12.5px] font-semibold flex items-center justify-center gap-1.5 transition-colors shrink-0"
-                                aria-label="Search"
+                                aria-label={t('nav', 'search')}
                             >
                                 <Search size={15} className="sm:hidden" />
-                                <span className="hidden sm:inline">Search</span>
+                                <span className="hidden sm:inline">{t('nav', 'search')}</span>
                             </button>
                         </div>
                     </form>
@@ -400,7 +382,7 @@ export default function Navbar() {
                                 <MapPin size={17} className="text-ink-3 group-hover:text-teal transition-colors shrink-0" />
                                 <div className="flex flex-col leading-[1.15] items-start min-w-0">
                                     <span className="text-[11px] text-ink-3 whitespace-nowrap">
-                                        Deliver to {country.label && <span className="text-ink-2">{country.flag} {country.label}</span>}
+                                        {t('nav', 'deliverTo')} {country.label && <span className="text-ink-2">{country.flag} {country.label}</span>}
                                     </span>
                                     <span className="text-[12.5px] font-semibold text-ink truncate max-w-[120px]">
                                         {displayCity}
@@ -411,8 +393,8 @@ export default function Navbar() {
                             {/* GPS auto-detect */}
                             <button
                                 onClick={handleGps}
-                                title="Auto-detect my location"
-                                aria-label="Auto-detect my location"
+                                title={t('nav', 'autoDetect')}
+                                aria-label={t('nav', 'autoDetect')}
                                 disabled={isGpsLoading}
                                 className="w-8 h-8 flex items-center justify-center rounded-lg text-ink-3 hover:text-teal hover:bg-teal-soft transition-colors disabled:opacity-50"
                             >
@@ -422,7 +404,7 @@ export default function Navbar() {
                             {savedAddress && (
                                 <button
                                     onClick={() => { setIsLocationOpen(!isLocationOpen); setShowQuickEdit(false); }}
-                                    aria-label="Delivery options"
+                                    aria-label={t('nav', 'deliveryOptions')}
                                     className="w-6 h-8 flex items-center justify-center text-ink-4 hover:text-ink transition-colors"
                                 >
                                     <ChevronDown size={13} className={cn('transition-transform', isLocationOpen && 'rotate-180')} />
@@ -435,14 +417,14 @@ export default function Navbar() {
                                         initial={{ opacity: 0, y: 4 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: 4 }}
-                                        className="absolute top-full right-0 mt-2 w-[300px] bg-surface border border-line rounded-2xl shadow-[0_16px_40px_rgba(15,23,42,0.12)] z-[110] overflow-hidden"
+                                        className="absolute top-full end-0 mt-2 w-[300px] bg-surface border border-line rounded-2xl shadow-[0_16px_40px_rgba(15,23,42,0.12)] z-[110] overflow-hidden"
                                     >
                                         <div className="px-4 py-3 border-b border-line bg-surface-2">
                                             <div className="flex items-center gap-2">
                                                 <MapPin size={13} className="text-teal" />
-                                                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3">Delivery Location</span>
+                                                <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3">{t('nav', 'deliveryLocation')}</span>
                                             </div>
-                                            <p className="mt-1 text-[13px] text-ink font-semibold truncate">{savedAddress || 'No address set'}</p>
+                                            <p className="mt-1 text-[13px] text-ink font-semibold truncate">{savedAddress || t('nav', 'noAddress')}</p>
                                         </div>
 
                                         {gpsError && (
@@ -450,49 +432,49 @@ export default function Navbar() {
                                         )}
                                         {!showQuickEdit ? (
                                             <div className="p-2 space-y-0.5">
-                                                <button onClick={handleGps} disabled={isGpsLoading} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-teal-soft text-left transition-colors disabled:opacity-50">
+                                                <button onClick={handleGps} disabled={isGpsLoading} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-teal-soft text-start transition-colors disabled:opacity-50">
                                                     <span className="w-8 h-8 rounded-full bg-teal-soft flex items-center justify-center shrink-0">
                                                         {isGpsLoading ? <Loader2 size={14} className="text-teal animate-spin" /> : <Navigation size={14} className="text-teal" />}
                                                     </span>
                                                     <div>
-                                                        <p className="text-[13px] font-semibold text-ink">Use my current location</p>
-                                                        <p className="text-[12px] text-ink-3">Auto-detect via GPS</p>
+                                                        <p className="text-[13px] font-semibold text-ink">{t('nav', 'useLocation')}</p>
+                                                        <p className="text-[12px] text-ink-3">{t('nav', 'useLocationHint')}</p>
                                                     </div>
                                                 </button>
-                                                <button onClick={() => { setShowQuickEdit(true); setAddressInput(savedAddress); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-2 text-left transition-colors">
+                                                <button onClick={() => { setShowQuickEdit(true); setAddressInput(savedAddress); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-2 text-start transition-colors">
                                                     <span className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center shrink-0">
                                                         <Pencil size={14} className="text-ink-3" />
                                                     </span>
                                                     <div>
-                                                        <p className="text-[13px] font-semibold text-ink">Quick edit</p>
-                                                        <p className="text-[12px] text-ink-3">Edit address inline</p>
+                                                        <p className="text-[13px] font-semibold text-ink">{t('nav', 'quickEdit')}</p>
+                                                        <p className="text-[12px] text-ink-3">{t('nav', 'quickEditHint')}</p>
                                                     </div>
                                                 </button>
-                                                <button onClick={() => { setIsLocationOpen(false); router.push('/account/address'); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-2 text-left transition-colors">
+                                                <button onClick={() => { setIsLocationOpen(false); router.push('/account/address'); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-surface-2 text-start transition-colors">
                                                     <span className="w-8 h-8 rounded-full bg-surface-3 flex items-center justify-center shrink-0">
                                                         <ExternalLink size={14} className="text-ink-3" />
                                                     </span>
                                                     <div>
-                                                        <p className="text-[13px] font-semibold text-ink">Full edit</p>
-                                                        <p className="text-[12px] text-ink-3">Street, city, zip & more</p>
+                                                        <p className="text-[13px] font-semibold text-ink">{t('nav', 'fullEdit')}</p>
+                                                        <p className="text-[12px] text-ink-3">{t('nav', 'fullEditHint')}</p>
                                                     </div>
                                                 </button>
                                             </div>
                                         ) : (
                                             <div className="p-4 space-y-3">
-                                                <p className="text-[11px] font-bold text-ink-3 uppercase tracking-wider">Quick Edit</p>
+                                                <p className="text-[11px] font-bold text-ink-3 uppercase tracking-wider">{t('nav', 'quickEdit')}</p>
                                                 <input
                                                     type="text"
                                                     value={addressInput}
                                                     onChange={(e) => setAddressInput(e.target.value)}
-                                                    placeholder="City, Country"
+                                                    placeholder={t('nav', 'cityCountry')}
                                                     className="w-full h-10 px-3 text-[13px] border border-line rounded-lg outline-none focus:border-[#2EC4B6] focus:ring-2 focus:ring-[#2EC4B6]/20 transition-all"
                                                     onKeyDown={(e) => { if (e.key === 'Enter') handleQuickSave(); if (e.key === 'Escape') setShowQuickEdit(false); }}
                                                     autoFocus
                                                 />
                                                 <div className="flex gap-2">
-                                                    <button onClick={() => setShowQuickEdit(false)} className="flex-1 h-9 text-[13px] font-semibold border border-line text-ink-2 rounded-lg hover:border-[#94A3B8] transition-colors">Cancel</button>
-                                                    <button onClick={handleQuickSave} disabled={!addressInput.trim()} className="flex-1 h-9 text-[13px] font-semibold bg-cta hover:bg-cta-hover disabled:bg-[#94A3B8] text-cta-fg rounded-lg transition-colors disabled:cursor-not-allowed">Save</button>
+                                                    <button onClick={() => setShowQuickEdit(false)} className="flex-1 h-9 text-[13px] font-semibold border border-line text-ink-2 rounded-lg hover:border-[#94A3B8] transition-colors">{t('nav', 'cancel')}</button>
+                                                    <button onClick={handleQuickSave} disabled={!addressInput.trim()} className="flex-1 h-9 text-[13px] font-semibold bg-cta hover:bg-cta-hover disabled:bg-[#94A3B8] text-cta-fg rounded-lg transition-colors disabled:cursor-not-allowed">{t('nav', 'save')}</button>
                                                 </div>
                                             </div>
                                         )}
@@ -502,10 +484,10 @@ export default function Navbar() {
                         </div>
 
                         {/* Language + currency — one quiet control, one panel */}
-                        <div ref={localeRef} className="relative hidden md:block">
+                        <div ref={localeRef} className="relative">
                             <button
                                 onClick={() => { setIsLangOpen(!isLangOpen); setIsCurrOpen(false); }}
-                                aria-label={`Language and currency: ${locale.toUpperCase()}, ${currency}`}
+                                aria-label={t('nav', 'localeAria', { language: meta.name, currency })}
                                 aria-expanded={isLangOpen}
                                 className={cn(
                                     'h-9 ps-2.5 pe-2 flex items-center gap-1.5 rounded-xl text-[13px] font-semibold text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60',
@@ -513,39 +495,41 @@ export default function Navbar() {
                                 )}
                             >
                                 <Globe size={16} className="text-ink-3" />
-                                <span className="uppercase">{locale}</span>
-                                <span className="text-ink-4" aria-hidden>·</span>
-                                <span>{currency}</span>
-                                <ChevronDown size={13} className={cn('text-ink-4 transition-transform', isLangOpen && 'rotate-180')} />
+                                <span className="uppercase">{meta.short}</span>
+                                <span className="hidden md:inline text-ink-4" aria-hidden>·</span>
+                                <span className="hidden md:inline">{currency}</span>
+                                <ChevronDown size={13} className={cn('hidden md:block text-ink-4 transition-transform', isLangOpen && 'rotate-180')} />
                             </button>
-                            <AnimatePresence>
+                            {/* Closes instantly (no exit fade) so the old language never lingers after a switch. */}
+                            <AnimatePresence initial={false}>
                                 {isLangOpen && (
                                     <motion.div
                                         initial={{ opacity: 0, y: 4 }}
                                         animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: 4 }}
-                                        className="absolute top-full right-0 mt-2 w-[440px] bg-surface rounded-2xl ring-1 ring-line shadow-[0_24px_60px_rgba(15,23,42,0.14)] p-2 z-[110] grid grid-cols-2 gap-2"
+                                        className="fixed md:absolute inset-x-3 md:inset-x-auto top-[60px] md:top-full md:end-0 md:mt-2 md:w-[440px] bg-surface rounded-2xl ring-1 ring-line shadow-[0_24px_60px_rgba(15,23,42,0.14)] p-2 z-[110] grid grid-cols-2 gap-2"
                                     >
                                         <div>
-                                            <p className="px-3 pt-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-4">Language</p>
+                                            <p className="px-3 pt-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-4">{t('nav', 'language')}</p>
                                             <div className="max-h-[300px] overflow-y-auto space-y-0.5">
                                                 {LANGUAGES.map((l) => (
                                                     <button
                                                         key={l.code}
-                                                        onClick={() => { setLocale(l.code as any); setIsLangOpen(false); }}
+                                                        lang={l.code}
+                                                        aria-current={locale === l.code ? 'true' : undefined}
+                                                        onClick={() => { setLocale(l.code); setIsLangOpen(false); }}
                                                         className={cn(
                                                             'w-full flex items-center justify-between px-3 py-2 text-[13px] rounded-lg transition-colors',
                                                             locale === l.code ? 'bg-teal-soft text-teal font-semibold' : 'text-ink-2 hover:bg-surface-2'
                                                         )}
                                                     >
-                                                        <span className="flex items-center gap-2"><span>{l.flag}</span>{l.name}</span>
+                                                        <span className="text-start">{l.name}</span>
                                                         {locale === l.code && <Check size={14} />}
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
                                         <div className="border-s border-[#F1F3F6] ps-2">
-                                            <p className="px-3 pt-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-4">Currency</p>
+                                            <p className="px-3 pt-2 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-ink-4">{t('nav', 'currency')}</p>
                                             <div className="max-h-[300px] overflow-y-auto space-y-0.5">
                                                 {CURRENCIES.map((c) => {
                                                     const ok = isAvailable(c.code);
@@ -553,7 +537,7 @@ export default function Navbar() {
                                                         <button
                                                             key={c.code}
                                                             disabled={!ok}
-                                                            title={ok ? undefined : 'Exchange rate currently unavailable'}
+                                                            title={ok ? undefined : t('nav', 'rateUnavailableTitle')}
                                                             onClick={() => { setCurrency(c.code); setIsLangOpen(false); }}
                                                             className={cn(
                                                                 'w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors text-start disabled:opacity-40 disabled:cursor-not-allowed',
@@ -562,7 +546,7 @@ export default function Navbar() {
                                                         >
                                                             <span className="leading-tight">
                                                                 <span className="block text-[13px] font-semibold">{c.code}</span>
-                                                                <span className="block text-[11px] opacity-70">{ok ? c.name : 'Rate unavailable'}</span>
+                                                                <span className="block text-[11px] opacity-70">{ok ? currencyName(c.code, meta.intl, c.name) : t('nav', 'rateUnavailable')}</span>
                                                             </span>
                                                             <span className="text-[13px] font-semibold">{c.symbol}</span>
                                                         </button>
@@ -571,11 +555,11 @@ export default function Navbar() {
                                             </div>
                                             <p className="px-3 pt-2 pb-1 text-[11px] leading-snug text-ink-4">
                                                 {preferredCurrency !== currency
-                                                    ? `${preferredCurrency} rate unavailable — showing EUR. `
+                                                    ? `${t('nav', 'preferredUnavailable', { currency: preferredCurrency })} `
                                                     : ''}
                                                 {ratesUpdatedAt
-                                                    ? `Rates updated ${new Date(ratesUpdatedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })} · ${ratesSource ?? ''}. Orders are charged in EUR.`
-                                                    : 'Live rates loading — prices shown in EUR. Orders are charged in EUR.'}
+                                                    ? t('nav', 'ratesUpdated', { date: fmt.date(ratesUpdatedAt, { day: 'numeric', month: 'short' }), source: ratesSource ?? '' })
+                                                    : t('nav', 'ratesLoading')}
                                             </p>
                                             {/* Signed-out visitors have no account menu — theme lives here too. */}
                                             {!user && <ThemeSwitch className="px-2 pt-2 mt-1 border-t border-line" />}
@@ -596,6 +580,7 @@ export default function Navbar() {
                                 <button
                                     onClick={() => setIsAccountOpen((v) => !v)}
                                     aria-haspopup="menu"
+                                    aria-label={t('nav', 'accountMenu')}
                                     aria-expanded={isAccountOpen}
                                     className={cn(
                                         'flex items-center gap-2 h-9 ps-1 pe-1.5 lg:pe-2.5 rounded-xl transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60',
@@ -604,7 +589,7 @@ export default function Navbar() {
                                 >
                                     <Avatar src={user.avatar} name={user.name} />
                                     <span className="hidden lg:inline text-[13px] font-semibold text-ink max-w-[140px] truncate">
-                                        Hi, {user?.name?.trim().split(/\s+/)[0] || 'there'}
+                                        {user?.name?.trim() ? t('nav', 'greeting', { name: user.name.trim().split(/\s+/)[0] }) : t('nav', 'greetingFallback')}
                                     </span>
                                     <ChevronDown size={14} className={cn('hidden lg:block text-ink-4 transition-transform', isAccountOpen && 'rotate-180')} />
                                 </button>
@@ -617,7 +602,7 @@ export default function Navbar() {
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, y: 4 }}
                                             transition={{ duration: 0.12 }}
-                                            className="absolute top-full right-0 mt-2 w-64 bg-surface rounded-2xl ring-1 ring-line shadow-[0_24px_60px_rgba(15,23,42,0.14)] p-1.5 z-[110]"
+                                            className="absolute top-full end-0 mt-2 w-64 bg-surface rounded-2xl ring-1 ring-line shadow-[0_24px_60px_rgba(15,23,42,0.14)] p-1.5 z-[110]"
                                         >
                                             <div className="flex items-center gap-3 px-3 pt-2.5 pb-3 mb-1 border-b border-[#F1F3F6]">
                                                 <Avatar src={user.avatar} name={user.name} size={40} />
@@ -627,22 +612,22 @@ export default function Navbar() {
                                                 </div>
                                             </div>
                                             <Link role="menuitem" href={dashboardLink} onClick={() => setIsAccountOpen(false)} className={menuItem}>
-                                                <Monitor size={16} className="text-ink-3" /> {isAdmin ? 'Admin Dashboard' : isSupplier ? 'Supplier Dashboard' : 'My Dashboard'}
+                                                <Monitor size={16} className="text-ink-3" /> {isAdmin ? t('nav', 'adminDashboard') : isSupplier ? t('nav', 'supplierDashboard') : t('nav', 'myDashboard')}
                                             </Link>
                                             {!isAdmin && !isSupplier && (
                                                 <Link role="menuitem" href="/dashboard/customer/orders" onClick={() => setIsAccountOpen(false)} className={menuItem}>
-                                                    <Package size={16} className="text-ink-3" /> Orders & Tracking
+                                                    <Package size={16} className="text-ink-3" /> {t('nav', 'ordersTracking')}
                                                 </Link>
                                             )}
                                             <Link role="menuitem" href="/saved" onClick={() => setIsAccountOpen(false)} className={menuItem}>
                                                 <Heart size={16} className="text-ink-3" />
-                                                <span className="flex-1">Saved Items</span>
+                                                <span className="flex-1">{t('nav', 'savedItems')}</span>
                                                 {savedCount > 0 && (
                                                     <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-surface-3 text-[11px] font-semibold text-ink-2 flex items-center justify-center">{savedCount > 99 ? '99+' : savedCount}</span>
                                                 )}
                                             </Link>
                                             <Link role="menuitem" href={settingsLink} onClick={() => setIsAccountOpen(false)} className={menuItem}>
-                                                <Settings size={16} className="text-ink-3" /> Settings
+                                                <Settings size={16} className="text-ink-3" /> {t('nav', 'settings')}
                                             </Link>
                                             <div className="h-px bg-surface-3 my-1" />
                                             <ThemeSwitch className="px-2 py-1.5" />
@@ -652,7 +637,7 @@ export default function Navbar() {
                                                 onClick={() => { setIsAccountOpen(false); logout(); }}
                                                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-[#FEF2F2] dark:hover:bg-red-500/15 text-[13px] font-medium text-[#DC2626] transition-colors"
                                             >
-                                                <LogOut size={16} /> Sign out
+                                                <LogOut size={16} /> {t('nav', 'signOut')}
                                             </button>
                                         </motion.div>
                                     )}
@@ -664,7 +649,7 @@ export default function Navbar() {
                                 className="flex items-center gap-2 h-9 ps-1 pe-1 lg:pe-3 rounded-lg hover:bg-surface-3 transition-colors no-underline outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60"
                             >
                                 <Avatar />
-                                <span className="hidden lg:inline text-[13px] font-semibold text-ink">Sign in</span>
+                                <span className="hidden lg:inline text-[13px] font-semibold text-ink">{t('nav', 'signIn')}</span>
                             </Link>
                         )}
 
@@ -672,17 +657,17 @@ export default function Navbar() {
                         <Link
                             href="/cart"
                             className="relative flex items-center gap-2 h-9 px-3 lg:ps-3 lg:pe-3.5 rounded-xl hover:bg-surface-3 lg:bg-cta lg:hover:bg-cta-hover lg:text-cta-fg text-ink transition-colors no-underline outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60 focus-visible:ring-offset-2"
-                            aria-label={`Cart, ${items.length} items`}
+                            aria-label={t('nav', 'cartAria', { count: items.length })}
                         >
                             <span className="relative">
                                 <ShoppingCart size={20} />
                                 {items.length > 0 && (
-                                    <span className="absolute -top-2 -right-2.5 min-w-[18px] h-[18px] px-1 bg-[#2EC4B6] text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white lg:ring-ink">
+                                    <span className="absolute -top-2 -end-2.5 min-w-[18px] h-[18px] px-1 bg-[#2EC4B6] text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-white lg:ring-ink">
                                         {items.length > 99 ? '99+' : items.length}
                                     </span>
                                 )}
                             </span>
-                            <span className="hidden lg:inline text-[13px] font-semibold ms-1">Cart</span>
+                            <span className="hidden lg:inline text-[13px] font-semibold ms-1">{t('nav', 'cart')}</span>
                         </Link>
                     </div>
                 </div>

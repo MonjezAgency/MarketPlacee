@@ -181,7 +181,32 @@ Shared in `frontend/src/components/support` (`messages.tsx`, `Composer.tsx`); do
 - Terms (use exactly): *buyer*, *supplier*, *Atlantis*, *order request*, *confirmed terms*, *net price* (supplier's price), *EXW location*, *case / pallet / truck*, *hub* (a verified Atlantis location), *delivery country*.
 - **Honesty rules:** never claim escrow, held funds, guarantees, partners, warehouses, coverage, delivery times or prices that the product and the business don't actually provide. If something is planned, say "planned" or leave it out. Prices exclude VAT unless stated.
 - CTA hierarchy: one primary (navy) action per view, one secondary at most. Labels say what happens ("Request a quote", not "Learn more").
-- Numbers: `€1,234.00` (en-IE), dates `16 Oct 2026`.
+- Numbers and dates follow the interface language (`fmt`, `formatPrice(…, meta.intl)`); in English: `€1,234.00`, `16 Oct 2026`.
+
+### Languages and direction
+
+The interface ships in seven languages: English, Arabic (right-to-left), French, Romanian,
+Italian, Spanish and Portuguese (Portugal). The list lives in `frontend/src/locales/config.ts`.
+
+- **All visible text comes from the dictionaries.** That covers labels, buttons, placeholders,
+  `aria-label`/`title`, empty, loading and error states, and dialogs. Use
+  `t('section', 'key', vars)` from `useLanguage()`. Never write English in JSX.
+  New keys go in `locales/en.ts` and in every other locale file. Terms follow
+  `locales/GLOSSARY.md`.
+- **Variables and plurals** use ICU syntax: `"Placed {date}"`,
+  `"{count, plural, one {# pallet} other {# pallets}}"`. Never build a sentence by concatenating.
+- **Inline links and emphasis** go through `<Trans text={t(…)} tags={{ link: (c) => <Link…>{c}</Link> }} />`,
+  so each language keeps its own word order.
+- **Dates and numbers** use `fmt.date` / `fmt.number` from `useLanguage()`. For prices, use
+  `formatPrice(amount, undefined, meta.intl)`. Values never change; only their display does.
+- **Direction-safe layout:** use logical utilities (`ms-`/`me-`/`ps-`/`pe-`, `start-`/`end-`,
+  `text-start`). Never use `left`/`right`. Arrows and chevrons that point "forward" get
+  `rtl:rotate-180`. Order ids, EANs, tracking numbers and emails sit in `<bdi dir="ltr">`.
+- **Regions rendered from dictionaries** carry `data-no-translate`, so the legacy runtime
+  translator (used only by pages not yet on the dictionaries) never rewrites them.
+- `npm run check:i18n` (part of the build) fails on any missing, empty or untranslated value,
+  mismatched placeholder, tag or plural form, and on hard-coded text in the localized files.
+  When you localize another file, add it to that script's scope list.
 
 ## 10. Checklist before you finish a UI change
 
@@ -190,4 +215,5 @@ Shared in `frontend/src/components/support` (`messages.tsx`, `Composer.tsx`); do
 3. Works at 375 / 768 / 1280 px with no horizontal scroll.
 4. Keyboard and focus visible; reduced motion respected.
 5. Every claim on the page is true today.
-6. `tsc`, `npm run build` (includes the i18n check — add new `en.ts` keys to `ar.ts`) and relevant tests pass.
+6. Text is in the dictionaries for all seven languages, and the page works in Arabic (RTL) as well as English.
+7. `tsc`, `npm run build` (includes the i18n check) and relevant tests pass.

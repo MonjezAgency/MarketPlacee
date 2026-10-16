@@ -28,29 +28,14 @@ import { cn } from '@/lib/utils';
 import { UserMenu } from '@/components/dashboard/UserMenu';
 import { apiFetch } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
-import type { Locale } from '@/locales';
+import { LOCALES, LOCALE_META } from '@/locales/config';
 import { formatPrice } from '@/lib/currency';
 import { GuidedTour } from '@/components/ui/GuidedTour';
 import NotificationBell from '@/components/ui/NotificationBell';
 import { ConfirmProvider } from '@/components/supplier/ui';
 
-// Languages available to suppliers — kept in sync with the public
-// Navbar list (LANGUAGES in components/layout/Navbar.tsx) so a
-// supplier sees the same options as a buyer.
-const SUPPLIER_LANGUAGES: { code: Locale; name: string; flag: string }[] = [
-    { code: 'en', name: 'English',     flag: '🇬🇧' },
-    { code: 'ar', name: 'العربية',     flag: '🇪🇬' },
-    { code: 'fr', name: 'Français',    flag: '🇫🇷' },
-    { code: 'ro', name: 'Română',      flag: '🇷🇴' },
-    { code: 'el', name: 'Ελληνικά',    flag: '🇬🇷' },
-    { code: 'it', name: 'Italiano',    flag: '🇮🇹' },
-    { code: 'es', name: 'Español',     flag: '🇪🇸' },
-    { code: 'de', name: 'Deutsch',     flag: '🇩🇪' },
-    { code: 'pt', name: 'Português',   flag: '🇵🇹' },
-    { code: 'nl', name: 'Nederlands',  flag: '🇳🇱' },
-    { code: 'pl', name: 'Polski',      flag: '🇵🇱' },
-    { code: 'tr', name: 'Türkçe',      flag: '🇹🇷' },
-];
+// Languages available to suppliers — the same list as the storefront (locales/config.ts).
+const SUPPLIER_LANGUAGES = LOCALES.map((code) => ({ code, name: LOCALE_META[code].name, flag: LOCALE_META[code].short }));
 
 // Supplier navigation. Removed from the menu (pages and APIs still exist, so
 // old links keep working): Analytics (its useful metrics now live on the
@@ -421,8 +406,7 @@ function SupplierLanguagePicker() {
                 title="Change language"
                 className="h-10 px-3 rounded-full hover:bg-slate-50 flex items-center gap-2 text-[#475569] transition-all border border-transparent hover:border-[#E2E8F0]"
             >
-                <span className="text-base">{current.flag}</span>
-                <span className="text-[12px] font-bold uppercase tracking-wider">{current.code}</span>
+                <span className="text-[12px] font-bold uppercase tracking-wider">{current.flag}</span>
             </button>
             <AnimatePresence>
                 {isOpen && (
@@ -430,7 +414,7 @@ function SupplierLanguagePicker() {
                         initial={{ opacity: 0, y: 4 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 4 }}
-                        className="absolute right-0 top-full mt-2 bg-white border border-[#E2E8F0] rounded-xl shadow-2xl p-2 min-w-[200px] z-[110] max-h-[320px] overflow-y-auto"
+                        className="absolute end-0 top-full mt-2 bg-white border border-[#E2E8F0] rounded-xl shadow-2xl p-2 min-w-[200px] z-[110] max-h-[320px] overflow-y-auto"
                     >
                         {SUPPLIER_LANGUAGES.map(l => (
                             <button
@@ -441,10 +425,7 @@ function SupplierLanguagePicker() {
                                     locale === l.code ? 'bg-[#0EA5A4]/10 text-[#0EA5A4]' : 'text-[#475569] hover:bg-slate-50',
                                 )}
                             >
-                                <span className="flex items-center gap-2">
-                                    <span>{l.flag}</span>
-                                    {l.name}
-                                </span>
+                                <span lang={l.code}>{l.name}</span>
                                 {locale === l.code && <span className="w-1.5 h-1.5 rounded-full bg-[#0EA5A4]" />}
                             </button>
                         ))}

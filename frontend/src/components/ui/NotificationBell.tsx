@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth';
 import { NOTIFICATION_TYPES } from '@/lib/types';
 import { useRouter } from 'next/navigation';
 import { notifyToast, toneOf } from '@/components/ui/NotifyToasts';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 function getNotificationLink(n: AppNotification): string | null {
   switch (n.type) {
@@ -55,14 +56,15 @@ function NotificationTile({ type }: { type: AppNotification['type'] }) {
     );
 }
 
-function timeAgo(date: string) {
-    const diff = Date.now() - new Date(date).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return 'Just now';
-    if (mins < 60) return `${mins}m ago`;
+/** "2 hours ago" in the interface language (Intl.RelativeTimeFormat). */
+function timeAgo(date: string, intl: string) {
+    const mins = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
+    let rtf: Intl.RelativeTimeFormat;
+    try { rtf = new Intl.RelativeTimeFormat(intl, { numeric: 'auto', style: 'short' }); } catch { rtf = new Intl.RelativeTimeFormat('en', { numeric: 'auto', style: 'short' }); }
+    if (mins < 60) return rtf.format(-Math.max(0, mins), 'minute');
     const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
+    if (hours < 24) return rtf.format(-hours, 'hour');
+    return rtf.format(-Math.floor(hours / 24), 'day');
 }
 
 /** `compact` renders an icon-only 44px button that matches the storefront header controls. */
@@ -70,6 +72,7 @@ export default function NotificationBell({ isLight, compact }: { isLight?: boole
     const { user } = useAuth();
     const { notifications, unreadCount, markRead, markAllRead } = useNotifications(!!user);
     const router = useRouter();
+    const { t, meta } = useLanguage();
     const [open, setOpen] = useState(false);
     // "While you were away": one summary toast, only for unread items that
     // arrived after this browser last saw the list. (Previously this showed
@@ -90,13 +93,13 @@ export default function NotificationBell({ isLight, compact }: { isLight?: boole
         if (!fresh.length) return;
         notifyToast({
             id: `away:${fresh[0].id}`,
-            eyebrow: 'While you were away',
-            title: `${fresh.length} new ${fresh.length === 1 ? 'notification' : 'notifications'}`,
+            eyebrow: t('notifications', 'whileAway'),
+            title: t('notifications', 'newCount', { count: fresh.length }),
             message: fresh[0].title,
             tone: toneOf(fresh[0].type),
-            action: { label: 'View notifications', onClick: () => setOpen(true) },
+            action: { label: t('notifications', 'view'), onClick: () => setOpen(true) },
         });
-    }, [compact, notifications]);
+    }, [compact, notifications, t]);
     const ref = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -118,10 +121,10 @@ export default function NotificationBell({ isLight, compact }: { isLight?: boole
                     compact && 'h-9 w-9 justify-center rounded-lg text-ink-2 hover:bg-surface-3 hover:text-ink transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]/60',
                     !compact && (isLight ? 'text-foreground' : 'text-white')
                 )}
-                aria-label="Notifications"
+                aria-label={t('notifications', 'title')}
             >
                 <Bell className="w-5 h-5 group-hover:text-secondary transition-colors" />
-                {!compact && <span className="text-[10px] font-bold">Alerts</span>}
+                {!compact && <span className="text-[10px] font-bold">{t('notifications', 'alerts')}</span>}
                 {unreadCount > 0 && (
                     <span className={cn('absolute bg-red-500 text-white text-[10px] font-bold min-w-[16px] h-4 px-0.5 rounded-full flex items-center justify-center', compact ? 'top-1.5 end-1.5 ring-2 ring-white' : '-top-1 -end-1 animate-pulse')}>
                         {unreadCount > 9 ? '9+' : unreadCount}
@@ -138,14 +141,14 @@ export default function NotificationBell({ isLight, compact }: { isLight?: boole
                 )}>
                     {/* Header */}
                     <div className={cn('flex items-center justify-between px-4 py-3 border-b', compact ? 'px-5 py-4 border-line' : 'border-border/50')}>
-                        <span className={cn('font-bold', compact ? 'text-[15px] text-ink' : 'text-sm')}>Notifications</span>
+                        <span className={cn('font-bold', compact ? 'text-[15px] text-ink' : 'text-sm')}>{t('notifications', 'title')}</span>
                         {unreadCount > 0 && (
                             <button
                                 onClick={markAllRead}
                                 className="flex items-center gap-1 text-[11px] font-bold text-primary hover:text-primary/80 transition-colors"
                             >
                                 <CheckCheck className="w-3 h-3" />
-                                Mark all read
+                                {t('notifications', 'markAllRead')}
                             </button>
                         )}
                     </div>
@@ -155,7 +158,7 @@ export default function NotificationBell({ isLight, compact }: { isLight?: boole
                         {notifications.length === 0 && (
                             <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
                                 <Bell className="w-8 h-8 opacity-30" />
-                                <p className="text-xs font-bold">No notifications yet</p>
+                                <p className="text-xs font-bold">{t('notifications', 'empty')}</p>
                             </div>
                         )}
                         {notifications.map(n => (
@@ -179,7 +182,7 @@ export default function NotificationBell({ isLight, compact }: { isLight?: boole
                                 <div className="flex-1 min-w-0">
                                     <p className={cn(compact ? 'text-[14px] font-semibold text-ink truncate' : 'text-xs font-bold truncate', !n.read && !compact && 'text-foreground')}>{n.title}</p>
                                     <p className={cn(compact ? 'text-[13px] text-ink-2 line-clamp-2 mt-0.5' : 'text-[11px] text-muted-foreground line-clamp-2 mt-0.5')}>{n.message}</p>
-                                    <p className={cn(compact ? 'text-[12px] text-ink-4 mt-1.5' : 'text-[10px] text-muted-foreground/60 mt-1')}>{timeAgo(n.createdAt)}</p>
+                                    <p className={cn(compact ? 'text-[12px] text-ink-4 mt-1.5' : 'text-[10px] text-muted-foreground/60 mt-1')}>{timeAgo(n.createdAt, meta.intl)}</p>
                                 </div>
                                 {!n.read && <span className={cn('w-2 h-2 rounded-full shrink-0 mt-1.5', compact ? 'bg-[#2EC4B6]' : 'bg-primary')} />}
                             </button>

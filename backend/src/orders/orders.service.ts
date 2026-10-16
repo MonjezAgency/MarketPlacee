@@ -614,11 +614,12 @@ export class OrdersService {
                 include: {
                     items: {
                         include: {
-                            product: { select: { id: true, name: true, images: true, brand: true, ean: true, supplierId: true } },
+                            product: { select: { id: true, name: true, images: true, brand: true, ean: true, supplierId: true, unit: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, exwLocation: true } },
                         },
                     },
                     shipment: { select: { trackingNumber: true, carrier: true, status: true, expectedDelivery: true } },
                     confirmations: { select: { supplierId: true, termsVersion: true, status: true, deadline: true } },
+                    inspections: { select: { status: true }, orderBy: { createdAt: 'desc' }, take: 1 },
                 },
                 orderBy: { createdAt: 'desc' },
                 skip,
@@ -631,9 +632,29 @@ export class OrdersService {
             const { submittedTerms, termsSnapshot, fulfillment, confirmations, reviewedById, ...safe } = o;
             void submittedTerms; void termsSnapshot; void fulfillment; void reviewedById;
             const state = confirmationState(confirmations || [], answeredVersion(confirmations || [], o.termsVersion), [...new Set<string>((confirmations || []).map((c: any) => c.supplierId))]);
-            return { ...safe, workflow: o.reviewStatus === 'LEGACY' ? null : { reviewStatus: o.reviewStatus, termsVersion: o.termsVersion, party: partyStatus(o, state), buyerMustAccept: buyerMustAccept(o) } };
+            const { inspections, ...rest } = safe;
+            return {
+                ...rest,
+                workflow: o.reviewStatus === 'LEGACY' ? null : { reviewStatus: o.reviewStatus, termsVersion: o.termsVersion, party: partyStatus(o, state), buyerMustAccept: buyerMustAccept(o) },
+                inspection: inspections?.[0]?.status ?? null,
+                delivery: this.buyerDeliverySummary(fulfillment),
+            };
         });
         return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    }
+
+    /** How the goods move, for the buyer's order list — no supplier ids, no supplier charges. */
+    private buyerDeliverySummary(fulfillment: any) {
+        if (!fulfillment || !Array.isArray(fulfillment.groups)) return null;
+        const f = FulfillmentService.forBuyer(fulfillment);
+        return {
+            status: f.status ?? null,
+            freightTotal: f.freightTotal ?? null,
+            methods: f.groups.map((g: any) => ({
+                method: g.method, status: g.status, total: g.total ?? null, transitDays: g.transitDays ?? null,
+                hub: g.hub ? { name: g.hub.name, city: g.hub.city, country: g.hub.country } : null,
+            })),
+        };
     }
 
     async findByIdForBuyer(orderId: string, customerId: string) {

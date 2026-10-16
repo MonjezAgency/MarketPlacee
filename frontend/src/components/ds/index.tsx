@@ -41,7 +41,7 @@ export function Section({ id, tone = 'plain', size = 'md', className, children, 
 }
 
 export function Eyebrow({ children, className, pill = false }: { children: React.ReactNode; className?: string; pill?: boolean }) {
-    if (pill) return <p className={cn('inline-flex items-center gap-2 h-7 px-3 rounded-full ring-1 ring-line bg-surface text-small font-medium text-ink-2', className)}><span className="w-1.5 h-1.5 rounded-full bg-[#2EC4B6]" aria-hidden />{children}</p>;
+    if (pill) return <p className={cn('inline-flex items-center gap-2 min-h-7 py-1 px-3 rounded-[14px] ring-1 ring-line bg-surface text-small leading-snug font-medium text-ink-2', className)}><span className="w-1.5 h-1.5 shrink-0 rounded-full bg-[#2EC4B6]" aria-hidden />{children}</p>;
     return <p className={cn('text-eyebrow uppercase text-teal', className)}>{children}</p>;
 }
 
@@ -90,7 +90,7 @@ export function ButtonLink({ href, children, variant = 'primary', size = 'lg', a
             variant === 'inverse' && 'bg-white text-heading hover:bg-white/90',
             className,
         )}>
-            {children}{(arrow ?? variant === 'primary') && <ArrowRight size={16} aria-hidden />}
+            {children}{(arrow ?? variant === 'primary') && <ArrowRight size={16} className="rtl:rotate-180" aria-hidden />}
         </Link>
     );
 }
