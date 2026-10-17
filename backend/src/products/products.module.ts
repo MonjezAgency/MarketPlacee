@@ -12,6 +12,7 @@ import { ExcelService } from '../admin/excel.service';
 import { ReviewsService } from './reviews.service';
 import { ReviewsController, AdminReviewsController } from './reviews.controller';
 import { SupplierCatalogController } from './supplier-catalog.controller';
+import { CatalogFieldsController } from './catalog-fields.controller';
 import { SupplierImportService } from './supplier-import.service';
 import { ImageLookupService } from './image-lookup.service';
 import { ImportEnrichmentService } from './import-enrichment.service';
@@ -29,7 +30,7 @@ import { EmailModule } from '../email/email.module';
 @Module({
     imports: [PricingModule, AiAgentModule, StorageModule, NotificationsModule, EmailModule],
     providers: [ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService, SupplierImportService, ImageLookupService, ImportEnrichmentService, SupplierOverviewService, PriceHistoryService, TargetPricesService, SupplierUpdatesService, OfferCompareService],
-    controllers: [SupplierCatalogController, PriceHistoryController, TargetPricesController, ProductsController, PlacementController, ReviewsController, AdminReviewsController],
+    controllers: [SupplierCatalogController, CatalogFieldsController, PriceHistoryController, TargetPricesController, ProductsController, PlacementController, ReviewsController, AdminReviewsController],
     exports: [ProductsService, PlacementService, PriceHistoryService],
 })
 export class ProductsModule { }

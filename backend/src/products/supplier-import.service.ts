@@ -6,6 +6,7 @@ import { ALL_FIELDS, IMPORT_FIELDS, buildFromValues, labelOf, weightAmounts, wei
 import { missingForPublish, realImages } from './catalog-rules';
 import { ImportEnrichmentService } from './import-enrichment.service';
 import { ImageLookupService } from './image-lookup.service';
+import { applyImportBrands } from './catalog-fields';
 
 /** Where a field's value comes from when the file has no column for it. */
 export interface ImportSource {
@@ -178,6 +179,8 @@ export class SupplierImportService {
             }
         }
         const where = (it: Item) => `${req.sheets.length > 1 ? `sheet “${it.sheet}” row ${it.built.row}` : `row ${it.built.row}`}${it.page ? ` (page ${it.page})` : ''}`;
+        // Brands: canonical spelling for known ones; brands not on Atlantis are flagged for the supplier to confirm.
+        const newBrands = applyImportBrands(items.map((it) => it.built), await this.products.brandCatalogFor(supplierId));
 
         // A photo chosen from the barcode search: only for rows without a photo of their own,
         // and only a photo that search returned for this row's barcode.
@@ -287,6 +290,7 @@ export class SupplierImportService {
             create: count('ready') + count('draft'), withWarnings: rows.filter((r) => r.warnings.length).length,
             photosFromFile: rows.filter((r) => r.imageStatus === 'from_file').length, missingImages: rows.filter((r) => r.imageStatus === 'missing').length,
             photosFromLookup: rows.filter((r) => r.imageStatus === 'from_lookup').length,
+            newBrands,
         };
         // What will be stored where — and what won't be stored at all.
         const usedKeys = new Set(req.sheets.flatMap((s) => (s.columns || []).map((c) => c.key)));

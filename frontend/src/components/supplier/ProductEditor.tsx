@@ -7,12 +7,13 @@ import toast from 'react-hot-toast';
 import { ArrowLeft, ImagePlus, Link2, Star, Trash2, ChevronLeft, ChevronRight, Plus, X, CheckCircle2, AlertCircle, History } from 'lucide-react';
 import { supplierApi, ApiError, type SupplierProduct } from '@/lib/supplier-api';
 import { CATEGORIES_LIST } from '@/lib/products';
-import { COUNTRIES } from '@/lib/countries';
 import { MOQ_UNITS, UNIT_TYPES, WEIGHT_UNITS, digitsOnly, gtinProblem, isRealImage, missingFields, splitWeight } from '@/lib/catalog-rules';
 import { Badge, Button, Card, ErrorState, Field, Notice, PRODUCT_STATUS, Skeleton, inputCls, selectCls, useConfirm } from '@/components/supplier/ui';
 import { categoryLabel, fieldLabel, gtinText, listJoin, missingLabel, moqUnitsLabel, statusLabel, unitLabel } from '@/components/supplier/import/types';
 import { useLanguage } from '@/contexts/LanguageContext';
 import BarcodeImageFinder from '@/components/supplier/BarcodeImageFinder';
+import { BrandCombobox, CountryCombobox, useCountryOptions, type BrandState } from '@/components/supplier/CatalogCombobox';
+import { isCanonicalCountry, suggestCountry } from '@/lib/country-match';
 import { cn } from '@/lib/utils';
 
 /** Suggested attribute names (saved as typed; the label is only the translation shown next to it). */
@@ -53,13 +54,6 @@ const fromProduct = (p: SupplierProduct): FormState => {
 
 /** Load error marker for a 404 (rendered in the current language). */
 const NOT_FOUND = '__not_found__';
-/** Country name in the current language; the stored value stays the English name. */
-function useCountryName() {
-    const { meta } = useLanguage();
-    return React.useCallback((iso: string, fallback: string) => {
-        try { return new Intl.DisplayNames([meta.intl], { type: 'region' }).of(iso) || fallback; } catch { return fallback; }
-    }, [meta.intl]);
-}
 
 const num = (s: string) => (s.trim() === '' ? null : Number(s.replace(',', '.')));
 
@@ -93,8 +87,9 @@ export default function ProductEditor({ productId }: { productId?: string }) {
     const router = useRouter();
     const confirm = useConfirm();
     const { t, fmt, meta } = useLanguage();
-    const countryName = useCountryName();
+    const countries = useCountryOptions();
     const tc = (k: string, v?: Record<string, string | number>) => t('supplierCatalog', k, v);
+    const tf = (k: string, v?: Record<string, string | number>) => t('catalogFields', k, v);
     const money = (n: number | null | undefined, digits = 2) => (n === null || n === undefined || !Number.isFinite(Number(n)) ? '—' : fmt.number(Number(n), { style: 'currency', currency: 'EUR', minimumFractionDigits: digits, maximumFractionDigits: digits }));
     const [product, setProduct] = React.useState<SupplierProduct | null>(null);
     const [f, setF] = React.useState<FormState>(EMPTY);
@@ -106,6 +101,8 @@ export default function ProductEditor({ productId }: { productId?: string }) {
     const [rates, setRates] = React.useState<Record<string, number>>({ EUR: 1 });
     const [touched, setTouched] = React.useState(false);
     const [history, setHistory] = React.useState<any[] | null>(null);
+    // Brand picked from the list ('known'), confirmed as new ('new'), or typed and not chosen yet ('unchecked').
+    const [brandState, setBrandState] = React.useState<BrandState>('known');
 
     const [defaultCurrency, setDefaultCurrency] = React.useState<string | null>(null);
     React.useEffect(() => {
@@ -120,7 +117,7 @@ export default function ProductEditor({ productId }: { productId?: string }) {
         if (!productId) return;
         setLoading(true); setLoadError(null);
         supplierApi.product(productId)
-            .then((p) => { setProduct(p); const s = fromProduct(p); setF(s); setInitial(JSON.stringify(s)); })
+            .then((p) => { setProduct(p); const s = fromProduct(p); setF(s); setInitial(JSON.stringify(s)); setBrandState('known'); })
             .catch((e) => setLoadError(e.status === 404 ? NOT_FOUND : e.message))
             .finally(() => setLoading(false));
     }, [productId]);
@@ -164,6 +161,12 @@ export default function ProductEditor({ productId }: { productId?: string }) {
     const rejected = status === 'REJECTED';
     const live = status === 'APPROVED';
     const err = (k: string) => serverErrors[k] || (touched && missing.find((m) => m.field === k) ? tc('required') : '') || '';
+    // Country of origin that isn't one country from the list ("Bucharest, Romania", "EU"): flagged, never replaced for the supplier.
+    const originChanged = f.origin !== (product?.origin ?? '');
+    const originSuggestion = f.origin && !isCanonicalCountry(f.origin) ? suggestCountry(countries, f.origin) : null;
+    const originProblem = f.origin && !isCanonicalCountry(f.origin)
+        ? (originSuggestion ? tf('originDidYouMean', { value: f.origin, country: originSuggestion.label }) : tf('originNotCountry', { value: f.origin }))
+        : '';
 
     const payload = (submit: boolean) => buildPayload(f, rates, submit);
     const save = async (mode: 'draft' | 'submit' | 'save') => {
@@ -177,6 +180,9 @@ export default function ProductEditor({ productId }: { productId?: string }) {
         }
         if (f.weightValue && !(Number(f.weightValue) > 0)) bad.weightValue = tc('errNumberAboveZero');
         if (!f.name.trim()) bad.name = tc('errNameForDraft');
+        const savedBrand = product?.brand ?? '';
+        if (f.brand.trim() && brandState === 'unchecked' && f.brand.trim() !== savedBrand.trim()) bad.brand = tf('errBrandChoose', { brand: f.brand.trim() });
+        if (f.origin && originChanged && !isCanonicalCountry(f.origin)) bad.origin = originProblem || tf('errOriginPick');
         if (Object.keys(bad).length) { setServerErrors(bad); toast.error(tc('toastFixFields')); document.getElementById(`pe-${Object.keys(bad)[0]}`)?.focus(); return; }
         if (mode === 'submit' && missing.length) { toast.error(tc('toastStillMissing', { fields: listJoin(missing.map((m) => missingLabel(m, t)), meta.intl) })); return; }
         setSaving(mode);
@@ -187,17 +193,25 @@ export default function ProductEditor({ productId }: { productId?: string }) {
                 const before: any = buildPayload(JSON.parse(initial), rates, false);
                 body = Object.fromEntries(Object.entries(body).filter(([k, v]) => k === 'submit' || JSON.stringify(v) !== JSON.stringify(before[k])));
             }
+            // The supplier chose "add it as a new brand" (the server rejects an unknown brand without it).
+            if (body.brand && brandState === 'new') body.newBrand = true;
             const saved = productId ? await supplierApi.update(productId, body) : await supplierApi.create(body);
             const s = fromProduct(saved);
-            setInitial(JSON.stringify(s)); setF(s); setProduct(saved); setServerErrors({});
+            setInitial(JSON.stringify(s)); setF(s); setProduct(saved); setServerErrors({}); setBrandState('known');
             toast.success(saved.status === 'PENDING' ? tc('toastSentForReview') : saved.status === 'APPROVED' ? tc('toastLiveUpdated') : tc('toastDraftSaved'));
             if (!productId) router.replace(`/supplier/products/${saved.id}/edit`);
         } catch (e: any) {
             const body = e instanceof ApiError ? e.body : null;
             const fieldErrs: Record<string, string> = {};
             for (const m of [...(body?.invalid || []), ...(body?.missing || [])]) fieldErrs[m.field === 'price' ? 'priceInput' : m.field === 'weight' ? 'weightValue' : m.field] = m.reason;
+            // Brand / origin problems found by the server, in the supplier's language.
+            let msg = e.message || tc('toastCouldNotSave');
+            if (body?.code === 'BRAND_NOT_ON_ATLANTIS') { msg = fieldErrs.brand = tf('errBrandNotOnAtlantis', { brand: body.brand || f.brand.trim() }); setBrandState('unchecked'); }
+            if (body?.code === 'ORIGIN_NOT_A_COUNTRY') msg = fieldErrs.origin = body.suggestion?.code
+                ? tf('originDidYouMean', { value: body.value || f.origin, country: countries.find((c) => c.iso === body.suggestion.code)?.label || body.suggestion.name })
+                : tf('originNotCountry', { value: body.value || f.origin });
             setServerErrors(fieldErrs);
-            toast.error(e.message || tc('toastCouldNotSave'));
+            toast.error(msg);
         } finally { setSaving(null); }
     };
 
@@ -237,8 +251,10 @@ export default function ProductEditor({ productId }: { productId?: string }) {
                             <Field label={tc('productName')} htmlFor="pe-name" required error={err('name')} className="sm:col-span-2" hint={tc('productNameHint')}>
                                 <input id="pe-name" value={f.name} onChange={(e) => set('name', e.target.value)} className={inputCls} aria-invalid={!!err('name')} maxLength={200} />
                             </Field>
-                            <Field label={tc('brand')} htmlFor="pe-brand" required error={err('brand')}>
-                                <input id="pe-brand" value={f.brand} onChange={(e) => set('brand', e.target.value)} className={inputCls} aria-invalid={!!err('brand')} />
+                            <Field label={tc('brand')} htmlFor="pe-brand" required error={err('brand')}
+                                hint={brandState === 'new' && f.brand.trim() ? tf('brandNewSelected') : brandState === 'unchecked' && f.brand.trim() && f.brand.trim() !== (product?.brand ?? '').trim() ? tf('errBrandChoose', { brand: f.brand.trim() }) : tf('brandHint')}>
+                                <BrandCombobox id="pe-brand" value={f.brand} state={brandState} invalid={!!err('brand')}
+                                    onChange={(v, st) => { set('brand', v); setBrandState(st); }} />
                             </Field>
                             <Field label={tc('category')} htmlFor="pe-category" required error={err('category')}>
                                 <select id="pe-category" value={f.category} onChange={(e) => set('category', e.target.value)} className={selectCls} aria-invalid={!!err('category')}>
@@ -258,12 +274,12 @@ export default function ProductEditor({ productId }: { productId?: string }) {
                                     </select>
                                 </div>
                             </Field>
-                            <Field label={tc('origin')} htmlFor="pe-origin" required error={err('origin')}>
-                                <select id="pe-origin" value={f.origin} onChange={(e) => set('origin', e.target.value)} className={selectCls} aria-invalid={!!err('origin')}>
-                                    <option value="">{tc('choose')}</option>
-                                    {f.origin && !COUNTRIES.some((c) => c.name === f.origin) && <option value={f.origin}>{f.origin}</option>}
-                                    {COUNTRIES.map((c) => <option key={c.iso} value={c.name}>{countryName(c.iso, c.name)}</option>)}
-                                </select>
+                            <Field label={tc('origin')} htmlFor="pe-origin" required error={err('origin') || (originChanged ? originProblem : '')}
+                                hint={!originChanged && originProblem ? originProblem : tf('countryHint')}>
+                                <CountryCombobox id="pe-origin" value={f.origin} onChange={(v) => set('origin', v)} invalid={!!(err('origin') || (originChanged && originProblem))} />
+                                {originSuggestion && (
+                                    <Button type="button" size="sm" variant="ghost" className="mt-1" onClick={() => set('origin', originSuggestion.name)}>{tf('originUse', { country: originSuggestion.label })}</Button>
+                                )}
                             </Field>
                             <Field label={tc('exwLabel')} htmlFor="pe-exw" required error={err('exwLocation')} hint={tc('exwHint')}>
                                 <input id="pe-exw" value={f.exwLocation} onChange={(e) => set('exwLocation', e.target.value)} className={inputCls} placeholder={tc('exwPlaceholder')} aria-invalid={!!err('exwLocation')} />

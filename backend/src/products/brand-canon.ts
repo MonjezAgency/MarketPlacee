@@ -10,10 +10,11 @@ export const brandKey = (b: string | null | undefined) => String(b ?? '').trim()
 
 export interface BrandCanon { display: Map<string, string>; variants: Map<string, string[]> }
 
-export function buildBrandCanon(groups: { brand: string | null; count: number }[]): BrandCanon {
+/** `key` defaults to brandKey; brand-catalog.ts passes its stricter match key (accents, apostrophes, punctuation). */
+export function buildBrandCanon(groups: { brand: string | null; count: number }[], key: (b: string | null | undefined) => string = brandKey): BrandCanon {
     const byKey = new Map<string, { raw: string; count: number }[]>();
     for (const g of groups) {
-        const k = brandKey(g.brand);
+        const k = key(g.brand);
         if (!k) continue;
         const list = byKey.get(k) ?? [];
         list.push({ raw: g.brand as string, count: g.count });
