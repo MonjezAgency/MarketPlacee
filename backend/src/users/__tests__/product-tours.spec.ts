@@ -1,6 +1,6 @@
 import { toursForRole, tourRolloutDate, isTourEligible, toursView, parseTourUpdate, applyTourUpdate, readTour, DEFAULT_TOUR_ROLLOUT } from '../product-tours';
 
-const ROLLOUT = new Date('2026-10-17T00:00:00.000Z');
+const ROLLOUT = new Date('2026-10-16T23:30:00.000Z');
 const NEW_USER = new Date('2026-10-18T09:00:00.000Z');
 const OLD_USER = new Date('2025-01-01T00:00:00.000Z');
 

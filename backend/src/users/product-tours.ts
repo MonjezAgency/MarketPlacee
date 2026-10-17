@@ -12,7 +12,7 @@
  *   eligible = status is not 'completed'/'skipped'
  *              AND (status === 'started' OR user.createdAt >= rollout date)
  * The rollout date comes from env PRODUCT_TOUR_FROM (ISO 8601), default
- * 2026-10-17T00:00:00.000Z. A tour that was already started stays eligible
+ * 2026-10-16T23:30:00.000Z. A tour that was already started stays eligible
  * (so it resumes) even if the rollout date is later moved.
  *
  * Transitions: started → completed | skipped. Once completed or skipped the
@@ -26,7 +26,7 @@ export type ToursJson = Record<string, TourState>;
 export interface TourView { eligible: boolean; status: TourStatus | null; step: number }
 
 export const MAX_TOUR_STEP = 20;
-export const DEFAULT_TOUR_ROLLOUT = '2026-10-17T00:00:00.000Z';
+export const DEFAULT_TOUR_ROLLOUT = '2026-10-16T23:30:00.000Z';
 
 const TOURS_BY_ROLE: Record<string, string[]> = {
     SUPPLIER: ['supplier-dashboard'],
