@@ -18,6 +18,11 @@
  *    per-variant override) reduces the case price of a single-product
  *    line — the same discount the product page shows. Supplier price and
  *    buyer price are reduced by the same percentage.
+ *  • A running special offer (Promotion, see promotions/promotion-rules.ts)
+ *    works the same way. A single line gets ONE discount: the deeper of the
+ *    offer and the special offer, never both. In mixed loads only special
+ *    offers apply (per product, on its case/variant price), via
+ *    `opts.discounts` — wholesale offers never applied to mixed loads.
  *  • Mixed loads: a mixed PALLET is filled with whole cases, a mixed TRUCK
  *    with whole pallets. Because every product has its own capacity
  *    (casesPerPallet / palletsPerShipment), each line occupies
@@ -237,6 +242,8 @@ export interface PricedLoadLine extends LoadLineInput {
     units: number;
     share: number;      // fraction of the load this line occupies
     lineSubtotal: number;
+    /** Special-offer % already included in casePrice (absent when none applies). */
+    discountPercent?: number;
 }
 export interface LoadMinimum {
     unit: 'case' | 'pallet';
@@ -327,7 +334,7 @@ function variantCasePrice(p: PricingProduct, variant: string | null | undefined,
  * (ineligible product, wrong supplier, over capacity) throw; an
  * under-filled load is returned with ready=false so a draft can be saved.
  */
-export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<string, PricingProduct>, m: Markups, opts: { requiredFill?: number } = {}): PricedLoad {
+export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<string, PricingProduct>, m: Markups, opts: { requiredFill?: number; discounts?: Map<string, number> } = {}): PricedLoad {
     if (kind !== 'PALLET' && kind !== 'TRUCK') throw new PricingError('INVALID_LOAD', 'Mixed loads are either a PALLET or a TRUCK.');
     if (!Array.isArray(lines)) throw new PricingError('INVALID_LOAD', 'Lines must be a list.');
     if (lines.length > MAX_LINES_PER_LOAD) throw new PricingError('INVALID_LOAD', `A mixed load can hold at most ${MAX_LINES_PER_LOAD} lines.`);
@@ -357,10 +364,12 @@ export function priceLoad(kind: LoadKind, lines: LoadLineInput[], products: Map<
         if (supplierId === null) supplierId = sup;
         else if (sup !== supplierId) mixedSuppliers = true;
         const cpp = pos(p.casesPerPallet), ppt = pos(p.palletsPerShipment), upc = pos(p.unitsPerCase);
-        const casePrice = round2(variantCasePrice(p, l.variant, m));
+        // A running special offer (promotion) takes its % off the supplier's (variant) case price, once.
+        const pct = opts.discounts?.get(l.productId) ?? 0;
+        const casePrice = round2(variantCasePrice(p, l.variant, m) * offerFactor(pct));
         const cases = kind === 'PALLET' ? l.quantity : l.quantity * cpp;
         const share = kind === 'PALLET' ? l.quantity / cpp : l.quantity / ppt;
-        out.push({ ...l, name: p.name, unit: kind === 'PALLET' ? 'case' : 'pallet', casePrice, cases, units: cases * upc, share, lineSubtotal: round2(casePrice * cases) });
+        out.push({ ...l, name: p.name, unit: kind === 'PALLET' ? 'case' : 'pallet', casePrice, cases, units: cases * upc, share, lineSubtotal: round2(casePrice * cases), ...(offerFactor(pct) < 1 ? { discountPercent: pct } : {}) });
     }
 
     const origin = loadOrigin(out.map((l) => products.get(l.productId)!));

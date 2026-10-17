@@ -13,7 +13,8 @@ import catalogFields from './catalogFields';
 import supplierOverview from './supplierOverview';
 import imageDiscovery from './imageDiscovery';
 import targetPrice from './targetPrice';
+import promotions from './promotions';
 
 /** Every area dictionary (see define.ts). Order doesn't matter; names must be unique. */
-export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, catalogImport, targetsPage, productTour, catalogFields, supplierOverview, imageDiscovery, targetPrice] as const;
+export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, catalogImport, targetsPage, productTour, catalogFields, supplierOverview, imageDiscovery, targetPrice, promotions] as const;
 export type SectionName = (typeof SECTIONS)[number]['name'];

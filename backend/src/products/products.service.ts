@@ -14,6 +14,7 @@ import { translateProduct } from '../common/translator';
 import { AiAgentService } from '../ai-agent/ai-agent.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../email/email.service';
+import { attachPromotions } from '../promotions/promotion-lookup';
 
 @Injectable()
 export class ProductsService {
@@ -543,6 +544,7 @@ export class ProductsService {
         }
 
         for (const p of products) if (p) p.brandDisplay = canonicalBrand(canon, p.brand);
+        await attachPromotions(this.prisma, products);
         const brandFacet = new Map<string, number>();
         for (const g of brandGroups as any[]) {
             const name = canonicalBrand(canon, g.brand);
@@ -1289,6 +1291,8 @@ export class ProductsService {
             // Non-fatal — if the offers table is missing or query fails,
             // PDP simply shows the product without a discount badge.
         }
+        // Running special offer (server clock, never cached) — `promotion` on the product.
+        await attachPromotions(this.prisma, [product as any]);
         return product;
     }
 
@@ -1580,7 +1584,7 @@ export class ProductsService {
             }
         }
 
-        return merged.slice(0, limit);
+        return attachPromotions(this.prisma, merged.slice(0, limit));
     }
 
     async fixupIncompleteProducts() {

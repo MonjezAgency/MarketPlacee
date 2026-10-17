@@ -42,6 +42,7 @@ import { EmailModule } from './email/email.module';
 import { I18nModule } from './i18n/i18n.module';
 import { OffersModule } from './offers/offers.module';
 import { EmailTrackingModule } from './email-tracking/email-tracking.module';
+import { PromotionsModule } from './promotions/promotions.module';
 
 @Module({
     imports: [
@@ -53,6 +54,8 @@ import { EmailTrackingModule } from './email-tracking/email-tracking.module';
         PrismaModule,
         SecurityModule,
         PricingModule,
+        // Before ProductsModule so /supplier-catalog/promotions is matched by its own controller.
+        PromotionsModule,
         ProductsModule,
         AdminModule,
         AuthModule,

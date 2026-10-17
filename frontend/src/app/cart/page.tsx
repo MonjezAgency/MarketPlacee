@@ -18,6 +18,7 @@ import {
 } from '@/lib/wholesale';
 import { LineStatus, MixedLoadPicker, ProgressMeter, loadProgress } from '@/components/cart/MinimumOrder';
 import { ARRIVAL_ESTIMATE } from '@/lib/config';
+import { CartPromoNote } from '@/components/promotions/PromotionPrice';
 
 /* ── helpers ─────────────────────────────────────────────────────────── */
 const UNIT_SHORT: Record<string, string> = { carton: 'cs', pallet: 'pal.', truck: 'trk' };
@@ -342,7 +343,10 @@ export default function CartPage() {
                                             bbd={fmtDate(q?.info?.shelfLife)}
                                             error={belowMin || stockShort ? (lineError[i.id] || null) : (lineError[i.id] || q?.error?.message) ?? null}
                                             unavailable={!!q?.error && UNAVAILABLE.has(q.error.code)}
-                                            extra={!q || locked ? undefined : <LineStatus line={q} tier={i.tier || 'carton'} onSetQuantity={(n) => updateQuantity(i.id, n)} />}
+                                            extra={!q ? undefined : <>
+                                                {!locked && <LineStatus line={q} tier={i.tier || 'carton'} onSetQuantity={(n) => updateQuantity(i.id, n)} />}
+                                                {!q.error && <CartPromoNote promotion={q.promotion} ended={q.promotionEnded} listLineTotal={q.promotion && q.listUnitPrice ? q.listUnitPrice * q.quantity : null} formatPrice={(n) => formatPrice(n)} />}
+                                            </>}
                                             muted={!!indicative}
                                             stepper={locked
                                                 ? <span className="w-[190px] text-center text-[13px] text-ink-3">1 mixed {unitWord(i.tier, 1)}</span>

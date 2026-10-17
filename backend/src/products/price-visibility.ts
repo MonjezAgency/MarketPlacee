@@ -3,7 +3,7 @@
  * responses keep every product field except commercial pricing, so the
  * storefront can't reveal it even if a client ignores the UI.
  */
-const PRICE_FIELDS = ['price', 'basePrice', 'previousPrice', 'priceChangedAt', 'variantPrices', 'tieredPrices', 'activeOffer'] as const;
+const PRICE_FIELDS = ['price', 'basePrice', 'previousPrice', 'priceChangedAt', 'variantPrices', 'tieredPrices', 'activeOffer', 'promotion'] as const;
 
 export function stripPrices<T>(p: T): T {
     if (!p || typeof p !== 'object') return p;

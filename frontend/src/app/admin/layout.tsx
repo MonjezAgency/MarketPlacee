@@ -67,7 +67,8 @@ interface SidebarGroup {
     title: string;
     titleKey: string;
     icon: React.ElementType;
-    links: { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean }[];
+    /** `section`: dictionary section of translationKey when it isn't `admin`. */
+    links: { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean; section?: 'promotions' }[];
 }
 
 // Owner-only group — بيظهر بس لـ OWNER
@@ -89,6 +90,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             { label: 'Dashboard', translationKey: 'overview', href: '/admin', icon: Home },
             { label: 'Inventory Hub', translationKey: 'allProducts', href: '/admin/products', icon: Package },
             { label: 'Approve Offers', translationKey: 'approveOffers', href: '/admin/wholesale-offers', icon: CheckCircle2 },
+            { label: 'Special offers', translationKey: 'nav', section: 'promotions', href: '/admin/promotions', icon: Tag },
             { label: 'Global Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
             { label: 'Target Prices', translationKey: 'targetPriceRequests', href: '/admin/target-prices', icon: Target },
             { label: 'Delivery Countries', translationKey: 'deliveryCountries', href: '/admin/delivery', icon: Globe2 },
@@ -180,7 +182,7 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
                         <Link
                             key={link.href}
                             href={link.href}
-                            title={t('admin', link.translationKey) || link.label}
+                            title={t(link.section ?? 'admin', link.translationKey) || link.label}
                             className={cn(
                                 "flex items-center justify-center w-11 h-11 rounded-xl transition-all relative group",
                                 isActive
@@ -237,7 +239,7 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
                                 >
                                     <div className="flex items-center gap-3">
                                         <Icon size={18} />
-                                        <span>{t('admin', link.translationKey) || link.label}</span>
+                                        <span>{t(link.section ?? 'admin', link.translationKey) || link.label}</span>
                                     </div>
                                     <span className="text-[9px] font-black uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                                         Soon
@@ -259,7 +261,7 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
                             >
                                 <div className="flex items-center gap-3">
                                     <Icon size={18} />
-                                    <span>{t('admin', link.translationKey) || link.label}</span>
+                                    <span>{t(link.section ?? 'admin', link.translationKey) || link.label}</span>
                                 </div>
                                 {(badgeCounts[link.href] || 0) > 0 && (
                                     <div className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">

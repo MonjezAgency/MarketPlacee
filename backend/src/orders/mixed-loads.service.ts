@@ -2,6 +2,10 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { PrismaService } from '../common/prisma.service';
 import { AppConfigService } from '../admin/app-config.service';
 import { LoadKind, LoadLineInput, Markups, PricingError, PricingProduct, basePerCase, priceLoad, PricedLoad, minUnits, variantSignatures } from './pricing';
+import { activePromotions, type PublicPromotion } from '../promotions/promotion-lookup';
+
+/** productId → special-offer % for priceLoad (running promotions only). */
+export const promotionDiscounts = (promos: Map<string, PublicPromotion>) => new Map([...promos].map(([id, p]) => [id, p.discountPercent]));
 
 const PRODUCT_PRICING_SELECT = {
     id: true, name: true, price: true, basePrice: true, unitsPerCase: true, casesPerPallet: true,
@@ -38,8 +42,9 @@ export class MixedLoadsService {
     }
 
     async price(kind: LoadKind, lines: LoadLineInput[], db: any = this.prisma): Promise<PricedLoad> {
-        const [products, m, requiredFill] = await Promise.all([this.loadProducts((lines || []).map((l) => l?.productId), db), this.markups(), this.requiredFill()]);
-        try { return priceLoad(kind, lines || [], products, m, { requiredFill }); } catch (e) { asHttp(e); }
+        const ids = (lines || []).map((l) => l?.productId);
+        const [products, m, requiredFill, promos] = await Promise.all([this.loadProducts(ids, db), this.markups(), this.requiredFill(), activePromotions(db, ids)]);
+        try { return priceLoad(kind, lines || [], products, m, { requiredFill, discounts: promotionDiscounts(promos) }); } catch (e) { asHttp(e); }
     }
 
     private async decorate(load: any) {
@@ -121,7 +126,7 @@ export class MixedLoadsService {
         const kind = row.kind as LoadKind;
         const lines = ((row.lines as any[]) || []) as LoadLineInput[];
         const products = await this.loadProducts(lines.map((l) => l.productId));
-        const [m, priced] = await Promise.all([this.markups(), this.price(kind, lines).catch(() => null)]);
+        const [m, priced, promos] = await Promise.all([this.markups(), this.price(kind, lines).catch(() => null), activePromotions(this.prisma, [...products.keys()])]);
         const fillLeft = Math.max(0, 1 - (priced?.fill ?? 0));
         const empty = (reason: string) => ({ kind, items: [], reason });
         if (!products.size) return empty('Add a product first.');
@@ -142,7 +147,10 @@ export class MixedLoadsService {
                 const label = sig.split('|').map((x) => x.split('=').slice(1).join('=')).join(' · ');
                 if (search && !`${p.name} ${label}`.toLowerCase().includes(search)) continue;
                 const own = Number(prices[sig]);
-                const casePrice = Math.round((Number.isFinite(own) && own > 0 ? own : basePerCase(p, m)) * m.mix * 10000) / 10000;
+                const net = Number.isFinite(own) && own > 0 ? own : basePerCase(p, m);
+                // Same as priceLoad: a running special offer comes off the case price first (rounded once), then the mix markup.
+                const promoPct = promos.get(p.id)?.discountPercent;
+                const casePrice = Math.round((promoPct ? Math.round(net * (1 - promoPct / 100) * 100) / 100 : net) * m.mix * 10000) / 10000;
                 const maxQuantity = Math.max(0, Math.min(byRoom, byStock));
                 if (maxQuantity < 1) continue;
                 items.push({

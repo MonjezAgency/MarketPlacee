@@ -16,6 +16,9 @@ update `docs/DESIGN_SYSTEM.md` in the same change and say why — don't add sile
   coverage, delivery dates or prices that the code and the business don't actually provide.
 - Suppliers never see the buyer price or the Atlantis margin; buyers never see supplier ids or supplier net prices.
 - Orders are requests until every supplier accepts and Atlantis approves (server-enforced, `backend/src/orders/order-workflow.ts`).
+- Special offers (`Promotion`, not the reviewed wholesale `Offer`) take a % off the supplier net price; the buyer price follows
+  through the markup. One discount per line (the deeper of offer / special offer). Applied only in `backend/src/promotions/promotion-lookup.ts`
+  at request time; rules in `promotion-rules.ts`. Managed at `/supplier/promotions` and `/admin/promotions`; times are UTC.
 - Delivery charges come only from the server calculation (`backend/src/fulfillment`); missing rates mean "quoted after the order".
 
 ## Known gaps
