@@ -6,6 +6,7 @@ import { ALL_FIELDS, IMPORT_FIELDS, buildFromValues, labelOf, weightAmounts, wei
 import { missingForPublish, realImages } from './catalog-rules';
 import { ImportEnrichmentService } from './import-enrichment.service';
 import { ImageLookupService } from './image-lookup.service';
+import { ImageDiscoveryService } from './image-discovery.service';
 
 /** Where a field's value comes from when the file has no column for it. */
 export interface ImportSource {
@@ -82,7 +83,7 @@ const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); cons
 @Injectable()
 export class SupplierImportService {
     private readonly logger = new Logger(SupplierImportService.name);
-    constructor(private readonly products: ProductsService, private readonly notifications: NotificationsService, private readonly storage: SupabaseStorageService, private readonly enrichment: ImportEnrichmentService, private readonly imageLookup: ImageLookupService) {}
+    constructor(private readonly products: ProductsService, private readonly notifications: NotificationsService, private readonly storage: SupabaseStorageService, private readonly enrichment: ImportEnrichmentService, private readonly imageLookup: ImageLookupService, private readonly discovery?: ImageDiscoveryService) {}
 
     /** Reject malformed requests; return the mapping problems the supplier must fix first. */
     private checkRequest(req: ImportRequest, maxRows = MAX_IMPORT_ROWS_TOTAL) {
@@ -355,6 +356,8 @@ export class SupplierImportService {
                     const missing = missingForPublish({ ...product, basePrice: product.price }).map((m) => m.label);
                     results.push({ ...head, outcome: 'created', productId: saved.id, status: saved.status, missing, imageMissing: !images.length, photoFromLookup: !!credits, notes });
                 }
+                // Saved without a photo: look for one by barcode in the background (shares the review search's cache).
+                if (!images.length) this.discovery?.trigger(saved.id);
                 if (credits) await this.products.setImageCredits(saved.id, credits).catch((e) => this.logger.warn(`[import] image credit for ${saved.id}: ${e?.message}`));
                 await this.products.recordImportSource(saved.id, supplierId, { file: req.fileName, sheet: r.sheet, row: r.row, columns: it.original, ...(it.page ? { page: it.page, extracted: it.source } : {}), ...(it.edited && Object.keys(it.edited).length ? { editedBySupplier: it.edited } : {}), ...(credits ? { imageCredits: credits } : {}) })
                     .catch((e) => this.logger.warn(`[import] source record for ${saved.id}: ${e?.message}`));

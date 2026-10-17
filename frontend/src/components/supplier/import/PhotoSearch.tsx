@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { digitsOnly, gtinProblem } from '@/lib/catalog-rules';
 import type { PhotoResult, Review, ReviewRow } from './types';
+import { useDiscoveryReason } from '@/components/supplier/ImageDiscoveryPanel';
 
 export interface PhotoSearchState {
     jobId: string | null;
@@ -81,6 +82,7 @@ export function PhotoThumb({ result, picked }: { result?: PhotoResult; picked: b
 /** In the opened row: the photo, why it is (or isn't) a match, its source and licence, and the choice. */
 export function PhotoChoice({ result, picked, onToggle, ownPhoto }: { result?: PhotoResult; picked: boolean; onToggle: (on: boolean) => void; ownPhoto: boolean }) {
     const { t } = useLanguage();
+    const more = useDiscoveryReason(); // newer reason codes (case code, store-internal code, low resolution)
     const ti = (k: string, v?: Record<string, string | number>) => t('catalogImport', k, v);
     if (!result || ownPhoto) return null;
     const c = result.candidate;
@@ -99,13 +101,13 @@ export function PhotoChoice({ result, picked, onToggle, ownPhoto }: { result?: P
                         <p className="text-ink-3"><a href={c.sourceUrl} target="_blank" rel="noopener noreferrer" className="hover:underline inline-flex items-center gap-1">{c.source}<ExternalLink size={11} /></a> · <a href={c.licenseUrl} target="_blank" rel="noopener noreferrer" className="hover:underline">{c.license}</a></p>
                     </div>
                 </div>
-                <ul className="text-[11.5px] space-y-0.5">{result.reasons.map((r) => <li key={r} className={cn(/differs|second|nothing|unknown/.test(r) ? 'text-amber-800' : 'text-emerald-700')}>{REASON_KEY[r] ? ti(REASON_KEY[r]) : r}</li>)}</ul>
+                <ul className="text-[11.5px] space-y-0.5">{result.reasons.map((r) => <li key={r} className={cn(/differs|second|nothing|unknown|case_code|low_resolution/.test(r) ? 'text-amber-800' : 'text-emerald-700')}>{REASON_KEY[r] ? ti(REASON_KEY[r]) : more(r) || r}</li>)}</ul>
                 <label className="flex items-start gap-2 text-[12.5px] cursor-pointer">
                     <input type="checkbox" className="mt-0.5 accent-[#0E7C74]" checked={picked} onChange={(e) => onToggle(e.target.checked)} />
                     <span>{ti('photoUse', { attribution: c.attribution, license: c.license })}</span>
                 </label>
             </>) : (
-                <p className="text-[12px] text-ink-3">{result.reasons.map((r) => (REASON_KEY[r] ? ti(REASON_KEY[r]) : r)).join(' ')}</p>
+                <p className="text-[12px] text-ink-3">{result.reasons.map((r) => (REASON_KEY[r] ? ti(REASON_KEY[r]) : more(r) || r)).join(' ')}</p>
             )}
         </div>
     );

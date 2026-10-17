@@ -11,6 +11,7 @@ import { categoryLabel, statusLabel } from '@/components/supplier/import/types';
 import { useLanguage } from '@/contexts/LanguageContext';
 import StockAdjustDialog from '@/components/supplier/StockAdjustDialog';
 import PriceStockUpdateDialog from '@/components/supplier/PriceStockUpdateDialog';
+import ImageDiscoveryBadge from '@/components/supplier/ImageDiscoveryBadge';
 import { Trans } from '@/components/i18n/Trans';
 import { cn } from '@/lib/utils';
 
@@ -48,6 +49,8 @@ function InventoryManager() {
     const [status, setStatus] = React.useState(params.get('status') || '');
     const [category, setCategory] = React.useState(params.get('category') || '');
     const [stock, setStock] = React.useState(params.get('stock') || '');
+    // ?attention=images (linked from the overview): products without a photo.
+    const [attention, setAttention] = React.useState(params.get('attention') === 'images' ? 'images' : '');
     const [sort, setSort] = React.useState(params.get('sort') || 'newest');
     const [page, setPage] = React.useState(Number(params.get('page')) || 1);
     const [data, setData] = React.useState<ProductPage | null>(null);
@@ -59,23 +62,23 @@ function InventoryManager() {
     const [updateOpen, setUpdateOpen] = React.useState(false);
 
     React.useEffect(() => { const t = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(t); }, [q]);
-    React.useEffect(() => { setPage(1); }, [debouncedQ, status, category, stock, sort]);
+    React.useEffect(() => { setPage(1); }, [debouncedQ, status, category, stock, sort, attention]);
 
     // Keep the URL in sync so filters survive refresh and links from the overview work.
     React.useEffect(() => {
         const u = new URLSearchParams();
         if (debouncedQ) u.set('q', debouncedQ); if (status) u.set('status', status); if (category) u.set('category', category);
-        if (stock) u.set('stock', stock); if (sort !== 'newest') u.set('sort', sort); if (page > 1) u.set('page', String(page));
+        if (stock) u.set('stock', stock); if (attention) u.set('attention', attention); if (sort !== 'newest') u.set('sort', sort); if (page > 1) u.set('page', String(page));
         router.replace(`/supplier/products${u.toString() ? `?${u}` : ''}`, { scroll: false });
-    }, [debouncedQ, status, category, stock, sort, page, router]);
+    }, [debouncedQ, status, category, stock, attention, sort, page, router]);
 
     const load = React.useCallback(() => {
         setLoading(true); setError(null);
-        supplierApi.products({ q: debouncedQ, status, category, stock, sort, page, limit: 25 })
+        supplierApi.products({ q: debouncedQ, status, category, stock, attention, sort, page, limit: 25 })
             .then((d) => { setData(d); setSelected(new Set()); })
             .catch((e) => setError(e.message))
             .finally(() => setLoading(false));
-    }, [debouncedQ, status, category, stock, sort, page]);
+    }, [debouncedQ, status, category, stock, attention, sort, page]);
     React.useEffect(() => { load(); }, [load]);
 
     const rows = data?.data ?? [];
@@ -136,6 +139,12 @@ function InventoryManager() {
                                 </button>
                             );
                         })}
+                        <span className="w-px bg-line mx-1 shrink-0" aria-hidden />
+                        <button type="button" aria-pressed={attention === 'images'} aria-label={t('imageDiscovery', 'filterImageNeededAria')} onClick={() => setAttention((a) => (a ? '' : 'images'))}
+                            className={cn('h-8 px-3 rounded-md text-[13px] font-medium whitespace-nowrap inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal',
+                                attention === 'images' ? 'bg-amber-100 text-amber-900 ring-1 ring-amber-300' : 'text-ink-2 hover:bg-surface-2')}>
+                            <ImageIcon size={14} aria-hidden />{t('imageDiscovery', 'filterImageNeeded')}{s?.imageNeeded !== undefined && <span className="tabular-nums text-ink-4">{fmt.number(s.imageNeeded)}</span>}
+                        </button>
                     </div>
                     <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_200px_160px_190px]">
                         <label className="relative">
@@ -174,7 +183,7 @@ function InventoryManager() {
                     <div className="p-4 space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
                 ) : rows.length === 0 && !error ? (
                     data?.summary.total ? (
-                        <EmptyState icon={<Search size={20} />} title={tc('noMatchTitle')} action={<Button onClick={() => { setQ(''); setStatus(''); setCategory(''); setStock(''); }}>{tc('clearFilters')}</Button>}>{tc('noMatchBody')}</EmptyState>
+                        <EmptyState icon={<Search size={20} />} title={tc('noMatchTitle')} action={<Button onClick={() => { setQ(''); setStatus(''); setCategory(''); setStock(''); setAttention(''); }}>{tc('clearFilters')}</Button>}>{tc('noMatchBody')}</EmptyState>
                     ) : (
                         <EmptyState icon={<Boxes size={20} />} title={tc('emptyTitle')}
                             action={<><Link href="/supplier/products/import"><Button icon={<Upload size={15} />}>{tc('bulkUpload')}</Button></Link><Link href="/supplier/products/new"><Button variant="primary" icon={<Plus size={15} />}>{tc('addProduct')}</Button></Link></>}>
@@ -215,6 +224,7 @@ function InventoryManager() {
                                                 <div className="flex flex-col items-start gap-1" title={p.statusNote}>
                                                     {status_(p.status)}
                                                     {p.missing.length > 0 && <span className="inline-flex items-center gap-1 text-[12px] text-amber-800"><AlertCircle size={12} />{tc('missingCount', { count: p.missing.length })}</span>}
+                                                    <ImageDiscoveryBadge product={p} onAccepted={load} />
                                                 </div>
                                             </td>
                                             <td className="px-2 py-2.5 text-end tabular-nums">{p.price && p.price > 0 ? money(p.price) : <span className="text-ink-4">—</span>}</td>
@@ -241,7 +251,8 @@ function InventoryManager() {
                             {rows.map((p) => (
                                 <li key={p.id} className="flex gap-3 p-3">
                                     <input type="checkbox" aria-label={tc('selectName', { name: p.name })} checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="mt-3 w-4 h-4 accent-[#0E7C74]" />
-                                    <Link href={`/supplier/products/${p.id}/edit`} className="flex gap-3 min-w-0 flex-1">
+                                    <div className="min-w-0 flex-1 space-y-1.5">
+                                    <Link href={`/supplier/products/${p.id}/edit`} className="flex gap-3 min-w-0">
                                         <Thumb src={p.images?.[0]} size={48} />
                                         <span className="min-w-0 flex-1">
                                             <span className="block font-medium text-ink truncate">{p.name}</span>
@@ -253,6 +264,8 @@ function InventoryManager() {
                                             </span>
                                         </span>
                                     </Link>
+                                    <div className="ps-14"><ImageDiscoveryBadge product={p} onAccepted={load} /></div>
+                                    </div>
                                 </li>
                             ))}
                         </ul>

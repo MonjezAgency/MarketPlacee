@@ -11,6 +11,7 @@ import { analyseWorkbook } from './import-analysis';
 import { MAX_PDF_BYTES, MAX_PDF_PAGES, analysePdf } from './pdf-import';
 import { ImportEnrichmentService, MAX_ENRICH_ITEMS, type EnrichItem } from './import-enrichment.service';
 import { ImageLookupService } from './image-lookup.service';
+import { ImageDiscoveryService } from './image-discovery.service';
 import { SupplierUpdatesService, type UpdateRequest } from './supplier-updates.service';
 import { SupplierOverviewService } from './supplier-overview.service';
 import { ALL_FIELDS, IMPORT_FIELDS, MAX_IMPORT_BYTES, buildTemplate, matchHeaders, parseSpreadsheet } from './product-import';
@@ -33,6 +34,7 @@ export class SupplierCatalogController {
         private readonly prisma: PrismaService,
         private readonly updates: SupplierUpdatesService,
         private readonly enrich: ImportEnrichmentService,
+        private readonly discovery: ImageDiscoveryService,
     ) {}
 
     @Get('overview')
@@ -48,6 +50,35 @@ export class SupplierCatalogController {
     @Get('products/:id')
     one(@Request() req, @Param('id') id: string) {
         return this.products.findMineOne(id, req.user.sub);
+    }
+
+    // ─── Photo search by barcode for a saved product (background; supplier approves) ──
+
+    @Get('products/:id/image-discovery')
+    @Throttle({ default: { limit: 120, ttl: 60_000 } })
+    imageDiscovery(@Request() req, @Param('id') id: string) {
+        return this.discovery.get(req.user.sub, id).then((state) => ({ state }));
+    }
+
+    @Post('products/:id/image-discovery/retry')
+    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    retryImageDiscovery(@Request() req, @Param('id') id: string) {
+        return this.discovery.retry(req.user.sub, id).then((state) => ({ state }));
+    }
+
+    /** Use one of the stored candidates as the product photo (copied to storage and credited). */
+    @Post('products/:id/image-discovery/accept')
+    @Throttle({ default: { limit: 30, ttl: 60_000 } })
+    acceptImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { url?: string }) {
+        if (!body?.url || typeof body.url !== 'string') throw new BadRequestException('Choose a photo.');
+        return this.discovery.accept(req.user.sub, id, body.url);
+    }
+
+    /** "Not my product": one photo ({url}) or all of them. */
+    @Post('products/:id/image-discovery/dismiss')
+    @Throttle({ default: { limit: 60, ttl: 60_000 } })
+    dismissImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { url?: string }) {
+        return this.discovery.dismiss(req.user.sub, id, typeof body?.url === 'string' ? body.url : undefined).then((state) => ({ state }));
     }
 
     @Get('products/:id/history')

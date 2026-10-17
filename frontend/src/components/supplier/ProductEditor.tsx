@@ -12,7 +12,7 @@ import { MOQ_UNITS, UNIT_TYPES, WEIGHT_UNITS, digitsOnly, gtinProblem, isRealIma
 import { Badge, Button, Card, ErrorState, Field, Notice, PRODUCT_STATUS, Skeleton, inputCls, selectCls, useConfirm } from '@/components/supplier/ui';
 import { categoryLabel, fieldLabel, gtinText, listJoin, missingLabel, moqUnitsLabel, statusLabel, unitLabel } from '@/components/supplier/import/types';
 import { useLanguage } from '@/contexts/LanguageContext';
-import BarcodeImageFinder from '@/components/supplier/BarcodeImageFinder';
+import ImageDiscoveryPanel from '@/components/supplier/ImageDiscoveryPanel';
 import { cn } from '@/lib/utils';
 
 /** Suggested attribute names (saved as typed; the label is only the translation shown next to it). */
@@ -201,6 +201,14 @@ export default function ProductEditor({ productId }: { productId?: string }) {
         } finally { setSaving(null); }
     };
 
+    // A photo found by barcode was accepted: the server already saved it; keep the form in step without losing other edits.
+    const onPhotoAccepted = (saved: SupplierProduct) => {
+        const imgs = (saved.images || []).filter(isRealImage);
+        setProduct(saved);
+        setF((x) => ({ ...x, images: imgs }));
+        setInitial((i) => JSON.stringify({ ...JSON.parse(i), images: imgs }));
+    };
+
     const leave = async () => {
         if (dirty && !(await confirm({ title: tc('discardTitle'), body: tc('discardBody'), confirm: tc('discard'), tone: 'danger' }))) return;
         setInitial(JSON.stringify(f)); // disarm the guard
@@ -340,7 +348,7 @@ export default function ProductEditor({ productId }: { productId?: string }) {
                     </Card>
 
                     <Card id="media" title={tc('photosTitle')} description={tc('photosDesc')}>
-                        <MediaEditor images={f.images} onChange={(imgs) => set('images', imgs)} ean={f.ean} name={f.name} brand={f.brand} productId={productId} savedEan={product?.ean ?? null} weight={f.weightValue ? `${f.weightPack ? `${f.weightPack} x ` : ''}${f.weightValue} ${f.weightUnit}` : ''} error={touched && !f.images.some(isRealImage) ? tc('addOnePhoto') : ''} />
+                        <MediaEditor images={f.images} onChange={(imgs) => set('images', imgs)} ean={f.ean} productId={productId} product={product} onPhotoAccepted={onPhotoAccepted} error={touched && !f.images.some(isRealImage) ? tc('addOnePhoto') : ''} />
                     </Card>
 
                     <Card title={tc('varietiesTitle')} description={tc('varietiesDesc')}>
@@ -408,7 +416,7 @@ export default function ProductEditor({ productId }: { productId?: string }) {
     );
 }
 
-function MediaEditor({ images, onChange, ean, name, brand, error, productId, savedEan, weight }: { images: string[]; onChange: (v: string[]) => void; ean: string; name: string; brand: string; error?: string; productId?: string; savedEan?: string | null; weight?: string }) {
+function MediaEditor({ images, onChange, ean, error, productId, product, onPhotoAccepted }: { images: string[]; onChange: (v: string[]) => void; ean: string; error?: string; productId?: string; product: SupplierProduct | null; onPhotoAccepted: (saved: SupplierProduct) => void }) {
     const { t } = useLanguage();
     const tc = (k: string, v?: Record<string, string | number>) => t('supplierCatalog', k, v);
     const fileRef = React.useRef<HTMLInputElement>(null);
@@ -468,9 +476,9 @@ function MediaEditor({ images, onChange, ean, name, brand, error, productId, sav
                 </div>
             </div>
             {urlErr && <p role="alert" className="text-[12.5px] text-red-700">{urlErr}</p>}
-            <BarcodeImageFinder productId={productId} savedEan={savedEan} ean={digitsOnly(ean)} name={name} brand={brand} weight={weight} current={images}
-                onAccept={(u) => { onChange([...imagesRef.current, u]); toast.success(tc('photoAddedSave')); }}
-                onSkip={() => fileRef.current?.click()} />
+            {/* Background search by the saved barcode; only shown while the product has no photo. */}
+            <ImageDiscoveryPanel productId={productId} product={product} ean={digitsOnly(ean)} hasImages={images.some(isRealImage)}
+                onAccepted={onPhotoAccepted} onUpload={() => fileRef.current?.click()} />
         </div>
     );
 }

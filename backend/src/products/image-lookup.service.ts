@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { barcodeProblem, normaliseBarcode } from './catalog-rules';
+import { sameGtin } from './product-data-providers';
 
 /**
  * Barcode → product image, as an assisted step the supplier must confirm.
@@ -72,15 +73,29 @@ function specs(s: string | null | undefined): Map<string, Set<number>> {
     return out;
 }
 
-export function compareNames(supplierName: string | undefined, sourceName: string | null): boolean | null {
-    const a = tokens(supplierName), b = new Set(tokens(sourceName));
-    if (!a.length || !b.size) return null;
+/** Words that name a kind of product rather than this product ("Energy Drink", "Ice Cream"): no evidence either way. */
+const GENERIC = new Set(['drink', 'drinks', 'energy', 'ice', 'cream', 'water', 'glas', 'glass']);
+/** Words that make a different variant of the same line (Coca-Cola vs Coca-Cola Zero). */
+const VARIANT = new Set(['zero', 'light', 'lite', 'diet', 'decaf', 'white', 'dark']);
+
+/**
+ * Do two product names agree? true / false (a different variant or size) / null (nothing to compare).
+ * When `brands` are given (the supplier's brand and the record's), brand words are not counted as
+ * agreement: "Monster Viking Berry" vs a record named just "Monster" says nothing about the flavour.
+ */
+export function compareNames(supplierName: string | undefined, sourceName: string | null, brands: (string | null | undefined)[] = []): boolean | null {
+    const brandWords = new Set(brands.flatMap((b) => tokens(b)));
+    const useful = (t: string) => !brandWords.has(t) && !GENERIC.has(t);
+    const a = tokens(supplierName).filter(useful), b = new Set(tokens(sourceName).filter(useful));
     // Same brand line but a different percentage / size is a different product.
     const sa = specs(supplierName), sb = specs(sourceName);
     for (const [unit, vals] of sa) {
         const other = sb.get(unit);
         if (other && ![...vals].some((v) => other.has(v))) return false;
     }
+    if (!a.length || !b.size) return null;
+    const va = a.filter((t) => VARIANT.has(t)), vb = [...b].filter((t) => VARIANT.has(t));
+    if (va.some((t) => !b.has(t)) || vb.some((t) => !a.includes(t))) return false;
     const shared = a.filter((t) => b.has(t)).length;
     return shared >= Math.min(2, a.length, b.size);
 }
@@ -143,7 +158,8 @@ export class ImageLookupService {
                 const res = await fetcher(`${src.api}/api/v2/product/${barcode}.json?fields=code,product_name,product_name_en,brands,quantity,selected_images,image_front_url,image_url,image_packaging_url`, {
                     headers: { 'User-Agent': UA, Accept: 'application/json' }, signal: AbortSignal.timeout(8000),
                 });
-                reachable++;
+                // A 404 is an answer (not in this database); 429/5xx means the database didn't answer.
+                if (res.ok || res.status === 404) reachable++;
                 if (!res.ok) return;
                 const j: any = await res.json();
                 const p = j?.product;
@@ -164,7 +180,7 @@ export class ImageLookupService {
                 addPhoto(p.image_packaging_url, 'packaging', null);
                 if (!photos.length) addPhoto(p.image_url, 'other', null);
                 if (!photos.length) return;
-                const barcodeMatch = normaliseBarcode(p.code || j.code) === barcode;
+                const barcodeMatch = sameGtin(p.code || j.code || barcode, barcode); // UPC-A 0… / EAN-13 00… are one code
                 const productName = p.product_name_en || p.product_name || null;
                 const sourceQuantity = typeof p.quantity === 'string' && p.quantity.trim() ? p.quantity.trim() : null;
                 const nameMatch = compareNames(name, productName);
