@@ -42,10 +42,14 @@ export async function POST(req: Request, { params }: { params: { productId: stri
             }
             
             console.error(`[Proxy] Backend error ${status}: ${errorText}`);
-            return NextResponse.json(
-                { message: 'Error from backend', details: errorText, status: status }, 
-                { status: status }
-            );
+            // Pass the backend's own reason through ("You can’t review your own product.",
+            // "This product can’t be reviewed.", …) so the form shows why, not a generic error.
+            let message = '';
+            try {
+                const body = JSON.parse(errorText);
+                message = Array.isArray(body?.message) ? body.message.join(' ') : (typeof body?.message === 'string' ? body.message : '');
+            } catch { /* not JSON */ }
+            return NextResponse.json({ message: message || undefined, status }, { status });
         }
 
         const data = await res.json();
