@@ -8,6 +8,7 @@ import { stockMovements } from './stock-ledger';
 import { PriceHistoryService } from './price-history.service';
 import { listedSince } from './listed-since';
 import { buildBrandCanon, brandKey, canonicalBrand, type BrandCanon } from './brand-canon';
+import { buildBrandCatalog, type BrandCatalog } from './brand-catalog';
 import { translateProduct } from '../common/translator';
 
 import { AiAgentService } from '../ai-agent/ai-agent.service';
@@ -1847,6 +1848,19 @@ export class ProductsService {
                 leadTime: true, basePrice: true, supplierPrice: true, supplierCurrency: true, unit: true, images: true,
             },
         });
+    }
+
+    /**
+     * Brand catalog for a supplier (brand-catalog.ts): brands on live listings
+     * plus the supplier's own, with product counts. `null` = live listings only.
+     */
+    async brandCatalogFor(supplierId: string | null): Promise<BrandCatalog> {
+        const groups = await this.prisma.product.groupBy({
+            by: ['brand'],
+            where: { brand: { not: null }, OR: [{ status: ProductStatus.APPROVED }, ...(supplierId ? [{ supplierId }] : [])] },
+            _count: { brand: true },
+        }).catch(() => [] as any[]);
+        return buildBrandCatalog(groups.map((g: any) => ({ brand: g.brand, count: g._count.brand })));
     }
 
     /** Brands already on Atlantis (live listings) plus the supplier's own — for reading a brand from a product name. */

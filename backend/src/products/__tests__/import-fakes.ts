@@ -1,11 +1,13 @@
 import { SupplierImportService } from '../supplier-import.service';
+import { buildBrandCatalog } from '../brand-catalog';
 
 /** The import service with its database, notifications, storage and photo search replaced by fakes. */
-export function fakes(existing: any[] = [], opts: { storageDown?: boolean; enrichment?: any } = {}) {
+export function fakes(existing: any[] = [], opts: { storageDown?: boolean; enrichment?: any; brands?: { brand: string; count: number }[] } = {}) {
     const created: any[] = [], updated: any[] = [], sources: any[] = [], uploads: any[] = [];
     const products: any = {
         findMineForImport: jest.fn(async () => existing),
         knownBrands: jest.fn(async () => ['Crunchy']),
+        brandCatalogFor: jest.fn(async () => buildBrandCatalog(opts.brands ?? [])),
         findOneRaw: jest.fn(async (id: string) => existing.find((e) => e.id === id) || null),
         countPendingSince: jest.fn(async () => 2),
         create: jest.fn(async (p: any) => { if (p.name === 'Explode') throw new Error('Database is down'); const id = `p${created.length + 1}`; created.push({ id, ...p }); return { id, status: p.images?.length && p.stock !== undefined ? 'PENDING' : 'DRAFT' }; }),

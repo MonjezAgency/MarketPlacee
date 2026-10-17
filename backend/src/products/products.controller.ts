@@ -37,6 +37,7 @@ import { SupabaseStorageService } from '../storage/supabase-storage.service';
 import { AiAgentService } from '../ai-agent/ai-agent.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../common/prisma.service';
+import { applyEditorCatalogFields } from './catalog-fields';
 
 @Controller('products')
 export class ProductsController {
@@ -392,6 +393,8 @@ export class ProductsController {
         } else {
             supplierId = req.user.sub;
         }
+        // Brand → canonical spelling (a new brand needs `newBrand: true`), origin → a recognised country.
+        applyEditorCatalogFields(createProductDto, await this.productsService.brandCatalogFor(isAdmin ? null : supplierId), { enforce: !isAdmin });
 
         // AI Auto-Categorization
         if (!createProductDto.category || createProductDto.category === 'General') {
@@ -586,11 +589,14 @@ export class ProductsController {
             // Parallel batches — sequential awaits on N rows used to take
             // forever for big files. We run rows in batches of 10 in parallel.
             const successResults = report.results.filter(r => r.success && r.data);
+            // Legacy upload (no review step): spellings of known brands and recognised countries are normalised; nothing else changes.
+            const brandCat = await this.productsService.brandCatalogFor(isAdmin ? null : req.user.sub);
             const BATCH_SIZE = 10;
             for (let batchStart = 0; batchStart < successResults.length; batchStart += BATCH_SIZE) {
                 const batch = successResults.slice(batchStart, batchStart + BATCH_SIZE);
                 await Promise.all(batch.map(async (result) => {
                     const dto = result.data as CreateProductDto;
+                    applyEditorCatalogFields(dto, brandCat, { enforce: false });
                     const supplierId = isAdmin ? (dto.supplierId || platformSupplierId || req.user.sub) : req.user.sub;
                     const priceInBase = dto.price ? (dto.price * rate) : 0;
 
@@ -699,6 +705,8 @@ export class ProductsController {
         // Admins bypass this gate — they edit during review and may
         // legitimately leave a field blank while triaging.
         const isAdmin = ['ADMIN', 'OWNER'].includes((req.user?.role || '').toUpperCase());
+        // Brand → canonical spelling (a new brand needs `newBrand: true`), origin → a recognised country.
+        applyEditorCatalogFields(updateProductDto, await this.productsService.brandCatalogFor(isAdmin ? null : req.user.sub), { enforce: !isAdmin });
         if (!isAdmin) {
             // Suppliers go through the shared catalog rules (draft / review /
             // live-must-stay-complete) with ownership re-checked in the service.

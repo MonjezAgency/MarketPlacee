@@ -7,6 +7,7 @@
  */
 import * as XLSX from 'xlsx';
 import { TO_EUR, MOQ_UNITS, UNIT_TYPES, barcodeProblem, invalidValues, missingForPublish, normaliseBarcode, normaliseWeight, type Missing } from './catalog-rules';
+import { originProblem, resolveOrigin } from './country-canon';
 
 export type FieldKey =
     | 'name' | 'brand' | 'category' | 'ean' | 'price' | 'piecePrice' | 'currency' | 'stock' | 'stockPieces' | 'stockPallets'
@@ -454,13 +455,22 @@ export function buildFromValues(input: Partial<Record<FieldKey, string>>, rowNum
     const variants = parseVariants(values.variants);
     if (values.variants && !variants) err('variants', 'Varieties', 'Write varieties as “Size: 330 ml | 500 ml; Flavor: Original | Zero”.');
 
+    // Country of origin: a recognised country, stored as its canonical English name. Never guessed:
+    // "Bucharest, Romania" or "EU" is left empty with a note, so the supplier chooses (see country-canon.ts).
+    let origin = values.origin || '';
+    if (origin) {
+        const o = resolveOrigin(origin);
+        if (o.kind === 'country') { if (o.changed) notes.origin = `${notes.origin ? `${notes.origin}; ` : ''}“${origin}” read as ${o.name}`; origin = o.name; }
+        else if (o.kind !== 'empty') { warnings.push(`${originProblem(origin, o)} Country of origin left empty until you choose it.`); origin = ''; }
+    }
+
     const product: any = {
         name: values.name || '',
         brand: values.brand || '',
         category: values.category || '',
         ean: ean || '',
         description: values.description || '',
-        origin: values.origin || '',
+        origin,
         exwLocation: values.exwLocation || '',
         weight: weight ? (normaliseWeight(weight) || weight) : '',
         shelfLife,

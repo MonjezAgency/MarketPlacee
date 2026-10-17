@@ -82,6 +82,13 @@ export default function ReviewStep({ review, fields, multi, sources, photoUrl, o
 
             <PhotoSearchPanel review={review} state={photos} picks={picks} onStart={onFindPhotos} updateExisting={onExisting === 'update'} />
 
+            {/* Brands not on Atlantis yet: importing is the supplier's confirmation (catalogFields section). */}
+            {(s.newBrands?.length ?? 0) > 0 && (
+                <Notice tone="warning" title={t('catalogFields', 'importNewBrandsTitle', { count: s.newBrands!.length })}>
+                    {t('catalogFields', 'importNewBrandsBody', { brands: listJoin(s.newBrands!.slice(0, 12).map((b) => `“${b}”`), meta.intl) + (s.newBrands!.length > 12 ? ' …' : '') })}
+                </Notice>
+            )}
+
             {existingCount > 0 && (
                 <div className="rounded-xl ring-1 ring-line p-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
                     <span className="text-ink-2"><Trans text={tc('existingMatch', { count: existingCount, n: fmt.number(existingCount) })} tags={{ b: (c) => <b>{c}</b> }} /></span>
