@@ -233,7 +233,6 @@ export const ar: Messages = {
         colSuppliers: "للموردين",
         colCompany: "الشركة",
         browseProducts: "تصفّح المنتجات",
-        loads: "منصّات وشاحنات وحمولات مختلطة",
         requestQuote: "اطلب عرض سعر",
         protectedPayments: "المدفوعات المحمية",
         goodsInspection: "فحص البضائع",

@@ -15,8 +15,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     // - /login and /register are gated user pages → must NOT be indexed.
     // - changeFrequency and priority hints were dropped: Google has ignored
     //   them since 2023 and they only add noise.
-    // - Shipping/returns/how-it-works/wholesale are real public pages we
-    //   want crawled.
+    // - Shipping/returns/how-it-works are real public pages we
+    //   want crawled. (/wholesale was retired; it redirects to /categories.)
     return [
         { url: `${SITE_URL}/`, lastModified },
         { url: `${SITE_URL}/categories`, lastModified },
@@ -26,7 +26,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
         { url: `${SITE_URL}/protected-payments`, lastModified },
         { url: `${SITE_URL}/goods-inspection`, lastModified },
         { url: `${SITE_URL}/warehouses`, lastModified },
-        { url: `${SITE_URL}/wholesale`, lastModified },
         { url: `${SITE_URL}/shipping`, lastModified },
         { url: `${SITE_URL}/returns`, lastModified },
         { url: `${SITE_URL}/help`, lastModified },

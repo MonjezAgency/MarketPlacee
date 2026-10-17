@@ -19,8 +19,23 @@ export function legacySupplierTarget(pathname: string): string | null {
   return '/supplier' + rest;
 }
 
+// Retired public pages and where their visitors go now (permanent, query kept).
+// /wholesale was a marketing explainer for case/pallet/truck volumes; its only
+// action was "Browse the catalog", so old links, bookmarks and search results
+// land on the catalog. The footer link and sitemap entry were removed with it.
+const RETIRED_PAGES: Record<string, string> = { '/wholesale': '/categories' };
+
+export function retiredPageTarget(pathname: string): string | null {
+  return RETIRED_PAGES[pathname.replace(/\/+$/, '') || '/'] ?? null;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  const retiredTarget = retiredPageTarget(pathname);
+  if (retiredTarget) {
+    return NextResponse.redirect(new URL(retiredTarget + request.nextUrl.search, request.url), 308);
+  }
 
   const legacyTarget = legacySupplierTarget(pathname);
   if (legacyTarget) {

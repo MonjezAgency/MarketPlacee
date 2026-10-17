@@ -236,7 +236,6 @@ export const ro: Messages = {
         colSuppliers: "Pentru furnizori",
         colCompany: "Companie",
         browseProducts: "Vedeți produsele",
-        loads: "Paleți, camioane și încărcături mixte",
         requestQuote: "Solicitați o ofertă",
         protectedPayments: "Plăți protejate",
         goodsInspection: "Inspecția mărfurilor",

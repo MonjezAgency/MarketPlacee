@@ -25,7 +25,6 @@ export default function Footer() {
     const cols: { title: string; links: { href: string; label: string }[] }[] = [
         { title: t('footer', 'colMarketplace'), links: [
             { href: '/categories', label: t('footer', 'browseProducts') },
-            { href: '/wholesale', label: t('footer', 'loads') },
             { href: '/deals', label: t('footer', 'dailyDeals') },
             { href: '/requests', label: t('footer', 'requestQuote') },
         ] },

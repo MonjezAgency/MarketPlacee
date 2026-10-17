@@ -236,7 +236,6 @@ export const fr: Messages = {
         colSuppliers: "Pour les fournisseurs",
         colCompany: "Entreprise",
         browseProducts: "Parcourir les produits",
-        loads: "Palettes, camions et chargements mixtes",
         requestQuote: "Demander un devis",
         protectedPayments: "Paiements protégés",
         goodsInspection: "Inspection des marchandises",

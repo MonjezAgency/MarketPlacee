@@ -234,7 +234,6 @@ export const en = {
         colSuppliers: "For suppliers",
         colCompany: "Company",
         browseProducts: "Browse products",
-        loads: "Pallets, trucks & mixed loads",
         requestQuote: "Request a quote",
         protectedPayments: "Protected Payments",
         goodsInspection: "Goods Inspection",
