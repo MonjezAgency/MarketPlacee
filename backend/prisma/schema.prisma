@@ -206,6 +206,15 @@ model Product {
   ///   { "<image url>": { "source": "Open Food Facts", "license": "CC BY-SA 3.0", "licenseUrl": "…", "attribution": "Open Food Facts contributors", "sourceUrl": "…", "barcode": "…", "addedAt": "ISO date" } }
   /// Null / missing key = the supplier's own photo.
   imageCredits Json?
+  /// Background photo search by barcode for a product saved without a photo (supplier must approve any result;
+  /// nothing here is ever applied automatically). Additive and optional; null = no search for this product. Shape:
+  ///   { "status": "searching" | "found_review" | "not_found" | "unavailable" | "invalid_barcode",
+  ///     "barcode": "…", "startedAt"?: ISO, "checkedAt"?: ISO, "reason"?: code, "reasons"?: [code],
+  ///     "candidates": [{ "url", "previewUrl", "source", "sourceUrl", "license", "licenseUrl", "attribution",
+  ///                      "confidence": "verified" | "needs_confirmation", "reasons": [code], "kind", "language", "width", "height" }],
+  ///     "dismissed"?: [url], "attempts"?: n }
+  /// Kept apart from `status` (ProductStatus is the review workflow; this is only a hint for the supplier).
+  imageDiscovery Json?
   // Short product demo videos — same array shape as images. Each
   // entry is a public URL: an uploaded MP4/WebM/MOV under /uploads,
   // or an https direct-link the supplier pasted. NOT YouTube/Vimeo

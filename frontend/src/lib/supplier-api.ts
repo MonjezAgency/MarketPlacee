@@ -4,6 +4,19 @@ import { apiFetch } from '@/lib/api';
 
 export interface Missing { field: string; label: string; reason: string }
 
+/** Background photo search by barcode for a product saved without a photo (Product.imageDiscovery on the server). */
+export interface DiscoveryCandidate {
+    url: string; previewUrl: string; source: string; sourceUrl: string; license: string; licenseUrl: string; attribution: string;
+    confidence: 'verified' | 'needs_confirmation'; reasons: string[];
+    kind?: string; language?: string | null; width?: number; height?: number;
+    productName?: string | null; brand?: string | null; quantity?: string | null;
+}
+export interface ImageDiscovery {
+    status: 'searching' | 'found_review' | 'not_found' | 'unavailable' | 'invalid_barcode';
+    barcode: string; startedAt?: string; checkedAt?: string; reason?: string; reasons?: string[];
+    candidates: DiscoveryCandidate[]; attempts?: number;
+}
+
 export interface SupplierProduct {
     id: string; name: string; brand: string | null; category: string; status: string; adminNotes: string | null;
     images: string[]; ean: string | null; price: number | null; basePrice: number | null; stock: number; unit: string | null;
@@ -14,12 +27,13 @@ export interface SupplierProduct {
     variants: { name: string; values: string[] }[];
     createdAt: string; updatedAt: string; reserved?: number;
     missing: Missing[]; statusNote: string;
+    imageDiscovery?: ImageDiscovery | null;
     movement?: { reserved: number; inTransit: number; delivered: number; cancelled: number; ordered: number };
 }
 
 export interface ProductPage {
     data: SupplierProduct[]; total: number; page: number; limit: number; pages: number;
-    summary: { total: number; byStatus: Record<string, number>; categories: number; outOfStock: number };
+    summary: { total: number; byStatus: Record<string, number>; categories: number; outOfStock: number; imageNeeded?: number };
     categories: string[];
 }
 
@@ -69,6 +83,11 @@ export const supplierApi = {
     resend: (id: string) => apiFetch(`/products/${id}/resend`, { method: 'PATCH' }).then((r) => json<any>(r)).then(changed),
     uploadImage: (file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/products/upload-image', { method: 'POST', body: fd }).then((r) => json<{ url: string }>(r)); },
     imageLookup: (q: { productId?: string; ean: string; name?: string; brand?: string; weight?: string }) => post('/supplier-catalog/image-lookup', q).then((r) => json<any>(r)),
+    imageDiscovery: (id: string) => apiFetch(`/supplier-catalog/products/${id}/image-discovery`, { cache: 'no-store' }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
+    retryImageDiscovery: (id: string) => post(`/supplier-catalog/products/${id}/image-discovery/retry`, {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
+    /** Use a found photo: the server copies it, adds it to the product and records its licence. Returns the saved product. */
+    acceptDiscoveredImage: (id: string, url: string) => post(`/supplier-catalog/products/${id}/image-discovery/accept`, { url }).then((r) => json<SupplierProduct>(r)),
+    dismissDiscoveredImage: (id: string, url?: string) => post(`/supplier-catalog/products/${id}/image-discovery/dismiss`, url ? { url } : {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     acceptImage: (url: string) => post('/supplier-catalog/image-lookup/accept', { url }).then((r) => json<{ url: string }>(r)),
     preferences: () => apiFetch('/supplier-catalog/preferences', { cache: 'no-store' }).then((r) => json<{ defaultCurrency: string | null; suggestedCurrency: string; effectiveCurrency: string; country: string | null; currencies: string[]; rates: Record<string, number> }>(r)),
     setPreferences: (body: { defaultCurrency: string | null }) => apiFetch('/supplier-catalog/preferences', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => json<any>(r)),

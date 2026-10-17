@@ -1752,7 +1752,7 @@ export class ProductsService {
      * The supplier's own products, paginated server-side, with stock movement
      * (cases) for the rows on the page and summary counts for the whole catalog.
      */
-    async findMine(supplierId: string, q: { q?: string; status?: string; category?: string; sort?: string; page?: string | number; limit?: string | number; stock?: string }) {
+    async findMine(supplierId: string, q: { q?: string; status?: string; category?: string; sort?: string; page?: string | number; limit?: string | number; stock?: string; attention?: string }) {
         const page = Math.max(1, Number(q.page) || 1);
         const limit = Math.min(100, Math.max(5, Number(q.limit) || 25));
         const where: any = { supplierId };
@@ -1763,6 +1763,9 @@ export class ProductsService {
         else if (wanted.length > 1) where.status = { in: [...new Set(wanted)] };
         if (q.category) where.category = q.category;
         if (q.stock === 'out') where.stock = { lte: 0 };
+        // ?attention=images: products with no real photo (none, or only a generated placeholder).
+        const imageless = await this.imagelessIds(supplierId);
+        if (q.attention === 'images') where.id = { in: imageless };
         const term = String(q.q || '').trim();
         if (term) {
             const digits = term.replace(/\D/g, '');
@@ -1786,7 +1789,7 @@ export class ProductsService {
                     id: true, name: true, brand: true, category: true, status: true, adminNotes: true, images: true, ean: true,
                     basePrice: true, price: true, stock: true, unit: true, moq: true, moqUnit: true, unitsPerCase: true,
                     casesPerPallet: true, palletsPerShipment: true, weight: true, origin: true, exwLocation: true, shelfLife: true,
-                    leadTime: true, createdAt: true, updatedAt: true, variants: true,
+                    leadTime: true, createdAt: true, updatedAt: true, variants: true, imageDiscovery: true,
                 },
             }),
             this.prisma.product.groupBy({ by: ['status'], where: { supplierId }, _count: { _all: true } }),
@@ -1809,9 +1812,18 @@ export class ProductsService {
                 byStatus: counts,
                 categories: (cats as any[]).filter((c) => c.category).length,
                 outOfStock,
+                imageNeeded: imageless.length,
             },
             categories: (cats as any[]).map((c) => c.category).filter(Boolean).sort(),
         };
+    }
+
+    /** Ids of this supplier's products without a real photo (empty, or only generated placeholders). */
+    private async imagelessIds(supplierId: string): Promise<string[]> {
+        const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+            SELECT id FROM "Product" WHERE "supplierId" = ${supplierId}
+            AND NOT EXISTS (SELECT 1 FROM unnest(images) AS u(x) WHERE x ~* '^(https?://|/uploads/)' OR (x LIKE 'data:image/%' AND x NOT LIKE 'data:image/svg+xml%'))`;
+        return rows.map((r) => r.id);
     }
 
     /** Supplier-scoped single product for the editor (404 for anyone else's). */

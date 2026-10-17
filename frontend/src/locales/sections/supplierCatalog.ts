@@ -17,7 +17,6 @@ export default defineSection('supplierCatalog', [
     "src/components/supplier/import/types.ts",
     "src/components/supplier/ProductEditor.tsx",
     "src/components/supplier/DropZone.tsx",
-    "src/components/supplier/BarcodeImageFinder.tsx",
     "src/components/supplier/PriceStockUpdateDialog.tsx",
     "src/components/supplier/StockAdjustDialog.tsx",
 ], {

@@ -11,7 +11,8 @@ import targetsPage from './targetsPage';
 import productTour from './productTour';
 import catalogFields from './catalogFields';
 import supplierOverview from './supplierOverview';
+import imageDiscovery from './imageDiscovery';
 
 /** Every area dictionary (see define.ts). Order doesn't matter; names must be unique. */
-export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, catalogImport, targetsPage, productTour, catalogFields, supplierOverview] as const;
+export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, catalogImport, targetsPage, productTour, catalogFields, supplierOverview, imageDiscovery] as const;
 export type SectionName = (typeof SECTIONS)[number]['name'];

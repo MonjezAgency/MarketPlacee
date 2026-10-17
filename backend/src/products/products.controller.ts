@@ -38,6 +38,7 @@ import { AiAgentService } from '../ai-agent/ai-agent.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../common/prisma.service';
 import { applyEditorCatalogFields } from './catalog-fields';
+import { ImageDiscoveryService } from './image-discovery.service';
 
 @Controller('products')
 export class ProductsController {
@@ -49,6 +50,8 @@ export class ProductsController {
         private readonly aiAgent: AiAgentService,
         private readonly notificationsService: NotificationsService,
         private readonly prisma: PrismaService,
+        /** Background photo search by barcode for supplier products saved without a photo. */
+        private readonly discovery?: ImageDiscoveryService,
     ) { }
 
     /**
@@ -413,7 +416,11 @@ export class ProductsController {
             supplierId,
         }, isAdmin, false, { submit, actorId: req.user.sub });
 
-        if (!isAdmin) return this.productsService.withCompleteness({ ...(product as any), price: (product as any).basePrice ?? null });
+        if (!isAdmin) {
+            // No photo but a barcode: look for one in the background (the supplier approves any result).
+            const state = await this.discovery?.enqueue((product as any).id).catch(() => null);
+            return this.productsService.withCompleteness({ ...(product as any), price: (product as any).basePrice ?? null, imageDiscovery: state ?? null });
+        }
         return plainToInstance(ProductDto, product);
     }
 
@@ -621,7 +628,12 @@ export class ProductsController {
                     // If no images provided in the row AND we have an EAN,
                     // fetch product photos from Open Food Facts → UPCItemDB
                     // → BarcodeSpider chain. White background is best-effort.
-                    if ((!dto.images || dto.images.length === 0) && (dto as any).ean) {
+                    // Suppliers: never auto-assign a photo found by a web search (EanService uses Bing and
+                    // keeps what it finds). Their products are searched in the background instead and
+                    // any photo found waits for their approval (ImageDiscoveryService).
+                    if (!isAdmin && (!dto.images || dto.images.length === 0)) {
+                        (dto as any).images = [];
+                    } else if ((!dto.images || dto.images.length === 0) && (dto as any).ean) {
                         try {
                             const fetched = await this.eanService.fetchImagesByEan(
                                 String((dto as any).ean),
@@ -648,6 +660,7 @@ export class ProductsController {
                             supplierKycStatus: isAdmin ? undefined : user?.kycStatus
                         }); // skipAi=true → no per-row Google Translate calls
                         createdProducts.push(product);
+                        if (!isAdmin && (product as any)?.id) this.discovery?.trigger((product as any).id);
                         (result as any).message = 'Created successfully';
                     } catch (e) {
                         result.success = false;
@@ -710,7 +723,10 @@ export class ProductsController {
         if (!isAdmin) {
             // Suppliers go through the shared catalog rules (draft / review /
             // live-must-stay-complete) with ownership re-checked in the service.
-            return this.productsService.supplierUpdate(id, req.user.sub, updateProductDto || {}, { submit: updateProductDto?.submit === true });
+            const saved: any = await this.productsService.supplierUpdate(id, req.user.sub, updateProductDto || {}, { submit: updateProductDto?.submit === true });
+            // Still no photo (or a new barcode): search in the background; a photo added clears old suggestions.
+            const state = await this.discovery?.enqueue(id).catch(() => undefined);
+            return state === undefined ? saved : { ...saved, imageDiscovery: state };
         }
 
         // AI Auto-Categorization on update if name changed and category is missing/General

@@ -137,7 +137,46 @@ Any of these would plug in where scanned pages are detected (`backend/src/produc
 - Each accepted photo is copied to Atlantis storage and recorded on the product (`Product.imageCredits`, additive JSON field) with its source, licence, licence link, attribution ("Open Food Facts contributors"), source page and barcode, and in the product's import record. The product page shows "Photo: Open Food Facts contributors, CC BY-SA 3.0" with links under that photo.
 - **Owner decision before relying on this in production:** ShareAlike means the photo (and adaptations of it) must stay under CC BY-SA; Atlantis must not claim exclusive rights to these images. Using packaging photos commercially can also involve trademark rights that the CC licence does not grant. The credit line is implemented; whether this use is acceptable is a legal/business decision.
 
-**Existing one-product photo search.** The photo finder in the product editor now uses the same rate-limited queue. It still does not save the source and licence with the photo it adds (a gap that predates this work; it should record credits the same way).
+### 7a. Automatic photo search for saved products
+
+**Why barcode photos were often missing (root causes found, tested against live Open Food Facts).**
+
+1. Nothing ran unless the supplier clicked: the editor finder needed a saved product and a click, the import search a click; products created without a photo just sat as drafts with no explanation.
+2. The editor finder compared barcodes literally (`code === barcode`). Open Food Facts stores a 12-digit UPC-A as its 13-digit EAN form (`0810116128839`), so UPC products were never "verified". It also asked all four databases in parallel on each click without a cache, and counted an HTTP 429/503 as an answer, reporting "no photo registered" during an outage. Accepted photos were not credited.
+3. The v3 API answers HTTP 404 `product_found_with_a_different_product_type` when a product exists in a sister database (one shared index). This was treated as "not found" and cached for 12 hours, so a product filed under another category (e.g. detergents that Open Food Facts holds) was missed.
+4. GTIN-14 case codes (24 of the 33 Prime rows) were never resolved to the item inside; a GTIN-14 with indicator 0 was not reduced to its EAN-13.
+5. The photo was chosen by language only: Red Bull 250 ml's English front is 160 × 400 px while its French front is 3024 × 4032 px. Pixel sizes in the `images` metadata were not requested.
+6. Store-internal codes (prefix 2) were looked up and matched unrelated records (2000000000015 → a Bulgarian milk).
+7. Name matching counted brand words and generic words ("ice cream", "energy drink") as agreement and ignored variant words, so "Kinder Bueno … white" was "verified" against a record named just "Kinder", and "Monster Ultra White" against "Monster Energy Ultra".
+8. The legacy `EanService` (Open Food Facts v2 + ean-search + **Bing image search**) was still called by `/products/bulk-upload`, which the old supplier dashboard uses, and stored what it found on supplier products without approval.
+
+**What happens now.**
+
+- When a supplier creates or saves a product (editor, import commit, legacy bulk upload) with a valid barcode and no photo, a background search starts (`ImageDiscoveryService`, `backend/src/products/image-discovery.service.ts`). It uses the same engine, cache (7 days found / 12 h not found) and rate-limited queue as the import review search, so rows already searched during the review are answered from the cache.
+- The outcome is stored on the product in `Product.imageDiscovery` (additive optional JSON; ProductStatus is untouched): `searching`, `found_review` (with candidates), `not_found`, `unavailable` or `invalid_barcode`, plus reasons and the time of the check. It survives reloads; searches cut short by a restart are resumed. Writing it never changes `updatedAt`.
+- **Nothing is applied automatically.** The supplier chooses "Use this photo" (editor, or one click in the product list for a verified match); an uncertain match needs a tick ("this photo shows exactly my product…") first. Accepting copies the photo to storage, adds it through the normal supplier update (draft/review rules unchanged) and records its credit in `Product.imageCredits`. A product that has a photo is never touched; acceptance is refused if a photo appeared meanwhile.
+- One search per product and barcode at a time; saving again or retrying while one runs starts nothing; an answered barcode is not searched again on the next save; "Search again" skips cached "not found" answers, with a 30-second cooldown. "Not my product" removes a photo for good for that barcode.
+- Lookups: the category's database first, then wherever the shared index points. GTIN-14 indicator 0 → its EAN-13; indicator 1–8 → the code itself, then the inner item's EAN-13 (results only ever "check before using", reason "case code"); indicator 9, EAN-13 prefix 2 / 02 / 04, UPC-A 2 / 4 and EAN-8 prefix 2 are never looked up.
+- Photo order: front packshots, then ≥ 500 px on the long side, then English, then no language, then others, then the largest (at most three fronts and one packaging photo).
+- Matching: exact GTIN (UPC/EAN-13 forms equal); brand words and generic words don't count as name agreement; variant words (zero, light, diet, decaf, white, dark) on one side only, a different size, percentage or multipack count all prevent "verified". Cleaning and personal care are never verified by a community database alone.
+- White background: **not detected.** It would need image analysis after download; nothing claims it.
+- API: `GET /supplier-catalog/products/:id/image-discovery`, `POST …/image-discovery/retry`, `POST …/image-discovery/accept {url}` (must be a stored candidate), `POST …/image-discovery/dismiss {url?}`; own products only. The list takes `?attention=images` (products without a real photo) and returns `summary.imageNeeded`.
+- The legacy bulk upload no longer fetches images for suppliers (admins unchanged).
+
+**Measured against the live databases (17 Oct 2026).** 244 rows: 13 test barcodes plus every barcode row the PDF reader extracts from the supplier PDFs (231 rows, 224 distinct codes; brands left empty as in the PDFs, category set per file). Same rows, old engine vs new engine:
+
+| | Verified | Needs review | Not found | Invalid | Unavailable |
+|---|---|---|---|---|---|
+| Before | 47 | 26 | 167 | 4 | 0 |
+| After | 38 | 59 | 143 | 4 | 0 |
+
+- 25 rows went from not found to a photo to review: 18 Prime case codes (via the inner item) and 7 cleaning products found by following the shared index.
+- 9 rows went from verified to needs review on purpose: the only "agreement" was a brand word or a generic word, or a variant word differed (e.g. "Kinder Bueno … white" vs a record named "Kinder", "Monster Ultra White" vs "Monster Energy Ultra", "Monster Ultra Rosa" vs "… zero sugar ultra rosa"). Some of these are probably right; they now need the supplier's tick.
+- 1 row went from a candidate to not found: the store-internal code 2000000000015.
+- Test barcodes: Takis Fuego, Monster The Doctor, Ferrero Rocher ice cream, Nutella 750 g, Halls, Coca-Cola 330 ml and Red Bull 250 ml are verified (Red Bull now with the 3024 × 4032 px photo instead of 160 × 400 px). Coccolino 8720181920790 is in none of the databases. 1234567890128 has a record without a photo.
+- Not found is mostly coverage, not matching: 108 Coccolino-file products, 15 drink rows, 8 water rows.
+
+**Not changed (reported):** the public, unauthenticated `GET /products/ean/:ean` and `POST /products/ean-lookup` and admin product creation still use `EanService` (Bing image search, no shared rate limit).
 
 ## 8. Verification
 

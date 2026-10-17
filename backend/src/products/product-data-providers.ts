@@ -20,16 +20,24 @@ import { normaliseBarcode } from './catalog-rules';
 
 export type ProductKind = 'food' | 'beauty' | 'household' | 'pet' | 'other';
 
-export interface ProviderPhoto { url: string; previewUrl: string; kind: 'front' | 'packaging' | 'other'; language: string | null }
+export interface ProviderPhoto {
+    url: string; previewUrl: string; kind: 'front' | 'packaging' | 'other'; language: string | null;
+    /** Pixel size of the full-size file, when the record says (Open*Facts `images` metadata). */
+    width?: number; height?: number;
+}
 export interface ProviderRecord { code: string; name: string | null; brands: string | null; quantity: string | null; categories: string[]; photos: ProviderPhoto[]; pageUrl: string }
 export type ProviderResult =
     | { status: 'found'; record: ProviderRecord }
     | { status: 'not_found' }
+    /** The shared Open*Facts index knows the code, but in another of the databases (e.g. a soft drink asked of Open Beauty Facts). */
+    | { status: 'elsewhere'; productType: string }
     | { status: 'unavailable'; reason: 'rate_limited' | 'error' | 'timeout' };
 
 export interface ProductDataProvider {
     id: string;
     label: string;
+    /** Open*Facts `product_type` this database holds (food, beauty, product, petfood), for following "elsewhere" answers. */
+    productType?: string;
     /** Shown with every candidate and stored with every accepted photo. */
     license: { images: string; imagesUrl: string; data: string; attribution: string };
     /** Hosts its images are served from (only these can be downloaded on acceptance). */
@@ -104,13 +112,14 @@ export class HostQueue {
 
 const CONTACT = process.env.PRODUCT_DATA_CONTACT || 'info@atlantisfmcg.com';
 export const USER_AGENT = `AtlantisFMCG/1.0 (${CONTACT})`;
-const FIELDS = 'code,product_name,product_name_en,brands,quantity,categories_tags,selected_images,image_front_url,image_packaging_url';
+// `images` carries the pixel size of each selected photo, so the largest usable one can be preferred.
+const FIELDS = 'code,product_name,product_name_en,brands,quantity,categories_tags,selected_images,image_front_url,image_packaging_url,images';
 
 /** Open Food Facts family: same API (v3), same licence, separate databases. */
-function openFactsProvider(o: { id: string; label: string; site: string; covers: ProductKind[]; verifies: ProductKind[] }, queue: HostQueue): ProductDataProvider {
+function openFactsProvider(o: { id: string; label: string; site: string; productType: string; covers: ProductKind[]; verifies: ProductKind[] }, queue: HostQueue): ProductDataProvider {
     const host = new URL(o.site).host.replace(/^world\./, '');
     return {
-        id: o.id, label: o.label,
+        id: o.id, label: o.label, productType: o.productType,
         license: { images: 'CC BY-SA 3.0', imagesUrl: 'https://creativecommons.org/licenses/by-sa/3.0/', data: 'ODbL 1.0', attribution: `${o.label} contributors` },
         imageHosts: [`images.${host}`, `static.${host}`],
         covers: (k) => o.covers.includes(k),
@@ -121,9 +130,12 @@ function openFactsProvider(o: { id: string; label: string; site: string; covers:
                 res = await queue.fetch(`${o.site}/api/v3/product/${encodeURIComponent(barcode)}.json?fields=${FIELDS}`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
             } catch (e: any) { return { status: 'unavailable', reason: e?.name === 'TimeoutError' ? 'timeout' : 'error' }; }
             if (res.status === 429 || res.status === 503) return { status: 'unavailable', reason: 'rate_limited' };
-            if (res.status === 404) return { status: 'not_found' };
-            if (!res.ok) return { status: 'unavailable', reason: 'error' };
+            if (res.status !== 404 && !res.ok) return { status: 'unavailable', reason: 'error' };
             const j: any = await res.json().catch(() => null);
+            // v3 answers 404 both for "no such product" and for "it is in another of the databases" (one shared index).
+            const other = openFactsElsewhere(j);
+            if (other && other !== o.productType) return { status: 'elsewhere', productType: other };
+            if (res.status === 404) return { status: 'not_found' };
             const p = j?.product;
             if (!p || j?.status === 'failure') return { status: 'not_found' };
             const photos: ProviderPhoto[] = [];
@@ -133,7 +145,7 @@ function openFactsProvider(o: { id: string; label: string; site: string; covers:
                 const key = u.replace(/\.(\d+)\.(100|200|400|full)\./, '.$1.');
                 if (seen.has(key)) return;
                 seen.add(key);
-                photos.push({ url: u.replace(/\.(\d+)\.(100|200|400)\.(jpg|png)$/i, '.$1.full.$3'), previewUrl: u, kind, language });
+                photos.push({ url: u.replace(/\.(\d+)\.(100|200|400)\.(jpg|png)$/i, '.$1.full.$3'), previewUrl: u, kind, language, ...photoSize(p.images, u) });
             };
             const sel = p.selected_images || {};
             for (const [lang, u] of Object.entries(sel.front?.display || {})) add(u, 'front', lang);
@@ -155,12 +167,60 @@ function openFactsProvider(o: { id: string; label: string; site: string; covers:
 export function buildProviders(queue: HostQueue): ProductDataProvider[] {
     return [
         // Food and drink: the main use. Verifies food only.
-        openFactsProvider({ id: 'openfoodfacts', label: 'Open Food Facts', site: 'https://world.openfoodfacts.org', covers: ['food', 'other'], verifies: ['food', 'other'] }, queue),
+        openFactsProvider({ id: 'openfoodfacts', label: 'Open Food Facts', site: 'https://world.openfoodfacts.org', productType: 'food', covers: ['food', 'other'], verifies: ['food', 'other'] }, queue),
         // Cosmetics / cleaning / pet food: asked, but never the only proof — always "check this photo".
-        openFactsProvider({ id: 'openbeautyfacts', label: 'Open Beauty Facts', site: 'https://world.openbeautyfacts.org', covers: ['beauty'], verifies: [] }, queue),
-        openFactsProvider({ id: 'openproductsfacts', label: 'Open Products Facts', site: 'https://world.openproductsfacts.org', covers: ['household'], verifies: [] }, queue),
-        openFactsProvider({ id: 'openpetfoodfacts', label: 'Open Pet Food Facts', site: 'https://world.openpetfoodfacts.org', covers: ['pet'], verifies: ['pet'] }, queue),
+        openFactsProvider({ id: 'openbeautyfacts', label: 'Open Beauty Facts', site: 'https://world.openbeautyfacts.org', productType: 'beauty', covers: ['beauty'], verifies: [] }, queue),
+        openFactsProvider({ id: 'openproductsfacts', label: 'Open Products Facts', site: 'https://world.openproductsfacts.org', productType: 'product', covers: ['household'], verifies: [] }, queue),
+        openFactsProvider({ id: 'openpetfoodfacts', label: 'Open Pet Food Facts', site: 'https://world.openpetfoodfacts.org', productType: 'petfood', covers: ['pet'], verifies: ['pet'] }, queue),
     ];
+}
+
+/** `product_found_with_a_different_product_type` → the product_type that holds it (food, beauty, product, petfood). */
+export function openFactsElsewhere(j: any): string | null {
+    if (j?.result?.id !== 'product_found_with_a_different_product_type') return null;
+    const e = (Array.isArray(j?.errors) ? j.errors : []).find((x: any) => x?.field?.id === 'product_type');
+    const v = String(e?.field?.value || '').trim();
+    return /^[a-z]{3,20}$/.test(v) ? v : null;
+}
+
+/** Full-size pixel size of a selected photo (…/front_en.14.400.jpg → images.front_en of the same revision). */
+export function photoSize(images: any, url: string): { width?: number; height?: number } {
+    const m = /\/((?:front|packaging)_[a-z]{2,3})\.(\d+)\.(?:100|200|400|full)\.(?:jpg|png)$/i.exec(url);
+    const meta = m && images && typeof images === 'object' ? images[m[1]] : null;
+    if (!m || !meta || String(meta.rev) !== m[2]) return {};
+    const w = Number(meta?.sizes?.full?.w), h = Number(meta?.sizes?.full?.h);
+    return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 ? { width: w, height: h } : {};
+}
+
+// ─── Barcode forms ────────────────────────────────────────────────────
+
+const checkDigit = (body: string) => {
+    const sum = body.split('').reverse().reduce((s, d, i) => s + Number(d) * (i % 2 === 0 ? 3 : 1), 0);
+    return String((10 - (sum % 10)) % 10);
+};
+
+/**
+ * What to ask the databases for a valid barcode, and what must never be looked up.
+ *  - GTIN-14 with indicator 0 is the same item as its last 13 digits: the EAN-13 is asked.
+ *  - GTIN-14 with indicator 1–8 identifies a case/pack of an inner item. The code is asked as it is;
+ *    if no database has it, the inner item's EAN-13 (digits 2–13 plus a recomputed check digit) is
+ *    asked, and anything found that way is only ever "check before using" (it shows the piece).
+ *  - Indicator 9 (variable measure), EAN-13 prefix 2 and 02/04, UPC-A number systems 2 and 4 and
+ *    EAN-8 prefix 2 are store-internal / random-weight codes: different products in different
+ *    shops, so they are never looked up. (EAN-8 prefix 0 is left alone: UPC-E codes look the same.)
+ */
+export function lookupPlan(raw: string): { code: string; inner?: string; skip?: 'internal_code' | 'variable_measure' } {
+    let code = normaliseBarcode(raw);
+    if (code.length === 14 && code[0] === '0') code = code.slice(1);
+    if (code.length === 14) {
+        if (code[0] === '9') return { code, skip: 'variable_measure' };
+        const body = code.slice(1, 13);
+        return { code, inner: body + checkDigit(body) };
+    }
+    if (code.length === 8 && code[0] === '2') return { code, skip: 'internal_code' };
+    if (code.length === 12 && /^[24]/.test(code)) return { code, skip: 'internal_code' };
+    if (code.length === 13 && (/^2/.test(code) || /^0[24]/.test(code))) return { code, skip: 'internal_code' };
+    return { code };
 }
 
 /** Same product code? UPC-A 012345678905 and EAN-13 0012345678905 are the same GTIN. */
