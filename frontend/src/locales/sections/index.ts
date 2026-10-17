@@ -9,5 +9,9 @@ import legacySupplier from './legacySupplier';
 import catalogImport from './catalogImport';
 import targetsPage from './targetsPage';
 import productTour from './productTour';
+import catalogFields from './catalogFields';
+import supplierOverview from './supplierOverview';
+
+/** Every area dictionary (see define.ts). Order doesn't matter; names must be unique. */
 export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, catalogImport, targetsPage, productTour, catalogFields, supplierOverview] as const;
 export type SectionName = (typeof SECTIONS)[number]['name'];
