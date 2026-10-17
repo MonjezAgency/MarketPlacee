@@ -26,7 +26,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import { UserMenu } from '@/components/dashboard/UserMenu';
-import { apiFetch } from '@/lib/api';
+import { supplierApi, SUPPLIER_DATA_CHANGED, type SupplierAttention } from '@/lib/supplier-api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LOCALES, LOCALE_META } from '@/locales/config';
 import { ProductTour } from '@/components/onboarding/ProductTour';
@@ -65,10 +65,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     const router = useRouter();
     const { t, dir, fmt } = useLanguage();
     const tr = (key: string, vars?: Record<string, string | number>) => t('supplierShell', key, vars);
-    const [pendingCounts, setPendingCounts] = React.useState<Record<string, number>>({
-        orders: 0,
-        products: 0
-    });
+    const [attention, setAttention] = React.useState<SupplierAttention | null>(null);
 
     // Auto-collapse sidebar on smaller screens
     React.useEffect(() => {
@@ -99,39 +96,47 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
     // (A header stats poll of /dashboard/supplier used to run here every 60 s; its result was never
     // shown and the response carries buyer-price revenue — see the gap register, SUP findings.)
 
-    // Counts Polling
-    React.useEffect(() => {
-        const fetchCounts = async () => {
-            try {
-                const [ordersRes, prodsRes] = await Promise.all([
-                    apiFetch('/supplier-catalog/overview?from=' + new Date(Date.now() - 86400000).toISOString().slice(0, 10)),
-                    apiFetch('/supplier-catalog/products?limit=5'),
-                ]);
-
-                let oCount = 0;
-                let pCount = 0;
-
-                // Orders badge = orders waiting for this supplier to confirm.
-                if (ordersRes.ok) {
-                    const data = await ordersRes.json();
-                    oCount = Number(data?.awaitingConfirmation) || 0;
-                }
-                // Products badge = listings Atlantis asked to change.
-                if (prodsRes.ok) {
-                    const data = await prodsRes.json();
-                    pCount = Number(data?.summary?.byStatus?.NEEDS_CHANGES) || 0;
-                }
-
-                setPendingCounts({ orders: oCount, products: pCount });
-            } catch (err) {
-                console.error('Failed to fetch sidebar counts:', err);
-            }
-        };
-
-        fetchCounts();
-        const interval = setInterval(fetchCounts, 60000);
-        return () => clearInterval(interval);
+    // Navigation badges (GET /supplier-catalog/attention): products needing the supplier
+    // (draft, rejected, needs changes — each product once) and order requests awaiting
+    // their confirmation. Refreshed on navigation, when the window regains focus, after
+    // product/order changes made through supplierApi, and every minute while visible.
+    const isSupplier = user?.role?.toUpperCase() === 'SUPPLIER';
+    const refreshAttention = React.useCallback(() => {
+        supplierApi.attention().then(setAttention).catch(() => { /* keep the last known counts */ });
     }, []);
+    React.useEffect(() => { if (isSupplier) refreshAttention(); }, [isSupplier, pathname, refreshAttention]);
+    React.useEffect(() => {
+        if (!isSupplier) return;
+        const onFocus = () => refreshAttention();
+        const onVisible = () => { if (document.visibilityState === 'visible') refreshAttention(); };
+        window.addEventListener('focus', onFocus);
+        window.addEventListener(SUPPLIER_DATA_CHANGED, onFocus);
+        document.addEventListener('visibilitychange', onVisible);
+        const interval = setInterval(() => { if (document.visibilityState === 'visible') refreshAttention(); }, 60_000);
+        return () => {
+            window.removeEventListener('focus', onFocus);
+            window.removeEventListener(SUPPLIER_DATA_CHANGED, onFocus);
+            document.removeEventListener('visibilitychange', onVisible);
+            clearInterval(interval);
+        };
+    }, [isSupplier, refreshAttention]);
+
+    /**
+     * Badge for a nav item: the count, its accessible label and the filtered view it opens.
+     * Products: on "Inventory & Products" (/supplier/products), where drafts, rejections and
+     * requested changes are resolved — not "Stock & Reservations", which is stock only.
+     */
+    const badgeFor = (key?: string): { count: number; label: string; href: string } | null => {
+        if (!attention || !key) return null;
+        if (key === 'products' && attention.products.total > 0) {
+            const p = attention.products;
+            return { count: p.total, href: '/supplier/products?status=DRAFT,NEEDS_CHANGES,REJECTED', label: t('supplierOverview', 'navProductsBadgeAria', { total: p.total, drafts: p.drafts, rejected: p.rejected, changes: p.needsChanges }) };
+        }
+        if (key === 'orders' && attention.ordersAwaiting > 0) {
+            return { count: attention.ordersAwaiting, href: '/supplier/orders?view=action', label: t('supplierOverview', 'navOrdersBadgeAria', { count: attention.ordersAwaiting }) };
+        }
+        return null;
+    };
 
     if (!isAuthReady || (user && user.role?.toUpperCase() !== 'SUPPLIER')) {
         return (
@@ -176,10 +181,10 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                         const Icon = link.icon;
                         const label = tr(link.labelKey);
                         const isActive = isLinkActive(pathname, link.href);
-                        const badgeCount = link.key ? pendingCounts[link.key] : 0;
+                        const badge = badgeFor(link.key);
                         return (
+                            <div key={link.href} className="relative">
                             <Link
-                                key={link.href}
                                 href={link.href}
                                 data-tour={link.tour}
                                 aria-current={isActive ? 'page' : undefined}
@@ -191,13 +196,16 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             >
                                 {isActive && <span aria-hidden className="absolute start-0 top-2 bottom-2 w-[3px] rounded-full bg-[#2EC4B6]" />}
                                 <Icon size={18} strokeWidth={1.9} className={cn("shrink-0", isActive ? "text-[#2EC4B6]" : "text-[#7C8BA1] group-hover:text-white")} />
-                                {isOpen && <span className="text-[13.5px] font-medium flex-1 truncate">{label}</span>}
-                                {badgeCount > 0 && (
-                                    <span className={cn("min-w-[20px] h-5 px-1.5 rounded-full bg-[#F59E0B] text-[#111827] text-[11px] font-bold flex items-center justify-center", !isOpen && "absolute top-0.5 end-0.5 min-w-[16px] h-4 text-[10px]")} aria-label={tr('needAttention', { count: badgeCount })}>
-                                        {fmt.number(badgeCount)}
-                                    </span>
-                                )}
+                                {isOpen && <span className={cn("text-[13.5px] font-medium flex-1 truncate", badge && "pe-8")}>{label}</span>}
                             </Link>
+                            {badge && (
+                                <Link href={badge.href} aria-label={badge.label} title={badge.label}
+                                    className={cn("absolute rounded-full bg-[#F59E0B] text-[#111827] font-bold flex items-center justify-center tabular-nums hover:bg-[#FBBF24] outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]",
+                                        isOpen ? "top-2.5 end-2 min-w-[20px] h-5 px-1.5 text-[11px]" : "top-0.5 end-0.5 min-w-[16px] h-4 px-1 text-[10px]")}>
+                                    {fmt.number(badge.count)}
+                                </Link>
+                            )}
+                            </div>
                         );
                     })}
                 </nav>
@@ -320,17 +328,25 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             <nav aria-label={tr('navAria')} className="flex-1 p-4 space-y-1">
                                 {SUPPLIER_LINKS.map((link) => {
                                     const active = isLinkActive(pathname, link.href);
+                                    const badge = badgeFor(link.key);
                                     return (
+                                        <div key={link.href} className="relative">
                                         <Link
-                                            key={link.href}
                                             href={link.href}
                                             aria-current={active ? 'page' : undefined}
                                             onClick={() => setIsMobileOpen(false)}
                                             className={cn("flex items-center gap-3 h-11 px-3 rounded-lg transition-colors", active ? "bg-white/[0.08] text-white" : "text-[#A3B1C6] hover:text-white")}
                                         >
                                             <link.icon size={18} className={active ? "text-[#2EC4B6]" : undefined} />
-                                            <span className="text-[14px] font-medium">{tr(link.labelKey)}</span>
+                                            <span className={cn("text-[14px] font-medium", badge && "pe-12")}>{tr(link.labelKey)}</span>
                                         </Link>
+                                        {badge && (
+                                            <Link href={badge.href} aria-label={badge.label} onClick={() => setIsMobileOpen(false)}
+                                                className="absolute top-0 end-0 h-11 min-w-[44px] px-2 flex items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] rounded-lg">
+                                                <span className="min-w-[22px] h-[22px] px-1.5 rounded-full bg-[#F59E0B] text-[#111827] text-[11px] font-bold flex items-center justify-center tabular-nums">{fmt.number(badge.count)}</span>
+                                            </Link>
+                                        )}
+                                        </div>
                                     );
                                 })}
                             </nav>
