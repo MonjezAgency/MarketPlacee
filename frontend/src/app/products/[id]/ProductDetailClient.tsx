@@ -931,7 +931,7 @@ export default function ProductDetailClient() {
                                                     </span>
                                                 </span>
                                                 <span className="block mt-0.5 text-[12px] text-ink-3">{opt.contents}</span>
-                                                {showPrices && <span className="block mt-1 text-[12.5px] text-ink-2 tabular-nums"><span className="font-semibold">{formatPrice(opt.perCasePrice)}</span> / case</span>}
+                                                {showPrices && <span className="block mt-1 text-[12.5px] text-ink-2 tabular-nums"><span className="font-semibold">{formatPrice(discountPct > 0 ? round2(opt.rawPerCase * (1 - discountPct / 100)) : opt.perCasePrice)}</span> / case</span>}
                                             </button>
                                         );
                                     })}

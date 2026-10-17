@@ -86,6 +86,8 @@ function mapProduct(item: any): Product {
         images: item.images || [],
         // Licence and source of photos that aren't the supplier's own (shown with the photo on the PDP).
         imageCredits: item.imageCredits ?? null,
+        // Running special offer from the server ({id, discountPercent, startsAt, endsAt}); prices stay undiscounted here.
+        promotion: item.promotion ?? null,
         // Videos array — short product demo clips. Falls through to []
         // for legacy rows that don't carry the field.
         videos: item.videos || [],
