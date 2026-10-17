@@ -35,9 +35,16 @@ export class SupplierCatalogController {
         private readonly enrich: ImportEnrichmentService,
     ) {}
 
+    /** ?range=3d|7d|30d|12m|custom&from=YYYY-MM-DD&to=YYYY-MM-DD&tz=<IANA> — boundaries are resolved on the server (report-range.ts). */
     @Get('overview')
-    overview(@Request() req, @Query('from') from?: string, @Query('to') to?: string) {
-        return this.overviewSvc.overview(req.user.sub, from, to);
+    overview(@Request() req, @Query('range') range?: string, @Query('from') from?: string, @Query('to') to?: string, @Query('tz') tz?: string) {
+        return this.overviewSvc.overview(req.user.sub, { range, from, to, tz });
+    }
+
+    /** Navigation badges: products needing the supplier (draft / rejected / needs changes) and orders awaiting their confirmation. */
+    @Get('attention')
+    attention(@Request() req) {
+        return this.overviewSvc.attention(req.user.sub);
     }
 
     @Get('products')

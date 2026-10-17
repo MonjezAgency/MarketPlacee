@@ -1756,7 +1756,10 @@ export class ProductsService {
         const limit = Math.min(100, Math.max(5, Number(q.limit) || 25));
         const where: any = { supplierId };
         const statuses = ['DRAFT', 'PENDING', 'APPROVED', 'NEEDS_CHANGES', 'REJECTED'];
-        if (q.status && statuses.includes(String(q.status).toUpperCase())) where.status = String(q.status).toUpperCase();
+        // One status, or several comma-separated (e.g. DRAFT,NEEDS_CHANGES,REJECTED — the "needs attention" link).
+        const wanted = String(q.status || '').toUpperCase().split(',').map((s) => s.trim()).filter((s) => statuses.includes(s));
+        if (wanted.length === 1) where.status = wanted[0];
+        else if (wanted.length > 1) where.status = { in: [...new Set(wanted)] };
         if (q.category) where.category = q.category;
         if (q.stock === 'out') where.stock = { lte: 0 };
         const term = String(q.q || '').trim();

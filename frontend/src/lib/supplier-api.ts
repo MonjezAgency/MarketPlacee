@@ -42,8 +42,19 @@ async function json<T>(res: Response): Promise<T> {
 
 const post = (path: string, body: unknown) => apiFetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
+/** Fired after a supplier changes products or answers an order, so the navigation badges refresh. */
+export const SUPPLIER_DATA_CHANGED = 'atl:supplier-data-changed';
+function changed<T>(value: T): T {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(SUPPLIER_DATA_CHANGED));
+    return value;
+}
+
+export interface SupplierAttention { products: { total: number; drafts: number; rejected: number; needsChanges: number }; ordersAwaiting: number; asOf: string }
+
 export const supplierApi = {
-    overview: (from: string, to: string) => apiFetch(`/supplier-catalog/overview?from=${from}&to=${to}`, { cache: 'no-store' }).then((r) => json<any>(r)),
+    /** Period resolved on the server: { range: '3d'|'7d'|'30d'|'12m' } or { range: 'custom', from, to } (YYYY-MM-DD, inclusive). */
+    overview: (q: { range: string; from?: string; to?: string }) => apiFetch(`/supplier-catalog/overview?${new URLSearchParams(q as Record<string, string>)}`, { cache: 'no-store' }).then((r) => json<any>(r)),
+    attention: () => apiFetch('/supplier-catalog/attention', { cache: 'no-store' }).then((r) => json<SupplierAttention>(r)),
     products: (q: Record<string, string | number | undefined>) => {
         const p = new URLSearchParams();
         for (const [k, v] of Object.entries(q)) if (v !== undefined && v !== '') p.set(k, String(v));
@@ -51,11 +62,11 @@ export const supplierApi = {
     },
     product: (id: string) => apiFetch(`/supplier-catalog/products/${id}`, { cache: 'no-store' }).then((r) => json<SupplierProduct>(r)),
     history: (id: string) => apiFetch(`/supplier-catalog/products/${id}/history`, { cache: 'no-store' }).then((r) => json<any[]>(r)),
-    create: (body: any) => post('/products', body).then((r) => json<SupplierProduct>(r)),
-    update: (id: string, body: any) => apiFetch(`/products/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => json<SupplierProduct>(r)),
-    remove: (id: string) => apiFetch(`/products/${id}`, { method: 'DELETE' }).then((r) => json<any>(r)),
-    removeMany: (ids: string[]) => post('/products/bulk-delete', { ids }).then((r) => json<{ count: number; skipped: number }>(r)),
-    resend: (id: string) => apiFetch(`/products/${id}/resend`, { method: 'PATCH' }).then((r) => json<any>(r)),
+    create: (body: any) => post('/products', body).then((r) => json<SupplierProduct>(r)).then(changed),
+    update: (id: string, body: any) => apiFetch(`/products/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => json<SupplierProduct>(r)).then(changed),
+    remove: (id: string) => apiFetch(`/products/${id}`, { method: 'DELETE' }).then((r) => json<any>(r)).then(changed),
+    removeMany: (ids: string[]) => post('/products/bulk-delete', { ids }).then((r) => json<{ count: number; skipped: number }>(r)).then(changed),
+    resend: (id: string) => apiFetch(`/products/${id}/resend`, { method: 'PATCH' }).then((r) => json<any>(r)).then(changed),
     uploadImage: (file: File) => { const fd = new FormData(); fd.append('file', file); return apiFetch('/products/upload-image', { method: 'POST', body: fd }).then((r) => json<{ url: string }>(r)); },
     imageLookup: (q: { productId?: string; ean: string; name?: string; brand?: string; weight?: string }) => post('/supplier-catalog/image-lookup', q).then((r) => json<any>(r)),
     acceptImage: (url: string) => post('/supplier-catalog/image-lookup/accept', { url }).then((r) => json<{ url: string }>(r)),
@@ -63,7 +74,7 @@ export const supplierApi = {
     setPreferences: (body: { defaultCurrency: string | null }) => apiFetch('/supplier-catalog/preferences', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => json<any>(r)),
     inventory: () => apiFetch('/products/inventory', { cache: 'no-store' }).then((r) => json<any[]>(r)),
     updatesPreview: (body: any) => post('/supplier-catalog/updates/preview', body).then((r) => json<any>(r)),
-    updatesCommit: (body: any) => post('/supplier-catalog/updates/commit', body).then((r) => json<any>(r)),
+    updatesCommit: (body: any) => post('/supplier-catalog/updates/commit', body).then((r) => json<any>(r)).then(changed),
     reputation: () => apiFetch('/supplier-catalog/reputation', { cache: 'no-store' }).then((r) => json<any>(r)),
     importSchema: () => apiFetch('/supplier-catalog/import/schema').then((r) => json<any>(r)),
     /** One-sheet read, used by the price & stock update file. */
@@ -78,11 +89,11 @@ export const supplierApi = {
         const fd = new FormData();
         fd.append('payload', JSON.stringify(payload));
         for (const p of photos) fd.append('photos', p.blob, p.path.split('/').pop() || 'photo');
-        return apiFetch('/supplier-catalog/import/commit', { method: 'POST', body: fd }).then((r) => json<any>(r));
+        return apiFetch('/supplier-catalog/import/commit', { method: 'POST', body: fd }).then((r) => json<any>(r)).then(changed);
     },
     orders: () => apiFetch('/orders/my-orders', { cache: 'no-store' }).then((r) => json<any[]>(r)),
-    acceptOrder: (id: string) => apiFetch(`/orders/${id}/supplier-accept`, { method: 'POST' }).then((r) => json<any>(r)),
-    declineOrder: (id: string, reason: string) => post(`/orders/${id}/supplier-decline`, { reason }).then((r) => json<any>(r)),
+    acceptOrder: (id: string) => apiFetch(`/orders/${id}/supplier-accept`, { method: 'POST' }).then((r) => json<any>(r)).then(changed),
+    declineOrder: (id: string, reason: string) => post(`/orders/${id}/supplier-decline`, { reason }).then((r) => json<any>(r)).then(changed),
 };
 
 /** Today and N days back as YYYY-MM-DD (UTC, matching the server's day buckets). */
