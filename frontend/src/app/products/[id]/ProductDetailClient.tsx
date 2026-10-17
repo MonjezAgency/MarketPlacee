@@ -1038,7 +1038,7 @@ export default function ProductDetailClient() {
                                         <button type="button"
                                             onClick={() => { if (!isLoggedIn) { router.push('/auth/login?redirect=' + encodeURIComponent(window.location.pathname)); return; } setTargetOpen(true); }}
                                             className="sm:w-auto h-10 px-4 rounded-xl ring-1 ring-line-strong hover:ring-ink text-[13.5px] font-semibold text-heading inline-flex items-center justify-center gap-2 transition-shadow">
-                                            <Target size={16} /> {isLoggedIn ? 'Set target price' : 'Sign in to set a target price'}
+                                            <Target size={16} /> {t('targetPrice', isLoggedIn ? 'setTarget' : 'signInTarget')}
                                         </button>
                                     )}
                                     <Link href={quoteHref} className="sm:w-auto h-10 px-4 rounded-xl ring-1 ring-line-strong hover:ring-ink text-[13.5px] font-semibold text-heading inline-flex items-center justify-center gap-2 transition-shadow">

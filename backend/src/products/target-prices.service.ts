@@ -5,6 +5,7 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../email/email.service';
 import { TO_EUR } from './catalog-rules';
 import { buyerCasePrice, minOrderCases, readMarkups } from '../common/markups';
+import { countryName, resolveCountry } from '../shipping/delivery-policy';
 
 export const TP_STAFF = ['ADMIN', 'OWNER', 'MODERATOR', 'SUPPORT'];
 const OPEN = ['OPEN', 'RESPONDED'];
@@ -17,6 +18,8 @@ export interface TargetPriceInput {
     quantity: number | string;
     quantityUnit?: 'CASE' | 'PALLET' | 'TRUCK';
     message?: string;
+    /** ISO 3166-1 alpha-2 (or a country name), optional. */
+    deliveryCountry?: string;
     idempotencyKey?: string;
 }
 
@@ -41,7 +44,7 @@ export class TargetPricesService {
             id: r.id, ref: r.ref, status: r.status, createdAt: r.createdAt, updatedAt: r.updatedAt,
             product: r.product ? { id: r.product.id, name: r.product.name, ean: r.product.ean, image: (r.product.images || []).find((x: string) => /^https?:/.test(x)) || null } : null,
             targetCasePrice: r.targetCasePrice, enteredPrice: r.enteredPrice, enteredBasis: r.enteredBasis, currency: r.currency,
-            quantity: r.quantity, quantityUnit: r.quantityUnit, quantityCases: r.quantityCases, message: r.message,
+            quantity: r.quantity, quantityUnit: r.quantityUnit, quantityCases: r.quantityCases, message: r.message, deliveryCountry: r.deliveryCountry ?? null,
             response: r.response, counterCasePrice: r.counterCasePrice, respondedAt: r.respondedAt,
             history: (r.history || []).map((h: any) => ({ status: h.status, at: h.at, note: h.note ?? null })),
         };
@@ -82,6 +85,12 @@ export class TargetPricesService {
         const minCases = minOrderCases(p);
         if (minCases && quantityCases < minCases) throw new BadRequestException(`The minimum order for this product is ${p.moq} ${String(p.moqUnit || '').toLowerCase()}(s) (${minCases} cases).`);
         const message = typeof input.message === 'string' ? input.message.trim().slice(0, 1000) : '';
+        // Optional delivery country: must be one country from the shared list; never guessed.
+        let deliveryCountry: string | null = null;
+        if (input.deliveryCountry != null && String(input.deliveryCountry).trim()) {
+            deliveryCountry = resolveCountry(String(input.deliveryCountry));
+            if (!deliveryCountry) throw new BadRequestException('Choose the delivery country from the list.');
+        }
 
         const open = await (this.prisma as any).targetPriceRequest.findFirst({ where: { buyerId: buyer.id, productId: p.id, status: { in: OPEN } } });
         if (open) throw new ConflictException({ code: 'TARGET_EXISTS', message: `You already have an open target price for this product (${open.ref}). Withdraw it to send a new one.`, ref: open.ref, id: open.id });
@@ -92,7 +101,7 @@ export class TargetPricesService {
             created = await (this.prisma as any).targetPriceRequest.create({
                 data: {
                     ref: this.ref(), productId: p.id, buyerId: buyer.id, targetCasePrice, enteredPrice: price, enteredBasis: basis, currency,
-                    quantity: qty, quantityUnit: unit, quantityCases, message: message || null, idempotencyKey: key,
+                    quantity: qty, quantityUnit: unit, quantityCases, message: message || null, deliveryCountry, idempotencyKey: key,
                     history: [{ status: 'OPEN', at: now, by: buyer.id, note: 'Submitted' }],
                 },
                 include: { product: true },
@@ -105,7 +114,7 @@ export class TargetPricesService {
             throw e;
         }
         const listed = buyerCasePrice(p, await readMarkups(this.prisma));
-        this.notifications.notifyAdmins('New target price', `${created.ref}: ${p.name} — target €${targetCasePrice.toFixed(2)}/case for ${quantityCases} cases${listed ? ` (listed €${listed.toFixed(2)})` : ''}.`, 'INFO', { targetPriceRequestId: created.id, productId: p.id }).catch(() => {});
+        this.notifications.notifyAdmins('New target price', `${created.ref}: ${p.name} — target €${targetCasePrice.toFixed(2)}/case for ${quantityCases} cases${deliveryCountry ? ` to ${countryName(deliveryCountry)}` : ''}${listed ? ` (listed €${listed.toFixed(2)})` : ''}.`, 'INFO', { targetPriceRequestId: created.id, productId: p.id }).catch(() => {});
         return this.buyerView(created);
     }
 

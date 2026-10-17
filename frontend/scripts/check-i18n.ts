@@ -48,7 +48,7 @@ const IDENTICAL_EVERYWHERE: Record<string, string> = {
     'ads.cocaColaTitle': 'brand name',
 };
 const IDENTICAL_OK: Partial<Record<Locale, Record<string, string>>> = {
-    fr: { 'orders.cartons': '"carton(s)" is the French word (glossary)', 'orders.lineCarton': '"carton(s)" is the French word (glossary)', 'workflow.unitCarton': '"carton" is the French word (glossary)', 'workflow.version': '"version" is the French word' },
+    fr: { 'orders.cartons': '"carton(s)" is the French word (glossary)', 'orders.lineCarton': '"carton(s)" is the French word (glossary)', 'workflow.unitCarton': '"carton" is the French word (glossary)', 'workflow.version': '"version" is the French word', 'targetPrice.message': '"message" is the French word' },
     ro: { 'categories.unisex': 'standard Romanian word', 'userMenu.moderator': 'the Romanian word for the role' },
     it: { 'workflow.unitPallet': '"pallet" is the Italian term (glossary)' },
     es: { 'categories.unisex': 'standard Spanish word', 'cart.subtotal': 'standard Spanish checkout term' },

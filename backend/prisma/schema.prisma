@@ -1160,6 +1160,8 @@ model TargetPriceRequest {
   quantityUnit    String                     // CASE | PALLET | TRUCK
   quantityCases   Int
   message         String?
+  // Where the buyer wants the goods (ISO 3166-1 alpha-2), optional. Additive; null on older requests.
+  deliveryCountry String?
   // OPEN → RESPONDED (counter / info) → ACCEPTED | DECLINED; or WITHDRAWN by the buyer.
   status          String    @default("OPEN")
   response        String?
