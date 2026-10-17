@@ -255,7 +255,7 @@ export default function SupplierOverviewPage() {
                     <Tile label={tr('tChanges')} hint={tr('tChangesHint')} value={inv?.needsChanges} tone="warning" loading={first} href="/supplier/products?status=NEEDS_CHANGES" fmt={fmt} />
                     <Tile label={tr('tRejected')} hint={tr('tRejectedHint')} value={inv?.rejected} tone="danger" loading={first} href="/supplier/products?status=REJECTED" fmt={fmt} />
                     <Tile label={tr('tMissing')} hint={tr('tMissingHint')} value={inv?.missingInfo} tone="warning" loading={first} fmt={fmt} />
-                    <Tile label={tr('tImages')} hint={tr('tImagesHint')} value={inv?.missingImages} tone="warning" loading={first} fmt={fmt} />
+                    <Tile label={tr('tImages')} hint={tr('tImagesHint')} value={inv?.missingImages} tone="warning" loading={first} href="/supplier/products?attention=images" fmt={fmt} />
                     <Tile label={tr('tOut')} hint={tr('tOutHint')} value={inv?.outOfStock} tone="danger" loading={first} href="/supplier/products?status=APPROVED&stock=out" fmt={fmt} />
                     <Tile label={tr('tBelow')} hint={tr('tBelowHint')} value={inv?.belowMinOrder} tone="warning" loading={first} fmt={fmt} />
                     <li className="rounded-xl border border-dashed border-line px-4 py-3 text-[12px] leading-5 text-ink-3 flex gap-2">

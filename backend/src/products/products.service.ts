@@ -1763,7 +1763,8 @@ export class ProductsService {
         else if (wanted.length > 1) where.status = { in: [...new Set(wanted)] };
         if (q.category) where.category = q.category;
         if (q.stock === 'out') where.stock = { lte: 0 };
-        // ?attention=images: products with no real photo (none, or only a generated placeholder).
+        // ?attention=images: products with no real photo (none, or only a generated placeholder), rejected
+        // listings excluded — the same rule as the overview's "Missing images" tile.
         const imageless = await this.imagelessIds(supplierId);
         if (q.attention === 'images') where.id = { in: imageless };
         const term = String(q.q || '').trim();
@@ -1821,7 +1822,7 @@ export class ProductsService {
     /** Ids of this supplier's products without a real photo (empty, or only generated placeholders). */
     private async imagelessIds(supplierId: string): Promise<string[]> {
         const rows = await this.prisma.$queryRaw<{ id: string }[]>`
-            SELECT id FROM "Product" WHERE "supplierId" = ${supplierId}
+            SELECT id FROM "Product" WHERE "supplierId" = ${supplierId} AND status <> 'REJECTED'
             AND NOT EXISTS (SELECT 1 FROM unnest(images) AS u(x) WHERE x ~* '^(https?://|/uploads/)' OR (x LIKE 'data:image/%' AND x NOT LIKE 'data:image/svg+xml%'))`;
         return rows.map((r) => r.id);
     }
