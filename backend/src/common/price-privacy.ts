@@ -17,6 +17,8 @@ export type Viewer = { id?: string; role?: string } | null | undefined;
 
 export const PRICE_STAFF = ['ADMIN', 'OWNER', 'MODERATOR', 'EDITOR', 'SUPPORT', 'DEVELOPER'];
 export const isPriceStaff = (v: Viewer) => PRICE_STAFF.includes(String(v?.role || '').toUpperCase());
+/** Supplier accounts: never shown buyer prices on buyer-demand views (Targets, price history). */
+export const isSupplierViewer = (v: Viewer) => !!v?.id && String(v?.role || '').toUpperCase() === 'SUPPLIER';
 
 const r4 = (n: number) => Math.round(n * 10000) / 10000;
 const isProductLike = (o: any) => o && typeof o === 'object' && !Array.isArray(o) && ('basePrice' in o || 'variantPrices' in o || 'supplierPrice' in o);

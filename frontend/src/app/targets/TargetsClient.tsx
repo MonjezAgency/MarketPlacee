@@ -58,8 +58,8 @@ function Section({ title, children, defaultOpen = true }: { title: string; child
     );
 }
 
-function TargetCard({ t: target, markups, signedIn, watched, onWatch, busy }: {
-    t: BuyerTarget; markups: Markups; signedIn: boolean; watched: boolean; busy: boolean; onWatch: () => void;
+function TargetCard({ t: target, markups, signedIn, isSupplier, watched, onWatch, busy }: {
+    t: BuyerTarget; markups: Markups; signedIn: boolean; isSupplier: boolean; watched: boolean; busy: boolean; onWatch: () => void;
 }) {
     const { t } = useLanguage();
     const tt = (k: string, v?: Record<string, string | number>) => t('targetsPage', k, v);
@@ -99,7 +99,7 @@ function TargetCard({ t: target, markups, signedIn, watched, onWatch, busy }: {
                 <p className="mt-1 text-[13px] text-ink-3 tabular-nums tracking-wide min-h-[1.5em]">{p.ean ? <bdi dir="ltr">{p.ean}</bdi> : null}</p>
                 <div className="mt-auto pt-3 flex items-center justify-between gap-2 text-[13px]">
                     <span className="text-ink-3">
-                        {price !== null ? <Trans text={tt('fromPrice', { price: formatPrice(price) })} tags={{ b: (c) => <span className="font-bold text-ink tabular-nums">{c}</span> }} /> : tt('signInForPrice')}
+                        {price !== null ? <Trans text={tt('fromPrice', { price: formatPrice(price) })} tags={{ b: (c) => <span className="font-bold text-ink tabular-nums">{c}</span> }} /> : isSupplier ? tt('supplierNoPrice') : tt('signInForPrice')}
                     </span>
                     <span className="text-ink-3 tabular-nums">{tt('offers', { count: target.approvedOffers })}</span>
                 </div>
@@ -116,6 +116,8 @@ export default function TargetsClient() {
     const tt = (k: string, v?: Record<string, string | number>) => t('targetsPage', k, v);
     const { user } = useAuth();
     const signedIn = !!user;
+    // Supplier accounts get demand data only; the API sends them no buyer prices.
+    const isSupplier = String((user as any)?.role || '').toUpperCase() === 'SUPPLIER';
     const [state, setState] = React.useState<LoadState>({ status: 'loading' });
     const [markups, setMarkups] = React.useState<Markups>(DEFAULT_MARKUPS);
     useCurrency(); // re-render prices when the display currency changes
@@ -287,7 +289,7 @@ export default function TargetsClient() {
                             </div>
                         ) : shown.length > 0 ? (
                             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-x-4 gap-y-8">
-                                {shown.map((x) => <TargetCard key={x.product.id} t={x} markups={markups} signedIn={signedIn} watched={watched.has(x.product.id)} busy={watchBusy === x.product.id} onWatch={() => toggleWatch(x.product.id)} />)}
+                                {shown.map((x) => <TargetCard key={x.product.id} t={x} markups={markups} signedIn={signedIn} isSupplier={isSupplier} watched={watched.has(x.product.id)} busy={watchBusy === x.product.id} onWatch={() => toggleWatch(x.product.id)} />)}
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-16 px-6 text-center rounded-2xl ring-1 ring-line">

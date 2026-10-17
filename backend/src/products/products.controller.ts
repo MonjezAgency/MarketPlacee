@@ -1,5 +1,6 @@
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt.guard';
 import { stripPrices, stripPriceList } from './price-visibility';
+import { isSupplierViewer } from '../common/price-privacy';
 import {
     Controller,
     Get,
@@ -272,8 +273,10 @@ export class ProductsController {
     @UseGuards(OptionalJwtAuthGuard)
     async getBuyerTargets(@Query('limit') limit?: string, @Request() req?: any) {
         const rows = await this.productsService.findBuyerTargets(limit ? parseInt(limit, 10) : 24);
-        // Wholesale prices are for signed-in accounts only (same rule as the catalog).
-        return req?.user ? rows : (rows as any[]).map((r: any) => ({ ...r, product: r?.product ? stripPrices(r.product) : r?.product }));
+        // Wholesale prices are for signed-in buyers and staff only: anonymous visitors and supplier
+        // accounts get the demand data (watch counts, offers) without any buyer price.
+        const hide = !req?.user || isSupplierViewer({ id: req.user.sub, role: req.user.role });
+        return hide ? (rows as any[]).map((r: any) => ({ ...r, product: r?.product ? stripPrices(r.product) : r?.product })) : rows;
     }
 
     /** Public endpoint — products that recently changed price, for the live header ticker */

@@ -48,7 +48,7 @@ export default function PriceHistorySection({ productId, isLoggedIn, currentOffe
             .then((r) => (r.ok ? r.json() : Promise.reject())).then(setData).catch(() => setError(true));
     }, [productId, months, isLoggedIn]);
 
-    if (data?.ownerView) return null; // suppliers don't see buyer prices for their own listing
+    if (data?.ownerView || data?.supplierView) return null; // supplier accounts never see buyer-price history (enforced by the API)
 
     const points: { price: number; t: number; carried?: boolean }[] = (data?.points ?? []).map((p: any) => ({ ...p, t: +new Date(p.at) }));
     const chart = points.length ? [...points, { price: points[points.length - 1].price, t: Date.now(), extended: true }] : [];

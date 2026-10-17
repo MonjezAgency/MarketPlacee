@@ -3,6 +3,7 @@ import { defineSection } from './define';
 /** Targets marketplace tab (/targets): products buyers are watching, ranked by demand. */
 export default defineSection('targetsPage', ['src/app/targets/TargetsClient.tsx'], {
     en: {
+        supplierNoPrice: 'Buyer prices aren’t shown to suppliers',
         home: 'Home', title: 'Targets', breadcrumbAria: 'Breadcrumb',
         lead: 'Products buyers are watching on Atlantis, ranked by demand. Suppliers can see what’s wanted and offer to supply it.',
         loading: 'Loading…', asking: 'What buyers are asking for',
@@ -26,6 +27,7 @@ export default defineSection('targetsPage', ['src/app/targets/TargetsClient.tsx'
         csvProduct: 'Product', csvBrand: 'Brand', csvEan: 'EAN', csvCategory: 'Category', csvWatching: 'Buyers watching', csvOffers: 'Approved offers', csvLink: 'Link',
     },
     ar: {
+        supplierNoPrice: 'لا تُعرض أسعار المشترين للمورّدين',
         home: 'الرئيسية', title: 'طلب المشترين', breadcrumbAria: 'مسار التنقل',
         lead: 'المنتجات التي يتابعها المشترون على Atlantis، مرتّبة حسب الطلب. يمكن للموردين معرفة المطلوب وعرض توريده.',
         loading: 'جارٍ التحميل…', asking: 'ما يطلبه المشترون',
@@ -49,6 +51,7 @@ export default defineSection('targetsPage', ['src/app/targets/TargetsClient.tsx'
         csvProduct: 'المنتج', csvBrand: 'العلامة التجارية', csvEan: 'EAN', csvCategory: 'الفئة', csvWatching: 'المشترون المتابعون', csvOffers: 'العروض المعتمدة', csvLink: 'الرابط',
     },
     fr: {
+        supplierNoPrice: 'Les prix acheteurs ne sont pas affichés aux fournisseurs',
         home: 'Accueil', title: 'Cibles', breadcrumbAria: 'Fil d’Ariane',
         lead: 'Les produits que les acheteurs suivent sur Atlantis, classés par demande. Les fournisseurs voient ce qui est recherché et peuvent proposer de le fournir.',
         loading: 'Chargement…', asking: 'Ce que recherchent les acheteurs',
@@ -72,6 +75,7 @@ export default defineSection('targetsPage', ['src/app/targets/TargetsClient.tsx'
         csvProduct: 'Produit', csvBrand: 'Marque', csvEan: 'EAN', csvCategory: 'Catégorie', csvWatching: 'Acheteurs qui suivent', csvOffers: 'Offres approuvées', csvLink: 'Lien',
     },
     ro: {
+        supplierNoPrice: 'Prețurile pentru cumpărători nu sunt afișate furnizorilor',
         home: 'Acasă', title: 'Ținte', breadcrumbAria: 'Navigare',
         lead: 'Produsele urmărite de cumpărători pe Atlantis, ordonate după cerere. Furnizorii văd ce se caută și pot oferi să livreze.',
         loading: 'Se încarcă…', asking: 'Ce caută cumpărătorii',
@@ -95,6 +99,7 @@ export default defineSection('targetsPage', ['src/app/targets/TargetsClient.tsx'
         csvProduct: 'Produs', csvBrand: 'Marcă', csvEan: 'EAN', csvCategory: 'Categorie', csvWatching: 'Cumpărători care urmăresc', csvOffers: 'Oferte aprobate', csvLink: 'Link',
     },
     it: {
+        supplierNoPrice: 'I prezzi per i buyer non sono mostrati ai fornitori',
         home: 'Home', title: 'Target', breadcrumbAria: 'Percorso',
         lead: 'I prodotti che i buyer seguono su Atlantis, ordinati per domanda. I fornitori vedono cosa è richiesto e possono offrirsi di fornirlo.',
         loading: 'Caricamento…', asking: 'Cosa cercano i buyer',
@@ -118,6 +123,7 @@ export default defineSection('targetsPage', ['src/app/targets/TargetsClient.tsx'
         csvProduct: 'Prodotto', csvBrand: 'Marca', csvEan: 'EAN', csvCategory: 'Categoria', csvWatching: 'Buyer che seguono', csvOffers: 'Offerte approvate', csvLink: 'Link',
     },
     es: {
+        supplierNoPrice: 'Los precios de comprador no se muestran a los proveedores',
         home: 'Inicio', title: 'Objetivos', breadcrumbAria: 'Ruta de navegación',
         lead: 'Los productos que siguen los compradores en Atlantis, ordenados por demanda. Los proveedores ven lo que se busca y pueden ofrecerse a suministrarlo.',
         loading: 'Cargando…', asking: 'Lo que piden los compradores',
@@ -141,6 +147,7 @@ export default defineSection('targetsPage', ['src/app/targets/TargetsClient.tsx'
         csvProduct: 'Producto', csvBrand: 'Marca', csvEan: 'EAN', csvCategory: 'Categoría', csvWatching: 'Compradores que siguen', csvOffers: 'Ofertas aprobadas', csvLink: 'Enlace',
     },
     pt: {
+        supplierNoPrice: 'Os preços de comprador não são mostrados aos fornecedores',
         home: 'Início', title: 'Alvos', breadcrumbAria: 'Navegação estrutural',
         lead: 'Os produtos que os compradores acompanham na Atlantis, ordenados por procura. Os fornecedores veem o que é procurado e podem propor o fornecimento.',
         loading: 'A carregar…', asking: 'O que os compradores procuram',

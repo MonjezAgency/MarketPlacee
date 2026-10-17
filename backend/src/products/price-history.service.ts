@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { buyerCasePrice, readMarkups } from '../common/markups';
-import { isPriceStaff, type Viewer } from '../common/price-privacy';
+import { isPriceStaff, isSupplierViewer, type Viewer } from '../common/price-privacy';
 
 const DAY = 86_400_000;
 
@@ -56,6 +56,8 @@ export class PriceHistoryService {
         if (String(viewer.role || '').toUpperCase() === 'SUPPLIER' && p.supplierId === viewer.id) {
             return { ownerView: true, reason: 'This is your listing. Your own price history is in Inventory & Products → product → Change history.' };
         }
+        // No supplier sees the buyer-price history of any listing (it would reveal buyer prices and margins).
+        if (isSupplierViewer(viewer)) return { supplierView: true, reason: 'Buyer price history isn’t shown to supplier accounts.' };
         await this.record(productId, 'OBSERVED'); // captures changes made outside the price-change path (e.g. markup updates)
 
         const months = [3, 6, 12].includes(Number(monthsIn)) ? Number(monthsIn) : 12;
