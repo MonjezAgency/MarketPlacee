@@ -155,7 +155,9 @@ export default function ProductEditor({ productId }: { productId?: string }) {
         setF((p) => ({ ...p, priceBasis: b, priceInput: next }));
     };
 
-    const missing = missingFields({ ...f, weightValue: f.weightValue, priceCaseEur, images: f.images });
+    // An origin that was just typed but isn't one country ("Bucharest, Romania") still counts as missing for review.
+    const originPending = f.origin !== (product?.origin ?? '') && !!f.origin && !isCanonicalCountry(f.origin);
+    const missing = missingFields({ ...f, origin: originPending ? '' : f.origin, weightValue: f.weightValue, priceCaseEur, images: f.images });
     const eanProblem = f.ean ? gtinText(gtinProblem(f.ean), f.ean, t) : null;
     const status = product?.status ?? 'NEW';
     const rejected = status === 'REJECTED';
