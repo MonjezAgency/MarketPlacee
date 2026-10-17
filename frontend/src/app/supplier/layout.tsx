@@ -19,7 +19,8 @@ import {
     Sun,
     Star,
     Settings,
-    Truck
+    Truck,
+    Tag
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -42,11 +43,13 @@ const SUPPLIER_LANGUAGES = LOCALES.map((code) => ({ code, name: LOCALE_META[code
 // Business Overview), Wholesale Offers, Offers & Ads, Payment Methods.
 // `labelKey` is a key of the supplierShell dictionary, translated at render time.
 // `tour` is the data-tour target used by the first-login tour (components/onboarding/tours.ts).
-const SUPPLIER_LINKS: { labelKey: string; href: string; icon: any; key?: string; locked?: boolean; tour?: string }[] = [
+// `section` (optional): the dictionary section of labelKey when it isn't supplierShell.
+const SUPPLIER_LINKS: { labelKey: string; href: string; icon: any; key?: string; locked?: boolean; tour?: string; section?: 'promotions' }[] = [
     { labelKey: 'navOverview', href: '/supplier', icon: LayoutDashboard },
     { labelKey: 'navProducts', href: '/supplier/products', icon: Package, key: 'products', tour: 'supplier-nav-products' },
     { labelKey: 'navInventory', href: '/supplier/inventory', icon: Warehouse, tour: 'supplier-nav-inventory' },
     { labelKey: 'navOrders', href: '/supplier/orders', icon: ShoppingCart, key: 'orders', tour: 'supplier-nav-orders' },
+    { labelKey: 'nav', section: 'promotions', href: '/supplier/promotions', icon: Tag },
     { labelKey: 'navFulfillment', href: '/supplier/fulfillment', icon: Truck },
     { labelKey: 'navSettings', href: '/supplier/settings', icon: Settings },
     { labelKey: 'navSupport', href: '/supplier/support', icon: LifeBuoy, tour: 'supplier-nav-support' },
@@ -179,7 +182,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                     {isOpen && <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-[#64748B]">{tr('workspace')}</p>}
                     {SUPPLIER_LINKS.map((link) => {
                         const Icon = link.icon;
-                        const label = tr(link.labelKey);
+                        const label = link.section ? t(link.section, link.labelKey) : tr(link.labelKey);
                         const isActive = isLinkActive(pathname, link.href);
                         const badge = badgeFor(link.key);
                         return (
@@ -338,7 +341,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                             className={cn("flex items-center gap-3 h-11 px-3 rounded-lg transition-colors", active ? "bg-white/[0.08] text-white" : "text-[#A3B1C6] hover:text-white")}
                                         >
                                             <link.icon size={18} className={active ? "text-[#2EC4B6]" : undefined} />
-                                            <span className={cn("text-[14px] font-medium", badge && "pe-12")}>{tr(link.labelKey)}</span>
+                                            <span className={cn("text-[14px] font-medium", badge && "pe-12")}>{link.section ? t(link.section, link.labelKey) : tr(link.labelKey)}</span>
                                         </Link>
                                         {badge && (
                                             <Link href={badge.href} aria-label={badge.label} onClick={() => setIsMobileOpen(false)}

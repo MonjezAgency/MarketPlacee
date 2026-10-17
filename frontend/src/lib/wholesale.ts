@@ -53,6 +53,11 @@ export interface QuoteLine {
     perCase: number | null; casesTotal: number | null; unitsTotal: number | null; minUnits: number | null;
     info: { ean: string | null; unitsPerCase: number | null; shelfLife: string | null; leadTime?: number | null; readyForDispatch?: boolean; exwLocation?: string | null } | null;
     offerPercent?: number | null;
+    /** Running special offer honoured in `price` (server clock), and the undiscounted unit price. */
+    promotion?: { id: string; discountPercent: number; endsAt: string } | null;
+    listUnitPrice?: number | null;
+    /** A special offer on this product ended recently; the normal price applies again. */
+    promotionEnded?: { discountPercent: number; endedAt: string } | null;
     /** Progress toward the product's MOQ, in the MOQ's own unit (server-computed). */
     minimum?: LineMinimum | null;
     error: {

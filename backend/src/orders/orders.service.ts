@@ -9,7 +9,10 @@ import { EscrowService } from '../payments/escrow.service';
 import { AppConfigService } from '../admin/app-config.service';
 import { MixedLoadsService, asHttp } from './mixed-loads.service';
 import { checkDestination, loadDeliveryCountries } from '../shipping/delivery-policy';
-import { PricingError, basePerCase, casesInUnit, normaliseTier, offerFactor, priceLine, priceLoad, round2 } from './pricing';
+import { PricingError, basePerCase, casesInUnit, normaliseTier, offerFactor, priceLine, priceLoad, round2, tierMarkup } from './pricing';
+import { promotionDiscounts } from './mixed-loads.service';
+import { activePromotions, recentlyEndedPromotions } from '../promotions/promotion-lookup';
+import { bestDiscount } from '../promotions/promotion-rules';
 import { casesForItem, supplierLineValue } from '../products/stock-ledger';
 import { minOrderCases } from '../common/markups';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
@@ -199,6 +202,9 @@ export class OrdersService {
         const productIds = items.filter((i) => i && !i.mixedLoadId).map((i) => String(i.productId || '').split('::')[0]).filter(Boolean);
         const products = await this.mixedLoads.loadProducts(productIds, db);
         const offers = await this.activeOffers(productIds, db);
+        // Special offers running right now (server clock) and ones that just ended, so the cart can say so.
+        const now = new Date();
+        const [promos, endedPromos] = await Promise.all([activePromotions(db, productIds, now), recentlyEndedPromotions(db, productIds, now)]);
         const lines: any[] = [];
         // Stock is in cases; a product can appear in several lines, so the check is on the running total.
         const wanted = new Map<string, number>();
@@ -227,7 +233,7 @@ export class OrdersService {
                         productId: null, mixedLoadId: load.id, quantity: 1, price: q.total, lineTotal: q.total,
                         tier: load.kind === 'PALLET' ? 'pallet' : 'truck',
                         name: `Mixed ${load.kind === 'PALLET' ? 'pallet' : 'truckload'} (${q.lines.length} product${q.lines.length === 1 ? '' : 's'})`,
-                        mixComposition: q.lines.map((l) => ({ productId: l.productId, name: l.name, variant: l.variant ?? null, quantity: l.quantity, unit: l.unit, cases: l.cases, unitPrice: l.casePrice, lineSubtotal: l.lineSubtotal })),
+                        mixComposition: q.lines.map((l) => ({ productId: l.productId, name: l.name, variant: l.variant ?? null, quantity: l.quantity, unit: l.unit, cases: l.cases, unitPrice: l.casePrice, lineSubtotal: l.lineSubtotal, ...(l.discountPercent ? { discountPercent: l.discountPercent } : {}) })),
                         stockTake: q.lines.map((l) => ({ productId: l.productId, cases: l.cases })),
                         supplierId: q.supplierId,
                     });
@@ -242,7 +248,7 @@ export class OrdersService {
                     if (tier === 'carton') throw new PricingError('INVALID_TIER', `${p.name}: variant mixes are by pallet or truckload.`);
                     const kind = tier === 'pallet' ? 'PALLET' : 'TRUCK';
                     const loadLines = raw.mixComposition.map((c: any) => ({ productId, variant: c.signature ?? c.variant ?? null, quantity: Number(c.quantity) }));
-                    const q = priceLoad(kind, loadLines, products, markups, { requiredFill: 1 });
+                    const q = priceLoad(kind, loadLines, products, markups, { requiredFill: 1, discounts: promotionDiscounts(promos) });
                     if (!q.ready) throw new PricingError('LOAD_NOT_READY', `${p.name}: ${q.issues.join(' ')}`);
                     if (Number(raw.quantity ?? 1) !== 1) throw new PricingError('INVALID_QUANTITY', `${p.name}: a mixed ${tier} is ordered one at a time.`);
                     const mixCases = q.lines.reduce((s, l) => s + l.cases, 0);
@@ -251,7 +257,11 @@ export class OrdersService {
                     continue;
                 }
                 const offerPercent = this.offerFor(offers.get(productId), raw.selectedVariants);
-                const priced = priceLine(p, tier, Number(raw.quantity), markups, { raw: !!p.supplierId && p.supplierId === customerId, discountPercent: offerPercent });
+                // One discount per line: the deeper of the wholesale offer and the special offer, never both.
+                const promo = promos.get(productId);
+                const applied = bestDiscount(offerPercent, promo?.discountPercent ?? 0);
+                const ownListing = !!p.supplierId && p.supplierId === customerId;
+                const priced = priceLine(p, tier, Number(raw.quantity), markups, { raw: ownListing, discountPercent: applied.percent });
                 try { takeStock(p, priced.casesTotal); } catch (e) {
                     // Keep the price and progress on a stock-short line, plus the most that fits.
                     if (e instanceof PricingError) {
@@ -261,8 +271,13 @@ export class OrdersService {
                     throw e;
                 }
                 // Supplier's own price for one ordered unit (no Atlantis margin) — for supplier views only.
-                const supplierUnitPrice = round2(basePerCase(p, markups) * offerFactor(offerPercent) * casesInUnit(p, priced.tier));
-                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, supplierUnitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, minimum: priced.minimum, offerPercent: offerPercent || null, stockTake: [{ productId, cases: priced.casesTotal }], info: lineInfo(p) });
+                // The supplier funds the discount: their net for the line drops by the same % (applied once).
+                const supplierUnitPrice = round2(basePerCase(p, markups) * offerFactor(applied.percent) * casesInUnit(p, priced.tier));
+                const promotion = applied.source === 'PROMOTION' && promo ? { id: promo.id, discountPercent: promo.discountPercent, endsAt: promo.endsAt } : null;
+                // Undiscounted price of one ordered unit, so the cart can show what the special offer saves.
+                const listUnitPrice = applied.percent > 0 ? round2(round2(basePerCase(p, markups) * (ownListing ? 1 : tierMarkup(priced.tier, markups))) * casesInUnit(p, priced.tier)) : priced.unitPrice;
+                const ended = !promo ? endedPromos.get(productId) : undefined;
+                lines.push({ productId, quantity: priced.quantity, price: priced.unitPrice, supplierUnitPrice, lineTotal: priced.lineTotal, tier: priced.tier, name: p.name, selectedVariants: raw.selectedVariants, supplierId: p.supplierId, unitsTotal: priced.unitsTotal, casesTotal: priced.casesTotal, perCase: priced.perCase, minUnits: priced.minUnits, minimum: priced.minimum, offerPercent: applied.source === 'OFFER' ? offerPercent : null, promotion, listUnitPrice, promotionEnded: ended ?? null, stockTake: [{ productId, cases: priced.casesTotal }], info: lineInfo(p) });
             } catch (e) {
                 // Cart view: flag the line and keep pricing the rest. Orders stay strict.
                 if (opts.lenient && e instanceof PricingError) {
@@ -401,6 +416,8 @@ export class OrdersService {
                                 selectedTier: l.tier,
                                 mixComposition: l.mixComposition ?? undefined,
                                 mixedLoadId: l.mixedLoadId ?? null,
+                                promotionId: l.promotion?.id ?? null,
+                                promotionPercent: l.promotion?.discountPercent ?? null,
                             })),
                         },
                         history: { create: { newStatus: OrderStatus.PENDING, changedById: customerId, reason: quote.coupon ? `Order created (promo ${quote.coupon} −${quote.discountPercent}%)` : 'Order created' } },

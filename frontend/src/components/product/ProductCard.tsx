@@ -11,6 +11,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import { type Product } from '@/lib/types';
 import { useAuth } from '@/lib/auth';
 import { formatPrice } from '@/lib/currency';
+import { PromoBadge, WasPrice, percentOff, promoPriceOf, runningPromotion } from '@/components/promotions/PromotionPrice';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { translateText } from '@/lib/translator';
@@ -85,7 +86,10 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     useEffect(() => { getAdminMarkups().then(setMarkups); }, []);
 
     // Per-case price at the cheapest reachable tier — see lib/card-pricing.
-    const cardPrice = computeCardPrice(product, markups, isOwnProduct);
+    const listCardPrice = computeCardPrice(product, markups, isOwnProduct);
+    // Running special offer (server-attached only while it runs): same % off, rounded once, as the checkout.
+    const promo = runningPromotion(product as any);
+    const cardPrice = promo && listCardPrice > 0 ? promoPriceOf(listCardPrice, promo.discountPercent) : listCardPrice;
 
     const rating = product.rating || 0;
     const reviews = product.reviewsCount || 0;
@@ -232,11 +236,19 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
                                 {tl('signInForPrice')}
                             </Link>
                         ) : cardPrice > 0 ? (
-                            <div className="flex items-baseline gap-1 min-w-0">
-                                <span className="text-[17px] font-bold text-ink tabular-nums tracking-tight">
-                                    <bdi>{formatPrice(cardPrice, currency, meta.intl)}</bdi>
-                                </span>
-                                <span className="text-[12px] text-ink-3 font-medium">{tl('perCase')}</span>
+                            <div className="min-w-0">
+                                <div className="flex items-baseline gap-1 min-w-0">
+                                    <span className="text-[17px] font-bold text-ink tabular-nums tracking-tight">
+                                        <bdi>{formatPrice(cardPrice, currency, meta.intl)}</bdi>
+                                    </span>
+                                    <span className="text-[12px] text-ink-3 font-medium">{tl('perCase')}</span>
+                                </div>
+                                {promo && (
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        <WasPrice className="text-[12px]"><bdi>{formatPrice(listCardPrice, currency, meta.intl)}</bdi></WasPrice>
+                                        <PromoBadge pct={percentOff(listCardPrice, cardPrice)} />
+                                    </div>
+                                )}
                             </div>
                         ) : (
                             // No list price on file — never show €0.00.

@@ -14,6 +14,7 @@ import { fetchProductById, apiFetch, fetchProductsWithFilters } from '@/lib/api'
 import { useCart } from '@/lib/cart';
 import { useAuth } from '@/lib/auth';
 import { formatPrice } from '@/lib/currency';
+import { PromoBadge, PromoEnds, WasPrice, percentOff, runningPromotion } from '@/components/promotions/PromotionPrice';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { translateText } from '@/lib/translator';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -668,8 +669,13 @@ export default function ProductDetailClient() {
     const activeOffer = (product as any).activeOffer as { discountPercent?: number; variantDiscounts?: Record<string, number>; validUntil?: string | null } | undefined;
     const offerPct = Math.max(0, Math.min(100, Number(activeOffer ? ((activeOffer.variantDiscounts && offerVariantKey ? activeOffer.variantDiscounts[offerVariantKey] : undefined) ?? activeOffer.discountPercent ?? 0) : 0)));
     const listPerCase = activePack.perCasePrice;
-    // Same rule as the server (orders/pricing.ts): the approved offer % comes off the tier price, rounded once.
-    const perCasePrice = offerPct > 0 && offerPct <= 90 ? round2(activePack.rawPerCase * (1 - offerPct / 100)) : listPerCase;
+    // Running special offer (server-attached only while it runs). Same rule as the server
+    // (orders/pricing.ts): ONE discount — the deeper of the offer and the special offer — off the tier price, rounded once.
+    const promo = runningPromotion(product as any);
+    const promoPct = promo ? promo.discountPercent : 0;
+    const discountPct = Math.max(offerPct > 0 && offerPct <= 90 ? offerPct : 0, promoPct);
+    const promoApplies = promoPct > 0 && promoPct >= offerPct;
+    const perCasePrice = discountPct > 0 ? round2(activePack.rawPerCase * (1 - discountPct / 100)) : listPerCase;
     const perPackPrice = round2(perCasePrice * activePack.casesInUnit);
     const subtotal = round2(perPackPrice * quantity);
     const perPiece = piecesPerCase > 0 ? perCasePrice / piecesPerCase : null;
@@ -979,11 +985,15 @@ export default function ProductDetailClient() {
                                             <p className="text-[12px] text-ink-3">Price per case · {activePack.label.toLowerCase()} rate</p>
                                             <div className="mt-0.5 flex items-baseline flex-wrap gap-x-2">
                                                 <span className="text-[24px] font-bold tracking-tight tabular-nums text-heading leading-none">{formatPrice(perCasePrice)}</span>
-                                                {offerPct > 0 && (<>
+                                                {promoApplies ? (<>
+                                                    <WasPrice className="text-[14px]">{formatPrice(listPerCase)}</WasPrice>
+                                                    <PromoBadge pct={percentOff(listPerCase, perCasePrice)} />
+                                                </>) : offerPct > 0 && (<>
                                                     <span className="text-[14px] text-ink-4 line-through tabular-nums">{formatPrice(listPerCase)}</span>
                                                     <span className="text-[12px] font-semibold text-[#B91C1C]">−{offerPct}% offer{activeOffer?.validUntil ? ` until ${new Date(activeOffer.validUntil).toLocaleDateString()}` : ''}</span>
                                                 </>)}
                                             </div>
+                                            {promoApplies && promo && <PromoEnds endsAt={promo.endsAt} className="mt-1 block" />}
                                             {perPiece != null && <p className="mt-1 text-[12.5px] text-ink-3 tabular-nums">{formatPrice(perPiece)} per unit</p>}
                                         </div>
                                         )}

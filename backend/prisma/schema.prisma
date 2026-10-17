@@ -296,6 +296,7 @@ model Product {
   changeLog    ProductChangeLog[]
   targetPrices TargetPriceRequest[]
   priceObservations PriceObservation[]
+  promotions   Promotion[]
   // What the supplier typed: price per case in their own currency. basePrice
   // (EUR) is derived from it; kept so the entered figure is never reinterpreted.
   supplierCurrency String?
@@ -583,6 +584,10 @@ model OrderItem {
   mixComposition Json?
   /// Set when this line is a server-validated mixed pallet/truckload (see MixedLoad).
   mixedLoadId String?
+  /// The special offer (Promotion) honoured on this line at order time, and its percentage.
+  /// `price` and `supplierUnitPrice` already include it; these only record why. Null = none.
+  promotionId      String?
+  promotionPercent Float?
 }
 
 model AdminActionLog {
@@ -1295,4 +1300,43 @@ model ProductChangeLog {
   createdAt DateTime @default(now())
 
   @@index([productId, createdAt])
+}
+
+/// A scheduled special offer on one product: a temporary percentage off the supplier's net price
+/// (basePrice). The buyer price follows through the normal markup, so both drop by the same
+/// percentage and the Atlantis markup ratio is unchanged (see backend/src/promotions/promotion-rules.ts).
+/// Lifecycle is derived from time on every request: Scheduled (now < startsAt), Active
+/// (startsAt <= now < endsAt, product approved), Expired (now >= endsAt). Only a cancellation is stored.
+/// Not the same thing as Offer (a supplier batch / wholesale offer that Atlantis reviews).
+model Promotion {
+  id                  String    @id @default(uuid())
+  productId           String
+  product             Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// The product's supplier when the promotion was created (ownership is always re-checked on the product).
+  supplierId          String
+  /// Optional internal campaign name (shown to the supplier and Atlantis, never to buyers).
+  name                String?
+  discountPercent     Float
+  /// UTC instants. Active from startsAt (inclusive) until endsAt (exclusive).
+  startsAt            DateTime
+  endsAt              DateTime
+  /// ACTIVE | CANCELLED. "ACTIVE" only means "not cancelled"; the state shown is derived from time.
+  status              String    @default("ACTIVE")
+  /// Supplier net price per case when the promotion was created (reference only: the discount
+  /// always applies to the price at quote time).
+  basePriceAtCreation Float?
+  createdById         String
+  createdByRole       String?
+  updatedById         String?
+  cancelledById       String?
+  cancelledAt         DateTime?
+  cancelReason        String?
+  /// Audit trail: [{ at, by, role, action: "CREATE" | "UPDATE" | "CANCEL", changes?: { field: [old, new] }, reason? }]
+  history             Json      @default("[]")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([productId, startsAt, endsAt])
+  @@index([supplierId])
+  @@index([endsAt])
 }
