@@ -117,7 +117,7 @@ describe('SupplierOverviewService with fake data', () => {
     const product = { name: 'Cola', images: ['https://img.example/c.jpg'], basePrice: 10, unitsPerCase: 24, casesPerPallet: 80, palletsPerShipment: 26 };
     const order = (id: string, status: string, reviewStatus: string, extra: any = {}) => ({ id, status, reviewStatus, termsVersion: 1, createdAt: D('2026-10-14T08:00:00Z'), reviewedAt: null, history: [], confirmations: [], ...extra });
     const ORDERS = [
-        order('pending', 'PENDING', 'PENDING_REVIEW', { confirmations: [{ supplierId: SUP, termsVersion: 1, status: 'PENDING', deadline: D('2026-10-20T00:00:00Z') }] }),
+        order('pending', 'PENDING', 'PENDING_REVIEW', { confirmations: [{ supplierId: SUP, termsVersion: 1, status: 'PENDING', deadline: D('2099-01-01T00:00:00Z') /* attention() uses the real clock */ }] }),
         order('accepted', 'PENDING', 'PENDING_REVIEW', { confirmations: [{ supplierId: SUP, termsVersion: 1, status: 'ACCEPTED', deadline: null }] }),
         order('bypass', 'PROCESSING', 'PENDING_REVIEW'),
         order('approved', 'PROCESSING', 'APPROVED', { reviewedAt: D('2026-10-15T09:00:00Z') }),

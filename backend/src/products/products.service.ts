@@ -15,6 +15,7 @@ import { AiAgentService } from '../ai-agent/ai-agent.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { EmailService } from '../email/email.service';
 import { attachPromotions } from '../promotions/promotion-lookup';
+import { ProductReviewService, type ReviewActor } from './product-review.service';
 
 @Injectable()
 export class ProductsService {
@@ -26,7 +27,14 @@ export class ProductsService {
         private notificationsService: NotificationsService,
         private emailService: EmailService,
         private readonly priceHistory: PriceHistoryService,
+        /** Review trail (ProductReviewEvent); optional so older unit tests can build the service without it. */
+        private readonly review?: ProductReviewService,
     ) { }
+
+    /** Where staff open a product for review. */
+    private static adminReviewLink(id: string) { return `/admin/products/${id}`; }
+    /** Where the supplier reads Atlantis feedback on a product. */
+    private static supplierFeedbackLink(id: string) { return `/supplier/products/${id}/edit#feedback`; }
 
     private buildWhiteCatalogPlaceholder(name?: string, ean?: string): string {
         const title = String(name || 'FMCG product').slice(0, 48).replace(/[&<>"']/g, '');
@@ -363,12 +371,15 @@ export class ProductsService {
 
             if (options?.actorId) this.logChanges(product.id, options.actorId, {}, { status: product.status }, 'Created').catch(() => {});
             // Notify Admins if created by supplier and it is ready for review
+            if (!isAdmin && product.status === ProductStatus.PENDING) {
+                this.review?.record({ productId: product.id, action: 'SUBMITTED', statusAfter: product.status, actor: { id: options?.actorId ?? product.supplierId, role: 'SUPPLIER' } });
+            }
             if (!isAdmin && product.supplierId && !skipAi && product.status === ProductStatus.PENDING) {
                 this.notificationsService.notifyAdmins(
                     'New Product Submitted',
                     `New product "${product.name}" from supplier ID: ${product.supplierId} is waiting for review.`,
                     'INFO',
-                    { productId: product.id }
+                    { productId: product.id, link: ProductsService.adminReviewLink(product.id) }
                 ).catch(() => {});
             }
 
@@ -731,7 +742,7 @@ export class ProductsService {
      * to NEEDS_CHANGES, supplier gets notified, the message is
      * stored on adminNotes for the supplier UI to display.
      */
-    async adminComment(productId: string, message: string) {
+    async adminComment(productId: string, message: string, actor?: ReviewActor | null) {
         const text = (message || '').trim();
         if (!text) throw new BadRequestException('Comment message is required.');
         const product = await this.prisma.product.findUnique({
@@ -747,6 +758,8 @@ export class ProductsService {
                 adminNotes: text,
             },
         });
+        // Kept with its author and time, so the supplier can still read it after the next resubmission clears adminNotes.
+        await this.review?.record({ productId, action: 'CHANGES_REQUESTED', message: text, statusAfter: ProductStatus.NEEDS_CHANGES, actor });
 
         // Notify the supplier in-app + by email so they don't miss the comment.
         if (product.supplierId) {
@@ -755,7 +768,7 @@ export class ProductsService {
                 'Atlantis sent you a comment on a product',
                 `Your product "${product.name}" needs changes before it can be approved.\n\nReason: ${text}\n\nFix the row in your inventory and click "Resend for Review".`,
                 'WARNING',
-                { productId: product.id, type: 'PRODUCT_NEEDS_CHANGES' },
+                { productId: product.id, type: 'PRODUCT_NEEDS_CHANGES', link: ProductsService.supplierFeedbackLink(product.id) },
             ).catch(() => {});
         }
         if ((product as any).supplier?.email) {
@@ -802,16 +815,17 @@ export class ProductsService {
                 adminNotes: null, // clear the prior comment so the next reviewer sees a fresh slate
             },
         });
+        await this.review?.record({ productId, action: 'RESUBMITTED', statusAfter: ProductStatus.PENDING, actor: { id: requesterId, role: requesterRole } });
         this.notificationsService.notifyAdmins(
             'Product resent for review',
             `Supplier resubmitted "${product.name}" after addressing the requested changes.`,
             'INFO',
-            { productId: product.id },
+            { productId: product.id, link: ProductsService.adminReviewLink(product.id) },
         ).catch(() => {});
         return updated;
     }
 
-    async updateStatus(id: string, status: ProductStatus, adminNotes?: string) {
+    async updateStatus(id: string, status: ProductStatus, adminNotes?: string, actor?: ReviewActor | null) {
         if (status === ProductStatus.APPROVED) {
             const product = await this.findOne(id);
             if (!product) throw new BadRequestException('Product not found');
@@ -833,6 +847,11 @@ export class ProductsService {
             data: { status, adminNotes },
         });
         if (status === ProductStatus.APPROVED) this.priceHistory.record(id, 'APPROVED').catch(() => {});
+        await this.review?.record({
+            productId: id,
+            action: status === ProductStatus.APPROVED ? 'APPROVED' : status === ProductStatus.REJECTED ? 'REJECTED' : status === ProductStatus.NEEDS_CHANGES ? 'CHANGES_REQUESTED' : 'STATUS_CHANGED',
+            message: adminNotes ?? null, statusAfter: status, actor,
+        });
 
         // Notify Supplier on status change
         if (updated.supplierId) {
@@ -844,9 +863,9 @@ export class ProductsService {
             this.notificationsService.notifyUser(
                 updated.supplierId,
                 title,
-                message,
-                status === ProductStatus.APPROVED ? 'SUCCESS' : 'INFO',
-                { productId: updated.id }
+                status === ProductStatus.REJECTED && adminNotes ? `${message}\n\nReason: ${adminNotes}` : message,
+                status === ProductStatus.APPROVED ? 'SUCCESS' : status === ProductStatus.REJECTED ? 'ERROR' : 'INFO',
+                { productId: updated.id, link: ProductsService.supplierFeedbackLink(updated.id) }
             ).catch(() => {});
         }
 
@@ -1058,7 +1077,7 @@ export class ProductsService {
         return { dryRun: false, count: updated, markups };
     }
 
-    async bulkApprove(ids: string[]) {
+    async bulkApprove(ids: string[], actor?: ReviewActor | null) {
         const all = await this.prisma.product.findMany({ where: { id: { in: ids } } });
         // Only complete products go live; the rest are reported back untouched.
         const skipped = all.map((p) => ({ id: p.id, name: p.name, missing: missingForPublish(p).map((m) => m.label) })).filter((x) => x.missing.length);
@@ -1078,16 +1097,17 @@ export class ProductsService {
                     'Product Approved',
                     `Your product "${p.name}" was approved in a bulk action and is now live!`,
                     'SUCCESS',
-                    { productId: p.id }
+                    { productId: p.id, link: ProductsService.supplierFeedbackLink(p.id) }
                 ).catch(() => {});
             }
         }
 
         for (const id of okIds) this.priceHistory.record(id, 'APPROVED').catch(() => {});
+        await this.review?.recordMany(okIds, 'APPROVED', null, ProductStatus.APPROVED, actor);
         return { count: updated.count, skipped };
     }
 
-    async bulkReject(ids: string[], reason?: string) {
+    async bulkReject(ids: string[], reason?: string, actor?: ReviewActor | null) {
         const products = await this.prisma.product.findMany({
             where: { id: { in: ids } },
             select: { id: true, name: true, supplierId: true }
@@ -1112,10 +1132,11 @@ export class ProductsService {
                     'Product Rejected',
                     `Your product "${p.name}" was rejected. Reason: ${explanation}`,
                     'ERROR',
-                    { productId: p.id, reason: explanation }
+                    { productId: p.id, reason: explanation, link: ProductsService.supplierFeedbackLink(p.id) }
                 ).catch(() => {});
             }
         }
+        await this.review?.recordMany(products.map((p) => p.id), 'REJECTED', explanation, ProductStatus.REJECTED, actor);
 
         return result;
     }
@@ -1741,7 +1762,12 @@ export class ProductsService {
         this.logChanges(id, supplierId, before, after, [typeof patchIn.changeReason === 'string' && patchIn.changeReason.trim() ? patchIn.changeReason.trim().slice(0, 200) : null, nextStatus !== existing.status ? `Status → ${nextStatus}` : null].filter(Boolean).join(' · ') || undefined).catch((e) => this.logger.warn(`change log failed: ${e?.message}`));
 
         if (nextStatus === ProductStatus.PENDING && existing.status !== ProductStatus.PENDING) {
-            this.notificationsService.notifyAdmins('Product submitted for review', `"${(saved as any).name}" is waiting for review.`, 'INFO', { productId: id }).catch(() => {});
+            this.review?.record({
+                productId: id,
+                action: existing.status === ProductStatus.APPROVED ? 'STATUS_CHANGED' : existing.status === ProductStatus.NEEDS_CHANGES ? 'RESUBMITTED' : 'SUBMITTED',
+                message: note ?? null, statusAfter: ProductStatus.PENDING, actor: { id: supplierId, role: 'SUPPLIER' },
+            });
+            this.notificationsService.notifyAdmins('Product submitted for review', `"${(saved as any).name}" is waiting for review.`, 'INFO', { productId: id, link: ProductsService.adminReviewLink(id) }).catch(() => {});
         }
         return this.withCompleteness({ ...(saved as any), price: (saved as any).basePrice ?? null });
     }

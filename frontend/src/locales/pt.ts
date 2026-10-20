@@ -420,7 +420,7 @@ export const pt: Messages = {
         teamMembers: "Membros da equipa",
         inviteCenter: "Centro de convites",
         groupCatalog: "Catálogo",
-        allProducts: "Todos os produtos",
+        allProducts: "Produtos",
         addProduct: "Adicionar produto",
         categories: "Categorias",
         groupPromotions: "Promoções",

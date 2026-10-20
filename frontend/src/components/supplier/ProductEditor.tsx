@@ -9,6 +9,7 @@ import { supplierApi, ApiError, type SupplierProduct } from '@/lib/supplier-api'
 import { CATEGORIES_LIST } from '@/lib/products';
 import { MOQ_UNITS, UNIT_TYPES, WEIGHT_UNITS, digitsOnly, gtinProblem, isRealImage, missingFields, splitWeight } from '@/lib/catalog-rules';
 import { Badge, Button, Card, ErrorState, Field, Notice, PRODUCT_STATUS, Skeleton, inputCls, selectCls, useConfirm } from '@/components/supplier/ui';
+import ReviewFeedback from '@/components/supplier/ReviewFeedback';
 import { categoryLabel, fieldLabel, gtinText, listJoin, missingLabel, moqUnitsLabel, statusLabel, unitLabel } from '@/components/supplier/import/types';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { BrandCombobox, CountryCombobox, useCountryOptions, type BrandState } from '@/components/supplier/CatalogCombobox';
@@ -415,6 +416,7 @@ export default function ProductEditor({ productId }: { productId?: string }) {
                             </dl>
                         )}
                     </Card>
+                    {productId && product && product.status !== 'DRAFT' && <ReviewFeedback productId={productId} refreshKey={product.updatedAt} />}
                     <div className="hidden lg:flex flex-col gap-2">
                         {primaryAction}
                         {!live && status !== 'PENDING' && <Button variant="secondary" loading={saving === 'draft'} disabled={rejected || !!saving} onClick={() => save('draft')}>{tc('saveDraft')}</Button>}

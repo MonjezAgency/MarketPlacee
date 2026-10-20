@@ -418,7 +418,7 @@ export const en = {
         teamMembers: "Team Members",
         inviteCenter: "Invite Center",
         groupCatalog: "Catalog",
-        allProducts: "All Products",
+        allProducts: "Products",
         addProduct: "Add Product",
         categories: "Categories",
         groupPromotions: "Promotions",

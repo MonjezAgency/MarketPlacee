@@ -6,6 +6,7 @@ import { ExcelService } from './excel.service';
 import { ProductsModule } from '../products/products.module';
 import { DashboardController } from './dashboard.controller';
 import { DashboardService } from '../common/dashboard.service';
+import { AdminOverviewService } from './admin-overview.service';
 import { AnalyticsService } from '../common/analytics.service';
 import { AuditService } from './audit.service';
 import { AuditController } from './audit.controller';
@@ -19,7 +20,7 @@ import { AiAgentModule } from '../ai-agent/ai-agent.module';
 
 @Module({
     imports: [ProductsModule, EmailModule, PrismaModule, AiAgentModule],
-    providers: [AdminService, ExcelService, DashboardService, AnalyticsService, AuditService, AppConfigService],
+    providers: [AdminService, ExcelService, DashboardService, AdminOverviewService, AnalyticsService, AuditService, AppConfigService],
     controllers: [TeamController, DashboardController, AuditController, AppConfigController],
     exports: [ExcelService, DashboardService, AnalyticsService, AuditService, AppConfigService],
 })

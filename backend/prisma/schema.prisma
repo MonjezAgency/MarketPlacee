@@ -108,6 +108,7 @@ model User {
   // Supplier's chosen currency for entering prices (ISO code). Null = suggest from country.
   defaultCurrency      String?
   targetPriceRequests  TargetPriceRequest[] @relation("TargetPriceBuyer")
+  productReviewEvents  ProductReviewEvent[] @relation("ProductReviewActor")
 
   // Two-Factor Authentication
   twoFactorEnabled     Boolean   @default(false)
@@ -297,6 +298,7 @@ model Product {
   targetPrices TargetPriceRequest[]
   priceObservations PriceObservation[]
   promotions   Promotion[]
+  reviewEvents ProductReviewEvent[]
   // What the supplier typed: price per case in their own currency. basePrice
   // (EUR) is derived from it; kept so the entered figure is never reinterpreted.
   supplierCurrency String?
@@ -1341,4 +1343,26 @@ model Promotion {
   @@index([productId, startsAt, endsAt])
   @@index([supplierId])
   @@index([endsAt])
+}
+
+/// Review trail of a product listing: every submission, Atlantis decision and feedback message, in order.
+/// Additive — Product.adminNotes keeps holding the latest message for older screens; this table keeps the history
+/// with its author and time so a supplier can read what was asked and Atlantis can see what happened before.
+model ProductReviewEvent {
+  id          String   @id @default(uuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  /// SUBMITTED | RESUBMITTED | CHANGES_REQUESTED | APPROVED | REJECTED | STATUS_CHANGED
+  action      String
+  message     String?
+  /// Product status right after this event.
+  statusAfter String?
+  actorId     String?
+  actor       User?    @relation("ProductReviewActor", fields: [actorId], references: [id], onDelete: SetNull)
+  /// Role of the actor at the time (SUPPLIER, ADMIN, OWNER, MODERATOR, SYSTEM).
+  actorRole   String?
+  createdAt   DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@index([action, createdAt])
 }

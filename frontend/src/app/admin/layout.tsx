@@ -88,7 +88,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         icon: LayoutDashboard,
         links: [
             { label: 'Dashboard', translationKey: 'overview', href: '/admin', icon: Home },
-            { label: 'Inventory Hub', translationKey: 'allProducts', href: '/admin/products', icon: Package },
+            { label: 'Products', translationKey: 'allProducts', href: '/admin/products', icon: Package },
             { label: 'Approve Offers', translationKey: 'approveOffers', href: '/admin/wholesale-offers', icon: CheckCircle2 },
             { label: 'Special offers', translationKey: 'nav', section: 'promotions', href: '/admin/promotions', icon: Tag },
             { label: 'Global Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },

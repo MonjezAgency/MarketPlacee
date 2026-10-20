@@ -1,2245 +1,356 @@
 'use client';
 
 import * as React from 'react';
-import { 
-    Search, Upload, Plus, Package, Clock, CheckCircle2, 
-    XCircle, AlertCircle, MoreHorizontal, ChevronRight,
-    ArrowUpRight, Info, User, Sparkles, MessageSquare,
-    Trash2, Eye, ExternalLink, Filter, Download,
-    CheckCircle, ShieldAlert, Activity, Pencil,
-    Image as ImageIcon, ListFilter, FileSpreadsheet, ShieldCheck
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { apiFetch } from '@/lib/api';
-import { formatPrice, getActiveCurrency, getCurrencyInfo } from '@/lib/currency';
-import { toast } from 'react-hot-toast';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import toast from 'react-hot-toast';
+import { AlertCircle, Boxes, CheckCircle2, ChevronLeft, ChevronRight, Eye, FileWarning, Image as ImageIcon, Pencil, Plus, Search, Upload, XCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
-import AddProductDrawer from '@/components/product/AddProductDrawer';
-import ImageLightbox from '@/components/ImageLightbox';
-
-// ─── Types ──────────────────────────────────────────────────────────────────
-
-interface Product {
-    id: string;
-    name: string;
-    description: string;
-    price: number;
-    stock: number;
-    category: string;
-    status: 'PENDING' | 'APPROVED' | 'REJECTED';
-    images: string[];
-    supplier?: {
-        name: string;
-        email: string;
-        id: string;
-        role?: string;
-        companyName?: string;
-    };
-    createdAt: string;
-    completeness?: number;       // Calculated field (0-100)
-    missingFields?: string[];     // Filled by computeCompleteness — used by the
-                                  // bar's hover tooltip to tell admins what
-                                  // exactly is still missing on this row.
-    unit?: string;
-    unitsPerCase?: number;
-    casesPerPallet?: number;
-    unitsPerPallet?: number;
-    palletsPerShipment?: number;
-    basePrice?: number;
-    moq?: number;
-    ean?: string;
-    origin?: string;
-    shelfLife?: string;
-    weight?: number;
-    /** EXW (Ex Works) — required at upload, surfaced on PDP. */
-    exwLocation?: string;
-    /** Optional brand string — used by completeness scoring. */
-    brand?: string;
-}
-
-// ─── Components ─────────────────────────────────────────────────────────────
-
-function KPICard({ label, value, icon: Icon, color, bg }: any) {
-    return (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex items-center gap-4 flex-1">
-            <div className={cn("w-12 h-12 rounded-xl flex items-center justify-center", bg)}>
-                <Icon className={cn("w-6 h-6", color)} />
-            </div>
-            <div>
-                <p className="text-[13px] font-medium text-slate-500 mb-0.5">{label}</p>
-                <p className="text-2xl font-semibold text-slate-900 leading-none">{value}</p>
-            </div>
-        </div>
-    );
-}
+import { adminApi, type AdminProductPage, type AdminProductRow, type CatalogScope } from '@/lib/admin-api';
+import { apiFetch } from '@/lib/api';
+import { Badge, Button, Card, ConfirmProvider, Dialog, EmptyState, ErrorState, Field, Notice, PRODUCT_STATUS, PageHeader, Skeleton, Thumb, inputCls, selectCls, useConfirm } from '@/components/supplier/ui';
+import { categoryLabel, statusLabel } from '@/components/supplier/import/types';
 
 /**
- * Compute a realistic data-completeness score plus a list of which
- * fields are still missing. Replaces the previous mock random value
- * so admins see, at a glance, exactly what each product still needs
- * before it can be approved. The fields are weighted: a few are
- * REQUIRED (must exist for a sane B2B listing), the rest are
- * RECOMMENDED (improve UX but not blocking).
- *
- * Returned shape:
- *   { score: 0-100, missing: ["Description", "EXW location", ...] }
+ * Admin → Products. Two datasets, never mixed: Atlantis Catalog (products owned
+ * by staff accounts) and Supplier Submissions (everything suppliers created).
+ * The split, counts, filters and pages come from GET /products/admin/list
+ * (backend/src/products/catalog-scope.ts); this page only shows them.
  */
-function computeCompleteness(p: Product): { score: number; missing: string[] } {
-    const checks: Array<{ label: string; ok: boolean; weight: number }> = [
-        { label: 'Name',                ok: !!(p.name && p.name.trim().length >= 2),               weight: 2 },
-        { label: 'Description',         ok: !!((p as any).description && String((p as any).description).trim().length >= 10), weight: 2 },
-        { label: 'Brand',               ok: !!((p as any).brand && String((p as any).brand).trim()), weight: 1 },
-        { label: 'Price',               ok: !!(p.price && Number(p.price) > 0),                    weight: 2 },
-        { label: 'Stock',               ok: !!(p.stock != null && Number(p.stock) > 0),            weight: 2 },
-        { label: 'Category',            ok: !!(p.category && p.category.trim()),                    weight: 1 },
-        { label: 'EXW location',        ok: !!((p as any).exwLocation && String((p as any).exwLocation).trim()), weight: 2 },
-        { label: 'Country of origin',   ok: !!(p.origin && p.origin.trim()),                       weight: 1 },
-        { label: 'Image',               ok: !!((p as any).images && (p as any).images.length > 0 || (p as any).image), weight: 1 },
-        { label: 'EAN / Barcode',       ok: !!(p.ean && String(p.ean).trim()),                      weight: 1 },
-        { label: 'Weight',              ok: !!(p.weight && String(p.weight).trim()),                weight: 1 },
-        { label: 'Shelf life / BBD',    ok: !!(p.shelfLife && String(p.shelfLife).trim()),          weight: 1 },
-        { label: 'Units per case',      ok: !!(p.unitsPerCase && p.unitsPerCase > 0),               weight: 1 },
-        { label: 'Cases per pallet',    ok: !!(p.casesPerPallet && p.casesPerPallet > 0),           weight: 1 },
-        { label: 'Pallets per truck',   ok: !!(p.palletsPerShipment && p.palletsPerShipment > 0),   weight: 1 },
-        { label: 'MOQ',                 ok: !!(p.moq && p.moq > 0),                                 weight: 1 },
-    ];
-    const totalWeight = checks.reduce((s, c) => s + c.weight, 0);
-    const earned      = checks.filter(c => c.ok).reduce((s, c) => s + c.weight, 0);
-    const score = Math.round((earned / totalWeight) * 100);
-    const missing = checks.filter(c => !c.ok).map(c => c.label);
-    return { score, missing };
+const STATUS_TABS = [
+    { id: '', key: 'stAll' }, { id: 'APPROVED', key: 'stLive' }, { id: 'PENDING', key: 'stPending' },
+    { id: 'NEEDS_CHANGES', key: 'stChanges' }, { id: 'DRAFT', key: 'stDraft' }, { id: 'REJECTED', key: 'stRejected' },
+];
+const SORTS = ['newest', 'updated', 'oldest', 'name', 'price_asc', 'price_desc', 'stock_asc', 'stock_desc'];
+
+export default function AdminProductsPage() {
+    return <React.Suspense fallback={null}><ConfirmProvider><ProductsWorkspace /></ConfirmProvider></React.Suspense>;
 }
 
-function CompletenessBar({ value, missing }: { value: number; missing?: string[] }) {
-    const color = value < 50 ? 'bg-red-500' : value < 80 ? 'bg-orange-500' : 'bg-green-500';
-    const dotColor = value < 50 ? 'bg-red-500' : value < 80 ? 'bg-orange-500' : 'bg-green-500';
-    return (
-        <div className="group/bar relative flex flex-col gap-1.5 w-full max-w-[100px]">
-            <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-400">{value}%</span>
-            </div>
-            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${value}%` }}
-                    className={cn("h-full rounded-full transition-all duration-1000", color)}
-                />
-            </div>
-
-            {/* Hover popover — lists exactly which fields are missing.
-                Shown on hover/focus over the cell so admins know what to
-                ask the supplier for instead of guessing why a row is at
-                72% instead of 100%. */}
-            {missing && missing.length > 0 && (
-                <div className="absolute z-50 left-0 top-full mt-2 w-[240px] hidden group-hover/bar:block pointer-events-none">
-                    <div className="bg-slate-900 text-white text-[11px] rounded-xl shadow-xl border border-slate-800 p-3 leading-relaxed">
-                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-white/10">
-                            <span className={cn("w-2 h-2 rounded-full", dotColor)} />
-                            <span className="font-bold">Missing data ({missing.length})</span>
-                        </div>
-                        <ul className="space-y-1">
-                            {missing.map((m, i) => (
-                                <li key={i} className="flex items-start gap-1.5">
-                                    <span className="text-amber-400 mt-0.5">•</span>
-                                    <span className="text-white/80">{m}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-}
-
-function StatusBadge({ status }: { status: string }) {
-    const styles: any = {
-        PENDING: 'bg-orange-50 text-orange-600 border-orange-100',
-        APPROVED: 'bg-green-50 text-green-600 border-green-100',
-        REJECTED: 'bg-red-50 text-red-600 border-red-100',
-    };
-    return (
-        <span className={cn(
-            "px-2.5 py-1 rounded-full text-[11px] font-semibold border",
-            styles[status] || 'bg-slate-50 text-slate-600'
-        )}>
-            {status.charAt(0) + status.slice(1).toLowerCase()}
-        </span>
-    );
-}
-
-// ─── Main Page ──────────────────────────────────────────────────────────────
-
-export default function ProductsModerationPage() {
-    const { locale } = useLanguage();
-    const isAr = locale === 'ar';
-    
-    const [products, setProducts] = React.useState<Product[]>([]);
+function ProductsWorkspace() {
     const router = useRouter();
-    const [isLoading, setIsLoading] = React.useState(true);
-    const [searchTerm, setSearchTerm] = React.useState('');
-    const [activeTab, setActiveTab] = React.useState('All Products');
-    /**
-     * Source tab — splits the catalog into the admin's own
-     * uploads ("Atlantis Catalog") vs supplier submissions
-     * waiting for / already through approval ("Supplier
-     * Submissions"). Each side keeps its own status sub-tab.
-     */
-    const [sourceTab, setSourceTab] = React.useState<'Atlantis Catalog' | 'Supplier Submissions'>('Atlantis Catalog');
-    const [selectedProduct, setSelectedProduct] = React.useState<Product | null>(null);
-    const [activePanelTab, setActivePanelTab] = React.useState('Product Info');
+    const params = useSearchParams();
+    const confirm = useConfirm();
+    const { t, fmt } = useLanguage();
+    const tp = (k: string, v?: Record<string, string | number>) => t('adminProducts', k, v);
+    const eur = (n: number | null | undefined) => (n === null || n === undefined || !(Number(n) > 0) ? null : fmt.number(Number(n), { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    const int = (n: number | null | undefined) => (n === null || n === undefined ? '—' : fmt.number(n));
+
+    const scope: CatalogScope = params.get('tab') === 'catalog' ? 'catalog' : 'submissions';
+    const [q, setQ] = React.useState(params.get('q') || '');
+    const [debouncedQ, setDebouncedQ] = React.useState(q);
+    const [status, setStatus] = React.useState(params.get('status') || '');
+    const [category, setCategory] = React.useState(params.get('category') || '');
+    const [brand, setBrand] = React.useState(params.get('brand') || '');
+    const [supplier, setSupplier] = React.useState(params.get('supplier') || '');
+    const [attention, setAttention] = React.useState(['missing', 'images'].includes(params.get('attention') || '') ? (params.get('attention') as string) : '');
+    const [sort, setSort] = React.useState(params.get('sort') || 'newest');
+    const [page, setPage] = React.useState(Number(params.get('page')) || 1);
+    const [data, setData] = React.useState<AdminProductPage | null>(null);
+    const [error, setError] = React.useState<string | null>(null);
+    const [loading, setLoading] = React.useState(true);
+    const [selected, setSelected] = React.useState<Set<string>>(new Set());
+    const [busy, setBusy] = React.useState(false);
+    const [rejectOpen, setRejectOpen] = React.useState(false);
     const [rejectReason, setRejectReason] = React.useState('');
-    const [showRejectInput, setShowRejectInput] = React.useState(false);
-    /** Admin → supplier comment thread on a submitted product. */
-    const [commentingProductId, setCommentingProductId] = React.useState<string | null>(null);
-    const [commentText, setCommentText] = React.useState('');
-    const [isSendingComment, setIsSendingComment] = React.useState(false);
-    const panelScrollRef = React.useRef<HTMLDivElement>(null);
-    
-    // Bulk Selection
-    const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
-    const [isBulkLoading, setIsBulkLoading] = React.useState(false);
+    const [importOpen, setImportOpen] = React.useState(false);
 
-    // Markup config (fetched from /config/markup)
-    const [markups, setMarkups] = React.useState({ piece: 1.5, pallet: 1.1, container: 1.05 });
-
+    React.useEffect(() => { const h = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(h); }, [q]);
+    React.useEffect(() => { setPage(1); }, [debouncedQ, status, category, brand, supplier, sort, attention, scope]);
     React.useEffect(() => {
-        apiFetch('/config/markup')
-            .then(r => r.json())
-            .then(d => { if (d?.piece) setMarkups({ piece: d.piece, pallet: d.pallet, container: d.container }); })
-            .catch(() => {});
-    }, []);
+        const u = new URLSearchParams();
+        u.set('tab', scope);
+        if (debouncedQ) u.set('q', debouncedQ); if (status) u.set('status', status); if (category) u.set('category', category); if (brand) u.set('brand', brand);
+        if (supplier) u.set('supplier', supplier); if (attention) u.set('attention', attention); if (sort !== 'newest') u.set('sort', sort); if (page > 1) u.set('page', String(page));
+        router.replace(`/admin/products?${u}`, { scroll: false });
+    }, [scope, debouncedQ, status, category, brand, supplier, attention, sort, page, router]);
 
-    // Edit Mode State
-    // `isEditing` / `editData` originally powered an inline edit panel
-    // inside the side drawer (image grid, EAN search, etc). The actual
-    // edit flow now lives at /admin/products/[id]/edit — see
-    // ProductEditorForm. We keep this state around because other
-    // features in this file still poke at it; once nothing reads from
-    // `editData` we can strip it entirely.
-    const [isEditing, setIsEditing] = React.useState(false);
-    const [editData, setEditData] = React.useState<any>(null);
-    const [isSavingEdit, setIsSavingEdit] = React.useState(false);
-    const [isUploadingImage, setIsUploadingImage] = React.useState(false);
-    const imageInputRef = React.useRef<HTMLInputElement>(null);
-    const [showUploadGuide, setShowUploadGuide] = React.useState(false);
-    const [showUrlInput, setShowUrlInput] = React.useState(false);
-    const [urlInputValue, setUrlInputValue] = React.useState('');
-    // Edit is now a dedicated route at /admin/products/[id]/edit. The
-    // table's "Edit Product Details" button navigates there instead of
-    // opening a modal; saves happen inside ProductEditorForm.
-    const startEditing = (product: any) => {
-        router.push(`/admin/products/${product.id}/edit`);
-    };
+    const load = React.useCallback(() => {
+        setLoading(true); setError(null);
+        adminApi.products(scope, { q: debouncedQ, status, category, brand, supplier: scope === 'submissions' ? supplier : '', attention, sort, page, limit: 25 })
+            .then((d) => { setData(d); setSelected(new Set()); })
+            .catch((e) => setError(e.message))
+            .finally(() => setLoading(false));
+    }, [scope, debouncedQ, status, category, brand, supplier, attention, sort, page]);
+    React.useEffect(() => { load(); }, [load]);
 
-    const handleSaveEdit = async () => {
-        if (!editData) return;
-        const tid = toast.loading('Saving changes...');
-        setIsSavingEdit(true);
+    const switchTab = (tab: CatalogScope) => { if (tab !== scope) { setStatus(''); setCategory(''); setBrand(''); setSupplier(''); setAttention(''); setQ(''); router.replace(`/admin/products?tab=${tab}`, { scroll: false }); } };
+    const clearFilters = () => { setQ(''); setStatus(''); setCategory(''); setBrand(''); setSupplier(''); setAttention(''); };
+
+    const rows = data?.data ?? [];
+    const allOnPage = rows.length > 0 && rows.every((r) => selected.has(r.id));
+    const toggleAll = () => setSelected(allOnPage ? new Set() : new Set(rows.map((r) => r.id)));
+    const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    const chosen = rows.filter((r) => selected.has(r.id));
+    const approvable = chosen.filter((r) => r.status !== 'APPROVED' && r.status !== 'REJECTED' && r.missing.length === 0);
+    const rejectable = chosen.filter((r) => r.status !== 'REJECTED');
+
+    const approveSelected = async () => {
+        if (!(await confirm({ title: tp('bulkApproveTitle', { count: approvable.length }), body: tp(scope === 'catalog' ? 'bulkPublishBody' : 'bulkApproveBody'), confirm: tp(scope === 'catalog' ? 'publish' : 'approve') }))) return;
+        setBusy(true);
         try {
-            // Build a clean PATCH body. CRITICAL: don't send `price` unless the
-            // admin actually changed the supplier-raw price in the form.
-            //
-            // Why: the backend treats `data.price` as a new basePrice and
-            // recomputes price = basePrice × markup. If we always echo
-            // editData.basePrice back as `price`, every Save Changes click
-            // re-runs the markup pipeline. With a slightly different
-            // markup config (or any rounding), the price drifts on every
-            // save. The user reported "the price keeps changing" — this
-            // is the cause. Stable rule: only touch the price column when
-            // the basePrice input was actually modified.
-            const basePriceChanged =
-                selectedProduct &&
-                Number(editData.basePrice) !== Number(selectedProduct.basePrice);
-
-            const patchPayload: any = { ...editData };
-            // Strip the customer-facing `price` from the payload — backend
-            // recomputes it.
-            delete patchPayload.price;
-            if (basePriceChanged) {
-                // Send only when the admin really edited the field.
-                patchPayload.price = editData.basePrice;
-            } else {
-                // Don't even send basePrice — leave it untouched in the DB.
-                delete patchPayload.basePrice;
-            }
-
-            const res = await apiFetch(`/products/${editData.id}`, {
-                method: 'PATCH',
-                body: JSON.stringify(patchPayload)
-            });
-
-            if (res.ok) {
-                toast.success('Product updated successfully', { id: tid });
-                setIsEditing(false);
-                fetchData();
-                setSelectedProduct(editData);
-            } else {
-                const err = await res.json();
-                toast.error(err.message || 'Failed to save changes', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Connection error', { id: tid });
-        } finally {
-            setIsSavingEdit(false);
-        }
+            const r = await adminApi.bulkApprove(approvable.map((p) => p.id));
+            toast.success(tp('toastApproved', { count: r.count }));
+            if (r.skipped?.length) toast(tp('toastSkipped', { count: r.skipped.length }));
+            load();
+        } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+    };
+    const rejectSelected = async () => {
+        const reason = rejectReason.trim();
+        if (reason.length < 10) { toast.error(tp('reasonTooShort')); return; }
+        setBusy(true);
+        try { await adminApi.bulkReject(rejectable.map((p) => p.id), reason); toast.success(tp('toastRejected', { count: rejectable.length })); setRejectOpen(false); setRejectReason(''); load(); }
+        catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
     };
 
-    const fetchData = React.useCallback(async () => {
-        setIsLoading(true);
-        try {
-            const res = await apiFetch('/products/admin/all');
-            if (res.ok) {
-                const data = await res.json();
-                // Compute REAL completeness from each product's fields, plus
-                // the list of missing items the admin can hover to see. No
-                // more mock random values — admins now know exactly why a
-                // row is at 72% and can chase the supplier for the gap.
-                const enriched = (data as Product[]).map(p => {
-                    const { score, missing } = computeCompleteness(p);
-                    return { ...p, completeness: score, missingFields: missing };
-                });
-                setProducts(enriched);
-            }
-        } catch (err) {
-            toast.error('Failed to load products');
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
-
-    React.useEffect(() => {
-        fetchData();
-    }, [fetchData]);
-
-    const [isMobile, setIsMobile] = React.useState(false);
-    React.useEffect(() => {
-        const check = () => setIsMobile(window.innerWidth < 768);
-        check();
-        window.addEventListener('resize', check);
-        return () => window.removeEventListener('resize', check);
-    }, []);
-
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        if (!files.length || !editData) return;
-
-        setIsUploadingImage(true);
-        const newUrls: string[] = [];
-        for (const file of files) {
-            const tid = toast.loading(`Uploading ${file.name}...`);
-            try {
-                const formData = new FormData();
-                formData.append('file', file);
-                const res = await apiFetch('/products/upload-image', { method: 'POST', body: formData });
-                if (res.ok) {
-                    const { url } = await res.json();
-                    newUrls.push(url);
-                    toast.success(`Uploaded: ${file.name}`, { id: tid });
-                } else {
-                    toast.error(`Failed: ${file.name}`, { id: tid });
-                }
-            } catch {
-                toast.error(`Error: ${file.name}`);
-            }
-        }
-        if (newUrls.length) {
-            setEditData((prev: any) => ({ ...prev, images: [...(prev.images || []), ...newUrls] }));
-        }
-        setIsUploadingImage(false);
-        if (imageInputRef.current) imageInputRef.current.value = '';
-    };
-
-    const handleAddImageUrls = () => {
-        if (!urlInputValue.trim() || !editData) return;
-        // Accept newline-separated, comma-separated, or space-separated URLs
-        const urls = urlInputValue
-            .split(/[\n,\s]+/)
-            .map(u => u.trim())
-            .filter(u => u.startsWith('http'));
-        if (!urls.length) { toast.error('No valid URLs found'); return; }
-        setEditData((prev: any) => ({ ...prev, images: [...(prev.images || []), ...urls] }));
-        setUrlInputValue('');
-        setShowUrlInput(false);
-        toast.success(`Added ${urls.length} image${urls.length > 1 ? 's' : ''}`);
-    };
-
-    const handleApprove = async (id: string) => {
-        const tid = toast.loading('Approving product...');
-        try {
-            const res = await apiFetch(`/products/${id}/approve`, { method: 'PATCH' });
-            if (res.ok) {
-                toast.success('Product approved successfully', { id: tid });
-                fetchData();
-                setSelectedProduct(null);
-            } else {
-                toast.error('Approval failed', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Error during approval', { id: tid });
-        }
-    };
-
-    /**
-     * Admin sends a comment on a supplier product. Backend flips
-     * status to NEEDS_CHANGES, stores the message on adminNotes,
-     * fires an in-app + email notification to the supplier.
-     */
-    const handleSendComment = async () => {
-        if (!commentingProductId) return;
-        const message = commentText.trim();
-        if (!message) {
-            toast.error('Write the issue you want the supplier to fix.');
-            return;
-        }
-        setIsSendingComment(true);
-        const tid = toast.loading('Sending comment to supplier…');
-        try {
-            const res = await apiFetch(`/products/${commentingProductId}/comment`, {
-                method: 'PATCH',
-                body: JSON.stringify({ message }),
-            });
-            if (res.ok) {
-                toast.success('Comment sent — supplier will get an email + in-app notification.', { id: tid });
-                setCommentingProductId(null);
-                setCommentText('');
-                fetchData();
-                setSelectedProduct(null);
-            } else {
-                const err = await res.json().catch(() => ({}));
-                toast.error(err?.message || 'Send failed', { id: tid });
-            }
-        } catch {
-            toast.error('Network error', { id: tid });
-        } finally {
-            setIsSendingComment(false);
-        }
-    };
-
-    const handleReject = async (id: string) => {
-        if (!rejectReason) {
-            toast.error('Please enter a reason for rejection');
-            return;
-        }
-        const tid = toast.loading('Rejecting product...');
-        try {
-            const res = await apiFetch(`/products/${id}/reject`, { 
-                method: 'PATCH',
-                body: JSON.stringify({ reason: rejectReason })
-            });
-            if (res.ok) {
-                toast.success('Product rejected', { id: tid });
-                fetchData();
-                setSelectedProduct(null);
-                setRejectReason('');
-                setShowRejectInput(false);
-            } else {
-                toast.error('Rejection failed', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Error during rejection', { id: tid });
-        }
-    };
-
-    // Image lightbox (zoom on click) — index null = closed.
-    const [lightboxIndex, setLightboxIndex] = React.useState<number | null>(null);
-
-    // EAN-based image search (single product)
-    const [eanSearchResult, setEanSearchResult] = React.useState<{
-        images: string[];
-        confidence_score: number;
-        matched: boolean;
-        cached: boolean;
-        source: string;
-        reason?: string;
-    } | null>(null);
-    const [isSearchingEan, setIsSearchingEan] = React.useState(false);
-
-    const handleEanSearch = async (refresh: boolean = false) => {
-        if (!editData?.ean) {
-            toast.error('Set EAN/Barcode first');
-            return;
-        }
-        setIsSearchingEan(true);
-        setEanSearchResult(null);
-        const tid = toast.loading('Searching by EAN…');
-        try {
-            const res = await apiFetch('/products/ean-lookup', {
-                method: 'POST',
-                body: JSON.stringify({
-                    ean: String(editData.ean).trim(),
-                    title: editData.name,
-                    brand: editData.brand,
-                    image_count: 5,
-                    refresh,
-                }),
-            });
-            const data = await res.json();
-            setEanSearchResult(data);
-            if (Array.isArray(data.images) && data.images.length > 0) {
-                const label = data.matched ? 'verified' : 'EAN-linked — review background';
-                toast.success(`Found ${data.images.length} ${label} image${data.images.length > 1 ? 's' : ''} (conf ${(data.confidence_score * 100).toFixed(0)}%)`, { id: tid });
-            } else {
-                toast.error(data.reason || 'No matching images found', { id: tid });
-            }
-        } catch (err: any) {
-            toast.error(`EAN search failed: ${err.message}`, { id: tid });
-        } finally {
-            setIsSearchingEan(false);
-        }
-    };
-
-    const addCandidateImage = (url: string) => {
-        if (!editData) return;
-        const existing = editData.images || [];
-        if (existing.includes(url)) {
-            toast.error('Already added');
-            return;
-        }
-        setEditData({ ...editData, images: [...existing, url] });
-        toast.success('Image added');
-    };
-
-    // Delete a single product (admin) — only allowed for PENDING / REJECTED.
-    const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false);
-    const [isDeleting, setIsDeleting] = React.useState(false);
-
-    const handleDelete = async (id: string) => {
-        const tid = toast.loading('Deleting product...');
-        setIsDeleting(true);
-        try {
-            const res = await apiFetch(`/products/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                toast.success('Product deleted', { id: tid });
-                setShowDeleteConfirm(false);
-                setSelectedProduct(null);
-                fetchData();
-            } else {
-                const err = await res.json().catch(() => ({}));
-                toast.error(err.message || 'Delete failed', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Error during delete', { id: tid });
-        } finally {
-            setIsDeleting(false);
-        }
-    };
-
-    // STALE-STATE GUARD. When selectedProduct changes (user clicks a
-    // different row, or closes the modal), reset every derived sub-state.
-    // Without this, opening Product B after editing Product A shows B's
-    // header with A's form fields populated — e.g. the user's screenshot
-    // of "Trolli All in One 1kg" carrying TENA XL's price + EAN through.
-    // Also clears the EAN search panel, lightbox, reject input, and
-    // delete-confirm UI so each product starts with a clean slate.
-    React.useEffect(() => {
-        setIsEditing(false);
-        setEditData(null);
-        setShowRejectInput(false);
-        setRejectReason('');
-        setShowDeleteConfirm(false);
-        setEanSearchResult(null);
-        setLightboxIndex(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedProduct?.id]);
-
-    const handleBulkAction = async (action: 'approve' | 'reject' | 'delete') => {
-        if (selectedIds.length === 0) return;
-
-        let reason = '';
-        if (action === 'reject') {
-            // Operations rule: every bulk rejection must carry a reason so
-            // each supplier sees the same explanation on their dashboard.
-            const input = window.prompt(
-                `Reject ${selectedIds.length} products. Enter the reason that will be shown to every affected supplier:`,
-                'Did not meet Atlantis quality / compliance standards.',
-            );
-            if (input === null) return; // cancelled
-            reason = input.trim();
-            if (!reason) {
-                toast.error('A rejection reason is required for bulk rejection');
-                return;
-            }
-        } else {
-            const confirmMsg = action === 'delete'
-                ? `Are you sure you want to delete ${selectedIds.length} products?`
-                : `Are you sure you want to ${action} ${selectedIds.length} products?`;
-            if (!window.confirm(confirmMsg)) return;
-        }
-
-        const tid = toast.loading(`${action.charAt(0).toUpperCase() + action.slice(1)}ing products...`);
-        setIsBulkLoading(true);
-        try {
-            const endpoint = `/products/bulk-${action}`;
-            const body: any = { ids: selectedIds };
-            if (action === 'reject') body.reason = reason;
-            const res = await apiFetch(endpoint, {
-                method: 'POST',
-                body: JSON.stringify(body),
-            });
-
-            if (res.ok) {
-                const result = await res.json();
-                toast.success(result.message || `Successfully ${action}d products`, { id: tid, duration: 4000 });
-                setSelectedIds([]);
-                fetchData();
-            } else {
-                const errorData = await res.json().catch(() => ({}));
-                toast.error(errorData.message || `Bulk ${action} failed`, { id: tid });
-            }
-        } catch (err) {
-            toast.error(`Error during bulk ${action}`, { id: tid });
-        } finally {
-            setIsBulkLoading(false);
-        }
-    };
-
-    const toggleSelectAll = () => {
-        if (selectedIds.length === filteredProducts.length) {
-            setSelectedIds([]);
-        } else {
-            setSelectedIds(filteredProducts.map(p => p.id));
-        }
-    };
-
-    const toggleSelectProduct = (e: React.MouseEvent, id: string) => {
-        e.stopPropagation(); // Don't trigger row click (panel open)
-        setSelectedIds(prev => 
-            prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-        );
-    };
-
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
-    const [isUploading, setIsUploading] = React.useState(false);
-    const [uploadCurrency, setUploadCurrency] = React.useState(() => getActiveCurrency());
-
-    // Keep uploadCurrency in sync with the user's settings — they no longer
-    // pick it manually, so we re-read whenever the settings change.
-    React.useEffect(() => {
-        const sync = () => setUploadCurrency(getActiveCurrency());
-        window.addEventListener('currency-changed', sync);
-        window.addEventListener('storage', sync);
-        return () => {
-            window.removeEventListener('currency-changed', sync);
-            window.removeEventListener('storage', sync);
-        };
-    }, []);
-
-    // Currency repair tool state
-    const [showFixCurrency, setShowFixCurrency] = React.useState(false);
-    const [fixFromCurrency, setFixFromCurrency] = React.useState('EUR');
-    const [fixSupplierId, setFixSupplierId] = React.useState('');
-    const [fixPreview, setFixPreview] = React.useState<any>(null);
-    const [isFixing, setIsFixing] = React.useState(false);
-
-    const runFixCurrency = async (dryRun: boolean) => {
-        setIsFixing(true);
-        const tid = toast.loading(dryRun ? 'Calculating preview...' : 'Converting prices...');
-        try {
-            const res = await apiFetch('/products/admin/fix-currency', {
-                method: 'POST',
-                body: JSON.stringify({
-                    fromCurrency: fixFromCurrency,
-                    supplierId: fixSupplierId || undefined,
-                    dryRun,
-                }),
-            });
-            const data = await res.json();
-            if (!res.ok || data.error) {
-                toast.error(data.error || data.message || 'Failed', { id: tid });
-                return;
-            }
-            if (dryRun) {
-                setFixPreview(data);
-                toast.success(`Preview ready: ${data.count} products would be updated`, { id: tid });
-            } else {
-                toast.success(`Updated ${data.count} products successfully`, { id: tid });
-                setShowFixCurrency(false);
-                setFixPreview(null);
-                fetchData();
-            }
-        } catch (e) {
-            toast.error('Connection error', { id: tid });
-        } finally {
-            setIsFixing(false);
-        }
-    };
-    const [isAddDrawerOpen, setIsAddDrawerOpen] = React.useState(false);
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-
-        setIsUploading(true);
-        const tid = toast.loading(`Uploading ${file.name}...`);
-        
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('currency', uploadCurrency);
-
-            const res = await apiFetch('/products/bulk-upload', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (res.ok) {
-                const result = await res.json();
-                toast.success(`Successfully processed! Created ${result.createdCount} products.`, { id: tid, duration: 5000 });
-                fetchData();
-            } else {
-                toast.error('Failed to process file', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Upload connection error', { id: tid });
-        } finally {
-            setIsUploading(false);
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        }
-    };
-
-    // Source split — admin-uploaded vs supplier-submitted.
-    // A product counts as "Atlantis Catalog" when its uploader has
-    // a staff role (ADMIN / OWNER / MODERATOR / EDITOR / DEVELOPER /
-    // LOGISTICS / SUPPORT). Anything else is a supplier submission.
-    const STAFF_ROLES = new Set(['ADMIN', 'OWNER', 'MODERATOR', 'EDITOR', 'DEVELOPER', 'LOGISTICS', 'SUPPORT']);
-    const isAdminProduct = (p: Product) => {
-        const role = (p.supplier?.role || '').toUpperCase();
-        if (STAFF_ROLES.has(role)) return true;
-        // Legacy fallback for older rows where role wasn't selected
-        if ((p.supplier?.email || '').toLowerCase() === 'info@atlantisfmcg.com') return true;
-        return false;
-    };
-
-    // Top-level source tab + nested status tab.
-    // sourceTab: 'Atlantis Catalog' (admin's own) or 'Supplier Submissions'
-    // activeTab: existing All / Pending / Approved / Rejected within that scope
-    const sourceFilteredProducts = products.filter(p =>
-        sourceTab === 'Atlantis Catalog' ? isAdminProduct(p) : !isAdminProduct(p),
-    );
-
-    const filteredProducts = sourceFilteredProducts.filter(p => {
-        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                             p.supplier?.name?.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesTab =
-            activeTab === 'All Products' ? true :
-            activeTab === 'Pending Review' ? p.status === 'PENDING' :
-            activeTab === 'Approved' ? p.status === 'APPROVED' :
-            activeTab === 'Rejected' ? p.status === 'REJECTED' : true;
-        return matchesSearch && matchesTab;
-    });
-
-    // ── Sort + Pagination ───────────────────────────────────────
-    // Operator request: control which order rows appear in (newest /
-    // approved / pending / alphabetical / oldest), and pick how many
-    // rows per page. The full table is local-state filtered so we
-    // sort + slice in memory.
-    const [sortBy, setSortBy] = React.useState<'NEWEST' | 'OLDEST' | 'AZ' | 'ZA' | 'STATUS' | 'PRICE_HIGH' | 'PRICE_LOW'>('NEWEST');
-    const [perPage, setPerPage] = React.useState<number>(25);
-    const [adminPage, setAdminPage] = React.useState<number>(1);
-    React.useEffect(() => {
-        // Reset to first page whenever the filter / sort / source / tab
-        // changes — otherwise the supplier lands on an empty page.
-        setAdminPage(1);
-    }, [sortBy, perPage, searchTerm, activeTab, sourceTab]);
-
-    const sortedProducts = React.useMemo(() => {
-        const arr = [...filteredProducts];
-        const ts = (p: any) => {
-            const d = p.createdAt || p.updatedAt;
-            return d ? new Date(d).getTime() : 0;
-        };
-        switch (sortBy) {
-            case 'NEWEST':     return arr.sort((a, b) => ts(b) - ts(a));
-            case 'OLDEST':     return arr.sort((a, b) => ts(a) - ts(b));
-            case 'AZ':         return arr.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-            case 'ZA':         return arr.sort((a, b) => String(b.name).localeCompare(String(a.name)));
-            case 'STATUS':     return arr.sort((a, b) => {
-                // PENDING first → NEEDS_CHANGES → APPROVED → REJECTED
-                const order: Record<string, number> = { PENDING: 0, NEEDS_CHANGES: 1, APPROVED: 2, REJECTED: 3 };
-                return (order[String(a.status).toUpperCase()] ?? 9) - (order[String(b.status).toUpperCase()] ?? 9);
-            });
-            case 'PRICE_HIGH': return arr.sort((a, b) => Number(b.basePrice ?? b.price ?? 0) - Number(a.basePrice ?? a.price ?? 0));
-            case 'PRICE_LOW':  return arr.sort((a, b) => Number(a.basePrice ?? a.price ?? 0) - Number(b.basePrice ?? b.price ?? 0));
-            default:           return arr;
-        }
-    }, [filteredProducts, sortBy]);
-
-    const totalPagesAdmin = Math.max(1, Math.ceil(sortedProducts.length / perPage));
-    const paginatedProducts = sortedProducts.slice((adminPage - 1) * perPage, adminPage * perPage);
-
-    // Stats are computed against the CURRENT source tab so the KPI
-    // cards reflect what's on screen — switching from "Atlantis
-    // Catalog" to "Supplier Submissions" updates the totals.
-    const stats = {
-        total: sourceFilteredProducts.length,
-        pending: sourceFilteredProducts.filter(p => p.status === 'PENDING').length,
-        approved: sourceFilteredProducts.filter(p => p.status === 'APPROVED').length,
-        rejected: sourceFilteredProducts.filter(p => p.status === 'REJECTED').length,
-        missing: sourceFilteredProducts.filter(p => (p.completeness || 0) < 80).length,
-    };
-
-    const tabs = ['All Products', 'Pending Review', 'Approved', 'Rejected'];
-
-    // Source-tab counts shown in the segmented pill (so admin can
-    // see at a glance how many supplier submissions are waiting).
-    const adminCount    = products.filter(isAdminProduct).length;
-    const supplierCount = products.filter(p => !isAdminProduct(p)).length;
-    const supplierPendingCount = products.filter(p => !isAdminProduct(p) && p.status === 'PENDING').length;
+    const c = data?.counts;
+    const isCatalog = scope === 'catalog';
+    const statusBadge = (st: string) => <Badge tone={PRODUCT_STATUS[st]?.tone ?? 'neutral'} dot>{statusLabel(st, t)}</Badge>;
+    const supplierName = (p: AdminProductRow) => p.supplier?.companyName || p.supplier?.name || '—';
 
     return (
-        <div className="space-y-8 pb-20 max-w-[1600px] mx-auto">
-            {/* 1. Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-6">
-                <div>
-                    <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Products Catalog</h1>
-                    <p className="text-sm text-slate-500 mt-1">Review and manage the marketplace inventory catalog.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                            type="text"
-                            placeholder="Search products, suppliers..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="h-10 w-[320px] pl-10 pr-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/5 transition-all"
-                        />
-                    </div>
-                    <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        accept=".csv,.xlsx,.xls"
-                    />
-                    {/* Currency comes from the user's settings (platform-currency
-                        in localStorage) — no manual dropdown shown. The active
-                        currency is displayed beside the Upload File button so
-                        the admin can confirm before uploading. */}
-                    <div className="h-10 px-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2" title="Currency the file's prices will be interpreted in. Change in Settings.">
-                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">File in</span>
-                        <span className="text-xs font-black text-slate-900">{uploadCurrency}</span>
-                    </div>
-                    <button
-                        onClick={() => setShowUploadGuide(true)}
-                        disabled={isUploading}
-                        className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 flex items-center gap-2 hover:bg-slate-50 transition-all disabled:opacity-50"
-                    >
-                        <Upload size={16} /> {isUploading ? 'Uploading...' : 'Upload File'}
-                    </button>
-                    <button
-                        onClick={() => setIsAddDrawerOpen(true)}
-                        className="h-10 px-4 bg-teal-600 text-white rounded-xl text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20"
-                    >
-                        <Plus size={16} /> Add Product
-                    </button>
-                </div>
-            </div>
+        <div data-no-translate className="text-start -mt-2">
+            <PageHeader title={tp('title')} description={tp('desc')}
+                actions={isCatalog ? <>
+                    <Button icon={<Upload size={15} />} onClick={() => setImportOpen(true)}>{tp('importFile')}</Button>
+                    <Link href="/admin/products/new"><Button variant="primary" icon={<Plus size={15} />}>{tp('addCatalogProduct')}</Button></Link>
+                </> : undefined} />
 
-            {/* 2. KPI Strip */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 px-6">
-                <KPICard label="Total Products" value={stats.total} icon={Package} color="text-slate-600" bg="bg-slate-50" />
-                <KPICard label="Pending Approval" value={stats.pending} icon={Clock} color="text-orange-600" bg="bg-orange-50" />
-                <KPICard label="Approved Products" value={stats.approved} icon={CheckCircle2} color="text-green-600" bg="bg-green-50" />
-                <KPICard label="Rejected Products" value={stats.rejected} icon={XCircle} color="text-red-600" bg="bg-red-50" />
-                <KPICard label="Missing Data" value={stats.missing} icon={AlertCircle} color="text-amber-600" bg="bg-amber-50" />
-            </div>
-
-            {/* 3. Main Content Area */}
-            <div className="grid grid-cols-12 gap-8 px-6 h-full min-h-[600px]">
-
-                {/* LEFT: 65% Table Area */}
-                <div className="col-span-12 space-y-6">
-
-                    {/* Source tabs — Admin catalog vs Supplier submissions */}
-                    <div className="flex items-center gap-2 p-1 bg-slate-100 border border-slate-200 rounded-xl w-fit">
-                        <button
-                            onClick={() => setSourceTab('Atlantis Catalog')}
-                            className={cn(
-                                'h-10 px-5 rounded-lg text-[12px] font-black uppercase tracking-widest flex items-center gap-2 transition-all',
-                                sourceTab === 'Atlantis Catalog' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700',
-                            )}
-                        >
-                            🏛 Atlantis Catalog
-                            <span className="text-[10px] tabular-nums opacity-70">{adminCount}</span>
+            {/* Scope tabs */}
+            <div role="tablist" aria-label={tp('scopeAria')} className="mb-4 flex gap-1 border-b border-line">
+                {(['catalog', 'submissions'] as CatalogScope[]).map((tab) => {
+                    const n = tab === 'catalog' ? c?.scopes.catalog : c?.scopes.submissions;
+                    const pending = tab === 'submissions' ? c?.scopes.submissionsPending : 0;
+                    return (
+                        <button key={tab} role="tab" aria-selected={scope === tab} onClick={() => switchTab(tab)}
+                            className={cn('relative -mb-px h-10 px-3 text-[13.5px] font-medium inline-flex items-center gap-2 border-b-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal rounded-t-md',
+                                scope === tab ? 'border-heading text-heading' : 'border-transparent text-ink-3 hover:text-ink')}>
+                            {tp(tab === 'catalog' ? 'tabCatalog' : 'tabSubmissions')}
+                            {n !== undefined && <span className="tabular-nums text-[12px] text-ink-4">{int(n)}</span>}
+                            {!!pending && <Badge tone="warning">{tp('pendingBadge', { count: pending })}</Badge>}
                         </button>
-                        <button
-                            onClick={() => setSourceTab('Supplier Submissions')}
-                            className={cn(
-                                'h-10 px-5 rounded-lg text-[12px] font-black uppercase tracking-widest flex items-center gap-2 transition-all',
-                                sourceTab === 'Supplier Submissions' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700',
-                            )}
-                        >
-                            🚚 Supplier Submissions
-                            <span className="text-[10px] tabular-nums opacity-70">{supplierCount}</span>
-                            {supplierPendingCount > 0 && (
-                                <span className="text-[10px] font-black bg-amber-500 text-white px-1.5 py-0.5 rounded-full">
-                                    {supplierPendingCount} pending
-                                </span>
-                            )}
-                        </button>
-                    </div>
+                    );
+                })}
+            </div>
+            <p className="mb-3 text-[13px] text-ink-3 max-w-[90ch]">{tp(isCatalog ? 'catalogExplain' : 'submissionsExplain')}</p>
 
-                    {/* Status tabs + sort + per-page picker — operator
-                        wanted control over WHICH rows show, what ORDER they
-                        appear in, and HOW MANY per page. All three drop the
-                        viewer back to page 1 to avoid empty-page jumps. */}
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                        <div className="flex items-center gap-2 p-1 bg-white border border-slate-200 rounded-xl w-fit">
-                            {tabs.map((tab) => (
-                                <button
-                                    key={tab}
-                                    onClick={() => setActiveTab(tab)}
-                                    className={cn(
-                                        "h-9 px-4 rounded-lg text-xs font-semibold transition-all",
-                                        activeTab === tab
-                                            ? "bg-teal-50 text-teal-700 shadow-sm border border-teal-100"
-                                            : "text-slate-500 hover:text-slate-900"
-                                    )}
-                                >
-                                    {tab}
+            <Card bodyClassName="p-0">
+                <div className="flex flex-col gap-3 p-3 sm:p-4 border-b border-line">
+                    <div role="tablist" aria-label={tp('statusAria')} className="flex gap-1 overflow-x-auto -mx-1 px-1">
+                        {STATUS_TABS.map((tab) => {
+                            const n = tab.id ? c?.byStatus[tab.id] : c?.total;
+                            return (
+                                <button key={tab.id || 'all'} role="tab" aria-selected={status === tab.id} onClick={() => setStatus(tab.id)}
+                                    className={cn('h-8 px-3 rounded-md text-[13px] font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal',
+                                        status === tab.id ? 'bg-heading text-white' : 'text-ink-2 hover:bg-surface-2')}>
+                                    {tp(tab.key)}{n !== undefined && <span className={cn('ms-1.5 tabular-nums', status === tab.id ? 'text-white/70' : 'text-ink-4')}>{int(n)}</span>}
                                 </button>
-                            ))}
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400">Sort</label>
-                            <select
-                                value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value as any)}
-                                className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50"
-                            >
-                                <option value="NEWEST">Newest first</option>
-                                <option value="OLDEST">Oldest first</option>
-                                <option value="AZ">Name A→Z</option>
-                                <option value="ZA">Name Z→A</option>
-                                <option value="STATUS">Status (pending first)</option>
-                                <option value="PRICE_HIGH">Price high → low</option>
-                                <option value="PRICE_LOW">Price low → high</option>
-                            </select>
-                            <label className="text-[11px] font-bold uppercase tracking-widest text-slate-400 ms-2">Per page</label>
-                            <select
-                                value={perPage}
-                                onChange={(e) => setPerPage(parseInt(e.target.value, 10) || 25)}
-                                className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-50"
-                            >
-                                <option value={10}>10</option>
-                                <option value={25}>25</option>
-                                <option value={50}>50</option>
-                                <option value={100}>100</option>
-                            </select>
-                        </div>
+                            );
+                        })}
+                        <span className="w-px bg-line mx-1 shrink-0" aria-hidden />
+                        {([['missing', 'attMissing', FileWarning, c?.missingInfo], ['images', 'attImages', ImageIcon, c?.missingImages]] as const).map(([id, key, Icon, n]) => (
+                            <button key={id} type="button" aria-pressed={attention === id} onClick={() => setAttention((a) => (a === id ? '' : id))}
+                                className={cn('h-8 px-3 rounded-md text-[13px] font-medium whitespace-nowrap inline-flex items-center gap-1.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal',
+                                    attention === id ? 'bg-amber-100 text-amber-900 ring-1 ring-amber-300' : 'text-ink-2 hover:bg-surface-2')}>
+                                <Icon size={14} aria-hidden />{tp(key)}{n !== undefined && <span className="tabular-nums text-ink-4">{int(n)}</span>}
+                            </button>
+                        ))}
                     </div>
+                    <div className={cn('grid gap-2', isCatalog ? 'sm:grid-cols-[minmax(0,1fr)_180px_180px_170px]' : 'sm:grid-cols-[minmax(0,1fr)_170px_170px_190px_170px]')}>
+                        <label className="relative">
+                            <span className="sr-only">{tp('search')}</span>
+                            <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-ink-4" />
+                            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tp(isCatalog ? 'searchCatalogPh' : 'searchSubmissionsPh')} className={cn(inputCls, 'ps-9')} />
+                        </label>
+                        <select aria-label={tp('category')} value={category} onChange={(e) => setCategory(e.target.value)} className={selectCls}>
+                            <option value="">{tp('allCategories')}</option>
+                            {(data?.facets.categories ?? []).map((x) => <option key={x.value} value={x.value}>{categoryLabel(x.value, t)} ({int(x.count)})</option>)}
+                        </select>
+                        <select aria-label={tp('brand')} value={brand} onChange={(e) => setBrand(e.target.value)} className={selectCls}>
+                            <option value="">{tp('allBrands')}</option>
+                            {(data?.facets.brands ?? []).map((x) => <option key={x.value} value={x.value}>{x.value} ({int(x.count)})</option>)}
+                        </select>
+                        {!isCatalog && (
+                            <select aria-label={tp('supplier')} value={supplier} onChange={(e) => setSupplier(e.target.value)} className={selectCls}>
+                                <option value="">{tp('allSuppliers')}</option>
+                                {(data?.facets.suppliers ?? []).map((x) => <option key={x.id} value={x.id}>{x.name} ({int(x.count)})</option>)}
+                            </select>
+                        )}
+                        <select aria-label={tp('sort')} value={sort} onChange={(e) => setSort(e.target.value)} className={selectCls}>
+                            {SORTS.map((o) => <option key={o} value={o}>{tp(`sort_${o}`)}</option>)}
+                        </select>
+                    </div>
+                </div>
 
-                    {/* Table (Desktop/Tablet) */}
-                    <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden hidden md:block">
-                        <div className="overflow-x-auto scrollbar-hide">
-                            <table className="w-full text-left">
-                                <thead className="bg-slate-50/50 border-b border-slate-100">
-                                    <tr className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                                        <th className="px-6 py-4 w-10">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={selectedIds.length > 0 && selectedIds.length === filteredProducts.length}
-                                                onChange={toggleSelectAll}
-                                                className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                                            />
-                                        </th>
-                                        <th className="px-6 py-4">Product</th>
-                                        <th className="px-6 py-4">Supplier</th>
-                                        <th className="px-6 py-4">Status</th>
-                                        <th className="px-6 py-4">Completeness</th>
-                                        <th className="px-6 py-4">Price</th>
-                                        <th className="px-6 py-4">Stock</th>
-                                        <th className="px-6 py-4">Date</th>
-                                        <th className="px-6 py-4 text-end">Actions</th>
+                {selected.size > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 px-4 py-2 bg-teal-soft border-b border-line text-[13px]">
+                        <span className="font-medium text-heading">{tp('selectedCount', { count: selected.size })}</span>
+                        <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{tp('clear')}</Button>
+                        <span className="flex-1" />
+                        {approvable.length > 0 && <Button size="sm" variant="primary" icon={<CheckCircle2 size={13} />} loading={busy} onClick={approveSelected}>{tp(isCatalog ? 'publishN' : 'approveN', { count: approvable.length })}</Button>}
+                        {rejectable.length > 0 && !isCatalog && <Button size="sm" variant="danger" icon={<XCircle size={13} />} disabled={busy} onClick={() => setRejectOpen(true)}>{tp('rejectN', { count: rejectable.length })}</Button>}
+                    </div>
+                )}
+
+                {error && <div className="p-4"><ErrorState message={error} onRetry={load} /></div>}
+
+                {loading && !data ? (
+                    <div className="p-4 space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
+                ) : rows.length === 0 && !error ? (
+                    data?.counts.total ? (
+                        <EmptyState icon={<Search size={20} />} title={tp('noMatchTitle')} action={<Button onClick={clearFilters}>{tp('clearFilters')}</Button>}>{tp('noMatchBody')}</EmptyState>
+                    ) : (
+                        <EmptyState icon={<Boxes size={20} />} title={tp(isCatalog ? 'emptyCatalogTitle' : 'emptySubmissionsTitle')}
+                            action={isCatalog ? <Link href="/admin/products/new"><Button variant="primary" icon={<Plus size={15} />}>{tp('addCatalogProduct')}</Button></Link> : undefined}>
+                            {tp(isCatalog ? 'emptyCatalogBody' : 'emptySubmissionsBody')}
+                        </EmptyState>
+                    )
+                ) : (
+                    <>
+                        <div className="hidden md:block overflow-x-auto">
+                            <table className={cn('w-full text-[13.5px] min-w-[880px]', loading && 'opacity-60')}>
+                                <thead>
+                                    <tr className="text-[12px] text-ink-3 bg-surface-2/60 border-b border-line">
+                                        <th className="w-10 ps-4 py-2"><input type="checkbox" aria-label={tp('selectAllOnPage')} checked={allOnPage} onChange={toggleAll} className="w-4 h-4 accent-[#0E7C74]" /></th>
+                                        <th className="text-start font-medium px-2 py-2">{tp('colProduct')}</th>
+                                        {!isCatalog && <th className="text-start font-medium px-2 py-2">{tp('colSupplier')}</th>}
+                                        <th className="text-start font-medium px-2 py-2 hidden xl:table-cell">{tp('category')}</th>
+                                        <th className="text-start font-medium px-2 py-2">{tp('colStatus')}</th>
+                                        <th className="text-end font-medium px-2 py-2">{tp('colNet')}</th>
+                                        <th className="text-end font-medium px-2 py-2">{tp('colBuyer')}</th>
+                                        <th className="text-end font-medium px-2 py-2">{tp('colStock')}</th>
+                                        <th className="text-start font-medium px-2 py-2 hidden lg:table-cell">{tp('colUpdated')}</th>
+                                        <th className="text-end font-medium pe-4 py-2"><span className="sr-only">{tp('actions')}</span></th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {isLoading ? (
-                                        [...Array(6)].map((_, i) => (
-                                            <tr key={i} className="animate-pulse">
-                                                <td colSpan={8} className="px-6 py-4 h-16 bg-slate-50/50" />
-                                            </tr>
-                                        ))
-                                    ) : paginatedProducts.map((p) => (
-                                        <tr 
-                                            key={p.id} 
-                                            onClick={() => setSelectedProduct(p)}
-                                            className={cn(
-                                                "group hover:bg-slate-50 transition-all cursor-pointer h-[64px]",
-                                                (selectedProduct?.id === p.id || selectedIds.includes(p.id)) && "bg-teal-50/30"
-                                            )}
-                                        >
-                                            <td className="px-6 py-4" onClick={(e) => toggleSelectProduct(e, p.id)}>
-                                                <input 
-                                                    type="checkbox" 
-                                                    checked={selectedIds.includes(p.id)}
-                                                    readOnly
-                                                    className="w-4 h-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
-                                                />
+                                <tbody>
+                                    {rows.map((p) => (
+                                        <tr key={p.id} className={cn('border-b border-line last:border-0 hover:bg-surface-2/40', selected.has(p.id) && 'bg-teal-soft/50')}>
+                                            <td className="ps-4 py-2.5"><input type="checkbox" aria-label={tp('selectName', { name: p.name })} checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="w-4 h-4 accent-[#0E7C74]" /></td>
+                                            <td className="px-2 py-2.5 max-w-[340px]">
+                                                <Link href={`/admin/products/${p.id}`} className="flex items-center gap-3 min-w-0 group">
+                                                    <Thumb src={p.image} size={40} />
+                                                    <span className="min-w-0">
+                                                        <span className="block truncate font-medium text-ink group-hover:underline">{p.name}</span>
+                                                        <span className="block truncate text-[12px] text-ink-3">{p.brand || tp('noBrand')}{p.weight ? ` · ${p.weight}` : ''}{p.ean ? <> · <bdi dir="ltr" className="font-mono text-[11.5px]">{p.ean}</bdi></> : <> · <span className="text-amber-800">{tp('noBarcode')}</span></>}</span>
+                                                    </span>
+                                                </Link>
                                             </td>
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 border border-slate-200">
-                                                        <img src={p.images?.[0] || 'https://via.placeholder.com/40'} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/40?text=NA'; }} className="w-full h-full object-cover" />
-                                                    </div>
-                                                    <span className="text-sm font-semibold text-slate-900 truncate max-w-[200px]">{p.name}</span>
+                                            {!isCatalog && <td className="px-2 py-2.5 max-w-[180px]"><span className="block truncate text-ink-2">{supplierName(p)}</span><span className="block truncate text-[12px] text-ink-4">{p.supplier?.email}</span></td>}
+                                            <td className="px-2 py-2.5 hidden xl:table-cell text-ink-2 max-w-[150px] truncate">{categoryLabel(p.category, t)}</td>
+                                            <td className="px-2 py-2.5">
+                                                <div className="flex flex-col items-start gap-1">
+                                                    {statusBadge(p.status)}
+                                                    {p.missing.length > 0 && <span className="inline-flex items-center gap-1 text-[12px] text-amber-800" title={p.missing.join(', ')}><AlertCircle size={12} />{tp('missingCount', { count: p.missing.length })}</span>}
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">{p.supplier?.name || 'Admin Upload'}</td>
-                                            <td className="px-6 py-4"><StatusBadge status={p.status} /></td>
-                                            <td className="px-6 py-4"><CompletenessBar value={p.completeness || 0} missing={p.missingFields} /></td>
-                                            <td className="px-6 py-4 text-sm font-bold text-slate-900" title={`Buyer price (with markup): ${formatPrice(p.price)}`}>{formatPrice(p.basePrice ?? p.price)}</td>
-                                            <td className="px-6 py-4 text-sm text-slate-600">{p.stock.toLocaleString()}</td>
-                                            <td className="px-6 py-4 text-xs text-slate-400 font-medium">{new Date(p.createdAt).toLocaleDateString()}</td>
-                                            <td className="px-6 py-4 text-end">
-                                                <button className="p-2 text-slate-400 hover:text-slate-900 transition-colors">
-                                                    <ChevronRight size={18} />
-                                                </button>
+                                            <td className="px-2 py-2.5 text-end tabular-nums">{eur(p.basePrice) ?? <span className="text-ink-4">—</span>}</td>
+                                            <td className="px-2 py-2.5 text-end tabular-nums">{eur(p.price) ?? <span className="text-ink-4">—</span>}</td>
+                                            <td className={cn('px-2 py-2.5 text-end tabular-nums', p.status === 'APPROVED' && p.stock <= 0 && 'text-red-700 font-medium')}>{int(p.stock)}</td>
+                                            <td className="px-2 py-2.5 hidden lg:table-cell text-[12.5px] text-ink-3 whitespace-nowrap">{fmt.date(p.updatedAt)}</td>
+                                            <td className="pe-4 py-2.5">
+                                                <div className="flex justify-end gap-1">
+                                                    <Link href={`/admin/products/${p.id}`} title={tp('review')} aria-label={tp('reviewName', { name: p.name })} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><Eye size={15} /></Link>
+                                                    <Link href={`/admin/products/${p.id}/edit`} title={tp('edit')} aria-label={tp('editName', { name: p.name })} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><Pencil size={15} /></Link>
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
                                 </tbody>
                             </table>
                         </div>
-                    </div>
-
-                    {/* Cards (Mobile) */}
-                    <div className="grid grid-cols-1 gap-4 md:hidden">
-                        {paginatedProducts.map(p => (
-                            <div key={p.id} onClick={() => setSelectedProduct(p)} className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm active:scale-95 transition-all">
-                                <div className="flex items-center gap-4">
-                                    <img src={p.images?.[0] || 'https://via.placeholder.com/64'} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).src = 'https://via.placeholder.com/64?text=NA'; }} className="w-16 h-16 rounded-xl object-cover border border-slate-100" />
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="text-sm font-bold text-slate-900 truncate">{p.name}</h4>
-                                        <p className="text-xs text-slate-500 mt-0.5">{p.supplier?.name || 'Admin Upload'}</p>
-                                        <div className="flex items-center gap-2 mt-2">
-                                            <StatusBadge status={p.status} />
-                                            <span className="text-[10px] font-bold text-slate-900" title={`Buyer price: ${formatPrice(p.price)}`}>{formatPrice(p.basePrice ?? p.price)}</span>
-                                        </div>
-                                    </div>
-                                    <ChevronRight size={18} className="text-slate-300" />
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Pagination footer — appears under both desktop
-                        table and mobile cards. Shows "Showing N–M of K"
-                        plus prev/next buttons + numeric page chips. */}
-                    {sortedProducts.length > perPage && (
-                        <div className="flex items-center justify-between gap-3 mt-4 flex-wrap">
-                            <p className="text-[11px] text-slate-500 font-semibold">
-                                Showing <span className="text-slate-900 font-bold">{(adminPage - 1) * perPage + 1}</span>
-                                {'–'}
-                                <span className="text-slate-900 font-bold">{Math.min(adminPage * perPage, sortedProducts.length)}</span>
-                                {' of '}
-                                <span className="text-slate-900 font-bold">{sortedProducts.length}</span>
-                            </p>
-                            <div className="flex items-center gap-1">
-                                <button
-                                    type="button"
-                                    onClick={() => setAdminPage((p) => Math.max(1, p - 1))}
-                                    disabled={adminPage === 1}
-                                    className="h-9 px-3 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    ← Prev
-                                </button>
-                                {Array.from({ length: totalPagesAdmin }).slice(0, 7).map((_, i) => {
-                                    // Show up to 7 page chips around the active one.
-                                    const half = 3;
-                                    let pageNum = i + 1;
-                                    if (totalPagesAdmin > 7) {
-                                        const start = Math.max(1, Math.min(adminPage - half, totalPagesAdmin - 6));
-                                        pageNum = start + i;
-                                    }
-                                    if (pageNum < 1 || pageNum > totalPagesAdmin) return null;
-                                    const active = pageNum === adminPage;
-                                    return (
-                                        <button
-                                            key={pageNum}
-                                            type="button"
-                                            onClick={() => setAdminPage(pageNum)}
-                                            className={cn(
-                                                'h-9 min-w-[36px] px-2 rounded-lg text-xs font-bold tabular-nums transition-colors',
-                                                active
-                                                    ? 'bg-teal-600 text-white shadow-sm'
-                                                    : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50',
-                                            )}
-                                        >
-                                            {pageNum}
-                                        </button>
-                                    );
-                                })}
-                                <button
-                                    type="button"
-                                    onClick={() => setAdminPage((p) => Math.min(totalPagesAdmin, p + 1))}
-                                    disabled={adminPage >= totalPagesAdmin}
-                                    className="h-9 px-3 rounded-lg bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                                >
-                                    Next →
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-            </div>
-
-            {/* Product Details — centered modal */}
-            <AnimatePresence>
-                {selectedProduct && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-8 bg-slate-900/60 backdrop-blur-sm"
-                        onClick={() => setSelectedProduct(null)}
-                    >
-                        <motion.div
-                            key={selectedProduct.id}
-                            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-                            transition={{ duration: 0.25, ease: 'easeOut' }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="relative w-full max-w-[920px] flex flex-col"
-                        >
-                            <div className="bg-white border border-slate-200 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[88vh]">
-                                {/* Panel Header */}
-                                <div className="p-5 border-b border-slate-100 flex items-start justify-between gap-3">
-                                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                                        <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
-                                            {selectedProduct.images?.[0] ? (
-                                                <img src={selectedProduct.images[0]} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="w-full h-full object-cover" />
-                                            ) : (
-                                                <Package size={20} className="text-slate-300" />
-                                            )}
-                                        </div>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <h3 className="text-base font-black text-slate-900 leading-tight truncate" title={selectedProduct.name}>
-                                                    {selectedProduct.name}
-                                                </h3>
-                                                {selectedProduct.supplier?.email === 'Info@atlantisfmcg.com' && (
-                                                    <span className="px-1.5 py-0.5 bg-indigo-600 text-[8px] text-white font-bold rounded uppercase tracking-tighter shadow-sm shadow-indigo-600/20 shrink-0">Founder</span>
-                                                )}
-                                            </div>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className={cn(
-                                                    "px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest",
-                                                    selectedProduct.status === 'APPROVED' && "bg-emerald-50 text-emerald-700 border border-emerald-200",
-                                                    selectedProduct.status === 'PENDING' && "bg-amber-50 text-amber-700 border border-amber-200",
-                                                    selectedProduct.status === 'REJECTED' && "bg-red-50 text-red-700 border border-red-200"
-                                                )}>
-                                                    {selectedProduct.status}
-                                                </span>
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID: {selectedProduct.id.slice(0, 8)}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => setSelectedProduct(null)}
-                                        className="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-all shrink-0"
-                                    >
-                                        <XCircle size={20} />
-                                    </button>
-                                </div>
-
-                                {/* Panel Content Tabs */}
-                                <div className="flex items-center gap-4 px-6 border-b border-slate-100 overflow-x-auto scrollbar-hide">
-                                    {['Product Info', 'Pricing & Units', 'Supplier Info', 'AI Data', 'Notes'].map((t) => (
-                                        <button
-                                            key={t}
-                                            onClick={() => { setActivePanelTab(t); panelScrollRef.current?.scrollTo({ top: 0 }); }}
-                                            className={cn(
-                                                "py-4 text-[11px] font-bold uppercase tracking-widest border-b-2 transition-all whitespace-nowrap",
-                                                activePanelTab === t ? "border-teal-500 text-teal-600" : "border-transparent text-slate-400 hover:text-slate-600"
-                                            )}
-                                        >
-                                            {t}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                {/* Scrollable Content */}
-                                <div ref={panelScrollRef} className="flex-1 min-h-0 overflow-y-auto p-6 space-y-6 scrollbar-hide">
-                                    {activePanelTab === 'Product Info' && (
-                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                                            {/* LEFT COLUMN — Overview + Basic Info */}
-                                            <div className="lg:col-span-2 space-y-5">
-                                                {/* Product Overview card */}
-                                                <div className="border border-slate-200 rounded-2xl p-5">
-                                                    <h4 className="text-[14px] font-bold text-slate-900 mb-4">Product Overview</h4>
-                                                    <div
-                                                        onClick={() => {
-                                                            if (isEditing) return;
-                                                            const list = selectedProduct.images || [];
-                                                            if (list.length > 0) setLightboxIndex(0);
-                                                        }}
-                                                        className={`aspect-[5/3] w-full rounded-2xl bg-slate-50 border border-slate-200 border-dashed overflow-hidden relative flex items-center justify-center ${
-                                                            !isEditing && (selectedProduct.images?.length ?? 0) > 0 ? 'cursor-zoom-in' : ''
-                                                        }`}
-                                                    >
-                                                        {(isEditing ? editData.images?.[0] : selectedProduct.images?.[0]) ? (
-                                                            <img src={isEditing ? editData.images?.[0] : selectedProduct.images?.[0]} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="w-full h-full object-cover" />
-                                                        ) : (
-                                                            <div className="flex flex-col items-center gap-3 text-slate-300 text-center px-6">
-                                                                <ImageIcon size={44} strokeWidth={1.5} />
-                                                                <div>
-                                                                    <p className="text-[14px] font-semibold text-slate-500">No image uploaded</p>
-                                                                    <p className="text-[12px] text-slate-400 mt-1">Upload a clear product image to help buyers identify your product.</p>
-                                                                </div>
-                                                            </div>
-                                                        )}
-                                                        {isEditing && (
-                                                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                                                <p className="text-white text-[10px] font-bold uppercase tracking-widest">Editing Mode</p>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    {/* Image thumbnails strip (only when there are multiple) */}
-                                                    {(selectedProduct.images && selectedProduct.images.length > 1) && (
-                                                        <div className="flex gap-2 overflow-x-auto pt-3 scrollbar-hide">
-                                                            {(isEditing ? editData.images : selectedProduct.images).map((img: string, i: number) => (
-                                                                <div key={i} className="relative group shrink-0">
-                                                                    <div
-                                                                        onClick={() => { if (!isEditing) setLightboxIndex(i); }}
-                                                                        className={`relative w-14 h-14 rounded-xl border border-slate-100 bg-slate-100 overflow-hidden flex items-center justify-center ${!isEditing ? 'cursor-zoom-in hover:border-slate-300' : ''}`}
-                                                                    >
-                                                                        <Package size={16} className="text-slate-300" />
-                                                                        <img src={img} referrerPolicy="no-referrer" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} className="absolute inset-0 w-full h-full object-cover" />
-                                                                    </div>
-                                                                    {isEditing && (
-                                                                        <button
-                                                                            onClick={() => setEditData({...editData, images: editData.images.filter((_:any, idx:number) => idx !== i)})}
-                                                                            className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg"
-                                                                        >
-                                                                            <Trash2 size={10} />
-                                                                        </button>
-                                                                    )}
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                    )}
-                                                    {isEditing && (
-                                                        <div className="mt-3 space-y-2">
-                                                            {/* Row 1 — upload + paste buttons */}
-                                                            <div className="flex gap-2">
-                                                                <input type="file" hidden multiple ref={imageInputRef} onChange={handleImageUpload} accept="image/*" />
-                                                                <button
-                                                                    onClick={() => imageInputRef.current?.click()}
-                                                                    disabled={isUploadingImage}
-                                                                    className="flex-1 h-10 rounded-xl border border-dashed border-slate-300 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
-                                                                >
-                                                                    <Upload size={14} /> {isUploadingImage ? 'Uploading…' : 'Upload images'}
-                                                                </button>
-                                                                <button
-                                                                    onClick={() => { setShowUrlInput(!showUrlInput); setUrlInputValue(''); }}
-                                                                    className="flex-1 h-10 rounded-xl border border-dashed border-slate-300 text-[12px] font-semibold text-slate-500 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
-                                                                >
-                                                                    <ImageIcon size={14} /> Paste URLs
-                                                                </button>
-                                                            </div>
-                                                            {/* EAN image search removed — operator
-                                                                decision. Suppliers / admins upload
-                                                                photos directly. */}
-                                                            {/* Row 3 — inline URL textarea (toggle) */}
-                                                            {showUrlInput && (
-                                                                <div className="space-y-1.5">
-                                                                    <textarea
-                                                                        rows={3}
-                                                                        value={urlInputValue}
-                                                                        onChange={(e) => setUrlInputValue(e.target.value)}
-                                                                        placeholder={"Paste image URLs (one per line or comma-separated):\nhttps://example.com/img1.jpg\nhttps://example.com/img2.jpg"}
-                                                                        className="w-full px-3 py-2 text-[12px] border border-slate-200 rounded-xl outline-none focus:border-teal-500 resize-none placeholder:text-slate-300"
-                                                                    />
-                                                                    <button
-                                                                        onClick={handleAddImageUrls}
-                                                                        className="w-full h-9 bg-teal-600 hover:bg-teal-700 text-white rounded-xl text-[12px] font-bold transition-colors"
-                                                                    >
-                                                                        Add URLs
-                                                                    </button>
-                                                                </div>
-                                                            )}
-                                                            {/* EAN search results panel removed. */}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Basic Information card */}
-                                                <div className="border border-slate-200 rounded-2xl p-5">
-                                                    <h4 className="text-[14px] font-bold text-slate-900 mb-4">Basic Information</h4>
-                                                    <dl className="divide-y divide-slate-100">
-                                                        <div className="flex items-center justify-between py-3">
-                                                            <dt className="text-[13px] text-slate-500">Product Name</dt>
-                                                            <dd className="text-[13px] font-bold text-slate-900 max-w-[60%] text-right truncate" title={selectedProduct.name}>
-                                                                {isEditing ? (
-                                                                    <input className="h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold outline-none focus:border-teal-500" value={editData.name} onChange={(e) => setEditData({...editData, name: e.target.value})} />
-                                                                ) : selectedProduct.name}
-                                                            </dd>
-                                                        </div>
-                                                        <div className="flex items-center justify-between py-3">
-                                                            <dt className="text-[13px] text-slate-500">Product ID</dt>
-                                                            <dd className="text-[13px] font-bold text-slate-900 font-mono">{selectedProduct.id.slice(0, 8).toUpperCase()}</dd>
-                                                        </div>
-                                                        <div className="flex items-center justify-between py-3">
-                                                            <dt className="text-[13px] text-slate-500">Status</dt>
-                                                            <dd>
-                                                                <span className={cn(
-                                                                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                                                                    selectedProduct.status === 'APPROVED' && "bg-emerald-50 text-emerald-700 border border-emerald-200",
-                                                                    selectedProduct.status === 'PENDING' && "bg-amber-50 text-amber-700 border border-amber-200",
-                                                                    selectedProduct.status === 'REJECTED' && "bg-red-50 text-red-700 border border-red-200"
-                                                                )}>
-                                                                    {selectedProduct.status}
-                                                                </span>
-                                                            </dd>
-                                                        </div>
-                                                        {selectedProduct.ean && (
-                                                            <div className="flex items-center justify-between py-3">
-                                                                <dt className="text-[13px] text-slate-500">EAN / UPC</dt>
-                                                                <dd className="text-[13px] font-bold text-slate-900 font-mono">{selectedProduct.ean}</dd>
-                                                            </div>
-                                                        )}
-                                                        {selectedProduct.origin && (
-                                                            <div className="flex items-center justify-between py-3">
-                                                                <dt className="text-[13px] text-slate-500">Origin</dt>
-                                                                <dd className="text-[13px] font-bold text-slate-900">{selectedProduct.origin}</dd>
-                                                            </div>
-                                                        )}
-                                                        {selectedProduct.shelfLife && (
-                                                            <div className="flex items-center justify-between py-3">
-                                                                <dt className="text-[13px] text-slate-500">BBD</dt>
-                                                                <dd className="text-[13px] font-bold text-slate-900">{selectedProduct.shelfLife}</dd>
-                                                            </div>
-                                                        )}
-                                                        {selectedProduct.weight ? (
-                                                            <div className="flex items-center justify-between py-3">
-                                                                <dt className="text-[13px] text-slate-500">Weight</dt>
-                                                                <dd className="text-[13px] font-bold text-slate-900">{(() => {
-                                                                    // Display the weight as-is if the supplier already typed
-                                                                    // a unit suffix (g/kg/ml/L/oz/lb). Only append "kg" when
-                                                                    // the value is a bare number — otherwise we get bugs
-                                                                    // like "100g kg".
-                                                                    const w = String(selectedProduct.weight).trim();
-                                                                    return /[a-z]/i.test(w) ? w : `${w} kg`;
-                                                                })()}</dd>
-                                                            </div>
-                                                        ) : null}
-                                                        {selectedProduct.description && (
-                                                            <div className="py-3">
-                                                                <dt className="text-[13px] text-slate-500 mb-2">Description</dt>
-                                                                <dd className="text-[12px] text-slate-700 leading-relaxed">{selectedProduct.description}</dd>
-                                                            </div>
-                                                        )}
-                                                    </dl>
-                                                </div>
-                                            </div>
-
-                                            {/* RIGHT COLUMN — Summary + Submission Checklist */}
-                                            <div className="space-y-5">
-                                                {/* Product Summary */}
-                                                <div className="border border-slate-200 rounded-2xl p-5">
-                                                    <h4 className="text-[14px] font-bold text-slate-900 mb-4">Product Summary</h4>
-                                                    <dl className="space-y-3">
-                                                        {[
-                                                            { label: 'Category',  value: selectedProduct.category },
-                                                            { label: 'Brand',     value: (selectedProduct as any).brand },
-                                                            { label: 'Unit Type', value: (() => {
-                                                                const u = String(selectedProduct.unit || '').toLowerCase();
-                                                                if (u === 'piece' || u === 'pcs' || u === 'item') return 'Piece';
-                                                                if (u === 'case' || u === 'carton' || u === 'box') return 'Carton';
-                                                                if (u === 'pallet') return 'Pallet';
-                                                                if (u === 'truck' || u === 'container' || u === 'shipment') return 'Truck';
-                                                                return selectedProduct.unit || null;
-                                                            })() },
-                                                            { label: 'Created At',   value: (selectedProduct as any).createdAt ? new Date((selectedProduct as any).createdAt).toLocaleDateString() : null },
-                                                            { label: 'Last Updated', value: (selectedProduct as any).updatedAt ? new Date((selectedProduct as any).updatedAt).toLocaleDateString() : null },
-                                                        ].map((row) => (
-                                                            <div key={row.label} className="flex items-center justify-between">
-                                                                <dt className="text-[12px] text-slate-500">{row.label}</dt>
-                                                                <dd className="text-[12px] font-bold text-slate-700">{row.value || '—'}</dd>
-                                                            </div>
-                                                        ))}
-                                                    </dl>
-                                                </div>
-
-                                                {/* Submission Checklist */}
-                                                <div className="border border-slate-200 rounded-2xl p-5">
-                                                    <h4 className="text-[14px] font-bold text-slate-900 mb-4">Submission Checklist</h4>
-                                                    {(() => {
-                                                        const checklist = [
-                                                            { label: 'Product image',       done: (selectedProduct.images || []).length > 0,        missingLabel: 'Missing' },
-                                                            { label: 'Pricing & units',     done: !!selectedProduct.price && !!selectedProduct.unit,  missingLabel: 'Pending' },
-                                                            { label: 'Supplier information', done: !!selectedProduct.supplier?.id,                    missingLabel: 'Pending' },
-                                                            { label: 'AI data',             done: !!selectedProduct.description && selectedProduct.description.length > 30, missingLabel: 'Pending' },
-                                                            { label: 'Notes',               done: !!(selectedProduct as any).notes,                   missingLabel: 'Pending' },
-                                                        ];
-                                                        return (
-                                                            <ul className="space-y-3">
-                                                                {checklist.map(item => (
-                                                                    <li key={item.label} className="flex items-center justify-between">
-                                                                        <span className="flex items-center gap-2.5">
-                                                                            <span className={cn(
-                                                                                'w-2 h-2 rounded-full',
-                                                                                item.done ? 'bg-emerald-500' : 'bg-slate-300'
-                                                                            )} />
-                                                                            <span className="text-[12px] font-semibold text-slate-700">{item.label}</span>
-                                                                        </span>
-                                                                        <span className={cn(
-                                                                            'px-2 py-0.5 rounded-full text-[10px] font-bold',
-                                                                            item.done
-                                                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                                                : item.missingLabel === 'Missing'
-                                                                                    ? 'bg-slate-50 text-slate-500 border border-slate-200'
-                                                                                    : 'bg-amber-50 text-amber-700 border border-amber-200'
-                                                                        )}>
-                                                                            {item.done ? 'Complete' : item.missingLabel}
-                                                                        </span>
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                        );
-                                                    })()}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {activePanelTab === 'Pricing & Units' && (
-                                        <div className="space-y-6">
-                                            {/* ── Order Requirements ──────────────────── */}
-                                            <div className="space-y-3">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    Order Requirements <Info size={12} className="text-teal-500"/>
-                                                </p>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Price per Piece</p>
-                                                        <p className="text-[9px] text-slate-400 -mt-0.5 mb-1.5">Supplier raw price (before markup)</p>
-                                                        {isEditing ? (
-                                                            <input
-                                                                type="number"
-                                                                step="0.01"
-                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                // Show basePrice ONLY. Don't fall back to `price` because
-                                                                // `price` is the marked-up customer-facing value (e.g. 15.48
-                                                                // when the supplier's raw is 15.00). Falling back to price
-                                                                // would silently overwrite basePrice with the marked-up
-                                                                // number on save and double-apply the markup downstream.
-                                                                value={editData.basePrice ?? 0}
-                                                                onChange={(e) => setEditData({...editData, basePrice: parseFloat(e.target.value)})}
-                                                            />
-                                                        ) : (
-                                                            <p className="text-sm font-bold text-slate-900">{formatPrice(selectedProduct.basePrice || 0)}</p>
-                                                        )}
-                                                    </div>
-                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Min Order (MOQ)</p>
-                                                        <div className="flex items-center gap-2">
-                                                            {isEditing ? (
-                                                                <>
-                                                                    <input
-                                                                        type="number"
-                                                                        min={1}
-                                                                        className="w-16 h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                        value={editData.moq ?? 1}
-                                                                        onChange={(e) => setEditData({ ...editData, moq: parseInt(e.target.value) || 1 })}
-                                                                    />
-                                                                    <select
-                                                                        value={String(editData.moqUnit || 'PIECE')}
-                                                                        onChange={(e) => setEditData({ ...editData, moqUnit: e.target.value })}
-                                                                        className="h-8 text-[11px] font-bold uppercase outline-none border border-slate-200 rounded-md bg-white px-1.5"
-                                                                    >
-                                                                        <option value="PIECE">Piece(s)</option>
-                                                                        <option value="CASE">Case(s)</option>
-                                                                        <option value="PALLET">Pallet(s)</option>
-                                                                        <option value="TRUCK">Truck(s)</option>
-                                                                    </select>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <span className="text-sm font-bold text-slate-900">{selectedProduct.moq || 1}</span>
-                                                                    <span className="text-[10px] font-bold text-slate-500 uppercase">
-                                                                        {(selectedProduct as any).moqUnit
-                                                                            ? `${String((selectedProduct as any).moqUnit).toLowerCase()}${(selectedProduct.moq || 1) > 1 ? 's' : ''}`
-                                                                            : 'piece(s)'}
-                                                                    </span>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">Available Stock (pcs)</p>
-                                                        {isEditing ? (
-                                                            <input
-                                                                type="number"
-                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                value={editData.stock ?? 0}
-                                                                onChange={(e) => setEditData({...editData, stock: parseInt(e.target.value)})}
-                                                            />
-                                                        ) : (
-                                                            <p className="text-sm font-bold text-slate-900">{selectedProduct.stock ?? 0}</p>
-                                                        )}
-                                                    </div>
-                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">EAN / Barcode</p>
-                                                        {isEditing ? (
-                                                            <input
-                                                                type="text"
-                                                                className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                value={editData.ean || ''}
-                                                                onChange={(e) => setEditData({...editData, ean: e.target.value})}
-                                                                placeholder="e.g. 7613035..."
-                                                            />
-                                                        ) : (
-                                                            <p className="text-sm font-bold text-slate-900 font-mono">{selectedProduct.ean || '—'}</p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            {/* ── Logistics / Pack Configuration ───── */}
-                                            <div className="space-y-3">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Logistics & Pack Configuration</p>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {[
-                                                        { label: 'Pcs / Case',      key: 'unitsPerCase',       placeholder: 'e.g. 24' },
-                                                        { label: 'Cases / Pallet',  key: 'casesPerPallet',     placeholder: 'e.g. 40' },
-                                                        { label: 'Pallets / Truck', key: 'palletsPerShipment', placeholder: 'e.g. 20' },
-                                                    ].map(({ label, key, placeholder }) => (
-                                                        <div key={key} className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
-                                                            <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">{label}</p>
-                                                            {isEditing ? (
-                                                                <input
-                                                                    type="number"
-                                                                    min="0"
-                                                                    className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                    value={(editData as any)[key] ?? ''}
-                                                                    onChange={(e) => setEditData({...editData, [key]: e.target.value ? parseInt(e.target.value) : null})}
-                                                                    placeholder={placeholder}
-                                                                />
-                                                            ) : (
-                                                                <p className="text-sm font-bold text-slate-900">{(selectedProduct as any)[key] ?? '—'}</p>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                    {/* Units / Pallet — auto-calculated */}
-                                                    <div className="p-4 border border-slate-100 rounded-2xl bg-teal-50/40">
-                                                        <p className="text-[9px] text-teal-500 font-bold uppercase mb-1">Units / Pallet (auto)</p>
-                                                        <p className="text-sm font-bold text-teal-700">
-                                                            {(() => {
-                                                                const pcs = (isEditing ? editData.unitsPerCase : selectedProduct.unitsPerCase) || 0;
-                                                                const cases = (isEditing ? editData.casesPerPallet : selectedProduct.casesPerPallet) || 0;
-                                                                return pcs && cases ? `${pcs * cases} pcs` : '—';
-                                                            })()}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                {/* Tier price preview — with markup, NO currency conversion (math stays in input currency) */}
-                                                {(() => {
-                                                    const pp = parseFloat((isEditing ? editData.basePrice : selectedProduct.basePrice) || 0);
-                                                    const pc = (isEditing ? editData.unitsPerCase : selectedProduct.unitsPerCase) || 0;
-                                                    const cp = (isEditing ? editData.casesPerPallet : selectedProduct.casesPerPallet) || 0;
-                                                    const pt = (isEditing ? editData.palletsPerShipment : selectedProduct.palletsPerShipment) || 0;
-                                                    if (!pp || !pc) return null;
-                                                    // Apply tier-specific markups
-                                                    const cartonTotal = pp * pc * markups.piece;
-                                                    const palletTotal = cp ? pp * pc * cp * markups.pallet : null;
-                                                    const truckTotal  = cp && pt ? pp * pc * cp * pt * markups.container : null;
-                                                    // Per-carton equivalents
-                                                    const palletPerCtn = palletTotal !== null && cp ? palletTotal / cp : null;
-                                                    const truckPerCtn  = truckTotal !== null && cp && pt ? truckTotal / (cp * pt) : null;
-                                                    // Local formatter — no currency conversion (input value is already in user's display currency)
-                                                    const sym = getCurrencyInfo().symbol;
-                                                    const fmt = (n: number) => `${sym}${n.toFixed(2)}`;
-                                                    return (
-                                                        <div className="p-4 bg-gradient-to-br from-teal-50 to-emerald-50 border border-teal-200 rounded-2xl space-y-3">
-                                                            <div className="flex items-center justify-between">
-                                                                <p className="text-[10px] text-teal-700 font-black uppercase tracking-widest">Customer prices (markup applied)</p>
-                                                                <p className="text-[9px] text-slate-500 font-mono">base {fmt(pp)} / pc</p>
-                                                            </div>
-                                                            <div className="grid grid-cols-3 gap-2">
-                                                                <div className="bg-white/60 rounded-xl p-2.5 text-center border border-white">
-                                                                    <p className="text-[9px] text-teal-600 font-black uppercase">Carton</p>
-                                                                    <p className="text-[15px] font-black text-teal-800">{fmt(cartonTotal)}</p>
-                                                                    <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
-                                                                        {fmt(pp)} × {pc} <span className="text-emerald-600 font-bold">+{Math.round((markups.piece - 1) * 100)}%</span>
-                                                                    </p>
-                                                                </div>
-                                                                {palletTotal !== null && (
-                                                                    <div className="bg-white/60 rounded-xl p-2.5 text-center border border-white">
-                                                                        <p className="text-[9px] text-teal-600 font-black uppercase">Pallet</p>
-                                                                        <p className="text-[15px] font-black text-teal-800">{fmt(palletTotal)}</p>
-                                                                        <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
-                                                                            {fmt(pp)} × {pc} × {cp} <span className="text-emerald-600 font-bold">+{Math.round((markups.pallet - 1) * 100)}%</span>
-                                                                        </p>
-                                                                        <p className="text-[9px] text-emerald-700 font-bold mt-0.5">{fmt(palletPerCtn!)}/ctn</p>
-                                                                    </div>
-                                                                )}
-                                                                {truckTotal !== null && (
-                                                                    <div className="bg-white/60 rounded-xl p-2.5 text-center border border-white">
-                                                                        <p className="text-[9px] text-teal-600 font-black uppercase">Truck</p>
-                                                                        <p className="text-[15px] font-black text-teal-800">{fmt(truckTotal)}</p>
-                                                                        <p className="text-[9px] text-slate-500 mt-0.5 leading-tight">
-                                                                            {fmt(pp)} × {pc} × {cp} × {pt} <span className="text-emerald-600 font-bold">+{Math.round((markups.container - 1) * 100)}%</span>
-                                                                        </p>
-                                                                        <p className="text-[9px] text-emerald-700 font-bold mt-0.5">{fmt(truckPerCtn!)}/ctn</p>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })()}
-                                            </div>
-
-                                            {/* ── Product Details ─────────────────── */}
-                                            <div className="space-y-3">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Product Details</p>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    {[
-                                                        { label: 'Origin (Country)',  key: 'origin',     placeholder: 'e.g. Germany' },
-                                                        { label: 'BBD (Best Before)', key: 'shelfLife',  placeholder: 'e.g. 20260731' },
-                                                        { label: 'Weight',            key: 'weight',     placeholder: 'e.g. 700g' },
-                                                        { label: 'Brand',             key: 'brand',      placeholder: 'e.g. Nestlé' },
-                                                    ].map(({ label, key, placeholder }) => (
-                                                        <div key={key} className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
-                                                            <p className="text-[9px] text-slate-400 font-bold uppercase mb-1">{label}</p>
-                                                            {isEditing ? (
-                                                                <input
-                                                                    type="text"
-                                                                    className="w-full h-8 text-sm font-bold outline-none border-b border-teal-100 bg-transparent"
-                                                                    value={(editData as any)[key] || ''}
-                                                                    onChange={(e) => setEditData({...editData, [key]: e.target.value})}
-                                                                    placeholder={placeholder}
-                                                                />
-                                                            ) : (
-                                                                <p className="text-sm font-bold text-slate-900">{(selectedProduct as any)[key] || '—'}</p>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                                {/* Description */}
-                                                <div className="p-4 border border-slate-100 rounded-2xl bg-slate-50/30">
-                                                    <p className="text-[9px] text-slate-400 font-bold uppercase mb-2">Product Description</p>
-                                                    {isEditing ? (
-                                                        <textarea
-                                                            rows={4}
-                                                            className="w-full px-0 text-[13px] font-medium outline-none border-b border-teal-100 bg-transparent resize-none"
-                                                            value={editData.description || ''}
-                                                            onChange={(e) => setEditData({...editData, description: e.target.value})}
-                                                        />
-                                                    ) : (
-                                                        <p className="text-[12px] text-slate-700 leading-relaxed">{selectedProduct.description || '—'}</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {activePanelTab === 'Supplier Info' && (
-                                        <div className="space-y-6">
-                                            <div className="p-6 bg-slate-900 rounded-3xl text-white relative overflow-hidden">
-                                                <div className="absolute -right-4 -top-4 opacity-10">
-                                                    <User size={120} />
-                                                </div>
-                                                <div className="relative z-10">
-                                                    <p className="text-[10px] font-bold text-teal-400 uppercase tracking-widest mb-2">Verified Supplier</p>
-                                                    <h4 className="text-xl font-bold mb-1">{selectedProduct.supplier?.name || 'Platform Inventory'}</h4>
-                                                    <p className="text-xs text-slate-400">{selectedProduct.supplier?.email || 'N/A'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-1 gap-3">
-                                                <div className="p-4 border border-slate-100 rounded-2xl flex items-center justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400"><Package size={16}/></div>
-                                                        <span className="text-xs font-semibold">Total Products</span>
-                                                    </div>
-                                                    <span className="text-sm font-bold">42</span>
-                                                </div>
-                                                <div className="p-4 border border-slate-100 rounded-2xl flex items-center justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-8 h-8 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400"><CheckCircle size={16}/></div>
-                                                        <span className="text-xs font-semibold">Quality Score</span>
-                                                    </div>
-                                                    <span className="text-sm font-bold text-green-600">98%</span>
-                                                </div>
-                                            </div>
-                                            <button
-                                                onClick={() => {
-                                                    if (selectedProduct?.supplier?.id) {
-                                                        router.push(`/admin/suppliers?id=${selectedProduct.supplier.id}`);
-                                                    } else {
-                                                        toast.error('Supplier info not available for this product');
-                                                    }
-                                                }}
-                                                disabled={!selectedProduct?.supplier?.id}
-                                                className="w-full h-12 bg-slate-100 text-slate-900 rounded-2xl text-[11px] font-bold uppercase tracking-widest hover:bg-slate-200 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                                            >
-                                                <ExternalLink size={14} /> View Supplier Profile
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {activePanelTab === 'AI Data' && (
-                                        <div className="space-y-6">
-                                            <div className="p-5 bg-teal-50 border border-teal-100 rounded-2xl flex items-center gap-4">
-                                                <div className="w-10 h-10 rounded-xl bg-teal-600 text-white flex items-center justify-center shadow-lg shadow-teal-600/20">
-                                                    <Sparkles size={18} />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-bold text-teal-900">AI Data Extraction</h4>
-                                                    <p className="text-[10px] text-teal-600 font-medium">Confidence Score: 94.2%</p>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-4">
-                                                <div className="flex items-center justify-between p-3 border-b border-slate-50">
-                                                    <span className="text-xs text-slate-500 font-medium">Auto-Categorization</span>
-                                                    <span className="text-xs font-bold text-slate-900">{selectedProduct.category}</span>
-                                                </div>
-                                                <div className="flex items-center justify-between p-3 border-b border-slate-50">
-                                                    <span className="text-xs text-slate-500 font-medium">Price Alignment</span>
-                                                    <span className="text-xs font-bold text-green-600">Optimal (+12%)</span>
-                                                </div>
-                                                <div className="flex items-center justify-between p-3 border-b border-slate-50">
-                                                    <span className="text-xs text-slate-500 font-medium">Quality Check</span>
-                                                    <span className="text-xs font-bold text-green-600">Passed</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {activePanelTab === 'Notes' && (
-                                        <div className="space-y-4">
-                                            <div className="flex items-center gap-2 text-slate-400 mb-2">
-                                                <MessageSquare size={16} />
-                                                <span className="text-[11px] font-bold uppercase tracking-widest">Internal Review Notes</span>
-                                            </div>
-                                            <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl">
-                                                <p className="text-xs text-amber-700 leading-relaxed font-medium">
-                                                    Supplier needs to provide higher resolution images for the secondary views. 
-                                                    Current images are slightly blurred.
-                                                </p>
-                                                <p className="text-[9px] text-amber-500 font-bold mt-4 uppercase">Last updated: 2 hours ago</p>
-                                            </div>
-                                            <textarea 
-                                                placeholder="Add private note for admin team..."
-                                                className="w-full h-32 bg-slate-50 border border-slate-100 rounded-2xl p-4 text-xs outline-none focus:border-teal-500 transition-all resize-none"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Panel Footer Actions */}
-                                <div className="p-6 border-t border-slate-100 bg-slate-50/50 space-y-4">
-                                    {isEditing ? (
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <button 
-                                                onClick={() => setIsEditing(false)}
-                                                className="h-11 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50"
-                                            >
-                                                Cancel
-                                            </button>
-                                            <button 
-                                                onClick={handleSaveEdit}
-                                                disabled={isSavingEdit}
-                                                className="h-11 bg-slate-900 text-white rounded-xl text-xs font-bold shadow-lg shadow-slate-900/20"
-                                            >
-                                                {isSavingEdit ? "Saving..." : "Save Changes"}
-                                            </button>
-                                        </div>
-                                    ) : showRejectInput ? (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="space-y-4"
-                                        >
-                                            <textarea
-                                                value={rejectReason}
-                                                onChange={(e) => setRejectReason(e.target.value)}
-                                                placeholder="Explain why this product is being rejected..."
-                                                className="w-full h-24 bg-white border border-red-100 rounded-2xl p-4 text-xs outline-none focus:border-red-500 transition-all resize-none shadow-sm"
-                                            />
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button
-                                                    onClick={() => setShowRejectInput(false)}
-                                                    className="h-11 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-500 hover:bg-slate-50"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    onClick={() => handleReject(selectedProduct.id)}
-                                                    className="h-11 bg-red-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-600/20"
-                                                >
-                                                    Submit Rejection
-                                                </button>
-                                            </div>
-                                        </motion.div>
-                                    ) : showDeleteConfirm ? (
-                                        <motion.div
-                                            initial={{ opacity: 0, y: 10 }}
-                                            animate={{ opacity: 1, y: 0 }}
-                                            className="space-y-4 p-4 bg-red-50 border border-red-200 rounded-2xl"
-                                        >
-                                            <div className="flex items-start gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                                                    <Trash2 size={18} className="text-red-600" />
-                                                </div>
-                                                <div className="flex-1">
-                                                    <p className="text-[14px] font-bold text-red-900 mb-1">Delete this product permanently?</p>
-                                                    <p className="text-[12px] text-red-700 leading-relaxed">
-                                                        "<strong>{selectedProduct.name}</strong>" ({selectedProduct.status}) will be removed from the system. This action cannot be undone.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <button
-                                                    onClick={() => setShowDeleteConfirm(false)}
-                                                    disabled={isDeleting}
-                                                    className="h-11 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                                                >
-                                                    Cancel
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDelete(selectedProduct.id)}
-                                                    disabled={isDeleting}
-                                                    className="h-11 bg-red-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-red-600/20 hover:bg-red-700 disabled:opacity-60 flex items-center justify-center gap-2"
-                                                >
-                                                    {isDeleting ? 'Deleting…' : <><Trash2 size={13} /> Yes, Delete</>}
-                                                </button>
-                                            </div>
-                                        </motion.div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <div className={`grid gap-3 ${selectedProduct.status === 'PENDING' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'}`}>
-                                                {/* Edit — always visible */}
-                                                <button
-                                                    onClick={() => startEditing(selectedProduct)}
-                                                    className="h-12 bg-white border border-slate-200 text-slate-700 rounded-xl text-[13px] font-semibold hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
-                                                >
-                                                    <Pencil size={14} /> Edit Product Details
-                                                </button>
-                                                {/* Reject — hide if already rejected */}
-                                                {selectedProduct.status !== 'REJECTED' && (
-                                                    <button
-                                                        onClick={() => setShowRejectInput(true)}
-                                                        className="h-12 bg-white border border-red-200 text-red-600 rounded-xl text-[13px] font-semibold hover:bg-red-50 transition-all flex items-center justify-center gap-2"
-                                                    >
-                                                        <XCircle size={14} /> Reject
-                                                    </button>
-                                                )}
-                                                {/* Approve — hide if already approved */}
-                                                {selectedProduct.status !== 'APPROVED' && (
-                                                    <button
-                                                        onClick={() => handleApprove(selectedProduct.id)}
-                                                        className="h-12 bg-teal-600 text-white rounded-xl text-[13px] font-semibold shadow-lg shadow-teal-600/25 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
-                                                    >
-                                                        <CheckCircle2 size={14} /> Approve
-                                                    </button>
-                                                )}
-                                                {/* Comment — only on supplier-submitted products that
-                                                    are NOT already APPROVED. Sends a message to the
-                                                    supplier and flips status to NEEDS_CHANGES. */}
-                                                {selectedProduct.status !== 'APPROVED' && !isAdminProduct(selectedProduct) && (
-                                                    <button
-                                                        onClick={() => { setCommentingProductId(selectedProduct.id); setCommentText(''); }}
-                                                        className="h-12 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[13px] font-semibold shadow-lg shadow-amber-500/25 transition-all flex items-center justify-center gap-2"
-                                                    >
-                                                        💬 Comment
-                                                    </button>
-                                                )}
-                                                {/* Already approved label */}
-                                                {selectedProduct.status === 'APPROVED' && (
-                                                    <div className="h-12 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl text-[13px] font-semibold flex items-center justify-center gap-2">
-                                                        <CheckCircle2 size={14} /> Product Approved
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {/* Delete — available for ANY status. Order history is preserved
-                                                via OrderItem.productNameSnapshot + the SET NULL cascade on the
-                                                productId FK, so deleting an approved product with orders no
-                                                longer breaks anything. The confirm dialog warns the admin if
-                                                the product has orders. */}
-                                            <button
-                                                onClick={() => setShowDeleteConfirm(true)}
-                                                className="w-full h-10 bg-white border border-red-100 text-red-500 rounded-xl text-[12px] font-semibold hover:bg-red-50 hover:border-red-300 transition-all flex items-center justify-center gap-2"
-                                            >
-                                                <Trash2 size={13} /> Delete this product
-                                            </button>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </motion.div>
-                    </motion.div>
+                        <ul className="md:hidden divide-y divide-line">
+                            {rows.map((p) => (
+                                <li key={p.id} className="flex gap-3 p-3">
+                                    <input type="checkbox" aria-label={tp('selectName', { name: p.name })} checked={selected.has(p.id)} onChange={() => toggle(p.id)} className="mt-3 w-4 h-4 accent-[#0E7C74]" />
+                                    <Link href={`/admin/products/${p.id}`} className="flex gap-3 min-w-0 flex-1">
+                                        <Thumb src={p.image} size={48} />
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block font-medium text-ink truncate">{p.name}</span>
+                                            <span className="block text-[12px] text-ink-3 truncate">{p.brand || tp('noBrand')}{!isCatalog && ` · ${supplierName(p)}`}</span>
+                                            <span className="mt-1 flex flex-wrap items-center gap-2 text-[12.5px]">
+                                                {statusBadge(p.status)}
+                                                {p.missing.length > 0 && <span className="text-amber-800">{tp('missingCount', { count: p.missing.length })}</span>}
+                                                <span className="tabular-nums text-ink-2">{eur(p.basePrice) ?? '—'}</span>
+                                            </span>
+                                        </span>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </>
                 )}
-            </AnimatePresence>
 
-            {/* Bulk Actions Floating Bar */}
-            <AnimatePresence>
-                {selectedIds.length > 0 && (
-                    <motion.div 
-                        initial={{ y: 100, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        exit={{ y: 100, opacity: 0 }}
-                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] w-full max-w-2xl px-6"
-                    >
-                        <div className="bg-slate-900 border border-slate-800 rounded-3xl p-4 shadow-2xl flex items-center justify-between gap-6 text-white ring-1 ring-white/10">
-                            <div className="flex items-center gap-4">
-                                <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center font-bold text-white shadow-lg shadow-teal-500/20">
-                                    {selectedIds.length}
-                                </div>
-                                <div>
-                                    <p className="text-sm font-bold">Items Selected</p>
-                                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Apply actions to selection</p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-3">
-                                <button 
-                                    onClick={() => handleBulkAction('approve')}
-                                    disabled={isBulkLoading}
-                                    className="h-10 px-4 bg-teal-600 hover:bg-teal-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
-                                >
-                                    <CheckCircle size={14} /> Approve
-                                </button>
-                                <button 
-                                    onClick={() => handleBulkAction('reject')}
-                                    disabled={isBulkLoading}
-                                    className="h-10 px-4 bg-orange-600 hover:bg-orange-700 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
-                                >
-                                    <XCircle size={14} /> Reject
-                                </button>
-                                <div className="w-px h-6 bg-slate-800 mx-1" />
-                                <button 
-                                    onClick={() => handleBulkAction('delete')}
-                                    disabled={isBulkLoading}
-                                    className="h-10 px-4 bg-white/10 hover:bg-red-600 rounded-xl text-xs font-bold flex items-center gap-2 transition-all disabled:opacity-50"
-                                >
-                                    <Trash2 size={14} /> Delete
-                                </button>
-                                <button 
-                                    onClick={() => setSelectedIds([])}
-                                    className="h-10 px-4 text-slate-400 hover:text-white transition-colors text-xs font-bold"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
+                {data && data.total > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-line text-[13px] text-ink-3">
+                        <span>{tp('rangeOf', { from: int((data.page - 1) * data.limit + 1), to: int(Math.min(data.page * data.limit, data.total)), total: int(data.total) })}</span>
+                        <div className="flex items-center gap-1">
+                            <Button size="sm" variant="ghost" icon={<ChevronLeft size={15} className="rtl:rotate-180" />} disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>{tp('previous')}</Button>
+                            <span className="px-2 tabular-nums">{tp('pageOf', { page: int(data.page), pages: int(data.pages) })}</span>
+                            <Button size="sm" variant="ghost" disabled={page >= data.pages || loading} onClick={() => setPage((p) => p + 1)}>{tp('next')} <ChevronRight size={15} className="rtl:rotate-180" /></Button>
                         </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Bulk Upload Guidelines Modal */}
-            <AnimatePresence>
-                {showUploadGuide && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                        <motion.div 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            onClick={() => setShowUploadGuide(false)}
-                            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
-                        />
-                        <motion.div 
-                            initial={{ scale: 0.95, opacity: 0, y: 20 }}
-                            animate={{ scale: 1, opacity: 1, y: 0 }}
-                            exit={{ scale: 0.95, opacity: 0, y: 20 }}
-                            className="bg-white rounded-[32px] w-full max-w-2xl relative z-10 overflow-hidden shadow-2xl border border-slate-200"
-                        >
-                            <div className="p-8">
-                                <div className="flex items-center justify-between mb-8">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 bg-teal-50 rounded-2xl flex items-center justify-center text-teal-600">
-                                            <FileSpreadsheet size={24} />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-xl font-bold text-slate-900">Bulk Ingestion Guidelines</h3>
-                                            <p className="text-sm text-slate-500 mt-0.5">Please ensure your file meets these requirements</p>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => setShowUploadGuide(false)} className="w-10 h-10 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400 transition-all">
-                                        <XCircle size={20} />
-                                    </button>
-                                </div>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div className="space-y-4">
-                                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                                            <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">Supported Formats</h4>
-                                            <div className="flex items-center gap-2">
-                                                <span className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600">.XLSX</span>
-                                                <span className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-600">.CSV</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-4 bg-teal-50 border border-teal-100 rounded-2xl">
-                                            <div className="flex items-start gap-3">
-                                                <ShieldCheck className="text-teal-600 mt-0.5" size={18} />
-                                                <div>
-                                                    <p className="text-sm font-bold text-teal-900">Validation Protocol</p>
-                                                    <p className="text-[12px] text-teal-700 mt-1 leading-relaxed">
-                                                        The system will verify each row. Invalid data (e.g. text in price column) will stop the ingestion.
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-4">
-                                        <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest px-2">Mandatory Columns</h4>
-                                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-                                            {[
-                                                'Product Name', 'Description', 'Product image',
-                                                'UnitBarcode', 'BBD (BBD)', 'Units / Carton',
-                                                'Cartons / Pallet', 'UnitPriceEUR', 'MOQ'
-                                            ].map(col => (
-                                                <div key={col} className="p-2.5 bg-white border border-slate-200 rounded-xl flex items-center gap-2">
-                                                    <div className="w-1.5 h-1.5 rounded-full bg-teal-500 shrink-0" />
-                                                    <span className="text-[10px] font-bold text-slate-600 truncate">{col}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="mt-10 flex items-center gap-3">
-                                    <button 
-                                        onClick={() => {
-                                            setShowUploadGuide(false);
-                                            setTimeout(() => fileInputRef.current?.click(), 100);
-                                        }}
-                                        className="flex-1 h-14 bg-teal-600 text-white rounded-2xl font-bold uppercase text-[12px] tracking-widest shadow-lg shadow-teal-600/20 hover:bg-teal-700 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <CheckCircle size={18} /> I Understand, Start Upload
-                                    </button>
-                                </div>
-                            </div>
-                        </motion.div>
                     </div>
                 )}
-            </AnimatePresence>
+            </Card>
 
-            {/* ── Add Product Side Drawer ──────────────────────────────── */}
-            <AddProductDrawer
-                isOpen={isAddDrawerOpen}
-                onClose={() => setIsAddDrawerOpen(false)}
-                onCreated={fetchData}
-                role="admin"
-            />
+            <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} title={tp('rejectDialogTitle', { count: rejectable.length })} description={tp('rejectDialogDesc')} size="sm"
+                footer={<><Button onClick={() => setRejectOpen(false)}>{tp('cancel')}</Button><Button variant="danger" loading={busy} onClick={rejectSelected}>{tp('rejectN', { count: rejectable.length })}</Button></>}>
+                <Field label={tp('reasonLabel')} htmlFor="bulk-reject-reason" required hint={tp('reasonHint')}>
+                    <textarea id="bulk-reject-reason" data-autofocus value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={4} className={cn(inputCls, 'h-auto py-2')} />
+                </Field>
+            </Dialog>
 
-            {/* Image lightbox — opened by clicking the product image / thumbs */}
-            <ImageLightbox
-                images={selectedProduct?.images || []}
-                startIndex={lightboxIndex}
-                onClose={() => setLightboxIndex(null)}
-                alt={selectedProduct?.name}
-            />
-
-            {/* Fix Currency Modal — repair wrongly-stored prices */}
-            <AnimatePresence>
-                {showFixCurrency && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-6"
-                    >
-                        <motion.div
-                            initial={{ scale: 0.95, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden"
-                        >
-                            <div className="p-6 border-b border-slate-100 flex items-start justify-between">
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-900">Fix Product Prices</h2>
-                                    <p className="text-xs text-slate-500 mt-1 max-w-xs">
-                                        Convert existing prices from a wrong source currency to EGP base. Use Preview first to verify.
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => { setShowFixCurrency(false); setFixPreview(null); }}
-                                    className="w-9 h-9 rounded-xl hover:bg-slate-100 flex items-center justify-center text-slate-400"
-                                >
-                                    <XCircle size={20} />
-                                </button>
-                            </div>
-
-                            <div className="p-6 space-y-4">
-                                <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
-                                        Prices were actually in
-                                    </label>
-                                    <select
-                                        value={fixFromCurrency}
-                                        onChange={(e) => { setFixFromCurrency(e.target.value); setFixPreview(null); }}
-                                        className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-teal-500"
-                                    >
-                                        <option value="USD">USD — US Dollar (×48.5)</option>
-                                        <option value="EUR">EUR — Euro (×52.8)</option>
-                                        <option value="GBP">GBP — British Pound (×61.4)</option>
-                                        <option value="AED">AED — UAE Dirham (×13.2)</option>
-                                        <option value="SAR">SAR — Saudi Riyal (×12.9)</option>
-                                        <option value="KWD">KWD — Kuwaiti Dinar (×158.0)</option>
-                                        <option value="QAR">QAR — Qatari Riyal (×13.3)</option>
-                                        <option value="TRY">TRY — Turkish Lira (×1.49)</option>
-                                        <option value="INR">INR — Indian Rupee (×0.583)</option>
-                                    </select>
-                                </div>
-
-                                <div>
-                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">
-                                        Limit to supplier (optional)
-                                    </label>
-                                    <input
-                                        type="text"
-                                        value={fixSupplierId}
-                                        onChange={(e) => { setFixSupplierId(e.target.value); setFixPreview(null); }}
-                                        placeholder="Leave empty to apply to ALL products"
-                                        className="w-full h-12 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-teal-500"
-                                    />
-                                </div>
-
-                                {fixPreview && (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 space-y-2">
-                                        <p className="text-xs font-black text-amber-900">
-                                            Preview: {fixPreview.count} products will be multiplied by ×{fixPreview.multiplier}
-                                        </p>
-                                        <div className="space-y-1.5">
-                                            {fixPreview.sample?.map((p: any) => (
-                                                <div key={p.id} className="text-[11px] flex justify-between gap-2 bg-white/50 rounded-lg px-2 py-1">
-                                                    <span className="truncate font-medium text-slate-700">{p.name}</span>
-                                                    <span className="font-bold text-slate-900 shrink-0">
-                                                        {p.currentBasePrice?.toFixed(2)} → {p.newBasePrice?.toFixed(2)} EGP
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div className="bg-red-50 border border-red-200 rounded-2xl p-3 text-[11px] text-red-700">
-                                    <strong>⚠ Warning:</strong> This is a one-way operation. If you run it twice with EUR, prices will be multiplied by 52.8² = 2787× — too much. Always preview first and only run once per source currency.
-                                </div>
-                            </div>
-
-                            <div className="p-4 border-t border-slate-100 flex gap-3">
-                                <button
-                                    onClick={() => runFixCurrency(true)}
-                                    disabled={isFixing}
-                                    className="flex-1 h-12 bg-slate-100 text-slate-900 rounded-2xl text-sm font-bold hover:bg-slate-200 transition-all disabled:opacity-50"
-                                >
-                                    {isFixing ? '...' : 'Preview'}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        if (!fixPreview) {
-                                            toast.error('Run Preview first to verify');
-                                            return;
-                                        }
-                                        if (!confirm(`Multiply prices of ${fixPreview.count} products by ×${fixPreview.multiplier}? This cannot be undone.`)) return;
-                                        runFixCurrency(false);
-                                    }}
-                                    disabled={isFixing || !fixPreview}
-                                    className="flex-1 h-12 bg-teal-600 text-white rounded-2xl text-sm font-black hover:bg-teal-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                                >
-                                    <CheckCircle2 size={16} /> {isFixing ? 'Converting...' : 'Apply Fix'}
-                                </button>
-                            </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Admin → Supplier comment modal. Auto-fills the product
-                info (name + image + supplier name) so the admin only
-                has to type the issue + click Send. Backend flips
-                status to NEEDS_CHANGES + emails the supplier. */}
-            <AnimatePresence>
-                {commentingProductId && (() => {
-                    const target = products.find(p => p.id === commentingProductId);
-                    if (!target) return null;
-                    return (
-                        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6">
-                            <motion.div
-                                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                                onClick={() => setCommentingProductId(null)}
-                                className="absolute inset-0 bg-slate-900/80 backdrop-blur-md"
-                            />
-                            <motion.div
-                                initial={{ opacity: 0, scale: 0.95, y: 20 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                                className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden"
-                            >
-                                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                                    <div>
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-amber-600">Send a comment</p>
-                                        <h2 className="text-[18px] font-black text-slate-900">Ask the supplier to fix this product</h2>
-                                    </div>
-                                    <button onClick={() => setCommentingProductId(null)} className="w-9 h-9 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400">✕</button>
-                                </div>
-
-                                <div className="p-6 space-y-4">
-                                    {/* Auto-prefilled product summary */}
-                                    <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
-                                        {target.images?.[0] ? (
-                                            <img src={target.images[0]} alt={target.name} className="w-14 h-14 rounded-lg object-cover bg-white border border-slate-200" />
-                                        ) : (
-                                            <div className="w-14 h-14 rounded-lg bg-white border border-slate-200 flex items-center justify-center"><Package size={18} className="text-slate-400" /></div>
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className="text-[13px] font-black text-slate-900 truncate">{target.name}</p>
-                                            <p className="text-[11px] text-slate-500 truncate">
-                                                Owner: <strong className="text-slate-700">{target.supplier?.companyName || target.supplier?.name || target.supplier?.email || '—'}</strong>
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-[12px] text-amber-800 leading-relaxed">
-                                        This message will be sent to the supplier as an in-app notification + email. The product status flips to <strong>NEEDS_CHANGES</strong>; the supplier sees a yellow callout, fixes the row, then clicks <strong>Resend for Review</strong>.
-                                    </div>
-
-                                    <div className="space-y-1.5">
-                                        <label className="text-[11px] font-black uppercase tracking-widest text-slate-500">What needs to change?</label>
-                                        <textarea
-                                            value={commentText}
-                                            onChange={e => setCommentText(e.target.value)}
-                                            placeholder="e.g. The product photo is blurry — please re-upload a clear front-facing image at minimum 800×800. Also the EAN field is missing."
-                                            rows={5}
-                                            className="w-full p-3 bg-slate-50 border-2 border-transparent rounded-xl text-[13px] outline-none focus:bg-white focus:border-amber-500 resize-y"
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end gap-2">
-                                    <button
-                                        onClick={() => setCommentingProductId(null)}
-                                        className="h-11 px-5 rounded-xl border border-slate-200 bg-white text-slate-600 font-bold text-[12px] uppercase tracking-widest"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button
-                                        onClick={handleSendComment}
-                                        disabled={isSendingComment || !commentText.trim()}
-                                        className="h-11 px-6 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-[12px] uppercase tracking-widest flex items-center gap-2 disabled:opacity-50"
-                                    >
-                                        {isSendingComment ? '...' : '💬'} Send Comment
-                                    </button>
-                                </div>
-                            </motion.div>
-                        </div>
-                    );
-                })()}
-            </AnimatePresence>
-
-            {/* Editing happens at /admin/products/[id]/edit — no modal here. */}
+            <ImportDialog open={importOpen} onClose={() => setImportOpen(false)} onDone={load} />
         </div>
+    );
+}
+
+/** Admin file import → Atlantis Catalog only (POST /products/bulk-upload attributes rows to the platform account). */
+function ImportDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+    const { t } = useLanguage();
+    const tp = (k: string, v?: Record<string, string | number>) => t('adminProducts', k, v);
+    const [file, setFile] = React.useState<File | null>(null);
+    const [currency, setCurrency] = React.useState('EUR');
+    const [busy, setBusy] = React.useState(false);
+    const [result, setResult] = React.useState<{ created: number; failed: number; errors: string[] } | null>(null);
+    const close = () => { if (busy) return; setFile(null); setResult(null); onClose(); };
+    const run = async () => {
+        if (!file) return;
+        setBusy(true);
+        try {
+            const fd = new FormData(); fd.append('file', file); fd.append('currency', currency);
+            const res = await apiFetch('/products/bulk-upload', { method: 'POST', body: fd });
+            const body = await res.json().catch(() => null);
+            if (!res.ok || body?.error) throw new Error(body?.error || body?.message || `HTTP ${res.status}`);
+            // Response of POST /products/bulk-upload: { totalRows, successCount, errorCount, createdCount, results: [{ success, errors }] }.
+            const created = Number(body?.createdCount ?? 0);
+            const errors: string[] = (Array.isArray(body?.results) ? body.results : []).filter((r: any) => !r?.success).flatMap((r: any) => (Array.isArray(r?.errors) ? r.errors : []).map((e: any) => (typeof e === 'string' ? e : e?.message || JSON.stringify(e))));
+            setResult({ created, failed: Number(body?.errorCount ?? 0), errors: errors.slice(0, 8) });
+            if (created > 0) onDone();
+        } catch (e: any) { toast.error(e.message || tp('importFailed')); } finally { setBusy(false); }
+    };
+    return (
+        <Dialog open={open} onClose={close} title={tp('importTitle')} description={tp('importDesc')} size="md" dismissable={!busy}
+            footer={result ? <Button variant="primary" onClick={close}>{tp('done')}</Button> : <><Button onClick={close} disabled={busy}>{tp('cancel')}</Button><Button variant="primary" loading={busy} disabled={!file} onClick={run}>{tp('importRun')}</Button></>}>
+            {result ? (
+                <div className="space-y-3 text-[13.5px]">
+                    <Notice tone={result.created > 0 ? 'success' : 'warning'} title={tp('importResult', { created: result.created, failed: result.failed })} />
+                    {result.errors.length > 0 && <ul className="list-disc ps-5 text-ink-2 space-y-0.5">{result.errors.map((e, i) => <li key={i}>{e}</li>)}</ul>}
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    <Notice tone="info" title={tp('importDestination')}>{tp('importBehaviour')}</Notice>
+                    <Field label={tp('importFileLabel')} htmlFor="admin-import-file" required hint={tp('importFileHint')}>
+                        <input id="admin-import-file" type="file" accept=".xlsx,.xls,.csv" onChange={(e) => setFile(e.target.files?.[0] ?? null)} className="block w-full text-[13.5px] text-ink-2 file:me-3 file:h-9 file:px-3 file:rounded-lg file:border-0 file:bg-surface-2 file:text-ink file:font-medium" />
+                    </Field>
+                    <Field label={tp('importCurrency')} htmlFor="admin-import-currency" hint={tp('importCurrencyHint')}>
+                        <select id="admin-import-currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className={selectCls}>
+                            {['EUR', 'USD', 'GBP', 'RON', 'EGP', 'AED', 'SAR', 'TRY'].map((c) => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </Field>
+                </div>
+            )}
+        </Dialog>
     );
 }

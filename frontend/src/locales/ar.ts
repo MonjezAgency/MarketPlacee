@@ -417,7 +417,7 @@ export const ar: Messages = {
         teamMembers: "أعضاء الفريق",
         inviteCenter: "مركز الدعوات",
         groupCatalog: "الكتالوج",
-        allProducts: "جميع المنتجات",
+        allProducts: "المنتجات",
         addProduct: "إضافة منتج",
         categories: "الفئات",
         groupPromotions: "العروض",

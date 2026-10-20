@@ -39,6 +39,12 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../common/prisma.service';
 import { applyEditorCatalogFields } from './catalog-fields';
 import { ImageDiscoveryService } from './image-discovery.service';
+import { AdminProductsService } from './admin-products.service';
+import { ProductReviewService } from './product-review.service';
+import { parseScope } from './catalog-scope';
+
+const STAFF_REVIEWERS = ['OWNER', 'ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
+const actorOf = (req: any) => ({ id: req?.user?.sub ?? null, role: req?.user?.role ?? null });
 
 @Controller('products')
 export class ProductsController {
@@ -52,6 +58,8 @@ export class ProductsController {
         private readonly prisma: PrismaService,
         /** Background photo search by barcode for supplier products saved without a photo. */
         private readonly discovery?: ImageDiscoveryService,
+        private readonly adminProducts?: AdminProductsService,
+        private readonly reviewTrail?: ProductReviewService,
     ) { }
 
     /**
@@ -204,6 +212,28 @@ export class ProductsController {
         return this.productsService.findAllAdmin();
     }
 
+    /**
+     * Admin Products page: one scope at a time (Atlantis Catalog or Supplier
+     * Submissions — catalog-scope.ts), paginated and filtered on the server,
+     * with the counts of the dataset actually shown.
+     */
+    @Get('admin/list')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+    async adminList(@Query() q: Record<string, string>) {
+        const scope = parseScope(q.scope);
+        if (!scope) throw new BadRequestException({ code: 'SCOPE_INVALID', message: 'scope must be catalog or submissions.' });
+        return this.adminProducts!.list(scope, q);
+    }
+
+    /** Everything the reviewer needs for one product: record, owner, completeness, review trail, recent changes. */
+    @Get('admin/:id/review')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+    async adminReview(@Param('id') id: string) {
+        return this.adminProducts!.review(id);
+    }
+
     @Get('cart/recommendations')
     @UseGuards(OptionalJwtAuthGuard)
     async getRecommendations(@Request() req) {
@@ -324,14 +354,14 @@ export class ProductsController {
     @Patch(':id/approve')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
-    async approve(@Param('id') id: string) {
-        return this.productsService.updateStatus(id, ProductStatus.APPROVED);
+    async approve(@Param('id') id: string, @Request() req: any) {
+        return this.productsService.updateStatus(id, ProductStatus.APPROVED, undefined, actorOf(req));
     }
 
     @Patch(':id/reject')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
-    async reject(@Param('id') id: string, @Body('reason') reason?: string) {
+    async reject(@Param('id') id: string, @Request() req: any, @Body('reason') reason?: string) {
         // Operator request: admin types a reason → it lands on
         // adminNotes so the supplier reads "why" on their product
         // row. Once REJECTED, the supplier can't edit the product
@@ -342,6 +372,7 @@ export class ProductsController {
             id,
             ProductStatus.REJECTED,
             text || 'Rejected by admin. No specific reason provided — please create a fresh listing avoiding the gaps noted on our review queue.',
+            actorOf(req),
         );
     }
 
@@ -355,8 +386,24 @@ export class ProductsController {
     @Patch(':id/comment')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
-    async comment(@Param('id') id: string, @Body() body: { message: string }) {
-        return this.productsService.adminComment(id, body?.message || '');
+    async comment(@Param('id') id: string, @Body() body: { message: string }, @Request() req: any) {
+        return this.productsService.adminComment(id, body?.message || '', actorOf(req));
+    }
+
+    /**
+     * Review trail of one product (submissions, decisions, feedback). Staff see
+     * who acted; a supplier sees only their own products and "Atlantis".
+     */
+    @Get(':id/review-history')
+    @UseGuards(JwtAuthGuard)
+    async reviewHistory(@Param('id') id: string, @Request() req: any) {
+        const role = String(req.user?.role || '').toUpperCase();
+        const staff = STAFF_REVIEWERS.includes(role);
+        if (!staff) {
+            const p = await this.productsService.findOneRaw(id);
+            if (!p || p.supplierId !== req.user?.sub) throw new NotFoundException('Product not found');
+        }
+        return this.reviewTrail!.history(id, staff ? 'staff' : 'supplier');
     }
 
     /**
@@ -699,9 +746,10 @@ export class ProductsController {
     @Roles(Role.ADMIN)
     async updateStatus(
         @Param('id') id: string,
-        @Body() body: { status: ProductStatus; adminNotes?: string }
+        @Body() body: { status: ProductStatus; adminNotes?: string },
+        @Request() req: any,
     ) {
-        return this.productsService.updateStatus(id, body.status, body.adminNotes);
+        return this.productsService.updateStatus(id, body.status, body.adminNotes, actorOf(req));
     }
 
     @Patch(':id')
@@ -777,9 +825,9 @@ export class ProductsController {
     @Post('bulk-approve')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.ADMIN)
-    async approveBulk(@Body() body: { ids: string[] }) {
+    async approveBulk(@Body() body: { ids: string[] }, @Request() req: any) {
         if (!body.ids || !body.ids.length) return { message: 'No IDs provided' };
-        const r = await this.productsService.bulkApprove(body.ids);
+        const r = await this.productsService.bulkApprove(body.ids, actorOf(req));
         return {
             message: r.skipped.length ? `Approved ${r.count}; ${r.skipped.length} incomplete product(s) left for the supplier to finish.` : 'Products approved',
             count: r.count,
@@ -790,10 +838,10 @@ export class ProductsController {
     @Post('bulk-reject')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
-    async rejectBulk(@Body() body: { ids: string[]; reason?: string }) {
+    async rejectBulk(@Body() body: { ids: string[]; reason?: string }, @Request() req: any) {
         if (!body.ids || !body.ids.length) return { message: 'No IDs provided' };
         const reason = (body.reason || '').trim();
-        await this.productsService.bulkReject(body.ids, reason || undefined);
+        await this.productsService.bulkReject(body.ids, reason || undefined, actorOf(req));
         return { message: 'Products rejected', count: body.ids.length };
     }
 

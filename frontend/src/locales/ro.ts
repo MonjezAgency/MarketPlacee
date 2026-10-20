@@ -420,7 +420,7 @@ export const ro: Messages = {
         teamMembers: "Membrii echipei",
         inviteCenter: "Centru de invitații",
         groupCatalog: "Catalog de produse",
-        allProducts: "Toate produsele",
+        allProducts: "Produse",
         addProduct: "Adăugați un produs",
         categories: "Categorii",
         groupPromotions: "Promoții",
