@@ -1,1023 +1,323 @@
 'use client';
 
 import * as React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useRouter } from 'next/navigation';
-import {
-    Search, Filter, Download, MoreHorizontal,
-    CheckCircle, XCircle, Clock, Truck,
-    ClipboardList, DollarSign, Calendar, User,
-    ChevronRight, X, Printer, Package, History,
-    CheckSquare, Square, RefreshCw, Trash2,
-    ArrowUpRight, ArrowDownRight, MoreVertical,
-    FileText, CreditCard, Activity, MessageCircle,
-    TrendingUp, TrendingDown, RotateCcw
-} from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
+import toast from 'react-hot-toast';
+import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ClipboardList, Download, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { apiFetch } from '@/lib/api';
-import { formatPrice } from '@/lib/currency';
+import { useLanguage } from '@/contexts/LanguageContext';
+import { Button, Card, EmptyState, ErrorState, Notice, PageHeader, Skeleton, StatusBadge, inputCls, selectCls } from '@/components/supplier/ui';
+import { NextActionCell, PAYMENT_KEY, PaymentBadge } from '@/components/admin/OrderBadges';
+import {
+    EXPORT_MAX_ROWS, ORDER_SORTS, ORDER_STATUSES, adminOrdersApi,
+    type AdminOrderPage, type AdminOrderRow, type OrderListParams,
+} from '@/lib/admin-orders-api';
 
-// ─── Types & Constants ──────────────────────────────────────────────────────
+/**
+ * Admin → Order management (/admin/orders). Every count, filter and page comes
+ * from GET /orders/admin/list (backend/src/orders/admin-orders.ts): the six real
+ * order statuses, the "requiring action" queue of the Founder Overview, and
+ * filters applied on the server. Nothing on this page is estimated.
+ */
+const QUEUES = [
+    { id: 'requires_action', key: 'qRequiresAction' }, { id: 'ready', key: 'qReady' }, { id: 'decision', key: 'qDecision' },
+    { id: 'legacy', key: 'qLegacy' }, { id: 'waiting_suppliers', key: 'qWaitingSuppliers' }, { id: 'waiting_buyer', key: 'qWaitingBuyer' },
+];
+const STATUS_CARD_KEY: Record<string, string> = { PENDING: 'cardPending', PAID: 'cardPaid', PROCESSING: 'cardProcessing', SHIPPED: 'cardShipped', DELIVERED: 'cardDelivered', CANCELLED: 'cardCancelled' };
+const DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-interface AdminOrder {
-    id: string;
-    customer: string;
-    customerId: string;
-    customerEmail?: string;
-    customerPhone?: string;
-    supplier: string;
-    total: number;
-    supplierProfit: number;
-    adminProfit: number;
-    status: 'PENDING' | 'PAID' | 'SHIPPED' | 'DELIVERED' | 'CANCELLED';
-    date: string;
-    shippingCompany?: string;
-    shippingCost?: number;
-    trackingNumber?: string;
-    carrier?: string;
-    items: {
-        product: string;
-        productId?: string;
-        quantity: number;
-        price: number;
-        supplierName?: string;
-        unit?: string;
-        unitsPerCase?: number;
-        casesPerPallet?: number;
-        unitsPerPallet?: number;
-        palletsPerShipment?: number;
-    }[];
+/** A chosen calendar day → the instant its local day starts (`next` = the following day). */
+function localDayStart(day: string, next = false): string | undefined {
+    if (!DAY_RE.test(day)) return undefined;
+    const [y, m, d] = day.split('-').map(Number);
+    const at = new Date(y, m - 1, d + (next ? 1 : 0), 0, 0, 0, 0);
+    return Number.isNaN(at.getTime()) ? undefined : at.toISOString();
 }
 
-const STATUS_MAP = {
-    PENDING: { label: 'Pending', color: 'text-orange-600', bg: 'bg-orange-50', border: 'border-orange-100' },
-    PAID: { label: 'Confirmed', color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
-    SHIPPED: { label: 'Shipped', color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-    DELIVERED: { label: 'Completed', color: 'text-teal-600', bg: 'bg-teal-50', border: 'border-teal-100' },
-    CANCELLED: { label: 'Cancelled', color: 'text-red-600', bg: 'bg-red-50', border: 'border-red-100' },
-};
+export default function AdminOrdersPage() {
+    return <React.Suspense fallback={null}><OrdersList /></React.Suspense>;
+}
 
-// ─── Sub-Components ─────────────────────────────────────────────────────────
+function OrdersList() {
+    const router = useRouter();
+    const params = useSearchParams();
+    const { t, fmt } = useLanguage();
+    const tl = React.useCallback((k: string, v?: Record<string, string | number>) => t('adminOrders', k, v), [t]);
+    const eur = (n: number | null | undefined) => (n == null ? '—' : fmt.number(Number(n), { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    const int = (n: number | null | undefined) => (n == null ? '—' : fmt.number(n));
 
-function OrderKPICard({ label, value, trend, trendValue, icon: Icon, color, iconColor }: any) {
-    const isUp = trend === 'up';
+    const [q, setQ] = React.useState(params.get('q') || '');
+    const [debouncedQ, setDebouncedQ] = React.useState(q);
+    const [status, setStatus] = React.useState(params.get('status') || '');
+    const [paymentStatus, setPaymentStatus] = React.useState(params.get('paymentStatus') || '');
+    const [supplier, setSupplier] = React.useState(params.get('supplier') || '');
+    const [buyer, setBuyer] = React.useState(params.get('buyer') || '');
+    const [fromDay, setFromDay] = React.useState(params.get('from') || '');
+    const [toDay, setToDay] = React.useState(params.get('to') || '');
+    const [attention, setAttention] = React.useState(params.get('attention') || '');
+    const [sort, setSort] = React.useState((ORDER_SORTS as readonly string[]).includes(params.get('sort') || '') ? (params.get('sort') as string) : 'newest');
+    const [page, setPage] = React.useState(Number(params.get('page')) || 1);
+    const [data, setData] = React.useState<AdminOrderPage | null>(null);
+    const [error, setError] = React.useState<string | null>(null);
+    const [loading, setLoading] = React.useState(true);
+    const [exporting, setExporting] = React.useState(false);
+
+    const rangeInvalid = DAY_RE.test(fromDay) && DAY_RE.test(toDay) && fromDay > toDay;
+    const query: OrderListParams = React.useMemo(() => ({
+        q: debouncedQ, status, paymentStatus, supplier, buyer, attention, sort,
+        from: localDayStart(fromDay), to: localDayStart(toDay, true), page, limit: 25,
+    }), [debouncedQ, status, paymentStatus, supplier, buyer, attention, sort, fromDay, toDay, page]);
+
+    React.useEffect(() => { const h = setTimeout(() => setDebouncedQ(q.trim()), 300); return () => clearTimeout(h); }, [q]);
+    React.useEffect(() => { setPage(1); }, [debouncedQ, status, paymentStatus, supplier, buyer, attention, sort, fromDay, toDay]);
+    React.useEffect(() => {
+        const u = new URLSearchParams();
+        const keep: [string, string][] = [['q', debouncedQ], ['status', status], ['paymentStatus', paymentStatus], ['supplier', supplier], ['buyer', buyer], ['from', fromDay], ['to', toDay], ['attention', attention]];
+        for (const [k, v] of keep) if (v) u.set(k, v);
+        if (sort !== 'newest') u.set('sort', sort);
+        if (page > 1) u.set('page', String(page));
+        router.replace(u.toString() ? `/admin/orders?${u}` : '/admin/orders', { scroll: false });
+    }, [debouncedQ, status, paymentStatus, supplier, buyer, fromDay, toDay, attention, sort, page, router]);
+
+    const load = React.useCallback(() => {
+        if (rangeInvalid) return;
+        setLoading(true); setError(null);
+        adminOrdersApi.list(query).then(setData).catch((e) => setError(e.message)).finally(() => setLoading(false));
+    }, [query, rangeInvalid]);
+    React.useEffect(() => { load(); }, [load]);
+
+    const filtersActive = !!(debouncedQ || status || paymentStatus || supplier || buyer || fromDay || toDay || attention);
+    const clearFilters = () => { setQ(''); setStatus(''); setPaymentStatus(''); setSupplier(''); setBuyer(''); setFromDay(''); setToDay(''); setAttention(''); };
+
+    const exportCsv = async () => {
+        setExporting(true);
+        try {
+            await adminOrdersApi.exportCsv(query);
+            const n = data?.total ?? 0;
+            if (n > EXPORT_MAX_ROWS) toast(tl('exportCapped', { max: int(EXPORT_MAX_ROWS), total: int(n) }));
+            else toast.success(tl('exportDone', { count: n }));
+        } catch (e: any) { toast.error(e.message || tl('exportFailed')); } finally { setExporting(false); }
+    };
+
+    const c = data?.counts;
+    const att = c?.attention;
+    const rows = data?.data ?? [];
+    const toggleSort = (field: 'created' | 'total') => {
+        if (field === 'created') setSort((s) => (s === 'newest' ? 'oldest' : 'newest'));
+        else setSort((s) => (s === 'total_desc' ? 'total_asc' : 'total_desc'));
+    };
+    const sortIcon = (field: 'created' | 'total') => {
+        const on = field === 'created' ? ['newest', 'oldest'].includes(sort) : ['total_desc', 'total_asc'].includes(sort);
+        if (!on) return null;
+        const down = sort === 'newest' || sort === 'total_desc';
+        return down ? <ArrowDown size={12} aria-hidden /> : <ArrowUp size={12} aria-hidden />;
+    };
+    const ariaSort = (field: 'created' | 'total'): 'ascending' | 'descending' | 'none' => {
+        if (field === 'created') return sort === 'newest' ? 'descending' : sort === 'oldest' ? 'ascending' : 'none';
+        return sort === 'total_desc' ? 'descending' : sort === 'total_asc' ? 'ascending' : 'none';
+    };
+
     return (
-        <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm flex flex-col justify-between hover:shadow-md transition-all group">
-            <div className="flex items-start justify-between mb-4">
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", color)}>
-                    <Icon size={20} className={iconColor} />
+        <div data-no-translate className="text-start -mt-2">
+            <PageHeader title={tl('title')} description={tl('subtitle')}
+                actions={<Button icon={<Download size={15} />} loading={exporting} disabled={!data || data.total === 0 || rangeInvalid} onClick={exportCsv}>{tl('exportCsv')}</Button>} />
+
+            {/* Summary — current counts over all orders, from the server */}
+            <section aria-label={tl('summaryAria')} className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 mb-2">
+                <SummaryCard label={tl('cardAll')} value={c ? int(c.total) : null} active={!status && !attention} onClick={() => { setStatus(''); setAttention(''); }} />
+                {ORDER_STATUSES.map((s) => (
+                    <SummaryCard key={s} label={tl(STATUS_CARD_KEY[s])} value={c ? int(c.byStatus[s]) : null} active={status === s} onClick={() => { setAttention(''); setStatus((x) => (x === s ? '' : s)); }} />
+                ))}
+                <SummaryCard tone="warning" label={tl('cardRequiresAction')} value={att ? int(att.requiresAction) : null} active={attention === 'requires_action'}
+                    hint={att ? tl('requiresActionHint', { ready: att.readyForApproval, decision: att.needsDecision, legacy: att.legacyPending }) : undefined}
+                    onClick={() => { setStatus(''); setAttention((x) => (x === 'requires_action' ? '' : 'requires_action')); }} />
+            </section>
+            <p className="mb-4 text-[12.5px] text-ink-3">{data ? tl('countsNote', { time: fmt.date(data.asOf, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }) : ' '}</p>
+
+            <Card bodyClassName="p-0">
+                <div className="flex flex-col gap-2 p-3 sm:p-4 border-b border-line">
+                    <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+                        <label className="relative sm:col-span-2">
+                            <span className="sr-only">{tl('search')}</span>
+                            <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-ink-4" aria-hidden />
+                            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl('searchPh')} className={cn(inputCls, 'ps-9')} />
+                        </label>
+                        <select aria-label={tl('filterStatus')} value={status} onChange={(e) => { setAttention(''); setStatus(e.target.value); }} className={selectCls}>
+                            <option value="">{tl('allStatuses')}</option>
+                            {ORDER_STATUSES.map((s) => <option key={s} value={s}>{tl(STATUS_CARD_KEY[s])}{c ? ` (${int(c.byStatus[s])})` : ''}</option>)}
+                        </select>
+                        <select aria-label={tl('filterQueue')} value={attention} onChange={(e) => setAttention(e.target.value)} className={selectCls}>
+                            <option value="">{tl('allQueues')}</option>
+                            {QUEUES.map((x) => <option key={x.id} value={x.id}>{tl(x.key)}{att ? ` (${int(queueCount(x.id, att))})` : ''}</option>)}
+                        </select>
+                        <select aria-label={tl('filterPayment')} value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className={selectCls}>
+                            <option value="">{tl('allPayments')}</option>
+                            {(data?.facets.paymentStatuses ?? []).map((p) => <option key={p.value} value={p.value}>{PAYMENT_KEY[p.value] ? tl(PAYMENT_KEY[p.value]) : p.value} ({int(p.count)})</option>)}
+                        </select>
+                        <select aria-label={tl('filterSupplier')} value={supplier} onChange={(e) => setSupplier(e.target.value)} className={selectCls}>
+                            <option value="">{tl('allSuppliers')}</option>
+                            {(data?.facets.suppliers ?? []).map((s) => <option key={s.id} value={s.id}>{s.name} ({int(s.count)})</option>)}
+                        </select>
+                        <select aria-label={tl('filterBuyer')} value={buyer} onChange={(e) => setBuyer(e.target.value)} className={selectCls}>
+                            <option value="">{tl('allBuyers')}</option>
+                            {(data?.facets.buyers ?? []).map((b) => <option key={b.id} value={b.id}>{b.name} ({int(b.count)})</option>)}
+                        </select>
+                        <select aria-label={tl('sort')} value={sort} onChange={(e) => setSort(e.target.value)} className={selectCls}>
+                            {ORDER_SORTS.map((o) => <option key={o} value={o}>{tl(`sort_${o}`)}</option>)}
+                        </select>
+                    </div>
+                    <div className="flex flex-wrap items-end gap-2">
+                        <label className="flex flex-col gap-1 text-[12.5px] text-ink-3">
+                            {tl('dateFrom')}
+                            <input type="date" value={fromDay} max={toDay || undefined} onChange={(e) => setFromDay(e.target.value)} className={cn(inputCls, 'w-[170px]')} />
+                        </label>
+                        <label className="flex flex-col gap-1 text-[12.5px] text-ink-3">
+                            {tl('dateTo')}
+                            <input type="date" value={toDay} min={fromDay || undefined} onChange={(e) => setToDay(e.target.value)} className={cn(inputCls, 'w-[170px]')} aria-invalid={rangeInvalid || undefined} />
+                        </label>
+                        <span className="pb-2.5 text-[12.5px] text-ink-3">{tl('dateHint')}</span>
+                        <span className="flex-1" />
+                        {filtersActive && <Button size="sm" variant="ghost" onClick={clearFilters}>{tl('clearFilters')}</Button>}
+                    </div>
+                    {rangeInvalid && <p role="alert" className="text-[12.5px] text-red-700">{tl('rangeInvalid')}</p>}
                 </div>
-                {trend && (
-                    <div className={cn(
-                        "flex items-center gap-1 text-[11px] font-bold",
-                        isUp ? "text-emerald-500" : "text-red-500"
-                    )}>
-                        {isUp ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
-                        {trendValue}%
+
+                {error && <div className="p-4"><ErrorState message={error} onRetry={load} /></div>}
+
+                {loading && !data ? (
+                    <div className="p-4 space-y-3">{Array.from({ length: 6 }).map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
+                ) : rows.length === 0 && !error ? (
+                    data?.counts.total ? (
+                        <EmptyState icon={<Search size={20} />} title={tl('noMatchTitle')} action={<Button onClick={clearFilters}>{tl('clearFilters')}</Button>}>{tl('noMatchBody')}</EmptyState>
+                    ) : (
+                        <EmptyState icon={<ClipboardList size={20} />} title={tl('emptyTitle')}>{tl('emptyBody')}</EmptyState>
+                    )
+                ) : (
+                    <>
+                        <div className="hidden lg:block overflow-x-auto">
+                            <table className={cn('w-full min-w-[1080px] text-[13.5px]', loading && 'opacity-60')}>
+                                <thead>
+                                    <tr className="text-[12px] text-ink-3 bg-surface-2/60 border-b border-line">
+                                        <th className="text-start font-medium ps-4 pe-2 py-2">{tl('colOrder')}</th>
+                                        <th className="text-start font-medium px-2 py-2">{tl('colBuyer')}</th>
+                                        <th className="text-start font-medium px-2 py-2">{tl('colSuppliers')}</th>
+                                        <th className="text-end font-medium px-2 py-2" aria-sort={ariaSort('total')}>
+                                            <button type="button" onClick={() => toggleSort('total')} className="inline-flex items-center gap-1 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal rounded">{tl('colTotal')}{sortIcon('total')}</button>
+                                        </th>
+                                        <th className="text-start font-medium px-2 py-2">{tl('colStatus')}</th>
+                                        <th className="text-start font-medium px-2 py-2">{tl('colPayment')}</th>
+                                        <th className="text-start font-medium px-2 py-2" aria-sort={ariaSort('created')}>
+                                            <button type="button" onClick={() => toggleSort('created')} className="inline-flex items-center gap-1 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal rounded">{tl('colCreated')}{sortIcon('created')}</button>
+                                        </th>
+                                        <th className="text-start font-medium px-2 pe-4 py-2">{tl('colNext')}</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((o) => (
+                                        <tr key={o.id} className="border-b border-line last:border-0 hover:bg-surface-2/40 align-top">
+                                            <td className="ps-4 pe-2 py-2.5 whitespace-nowrap">
+                                                <Link href={`/admin/orders/${o.id}`} className="font-medium text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal rounded">
+                                                    <bdi dir="ltr" className="font-mono text-[13px]">#{o.ref}</bdi>
+                                                </Link>
+                                                <span className="block text-[12px] text-ink-3">{tl('linesCount', { count: o.lines })}</span>
+                                            </td>
+                                            <td className="px-2 py-2.5 max-w-[220px]"><BuyerCell o={o} /></td>
+                                            <td className="px-2 py-2.5 max-w-[220px]"><SupplierCell o={o} tl={tl} /></td>
+                                            <td className="px-2 py-2.5 text-end tabular-nums whitespace-nowrap font-medium text-ink">{eur(o.total)}</td>
+                                            <td className="px-2 py-2.5"><StatusBadge kind="order" status={o.status} /></td>
+                                            <td className="px-2 py-2.5"><PaymentBadge value={o.paymentStatus} tl={tl} /></td>
+                                            <td className="px-2 py-2.5 text-[12.5px] text-ink-2 whitespace-nowrap tabular-nums">{fmt.date(o.createdAt)}<span className="block text-ink-4">{fmt.date(o.createdAt, { hour: '2-digit', minute: '2-digit' })}</span></td>
+                                            <td className="px-2 pe-4 py-2.5"><NextActionCell action={o.nextAction} tl={tl} /></td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        <ul className="lg:hidden divide-y divide-line">
+                            {rows.map((o) => (
+                                <li key={o.id}>
+                                    <Link href={`/admin/orders/${o.id}`} className="block p-3 hover:bg-surface-2/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal">
+                                        <span className="flex items-center justify-between gap-2">
+                                            <bdi dir="ltr" className="font-mono text-[13px] font-medium text-ink">#{o.ref}</bdi>
+                                            <span className="tabular-nums font-medium text-ink">{eur(o.total)}</span>
+                                        </span>
+                                        <span className="mt-0.5 block text-[13px] text-ink-2 truncate">{o.buyer?.companyName || o.buyer?.name || tl('unknownBuyer')}</span>
+                                        <span className="block text-[12px] text-ink-3 truncate">{o.suppliers.map((s) => s.name || tl('unnamedSupplier')).join(', ') || tl('noSupplier')} · {fmt.date(o.createdAt)}</span>
+                                        <span className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                                            <StatusBadge kind="order" status={o.status} />
+                                            <PaymentBadge value={o.paymentStatus} tl={tl} />
+                                            <NextActionCell action={o.nextAction} tl={tl} />
+                                        </span>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </>
+                )}
+
+                {data && data.total > 0 && (
+                    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-line text-[13px] text-ink-3">
+                        <span aria-live="polite">{tl('rangeOf', { from: int((data.page - 1) * data.limit + 1), to: int(Math.min(data.page * data.limit, data.total)), total: int(data.total) })}</span>
+                        <div className="flex items-center gap-1">
+                            <Button size="sm" variant="ghost" icon={<ChevronLeft size={15} className="rtl:rotate-180" />} disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>{tl('previous')}</Button>
+                            <span className="px-2 tabular-nums">{tl('pageOf', { page: int(data.page), pages: int(data.pages) })}</span>
+                            <Button size="sm" variant="ghost" disabled={page >= data.pages || loading} onClick={() => setPage((p) => p + 1)}>{tl('next')} <ChevronRight size={15} className="rtl:rotate-180" /></Button>
+                        </div>
                     </div>
                 )}
-            </div>
-            <div>
-                <p className="text-[13px] font-medium text-slate-500 uppercase tracking-wide mb-1.5">{label}</p>
-                <p className="text-2xl font-semibold text-slate-900 tracking-tight leading-none">{value}</p>
-            </div>
+            </Card>
+
+            <div className="mt-4"><Notice tone="info">{tl('returnsNote')}</Notice></div>
         </div>
     );
 }
 
-function StatusBadge({ status }: { status: keyof typeof STATUS_MAP }) {
-    const config = STATUS_MAP[status] || STATUS_MAP.PENDING;
+function queueCount(id: string, a: NonNullable<AdminOrderPage['counts']['attention']>) {
+    switch (id) {
+        case 'requires_action': return a.requiresAction;
+        case 'ready': return a.readyForApproval;
+        case 'decision': return a.needsDecision;
+        case 'legacy': return a.legacyPending;
+        case 'waiting_suppliers': return a.waitingSuppliers;
+        case 'waiting_buyer': return a.waitingBuyer;
+        default: return 0;
+    }
+}
+
+function SummaryCard({ label, value, hint, active, onClick, tone }: { label: string; value: string | null; hint?: string; active: boolean; onClick: () => void; tone?: 'warning' }) {
     return (
-        <span className={cn(
-            "px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border whitespace-nowrap",
-            config.color, config.bg, config.border
-        )}>
-            {config.label}
+        <button type="button" aria-pressed={active} onClick={onClick}
+            className={cn('text-start rounded-xl bg-surface ring-1 px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal',
+                active ? 'ring-2 ring-heading' : 'ring-line hover:ring-line-strong', tone === 'warning' && !active && 'ring-amber-200 bg-amber-50/50')}>
+            <span className={cn('flex items-center gap-1 text-[12px] font-medium', tone === 'warning' ? 'text-amber-800' : 'text-ink-3')}>
+                {tone === 'warning' && <AlertTriangle size={12} aria-hidden />}{label}
+            </span>
+            {value === null ? <Skeleton className="mt-1 h-6 w-12" /> : <span className="mt-0.5 block text-[20px] leading-7 font-semibold text-heading tabular-nums">{value}</span>}
+            {hint && <span className="block text-[11.5px] leading-4 text-ink-3">{hint}</span>}
+        </button>
+    );
+}
+
+function BuyerCell({ o }: { o: AdminOrderRow }) {
+    const { t } = useLanguage();
+    if (!o.buyer) return <span className="text-ink-4">{t('adminOrders', 'unknownBuyer')}</span>;
+    const main = o.buyer.companyName || o.buyer.name;
+    return (
+        <span className="block min-w-0">
+            <span className="block truncate text-ink">{main}</span>
+            {o.buyer.companyName && o.buyer.name && <span className="block truncate text-[12px] text-ink-3">{o.buyer.name}</span>}
         </span>
     );
 }
 
-// ─── Main Component ─────────────────────────────────────────────────────────
-
-export default function AdminOrdersPage() {
-    const router = useRouter();
-    const [orders, setOrders] = React.useState<AdminOrder[]>([]);
-    const [loading, setLoading] = React.useState(true);
-    const [searchTerm, setSearchTerm] = React.useState('');
-    const [filterStatus, setFilterStatus] = React.useState<string>('ALL');
-    const [selectedOrder, setSelectedOrder] = React.useState<AdminOrder | null>(null);
-    const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
-    const [isBulkLoading, setIsBulkLoading] = React.useState(false);
-    const [isExporting, setIsExporting] = React.useState(false);
-    const [detailTab, setDetailTab] = React.useState<'info' | 'customer' | 'payment' | 'timeline'>('info');
-
-    const [isStatusUpdating, setIsStatusUpdating] = React.useState<string | null>(null);
-    const [shipmentForm, setShipmentForm] = React.useState({ trackingNumber: '', carrier: 'DHL' });
-    const [isNotifying, setIsNotifying] = React.useState(false);
-
-    const loadOrders = async () => {
-        try {
-            setLoading(true);
-            const res = await apiFetch('/orders');
-            if (res.ok) {
-                const data = await res.json();
-                setOrders(data);
-                // Note: do not auto-select; details now open as a modal on row click
-            }
-        } catch (err) {
-            console.error('Failed to load orders:', err);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const updateStatus = async (id: string, status: string) => {
-        setIsStatusUpdating(id);
-        const tid = toast.loading(`Updating status to ${status}...`);
-        try {
-            const res = await apiFetch(`/orders/${id}/status`, {
-                method: 'PATCH',
-                body: JSON.stringify({ status })
-            });
-            if (res.ok) {
-                const updated = await res.json();
-                setOrders(prev => prev.map(o => o.id === id ? { ...o, status: updated.status as any } : o));
-                if (selectedOrder?.id === id) {
-                    setSelectedOrder(prev => prev ? { ...prev, status: updated.status as any } : null);
-                }
-                toast.success(`Order ${status.toLowerCase()} successfully`, { id: tid });
-            } else {
-                toast.error(`Failed to update status`, { id: tid });
-            }
-        } catch (err) {
-            toast.error('Connection error', { id: tid });
-        } finally {
-            setIsStatusUpdating(null);
-        }
-    };
-
-    const handleDeleteOrder = async (id: string) => {
-        if (!confirm('Are you sure you want to delete this order permanently?')) return;
-        const tid = toast.loading('Deleting order...');
-        try {
-            const res = await apiFetch(`/orders/${id}`, { method: 'DELETE' });
-            if (res.ok) {
-                toast.success('Order deleted', { id: tid });
-                setOrders(prev => prev.filter(o => o.id !== id));
-                setSelectedOrder(null);
-            } else {
-                toast.error('Failed to delete order', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Connection error', { id: tid });
-        }
-    };
-
-    const handleContactCustomer = (order: AdminOrder) => {
-        // Redirect to Support HQ and pass the customer name/id in the query
-        // The Support HQ page can then use this to auto-select the conversation
-        router.push(`/admin/support?search=${encodeURIComponent(order.customerId)}`);
-    };
-
-    const handleSaveShipment = async (orderId: string) => {
-        const tid = toast.loading('Saving delivery details...');
-        try {
-            const res = await apiFetch('/shipments', {
-                method: 'POST',
-                body: JSON.stringify({
-                    orderId,
-                    trackingNumber: shipmentForm.trackingNumber,
-                    carrier: shipmentForm.carrier
-                })
-            });
-            if (res.ok) {
-                toast.success('Delivery information updated', { id: tid });
-                await loadOrders();
-            } else {
-                toast.error('Failed to update delivery', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Network error', { id: tid });
-        }
-    };
-
-    const handleNotifyArriving = async (orderId: string) => {
-        setIsNotifying(true);
-        const tid = toast.loading('Sending notification...');
-        try {
-            const res = await apiFetch(`/orders/${orderId}/notify-delivery-day`, { method: 'POST' });
-            if (res.ok) toast.success('Notification sent', { id: tid });
-            else toast.error('Failed to send', { id: tid });
-        } catch (err) {
-            toast.error('Connection error', { id: tid });
-        } finally {
-            setIsNotifying(false);
-        }
-    };
-
-    const toggleSelection = (id: string) => {
-        const next = new Set(selectedIds);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        setSelectedIds(next);
-    };
-
-    const toggleAllSelections = () => {
-        if (selectedIds.size === filteredOrders.length) {
-            setSelectedIds(new Set());
-        } else {
-            setSelectedIds(new Set(filteredOrders.map(o => o.id)));
-        }
-    };
-
-    const handleBulkDelete = async () => {
-        if (!confirm(`Are you sure you want to delete ${selectedIds.size} orders?`)) return;
-        const tid = toast.loading('Deleting orders...');
-        setIsBulkLoading(true);
-        try {
-            const ids = Array.from(selectedIds);
-            const res = await apiFetch('/orders/bulk', {
-                method: 'DELETE',
-                body: JSON.stringify({ ids })
-            });
-            if (res.ok) {
-                toast.success('Orders deleted', { id: tid });
-                setOrders(prev => prev.filter(o => !selectedIds.has(o.id)));
-                setSelectedIds(new Set());
-            } else {
-                toast.error('Failed to delete', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Connection error', { id: tid });
-        } finally {
-            setIsBulkLoading(false);
-        }
-    };
-
-    const handleBulkStatusUpdate = async (status: string) => {
-        const tid = toast.loading(`Updating ${selectedIds.size} orders to ${status}...`);
-        setIsBulkLoading(true);
-        try {
-            const ids = Array.from(selectedIds);
-            const res = await apiFetch('/orders/bulk-status', {
-                method: 'PATCH',
-                body: JSON.stringify({ ids, status })
-            });
-            if (res.ok) {
-                toast.success('Status updated', { id: tid });
-                setOrders(prev => prev.map(o => selectedIds.has(o.id) ? { ...o, status: status as any } : o));
-                setSelectedIds(new Set());
-            } else {
-                toast.error('Failed to update status', { id: tid });
-            }
-        } catch (err) {
-            toast.error('Connection error', { id: tid });
-        } finally {
-            setIsBulkLoading(false);
-        }
-    };
-
-    React.useEffect(() => {
-        loadOrders();
-    }, []);
-
-    // Auto-refresh every 30s while the tab is visible so new orders
-    // appear without an explicit reload. Cheap polling, pauses when
-    // backgrounded. Operator-required.
-    React.useEffect(() => {
-        const tick = () => { if (!document.hidden) loadOrders(); };
-        const id = setInterval(tick, 30000);
-        return () => clearInterval(id);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
-
-    const filteredOrders = orders
-        .filter(o => filterStatus === 'ALL' || o.status === filterStatus)
-        .filter(o =>
-            o.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            o.customer.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            o.supplier.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-
-    const stats = {
-        total: orders.length,
-        pending: orders.filter(o => o.status === 'PENDING').length,
-        completed: orders.filter(o => o.status === 'DELIVERED').length,
-        cancelled: orders.filter(o => o.status === 'CANCELLED').length,
-        returned: 12, // Mocked for visual
-    };
-
-    /**
-     * Export the current orders table to PDF by opening a print-styled
-     * window and calling window.print(). The user can save as PDF from
-     * the browser's print dialog — works in every browser, no heavy
-     * client-side PDF library required.
-     *
-     * Also still offers a CSV fallback via the Cmd/Ctrl-click path.
-     */
-    const handleExport = async (format: 'pdf' | 'csv' = 'pdf') => {
-        setIsExporting(true);
-        const tid = toast.loading(`Generating ${format.toUpperCase()} export...`);
-        try {
-            if (orders.length === 0) {
-                toast.error('No orders to export', { id: tid });
-                setIsExporting(false);
-                return;
-            }
-
-            if (format === 'csv') {
-                const headers = ['Order ID', 'Customer', 'Supplier', 'Total', 'Status', 'Date'];
-                const rows = orders.map(o => [
-                    o.id,
-                    o.customer,
-                    o.supplier,
-                    o.total.toString(),
-                    o.status,
-                    new Date(o.date).toLocaleDateString(),
-                ]);
-                const csvContent = [
-                    headers.join(','),
-                    ...rows.map(r => r.map(cell => `"${cell}"`).join(',')),
-                ].join('\n');
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const link = document.createElement('a');
-                const url = URL.createObjectURL(blob);
-                link.setAttribute('href', url);
-                link.setAttribute('download', `atlantis-orders-${new Date().toISOString().split('T')[0]}.csv`);
-                link.style.visibility = 'hidden';
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                toast.success('CSV downloaded', { id: tid });
-                return;
-            }
-
-            // ── PDF path: open a print-styled window + call window.print()
-            const escape = (s: any) =>
-                String(s ?? '')
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;');
-            const now = new Date().toLocaleString();
-            const rowsHtml = orders.map(o => `
-                <tr>
-                    <td><span class="mono">${escape(o.id.slice(-8).toUpperCase())}</span></td>
-                    <td>${escape(o.customer)}</td>
-                    <td>${escape(o.supplier)}</td>
-                    <td style="text-align:right;">€ ${Number(o.total || 0).toFixed(2)}</td>
-                    <td><span class="badge badge-${escape((o.status || '').toLowerCase())}">${escape(o.status)}</span></td>
-                    <td>${escape(new Date(o.date).toLocaleDateString('en-GB'))}</td>
-                </tr>
-            `).join('');
-            const totalRevenue = orders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-
-            const html = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"/>
-<title>Atlantis Orders Export — ${now}</title>
-<style>
-    body { font-family: 'Inter', Arial, sans-serif; color: #0F172A; padding: 32px; margin: 0; }
-    h1 { font-size: 22px; margin: 0 0 6px; letter-spacing: -0.02em; }
-    .meta { color: #64748B; font-size: 12px; margin-bottom: 24px; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th, td { padding: 10px 12px; border-bottom: 1px solid #E2E8F0; text-align: left; vertical-align: top; }
-    th { background: #F8FAFC; color: #475569; text-transform: uppercase; font-size: 10px; letter-spacing: 0.08em; font-weight: 800; }
-    tr:nth-child(even) td { background: #FAFBFC; }
-    .mono { font-family: 'JetBrains Mono', monospace; font-size: 11px; color: #334155; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
-    .badge-delivered { background: #DCFCE7; color: #166534; }
-    .badge-shipped { background: #DBEAFE; color: #1E40AF; }
-    .badge-processing { background: #FEF3C7; color: #92400E; }
-    .badge-pending { background: #FEF3C7; color: #92400E; }
-    .badge-cancelled { background: #FEE2E2; color: #991B1B; }
-    .footer { margin-top: 24px; font-size: 11px; color: #64748B; display: flex; justify-content: space-between; }
-    @page { margin: 16mm; }
-</style></head><body>
-<h1>Atlantis Marketplace — Orders Export</h1>
-<p class="meta">Generated on ${now} · ${orders.length} order${orders.length === 1 ? '' : 's'} · Total: € ${totalRevenue.toFixed(2)}</p>
-<table>
-    <thead>
-        <tr>
-            <th>Order #</th>
-            <th>Customer</th>
-            <th>Supplier</th>
-            <th style="text-align:right;">Total</th>
-            <th>Status</th>
-            <th>Date</th>
-        </tr>
-    </thead>
-    <tbody>${rowsHtml}</tbody>
-</table>
-<div class="footer">
-    <span>© ${new Date().getFullYear()} Atlantis FMCG</span>
-    <span>Bridging Markets. Building Opportunities.</span>
-</div>
-</body></html>`;
-
-            // Use a hidden iframe instead of window.open() so Chrome's
-            // pop-up blocker (default-on for any non-direct-click flow,
-            // and definitely for our async toast→export path) can't
-            // intercept us. The iframe lives in the current document,
-            // so no extra permission is needed.
-            const existing = document.getElementById('atlantis-pdf-export-frame');
-            if (existing) existing.remove();
-            const iframe = document.createElement('iframe');
-            iframe.id = 'atlantis-pdf-export-frame';
-            iframe.style.position = 'fixed';
-            iframe.style.right = '0';
-            iframe.style.bottom = '0';
-            iframe.style.width = '0';
-            iframe.style.height = '0';
-            iframe.style.border = '0';
-            iframe.style.opacity = '0';
-            iframe.setAttribute('aria-hidden', 'true');
-            document.body.appendChild(iframe);
-
-            const doc = iframe.contentDocument || iframe.contentWindow?.document;
-            if (!doc) {
-                toast.error('Could not initialize PDF export frame.', { id: tid });
-                iframe.remove();
-                return;
-            }
-            doc.open();
-            doc.write(html);
-            doc.close();
-
-            // Trigger print after the iframe has parsed the document.
-            // onload covers most browsers; the setTimeout fallback covers
-            // Safari, which sometimes fires onload before images settle.
-            const triggerPrint = () => {
-                try {
-                    iframe.contentWindow?.focus();
-                    iframe.contentWindow?.print();
-                } catch (e) {
-                    console.warn('iframe print failed', e);
-                }
-                // Clean up a few seconds later — long enough for the
-                // print dialog to read from it, short enough not to leak.
-                setTimeout(() => { iframe.remove(); }, 30_000);
-            };
-            iframe.onload = () => setTimeout(triggerPrint, 200);
-            // Belt-and-braces: if the iframe never fires onload (rare),
-            // force the print after a generous timeout so the operator
-            // doesn't get a silent no-op.
-            setTimeout(() => {
-                if (document.body.contains(iframe)) triggerPrint();
-            }, 1200);
-
-            toast.success('Print dialog will open — choose "Save as PDF"', { id: tid });
-        } catch (err) {
-            toast.error('Export failed', { id: tid });
-        } finally {
-            setIsExporting(false);
-        }
-    };
-
-    const [showFilterBar, setShowFilterBar] = React.useState(true);
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-[600px]">
-                <RefreshCw className="w-10 h-10 animate-spin text-teal-600" />
-            </div>
-        );
-    }
-
+function SupplierCell({ o, tl }: { o: AdminOrderRow; tl: (k: string, v?: Record<string, string | number>) => string }) {
+    if (!o.suppliers.length) return <span className="text-ink-4">{tl('noSupplier')}</span>;
+    const names = o.suppliers.map((s) => s.name || tl('unnamedSupplier'));
     return (
-        <div className="space-y-8 animate-in fade-in duration-700 pb-20">
-            {/* Header Area */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-2xl font-semibold text-slate-900 tracking-tight">Orders Management</h1>
-                    <p className="text-sm text-slate-500 mt-1">Track and manage marketplace transactions globally.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <div className="relative group">
-                        <Search className="absolute start-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-teal-600 transition-colors" size={16} />
-                        <input
-                            type="text"
-                            placeholder="Search orders..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="h-10 ps-11 pe-4 bg-white border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-teal-500/20 transition-all min-w-[280px]"
-                        />
-                    </div>
-                    <button 
-                        onClick={() => setShowFilterBar(!showFilterBar)}
-                        className={cn(
-                            "h-10 px-4 border rounded-xl text-xs font-semibold flex items-center gap-2 transition-all",
-                            showFilterBar ? "bg-teal-50 border-teal-200 text-teal-700" : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                        )}
-                    >
-                        <Filter size={16} />
-                        Filters
-                    </button>
-                    <div className="flex items-center gap-1 rounded-xl bg-teal-600 shadow-md shadow-teal-600/20 overflow-hidden">
-                        <button
-                            onClick={() => handleExport('pdf')}
-                            disabled={isExporting}
-                            className="h-10 ps-4 pe-3 text-white text-xs font-semibold flex items-center gap-2 hover:bg-teal-700 transition-all disabled:opacity-60"
-                            title="Open print dialog → Save as PDF"
-                        >
-                            <Download size={16} />
-                            Export PDF
-                        </button>
-                        <button
-                            onClick={() => handleExport('csv')}
-                            disabled={isExporting}
-                            className="h-10 px-3 text-white/90 text-[11px] font-bold border-s border-white/20 hover:bg-teal-700 transition-all disabled:opacity-60"
-                            title="Download CSV"
-                        >
-                            CSV
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            {/* KPI Strip (5 Cards) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
-                <OrderKPICard icon={Package} label="Total Orders" value={stats.total} trend="up" trendValue={12} color="bg-slate-50" iconColor="text-slate-600" />
-                <OrderKPICard icon={Clock} label="Pending" value={stats.pending} trend="up" trendValue={8} color="bg-orange-50" iconColor="text-orange-600" />
-                <OrderKPICard icon={CheckCircle} label="Completed" value={stats.completed} trend="up" trendValue={15} color="bg-teal-50" iconColor="text-teal-600" />
-                <OrderKPICard icon={XCircle} label="Cancelled" value={stats.cancelled} trend="down" trendValue={4} color="bg-red-50" iconColor="text-red-600" />
-                <OrderKPICard icon={RotateCcw} label="Returned" value={stats.returned} trend="up" trendValue={2} color="bg-slate-50" iconColor="text-slate-500" />
-            </div>
-
-            {/* Sticky Filter Bar */}
-            <AnimatePresence>
-                {showFilterBar && (
-                    <motion.div 
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        className="sticky top-0 z-20 bg-slate-50/80 backdrop-blur-md py-4 border-b border-slate-200 -mx-6 px-6 lg:-mx-8 lg:px-8 overflow-hidden"
-                    >
-                        <div className="flex flex-wrap items-center gap-4">
-                            <select 
-                                value={filterStatus}
-                                onChange={(e) => setFilterStatus(e.target.value)}
-                                className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500/20"
-                            >
-                                <option value="ALL">All Statuses</option>
-                                <option value="PENDING">Pending</option>
-                                <option value="PAID">Confirmed</option>
-                                <option value="SHIPPED">Shipped</option>
-                                <option value="DELIVERED">Delivered</option>
-                                <option value="CANCELLED">Cancelled</option>
-                            </select>
-                            
-                            <div className="h-9 px-4 bg-white border border-slate-200 rounded-lg flex items-center gap-2">
-                                <Calendar size={14} className="text-slate-400" />
-                                <input type="date" className="bg-transparent border-none outline-none text-[10px] font-bold text-slate-600" />
-                                <span className="text-slate-300">→</span>
-                                <input type="date" className="bg-transparent border-none outline-none text-[10px] font-bold text-slate-600" />
-                            </div>
-
-                            <select className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500/20">
-                                <option>All Payment Statuses</option>
-                                <option>Paid</option>
-                                <option>Awaiting Payment</option>
-                                <option>Refunded</option>
-                            </select>
-
-                            <select 
-                                onChange={(e) => setSearchTerm(e.target.value === 'All Suppliers' ? '' : e.target.value)}
-                                className="h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-semibold outline-none focus:ring-2 focus:ring-teal-500/20"
-                            >
-                                <option>All Suppliers</option>
-                                {Array.from(new Set(orders.map(o => o.supplier))).map(s => (
-                                    <option key={s} value={s}>{s}</option>
-                                ))}
-                            </select>
-
-                            {(filterStatus !== 'ALL' || searchTerm) && (
-                                <button 
-                                    onClick={() => { setFilterStatus('ALL'); setSearchTerm(''); }}
-                                    className="text-[10px] font-bold text-teal-600 uppercase hover:underline"
-                                >
-                                    Reset Filters
-                                </button>
-                            )}
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Main Content — full width table; details open in modal */}
-            <div className="grid grid-cols-12 gap-8 items-start">
-
-                {/* Orders Table (full width) */}
-                <div className="col-span-12 bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-start">
-                            <thead className="bg-slate-50/50 border-b border-slate-100">
-                                <tr>
-                                    <th className="px-6 py-4 w-12">
-                                        <button onClick={toggleAllSelections} className="text-slate-400 hover:text-teal-600 transition-colors">
-                                            {selectedIds.size === filteredOrders.length && filteredOrders.length > 0 ? <CheckSquare size={18} /> : <Square size={18} />}
-                                        </button>
-                                    </th>
-                                    <th className="px-6 py-4 text-start text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order ID</th>
-                                    <th className="px-6 py-4 text-start text-[10px] font-bold text-slate-400 uppercase tracking-widest">Customer</th>
-                                    <th className="px-6 py-4 text-start text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Price</th>
-                                    <th className="px-6 py-4 text-start text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
-                                    <th className="px-6 py-4 text-start text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
-                                    <th className="px-6 py-4 text-end"></th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-50">
-                                {filteredOrders.map((order) => (
-                                        <tr
-                                            key={order.id}
-                                            onClick={() => router.push(`/admin/orders/${order.id}`)}
-                                            className={cn(
-                                                "group cursor-pointer transition-all",
-                                                selectedOrder?.id === order.id ? "bg-teal-50/30" : "hover:bg-slate-50",
-                                                selectedIds.has(order.id) && "bg-teal-50/50"
-                                            )}
-                                        >
-                                            <td className="px-6 py-5" onClick={(e) => { e.stopPropagation(); toggleSelection(order.id); }}>
-                                                <div className={cn("transition-colors", selectedIds.has(order.id) ? "text-teal-600" : "text-slate-300 group-hover:text-slate-400")}>
-                                                    {selectedIds.has(order.id) ? <CheckSquare size={18} /> : <Square size={18} />}
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-5">
-                                                <div className="flex flex-col">
-                                                    <span className="text-sm font-semibold text-slate-900">{order.customer}</span>
-                                                    <span className="text-[10px] text-slate-400 font-medium">via {order.supplier}</span>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-5">
-                                                <span className="text-sm font-bold text-slate-900">{formatPrice(order.total)}</span>
-                                            </td>
-                                            <td className="px-6 py-5">
-                                                <StatusBadge status={order.status} />
-                                            </td>
-                                            <td className="px-6 py-5">
-                                                <span className="text-xs text-slate-500 font-medium">{new Date(order.date).toLocaleDateString()}</span>
-                                            </td>
-                                            <td className="px-6 py-5 text-end">
-                                                <ChevronRight size={18} className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-1 transition-all" />
-                                            </td>
-                                        </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-            </div>
-
-            {/* Order Details — centered modal */}
-            <AnimatePresence>
-                {selectedOrder && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="fixed inset-0 z-[80] flex items-center justify-center p-4 sm:p-8 bg-slate-900/60 backdrop-blur-sm"
-                        onClick={() => setSelectedOrder(null)}
-                    >
-                        <motion.div
-                            key={selectedOrder.id}
-                            initial={{ opacity: 0, y: 24, scale: 0.97 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            exit={{ opacity: 0, y: 24, scale: 0.97 }}
-                            transition={{ duration: 0.25, ease: 'easeOut' }}
-                            onClick={(e) => e.stopPropagation()}
-                            className="relative w-full max-w-[920px] max-h-[88vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col"
-                        ><div className="flex flex-col h-full overflow-hidden">
-                                {/* Panel Header */}
-                                <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-teal-600 shadow-sm">
-                                            <Package size={20} />
-                                        </div>
-                                        <div>
-                                            <h3 className="text-sm font-bold text-slate-900">Order #{selectedOrder.id.slice(-6).toUpperCase()}</h3>
-                                            <p className="text-[10px] text-slate-400 font-medium mt-0.5">Placed on {new Date(selectedOrder.date).toLocaleString()}</p>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => setSelectedOrder(null)} className="p-2 text-slate-400 hover:text-slate-900 transition-colors">
-                                        <X size={18} />
-                                    </button>
-                                </div>
-
-                                {/* Tabs */}
-                                <div className="flex items-center gap-6 px-6 py-3 border-b border-slate-100">
-                                    {['info', 'customer', 'payment', 'timeline'].map((t) => (
-                                        <button 
-                                            key={t}
-                                            onClick={() => setDetailTab(t as any)}
-                                            className={cn(
-                                                "text-[10px] font-bold uppercase tracking-widest pb-2 border-b-2 transition-all",
-                                                detailTab === t ? "text-teal-600 border-teal-500" : "text-slate-400 border-transparent hover:text-slate-900"
-                                            )}
-                                        >
-                                            {t}
-                                        </button>
-                                    ))}
-                                </div>
-
-                                {/* Panel Content */}
-                                <div className="p-6 space-y-6 overflow-y-auto no-scrollbar" style={{ maxHeight: 'calc(88vh - 200px)' }}>
-                                    {detailTab === 'info' && (
-                                        <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                                            {/* Supplier banner */}
-                                            {selectedOrder.supplier && (
-                                                <div className="flex items-center gap-3 p-3 bg-slate-900 rounded-xl">
-                                                    <div className="w-8 h-8 rounded-lg bg-teal-500/20 flex items-center justify-center text-teal-400 shrink-0">
-                                                        <User size={14} />
-                                                    </div>
-                                                    <div>
-                                                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Supplier</p>
-                                                        <p className="text-xs font-bold text-white">{selectedOrder.supplier}</p>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            <div className="space-y-3">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Order Summary</p>
-                                                <div className="space-y-3">
-                                                    {selectedOrder.items.map((item, idx) => {
-                                                        const logisticsStr = (() => {
-                                                            if (item.unit === 'case' && item.unitsPerCase && item.casesPerPallet) {
-                                                                const totalPieces = item.quantity * item.unitsPerCase;
-                                                                return `${item.quantity}×${item.unitsPerCase} = ${totalPieces} pcs (${item.casesPerPallet} cases/pallet)`;
-                                                            }
-                                                            if (item.unit === 'pallet' && item.unitsPerPallet) {
-                                                                return `${item.quantity} pallet(s) × ${item.unitsPerPallet} = ${item.quantity * item.unitsPerPallet} pcs`;
-                                                            }
-                                                            if (item.unit === 'shipment' && item.palletsPerShipment && item.unitsPerPallet) {
-                                                                const total = item.quantity * item.palletsPerShipment * item.unitsPerPallet;
-                                                                return `${item.quantity}×${item.palletsPerShipment}×${item.unitsPerPallet}=${total.toLocaleString()} pcs`;
-                                                            }
-                                                            return null;
-                                                        })();
-                                                        return (
-                                                            <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-100 space-y-1">
-                                                                <div className="flex items-start justify-between gap-2">
-                                                                    <div className="flex-1 min-w-0">
-                                                                        <p className="text-xs font-bold text-slate-900 truncate">{item.product}</p>
-                                                                        {item.supplierName && <p className="text-[10px] text-slate-400 font-medium">{item.supplierName}</p>}
-                                                                        {logisticsStr && (
-                                                                            <p className="text-[10px] font-bold text-teal-600 mt-0.5">{logisticsStr}</p>
-                                                                        )}
-                                                                        {!logisticsStr && (
-                                                                            <p className="text-[10px] text-slate-400">Qty: {item.quantity}</p>
-                                                                        )}
-                                                                    </div>
-                                                                    <span className="font-bold text-slate-900 text-xs shrink-0">{formatPrice(item.price * item.quantity)}</span>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                            <div className="h-px bg-slate-100" />
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-slate-400">Subtotal</span>
-                                                    <span className="font-medium text-slate-900">{formatPrice(selectedOrder.total)}</span>
-                                                </div>
-                                                <div className="flex justify-between text-xs">
-                                                    <span className="text-slate-400">Shipping</span>
-                                                    <span className="font-medium text-emerald-600">Free</span>
-                                                </div>
-                                                <div className="flex justify-between text-sm font-bold pt-2">
-                                                    <span className="text-slate-900">Total</span>
-                                                    <span className="text-teal-600">{formatPrice(selectedOrder.total)}</span>
-                                                </div>
-                                            </div>
-
-                                            {/* Logistics / Shipment Form */}
-                                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-4">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex items-center gap-2">
-                                                        <Truck size={14} className="text-teal-600" />
-                                                        <span className="text-[10px] font-bold text-slate-900 uppercase">Logistics Hub</span>
-                                                    </div>
-                                                    {selectedOrder.status === 'SHIPPED' && (
-                                                        <button 
-                                                            onClick={() => handleNotifyArriving(selectedOrder.id)}
-                                                            disabled={isNotifying}
-                                                            className="text-[9px] font-bold text-teal-600 hover:underline"
-                                                        >
-                                                            Notify Arrival
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <div className="space-y-1">
-                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Tracking #</label>
-                                                        <input 
-                                                            type="text" 
-                                                            className="w-full h-8 px-2 bg-white border border-slate-200 rounded-lg text-[10px] outline-none"
-                                                            value={shipmentForm.trackingNumber || selectedOrder.trackingNumber || ''}
-                                                            onChange={(e) => setShipmentForm({...shipmentForm, trackingNumber: e.target.value})}
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-1">
-                                                        <label className="text-[9px] font-bold text-slate-400 uppercase">Carrier</label>
-                                                        <select 
-                                                            className="w-full h-8 px-1 bg-white border border-slate-200 rounded-lg text-[10px] outline-none"
-                                                            value={shipmentForm.carrier || selectedOrder.carrier || 'DHL'}
-                                                            onChange={(e) => setShipmentForm({...shipmentForm, carrier: e.target.value})}
-                                                        >
-                                                            <option value="DHL">DHL</option>
-                                                            <option value="FEDEX">FedEx</option>
-                                                            <option value="UPS">UPS</option>
-                                                            <option value="ARAMEX">Aramex</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                <button 
-                                                    onClick={() => handleSaveShipment(selectedOrder.id)}
-                                                    className="w-full h-8 bg-slate-900 text-white text-[10px] font-bold uppercase rounded-lg hover:bg-slate-800 transition-all"
-                                                >
-                                                    Update Delivery
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {detailTab === 'customer' && (
-                                        <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center font-bold text-slate-400">
-                                                    {selectedOrder.customer[0]}
-                                                </div>
-                                                <div>
-                                                    <p className="text-sm font-bold text-slate-900">{selectedOrder.customer}</p>
-                                                    <p className="text-xs text-slate-500">{selectedOrder.customerEmail || 'no-email@atlantis.com'}</p>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-3">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Shipping Address</p>
-                                                <div className="p-4 bg-slate-50 rounded-xl text-xs text-slate-600 leading-relaxed italic">
-                                                    Address details not provided by customer during registration.
-                                                </div>
-                                            </div>
-                                            <button 
-                                                onClick={() => handleContactCustomer(selectedOrder)}
-                                                className="w-full h-10 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 flex items-center justify-center gap-2 hover:bg-slate-100 transition-all"
-                                            >
-                                                <MessageCircle size={14} />
-                                                Contact Customer
-                                            </button>
-                                        </div>
-                                    )}
-
-                                    {detailTab === 'payment' && (
-                                        <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                                            <div className="p-4 bg-teal-50 border border-teal-100 rounded-xl flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-teal-600 shadow-sm">
-                                                    <CreditCard size={20} />
-                                                </div>
-                                                <div>
-                                                    <p className="text-[10px] font-bold text-teal-600 uppercase tracking-widest">Payment Method</p>
-                                                    <p className="text-xs font-bold text-slate-900 mt-0.5">Credit Card (Stripe)</p>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-3">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Transaction Details</p>
-                                                <div className="space-y-3">
-                                                    <div className="flex justify-between text-xs">
-                                                        <span className="text-slate-400">Transaction ID</span>
-                                                        <span className="font-mono text-slate-900 uppercase">INTERNAL_B2B_{selectedOrder.id.slice(0, 8)}</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-xs">
-                                                        <span className="text-slate-400">Status</span>
-                                                        <span className="font-bold text-emerald-600">Captured</span>
-                                                    </div>
-                                                    <div className="flex justify-between text-xs">
-                                                        <span className="text-slate-400">Date</span>
-                                                        <span className="font-medium text-slate-900">May 20, 2024</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {detailTab === 'timeline' && (
-                                        <div className="space-y-6 animate-in fade-in slide-in-from-right-2 duration-300">
-                                            <div className="space-y-6 ps-4 border-s-2 border-slate-100">
-                                                {(selectedOrder as any).history && (selectedOrder as any).history.length > 0 ? (
-                                                    (selectedOrder as any).history.map((h: any, idx: number) => (
-                                                        <div key={idx} className="relative">
-                                                            <div className={cn("absolute -left-[25px] top-1 w-4 h-4 rounded-full ring-4 ring-white bg-emerald-500")} />
-                                                            <p className="text-xs font-bold text-slate-900">{h.status}</p>
-                                                            <p className="text-[10px] text-slate-400 mt-0.5">{new Date(h.time).toLocaleString()} • {h.reason || 'No details'}</p>
-                                                        </div>
-                                                    ))
-                                                ) : (
-                                                    <div className="relative">
-                                                        <div className={cn("absolute -left-[25px] top-1 w-4 h-4 rounded-full ring-4 ring-white bg-slate-300")} />
-                                                        <p className="text-xs font-bold text-slate-900">Initial Request</p>
-                                                        <p className="text-[10px] text-slate-400 mt-0.5">{new Date(selectedOrder.date).toLocaleString()}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Panel Actions */}
-                                <div className="p-6 bg-slate-50 border-t border-slate-100 flex flex-wrap gap-3">
-                                    {selectedOrder.status === 'PENDING' && (
-                                        <button 
-                                            onClick={() => updateStatus(selectedOrder.id, 'PAID')}
-                                            disabled={isStatusUpdating === selectedOrder.id}
-                                            className="flex-1 h-10 bg-teal-600 text-white rounded-xl text-xs font-semibold hover:bg-teal-700 transition-all shadow-md shadow-teal-600/20 disabled:opacity-50"
-                                        >
-                                            Confirm Order
-                                        </button>
-                                    )}
-                                    {selectedOrder.status === 'PAID' && (
-                                        <button 
-                                            onClick={() => updateStatus(selectedOrder.id, 'SHIPPED')}
-                                            disabled={isStatusUpdating === selectedOrder.id}
-                                            className="flex-1 h-10 bg-blue-600 text-white rounded-xl text-xs font-semibold hover:bg-blue-700 transition-all shadow-md shadow-blue-600/20 disabled:opacity-50"
-                                        >
-                                            Mark Shipped
-                                        </button>
-                                    )}
-                                    {selectedOrder.status === 'SHIPPED' && (
-                                        <button 
-                                            onClick={() => updateStatus(selectedOrder.id, 'DELIVERED')}
-                                            disabled={isStatusUpdating === selectedOrder.id}
-                                            className="flex-1 h-10 bg-emerald-600 text-white rounded-xl text-xs font-semibold hover:bg-emerald-700 transition-all shadow-md shadow-emerald-600/20 disabled:opacity-50"
-                                        >
-                                            Confirm Delivery
-                                        </button>
-                                    )}
-                                    <button 
-                                        onClick={() => updateStatus(selectedOrder.id, 'CANCELLED')}
-                                        disabled={isStatusUpdating === selectedOrder.id}
-                                        className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all disabled:opacity-50"
-                                    >
-                                        Cancel
-                                    </button>
-                                    <button 
-                                        onClick={() => handleDeleteOrder(selectedOrder.id)}
-                                        className="h-10 px-4 bg-white border border-red-200 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 transition-all"
-                                    >
-                                        Delete
-                                    </button>
-                                </div>
-                        </div>
-                        </motion.div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
-            {/* Bulk Action Bar */}
-            <AnimatePresence>
-                {selectedIds.size > 0 && (
-                    <motion.div
-                        initial={{ opacity: 0, y: 50 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 50 }}
-                        className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50"
-                    >
-                        <div className="bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-6 border border-white/10 backdrop-blur-xl">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Selected</span>
-                                <span className="text-sm font-bold">{selectedIds.size} Orders</span>
-                            </div>
-                            <div className="h-8 w-px bg-white/10"></div>
-                            <div className="flex items-center gap-3">
-                                <button 
-                                    onClick={() => handleBulkStatusUpdate('PAID')}
-                                    disabled={isBulkLoading}
-                                    className="h-10 px-5 bg-teal-500 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-teal-600 transition-all flex items-center gap-2"
-                                >
-                                    <CheckCircle size={16} /> Approve All
-                                </button>
-                                <button 
-                                    onClick={() => handleBulkStatusUpdate('CANCELLED')}
-                                    disabled={isBulkLoading}
-                                    className="h-10 px-5 bg-white/10 border border-white/10 text-white rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-white/20 transition-all flex items-center gap-2"
-                                >
-                                    <XCircle size={16} /> Cancel All
-                                </button>
-                                <button 
-                                    onClick={handleBulkDelete}
-                                    disabled={isBulkLoading}
-                                    className="h-10 px-5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-[11px] font-bold uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
-                                >
-                                    <Trash2 size={16} /> Delete All
-                                </button>
-                                <button 
-                                    onClick={() => setSelectedIds(new Set())}
-                                    className="p-2 text-slate-400 hover:text-white transition-colors"
-                                >
-                                    <X size={20} />
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
+        <span className="block min-w-0" title={names.join(', ')}>
+            <span className="block truncate text-ink-2">{names[0]}</span>
+            {names.length > 1 && <span className="block text-[12px] text-ink-3">{tl('moreSuppliers', { count: names.length - 1 })}</span>}
+        </span>
     );
 }

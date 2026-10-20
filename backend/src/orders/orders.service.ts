@@ -133,7 +133,7 @@ export class OrdersService {
                     }
                     await tx.orderStatusHistory.create({ data: { orderId, previousStatus: current.status, newStatus: current.status, changedById: actorId || current.customerId, reason: `Delivery charge ${orderData.shippingCost == null ? 'cleared' : `set to €${Number(orderData.shippingCost).toFixed(2)}`} — terms v${version}, buyer acceptance needed` } });
                 });
-                this.notificationsService.create(current.customerId, `Order #${orderId.slice(-8).toUpperCase()}: delivery charge ${orderData.shippingCost == null ? 'removed' : 'quoted'}`, 'Review the updated terms and accept them on the order page.', 'INFO', { orderId }).catch(() => {});
+                this.notificationsService.create(current.customerId, `Order #${orderId.slice(-8).toUpperCase()}: delivery charge ${orderData.shippingCost == null ? 'removed' : 'quoted'}`, 'Review the updated terms and accept them on the order page.', 'INFO', { orderId, kind: orderData.shippingCost == null ? 'ORDER_DELIVERY_REMOVED' : 'ORDER_DELIVERY_QUOTED', params: { ref: `#${orderId.slice(-8).toUpperCase()}` } }).catch(() => {});
             } else {
                 await this.prisma.order.update({ where: { id: orderId }, data: orderData });
             }
@@ -465,7 +465,7 @@ export class OrdersService {
                 'New Order Received',
                 `You have a new order #${order.id.slice(-8).toUpperCase()} waiting for confirmation.`,
                 'INFO',
-                { orderId: order.id },
+                { orderId: order.id, kind: 'ORDER_NEW_SUPPLIER', params: { ref: `#${order.id.slice(-8).toUpperCase()}` }, dedupeKey: `order:${order.id}:new` },
             ).catch(() => {});
         }
         // Email each supplier (unless they turned order emails off). Sent once,
@@ -479,7 +479,7 @@ export class OrdersService {
             'New Order Received',
             `Order #${order.id.slice(-8).toUpperCase()} has been placed by ${order.customer?.name}.`,
             'INFO',
-            { orderId: order.id }
+            { orderId: order.id, kind: 'ORDER_NEW_ADMIN', params: { ref: `#${order.id.slice(-8).toUpperCase()}`, buyer: order.customer?.companyName || order.customer?.name || '' }, dedupeKey: `order:${order.id}:new` }
         ).catch(() => {});
 
         return order;
@@ -856,9 +856,9 @@ export class OrdersService {
             const min = minOrderCases(p);
             if ((p.supplier?.notificationPrefs as any)?.lowStockAlerts === false || !p.supplierId) continue;
             if (after <= 0 && before > 0) {
-                this.notificationsService.create(p.supplierId, 'Out of stock', `“${p.name}” is out of stock after a new order. Buyers can’t order it until you add stock.`, 'WARNING', { productId: p.id, type: 'LOW_STOCK' }).catch(() => {});
+                this.notificationsService.create(p.supplierId, 'Out of stock', `“${p.name}” is out of stock after a new order. Buyers can’t order it until you add stock.`, 'WARNING', { productId: p.id, type: 'LOW_STOCK', kind: 'STOCK_OUT', params: { product: p.name } }).catch(() => {});
             } else if (min > 0 && after < min && before >= min) {
-                this.notificationsService.create(p.supplierId, 'Low stock', `“${p.name}” has ${after} cases left — less than one minimum order (${min} cases).`, 'WARNING', { productId: p.id, type: 'LOW_STOCK' }).catch(() => {});
+                this.notificationsService.create(p.supplierId, 'Low stock', `“${p.name}” has ${after} cases left — less than one minimum order (${min} cases).`, 'WARNING', { productId: p.id, type: 'LOW_STOCK', kind: 'STOCK_LOW', params: { product: p.name, cases: after, min } }).catch(() => {});
             }
         }
     }
@@ -899,7 +899,7 @@ export class OrdersService {
         const state = await this.stateOf(order as any);
         await this.log(orderId, order.status, supplierId, `Supplier accepted terms v${(order as any).termsVersion}`);
         if (state.allAccepted) {
-            this.notificationsService.notifyAdmins('Order ready for approval', `Order #${orderId.slice(-8).toUpperCase()}: every supplier accepted the terms. Review and approve it.`, 'INFO', { orderId }).catch(() => {});
+            this.notificationsService.notifyAdmins('Order ready for approval', `Order #${orderId.slice(-8).toUpperCase()}: every supplier accepted the terms. Review and approve it.`, 'INFO', { orderId, kind: 'ORDER_READY', params: { ref: `#${orderId.slice(-8).toUpperCase()}` } }).catch(() => {});
         }
         return { id: orderId, status: order.status, reviewStatus: (order as any).reviewStatus, confirmation: conf, allSuppliersAccepted: state.allAccepted };
     }
@@ -917,7 +917,7 @@ export class OrdersService {
         const othersOnOrder = order.items.some((i: any) => i.product?.supplierId !== supplierId || i.mixedLoadId);
         if ((order as any).reviewStatus === 'LEGACY') {
             if (othersOnOrder) {
-                this.notificationsService.notifyAdmins('Supplier can’t fulfil part of an order', `Order #${orderId.slice(-8).toUpperCase()}: a supplier asked to decline their lines. Reason: ${text.slice(0, 300)}`, 'WARNING', { orderId, supplierId }).catch(() => {});
+                this.notificationsService.notifyAdmins('Supplier can’t fulfil part of an order', `Order #${orderId.slice(-8).toUpperCase()}: a supplier asked to decline their lines. Reason: ${text.slice(0, 300)}`, 'WARNING', { orderId, supplierId, kind: 'ORDER_SUPPLIER_DECLINED_LINES', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, reason: text.slice(0, 300) } }).catch(() => {});
                 throw new ConflictException({ code: 'SHARED_ORDER', message: 'This order also contains other suppliers’ products, so it can’t be declined from here. We’ve told the Atlantis team — they will contact you.' });
             }
             return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, supplierId, `Declined by supplier: ${text.slice(0, 500)}`, AWAITING_SUPPLIER);
@@ -928,7 +928,7 @@ export class OrdersService {
             return this.internalUpdateStatus(orderId, OrderStatus.CANCELLED, supplierId, `Declined by supplier: ${text.slice(0, 500)}`, AWAITING_SUPPLIER);
         }
         await this.log(orderId, order.status, supplierId, `A supplier rejected terms v${(order as any).termsVersion}: ${text.slice(0, 300)}`);
-        this.notificationsService.notifyAdmins('Supplier rejected an order', `Order #${orderId.slice(-8).toUpperCase()}: a supplier rejected the terms. Reason: ${text.slice(0, 300)}. Amend the order or reject it.`, 'WARNING', { orderId, supplierId }).catch(() => {});
+        this.notificationsService.notifyAdmins('Supplier rejected an order', `Order #${orderId.slice(-8).toUpperCase()}: a supplier rejected the terms. Reason: ${text.slice(0, 300)}. Amend the order or reject it.`, 'WARNING', { orderId, supplierId, kind: 'ORDER_SUPPLIER_REJECTED', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, reason: text.slice(0, 300) } }).catch(() => {});
         return { id: orderId, status: order.status, reviewStatus: (order as any).reviewStatus, rejected: true };
     }
 
@@ -1030,7 +1030,7 @@ export class OrdersService {
             this.notificationsService.create(order.customer.id, `Order #${orderId.slice(-8).toUpperCase()} confirmed`,
                 needsBuyer ? 'The confirmed terms differ from what you submitted (for example the delivery charge). Review and accept them on the order page.'
                     : 'Every supplier confirmed and Atlantis approved your order. The Atlantis team will send payment details.',
-                'INFO', { orderId }).catch(() => {});
+                'INFO', { orderId, kind: needsBuyer ? 'ORDER_CONFIRMED_ACCEPT' : 'ORDER_CONFIRMED', params: { ref: `#${orderId.slice(-8).toUpperCase()}` } }).catch(() => {});
         }
         return updated;
     }
@@ -1054,7 +1054,7 @@ export class OrdersService {
         const deadline = new Date(Date.now() + (await this.confirmHours()) * 3600_000);
         const r = await this.prisma.orderSupplierConfirmation.updateMany({ where: { orderId, termsVersion: order.termsVersion, status: { in: ['PENDING', 'EXPIRED'] } }, data: { status: 'PENDING', deadline } });
         const waiting = await this.prisma.orderSupplierConfirmation.findMany({ where: { orderId, termsVersion: order.termsVersion, status: 'PENDING' }, select: { supplierId: true } });
-        for (const w of waiting) this.notificationsService.create(w.supplierId, 'Please confirm an order', `Order #${orderId.slice(-8).toUpperCase()} is waiting for your confirmation.`, 'INFO', { orderId }).catch(() => {});
+        for (const w of waiting) this.notificationsService.create(w.supplierId, 'Please confirm an order', `Order #${orderId.slice(-8).toUpperCase()} is waiting for your confirmation.`, 'INFO', { orderId, kind: 'ORDER_CONFIRM_REQUEST', params: { ref: `#${orderId.slice(-8).toUpperCase()}` } }).catch(() => {});
         await this.log(orderId, order.status, adminId, `Atlantis asked ${r.count} supplier${r.count === 1 ? '' : 's'} to confirm again (deadline ${deadline.toISOString().slice(0, 16)}Z)`);
         return { requested: r.count, deadline };
     }
@@ -1118,8 +1118,8 @@ export class OrdersService {
             }
             await tx.orderStatusHistory.create({ data: { orderId, previousStatus: order.status, newStatus: order.status, changedById: adminId, reason: `Terms amended to v${version}: ${reason.slice(0, 500)}` } });
         });
-        for (const sid of affected) this.notificationsService.create(sid, 'Order changed — please confirm again', `Order #${orderId.slice(-8).toUpperCase()} was changed: ${reason.slice(0, 200)}`, 'WARNING', { orderId }).catch(() => {});
-        if (order.customer?.id) this.notificationsService.create(order.customer.id, `Order #${orderId.slice(-8).toUpperCase()} changed`, `Atlantis changed your order before confirming it: ${reason.slice(0, 200)}. You’ll be asked to accept the new terms once the supplier confirms.`, 'WARNING', { orderId }).catch(() => {});
+        for (const sid of affected) this.notificationsService.create(sid, 'Order changed — please confirm again', `Order #${orderId.slice(-8).toUpperCase()} was changed: ${reason.slice(0, 200)}`, 'WARNING', { orderId, kind: 'ORDER_CHANGED_SUPPLIER', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, reason: reason.slice(0, 200) } }).catch(() => {});
+        if (order.customer?.id) this.notificationsService.create(order.customer.id, `Order #${orderId.slice(-8).toUpperCase()} changed`, `Atlantis changed your order before confirming it: ${reason.slice(0, 200)}. You’ll be asked to accept the new terms once the supplier confirms.`, 'WARNING', { orderId, kind: 'ORDER_CHANGED_BUYER', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, reason: reason.slice(0, 200) } }).catch(() => {});
         return this.workflowForAdmin(orderId);
     }
 
@@ -1132,7 +1132,7 @@ export class OrdersService {
         const r = await this.prisma.order.updateMany({ where: { id: orderId, customerId, termsVersion: order.termsVersion }, data: { buyerAcceptedVersion: order.termsVersion, buyerAcceptedAt: new Date() } });
         if (!r.count) throw new ConflictException({ code: 'TERMS_CHANGED', message: 'The terms changed again. Refresh the page and review them.' });
         await this.log(orderId, order.status, customerId, `Buyer accepted terms v${order.termsVersion}`);
-        this.notificationsService.notifyAdmins('Buyer accepted updated terms', `Order #${orderId.slice(-8).toUpperCase()}: the buyer accepted terms v${order.termsVersion}.`, 'INFO', { orderId }).catch(() => {});
+        this.notificationsService.notifyAdmins('Buyer accepted updated terms', `Order #${orderId.slice(-8).toUpperCase()}: the buyer accepted terms v${order.termsVersion}.`, 'INFO', { orderId, kind: 'ORDER_TERMS_ACCEPTED', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, version: order.termsVersion }, dedupeKey: `order:${orderId}:terms:${order.termsVersion}` }).catch(() => {});
         return { id: orderId, buyerAcceptedVersion: order.termsVersion };
     }
 
@@ -1142,7 +1142,7 @@ export class OrdersService {
         if (!stale.length) return 0;
         await this.prisma.orderSupplierConfirmation.updateMany({ where: { id: { in: stale.map((s) => s.id) }, status: 'PENDING' }, data: { status: 'EXPIRED' } });
         for (const orderId of new Set(stale.map((s) => s.orderId))) {
-            this.notificationsService.notifyAdmins('Supplier didn’t confirm in time', `Order #${orderId.slice(-8).toUpperCase()}: a supplier confirmation expired. Ask again or reject the order.`, 'WARNING', { orderId }).catch(() => {});
+            this.notificationsService.notifyAdmins('Supplier didn’t confirm in time', `Order #${orderId.slice(-8).toUpperCase()}: a supplier confirmation expired. Ask again or reject the order.`, 'WARNING', { orderId, kind: 'ORDER_CONFIRM_EXPIRED', params: { ref: `#${orderId.slice(-8).toUpperCase()}` } }).catch(() => {});
         }
         return stale.length;
     }
@@ -1245,7 +1245,7 @@ export class OrdersService {
             : await this.prisma.orderInspection.create({ data: { ...data, orderId, createdById: actorId } });
         await this.log(orderId, order.status, actorId, `Inspection ${inspectionId ? 'updated' : 'recorded'}: ${status.toLowerCase().replace(/_/g, ' ')}${resolution ? `, resolution ${resolution.toLowerCase().replace(/_/g, ' ')}` : ''}`);
         if (['PASSED', 'PASSED_WITH_FINDINGS', 'FAILED'].includes(status)) {
-            this.notificationsService.create(order.customerId, `Order #${orderId.slice(-8).toUpperCase()}: inspection ${status === 'PASSED' ? 'passed' : status === 'FAILED' ? 'failed' : 'found issues'}`, 'The inspection report is on your order page.', status === 'PASSED' ? 'INFO' : 'WARNING', { orderId }).catch(() => {});
+            this.notificationsService.create(order.customerId, `Order #${orderId.slice(-8).toUpperCase()}: inspection ${status === 'PASSED' ? 'passed' : status === 'FAILED' ? 'failed' : 'found issues'}`, 'The inspection report is on your order page.', status === 'PASSED' ? 'INFO' : 'WARNING', { orderId, kind: status === 'PASSED' ? 'ORDER_INSPECTION_PASSED' : status === 'FAILED' ? 'ORDER_INSPECTION_FAILED' : 'ORDER_INSPECTION_ISSUES', params: { ref: `#${orderId.slice(-8).toUpperCase()}` } }).catch(() => {});
         }
         return this.inspectionView(saved, order.items);
     }
@@ -1412,7 +1412,7 @@ export class OrdersService {
                 `Order #${orderId.slice(-8).toUpperCase()}: ${label}`,
                 status === OrderStatus.CANCELLED && reason ? `Your order was cancelled. ${reason}` : `Your order is now ${label.toLowerCase()}.`,
                 status === OrderStatus.CANCELLED ? 'WARNING' : 'INFO',
-                { orderId, status },
+                { orderId, status, kind: 'ORDER_STATUS_BUYER', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, status, reason: status === OrderStatus.CANCELLED && reason ? String(reason).slice(0, 300) : '' } },
             ).catch(() => {});
         }
 
@@ -1429,7 +1429,7 @@ export class OrdersService {
                 `Order ${STATUS_LABELS[status] || status}`,
                 `Order #${orderId.slice(-8).toUpperCase()} has been updated to ${STATUS_LABELS[status] || status}.`,
                 'INFO',
-                { orderId },
+                { orderId, kind: 'ORDER_STATUS_SUPPLIER', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, status } },
             ).catch(() => {});
         }
 
@@ -1454,7 +1454,7 @@ export class OrdersService {
                 `${actorLabel} ${verb} order #${orderId.slice(-8).toUpperCase()}`,
                 `${actorLabel} marked order #${orderId.slice(-8).toUpperCase()} as ${STATUS_LABELS[status] || status}.`,
                 'INFO',
-                { orderId, supplierId: changedById, newStatus: status },
+                { orderId, supplierId: changedById, newStatus: status, kind: 'ORDER_STATUS_BY_SUPPLIER', params: { ref: `#${orderId.slice(-8).toUpperCase()}`, status, actor: actorLabel } },
             ).catch(() => { });
         }
 

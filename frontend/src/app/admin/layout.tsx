@@ -42,13 +42,11 @@ import {
     ShieldAlert,
     Code2,
     ExternalLink,
-    Bot,
     Lock,
     LifeBuoy,
     MessageCircle,
     Activity,
     CheckCircle2,
-    ScrollText,
     Image as ImageIcon,
     Target,
     Globe2,
@@ -70,7 +68,7 @@ interface SidebarGroup {
     links: SidebarLink[];
 }
 /** `section`: dictionary section of translationKey when it isn't `admin`. `children`: a parent that expands (no page of its own). */
-interface SidebarLink { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean; section?: 'promotions' | 'adminProducts'; children?: SidebarLink[] }
+interface SidebarLink { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean; section?: 'promotions' | 'adminProducts' | 'adminUsers'; children?: SidebarLink[] }
 
 // Owner-only group — بيظهر بس لـ OWNER
 const OWNER_GROUP: SidebarGroup = {
@@ -102,8 +100,8 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             { label: 'Target Prices', translationKey: 'targetPriceRequests', href: '/admin/target-prices', icon: Target },
             { label: 'Delivery Countries', translationKey: 'deliveryCountries', href: '/admin/delivery', icon: Globe2 },
             { label: 'Hubs & Freight Rates', translationKey: 'hubsRates', href: '/admin/fulfillment', icon: Truck },
-            { label: 'Supply Chain', translationKey: 'suppliers', href: '/admin/suppliers', icon: Store },
-            { label: 'B2B Customers', translationKey: 'buyers', href: '/admin/buyers', icon: Users },
+            // One Users entry replaces Suppliers, Buyers and User Directory; /admin/suppliers and /admin/buyers redirect there.
+            { label: 'Users', translationKey: 'nav', section: 'adminUsers', href: '/admin/users', icon: Users },
             { label: 'Finance & Logistics', translationKey: 'groupFinance', href: '/admin/finance', icon: DollarSign },
         ]
     },
@@ -135,7 +133,6 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         links: [
             { label: 'Support Overview', translationKey: 'overview', href: '/admin/support', icon: LayoutDashboard },
             { label: 'Dispute Center', translationKey: 'disputes', href: '/admin/disputes', icon: AlertCircle },
-            { label: 'Live Assistance', translationKey: 'liveChat', href: '/admin/support?tab=chat', icon: MessageCircle },
             { label: 'KYC Verification', translationKey: 'kycQueue', href: '/admin/kyc', icon: ShieldCheck },
         ]
     },
@@ -144,7 +141,6 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         titleKey: 'groupUsers',
         icon: Shield,
         links: [
-            { label: 'User Directory', translationKey: 'users', href: '/admin/users', icon: Users },
             { label: 'Internal Team', translationKey: 'teamMembers', href: '/admin/team', icon: KeyRound },
             { label: 'Invite Center', translationKey: 'inviteCenter', href: '/admin/invite', icon: UserPlus },
         ]
@@ -154,10 +150,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         titleKey: 'groupSystem',
         icon: Wrench,
         links: [
-            { label: 'Security Reports', translationKey: 'reports', href: '/admin/security', icon: Activity },
             { label: 'System Settings', translationKey: 'settings', href: '/admin/settings', icon: Settings },
-            { label: 'Terms & Conditions', translationKey: 'termsAndConditions', href: '/admin/terms', icon: ScrollText },
-            { label: 'AI Intelligence', translationKey: 'aiAgent', href: '/admin/ai-agent', icon: Bot },
         ]
     },
 ];
@@ -518,7 +511,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                         </button>
                     )}
                     <span className="hidden md:block"><WorldClock /></span>
-                    <span id="tour-admin-alerts" className="flex items-center"><NotificationBell compact /></span>
+                    <span id="tour-admin-alerts" className="flex items-center"><NotificationBell /></span>
                     <UserMenu role={user?.role || 'admin'} />
                 </header>
 

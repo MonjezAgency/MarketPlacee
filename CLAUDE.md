@@ -43,6 +43,16 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   account, duplicates matched against staff-owned products only, complete rows published, incomplete rows drafts.
 - Founder Overview figures are defined in `backend/src/admin/admin-overview.ts`. Atlantis revenue = buyer price − supplier net on
   lines with a recorded supplier price; net profit is unavailable (no cost records); payments = Stripe escrow records.
+- Admin Users is one list (`/admin/users`, `?role=SUPPLIER|CUSTOMER`) with a role-adapted detail page `/admin/users/[id]`;
+  `/admin/buyers` and `/admin/suppliers` redirect there. Security reports, Terms and the AI monitor left the sidebar but keep their
+  pages (linked from `/admin/settings`).
+- Admin Order Management: `/admin/orders` and `/admin/orders/[id]`, read models in `backend/src/orders/admin-orders.ts`
+  (`GET /orders/admin/list|export|:id/detail`). No returns/refunds card: nothing records a return. Supplier net and markup only for OWNER/ADMIN.
+- Product bulk actions: `POST /products/admin/bulk`, per-row rules in `backend/src/products/admin-bulk.ts`; every skip is reported.
+- Notifications: persisted per user; `data.kind` + `data.params` let the bell (`components/ui/NotificationBell.tsx`,
+  `lib/notifications.ts`) render them in the reader's language (keys in `locales/sections/notificationsCenter.ts`);
+  `data.dedupeKey` stores an event once; links are derived for the recipient's role in `backend/src/notifications/notification-links.ts`.
+  Supplier notifications never carry a buyer, a target price or a buyer price.
 - Unauthenticated requests to protected routes are sent to `/auth/login?redirect=<path>` (see `frontend/src/middleware.ts`).
 
 ## Before you finish

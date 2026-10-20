@@ -377,9 +377,9 @@ export class ProductsService {
             if (!isAdmin && product.supplierId && !skipAi && product.status === ProductStatus.PENDING) {
                 this.notificationsService.notifyAdmins(
                     'New Product Submitted',
-                    `New product "${product.name}" from supplier ID: ${product.supplierId} is waiting for review.`,
+                    `New product "${product.name}" is waiting for review.`,
                     'INFO',
-                    { productId: product.id, link: ProductsService.adminReviewLink(product.id) }
+                    { productId: product.id, link: ProductsService.adminReviewLink(product.id), kind: 'PRODUCT_SUBMITTED', params: { product: product.name } }
                 ).catch(() => {});
             }
 
@@ -769,7 +769,7 @@ export class ProductsService {
                 'Atlantis sent you a comment on a product',
                 `Your product "${product.name}" needs changes before it can be approved.\n\nReason: ${text}\n\nFix the row in your inventory and click "Resend for Review".`,
                 'WARNING',
-                { productId: product.id, type: 'PRODUCT_NEEDS_CHANGES', link: ProductsService.supplierFeedbackLink(product.id) },
+                { productId: product.id, type: 'PRODUCT_NEEDS_CHANGES', link: ProductsService.supplierFeedbackLink(product.id), kind: 'PRODUCT_CHANGES_REQUESTED', params: { product: product.name, message: text.slice(0, 300) } },
             ).then(() => true, (e) => { this.logger.warn(`in-app notification failed for ${product.id}: ${e?.message}`); return false; });
         }
         if (!(product as any).supplier?.email) delivery.email = null;
@@ -820,7 +820,7 @@ export class ProductsService {
             'Product resent for review',
             `Supplier resubmitted "${product.name}" after addressing the requested changes.`,
             'INFO',
-            { productId: product.id, link: ProductsService.adminReviewLink(product.id) },
+            { productId: product.id, link: ProductsService.adminReviewLink(product.id), kind: 'PRODUCT_RESUBMITTED', params: { product: product.name } },
         ).catch(() => {});
         return updated;
     }
@@ -865,7 +865,7 @@ export class ProductsService {
                 title,
                 status === ProductStatus.REJECTED && adminNotes ? `${message}\n\nReason: ${adminNotes}` : message,
                 status === ProductStatus.APPROVED ? 'SUCCESS' : status === ProductStatus.REJECTED ? 'ERROR' : 'INFO',
-                { productId: updated.id, link: ProductsService.supplierFeedbackLink(updated.id) }
+                { productId: updated.id, link: ProductsService.supplierFeedbackLink(updated.id), kind: status === ProductStatus.APPROVED ? 'PRODUCT_APPROVED' : status === ProductStatus.REJECTED ? 'PRODUCT_REJECTED' : 'PRODUCT_STATUS', params: { product: updated.name, reason: adminNotes ? String(adminNotes).slice(0, 300) : '' } }
             ).then(() => true, (e) => { this.logger.warn(`status notification failed for ${updated.id}: ${e?.message}`); return false; });
             return { ...updated, delivery: { inApp, email: null } };
         }
@@ -1098,7 +1098,7 @@ export class ProductsService {
                     'Product Approved',
                     `Your product "${p.name}" was approved in a bulk action and is now live!`,
                     'SUCCESS',
-                    { productId: p.id, link: ProductsService.supplierFeedbackLink(p.id) }
+                    { productId: p.id, link: ProductsService.supplierFeedbackLink(p.id), kind: 'PRODUCT_APPROVED', params: { product: p.name } }
                 ).catch(() => {});
             }
         }
@@ -1133,7 +1133,7 @@ export class ProductsService {
                     'Product Rejected',
                     `Your product "${p.name}" was rejected. Reason: ${explanation}`,
                     'ERROR',
-                    { productId: p.id, reason: explanation, link: ProductsService.supplierFeedbackLink(p.id) }
+                    { productId: p.id, reason: explanation, link: ProductsService.supplierFeedbackLink(p.id), kind: 'PRODUCT_REJECTED', params: { product: p.name, reason: explanation.slice(0, 300) } }
                 ).catch(() => {});
             }
         }
@@ -1768,7 +1768,7 @@ export class ProductsService {
                 action: existing.status === ProductStatus.APPROVED ? 'STATUS_CHANGED' : existing.status === ProductStatus.NEEDS_CHANGES ? 'RESUBMITTED' : 'SUBMITTED',
                 message: note ?? null, statusAfter: ProductStatus.PENDING, actor: { id: supplierId, role: 'SUPPLIER' },
             });
-            this.notificationsService.notifyAdmins('Product submitted for review', `"${(saved as any).name}" is waiting for review.`, 'INFO', { productId: id, link: ProductsService.adminReviewLink(id) }).catch(() => {});
+            this.notificationsService.notifyAdmins('Product submitted for review', `"${(saved as any).name}" is waiting for review.`, 'INFO', { productId: id, link: ProductsService.adminReviewLink(id), kind: existing.status === ProductStatus.NEEDS_CHANGES ? 'PRODUCT_RESUBMITTED' : 'PRODUCT_SUBMITTED', params: { product: (saved as any).name } }).catch(() => {});
         }
         return this.withCompleteness({ ...(saved as any), price: (saved as any).basePrice ?? null });
     }

@@ -66,6 +66,17 @@ export default function AdminOverviewPage() {
     const revenueComplete = !!c && c.current.lines > 0 && c.current.linesWithoutNet === 0;
     const prevLabel = r ? tr('vsRange', { from: day(r.previous.from, false), to: day(r.previous.to) }) : '';
 
+    // Shown in place of the trend when nothing was approved in the period: the real work that moves the marketplace forward.
+    const quiet: { key: string; value: number; of?: number; href: string; icon: React.ElementType }[] = s ? [
+        { key: 'qOrdersPlaced', value: s.orders.placedInPeriod ?? 0, href: '/admin/orders', icon: ShoppingCart },
+        { key: 'qOrdersOpen', value: s.orders.open ?? 0, href: '/admin/orders', icon: ClipboardCheck },
+        { key: 'qToReview', value: s.products.submissions.byStatus?.PENDING ?? 0, href: '/admin/products/submissions?status=PENDING', icon: ClipboardCheck },
+        { key: 'qSubmitted', value: ins?.submissions?.current ?? 0, href: '/admin/products/submissions', icon: Package },
+        { key: 'qLive', value: s.products.live ?? 0, href: '/admin/products/catalog?status=APPROVED', icon: Package },
+        { key: 'qSuppliersLive', value: s.people.suppliers.withLiveProducts ?? 0, of: s.people.suppliers.total ?? 0, href: '/admin/users?role=SUPPLIER', icon: Store },
+        { key: 'qNewSuppliers', value: ins?.newSuppliers?.current ?? 0, href: '/admin/users?role=SUPPLIER&sort=newest', icon: UserPlus },
+        { key: 'qCatalogMissing', value: s.products.catalog.missingInfo ?? 0, href: '/admin/products/catalog?attention=missing', icon: FileWarning },
+    ] : [];
     const attention: { key: string; count: number; href: string; icon: React.ElementType; tone: Tone }[] = s ? ([
         { key: 'attSubmissions', count: s.products.submissions.byStatus?.PENDING ?? 0, href: '/admin/products/submissions?status=PENDING', icon: ClipboardCheck, tone: 'warning' },
         { key: 'attReady', count: s.orders.readyForApproval, href: '/admin/orders', icon: ShoppingCart, tone: 'danger' },
@@ -126,9 +137,9 @@ export default function AdminOverviewPage() {
                     <Kpi small icon={Boxes} tone="info" loading={first} label={tr('productsSold')} info={tr('defSold')}
                         value={c ? tr('casesValue', { count: c.current.casesSold, n: int(c.current.casesSold) }) : '—'} delta={c?.change.casesSold}
                         foot={c ? [tr('soldDistinct', { count: c.current.productsSold })] : []} />
-                    <Kpi small icon={Store} tone="brand" loading={first} label={tr('suppliers')} info={tr('defSuppliers')} href="/admin/suppliers"
+                    <Kpi small icon={Store} tone="brand" loading={first} label={tr('suppliers')} info={tr('defSuppliers')} href="/admin/users?role=SUPPLIER"
                         value={int(s?.people.suppliers.total)} foot={s ? [tr('suppliersActive', { active: int(s.people.suppliers.active), live: int(s.people.suppliers.withLiveProducts) })] : []} />
-                    <Kpi small icon={Users} tone="info" loading={first} label={tr('buyers')} info={tr('defBuyers')} href="/admin/buyers"
+                    <Kpi small icon={Users} tone="info" loading={first} label={tr('buyers')} info={tr('defBuyers')} href="/admin/users?role=CUSTOMER"
                         value={int(s?.people.buyers.total)} foot={s ? [tr('buyersActive', { active: int(s.people.buyers.active) }), tr('buyersOrdering', { count: s.people.buyers.orderingInPeriod })] : []} />
                     <Kpi small icon={Scale} tone={s?.disputesOpen ? 'danger' : 'neutral'} loading={first} label={tr('openDisputes')} info={tr('defDisputes')} href="/admin/disputes"
                         value={int(s?.disputesOpen)} foot={s ? [tr('cancelledLine', { count: int(s.orders.cancelled) })] : []} />
@@ -136,6 +147,21 @@ export default function AdminOverviewPage() {
 
                 {/* Row 3 — trend · order status · needs attention */}
                 <div className="grid gap-3 xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_minmax(0,1fr)]">
+                    {!first && withSales === 0 && s ? (
+                        <Panel title={tr('quietTitle')} sub={tr('quietSub')}>
+                            <ul className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                {quiet.map((q) => (
+                                    <li key={q.key}>
+                                        <Link href={q.href} className="block h-full rounded-lg bg-surface-2 ring-1 ring-inset ring-line px-3 py-2.5 hover:ring-teal/50 hover:bg-teal-soft/40 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-teal/60">
+                                            <span className="flex items-center gap-1.5 text-[12px] text-ink-3"><q.icon size={13} aria-hidden />{tr(q.key)}</span>
+                                            <span className="mt-1 block text-[18px] font-semibold text-heading tabular-nums">{int(q.value)}{q.of != null && <span className="text-[12.5px] font-normal text-ink-3"> / {int(q.of)}</span>}</span>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                            <p className="mt-3 flex items-center gap-1.5 text-[12.5px] text-ink-3"><TrendingUp size={14} aria-hidden />{tr('quietNote')}</p>
+                        </Panel>
+                    ) : (
                     <Panel title={tr('trendTitle2')} sub={r ? tr('trendSub', { unit: tr(monthly ? 'unitMonth' : 'unitDay') }) : undefined}
                         aside={<div className="flex items-center gap-3 text-[12px] text-ink-3"><Legend color="#0E7C74" label={tr('legendGmv')} /><Legend color="#0B1F3A" label={tr('legendRevenue')} /></div>}>
                         {first ? <Skeleton className="h-[220px]" /> : withSales >= 2 ? (
@@ -168,6 +194,7 @@ export default function AdminOverviewPage() {
                             </div>
                         )}
                     </Panel>
+                    )}
 
                     <Panel title={tr('statusTitle')} sub={tr('statusSub')}>
                         {first ? <Skeleton className="h-[220px]" /> : !data?.ordersByStatus?.total ? (
@@ -226,7 +253,7 @@ export default function AdminOverviewPage() {
 
                 {/* Row 4 — suppliers · products · activity */}
                 <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)]">
-                    <Panel title={tr('topSuppliers')} sub={tr('topSuppliersSub')} flush action={<Link href="/admin/suppliers" className="text-[12.5px] font-medium text-teal hover:underline">{tr('viewAll')}</Link>}>
+                    <Panel title={tr('topSuppliers')} sub={tr('topSuppliersSub')} flush action={<Link href="/admin/users?role=SUPPLIER" className="text-[12.5px] font-medium text-teal hover:underline">{tr('viewAll')}</Link>}>
                         {first ? <ListSkeleton /> : !c?.topSuppliers?.length ? <Empty text={tr('noSales')} /> : (
                             <table className="w-full text-[12.5px]">
                                 <thead><tr className="text-[11.5px] text-ink-3"><th className="text-start font-medium ps-4 py-1.5 w-8">#</th><th className="text-start font-medium px-2 py-1.5">{tr('supplierCol')}</th><th className="text-end font-medium px-2 py-1.5">{tr('valueCol')}</th><th className="text-end font-medium pe-4 py-1.5">{tr('ordersCol')}</th></tr></thead>

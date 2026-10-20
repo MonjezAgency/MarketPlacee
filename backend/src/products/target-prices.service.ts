@@ -114,7 +114,13 @@ export class TargetPricesService {
             throw e;
         }
         const listed = buyerCasePrice(p, await readMarkups(this.prisma));
-        this.notifications.notifyAdmins('New target price', `${created.ref}: ${p.name} — target €${targetCasePrice.toFixed(2)}/case for ${quantityCases} cases${deliveryCountry ? ` to ${countryName(deliveryCountry)}` : ''}${listed ? ` (listed €${listed.toFixed(2)})` : ''}.`, 'INFO', { targetPriceRequestId: created.id, productId: p.id }).catch(() => {});
+        this.notifications.notifyAdmins('New target price', `${created.ref}: ${p.name} — target €${targetCasePrice.toFixed(2)}/case for ${quantityCases} cases${deliveryCountry ? ` to ${countryName(deliveryCountry)}` : ''}${listed ? ` (listed €${listed.toFixed(2)})` : ''}.`, 'INFO',
+            { targetPriceRequestId: created.id, targetRef: created.ref, productId: p.id, kind: 'TARGET_CREATED', params: { ref: created.ref, product: p.name, cases: quantityCases }, dedupeKey: `target:${created.id}:created` }).catch(() => {});
+        // The product's supplier learns that buyers want this product at a better price — never the target, the buyer or any buyer price.
+        if (p.supplierId) {
+            this.notifications.notifyUser(p.supplierId, 'Buyer price interest', `A buyer asked Atlantis for a better price on “${p.name}” (${quantityCases} cases). Atlantis handles the request; you may be asked about your price.`, 'INFO',
+                { targetPriceRequestId: created.id, productId: p.id, kind: 'TARGET_INTEREST_SUPPLIER', params: { product: p.name, cases: quantityCases }, dedupeKey: `target:${created.id}:supplier` }).catch(() => {});
+        }
         return this.buyerView(created);
     }
 
@@ -131,7 +137,10 @@ export class TargetPricesService {
             data: { status: 'WITHDRAWN', history: [...(r.history || []), { status: 'WITHDRAWN', at: new Date().toISOString(), by: buyerId, note: 'Withdrawn by buyer' }] },
         });
         if (!moved.count) throw new ConflictException('This request is already closed.');
-        return this.buyerView(await (this.prisma as any).targetPriceRequest.findUnique({ where: { id }, include: { product: true } }));
+        const out = await (this.prisma as any).targetPriceRequest.findUnique({ where: { id }, include: { product: true } });
+        this.notifications.notifyAdmins('Target price withdrawn', `${r.ref}: the buyer withdrew the request.`, 'INFO',
+            { targetPriceRequestId: id, targetRef: r.ref, productId: r.productId, kind: 'TARGET_WITHDRAWN', params: { ref: r.ref, product: out?.product?.name ?? '' }, dedupeKey: `target:${id}:withdrawn` }).catch(() => {});
+        return this.buyerView(out);
     }
 
     /** Staff list: includes the listed buyer price for comparison, never the supplier price. */
@@ -174,7 +183,8 @@ export class TargetPricesService {
         if (!moved.count) throw new ConflictException('This request is already closed.');
         const label = status === 'ACCEPTED' ? 'accepted' : status === 'DECLINED' ? 'declined' : 'answered';
         const text = `Your target price ${r.ref} for ${r.product?.name} was ${label}. ${response}${counter ? ` Our offer: €${counter.toFixed(2)} per case.` : ''}`;
-        this.notifications.notifyUser(r.buyerId, `Target price ${label}`, text, status === 'DECLINED' ? 'WARNING' : 'SUCCESS', { targetPriceRequestId: id, productId: r.productId }).catch(() => {});
+        this.notifications.notifyUser(r.buyerId, `Target price ${label}`, text, status === 'DECLINED' ? 'WARNING' : 'SUCCESS',
+            { targetPriceRequestId: id, targetRef: r.ref, productId: r.productId, kind: `TARGET_${status}`, params: { ref: r.ref, product: r.product?.name ?? '', reason: response.slice(0, 300), price: counter ? Math.round(counter * 100) / 100 : '' }, dedupeKey: `target:${id}:${status}:${(r.history || []).length}` }).catch(() => {});
         // Operational email (an answer to the buyer's own request), unless they turned order/account updates off.
         const prefs = (r.buyer?.notificationPrefs as any) || {};
         if (r.buyer?.email && prefs.orderUpdates !== false) {

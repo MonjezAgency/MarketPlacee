@@ -44,7 +44,7 @@ export class PriceHistoryService {
         for (const r of reqs) {
             const claimed = await (this.prisma as any).targetPriceRequest.updateMany({ where: { id: r.id, reachedNotifiedAt: null }, data: { reachedNotifiedAt: new Date() } });
             if (!claimed.count) continue;
-            this.notifications.notifyUser(r.buyerId, 'Price reached your target', `${r.product?.name} is now listed at €${price.toFixed(2)} per case — at or below your target (${r.ref}).`, 'SUCCESS', { productId, targetPriceRequestId: r.id }).catch(() => {});
+            this.notifications.notifyUser(r.buyerId, 'Price reached your target', `${r.product?.name} is now listed at €${price.toFixed(2)} per case — at or below your target (${r.ref}).`, 'SUCCESS', { productId, targetPriceRequestId: r.id, targetRef: r.ref, kind: 'TARGET_REACHED', params: { ref: r.ref, product: r.product?.name ?? '', price: Math.round(price * 100) / 100 }, dedupeKey: `target:${r.id}:reached` }).catch(() => {});
         }
     }
 

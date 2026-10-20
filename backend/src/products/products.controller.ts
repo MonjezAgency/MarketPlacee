@@ -21,6 +21,8 @@ import {
     Logger
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { Throttle } from '@nestjs/throttler';
+import { BULK_ACTIONS, BULK_MAX, type BulkAction } from './admin-bulk';
 import { ProductsService } from './products.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
@@ -242,6 +244,46 @@ export class ProductsController {
         const scope = parseScope(q.scope);
         if (!scope) throw new BadRequestException({ code: 'SCOPE_INVALID', message: 'scope must be catalog or submissions.' });
         return this.adminProducts!.list(scope, q);
+    }
+
+    /**
+     * Bulk review / delete from the admin Products page. The server decides per
+     * product what may change (admin-bulk.ts) and returns what was done and why
+     * each other product was skipped. Supplier Submissions: approve, reject,
+     * changes. Atlantis Catalog: delete (owners and admins only).
+     */
+    @Post('admin/bulk')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    async adminBulk(@Body() body: { action?: string; ids?: unknown; message?: string }, @Request() req: any) {
+        const action = String(body?.action || '') as BulkAction;
+        if (!(BULK_ACTIONS as readonly string[]).includes(action)) throw new BadRequestException({ code: 'ACTION', message: 'Unknown bulk action.' });
+        const ids = Array.isArray(body?.ids) ? Array.from(new Set(body!.ids.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length < 64))) : [];
+        if (!ids.length) throw new BadRequestException({ code: 'NO_IDS', message: 'Select at least one product.' });
+        if (ids.length > BULK_MAX) throw new BadRequestException({ code: 'TOO_MANY', message: `Select at most ${BULK_MAX} products at a time.` });
+        const role = String(req.user?.role || '').toUpperCase();
+        if (action === 'delete' && !['OWNER', 'ADMIN'].includes(role)) throw new ForbiddenException({ code: 'ROLE', message: 'Only owners and admins can delete catalog products.' });
+        const message = String(body?.message || '').trim().slice(0, 2000);
+        if ((action === 'reject' || action === 'changes') && message.length < 3) throw new BadRequestException({ code: 'MESSAGE', message: action === 'reject' ? 'Write the reason the supplier will read.' : 'Write what the supplier needs to change.' });
+
+        const plan = await this.adminProducts!.planBulk(action, ids);
+        const okIds = plan.eligible.map((e) => e.id);
+        const failed: { id: string; name: string; error: string }[] = [];
+        let done = 0;
+        if (okIds.length) {
+            const actor = actorOf(req);
+            if (action === 'approve') done = (await this.productsService.bulkApprove(okIds, actor)).count;
+            else if (action === 'reject') done = (await this.productsService.bulkReject(okIds, message, actor)).count;
+            else if (action === 'delete') done = (await this.productsService.deleteProducts(okIds)).deletedCount;
+            else {
+                for (const e of plan.eligible) {
+                    try { await this.productsService.adminComment(e.id, message, actor); done++; }
+                    catch (err: any) { failed.push({ id: e.id, name: e.name, error: err?.message || 'Not saved' }); }
+                }
+            }
+        }
+        return { action, requested: ids.length, done, skipped: plan.skipped, failed };
     }
 
     /** Everything the reviewer needs for one product: record, owner, completeness, review trail, recent changes. */

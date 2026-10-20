@@ -571,7 +571,7 @@ export default function Navbar() {
 
                         {/* Alerts */}
                         <div className="hidden md:block">
-                            <NotificationBell isLight compact />
+                            <NotificationBell />
                         </div>
 
                         {/* Account — greeting opens the menu (Saved Items lives here now) */}

@@ -14,11 +14,13 @@ import { AdminModule } from '../admin/admin.module';
 import { StorageModule } from '../storage/storage.module';
 import { FulfillmentModule } from '../fulfillment/fulfillment.module';
 import { OrderWorkflowCron } from './order-workflow.cron';
+import { AdminOrdersService } from './admin-orders.service';
+import { AdminOrdersController } from './admin-orders.controller';
 
 @Module({
     imports: [PrismaModule, EmailModule, NotificationsModule, InvoiceModule, StorageModule, FulfillmentModule, forwardRef(() => PaymentsModule), forwardRef(() => AdminModule)],
-    providers: [OrdersService, MixedLoadsService, StepUpService, OrderWorkflowCron],
-    controllers: [OrdersController, MixedLoadsController],
+    providers: [OrdersService, MixedLoadsService, StepUpService, OrderWorkflowCron, AdminOrdersService],
+    controllers: [AdminOrdersController, OrdersController, MixedLoadsController],
     exports: [OrdersService, MixedLoadsService],
 })
 export class OrdersModule { }

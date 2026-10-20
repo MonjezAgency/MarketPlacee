@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
     Settings, Users, Bell, Shield, Globe,
     Save, Plus, Pencil, MoreHorizontal,
@@ -325,6 +326,14 @@ export default function SettingsDashboard() {
                     Save Changes
                 </button>
             </div>
+
+            {/* Pages that left the sidebar but stay available to staff (nothing was removed). */}
+            <nav aria-label="More system pages" className="flex flex-wrap items-center gap-2 px-4 lg:px-0 text-[13px]">
+                <span className="text-slate-500">More:</span>
+                {[{ href: '/admin/terms', label: 'Terms & Conditions' }, { href: '/admin/security', label: 'Security reports' }, { href: '/admin/ai-agent', label: 'AI monitoring' }].map((l) => (
+                    <Link key={l.href} href={l.href} className="h-8 inline-flex items-center rounded-lg px-3 font-medium text-slate-700 ring-1 ring-inset ring-slate-200 hover:bg-slate-50">{l.label}</Link>
+                ))}
+            </nav>
 
             <div className="grid grid-cols-12 gap-8 px-4 lg:px-0 h-full min-h-[600px]">
                 

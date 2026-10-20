@@ -48,7 +48,7 @@ export class AdminOverviewService {
         const activity = mergeActivity([
             orders.map((o): ActivityItem => ({ kind: 'ORDER_PLACED', at: o.createdAt.toISOString(), href: `/admin/orders/${o.id}`, subject: o.id.slice(0, 8).toUpperCase(), detail: who(o.customer) })),
             disputes.map((d): ActivityItem => ({ kind: 'DISPUTE_OPENED', at: d.createdAt.toISOString(), href: '/admin/disputes', subject: d.orderId.slice(0, 8).toUpperCase(), detail: d.reason })),
-            accounts.map((u): ActivityItem => ({ kind: 'ACCOUNT_REGISTERED', at: u.createdAt.toISOString(), href: u.role === 'SUPPLIER' ? '/admin/suppliers' : '/admin/buyers', subject: who(u), detail: u.role })),
+            accounts.map((u): ActivityItem => ({ kind: 'ACCOUNT_REGISTERED', at: u.createdAt.toISOString(), href: `/admin/users/${u.id}`, subject: who(u), detail: u.role })),
             reviews.filter((r) => r.product).map((r): ActivityItem => ({ kind: 'PRODUCT_REVIEW', at: r.createdAt.toISOString(), href: `/admin/products/${r.product!.id}`, subject: r.product!.name, detail: r.action })),
         ]);
         return {

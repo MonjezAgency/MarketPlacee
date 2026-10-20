@@ -127,13 +127,14 @@ export class AiAgentService {
             // Auto-fix: notify the customer
             if (ALLOWED_ACTIONS.has('SEND_NOTIFICATION')) {
                 try {
-                    await this.notifications.create(
+                    const sent = await this.notifications.create(
                         order.customerId,
                         'Order Update Required',
                         `Your order #${order.id.slice(-8)} is still pending. Please complete payment or contact support.`,
                         'WARNING',
-                        { orderId: order.id },
+                        { orderId: order.id, dedupeKey: `ai:stuck-order:${order.id}`, kind: 'AI_ORDER_PENDING', params: { ref: `#${order.id.slice(-8).toUpperCase()}` } },
                     );
+                    if ((sent as any)?.duplicate) continue;
                     issues[issues.length - 1].autoFixed = true;
                     issues[issues.length - 1].fixDescription = 'Sent reminder notification to customer';
                     actions.push(`SEND_NOTIFICATION:order:${order.id}`);
@@ -193,13 +194,14 @@ export class AiAgentService {
 
             if (SUPPLIER_PING_KYC_REMINDER && ALLOWED_ACTIONS.has('REMIND_KYC')) {
                 try {
-                    await this.notifications.create(
+                    const sent = await this.notifications.create(
                         user.id,
                         'KYC Verification Required',
                         'Please complete your identity verification to start selling. Go to Dashboard → KYC Verification.',
                         'WARNING',
-                        { link: '/dashboard/kyc' },
+                        { link: '/dashboard/kyc', dedupeKey: `ai:kyc-required:${user.id}`, kind: 'AI_KYC_REQUIRED' },
                     );
+                    if ((sent as any)?.duplicate) continue;
                     issues[issues.length - 1].autoFixed = true;
                     issues[issues.length - 1].fixDescription = 'Sent KYC reminder notification';
                     actions.push(`REMIND_KYC:${user.id}`);
@@ -231,13 +233,14 @@ export class AiAgentService {
 
             if (SUPPLIER_PING_REJECTED_PRODUCT && product.supplierId && ALLOWED_ACTIONS.has('SEND_NOTIFICATION')) {
                 try {
-                    await this.notifications.create(
+                    const sent = await this.notifications.create(
                         product.supplierId,
                         'Action Required: Product Needs Update',
                         `Your product "${product.name}" was rejected. Please review the feedback and resubmit.`,
                         'WARNING',
-                        { productId: product.id, link: '/supplier/products' },
+                        { productId: product.id, link: '/supplier/products', dedupeKey: `ai:rejected:${product.id}`, kind: 'AI_PRODUCT_REJECTED', params: { product: product.name } },
                     );
+                    if ((sent as any)?.duplicate) continue;
                     issues[issues.length - 1].autoFixed = true;
                     issues[issues.length - 1].fixDescription = 'Sent resubmission reminder to supplier';
                     actions.push(`SEND_NOTIFICATION:product:${product.id}`);
@@ -268,13 +271,14 @@ export class AiAgentService {
 
             if (product.supplierId && ALLOWED_ACTIONS.has('SEND_NOTIFICATION')) {
                 try {
-                    await this.notifications.create(
+                    const sent = await this.notifications.create(
                         product.supplierId,
                         'Low Stock Alert',
                         `"${product.name}" has only ${product.stock} units left. Consider restocking soon.`,
                         'WARNING',
-                        { productId: product.id },
+                        { productId: product.id, type: 'LOW_STOCK', dedupeKey: `ai:low-stock:${product.id}:${product.stock}`, kind: 'AI_LOW_STOCK', params: { product: product.name, units: product.stock } },
                     );
+                    if ((sent as any)?.duplicate) continue;
                     issues[issues.length - 1].autoFixed = true;
                     issues[issues.length - 1].fixDescription = 'Sent low-stock alert to supplier';
                     actions.push(`SEND_NOTIFICATION:stock:${product.id}`);

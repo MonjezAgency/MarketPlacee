@@ -19,6 +19,11 @@ export default function AdminTargetPricesPage() {
     const [data, setData] = React.useState<any | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [answer, setAnswer] = React.useState<any | null>(null);
+    // Opened from a notification (?q=<ref>): show that request whatever its status.
+    React.useEffect(() => {
+        const ref = new URLSearchParams(window.location.search).get('q');
+        if (ref) { setQ(ref.slice(0, 80)); setStatus(''); }
+    }, []);
     const load = React.useCallback(() => {
         setError(null);
         apiFetch(`/target-prices?status=${status}&q=${encodeURIComponent(q.trim())}`, { cache: 'no-store' })

@@ -279,7 +279,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                         </button>
 
                         {/* Notifications */}
-                        <NotificationBell isLight={theme !== 'dark'} />
+                        <NotificationBell />
 
                         <div className="hidden sm:block h-8 w-[1px] bg-[#E2E8F0]" />
 

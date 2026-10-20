@@ -29,6 +29,14 @@ export interface ReviewEvent {
 
 export interface Missing { field: string; label: string; reason: string }
 
+export type BulkAction = 'approve' | 'reject' | 'changes' | 'delete';
+export type BulkSkipReason = 'NOT_FOUND' | 'WRONG_SCOPE' | 'ALREADY_APPROVED' | 'ALREADY_REJECTED' | 'ALREADY_CHANGES' | 'NOT_SUBMITTED' | 'LIVE' | 'CLOSED' | 'INCOMPLETE' | 'HAS_ORDERS' | 'HAS_TARGETS' | 'HAS_PROMOTIONS' | 'HAS_OFFERS';
+export interface BulkResult {
+    action: BulkAction; requested: number; done: number;
+    skipped: { id: string; name: string | null; reason: BulkSkipReason; detail?: string[] }[];
+    failed: { id: string; name: string; error: string }[];
+}
+
 export interface AdminProductReview {
     product: any;
     scope: CatalogScope;
@@ -66,6 +74,8 @@ export const adminApi = {
     setStatus: (id: string, status: string, adminNotes?: string) => post(`/products/${id}/status`, { status, adminNotes }, 'PATCH').then((r) => json<any>(r)),
     bulkApprove: (ids: string[]) => post('/products/bulk-approve', { ids }).then((r) => json<{ count: number; skipped: { id: string; name: string; missing: string[] }[]; message: string }>(r)),
     bulkReject: (ids: string[], reason: string) => post('/products/bulk-reject', { ids, reason }).then((r) => json<any>(r)),
+    /** One bulk action; the server decides per product and reports every skip (backend/src/products/admin-bulk.ts). */
+    bulk: (action: BulkAction, ids: string[], message?: string) => post('/products/admin/bulk', { action, ids, message }).then((r) => json<BulkResult>(r)),
     remove: (id: string) => apiFetch(`/products/${id}`, { method: 'DELETE' }).then((r) => json<any>(r)),
     /** Review trail of one product (staff view, with team member names). */
     reviewHistory: (id: string) => apiFetch(`/products/${id}/review-history`, { cache: 'no-store' }).then((r) => json<ReviewEvent[]>(r)),

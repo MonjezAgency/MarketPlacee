@@ -3,14 +3,15 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import toast from 'react-hot-toast';
-import { AlertCircle, Boxes, CheckCircle2, ChevronLeft, ChevronRight, Euro, Eye, FileWarning, Image as ImageIcon, Pencil, Plus, RefreshCw, Search, Upload, XCircle } from 'lucide-react';
+import { AlertCircle, Boxes, CheckCircle2, ChevronLeft, ChevronRight, Euro, Eye, FileWarning, Image as ImageIcon, MessageSquare, Pencil, Plus, RefreshCw, Search, Trash2, Upload, XCircle } from 'lucide-react';
 import UpdatePriceDialog from '@/components/admin/UpdatePriceDialog';
+import BulkActionDialog from '@/components/admin/BulkActionDialog';
+import { useAuth } from '@/lib/auth';
 import PriceStockUpdateDialog from '@/components/supplier/PriceStockUpdateDialog';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { adminApi, type AdminProductPage, type AdminProductRow, type CatalogScope } from '@/lib/admin-api';
-import { Badge, Button, Card, ConfirmProvider, Dialog, EmptyState, ErrorState, Field, PRODUCT_STATUS, PageHeader, Skeleton, Thumb, inputCls, selectCls, useConfirm } from '@/components/supplier/ui';
+import { adminApi, type AdminProductPage, type AdminProductRow, type BulkAction, type CatalogScope } from '@/lib/admin-api';
+import { Badge, Button, Card, ConfirmProvider, EmptyState, ErrorState, PRODUCT_STATUS, PageHeader, Skeleton, Thumb, inputCls, selectCls } from '@/components/supplier/ui';
 import { categoryLabel, statusLabel } from '@/components/supplier/import/types';
 
 /**
@@ -34,7 +35,7 @@ export default function ProductsWorkspace({ scope }: { scope: CatalogScope }) {
 function Workspace({ scope }: { scope: CatalogScope }) {
     const router = useRouter();
     const params = useSearchParams();
-    const confirm = useConfirm();
+    const { user } = useAuth();
     const { t, fmt } = useLanguage();
     const tp = (k: string, v?: Record<string, string | number>) => t('adminProducts', k, v);
     const eur = (n: number | null | undefined) => (n === null || n === undefined || !(Number(n) > 0) ? null : fmt.number(Number(n), { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }));
@@ -53,9 +54,6 @@ function Workspace({ scope }: { scope: CatalogScope }) {
     const [error, setError] = React.useState<string | null>(null);
     const [loading, setLoading] = React.useState(true);
     const [selected, setSelected] = React.useState<Set<string>>(new Set());
-    const [busy, setBusy] = React.useState(false);
-    const [rejectOpen, setRejectOpen] = React.useState(false);
-    const [rejectReason, setRejectReason] = React.useState('');
     const [priceFor, setPriceFor] = React.useState<AdminProductRow | null>(null);
     const [bulkPriceOpen, setBulkPriceOpen] = React.useState(false);
 
@@ -85,26 +83,11 @@ function Workspace({ scope }: { scope: CatalogScope }) {
     const toggleAll = () => setSelected(allOnPage ? new Set() : new Set(rows.map((r) => r.id)));
     const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
     const chosen = rows.filter((r) => selected.has(r.id));
-    const approvable = chosen.filter((r) => r.status !== 'APPROVED' && r.status !== 'REJECTED' && r.missing.length === 0);
-    const rejectable = chosen.filter((r) => r.status !== 'REJECTED');
-
-    const approveSelected = async () => {
-        if (!(await confirm({ title: tp('bulkApproveTitle', { count: approvable.length }), body: tp(scope === 'catalog' ? 'bulkPublishBody' : 'bulkApproveBody'), confirm: tp(scope === 'catalog' ? 'publish' : 'approve') }))) return;
-        setBusy(true);
-        try {
-            const r = await adminApi.bulkApprove(approvable.map((p) => p.id));
-            toast.success(tp('toastApproved', { count: r.count }));
-            if (r.skipped?.length) toast(tp('toastSkipped', { count: r.skipped.length }));
-            load();
-        } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
-    };
-    const rejectSelected = async () => {
-        const reason = rejectReason.trim();
-        if (reason.length < 10) { toast.error(tp('reasonTooShort')); return; }
-        setBusy(true);
-        try { await adminApi.bulkReject(rejectable.map((p) => p.id), reason); toast.success(tp('toastRejected', { count: rejectable.length })); setRejectOpen(false); setRejectReason(''); load(); }
-        catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
-    };
+    const [bulkAction, setBulkAction] = React.useState<BulkAction | null>(null);
+    const canDelete = ['OWNER', 'ADMIN'].includes(String(user?.role || '').toUpperCase());
+    const bulkButtons: { action: BulkAction; key: string; icon: React.ReactNode; variant?: 'primary' | 'danger' }[] = scope === 'catalog'
+        ? [{ action: 'approve', key: 'bulkBtn_publish', icon: <CheckCircle2 size={13} />, variant: 'primary' }, ...(canDelete ? [{ action: 'delete' as const, key: 'bulkBtn_delete', icon: <Trash2 size={13} />, variant: 'danger' as const }] : [])]
+        : [{ action: 'approve', key: 'bulkBtn_approve', icon: <CheckCircle2 size={13} />, variant: 'primary' }, { action: 'changes', key: 'bulkBtn_changes', icon: <MessageSquare size={13} /> }, { action: 'reject', key: 'bulkBtn_reject', icon: <XCircle size={13} />, variant: 'danger' }];
 
     const c = data?.counts;
     const isCatalog = scope === 'catalog';
@@ -173,8 +156,7 @@ function Workspace({ scope }: { scope: CatalogScope }) {
                         <span className="font-medium text-heading">{tp('selectedCount', { count: selected.size })}</span>
                         <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>{tp('clear')}</Button>
                         <span className="flex-1" />
-                        {approvable.length > 0 && <Button size="sm" variant="primary" icon={<CheckCircle2 size={13} />} loading={busy} onClick={approveSelected}>{tp(isCatalog ? 'publishN' : 'approveN', { count: approvable.length })}</Button>}
-                        {rejectable.length > 0 && !isCatalog && <Button size="sm" variant="danger" icon={<XCircle size={13} />} disabled={busy} onClick={() => setRejectOpen(true)}>{tp('rejectN', { count: rejectable.length })}</Button>}
+                        {bulkButtons.map((b) => <Button key={b.action} size="sm" variant={b.variant} icon={b.icon} onClick={() => setBulkAction(b.action)}>{tp(b.key)}</Button>)}
                     </div>
                 )}
 
@@ -281,12 +263,7 @@ function Workspace({ scope }: { scope: CatalogScope }) {
                 )}
             </Card>
 
-            <Dialog open={rejectOpen} onClose={() => setRejectOpen(false)} title={tp('rejectDialogTitle', { count: rejectable.length })} description={tp('rejectDialogDesc')} size="sm"
-                footer={<><Button onClick={() => setRejectOpen(false)}>{tp('cancel')}</Button><Button variant="danger" loading={busy} onClick={rejectSelected}>{tp('rejectN', { count: rejectable.length })}</Button></>}>
-                <Field label={tp('reasonLabel')} htmlFor="bulk-reject-reason" required hint={tp('reasonHint')}>
-                    <textarea id="bulk-reject-reason" data-autofocus value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={4} className={cn(inputCls, 'h-auto py-2')} />
-                </Field>
-            </Dialog>
+            <BulkActionDialog action={bulkAction} scope={scope} rows={chosen} onClose={() => setBulkAction(null)} onDone={load} />
             <UpdatePriceDialog product={priceFor} onClose={() => setPriceFor(null)} onSaved={() => { setPriceFor(null); load(); }} />
             {isCatalog && <PriceStockUpdateDialog target="catalog" open={bulkPriceOpen} onClose={() => { setBulkPriceOpen(false); load(); }} />}
         </div>

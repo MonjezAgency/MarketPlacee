@@ -1,982 +1,609 @@
 'use client';
 
 import * as React from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import {
-    ArrowLeft,
-    Package,
-    Truck,
-    CheckCircle2,
-    Clock,
-    User as UserIcon,
-    Mail,
-    Phone,
-    MapPin,
-    CreditCard,
-    Trash2,
-    Printer,
-    Download,
-    ExternalLink,
-    Building2,
-    MessageSquare,
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { apiFetch } from '@/lib/api';
-import { toast } from 'react-hot-toast';
+import { useParams, useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
+import { ArrowLeft, BellRing, ClipboardList, ExternalLink, FileText, MessageSquare, Printer, Trash2, Truck } from 'lucide-react';
 import { cn, prettifyVariantSignature } from '@/lib/utils';
-import OrderChatModal from '@/components/chat/OrderChatModal';
+import { useLanguage } from '@/contexts/LanguageContext';
 import { AdminWorkflowPanel } from '@/components/orders/AdminWorkflowPanel';
 import { DeliveryBreakdown } from '@/components/orders/DeliveryBreakdown';
-import type { AdminWorkflow, Inspection } from '@/lib/order-workflow';
+import { NextActionCell, PaymentBadge } from '@/components/admin/OrderBadges';
+import {
+    Badge, Button, Card, ConfirmProvider, Dialog, EmptyState, ErrorState, Field, Notice, ORDER_STATUS, Skeleton, StatusBadge, Thumb, inputCls, useConfirm, type Tone,
+} from '@/components/supplier/ui';
+import { adminOrdersApi, type AdminOrderDetail, type AdminOrderLine, type Party, type TimelineEvent } from '@/lib/admin-orders-api';
 
-type AdminOrderItem = {
-    id: string;
-    quantity: number;
-    unitPrice: number;
-    totalPrice: number;
-    product?: {
-        id: string;
-        name?: string;
-        brand?: string;
-        category?: string;
-        ean?: string;
-        sku?: string;
-        weight?: string | number;
-        unit?: string;
-        unitsPerCase?: number;
-        casesPerPallet?: number;
-        unitsPerPallet?: number;
-        palletsPerShipment?: number;
-        shelfLife?: string;
-        images?: string[];
-        stock?: number;
-        exwLocation?: string;
-        origin?: string;
-        // Supplier the listing belongs to. Admin uses this to ping
-        // the supplier ("do you have N cases in stock?") before
-        // confirming the order. Optional because legacy orders
-        // pre-date the include — and a deleted product carries null.
-        supplier?: {
-            id: string;
-            name: string;
-            email?: string;
-            phone?: string;
-            companyName?: string;
-            country?: string;
-        } | null;
-    };
+/**
+ * Admin → Order detail (/admin/orders/[id]). Everything shown is a recorded
+ * field from GET /orders/admin/:id/detail; anything the data model doesn't
+ * record is labelled as not recorded. Actions call the existing order
+ * endpoints, and the server checks every one of them again.
+ */
+type Tl = (k: string, v?: Record<string, string | number>) => string;
+
+const REVIEW: Record<string, { key: string; tone: Tone }> = {
+    LEGACY: { key: 'reviewLegacy', tone: 'neutral' }, PENDING_REVIEW: { key: 'reviewPending', tone: 'warning' },
+    APPROVED: { key: 'reviewApproved', tone: 'success' }, REJECTED: { key: 'reviewRejected', tone: 'danger' },
 };
-
-type AdminOrder = {
-    id: string;
-    status: string;
-    paymentStatus?: string;
-    total: number;
-    createdAt: string;
-    updatedAt?: string;
-    trackingNumber?: string | null;
-    carrier?: string | null;
-    expectedDelivery?: string | null;
-    shippingCompany?: string | null;
-    /** Supplier-uploaded invoice / receipt scan for this order. */
-    supplierInvoiceUrl?: string | null;
-    // Snapshot of the carrier the buyer chose at checkout. Stays
-    // pinned even if admin re-assigns shippingCompany later.
-    customerShippingCompany?: string | null;
-    shippingCost?: number | null;
-    paymentMethod?: string | null;
-    customer?: {
-        id: string;
-        name?: string;
-        email?: string;
-        phone?: string;
-        companyName?: string;
-        country?: string;
-        vatNumber?: string;
-        address?: string;
-    };
-    shippingAddress?: string;
-    items?: AdminOrderItem[];
-    /** Confirmation workflow (null for orders placed before it existed). */
-    workflow?: AdminWorkflow | null;
-    inspections?: Inspection[];
-    destinationCountry?: string | null;
+const STATUS_ACTION: Record<string, { key: string; confirmKey: string; variant: 'primary' | 'secondary' }> = {
+    PAID: { key: 'markPaid', confirmKey: 'confirmPaid', variant: 'secondary' },
+    PROCESSING: { key: 'markConfirmed', confirmKey: 'confirmConfirmed', variant: 'primary' },
+    SHIPPED: { key: 'markShipped', confirmKey: 'confirmShipped', variant: 'primary' },
+    DELIVERED: { key: 'markDelivered', confirmKey: 'confirmDelivered', variant: 'primary' },
 };
-
-const STEPS = [
-    { key: 'CREATED', label: 'Order Created', icon: Package },
-    { key: 'PAID',    label: 'Paid',          icon: CreditCard },
-    { key: 'SHIPPED', label: 'Shipped',       icon: Truck },
-    { key: 'DELIVERED', label: 'Delivered',   icon: CheckCircle2 },
-];
-
-function statusIndex(s?: string) {
-    switch ((s || '').toUpperCase()) {
-        case 'PENDING':   return 0;
-        case 'PAID':
-        case 'COMPLETED': return 1;
-        case 'SHIPPED':   return 2;
-        case 'DELIVERED': return 3;
-        case 'CANCELLED': return -1;
-        default:          return 0;
-    }
-}
-
-function fmtMoney(n?: number) {
-    if (n === undefined || n === null) return '—';
-    return new Intl.NumberFormat('en-EU', { style: 'currency', currency: 'EUR' }).format(n);
-}
-
-function fmtDate(s?: string) {
-    if (!s) return '—';
-    try {
-        return new Date(s).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-    } catch { return s; }
-}
+const CARD_KEY: Record<string, string> = { HOLDING: 'cardHolding', CAPTURED: 'cardCaptured', RELEASED: 'cardReleased', REFUNDED: 'cardRefunded', DISPUTED: 'cardDisputed' };
+const INVOICE_KEY: Record<string, string> = { ISSUED: 'invIssued', PAID: 'invPaid', OVERDUE: 'invOverdue', CANCELLED: 'invCancelled' };
+const USER_STATUS_KEY: Record<string, string> = { PENDING_APPROVAL: 'accPending', ACTIVE: 'accActive', REJECTED: 'accRejected', BLOCKED: 'accBlocked', DELETED: 'accDeleted' };
+const KYC_KEY: Record<string, string> = { UNVERIFIED: 'kycUnverified', PENDING: 'kycPending', VERIFIED: 'kycVerified', REJECTED: 'kycRejected' };
+const DISPUTE_KEY: Record<string, string> = { OPEN: 'dispOpen', UNDER_REVIEW: 'dispReview', RESOLVED_REFUND: 'dispRefund', RESOLVED_NO_REFUND: 'dispNoRefund', CLOSED: 'dispClosed' };
+const INSPECTION_KEY: Record<string, string> = { SCHEDULED: 'inspScheduled', PASSED: 'inspPassed', PASSED_WITH_FINDINGS: 'inspFindings', FAILED: 'inspFailed' };
+const FREIGHT_KEY: Record<string, string> = { priced: 'freightPriced', set_by_atlantis: 'freightSet', quote_required: 'freightQuote' };
+const QTY_KEY: Record<string, string> = { case: 'qtyCase', pallet: 'qtyPallet', truck: 'qtyTruck' };
 
 export default function AdminOrderDetailPage() {
+    return <ConfirmProvider><OrderDetail /></ConfirmProvider>;
+}
+
+function OrderDetail() {
     const params = useParams<{ id: string }>();
     const router = useRouter();
-    const [order, setOrder] = React.useState<AdminOrder | null>(null);
+    const confirm = useConfirm();
+    const { t, fmt } = useLanguage();
+    const tl: Tl = React.useCallback((k, v) => t('adminOrders', k, v), [t]);
+    const eur = (n: number | null | undefined) => (n == null ? '—' : fmt.number(Number(n), { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+    const money = (n: number, currency: string) => { try { return fmt.number(Number(n), { style: 'currency', currency: (currency || 'EUR').toUpperCase(), minimumFractionDigits: 2, maximumFractionDigits: 2 }); } catch { return `${n} ${currency}`; } };
+    const when = (d: string | null | undefined) => (d ? fmt.date(d, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : null);
+
+    const [order, setOrder] = React.useState<AdminOrderDetail | null>(null);
+    const [error, setError] = React.useState<{ message: string; status?: number } | null>(null);
     const [loading, setLoading] = React.useState(true);
-    const [updating, setUpdating] = React.useState(false);
-    const [chatOpen, setChatOpen] = React.useState(false);
-    // Transport editor — admin assigns carrier + price + tracking number
-    // after the buyer places the order and after the booking call with the
-    // carrier. Each field can be filled independently as info comes in.
-    const [shippingCompanyDraft, setShippingCompanyDraft] = React.useState<string>('');
-    const [shippingCostDraft, setShippingCostDraft] = React.useState<string>('');
-    const [trackingNumberDraft, setTrackingNumberDraft] = React.useState<string>('');
-    const [savingShipping, setSavingShipping] = React.useState(false);
+    const [busy, setBusy] = React.useState<string | null>(null);
+    const [cancelOpen, setCancelOpen] = React.useState(false);
+    const [cancelReason, setCancelReason] = React.useState('');
 
-    React.useEffect(() => {
-        if (order) {
-            setShippingCompanyDraft(order.shippingCompany || '');
-            setShippingCostDraft(order.shippingCost != null ? String(order.shippingCost) : '');
-            setTrackingNumberDraft(order.trackingNumber || '');
-        }
-    }, [order?.id, order?.shippingCompany, order?.shippingCost, order?.trackingNumber]);
-
-    const saveShipping = async () => {
-        if (!order) return;
-        setSavingShipping(true);
-        try {
-            const res = await apiFetch(`/orders/${order.id}/shipping`, {
-                method: 'PATCH',
-                body: JSON.stringify({
-                    shippingCompany: shippingCompanyDraft || null,
-                    shippingCost: shippingCostDraft ? Number(shippingCostDraft) : null,
-                    trackingNumber: trackingNumberDraft.trim() || null,
-                }),
-            });
-            if (!res.ok) throw new Error('Save failed');
-            const updated = await res.json();
-            setOrder(prev => prev ? {
-                ...prev,
-                shippingCompany: updated.shippingCompany,
-                shippingCost: updated.shippingCost,
-                trackingNumber: updated.trackingNumber,
-            } : prev);
-            toast.success('Transport details saved');
-        } catch (err: any) {
-            toast.error(err.message || 'Could not save');
-        } finally {
-            setSavingShipping(false);
-        }
-    };
-
-    const [reloadKey, setReloadKey] = React.useState(0);
-    const reload = React.useCallback(() => setReloadKey((k) => k + 1), []);
-    React.useEffect(() => {
+    const load = React.useCallback(() => {
         if (!params?.id) return;
-        let cancelled = false;
-        (async () => {
-            setLoading(true);
-            try {
-                const res = await apiFetch(`/orders/${params.id}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (!cancelled) setOrder(data);
-                } else if (!cancelled) {
-                    toast.error('Could not load order');
-                }
-            } catch {
-                if (!cancelled) toast.error('Network error loading order');
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [params?.id, reloadKey]);
+        setLoading(true); setError(null);
+        adminOrdersApi.detail(params.id).then(setOrder).catch((e) => setError({ message: e.message, status: e.status })).finally(() => setLoading(false));
+    }, [params?.id]);
+    React.useEffect(() => { load(); }, [load]);
 
-    const setStatus = async (next: string) => {
+    const statusLabel = (s: string | null | undefined) => (s && ORDER_STATUS[s] ? t('supplierShell', ORDER_STATUS[s].labelKey) : s || '—');
+
+    const changeStatus = async (to: string, reason?: string) => {
         if (!order) return;
-        setUpdating(true);
+        setBusy(`status-${to}`);
         try {
-            const res = await apiFetch(`/orders/${order.id}/status`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: next }),
-            });
-            if (res.ok) {
-                const updated = await res.json();
-                setOrder(prev => prev ? { ...prev, status: updated.status } : prev);
-                toast.success(`Order marked as ${next}`);
-                reload();
-            } else {
-                // The server explains refusals (e.g. approval or buyer acceptance missing).
-                const err = await res.json().catch(() => null);
-                toast.error(typeof err?.message === 'string' ? err.message : 'Could not update status');
-            }
-        } catch {
-            toast.error('Network error');
-        } finally {
-            setUpdating(false);
-        }
+            await adminOrdersApi.setStatus(order.id, to, reason);
+            toast.success(tl('statusChanged', { status: statusLabel(to) }));
+            setCancelOpen(false); setCancelReason('');
+            load();
+        } catch (e: any) { toast.error(e.message || tl('actionFailed')); } finally { setBusy(null); }
     };
-
-    const printInvoice = () => {
-        if (typeof window !== 'undefined') window.print();
-    };
-
-    const exportJson = () => {
+    const askStatus = async (to: string) => {
         if (!order) return;
-        const blob = new Blob([JSON.stringify(order, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `order-${order.id.slice(-6).toUpperCase()}.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
+        const a = STATUS_ACTION[to];
+        if (!(await confirm({ title: tl(a.key), body: tl(a.confirmKey, { ref: order.ref }), confirm: tl(a.key), tone: 'primary' }))) return;
+        changeStatus(to);
     };
-
-    const handleDelete = async () => {
+    const notifyArrival = async () => {
         if (!order) return;
-        if (!confirm(`Delete order #${order.id.slice(-6).toUpperCase()}? This cannot be undone.`)) return;
-        try {
-            const res = await apiFetch(`/orders/${order.id}`, { method: 'DELETE' });
-            if (res.ok) {
-                toast.success('Order deleted');
-                router.push('/admin/orders');
-            } else {
-                toast.error('Could not delete order');
-            }
-        } catch {
-            toast.error('Network error');
-        }
+        if (!(await confirm({ title: tl('notifyArrival'), body: tl('confirmNotify', { ref: order.ref }), confirm: tl('sendEmail') }))) return;
+        setBusy('notify');
+        try { await adminOrdersApi.notifyDeliveryDay(order.id); toast.success(tl('notifySent')); } catch (e: any) { toast.error(e.message || tl('actionFailed')); } finally { setBusy(null); }
+    };
+    const removeOrder = async () => {
+        if (!order) return;
+        if (!(await confirm({ title: tl('deleteTitle', { ref: order.ref }), body: tl('deleteBody'), confirm: tl('deleteOrder'), tone: 'danger' }))) return;
+        setBusy('delete');
+        try { await adminOrdersApi.remove(order.id); toast.success(tl('deleted')); router.push('/admin/orders'); } catch (e: any) { toast.error(e.message || tl('actionFailed')); setBusy(null); }
     };
 
-    if (loading) {
+    const back = (
+        <Link href="/admin/orders" className="no-print inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-3 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal rounded">
+            <ArrowLeft size={14} className="rtl:rotate-180" aria-hidden />{tl('backToList')}
+        </Link>
+    );
+
+    if (loading && !order) {
         return (
-            <div className="p-8 max-w-7xl mx-auto animate-pulse space-y-6">
-                <div className="h-8 w-48 bg-slate-200 rounded" />
-                <div className="grid grid-cols-3 gap-6">
-                    <div className="col-span-2 space-y-4">
-                        <div className="h-44 bg-slate-200 rounded-2xl" />
-                        <div className="h-72 bg-slate-200 rounded-2xl" />
-                    </div>
-                    <div className="space-y-4">
-                        <div className="h-32 bg-slate-200 rounded-2xl" />
-                        <div className="h-48 bg-slate-200 rounded-2xl" />
-                    </div>
-                </div>
+            <div className="text-start -mt-2 space-y-4" aria-busy="true">
+                {back}
+                <Skeleton className="h-20" />
+                <div className="grid gap-4 lg:grid-cols-3"><Skeleton className="h-72 lg:col-span-2" /><Skeleton className="h-72" /></div>
             </div>
         );
     }
-
     if (!order) {
         return (
-            <div className="p-12 text-center">
-                <Package size={48} className="text-slate-300 mx-auto mb-4" />
-                <p className="text-slate-500">Order not found.</p>
-                <Link href="/admin/orders" className="text-teal-600 font-semibold mt-2 inline-block">Back to Orders</Link>
+            <div className="text-start -mt-2 space-y-4">
+                {back}
+                {error?.status === 404
+                    ? <Card><EmptyState icon={<ClipboardList size={20} />} title={tl('notFoundTitle')}>{tl('notFoundBody')}</EmptyState></Card>
+                    : <ErrorState message={error?.message} onRetry={load} />}
             </div>
         );
     }
 
-    const sIdx = statusIndex(order.status);
-    const cancelled = (order.status || '').toUpperCase() === 'CANCELLED';
+    const o = order;
+    const review = REVIEW[o.reviewStatus] ?? { key: '', tone: 'neutral' as Tone };
+    const actionable = o.statusOptions.filter((x) => x.to !== 'CANCELLED' && STATUS_ACTION[x.to] && (!x.blocker || ['SHIPPED', 'DELIVERED'].includes(x.to)));
+    const canCancel = o.statusOptions.some((x) => x.to === 'CANCELLED' && !x.blocker);
+    const buyerName = o.buyer?.companyName || o.buyer?.name || tl('unknownBuyer');
 
     return (
-        // Force LTR on this page — every label, table header, money,
-        // and ID is in English and reads left-to-right. The parent
-        // layout may inherit a `dir="rtl"` from the global language
-        // setting, which was making half the order page right-aligned
-        // (Arabic style) and the other half left-aligned (English),
-        // hence the operator's "نص بادئ من اليمين و نص بادئ من الشمال"
-        // complaint. text-left/right were also flipped to logical
-        // text-start/text-end so columns line up consistently.
-        <div dir="ltr" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+        <div data-no-translate className="text-start -mt-2 space-y-4">
+            {back}
 
-            {/* Top bar — Back + actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div>
-                    <Link
-                        href="/admin/orders"
-                        className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-slate-500 hover:text-teal-600 transition-colors"
-                    >
-                        <ArrowLeft size={14} /> Back to Orders
-                    </Link>
-                    <div className="flex items-center gap-3 mt-1.5">
-                        <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                            Order #{order.id.slice(-6).toUpperCase()}
+            {/* Summary block: a section, because the print stylesheet hides header elements */}
+            <section aria-labelledby="order-title" className="rounded-xl bg-surface ring-1 ring-line p-4 sm:p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0">
+                        <h1 id="order-title" className="font-sans text-[22px] leading-tight font-semibold text-heading tracking-tight">
+                            {tl('orderTitle')} <bdi dir="ltr" className="font-mono">#{o.ref}</bdi>
                         </h1>
-                        <span className={cn(
-                            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider',
-                            cancelled                       ? 'bg-red-50 text-red-700 border border-red-200' :
-                            sIdx >= 3                       ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                            sIdx >= 1                       ? 'bg-teal-50 text-teal-700 border border-teal-200' :
-                                                              'bg-amber-50 text-amber-700 border border-amber-200'
-                        )}>
-                            <CheckCircle2 size={11} /> {(order.status || '—').toUpperCase()}
-                        </span>
-                        {(order.paymentStatus) && (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-50 text-slate-700 border border-slate-200">
-                                {order.paymentStatus}
-                            </span>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <StatusBadge kind="order" status={o.status} />
+                            {review.key && <Badge tone={review.tone}>{tl(review.key)}</Badge>}
+                            <PaymentBadge value={o.payment.status} tl={tl} />
+                            {o.termsVersion > 1 && <Badge>{tl('termsVersion', { version: o.termsVersion })}</Badge>}
+                        </div>
+                        <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-6 gap-y-2 text-[13px]">
+                            <Meta label={tl('created')} value={when(o.createdAt)} />
+                            <Meta label={tl('lastUpdated')} value={when(o.updatedAt)} />
+                            <Meta label={tl('buyer')} value={o.buyer ? <Link href={`/admin/buyers?focus=${o.buyer.id}`} className="text-teal font-medium hover:underline">{buyerName}</Link> : buyerName} />
+                            <Meta label={tl('suppliersLabel', { count: o.suppliers.length })} value={o.suppliers.length ? o.suppliers.map((s) => s.companyName || s.name || tl('unnamedSupplier')).join(', ') : tl('noSupplier')} />
+                            {o.reviewedAt && <Meta label={o.reviewStatus === 'REJECTED' ? tl('rejectedAt') : tl('approvedAt')} value={<>{when(o.reviewedAt)}{o.reviewedBy ? <span className="text-ink-3"> · {tl('byName', { name: o.reviewedBy })}</span> : null}</>} />}
+                            <Meta label={tl('orderId')} value={<bdi dir="ltr" className="font-mono text-[12px] break-all">{o.id}</bdi>} />
+                        </dl>
+                    </div>
+                    <div className="no-print flex flex-wrap items-center gap-2 lg:justify-end lg:max-w-[46%]">
+                        <Button size="sm" icon={<Printer size={14} />} onClick={() => window.print()}>{tl('print')}</Button>
+                        {o.buyer && <Link href={`/admin/support?search=${o.buyer.id}`}><Button size="sm" icon={<MessageSquare size={14} />}>{tl('messageBuyer')}</Button></Link>}
+                        {o.status === 'SHIPPED' && <Button size="sm" icon={<BellRing size={14} />} loading={busy === 'notify'} onClick={notifyArrival}>{tl('notifyArrival')}</Button>}
+                        <Button size="sm" variant="ghost" className="text-red-700 hover:bg-red-50" icon={<Trash2 size={14} />} loading={busy === 'delete'} onClick={removeOrder}>{tl('deleteOrder')}</Button>
+                    </div>
+                </div>
+
+                <div className="mt-4 flex flex-col gap-3 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                        <span className="text-ink-3">{tl('nextStep')}</span>
+                        <NextActionCell action={o.nextAction} tl={tl} />
+                        {o.nextAction && <span className="text-ink-3">{tl(`next_${o.nextAction}`)}</span>}
+                    </div>
+                    {(actionable.length > 0 || canCancel) && (
+                        <div className="no-print flex flex-wrap items-center gap-2">
+                            {actionable.map((x) => (
+                                <Button key={x.to} size="sm" variant={STATUS_ACTION[x.to].variant} disabled={!!x.blocker || !!busy} loading={busy === `status-${x.to}`} onClick={() => askStatus(x.to)} title={x.blocker || undefined}>
+                                    {tl(STATUS_ACTION[x.to].key)}
+                                </Button>
+                            ))}
+                            {canCancel && <Button size="sm" variant="secondary" disabled={!!busy} onClick={() => setCancelOpen(true)}>{tl('cancelOrder')}</Button>}
+                        </div>
+                    )}
+                </div>
+                {actionable.filter((x) => x.blocker).map((x) => <p key={x.to} className="mt-2 text-[12.5px] text-amber-800" lang="en">{x.blocker}</p>)}
+            </section>
+
+            <div className="grid gap-4 lg:grid-cols-3 items-start">
+                <div className="lg:col-span-2 space-y-4 min-w-0">
+                    {o.workflow && (
+                        <div className="no-print">
+                            <AdminWorkflowPanel orderId={o.id} status={o.status} workflow={o.workflow} inspections={o.inspections} onChange={load}
+                                items={o.lines.map((l) => ({ id: l.id, quantity: l.quantity, unitPrice: l.unitPrice, product: { name: l.name || undefined } }))} />
+                        </div>
+                    )}
+
+                    <LinesCard o={o} tl={tl} eur={eur} />
+                    <LogisticsCard o={o} tl={tl} eur={eur} when={when} onSaved={load} />
+                    <TimelineCard events={o.timeline} tl={tl} when={when} statusLabel={statusLabel} />
+                </div>
+
+                <div className="space-y-4 min-w-0">
+                    <MoneyCard o={o} tl={tl} eur={eur} money={money} when={when} />
+                    <PartyCard title={tl('buyerInfo')} party={o.buyer} tl={tl} when={when} href={o.buyer ? `/admin/buyers?focus=${o.buyer.id}` : null} />
+                    {o.suppliers.length === 0
+                        ? <Card title={tl('supplierInfo')}><p className="text-[13px] text-ink-3">{tl('noSupplierRecorded')}</p></Card>
+                        : o.suppliers.map((s) => <PartyCard key={s.id} title={tl('supplierInfoN', { count: s.lines })} party={s} tl={tl} when={when} href={`/admin/suppliers?id=${s.id}`} />)}
+                    {o.disputes.length > 0 && (
+                        <Card title={tl('disputes')} actions={<Link href="/admin/disputes" className="no-print text-[13px] text-teal font-medium hover:underline">{tl('openDisputes')}</Link>}>
+                            <ul className="space-y-2.5 text-[13px]">
+                                {o.disputes.map((d) => (
+                                    <li key={d.id} className="flex flex-col gap-0.5">
+                                        <span className="flex flex-wrap items-center gap-2"><Badge tone={['OPEN', 'UNDER_REVIEW'].includes(d.status) ? 'warning' : 'neutral'}>{DISPUTE_KEY[d.status] ? tl(DISPUTE_KEY[d.status]) : d.status}</Badge><span className="text-ink-3">{when(d.createdAt)}</span></span>
+                                        <span className="text-ink-2" lang="en">{d.reason}</span>
+                                        {d.resolution && <span className="text-ink-3" lang="en">{d.resolution}</span>}
+                                    </li>
+                                ))}
+                            </ul>
+                        </Card>
+                    )}
+                </div>
+            </div>
+
+            <Dialog open={cancelOpen} onClose={() => setCancelOpen(false)} title={tl('cancelTitle', { ref: o.ref })} description={tl('cancelBody')} size="sm"
+                footer={<><Button onClick={() => setCancelOpen(false)}>{tl('keepOrder')}</Button><Button variant="danger" loading={busy === 'status-CANCELLED'} onClick={() => changeStatus('CANCELLED', cancelReason.trim() || undefined)}>{tl('cancelOrder')}</Button></>}>
+                <Field label={tl('cancelReason')} htmlFor="cancel-reason" optional hint={tl('cancelReasonHint')}>
+                    <textarea id="cancel-reason" data-autofocus value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} rows={3} maxLength={500} className={cn(inputCls, 'h-auto py-2')} />
+                </Field>
+            </Dialog>
+        </div>
+    );
+}
+
+function Meta({ label, value }: { label: string; value: React.ReactNode }) {
+    return (
+        <div className="min-w-0">
+            <dt className="text-[12px] text-ink-3">{label}</dt>
+            <dd className="text-ink truncate">{value ?? '—'}</dd>
+        </div>
+    );
+}
+
+function NotRecorded({ tl }: { tl: Tl }) {
+    return <span className="text-ink-4">{tl('notRecorded')}</span>;
+}
+
+function Row({ label, children, strong }: { label: React.ReactNode; children: React.ReactNode; strong?: boolean }) {
+    return (
+        <div className={cn('flex items-baseline justify-between gap-3 py-1.5 text-[13px]', strong && 'border-t border-line mt-1 pt-2.5')}>
+            <dt className={cn(strong ? 'font-semibold text-heading' : 'text-ink-3')}>{label}</dt>
+            <dd className={cn('text-end tabular-nums', strong ? 'font-semibold text-heading text-[14px]' : 'text-ink')}>{children}</dd>
+        </div>
+    );
+}
+
+function qty(tl: Tl, quantity: number | null, unit: string | null) {
+    if (quantity == null) return tl('notRecorded');
+    const key = unit ? QTY_KEY[String(unit).toLowerCase()] : null;
+    if (key) return tl(key, { count: quantity });
+    return unit ? tl('qtyOther', { count: quantity, unit }) : tl('qtyNoUnit', { count: quantity });
+}
+
+function LinesCard({ o, tl, eur }: { o: AdminOrderDetail; tl: Tl; eur: (n: number | null | undefined) => string }) {
+    return (
+        <Card title={tl('linesTitle', { count: o.lines.length })} description={tl('linesDesc')} bodyClassName="p-0">
+            <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px] text-[13px]">
+                    <thead>
+                        <tr className="text-[12px] text-ink-3 bg-surface-2/60 border-y border-line">
+                            <th className="text-start font-medium ps-4 pe-2 py-2">{tl('colProduct')}</th>
+                            <th className="text-start font-medium px-2 py-2">{tl('colQuantity')}</th>
+                            <th className="text-end font-medium px-2 py-2">{tl('colUnitPrice')}</th>
+                            <th className="text-end font-medium px-2 py-2">{tl('colLineTotal')}</th>
+                            {o.netVisible && <th className="text-end font-medium px-2 pe-4 py-2">{tl('colNet')}</th>}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {o.lines.map((l) => <LineRow key={l.id} l={l} netVisible={o.netVisible} tl={tl} eur={eur} />)}
+                    </tbody>
+                </table>
+            </div>
+        </Card>
+    );
+}
+
+function LineRow({ l, netVisible, tl, eur }: { l: AdminOrderLine; netVisible: boolean; tl: Tl; eur: (n: number | null | undefined) => string }) {
+    const name = l.name || (l.kind === 'mixed' ? tl('mixedLoad') : tl('deletedProduct'));
+    return (
+        <tr className="border-b border-line last:border-0 align-top">
+            <td className="ps-4 pe-2 py-3">
+                <div className="flex gap-3 min-w-0">
+                    <Thumb src={l.image} alt={name} size={44} />
+                    <div className="min-w-0">
+                        {l.productId && l.productExists
+                            ? <Link href={`/admin/products/${l.productId}`} className="font-medium text-ink hover:underline">{name}</Link>
+                            : <span className="font-medium text-ink">{name}</span>}
+                        <p className="text-[12px] text-ink-3">
+                            {l.brand}
+                            {l.ean ? <>{l.brand ? ' · ' : ''}{tl('ean')} <bdi dir="ltr" className="font-mono">{l.ean}</bdi></> : l.kind === 'product' ? <>{l.brand ? ' · ' : ''}{tl('noEan')}</> : null}
+                        </p>
+                        <p className="text-[12px] text-ink-3">{l.supplier ? tl('supplierIs', { name: l.supplier.name || tl('unnamedSupplier') }) : tl('noSupplierRecorded')}</p>
+                        {!l.productExists && l.kind === 'product' && <p className="text-[12px] text-amber-800">{tl('productRemoved')}</p>}
+                        {(l.selectedVariants || l.promotionPercent) && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                                {l.selectedVariants && Object.entries(l.selectedVariants).map(([k, v]) => <Badge key={k}><span className="text-ink-3">{k}:</span> {v}</Badge>)}
+                                {l.promotionPercent ? <Badge tone="brand">{tl('specialOffer', { percent: l.promotionPercent })}</Badge> : null}
+                            </div>
+                        )}
+                        {l.mixComposition && (
+                            <div className="mt-2 rounded-lg ring-1 ring-line bg-surface-2/50 p-2.5">
+                                <p className="text-[12px] font-medium text-ink-2">{l.mixedLoad ? tl(l.mixedLoad.kind === 'TRUCK' ? 'mixTruck' : 'mixPallet') : tl('mixComposition')}</p>
+                                <ul className="mt-1 space-y-1">
+                                    {l.mixComposition.map((c, i) => (
+                                        <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3 text-[12px]">
+                                            <span className="min-w-0 text-ink">
+                                                {c.name || prettifyVariantSignature(c.signature || '') || tl('variant')}
+                                                {c.variant ? <span className="text-ink-3"> · {c.variant}</span> : null}
+                                                {c.signature && c.name ? <span className="text-ink-3"> · {prettifyVariantSignature(c.signature)}</span> : null}
+                                                {c.ean ? <span className="text-ink-3"> · <bdi dir="ltr" className="font-mono">{c.ean}</bdi></span> : null}
+                                            </span>
+                                            <span className="tabular-nums text-ink-2">
+                                                {qty(tl, c.quantity, c.unit)}
+                                                {c.cases != null && c.unit !== 'case' ? <span className="text-ink-3"> · {tl('qtyCase', { count: c.cases })}</span> : null}
+                                                {c.lineSubtotal != null ? <span className="text-ink-3"> · {eur(c.lineSubtotal)}</span> : null}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
                         )}
                     </div>
-                    <p className="text-[12px] text-slate-500 mt-1">{fmtDate(order.createdAt)}</p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={printInvoice} className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-2">
-                        <Printer size={14} /> Print Invoice
-                    </button>
-                    <button onClick={exportJson} className="h-10 px-4 bg-white border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-all flex items-center gap-2">
-                        <Download size={14} /> Export
-                    </button>
-                    <button onClick={handleDelete} className="h-10 px-4 bg-white border border-red-200 rounded-xl text-[13px] font-semibold text-red-600 hover:bg-red-50 transition-all flex items-center gap-2">
-                        <Trash2 size={14} /> Delete
-                    </button>
+            </td>
+            <td className="px-2 py-3 whitespace-nowrap">
+                <span className="text-ink">{qty(tl, l.quantity, l.tier)}</span>
+                {!l.tier && <span className="block text-[12px] text-ink-4">{tl('tierNotRecorded')}</span>}
+                {l.stockCases != null && <span className="block text-[12px] text-ink-3">{tl('stockCases', { count: l.stockCases })}</span>}
+            </td>
+            <td className="px-2 py-3 text-end tabular-nums whitespace-nowrap">{eur(l.unitPrice)}</td>
+            <td className="px-2 py-3 text-end tabular-nums whitespace-nowrap font-medium text-ink">{eur(l.lineTotal)}</td>
+            {netVisible && (
+                <td className="px-2 pe-4 py-3 text-end tabular-nums whitespace-nowrap">
+                    {l.supplierUnitPrice == null ? <NotRecorded tl={tl} /> : <>{eur(l.supplierUnitPrice)}<span className="block text-[12px] text-ink-3">{eur(l.supplierLineTotal)}</span></>}
+                </td>
+            )}
+        </tr>
+    );
+}
+
+function MoneyCard({ o, tl, eur, money, when }: { o: AdminOrderDetail; tl: Tl; eur: (n: number | null | undefined) => string; money: (n: number, c: string) => string; when: (d: string | null | undefined) => string | null }) {
+    const m = o.money;
+    const card = o.payment.card;
+    return (
+        <Card title={tl('moneyTitle')} description={tl('moneyDesc')}>
+            <dl>
+                <Row label={tl('linesSubtotal')}>{eur(m.linesSubtotal)}</Row>
+                {m.coupon && <Row label={<>{tl('coupon')} <bdi dir="ltr" className="font-mono text-[12px]">{m.coupon}</bdi></>}>{m.couponDiscount != null ? `−${eur(m.couponDiscount)}` : '—'}</Row>}
+                <Row label={tl('goodsTotal')} strong>{eur(m.goodsTotal)}</Row>
+                <Row label={<>{tl('deliveryCharge')}<span className="block text-[12px] text-ink-4">{tl(FREIGHT_KEY[m.freightStatus])}</span></>}>{m.freight != null ? eur(m.freight) : <span className="text-ink-3">{tl('quotedAfter')}</span>}</Row>
+                <Row label={tl('vat')}><NotRecorded tl={tl} /></Row>
+                <Row label={tl('totalWithDelivery')} strong>{m.totalWithFreight != null ? eur(m.totalWithFreight) : <span className="text-[13px] font-normal text-ink-3">{tl('totalPendingDelivery')}</span>}</Row>
+            </dl>
+            {m.unexplainedDifference != null && <p className="mt-2 text-[12.5px] text-amber-800">{tl('unexplainedDiff', { amount: eur(m.unexplainedDifference) })}</p>}
+
+            {o.netVisible && (
+                <div className="mt-4 border-t border-line pt-3">
+                    <p className="text-[12px] font-medium text-ink-3">{tl('netTitle')}</p>
+                    <dl>
+                        <Row label={tl('supplierNet')}>{m.supplierNet != null ? eur(m.supplierNet) : <NotRecorded tl={tl} />}</Row>
+                        <Row label={tl('markup')}>{m.markupOnRecordedLines != null ? eur(m.markupOnRecordedLines) : <NotRecorded tl={tl} />}</Row>
+                    </dl>
+                    {!!m.linesWithoutNet && <p className="mt-1 text-[12.5px] text-amber-800">{tl('linesWithoutNet', { count: m.linesWithoutNet })}</p>}
                 </div>
+            )}
+
+            <div className="mt-4 border-t border-line pt-3">
+                <p className="text-[12px] font-medium text-ink-3">{tl('paymentTitle')}</p>
+                <dl>
+                    <Row label={tl('paymentStatus')}><PaymentBadge value={o.payment.status} tl={tl} /></Row>
+                    <Row label={tl('paidAt')}>{when(o.payment.paidAt) ?? <NotRecorded tl={tl} />}</Row>
+                </dl>
+                {card ? (
+                    <div className="mt-2 rounded-lg ring-1 ring-line p-2.5">
+                        <p className="text-[12.5px] font-medium text-ink-2">{tl('cardRecord')}</p>
+                        <dl>
+                            <Row label={tl('cardStatus')}>{CARD_KEY[card.status] ? tl(CARD_KEY[card.status]) : card.status}</Row>
+                            <Row label={tl('cardAmount')}>{money(card.amount, card.currency)}</Row>
+                            <Row label={tl('cardCapturedAt')}>{when(card.capturedAt) ?? <NotRecorded tl={tl} />}</Row>
+                            <Row label={tl('cardReleasedAt')}>{when(card.releasedAt) ?? <NotRecorded tl={tl} />}</Row>
+                            {o.netVisible && card.platformFee != null && <Row label={tl('cardFee')}>{money(card.platformFee, card.currency)}</Row>}
+                            {o.netVisible && card.supplierAmount != null && <Row label={tl('cardSupplierAmount')}>{money(card.supplierAmount, card.currency)}</Row>}
+                        </dl>
+                    </div>
+                ) : <p className="mt-1 text-[12.5px] text-ink-3">{o.payment.cardPaymentStarted ? tl('cardStartedNoRecord') : tl('noCardRecord')}</p>}
             </div>
 
-            {/* Main grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                {/* LEFT — products + tracking */}
-                <div className="lg:col-span-2 space-y-6">
-
-                    {order.workflow && (
-                        <AdminWorkflowPanel orderId={order.id} status={order.status} workflow={order.workflow} inspections={order.inspections || []} onChange={reload}
-                            items={(order.items || []).map((i) => ({ id: i.id, quantity: i.quantity, unitPrice: i.unitPrice, product: i.product ? { name: i.product.name } : null }))} />
+            <div className="mt-4 border-t border-line pt-3">
+                <p className="text-[12px] font-medium text-ink-3">{tl('documentsTitle')}</p>
+                {o.documents.invoices.length === 0 && !o.documents.supplierInvoiceUrl && <p className="mt-1 text-[12.5px] text-ink-3">{tl('noInvoices')}</p>}
+                <ul className="mt-1 space-y-2">
+                    {o.documents.invoices.map((inv) => (
+                        <li key={inv.id} className="text-[13px]">
+                            <span className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="inline-flex items-center gap-1.5 text-ink"><FileText size={14} className="text-ink-4" aria-hidden /><bdi dir="ltr" className="font-mono text-[12.5px]">{inv.invoiceNumber}</bdi></span>
+                                <Badge tone={inv.status === 'PAID' ? 'success' : inv.status === 'OVERDUE' ? 'warning' : 'neutral'}>{INVOICE_KEY[inv.status] ? tl(INVOICE_KEY[inv.status]) : inv.status}</Badge>
+                            </span>
+                            <span className="block text-[12px] text-ink-3">{tl('invoiceLine', { date: when(inv.createdAt) || '—', amount: money(inv.amount, inv.currency), tax: money(inv.tax, inv.currency), total: money(inv.totalAmount, inv.currency) })}</span>
+                            {inv.pdfUrl ? <a href={inv.pdfUrl} target="_blank" rel="noopener noreferrer" className="no-print text-[12.5px] text-teal font-medium hover:underline inline-flex items-center gap-1">{tl('openPdf')}<ExternalLink size={12} aria-hidden /></a> : <span className="block text-[12px] text-ink-4">{tl('noPdfStored')}</span>}
+                        </li>
+                    ))}
+                    {o.documents.supplierInvoiceUrl && (
+                        <li className="text-[13px]">
+                            <a href={o.documents.supplierInvoiceUrl} target="_blank" rel="noopener noreferrer" className="text-teal font-medium hover:underline inline-flex items-center gap-1">{tl('supplierDocument')}<ExternalLink size={12} aria-hidden /></a>
+                            <span className="block text-[12px] text-ink-3">{tl('supplierDocumentHint')}</span>
+                        </li>
                     )}
-                    {order.workflow?.terms?.fulfillment && (
-                        <section className="text-start bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
-                            <h2 className="text-[15px] font-semibold text-slate-900 mb-3">Delivery (calculated at order){order.destinationCountry ? ` · to ${order.destinationCountry}` : ''}</h2>
-                            <DeliveryBreakdown quote={order.workflow.terms.fulfillment} setByAtlantis={order.workflow.terms.freight?.status === 'set_by_atlantis' && order.workflow.terms.freight.amount != null ? order.workflow.terms.freight : null} />
-                        </section>
-                    )}
+                </ul>
+            </div>
+        </Card>
+    );
+}
 
-                    {/* Items */}
-                    <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
-                        <h2 className="text-[15px] font-bold text-slate-900 mb-4">
-                            Products ({order.items?.length || 0})
-                        </h2>
-
-                        <div className="overflow-x-auto -mx-2 sm:mx-0">
-                            <table className="w-full text-start min-w-[520px]">
-                                <thead>
-                                    <tr className="text-[10px] font-bold uppercase tracking-widest text-slate-400 border-b border-slate-100">
-                                        <th className="py-3 px-2 sm:px-3">Product</th>
-                                        <th className="py-3 px-2 sm:px-3">SKU / EAN</th>
-                                        <th className="py-3 px-2 sm:px-3">Qty</th>
-                                        <th className="py-3 px-2 sm:px-3">Unit Price</th>
-                                        <th className="py-3 px-2 sm:px-3 text-end">Total</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-50">
-                                    {(order.items || []).map((it) => {
-                                        const p = (it.product || {}) as NonNullable<AdminOrderItem['product']>;
-                                        return (
-                                            <tr key={it.id} className="align-top">
-                                                <td className="py-4 px-2 sm:px-3">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-12 h-12 rounded-xl bg-slate-50 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
-                                                            {p.images?.[0] ? (
-                                                                <img src={p.images[0]} referrerPolicy="no-referrer" className="w-full h-full object-cover" alt={p.name} />
-                                                            ) : (
-                                                                <Package size={18} className="text-slate-300" />
-                                                            )}
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <Link href={p.id ? `/admin/products?focus=${p.id}` : '#'} className="text-[13px] font-bold text-slate-900 hover:text-teal-600 line-clamp-1 transition-colors">
-                                                                {p.name || 'Unknown product'}
-                                                            </Link>
-                                                            <p className="text-[11px] text-slate-500 mt-0.5">
-                                                                {p.brand ? `${p.brand} · ` : ''}{p.category || '—'}
-                                                            </p>
-                                                            {/* Shopify-style variant snapshot. The buyer
-                                                                picked these on the PDP and they were
-                                                                stored on OrderItem.selectedVariants at
-                                                                checkout — admin can see the exact
-                                                                configuration without going back to the
-                                                                product page. selectedTier appears as a
-                                                                small badge (Truck / Pallet / Case) so the
-                                                                ops team can match the markup tier to the
-                                                                line price. */}
-                                                            {((it as any).selectedVariants || (it as any).selectedTier) && (
-                                                                <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                                                                    {(it as any).selectedTier && (
-                                                                        <span className="inline-flex items-center h-5 px-2 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold uppercase tracking-wider">
-                                                                            {(it as any).selectedTier}
-                                                                        </span>
-                                                                    )}
-                                                                    {(it as any).selectedVariants &&
-                                                                        Object.entries((it as any).selectedVariants)
-                                                                            .filter(([k]) => !k.startsWith('__'))
-                                                                            .map(([k, v]) => (
-                                                                                <span
-                                                                                    key={k}
-                                                                                    className="inline-flex items-center h-5 px-2 rounded-md bg-violet-50 border border-violet-200 text-violet-700 text-[10px] font-semibold"
-                                                                                >
-                                                                                    <span className="text-violet-400 font-normal">{k}:</span>
-                                                                                    <span className="ms-1">{String(v)}</span>
-                                                                                </span>
-                                                                            ))}
-                                                                </div>
-                                                            )}
-                                                            {Array.isArray((it as any).mixComposition) && (it as any).mixComposition.length > 0 && (
-                                                                <div className="mt-2 rounded-lg border border-orange-200 bg-orange-50/40 px-2.5 py-1.5 text-[11px]">
-                                                                    <p className="font-black text-orange-700 uppercase tracking-widest text-[9px] mb-1">Mixed composition</p>
-                                                                    <ul className="space-y-0.5 text-slate-700">
-                                                                        {((it as any).mixComposition as Array<{ signature: string; quantity: number }>).map((c) => (
-                                                                            <li key={c.signature} className="break-all">
-                                                                                {c.quantity} × {prettifyVariantSignature(c.signature) || 'Variant'}
-                                                                            </li>
-                                                                        ))}
-                                                                    </ul>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-2 sm:px-3">
-                                                    <p className="text-[12px] font-mono text-slate-700">{p.sku || p.ean || '—'}</p>
-                                                    {p.ean && p.sku && (
-                                                        <p className="text-[10px] font-mono text-slate-400 mt-0.5">EAN: {p.ean}</p>
-                                                    )}
-                                                </td>
-                                                <td className="py-4 px-2 sm:px-3 text-[13px] font-bold text-slate-900">
-                                                    {/* Operator request: surface the unit
-                                                        the customer ordered (Truck / Pallet
-                                                        / Case) next to the count. Pulls from
-                                                        the order line's selectedTier first
-                                                        (snapshot at checkout), falls back to
-                                                        the product's default unit. */}
-                                                    <div className="flex items-center gap-1.5">
-                                                        <span>{it.quantity}</span>
-                                                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                                            × {(it as any).selectedTier || p.unit || 'unit'}
-                                                        </span>
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-2 sm:px-3 text-[13px] font-semibold text-slate-700">
-                                                    {fmtMoney(it.unitPrice)}
-                                                </td>
-                                                <td className="py-4 px-2 sm:px-3 text-[13px] font-bold text-slate-900 text-end">
-                                                    {fmtMoney(it.totalPrice)}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        {/* Per-item product specs (compact) */}
-                        {(order.items || []).map((it) => {
-                            const p = (it.product || {}) as NonNullable<AdminOrderItem['product']>;
-                            const specs: Array<[string, string]> = [];
-                            if (p.weight) specs.push(['Weight', String(p.weight)]);
-                            if (p.unit) specs.push(['Unit', String(p.unit)]);
-                            if (p.unitsPerCase) specs.push(['Pcs / Case', String(p.unitsPerCase)]);
-                            if (p.casesPerPallet) specs.push(['Cases / Pallet', String(p.casesPerPallet)]);
-                            if (p.unitsPerPallet) specs.push(['Pcs / Pallet', String(p.unitsPerPallet)]);
-                            if (p.palletsPerShipment) specs.push(['Pallets / Truck', String(p.palletsPerShipment)]);
-                            if (p.shelfLife) specs.push(['BBD', String(p.shelfLife)]);
-                            if (typeof p.stock === 'number') specs.push(['Stock', `${p.stock} cases`]);
-                            if (p.exwLocation) specs.push(['EXW · Currently In', String(p.exwLocation)]);
-                            if (p.origin) specs.push(['Country of Origin', String(p.origin)]);
-                            const supplier = (p as any).supplier as AdminOrderItem['product'] extends { supplier?: infer S } ? S : any;
-                            const hasSupplier = supplier && (supplier.id || supplier.name);
-                            if (specs.length === 0 && !hasSupplier) return null;
-                            return (
-                                <div key={`specs-${it.id}`} className="mt-4 space-y-3">
-                                    {specs.length > 0 && (
-                                        <div className="p-4 bg-slate-50/60 border border-slate-100 rounded-xl">
-                                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5">{p.name} — specifications</p>
-                                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                                {specs.map(([k, v]) => (
-                                                    <div key={k}>
-                                                        <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">{k}</p>
-                                                        <p className="text-[12px] font-bold text-slate-800 mt-0.5">{v}</p>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* ── Supplier panel ──
-                                        Operator workflow: admin checks each line's
-                                        supplier, pings them to confirm stock, then
-                                        flips the order to PROCESSING. This card
-                                        surfaces every supplier-side contact path:
-                                          • Portfolio link  → /admin/suppliers?id=…
-                                                              (admin sees this supplier's
-                                                              full catalog in context)
-                                          • All listings    → /admin/products?supplierId=…
-                                                              (zoom into the supplier's
-                                                              product table)
-                                          • Email           → mailto: with a pre-filled
-                                                              subject referencing the
-                                                              order id, so the supplier
-                                                              knows exactly which order
-                                                              to confirm
-                                          • Phone           → tel: link
-                                        Customer-facing data stays masked elsewhere
-                                        but the admin sees the supplier in full.
-                                    */}
-                                    {hasSupplier && (
-                                        <div className="p-4 bg-blue-50/40 border border-blue-100 rounded-xl">
-                                            <div className="flex items-start justify-between gap-4 flex-wrap">
-                                                <div className="min-w-0">
-                                                    <p className="text-[10px] font-bold text-blue-700 uppercase tracking-widest mb-1">Supplier · {p.name}</p>
-                                                    <p className="text-[14px] font-bold text-slate-900">
-                                                        {supplier?.companyName || supplier?.name || 'Unknown supplier'}
-                                                    </p>
-                                                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-slate-600 mt-1">
-                                                        {supplier?.country && (
-                                                            <span>📍 {supplier.country}</span>
-                                                        )}
-                                                        {supplier?.email && (
-                                                            <a
-                                                                href={`mailto:${supplier.email}?subject=${encodeURIComponent(`Atlantis · order ${order.id.slice(0, 8)} — please confirm stock for "${p.name}"`)}&body=${encodeURIComponent(`Hi ${supplier.name || ''},\n\nWe just received an order on Atlantis that includes "${p.name}" (${it.quantity} ${(it as any).selectedTier || p.unit || 'units'}). Could you confirm you have the stock ready to ship?\n\nOnce you confirm, we'll process the order on our side.\n\nThanks,\nAtlantis Operations`)}`}
-                                                                className="text-blue-700 hover:underline font-semibold"
-                                                            >
-                                                                ✉ {supplier.email}
-                                                            </a>
-                                                        )}
-                                                        {supplier?.phone && (
-                                                            <a
-                                                                href={`tel:${supplier.phone}`}
-                                                                className="text-blue-700 hover:underline font-semibold"
-                                                            >
-                                                                📞 {supplier.phone}
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    {supplier?.id && (
-                                                        <>
-                                                            <Link
-                                                                href={`/admin/suppliers?id=${supplier.id}`}
-                                                                className="h-9 px-3 rounded-lg bg-white border border-blue-200 hover:border-blue-400 text-blue-700 text-[12px] font-bold flex items-center gap-1.5 transition-colors"
-                                                            >
-                                                                Open portfolio →
-                                                            </Link>
-                                                            <Link
-                                                                href={`/admin/products?supplierId=${supplier.id}`}
-                                                                className="h-9 px-3 rounded-lg bg-white border border-blue-200 hover:border-blue-400 text-blue-700 text-[12px] font-bold flex items-center gap-1.5 transition-colors"
-                                                            >
-                                                                All their listings
-                                                            </Link>
-                                                        </>
-                                                    )}
-                                                    {supplier?.id && (
-                                                        <Link
-                                                            href={`/admin/support?search=${supplier.id}`}
-                                                            className="h-9 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[12px] font-bold flex items-center gap-1.5 transition-colors shadow-sm"
-                                                            title="Open Atlantis Talk conversation with this supplier"
-                                                        >
-                                                            💬 Message supplier
-                                                        </Link>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </section>
-
-                    {/* Logistics & Tracking */}
-                    <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
-                        <h2 className="text-[15px] font-bold text-slate-900 mb-5">Logistics &amp; Tracking</h2>
-
-                        <div className="grid grid-cols-4 gap-2 sm:gap-4 mb-5">
-                            {STEPS.map((step, i) => {
-                                const reached = !cancelled && i <= sIdx;
-                                const current = !cancelled && i === sIdx + (order.status?.toUpperCase() === 'DELIVERED' ? 0 : 0);
-                                return (
-                                    <div key={step.key} className="flex flex-col items-center text-center">
-                                        <div className="relative w-full flex items-center justify-center">
-                                            {i < STEPS.length - 1 && (
-                                                <div className={cn(
-                                                    'absolute h-[2px] left-1/2 right-0 top-1/2 -translate-y-1/2 transition-colors',
-                                                    reached && i < sIdx ? 'bg-teal-500' : 'bg-slate-200'
-                                                )} style={{ left: 'calc(50% + 18px)', right: '-50%' }} />
-                                            )}
-                                            <div className={cn(
-                                                'relative z-10 w-9 h-9 rounded-full flex items-center justify-center transition-all',
-                                                reached ? 'bg-teal-500 text-white shadow-sm shadow-teal-500/30' : 'bg-slate-100 text-slate-400'
-                                            )}>
-                                                <step.icon size={16} />
-                                            </div>
-                                        </div>
-                                        <p className={cn(
-                                            'mt-2 text-[11px] font-bold',
-                                            reached ? 'text-teal-700' : 'text-slate-400'
-                                        )}>
-                                            {step.label}
-                                        </p>
-                                        <p className="text-[10px] text-slate-400">
-                                            {step.key === 'CREATED'   && fmtDate(order.createdAt)}
-                                            {step.key === 'PAID'      && (sIdx >= 1 ? fmtDate(order.updatedAt || order.createdAt) : 'Pending')}
-                                            {step.key === 'SHIPPED'   && (sIdx >= 2 ? fmtDate(order.updatedAt || order.createdAt) : 'Pending')}
-                                            {step.key === 'DELIVERED' && (sIdx >= 3 ? fmtDate(order.updatedAt || order.createdAt) : 'Pending')}
-                                        </p>
-                                    </div>
-                                );
-                            })}
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-slate-50/60 border border-slate-100 rounded-xl">
-                            <div className="flex items-center gap-3">
-                                <Truck size={16} className="text-slate-400" />
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tracking #</p>
-                                    <p className="text-[12px] font-bold text-slate-800 font-mono">{order.trackingNumber || '—'}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Building2 size={16} className="text-slate-400" />
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Carrier</p>
-                                    <p className="text-[12px] font-bold text-slate-800">{order.carrier || '—'}</p>
-                                </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <Clock size={16} className="text-slate-400" />
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Est. Delivery</p>
-                                    <p className="text-[12px] font-bold text-slate-800">{order.expectedDelivery ? fmtDate(order.expectedDelivery) : '—'}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* ── Transport assignment (admin) ────────────────────────
-                            Admin picks the carrier and enters the negotiated
-                            transport price. Stored on the order so the
-                            customer's tracking page, the invoice, and the
-                            supplier shipping email all see the same numbers. */}
-                        <div className="mt-5 p-4 rounded-2xl border border-slate-200 bg-slate-50/40 space-y-3">
-                            <div className="flex items-center justify-between">
-                                <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest">Transport Assignment</p>
-                                {order.shippingCompany && order.shippingCost != null && (
-                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full">
-                                        Assigned
-                                    </span>
-                                )}
-                            </div>
-
-                            {/* Buyer's chosen carrier banner — surfaced from
-                                Order.customerShippingCompany, which is the
-                                snapshot taken at checkout. Always renders
-                                regardless of what the admin re-assigned later. */}
-                            {order.customerShippingCompany && (
-                                <div className="flex items-center gap-3 p-3 rounded-xl border border-blue-200 bg-blue-50/60">
-                                    <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
-                                        🛒
-                                    </div>
-                                    <div className="min-w-0 flex-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">
-                                            Buyer picked at checkout
-                                        </p>
-                                        <p className="text-[14px] font-black text-blue-900 mt-0.5 truncate">
-                                            {order.customerShippingCompany}
-                                        </p>
-                                    </div>
-                                    {order.shippingCompany &&
-                                        order.shippingCompany !== order.customerShippingCompany && (
-                                            <span
-                                                title="Admin re-assigned a different carrier"
-                                                className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full shrink-0"
-                                            >
-                                                Overridden
-                                            </span>
-                                        )}
-                                </div>
-                            )}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Shipping Company</label>
-                                    <select
-                                        value={shippingCompanyDraft}
-                                        onChange={e => setShippingCompanyDraft(e.target.value)}
-                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px] font-bold focus:border-teal-500 outline-none"
-                                    >
-                                        <option value="">— Select carrier —</option>
-                                        <option value="DB SCHENKER">DB Schenker</option>
-                                        <option value="LKW WALTER">LKW Walter</option>
-                                        <option value="Raben Group">Raben Group</option>
-                                        <option value="DHL Freight">DHL Freight</option>
-                                        <option value="DSV">DSV</option>
-                                        <option value="Kuehne+Nagel">Kuehne + Nagel</option>
-                                        <option value="GEFCO">GEFCO</option>
-                                        <option value="Maersk">Maersk</option>
-                                        <option value="UPS">UPS Freight</option>
-                                        <option value="FedEx">FedEx Freight</option>
-                                        <option value="Other">Other (custom)</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Transport Cost (€)</label>
-                                    <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={shippingCostDraft}
-                                        onChange={e => setShippingCostDraft(e.target.value)}
-                                        placeholder="e.g. 350.00"
-                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px] font-bold focus:border-teal-500 outline-none"
-                                    />
-                                </div>
-                                <div className="sm:col-span-2">
-                                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1 block">Tracking Number (from carrier)</label>
-                                    <input
-                                        type="text"
-                                        value={trackingNumberDraft}
-                                        onChange={e => setTrackingNumberDraft(e.target.value)}
-                                        placeholder="e.g. ABCD-1234567890"
-                                        className="w-full h-10 px-3 rounded-xl border border-slate-200 bg-white text-[13px] font-bold font-mono focus:border-teal-500 outline-none"
-                                    />
-                                    <p className="text-[10px] text-slate-400 mt-1">
-                                        Once added, the buyer sees this in their order tracking page and can follow the shipment with the carrier.
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between gap-3 pt-1">
-                                <p className="text-[11px] text-slate-500">
-                                    {order.shippingCompany || order.shippingCost != null
-                                        ? <>Currently: <strong>{order.shippingCompany || '—'}</strong> · <strong>€{(order.shippingCost ?? 0).toFixed(2)}</strong></>
-                                        : 'No transport assigned yet — supplier won\'t ship until set.'}
-                                </p>
-                                <button
-                                    onClick={saveShipping}
-                                    disabled={savingShipping}
-                                    className="h-9 px-5 bg-[#0B1F3A] text-white rounded-xl text-[12px] font-bold hover:bg-[#1a3a6b] transition-colors disabled:opacity-50"
-                                >
-                                    {savingShipping ? 'Saving…' : 'Save Transport'}
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* ── Supplier invoice attachment ─────────────────
-                            When the supplier (or admin) uploaded a receipt
-                            from /supplier/orders, it shows here so admin
-                            can audit the paperwork. PDF renders as a
-                            link, image renders inline. */}
-                        {order.supplierInvoiceUrl && (
-                            <div className="mt-5 p-4 rounded-2xl border border-slate-200 bg-white">
-                                <p className="text-[11px] font-black text-slate-700 uppercase tracking-widest mb-2">
-                                    Supplier invoice attachment
-                                </p>
-                                {(/\.pdf(\?|$)/i.test(order.supplierInvoiceUrl)) ? (
-                                    <a
-                                        href={order.supplierInvoiceUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 h-9 px-4 rounded-xl bg-slate-900 text-white text-[12px] font-bold hover:bg-slate-800"
-                                    >
-                                        Open invoice PDF
-                                    </a>
-                                ) : (
-                                    <a
-                                        href={order.supplierInvoiceUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block rounded-xl overflow-hidden border border-slate-200 max-w-sm"
-                                    >
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img src={order.supplierInvoiceUrl} alt="Supplier invoice" className="w-full h-auto" />
-                                    </a>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Status actions */}
-                        <div className="flex flex-wrap items-center gap-2 mt-5">
-                            {/* Workflow orders are confirmed only by approval (panel above). */}
-                            {order.status === 'PENDING' && !order.workflow && (
-                                <button onClick={() => setStatus('PAID')} disabled={updating}
-                                    className="h-10 px-5 bg-teal-600 text-white rounded-xl text-[13px] font-semibold hover:bg-teal-700 transition-all disabled:opacity-50">
-                                    Mark as Paid
-                                </button>
-                            )}
-                            {order.status === 'PAID' && !order.workflow && (
-                                <button onClick={() => setStatus('PROCESSING')} disabled={updating}
-                                    className="h-10 px-5 bg-teal-600 text-white rounded-xl text-[13px] font-semibold hover:bg-teal-700 transition-all disabled:opacity-50">
-                                    Mark as Confirmed
-                                </button>
-                            )}
-                            {order.status === 'PROCESSING' && (
-                                <button onClick={() => setStatus('SHIPPED')} disabled={updating || !!order.workflow?.buyerMustAccept}
-                                    title={order.workflow?.buyerMustAccept ? 'The buyer must accept the changed terms first' : undefined}
-                                    className="h-10 px-5 bg-blue-600 text-white rounded-xl text-[13px] font-semibold hover:bg-blue-700 transition-all disabled:opacity-50">
-                                    Mark as Shipped
-                                </button>
-                            )}
-                            {order.status === 'SHIPPED' && (
-                                <button onClick={() => setStatus('DELIVERED')} disabled={updating}
-                                    className="h-10 px-5 bg-emerald-600 text-white rounded-xl text-[13px] font-semibold hover:bg-emerald-700 transition-all disabled:opacity-50">
-                                    Mark as Delivered
-                                </button>
-                            )}
-                            {!cancelled && order.status !== 'DELIVERED' && (
-                                <button onClick={() => setStatus('CANCELLED')} disabled={updating}
-                                    className="h-10 px-5 bg-white border border-slate-200 rounded-xl text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-all">
-                                    Cancel Order
-                                </button>
-                            )}
-                        </div>
-                    </section>
+function PartyCard({ title, party, tl, when, href }: { title: string; party: (Party & { createdAt?: string; role?: string | null }) | null; tl: Tl; when: (d: string | null | undefined) => string | null; href: string | null }) {
+    if (!party) return <Card title={title}><p className="text-[13px] text-ink-3">{tl('accountMissing')}</p></Card>;
+    return (
+        <Card title={title} actions={href ? <Link href={href} className="no-print text-[13px] text-teal font-medium hover:underline">{tl('openAccount')}</Link> : undefined}>
+            <dl className="space-y-2 text-[13px]">
+                <div>
+                    <dt className="sr-only">{tl('name')}</dt>
+                    <dd className="font-medium text-ink">{party.companyName || party.name || tl('unnamedSupplier')}</dd>
+                    {party.companyName && party.name && <dd className="text-ink-3">{party.name}</dd>}
                 </div>
+                <div>
+                    <dt className="text-[12px] text-ink-3">{tl('email')}</dt>
+                    <dd className="flex flex-wrap items-center gap-1.5">
+                        {party.email ? <><a href={`mailto:${party.email}`} className="text-ink hover:underline break-all"><bdi dir="ltr">{party.email}</bdi></a><Badge tone={party.emailVerified ? 'success' : 'warning'}>{tl(party.emailVerified ? 'emailVerified' : 'emailUnverified')}</Badge></> : <NotRecorded tl={tl} />}
+                    </dd>
+                </div>
+                <div>
+                    <dt className="text-[12px] text-ink-3">{tl('phone')}</dt>
+                    <dd>{party.phone ? <><bdi dir="ltr">{party.phone}</bdi> <span className="text-[12px] text-ink-4">{tl('phoneUnverified')}</span></> : <NotRecorded tl={tl} />}</dd>
+                </div>
+                <div>
+                    <dt className="text-[12px] text-ink-3">{tl('country')}</dt>
+                    <dd>{party.country || <NotRecorded tl={tl} />}</dd>
+                </div>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                    {party.status && <Badge tone={party.status === 'ACTIVE' ? 'success' : party.status === 'PENDING_APPROVAL' ? 'warning' : 'danger'}>{USER_STATUS_KEY[party.status] ? tl(USER_STATUS_KEY[party.status]) : party.status}</Badge>}
+                    {party.kycStatus && <Badge tone={party.kycStatus === 'VERIFIED' ? 'success' : party.kycStatus === 'REJECTED' ? 'danger' : 'neutral'}>{KYC_KEY[party.kycStatus] ? tl(KYC_KEY[party.kycStatus]) : party.kycStatus}</Badge>}
+                </div>
+                {party.createdAt && <p className="text-[12px] text-ink-3">{tl('memberSince', { date: when(party.createdAt) || '—' })}</p>}
+            </dl>
+            <Link href={`/admin/support?search=${party.id}`} className="no-print mt-3 inline-flex items-center gap-1.5 text-[13px] text-teal font-medium hover:underline"><MessageSquare size={14} aria-hidden />{tl('sendMessage')}</Link>
+        </Card>
+    );
+}
 
-                {/* RIGHT — summary + customer + payment */}
-                <div className="space-y-6">
+function LogisticsCard({ o, tl, eur, when, onSaved }: { o: AdminOrderDetail; tl: Tl; eur: (n: number | null | undefined) => string; when: (d: string | null | undefined) => string | null; onSaved: () => void }) {
+    const confirm = useConfirm();
+    const lg = o.logistics;
+    const [carrier, setCarrier] = React.useState(lg.shippingCompany || '');
+    const [cost, setCost] = React.useState(lg.shippingCost != null ? String(lg.shippingCost) : '');
+    const [tracking, setTracking] = React.useState(lg.shipment?.trackingNumber || '');
+    const [saving, setSaving] = React.useState(false);
+    React.useEffect(() => { setCarrier(lg.shippingCompany || ''); setCost(lg.shippingCost != null ? String(lg.shippingCost) : ''); setTracking(lg.shipment?.trackingNumber || ''); }, [lg.shippingCompany, lg.shippingCost, lg.shipment?.trackingNumber]);
 
-                    <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
-                        <h3 className="text-[14px] font-bold text-slate-900 mb-4">Order Summary</h3>
-                        <div className="space-y-2.5">
-                            <div className="flex justify-between text-[13px] text-slate-600">
-                                <span>Subtotal</span>
-                                <span className="font-semibold">{fmtMoney(order.total)}</span>
-                            </div>
-                            <div className="flex justify-between text-[13px] text-slate-600">
-                                <span>Shipping</span>
-                                {order.shippingCost != null
-                                    ? <span className="font-semibold">{fmtMoney(order.shippingCost)}</span>
-                                    : <span className="font-semibold text-amber-700">Not quoted yet</span>}
-                            </div>
-                            <div className="border-t border-slate-100 pt-2.5 flex justify-between">
-                                <span className="text-[14px] font-bold text-slate-900">Total <span className="text-[12px] font-medium text-slate-500">excl. VAT</span></span>
-                                <span className="text-[16px] font-bold text-teal-600">{fmtMoney(order.total + (order.shippingCost ?? 0))}</span>
-                            </div>
-                        </div>
-                    </section>
+    const locked = ['SHIPPED', 'DELIVERED', 'CANCELLED'].includes(o.status);
+    const costNum = cost.trim() === '' ? null : Number(cost);
+    const costInvalid = costNum != null && !(Number.isFinite(costNum) && costNum >= 0);
+    const costChanged = (costNum ?? null) !== (lg.shippingCost ?? null);
+    const dirty = carrier.trim() !== (lg.shippingCompany || '') || costChanged || tracking.trim() !== (lg.shipment?.trackingNumber || '');
+    const save = async () => {
+        if (costInvalid) return;
+        if (costChanged && ['PENDING_REVIEW', 'APPROVED'].includes(o.reviewStatus)) {
+            if (!(await confirm({ title: tl('freightChangeTitle'), body: tl('freightChangeBody', { version: o.termsVersion + 1 }), confirm: tl('saveTransport') }))) return;
+        }
+        setSaving(true);
+        try {
+            const body: { shippingCompany?: string | null; shippingCost?: number | null; trackingNumber?: string | null } = { shippingCompany: carrier.trim() || null, trackingNumber: tracking.trim() || null };
+            if (costChanged) body.shippingCost = costNum;
+            await adminOrdersApi.setShipping(o.id, body);
+            toast.success(tl('transportSaved'));
+            onSaved();
+        } catch (e: any) { toast.error(e.message || tl('actionFailed')); } finally { setSaving(false); }
+    };
+    const a = lg.shippingAddress;
+    const addressLines = a ? [a.name, a.company, a.street, [a.postal, a.city].filter(Boolean).join(' '), a.country].filter((x) => x && String(x).trim()) : [];
 
-                    <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
-                        <h3 className="text-[14px] font-bold text-slate-900 mb-4 flex items-center gap-2">
-                            <UserIcon size={16} className="text-slate-400" /> Customer Information
-                        </h3>
-                        {order.customer ? (
-                            <div className="space-y-3 text-[13px]">
-                                {order.customer.companyName && (
-                                    <div>
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Company</p>
-                                        <p className="font-bold text-slate-900">{order.customer.companyName}</p>
-                                    </div>
-                                )}
-                                <div>
-                                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Buyer</p>
-                                    <Link
-                                        href={order.customer.id ? `/admin/buyers?focus=${order.customer.id}` : '#'}
-                                        className="font-bold text-slate-900 hover:text-teal-600 inline-flex items-center gap-1 transition-colors"
-                                    >
-                                        {order.customer.name || 'Unknown'} <ExternalLink size={11} />
-                                    </Link>
-                                </div>
-                                {order.customer.email && (
-                                    <div className="flex items-center gap-2 text-slate-600">
-                                        <Mail size={13} className="text-slate-400 shrink-0" />
-                                        <span className="truncate">{order.customer.email}</span>
-                                    </div>
-                                )}
-                                {order.customer.phone && (
-                                    <div className="flex items-center gap-2 text-slate-600">
-                                        <Phone size={13} className="text-slate-400 shrink-0" />
-                                        <span>{order.customer.phone}</span>
-                                    </div>
-                                )}
-                                {(order.customer.country || order.shippingAddress) && (
-                                    <div className="flex items-start gap-2 text-slate-600">
-                                        <MapPin size={13} className="text-slate-400 shrink-0 mt-0.5" />
-                                        <span className="leading-snug">{order.shippingAddress || order.customer.country}</span>
-                                    </div>
-                                )}
-                                {order.customer.vatNumber && (
-                                    <div className="pt-2 border-t border-slate-100">
-                                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">VAT</p>
-                                        <p className="font-mono text-[12px] text-slate-700">{order.customer.vatNumber}</p>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <p className="text-[12px] text-slate-400">Customer details unavailable.</p>
+    return (
+        <Card title={tl('logisticsTitle')} description={tl('logisticsDesc')}>
+            <div className="grid gap-4 sm:grid-cols-2">
+                <dl className="space-y-2 text-[13px]">
+                    <div>
+                        <dt className="text-[12px] text-ink-3">{tl('deliveryAddress')}</dt>
+                        <dd className="text-ink">{addressLines.length ? addressLines.map((x, i) => <span key={i} className="block">{x}</span>) : <NotRecorded tl={tl} />}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-[12px] text-ink-3">{tl('deliveryCountry')}</dt>
+                        <dd>{lg.destinationCountry ? <bdi dir="ltr">{lg.destinationCountry}</bdi> : <NotRecorded tl={tl} />}</dd>
+                    </div>
+                </dl>
+                <dl className="space-y-2 text-[13px]">
+                    <div>
+                        <dt className="text-[12px] text-ink-3">{tl('buyerCarrier')}</dt>
+                        <dd>{lg.customerShippingCompany || <NotRecorded tl={tl} />}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-[12px] text-ink-3">{tl('assignedCarrier')}</dt>
+                        <dd>{lg.shippingCompany || <NotRecorded tl={tl} />}</dd>
+                    </div>
+                    <div>
+                        <dt className="text-[12px] text-ink-3">{tl('deliveryCharge')}</dt>
+                        <dd className="tabular-nums">{lg.shippingCost != null ? eur(lg.shippingCost) : <span className="text-ink-3">{tl('quotedAfter')}</span>}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            {lg.fulfillment?.groups?.length ? (
+                <div className="mt-4 border-t border-line pt-3">
+                    <p className="mb-2 text-[12px] font-medium text-ink-3">{tl('deliveryAtOrder')}</p>
+                    <DeliveryBreakdown quote={lg.fulfillment} setByAtlantis={lg.shippingCost != null && lg.fulfillment.status !== 'priced' ? { amount: lg.shippingCost, carrier: lg.shippingCompany } : null} />
+                </div>
+            ) : null}
+
+            <div className="mt-4 border-t border-line pt-3">
+                <p className="text-[12px] font-medium text-ink-3">{tl('shipmentTitle')}</p>
+                {lg.shipment ? (
+                    <>
+                        <dl className="mt-1 grid gap-x-6 gap-y-1 sm:grid-cols-2 text-[13px]">
+                            <Row label={tl('trackingNumber')}><bdi dir="ltr" className="font-mono">{lg.shipment.trackingNumber}</bdi></Row>
+                            <Row label={tl('carrier')}>{lg.shipment.carrier || <NotRecorded tl={tl} />}</Row>
+                            <Row label={tl('shipmentStatus')}><span lang="en">{lg.shipment.status}</span></Row>
+                            <Row label={tl('expectedDelivery')}>{when(lg.shipment.expectedDelivery) ?? <NotRecorded tl={tl} />}</Row>
+                        </dl>
+                        {lg.shipment.updates.length > 0 && (
+                            <ul className="mt-2 space-y-1 text-[12.5px]">
+                                {lg.shipment.updates.map((u, i) => <li key={i} className="flex flex-wrap gap-x-2"><span className="text-ink-3 tabular-nums">{when(u.createdAt)}</span><span className="text-ink" lang="en">{u.status} · {u.description}{u.location ? ` · ${u.location}` : ''}</span></li>)}
+                            </ul>
                         )}
+                    </>
+                ) : <p className="mt-1 text-[12.5px] text-ink-3">{tl('noShipment')}</p>}
+                <p className="mt-2 flex gap-1.5 text-[12.5px] text-ink-3"><Truck size={14} className="shrink-0 mt-0.5" aria-hidden />{tl('noCarrierIntegration')}</p>
+            </div>
 
-                        <div className="mt-4 pt-4 border-t border-slate-100">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Handled by</p>
-                            <p className="text-[13px] font-bold text-teal-600">Atlantis Marketplace</p>
-                        </div>
-
-                        {/* Contact Customer — opens the full Support tab with
-                            this customer already selected. We send the admin
-                            to /admin/support?search=<id> rather than popping
-                            a tiny modal so the conversation lives in the
-                            normal Atlantis Talk thread on the right pane. */}
-                        {order.customer?.id ? (
-                            <Link
-                                href={`/admin/support?search=${order.customer.id}`}
-                                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#0B1F3A] hover:bg-[#1a3a6b] text-white font-bold text-[13px] rounded-2xl transition-all shadow-sm"
-                            >
-                                <MessageSquare size={16} />
-                                Contact Customer
-                            </Link>
-                        ) : (
-                            <button
-                                onClick={() => setChatOpen(true)}
-                                className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#0B1F3A] hover:bg-[#1a3a6b] text-white font-bold text-[13px] rounded-2xl transition-all shadow-sm"
-                            >
-                                <MessageSquare size={16} />
-                                Contact Customer
-                            </button>
-                        )}
-                    </section>
-
-                    {/* Order Chat Modal */}
-                    <AnimatePresence>
-                        {chatOpen && order && (
-                            <OrderChatModal
-                                orderId={order.id}
-                                orderTotal={order.total}
-                                customerName={order.customer?.name}
-                                isAdmin={true}
-                                onClose={() => setChatOpen(false)}
-                            />
-                        )}
-                    </AnimatePresence>
-
-                    <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm">
-                        <h3 className="text-[14px] font-bold text-slate-900 mb-4 flex items-center gap-2">
-                            <CreditCard size={16} className="text-slate-400" /> Payment
-                        </h3>
-                        <div className="space-y-2 text-[13px]">
-                            <div className="flex justify-between">
-                                <span className="text-slate-500">Method</span>
-                                <span className="font-bold text-slate-900">{order.paymentMethod || 'Card'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                                <span className="text-slate-500">Status</span>
-                                <span className="font-bold text-slate-900">{order.paymentStatus || (order.status === 'PAID' || order.status === 'SHIPPED' || order.status === 'DELIVERED' ? 'Paid' : 'Pending')}</span>
-                            </div>
-                        </div>
-                    </section>
+            <div className="no-print mt-4 border-t border-line pt-3">
+                <p className="text-[13px] font-semibold text-heading">{tl('transportTitle')}</p>
+                <p className="text-[12.5px] text-ink-3">{tl('transportDesc')}</p>
+                {locked && <div className="mt-2"><Notice tone="neutral">{tl('transportLocked')}</Notice></div>}
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    <Field label={tl('carrier')} htmlFor="t-carrier">
+                        <input id="t-carrier" value={carrier} onChange={(e) => setCarrier(e.target.value)} maxLength={120} className={inputCls} disabled={saving} />
+                    </Field>
+                    <Field label={tl('deliveryChargeEur')} htmlFor="t-cost" hint={tl('deliveryChargeHint')} error={costInvalid ? tl('costInvalid') : null}>
+                        <input id="t-cost" type="number" inputMode="decimal" step="0.01" min="0" value={cost} onChange={(e) => setCost(e.target.value)} className={inputCls} disabled={saving || locked} aria-invalid={costInvalid || undefined} />
+                    </Field>
+                    <Field label={tl('trackingNumber')} htmlFor="t-tracking" className="sm:col-span-2" hint={tl('trackingHint')}>
+                        <input id="t-tracking" value={tracking} onChange={(e) => setTracking(e.target.value)} maxLength={120} className={cn(inputCls, 'font-mono')} disabled={saving} />
+                    </Field>
+                </div>
+                <div className="mt-3 flex justify-end">
+                    <Button variant="primary" size="sm" loading={saving} disabled={!dirty || costInvalid} onClick={save}>{tl('saveTransport')}</Button>
                 </div>
             </div>
-        </div>
+        </Card>
+    );
+}
+
+function TimelineCard({ events, tl, when, statusLabel }: { events: TimelineEvent[]; tl: Tl; when: (d: string | null | undefined) => string | null; statusLabel: (s: string | null | undefined) => string }) {
+    const text = (e: TimelineEvent): string => {
+        switch (e.kind) {
+            case 'CREATED': return tl('evCreated');
+            case 'STATUS': return e.from ? tl('evStatus', { from: statusLabel(e.from), to: statusLabel(e.status) }) : tl('evStatusSet', { to: statusLabel(e.status) });
+            case 'NOTE': return tl('evNote');
+            case 'CONFIRMATION_REQUESTED': return tl('evConfRequested', { supplier: e.supplier || '—', version: e.version ?? 1 });
+            case 'CONFIRMATION_DECIDED': return tl(e.status === 'ACCEPTED' ? 'evConfAccepted' : e.status === 'REJECTED' ? 'evConfRejected' : 'evConfOther', { supplier: e.supplier || '—', version: e.version ?? 1, status: e.status || '' });
+            case 'REVIEWED': return tl(e.status === 'APPROVED' ? 'evApproved' : 'evRejected');
+            case 'BUYER_ACCEPTED': return tl('evBuyerAccepted', { version: e.version ?? 1 });
+            case 'INSPECTION': return tl('evInspection', { status: e.status && INSPECTION_KEY[e.status] ? tl(INSPECTION_KEY[e.status]) : e.status || '' });
+            case 'SHIPMENT_CREATED': return tl('evShipment', { tracking: e.ref || '' });
+            case 'SHIPMENT_UPDATE': return tl('evShipmentUpdate', { status: e.status || '' });
+            case 'PAYMENT_MARKED_PAID': return tl('evMarkedPaid');
+            case 'CARD_CAPTURED': return tl('evCardCaptured');
+            case 'CARD_RELEASED': return tl('evCardReleased');
+            case 'INVOICE_ISSUED': return tl('evInvoiceIssued', { number: e.ref || '' });
+            case 'INVOICE_PAID': return tl('evInvoicePaid', { number: e.ref || '' });
+            case 'DISPUTE_OPENED': return tl('evDisputeOpened');
+            case 'DISPUTE_RESOLVED': return tl('evDisputeResolved', { status: e.status && DISPUTE_KEY[e.status] ? tl(DISPUTE_KEY[e.status]) : e.status || '' });
+            default: return e.kind;
+        }
+    };
+    return (
+        <Card title={tl('timelineTitle')} description={tl('timelineDesc')}>
+            {events.length === 0 ? <p className="text-[13px] text-ink-3">{tl('timelineEmpty')}</p> : (
+                <ol className="relative space-y-3 ms-1.5 border-s border-line ps-4">
+                    {events.map((e, i) => (
+                        <li key={i} className="relative">
+                            <span aria-hidden className={cn('absolute -start-[21.5px] top-1.5 w-2.5 h-2.5 rounded-full ring-2 ring-surface', ['REVIEWED', 'STATUS'].includes(e.kind) ? 'bg-teal' : e.kind.startsWith('DISPUTE') ? 'bg-amber-500' : 'bg-line-strong')} />
+                            <p className="text-[13px] text-ink">{text(e)}</p>
+                            <p className="text-[12px] text-ink-3 tabular-nums">{when(e.at)}{e.actor ? ` · ${tl('byName', { name: e.actor })}` : ''}</p>
+                            {e.note && <p className="mt-0.5 text-[12.5px] text-ink-2" lang="en">{e.note}</p>}
+                        </li>
+                    ))}
+                </ol>
+            )}
+        </Card>
     );
 }

@@ -3,6 +3,7 @@ import { PrismaService } from '../common/prisma.service';
 import { invalidValues, isRealImage, missingForPublish, type Missing } from './catalog-rules';
 import { STAFF_ROLES, scopeOf, scopeWhere, type CatalogScope } from './catalog-scope';
 import { ProductReviewService } from './product-review.service';
+import { planBulk, type BulkAction, type BulkCandidate, type BulkPlan } from './admin-bulk';
 
 /**
  * Admin Products page and product review view — read models only.
@@ -33,6 +34,26 @@ export class AdminProductsService {
     async staffIds(): Promise<string[]> {
         const rows = await this.prisma.user.findMany({ where: { role: { in: [...STAFF_ROLES] as any } }, select: { id: true } });
         return rows.map((r) => r.id);
+    }
+
+    /** Which of the selected products a bulk action may touch, and why the others are skipped (admin-bulk.ts). */
+    async planBulk(action: BulkAction, ids: string[]): Promise<BulkPlan> {
+        const rows = await this.prisma.product.findMany({ where: { id: { in: ids } }, select: { ...COMPLETENESS_SELECT, supplier: { select: { role: true } } } as any });
+        const found = rows.map((p: any): BulkCandidate => ({ id: p.id, name: p.name, status: p.status, scope: scopeOf(p.supplier?.role), product: p }));
+        if (action === 'delete' && found.length) {
+            const pid = found.map((c) => c.id);
+            const now = new Date();
+            const [orders, targets, promos, offers] = await Promise.all([
+                (this.prisma as any).orderItem.groupBy({ by: ["productId"], where: { productId: { in: pid } }, _count: { _all: true } }),
+                (this.prisma as any).targetPriceRequest.groupBy({ by: ['productId'], where: { productId: { in: pid }, status: { in: ['OPEN', 'RESPONDED'] } }, _count: { _all: true } }),
+                (this.prisma as any).promotion.groupBy({ by: ['productId'], where: { productId: { in: pid }, status: 'ACTIVE', endsAt: { gt: now } }, _count: { _all: true } }),
+                (this.prisma as any).offer.groupBy({ by: ['productId'], where: { productId: { in: pid }, status: 'APPROVED' }, _count: { _all: true } }),
+            ]);
+            const m = (list: any[]) => new Map(list.map((r: any) => [r.productId, r._count?._all ?? 0]));
+            const o = m(orders as any[]), t = m(targets), pr = m(promos), of = m(offers as any[]);
+            for (const c of found) c.usage = { orderLines: o.get(c.id) || 0, openTargets: t.get(c.id) || 0, activePromotions: pr.get(c.id) || 0, approvedOffers: of.get(c.id) || 0 };
+        }
+        return planBulk(action, ids, found);
     }
 
     async list(scope: CatalogScope, q: AdminListQuery) {
