@@ -8,7 +8,7 @@ export type CatalogScope = 'catalog' | 'submissions';
 export interface AdminProductRow {
     id: string; name: string; brand: string | null; category: string; status: string; adminNotes: string | null;
     images: string[]; image: string | null; hasImage: boolean; ean: string | null;
-    basePrice: number | null; price: number; stock: number; unit: string | null; moq: number | null; moqUnit: string | null;
+    basePrice: number | null; price: number; supplierCurrency?: string | null; supplierPrice?: number | null; stock: number; unit: string | null; moq: number | null; moqUnit: string | null;
     unitsPerCase: number | null; casesPerPallet: number | null; palletsPerShipment: number | null;
     weight: string | null; origin: string | null; exwLocation: string | null; createdAt: string; updatedAt: string;
     supplier: { id: string; name: string; companyName: string | null; email: string; role: string } | null;

@@ -44,6 +44,9 @@ const AMBIGUOUS = new Set(['price', 'cost', 'unit price', 'quantity', 'qty', 'ا
 
 export interface UpdateRequest { headers: string[]; rows: string[][]; firstRow?: number; fileName?: string }
 
+/** One owner, or any of several (the Atlantis Catalog is owned by staff accounts). */
+const owners = (id: string | string[]) => (Array.isArray(id) ? { in: id } : id);
+
 @Injectable()
 export class SupplierUpdatesService {
     private readonly logger = new Logger(SupplierUpdatesService.name);
@@ -54,8 +57,8 @@ export class SupplierUpdatesService {
      * product of the supplier (except rejected ones) with its current values
      * in the reference columns and the NEW columns left empty.
      */
-    async template(supplierId: string, blank = false): Promise<Buffer> {
-        const rows: any[] = blank ? [] : await this.prisma.product.findMany({ where: { supplierId, status: { not: 'REJECTED' } }, orderBy: { name: 'asc' }, select: { id: true, ean: true, name: true, basePrice: true, stock: true, supplierCurrency: true, supplierPrice: true } as any });
+    async template(supplierId: string | string[], blank = false): Promise<Buffer> {
+        const rows: any[] = blank ? [] : await this.prisma.product.findMany({ where: { supplierId: owners(supplierId), status: { not: 'REJECTED' } }, orderBy: { name: 'asc' }, select: { id: true, ean: true, name: true, basePrice: true, stock: true, supplierCurrency: true, supplierPrice: true } as any });
         const aoa: any[][] = [UPDATE_COLUMNS.map((c) => c.header), UPDATE_COLUMNS.map((c) => c.role),
             ...rows.map((p) => [p.id, p.ean || '', p.name, p.supplierCurrency || 'EUR', p.supplierCurrency && p.supplierPrice ? p.supplierPrice : (p.basePrice ?? ''), '', p.stock ?? 0, ''])];
         const ws = XLSX.utils.aoa_to_sheet(aoa);
@@ -96,13 +99,13 @@ export class SupplierUpdatesService {
         return { map, problems };
     }
 
-    async preview(supplierId: string, req: UpdateRequest) {
+    async preview(supplierId: string | string[], req: UpdateRequest) {
         if (!Array.isArray(req?.rows) || !req.rows.length) throw new BadRequestException('No rows in the file.');
         if (req.rows.length > MAX_IMPORT_ROWS) throw new BadRequestException(`Update at most ${MAX_IMPORT_ROWS} rows at a time.`);
         const { map, problems } = this.mapHeaders(req.headers || []);
         if (problems.length) throw new BadRequestException({ code: 'MAPPING', message: problems.join(' '), problems });
 
-        const mine: any[] = await this.prisma.product.findMany({ where: { supplierId }, select: { id: true, ean: true, name: true, status: true, basePrice: true, stock: true, supplierCurrency: true, supplierPrice: true } as any });
+        const mine: any[] = await this.prisma.product.findMany({ where: { supplierId: owners(supplierId) }, select: { id: true, supplierId: true, ean: true, name: true, status: true, basePrice: true, stock: true, supplierCurrency: true, supplierPrice: true } as any });
         const byId = new Map(mine.map((p) => [p.id, p]));
         const byEan = new Map<string, any[]>();
         for (const p of mine) if (p.ean) byEan.set(p.ean, [...(byEan.get(p.ean) || []), p]);
@@ -144,7 +147,7 @@ export class SupplierUpdatesService {
             const priceChanged = priceAfter !== null && priceAfter !== priceBefore;
             const stockChanged = stockAfter !== null && stockAfter !== product?.stock;
             return {
-                row, productId: product?.id ?? null, name: product?.name ?? cell(r, 'name') ?? null, ean: product?.ean ?? ean ?? null,
+                row, productId: product?.id ?? null, ownerId: product?.supplierId ?? null, name: product?.name ?? cell(r, 'name') ?? null, ean: product?.ean ?? ean ?? null,
                 price: { before: priceBefore, after: priceAfter, currencyBefore: curBefore, currency, changed: priceChanged },
                 stock: { before: product?.stock ?? null, after: stockAfter, changed: stockChanged },
                 state: errors.length ? 'error' : priceChanged || stockChanged ? 'change' : 'unchanged',
@@ -155,7 +158,11 @@ export class SupplierUpdatesService {
         return { rows, summary: { total: rows.length, changes: rows.filter((r) => r.state === 'change').length, unchanged: rows.filter((r) => r.state === 'unchanged').length, errors: rows.filter((r) => r.state === 'error').length } };
     }
 
-    async commit(supplierId: string, req: UpdateRequest) {
+    /**
+     * `supplierId` is the supplier (their own catalog) or, for the Atlantis Catalog, the list of
+     * staff accounts; each row is then saved as its own owner through the same rules (supplierUpdate).
+     */
+    async commit(supplierId: string | string[], req: UpdateRequest) {
         const p = await this.preview(supplierId, req);
         const results: any[] = [];
         const reason = `Bulk price/stock update${req.fileName ? ` (${String(req.fileName).slice(0, 80)})` : ''}`;
@@ -166,7 +173,7 @@ export class SupplierUpdatesService {
             if (r.price.changed) { patch.supplierCurrency = r.price.currency; patch.supplierPrice = r.price.after; }
             if (r.stock.changed) patch.stock = r.stock.after;
             try {
-                const saved: any = await this.products.supplierUpdate(r.productId!, supplierId, patch, {});
+                const saved: any = await this.products.supplierUpdate(r.productId!, Array.isArray(supplierId) ? r.ownerId! : supplierId, patch, {});
                 results.push({ row: r.row, name: r.name, productId: r.productId, outcome: 'updated', status: saved.status });
             } catch (e: any) {
                 const msg = e?.response?.message || e?.message || 'Could not update this row.';
@@ -175,7 +182,7 @@ export class SupplierUpdatesService {
         }
         const count = (o: string) => results.filter((x) => x.outcome === o).length;
         const summary = { total: results.length, updated: count('updated'), unchanged: count('unchanged'), failed: count('failed') };
-        if (summary.failed) this.notifications.notifyUser(supplierId, 'Price & stock update: some rows failed', `${summary.failed} of ${summary.total} rows weren’t applied. Open Inventory & Products to see why and upload a corrected file.`, 'WARNING', { type: 'BULK_UPDATE' }).catch(() => {});
+        if (summary.failed && !Array.isArray(supplierId)) this.notifications.notifyUser(supplierId, 'Price & stock update: some rows failed', `${summary.failed} of ${summary.total} rows weren’t applied. Open Inventory & Products to see why and upload a corrected file.`, 'WARNING', { type: 'BULK_UPDATE' }).catch(() => {});
         return { summary, results };
     }
 }

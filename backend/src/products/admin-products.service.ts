@@ -78,7 +78,7 @@ export class AdminProductsService {
                 where, orderBy, skip: (page - 1) * limit, take: limit,
                 select: {
                     id: true, name: true, brand: true, category: true, status: true, adminNotes: true, images: true, ean: true,
-                    basePrice: true, price: true, stock: true, unit: true, moq: true, moqUnit: true, unitsPerCase: true, casesPerPallet: true,
+                    basePrice: true, price: true, supplierCurrency: true, supplierPrice: true, stock: true, unit: true, moq: true, moqUnit: true, unitsPerCase: true, casesPerPallet: true,
                     palletsPerShipment: true, weight: true, origin: true, exwLocation: true, createdAt: true, updatedAt: true,
                     supplier: { select: { id: true, name: true, companyName: true, email: true, role: true } },
                 },

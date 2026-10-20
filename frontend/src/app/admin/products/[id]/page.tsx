@@ -4,13 +4,14 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { AlertCircle, ArrowLeft, CheckCircle2, ExternalLink, EyeOff, MessageSquare, Pencil, Trash2, Upload, XCircle } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, Euro, ExternalLink, EyeOff, MessageSquare, Pencil, Trash2, Upload, XCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { adminApi, type AdminProductReview } from '@/lib/admin-api';
 import { Badge, Button, Card, ConfirmProvider, Dialog, ErrorState, Field, Notice, PRODUCT_STATUS, Skeleton, inputCls, useConfirm } from '@/components/supplier/ui';
 import { categoryLabel, statusLabel } from '@/components/supplier/import/types';
 import { ReviewTrail } from '@/components/products/ReviewTrail';
+import UpdatePriceDialog from '@/components/admin/UpdatePriceDialog';
 
 /**
  * Admin → product review (/admin/products/[id]). One record, read from
@@ -36,6 +37,7 @@ function ReviewView({ params }: { params: { id: string } }) {
     const [dialog, setDialog] = React.useState<null | 'reject' | 'changes'>(null);
     const [text, setText] = React.useState('');
     const [lightbox, setLightbox] = React.useState<string | null>(null);
+    const [priceOpen, setPriceOpen] = React.useState(false);
 
     const load = React.useCallback(() => {
         setError(null);
@@ -214,6 +216,7 @@ function ReviewView({ params }: { params: { id: string } }) {
                             {!isCatalog && status !== 'REJECTED' && <Button icon={<MessageSquare size={15} />} disabled={!!busy} onClick={() => { setText(''); setDialog('changes'); }}>{tp('requestChanges')}</Button>}
                             {!isCatalog && status !== 'REJECTED' && <Button variant="danger" icon={<XCircle size={15} />} disabled={!!busy} onClick={() => { setText(''); setDialog('reject'); }}>{tp('reject')}</Button>}
                             {isCatalog && status === 'APPROVED' && <Button icon={<EyeOff size={15} />} loading={busy === 'offline'} disabled={!!busy} onClick={() => act('offline')}>{tp('takeOffline')}</Button>}
+                            {isCatalog && status !== 'REJECTED' && <Button icon={<Euro size={15} />} onClick={() => setPriceOpen(true)}>{tp('updatePrice')}</Button>}
                             {isCatalog && <Link href={editHref}><Button className="w-full" icon={<Pencil size={15} />}>{tp('editDetails')}</Button></Link>}
                             {!data.canApprove && canPublish && <p className="text-[12.5px] text-amber-800">{tp('approveBlocked')}</p>}
                             {status === 'REJECTED' && <p className="text-[12.5px] text-ink-3">{tp('rejectedFinal')}</p>}
@@ -277,6 +280,7 @@ function ReviewView({ params }: { params: { id: string } }) {
                     <textarea id="rv-reject" data-autofocus value={text} onChange={(e) => setText(e.target.value)} rows={4} maxLength={4000} className={cn(inputCls, 'h-auto py-2')} />
                 </Field>
             </Dialog>
+            <UpdatePriceDialog product={priceOpen ? p : null} onClose={() => setPriceOpen(false)} onSaved={() => { setPriceOpen(false); load(); }} />
             <Dialog open={!!lightbox} onClose={() => setLightbox(null)} title={p.name} size="lg">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {lightbox && <img src={lightbox} alt={p.name} className="max-h-[70vh] w-full object-contain" />}

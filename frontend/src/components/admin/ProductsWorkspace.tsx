@@ -4,7 +4,9 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { AlertCircle, Boxes, CheckCircle2, ChevronLeft, ChevronRight, Eye, FileWarning, Image as ImageIcon, Pencil, Plus, Search, Upload, XCircle } from 'lucide-react';
+import { AlertCircle, Boxes, CheckCircle2, ChevronLeft, ChevronRight, Euro, Eye, FileWarning, Image as ImageIcon, Pencil, Plus, RefreshCw, Search, Upload, XCircle } from 'lucide-react';
+import UpdatePriceDialog from '@/components/admin/UpdatePriceDialog';
+import PriceStockUpdateDialog from '@/components/supplier/PriceStockUpdateDialog';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { adminApi, type AdminProductPage, type AdminProductRow, type CatalogScope } from '@/lib/admin-api';
@@ -54,6 +56,8 @@ function Workspace({ scope }: { scope: CatalogScope }) {
     const [busy, setBusy] = React.useState(false);
     const [rejectOpen, setRejectOpen] = React.useState(false);
     const [rejectReason, setRejectReason] = React.useState('');
+    const [priceFor, setPriceFor] = React.useState<AdminProductRow | null>(null);
+    const [bulkPriceOpen, setBulkPriceOpen] = React.useState(false);
 
     React.useEffect(() => { const h = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(h); }, [q]);
     React.useEffect(() => { setPage(1); }, [debouncedQ, status, category, brand, supplier, sort, attention, scope]);
@@ -111,6 +115,7 @@ function Workspace({ scope }: { scope: CatalogScope }) {
         <div data-no-translate className="text-start -mt-2">
             <PageHeader eyebrow={tp('title')} title={tp(isCatalog ? 'tabCatalog' : 'tabSubmissions')} description={tp(isCatalog ? 'catalogExplain' : 'submissionsExplain')}
                 actions={isCatalog ? <>
+                    <Button icon={<RefreshCw size={15} />} onClick={() => setBulkPriceOpen(true)}>{t('supplierCatalog', 'updatePricesStock')}</Button>
                     <Link href="/admin/products/catalog/import"><Button icon={<Upload size={15} />}>{tp('importFile')}</Button></Link>
                     <Link href="/admin/products/new"><Button variant="primary" icon={<Plus size={15} />}>{tp('addCatalogProduct')}</Button></Link>
                 </> : (c?.scopes.submissionsPending ? <Badge tone="warning">{tp('pendingBadge', { count: c.scopes.submissionsPending })}</Badge> : undefined)} />
@@ -232,6 +237,7 @@ function Workspace({ scope }: { scope: CatalogScope }) {
                                             <td className="pe-4 py-2.5">
                                                 <div className="flex justify-end gap-1">
                                                     <Link href={`/admin/products/${p.id}`} title={tp('review')} aria-label={tp('reviewName', { name: p.name })} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><Eye size={15} /></Link>
+                                                    {isCatalog && p.status !== 'REJECTED' && <button type="button" onClick={() => setPriceFor(p)} title={tp('updatePrice')} aria-label={tp('updatePriceOf', { name: p.name })} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><Euro size={15} /></button>}
                                                     {isCatalog && <Link href={`/admin/products/${p.id}/edit`} title={tp('edit')} aria-label={tp('editName', { name: p.name })} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><Pencil size={15} /></Link>}
                                                 </div>
                                             </td>
@@ -256,6 +262,7 @@ function Workspace({ scope }: { scope: CatalogScope }) {
                                             </span>
                                         </span>
                                     </Link>
+                                    {isCatalog && p.status !== 'REJECTED' && <button type="button" onClick={() => setPriceFor(p)} aria-label={tp('updatePriceOf', { name: p.name })} className="self-center w-9 h-9 shrink-0 rounded-lg ring-1 ring-line flex items-center justify-center text-ink-2 hover:bg-surface-2"><Euro size={15} /></button>}
                                 </li>
                             ))}
                         </ul>
@@ -280,7 +287,8 @@ function Workspace({ scope }: { scope: CatalogScope }) {
                     <textarea id="bulk-reject-reason" data-autofocus value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} rows={4} className={cn(inputCls, 'h-auto py-2')} />
                 </Field>
             </Dialog>
-
+            <UpdatePriceDialog product={priceFor} onClose={() => setPriceFor(null)} onSaved={() => { setPriceFor(null); load(); }} />
+            {isCatalog && <PriceStockUpdateDialog target="catalog" open={bulkPriceOpen} onClose={() => { setBulkPriceOpen(false); load(); }} />}
         </div>
     );
 }

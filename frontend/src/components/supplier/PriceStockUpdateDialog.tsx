@@ -3,19 +3,38 @@
 import * as React from 'react';
 import { Download, ArrowRight, FileSpreadsheet } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
-import { supplierApi } from '@/lib/supplier-api';
+import { supplierApi, ApiError } from '@/lib/supplier-api';
+import type { ImportTarget } from '@/components/supplier/import/api';
 import { DropZone } from '@/components/supplier/DropZone';
 import { Badge, Button, Dialog, ErrorState, Notice, useConfirm } from '@/components/supplier/ui';
 import { Trans } from '@/components/i18n/Trans';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 
+/** Wording that differs for the Atlantis Catalog (adminProducts dictionary): it updates Atlantis products, not "your catalog". */
+const CATALOG_TEXT: Record<string, string> = { updDescUpload: 'updCatDescUpload', updRecommended: 'updCatRecommended', updStep1: 'updCatStep1', downloadExistingCatalog: 'updCatDownload' };
+
+async function jsonOrThrow(res: Response) {
+    const body = await res.json().catch(() => null);
+    if (!res.ok) { const m = body?.message; throw new ApiError(Array.isArray(m) ? m.join(' ') : typeof m === 'string' && m ? m : `HTTP ${res.status}`, res.status, body); }
+    return body;
+}
+
 /**
  * Update prices and stock of EXISTING products from a spreadsheet:
- * download your catalog → edit → upload → check every before/after → apply.
+ * download the catalog → edit → upload → check every before/after → apply.
  * Nothing is created; empty cells change nothing; each change is logged.
+ * `supplier`: the signed-in supplier's products (/supplier-catalog/*).
+ * `catalog`: Atlantis Catalog products, staff only (/admin-catalog/*) — same
+ * service and rules, matched against platform-owned products only.
  */
-export default function PriceStockUpdateDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function PriceStockUpdateDialog({ open, onClose, target = 'supplier' }: { open: boolean; onClose: () => void; target?: ImportTarget }) {
+    const base = target === 'catalog' ? '/admin-catalog' : '/supplier-catalog';
+    const api = React.useMemo(() => target === 'catalog' ? {
+        parse: (f: File) => { const fd = new FormData(); fd.append('file', f); return apiFetch(`${base}/import/parse`, { method: 'POST', body: fd }).then(jsonOrThrow); },
+        preview: (body: any) => apiFetch(`${base}/updates/preview`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(jsonOrThrow),
+        commit: (body: any) => apiFetch(`${base}/updates/commit`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then(jsonOrThrow),
+    } : { parse: supplierApi.importParse, preview: supplierApi.updatesPreview, commit: supplierApi.updatesCommit }, [target, base]);
     const [step, setStep] = React.useState<'upload' | 'review' | 'done'>('upload');
     const [file, setFile] = React.useState<File | null>(null);
     const [parsed, setParsed] = React.useState<any | null>(null);
@@ -25,7 +44,7 @@ export default function PriceStockUpdateDialog({ open, onClose }: { open: boolea
     const [error, setError] = React.useState<string | null>(null);
     const confirm = useConfirm();
     const { t, fmt: f } = useLanguage();
-    const tc = (k: string, v?: Record<string, string | number>) => t('supplierCatalog', k, v);
+    const tc = (k: string, v?: Record<string, string | number>) => (target === 'catalog' && CATALOG_TEXT[k] ? t('adminProducts', CATALOG_TEXT[k], v) : t('supplierCatalog', k, v));
     const int = (n: number | null | undefined) => (n === null || n === undefined ? '—' : f.number(n));
     const reset = () => { setStep('upload'); setFile(null); setParsed(null); setPreview(null); setResult(null); setError(null); };
     const close = () => { if (busy === 'commit') return; reset(); onClose(); };
@@ -33,17 +52,17 @@ export default function PriceStockUpdateDialog({ open, onClose }: { open: boolea
     const download = async (blank: boolean) => {
         setBusy(blank ? 'blank' : 'template');
         try {
-            const res = await apiFetch(`/supplier-catalog/updates/template${blank ? '?blank=1' : ''}`);
+            const res = await apiFetch(`${base}/updates/template${blank ? '?blank=1' : ''}`);
             if (!res.ok) throw new Error(blank ? tc('errTemplateDownload') : tc('errCatalogDownload'));
-            const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = blank ? 'atlantis-price-update-template.xlsx' : 'atlantis-my-catalog-prices.xlsx'; a.click();
+            const a = document.createElement('a'); a.href = URL.createObjectURL(await res.blob()); a.download = blank ? 'atlantis-price-update-template.xlsx' : target === 'catalog' ? 'atlantis-catalog-prices.xlsx' : 'atlantis-my-catalog-prices.xlsx'; a.click();
         } catch (e: any) { setError(e.message); } finally { setBusy(null); }
     };
     const read = async (f: File) => {
         setError(null); setFile(f); setBusy('parse');
         try {
-            const p = await supplierApi.importParse(f);
+            const p = await api.parse(f);
             setParsed(p);
-            setPreview(await supplierApi.updatesPreview({ headers: p.headers, rows: p.rows, firstRow: (p.headerRow || 1) + 1, fileName: f.name }));
+            setPreview(await api.preview({ headers: p.headers, rows: p.rows, firstRow: (p.headerRow || 1) + 1, fileName: f.name }));
             setStep('review');
         } catch (e: any) { setError(e.message); setFile(null); } finally { setBusy(null); }
     };
@@ -52,7 +71,7 @@ export default function PriceStockUpdateDialog({ open, onClose }: { open: boolea
         const ok = await confirm({ title: tc('applyChangesTitle', { count: n }), body: tc('applyChangesBody'), confirm: tc('applyChanges') });
         if (!ok) return;
         setBusy('commit'); setError(null);
-        try { setResult(await supplierApi.updatesCommit({ headers: parsed.headers, rows: parsed.rows, firstRow: (parsed.headerRow || 1) + 1, fileName: file?.name })); setStep('done'); }
+        try { setResult(await api.commit({ headers: parsed.headers, rows: parsed.rows, firstRow: (parsed.headerRow || 1) + 1, fileName: file?.name })); setStep('done'); }
         catch (e: any) { setError(e.message); } finally { setBusy(null); }
     };
     const fmt = (v: number | null, cur?: string) => (v === null || v === undefined ? '—' : `${f.number(Number(v), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}${cur ? ` ${cur}` : ''}`);
