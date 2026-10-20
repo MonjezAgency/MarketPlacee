@@ -307,6 +307,27 @@ describe('import commit', () => {
     const base = () => requestFrom(withPicture(multiSheetOffer(), 1, 8), 'offer.xlsx', {
         sources: { category: { kind: 'constant', value: 'Snacks & Biscuits' }, origin: { kind: 'constant', value: 'Germany' }, exwLocation: { kind: 'constant', value: 'Hamburg, Germany' }, stock: { kind: 'constant', value: '40' }, brand: { kind: 'fromName', value: 'Gummy Co' }, weight: { kind: 'fromName' } },
     });
+    it('Atlantis Catalog mode: owned by the platform, matched against staff products only, complete rows published, no supplier review notice', async () => {
+        const f = fakes();
+        f.products.updateStatus = jest.fn(async (id: string, status: string) => ({ id, status }));
+        const actor = { id: 'admin-1', role: 'ADMIN' };
+        const out = await f.svc.commit('platform', { ...base(), last: true, startedAt: new Date().toISOString() }, [{ originalname: 'image1.png', buffer: PNG, mimetype: 'image/png', size: PNG.length }], { catalog: { ownerIds: ['platform', 'admin-1'], actor } });
+        expect(f.products.findMineForImport.mock.calls[0][0]).toEqual(['platform', 'admin-1']); // duplicates: staff-owned products only
+        expect(f.created[0]).toMatchObject({ supplierId: 'platform' });
+        expect(f.products.create.mock.calls[0][3]).toMatchObject({ actorId: 'admin-1', actorRole: 'ADMIN' });
+        expect(f.products.updateStatus).toHaveBeenCalledWith(expect.any(String), 'APPROVED', '', actor, { notify: false });
+        expect(out.results[0]).toMatchObject({ outcome: 'created', status: 'APPROVED' });
+        expect(out.summary.published).toBe(1);
+        expect(f.notifications.notifyAdmins).not.toHaveBeenCalled();
+        expect(f.sources[0][1]).toBe('admin-1'); // import source recorded under the admin who ran it
+    });
+    it('Atlantis Catalog mode: an existing catalog product is updated as its own staff owner, never as another account', async () => {
+        const existing = [{ id: 'cat-1', supplierId: 'owner-2', ean: '5000000000036', name: 'Crunchy Biscuits Original 200g', status: 'APPROVED', images: ['https://cdn.example.com/a.jpg'] }];
+        const f = fakes(existing);
+        f.products.updateStatus = jest.fn(async (id: string, status: string) => ({ id, status }));
+        await f.svc.commit('platform', { ...base(), onExisting: 'update' }, [], { catalog: { ownerIds: ['platform', 'owner-2'], actor: { id: 'admin-1', role: 'ADMIN' } } });
+        expect(f.products.supplierUpdate.mock.calls.every((c: any[]) => c[1] === 'owner-2')).toBe(true);
+    });
     it('stores the row’s picture first, so a complete product goes to review; the original row is kept', async () => {
         const f = fakes();
         const out = await f.svc.commit('sup', { ...base(), last: true, startedAt: new Date().toISOString() }, [{ originalname: 'image1.png', buffer: PNG, mimetype: 'image/png', size: PNG.length }]);

@@ -19,13 +19,22 @@ import { confirmationState, buyerMustAccept, type Confirmation } from '../orders
  *    orders are never sales.
  *  Supplier net (period) — Σ OrderItem.supplierUnitPrice × quantity over the
  *    same lines, counted only where the supplier price was recorded.
- *  Atlantis margin (period) — Order value − Supplier net, shown only when
- *    EVERY line in the period has a recorded supplier price; otherwise null
- *    with the number of lines missing it. Nothing is estimated.
+ *  Atlantis revenue (period) — the business model is a markup on the supplier
+ *    net price, so Atlantis's revenue on a line is (buyer price − supplier net)
+ *    × quantity. Summed over lines that have a recorded supplier price; the
+ *    number of lines without one is returned so the page can say the figure is
+ *    partial. `margin` (whole-period) is set only when every line is covered.
+ *  Net profit — NOT calculable: no expense, cost, fee, freight-cost or payout
+ *    records exist in the data model. Returned as unavailable, never as 0.
+ *  Products sold (period) — cases (order lines converted to cases with the
+ *    ordered tier's pack sizes, stock-ledger.ts) and distinct products on
+ *    eligible orders recognised in the period.
  *  Average order value — Order value ÷ eligible orders; null when 0 orders.
- *  Payments received (period) — Σ Order.totalAmount where paymentStatus = PAID
- *    and paidAt falls in the period. PAID orders without paidAt can't be
- *    placed in time and are reported separately as `undated` (count, amount).
+ *  Payments received (period) — Stripe-confirmed card payments: escrow records
+ *    (EscrowTransaction) with status CAPTURED or RELEASED, dated by capturedAt.
+ *    The current code never writes Order.paymentStatus = PAID or paidAt, so
+ *    orders marked PAID are reported separately as `markedPaid` (count, amount,
+ *    undated) — they are not treated as received money.
  *  Approved, not yet paid (now) — eligible orders whose paymentStatus ≠ PAID.
  *  Refunds (period) — FinancialAuditLog REFUND_ISSUED rows in the period (the
  *    only dated refund record). Orders marked REFUNDED are a current count.
@@ -45,6 +54,8 @@ export interface SaleLineFacts {
     supplierUnitPrice: number | null;
     supplierId: string | null;
     supplierName: string | null;
+    /** Cases this line represents (stock-ledger casesForItem); 0 when unknown. */
+    cases?: number;
 }
 
 export interface EligibleOrder {
@@ -78,16 +89,26 @@ export interface PeriodCommercial {
     linesWithoutNet: number;
     /** Order value − supplier net; null unless every line has a supplier price. */
     margin: number | null;
+    /** Atlantis revenue (buyer price − supplier net) on the lines that have a supplier price. */
+    revenueRecorded: number;
+    casesSold: number;
+    productsSold: number;
+    lines: number;
 }
 
 function periodTotals(orders: EligibleOrder[]): PeriodCommercial {
-    let value = 0, net = 0, withNet = 0, withoutNet = 0;
+    let value = 0, net = 0, withNet = 0, withoutNet = 0, revenue = 0, cases = 0, lines = 0;
+    const products = new Set<string>();
     for (const o of orders) {
         value += o.totalAmount;
         for (const l of o.lines) {
+            lines++;
+            cases += Number(l.cases) || 0;
+            if (l.productId) products.add(l.productId);
             if (l.supplierUnitPrice == null) { withoutNet++; continue; }
             withNet++;
             net += l.supplierUnitPrice * l.quantity;
+            revenue += ((Number(l.price) || 0) - l.supplierUnitPrice) * l.quantity;
         }
     }
     const n = orders.length;
@@ -95,6 +116,7 @@ function periodTotals(orders: EligibleOrder[]): PeriodCommercial {
         orderValue: r2(value), orders: n, aov: n > 0 ? r2(value / n) : null,
         supplierNet: r2(net), linesWithNet: withNet, linesWithoutNet: withoutNet,
         margin: n > 0 && withoutNet === 0 && withNet > 0 ? r2(value - net) : null,
+        revenueRecorded: r2(revenue), casesSold: cases, productsSold: products.size, lines,
     };
 }
 
@@ -119,7 +141,7 @@ export function commercialSummary(all: EligibleOrder[], range: Pick<ResolvedRang
             const lineValue = (Number(l.price) || 0) * l.quantity;
             if (l.productId) {
                 const p = products.get(l.productId) || { productId: l.productId, name: l.name, image: l.image, orderValue: 0, units: 0, orders: new Set<string>() };
-                p.orderValue += lineValue; p.units += l.quantity; p.orders.add(o.id);
+                p.orderValue += lineValue; p.units += Number(l.cases) || 0; p.orders.add(o.id);
                 products.set(l.productId, p);
             }
             if (l.supplierId) {
@@ -139,25 +161,35 @@ export function commercialSummary(all: EligibleOrder[], range: Pick<ResolvedRang
 
     return {
         current, previous,
-        change: { orderValue: pctChange(current.orderValue, previous.orderValue), orders: pctChange(current.orders, previous.orders), aov: current.aov != null && previous.aov != null ? pctChange(current.aov, previous.aov) : null },
+        change: {
+            orderValue: pctChange(current.orderValue, previous.orderValue), orders: pctChange(current.orders, previous.orders),
+            aov: current.aov != null && previous.aov != null ? pctChange(current.aov, previous.aov) : null,
+            casesSold: pctChange(current.casesSold, previous.casesSold),
+            // Revenue compares only when both periods are fully covered by supplier prices.
+            revenue: current.linesWithoutNet === 0 && previous.linesWithoutNet === 0 && previous.linesWithNet > 0 ? pctChange(current.revenueRecorded, previous.revenueRecorded) : null,
+        },
         series, topProducts, topSuppliers,
     };
 }
 
-export interface PaidOrderFacts { totalAmount: number; paidAt: Date | string | null }
+export interface PaymentFacts { amount: number; currency: string | null; capturedAt: Date | string | null }
 
-/** Payments received: dated by paidAt; PAID orders with no paidAt are reported, not placed. */
-export function paymentsSummary(paid: PaidOrderFacts[], range: Pick<ResolvedRange, 'start' | 'end' | 'previous'>) {
-    const sum = (rows: PaidOrderFacts[]) => r2(rows.reduce((s, o) => s + (Number(o.totalAmount) || 0), 0));
-    const dated = paid.filter((o) => o.paidAt);
-    const undated = paid.filter((o) => !o.paidAt);
-    const cur = dated.filter((o) => within(new Date(o.paidAt!), range.start, range.end));
-    const prev = dated.filter((o) => within(new Date(o.paidAt!), range.previous.start, range.previous.end));
+/**
+ * Payments received: Stripe-confirmed escrow records, dated by capturedAt. Only
+ * EUR amounts are summed (the marketplace currency); records in another
+ * currency, or without a capture date, are counted separately and never added.
+ */
+export function paymentsSummary(rows: PaymentFacts[], range: Pick<ResolvedRange, 'start' | 'end' | 'previous'>) {
+    const eur = rows.filter((r) => String(r.currency || '').toUpperCase() === 'EUR' && r.capturedAt);
+    const pick = (from: Date, to: Date) => eur.filter((r) => within(new Date(r.capturedAt!), from, to));
+    const sum = (xs: PaymentFacts[]) => r2(xs.reduce((s, r) => s + (Number(r.amount) || 0), 0));
+    const cur = pick(range.start, range.end), prev = pick(range.previous.start, range.previous.end);
     return {
-        current: { amount: sum(cur), orders: cur.length },
-        previous: { amount: sum(prev), orders: prev.length },
-        change: pctChange(sum(cur), sum(prev)),
-        undated: { orders: undated.length, amount: sum(undated) },
+        current: { amount: sum(cur), payments: cur.length },
+        previous: { amount: sum(prev), payments: prev.length },
+        change: prev.length ? pctChange(sum(cur), sum(prev)) : null,
+        excluded: rows.length - eur.length,
+        recordsEver: rows.length,
     };
 }
 

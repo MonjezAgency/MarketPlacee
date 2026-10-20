@@ -67,9 +67,10 @@ interface SidebarGroup {
     title: string;
     titleKey: string;
     icon: React.ElementType;
-    /** `section`: dictionary section of translationKey when it isn't `admin`. */
-    links: { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean; section?: 'promotions' }[];
+    links: SidebarLink[];
 }
+/** `section`: dictionary section of translationKey when it isn't `admin`. `children`: a parent that expands (no page of its own). */
+interface SidebarLink { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean; section?: 'promotions' | 'adminProducts'; children?: SidebarLink[] }
 
 // Owner-only group — بيظهر بس لـ OWNER
 const OWNER_GROUP: SidebarGroup = {
@@ -88,7 +89,13 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         icon: LayoutDashboard,
         links: [
             { label: 'Dashboard', translationKey: 'overview', href: '/admin', icon: Home },
-            { label: 'Products', translationKey: 'allProducts', href: '/admin/products', icon: Package },
+            {
+                label: 'Products', translationKey: 'allProducts', href: '/admin/products', icon: Package,
+                children: [
+                    { label: 'Atlantis Catalog', translationKey: 'tabCatalog', section: 'adminProducts', href: '/admin/products/catalog', icon: Store },
+                    { label: 'Supplier Submissions', translationKey: 'tabSubmissions', section: 'adminProducts', href: '/admin/products/submissions', icon: Package },
+                ],
+            },
             { label: 'Approve Offers', translationKey: 'approveOffers', href: '/admin/wholesale-offers', icon: CheckCircle2 },
             { label: 'Special offers', translationKey: 'nav', section: 'promotions', href: '/admin/promotions', icon: Tag },
             { label: 'Global Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
@@ -162,38 +169,58 @@ interface NotificationCounts {
     pendingPlacements: number;
 }
 
-function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group: SidebarGroup; isOpen: boolean; pathname: string; badgeCounts: Record<string, number> }) {
-    const hasActiveLink = group.links.some(l => l.href === pathname);
-    const [expanded, setExpanded] = React.useState(hasActiveLink);
-    const { t } = useLanguage();
+/** A link is active on its own path and on its sub-pages (e.g. /admin/products/catalog/import, a product under review). */
+function linkActive(href: string, pathname: string) {
+    if (href === '/admin') return pathname === '/admin';
+    return pathname === href || pathname.startsWith(href + '/');
+}
+/** Products under review (/admin/products/<id>) belong to Supplier Submissions unless they are under Catalog routes. */
+function childActive(child: SidebarLink, pathname: string) {
+    if (linkActive(child.href, pathname)) return true;
+    return child.href === '/admin/products/submissions' && /^\/admin\/products\/(?!catalog|submissions|new)[^/]+/.test(pathname);
+}
+const EXPANDED_KEY = 'atl-admin-nav-expanded';
 
-    // Auto-expand on route change
+function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group: SidebarGroup; isOpen: boolean; pathname: string; badgeCounts: Record<string, number> }) {
+    const { t } = useLanguage();
+    const label = (l: SidebarLink) => t(l.section ?? 'admin', l.translationKey) || l.label;
+    const isLinkActive = (l: SidebarLink) => (l.children ? l.children.some((c) => childActive(c, pathname)) : linkActive(l.href, pathname));
+    const hasActiveLink = group.links.some(isLinkActive);
+    const [expanded, setExpanded] = React.useState(true);
+    // Parents (Products) remember whether they are open; they always open when one of their pages is active.
+    const [openParents, setOpenParents] = React.useState<Record<string, boolean>>({});
     React.useEffect(() => {
-        if (hasActiveLink) setExpanded(true);
-    }, [hasActiveLink, pathname]);
+        let saved: Record<string, boolean> = {};
+        try { saved = JSON.parse(localStorage.getItem(EXPANDED_KEY) || '{}'); } catch { /* storage blocked */ }
+        const next = { ...saved };
+        for (const l of group.links) if (l.children && isLinkActive(l)) next[l.href] = true;
+        setOpenParents(next);
+    }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+    React.useEffect(() => { if (hasActiveLink) setExpanded(true); }, [hasActiveLink, pathname]);
+    const toggleParent = (href: string) => setOpenParents((o) => {
+        const next = { ...o, [href]: !o[href] };
+        try { localStorage.setItem(EXPANDED_KEY, JSON.stringify(next)); } catch { /* storage blocked */ }
+        return next;
+    });
+
+    const rowCls = (active: boolean) => cn(
+        'flex items-center gap-2.5 h-9 px-2.5 rounded-lg text-[13.5px] font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]',
+        active ? 'bg-white/[0.08] text-white' : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04]',
+    );
+    const badge = (n: number) => n > 0 ? <span className="ms-auto min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10.5px] font-semibold flex items-center justify-center tabular-nums">{n > 99 ? '99+' : n}</span> : null;
 
     if (!isOpen) {
         return (
-            <div className="space-y-4 py-4 flex flex-col items-center">
-                {group.links.map(link => {
+            <div className="py-2 flex flex-col items-center gap-1 border-b border-white/5 last:border-0">
+                {group.links.map((link) => {
                     const Icon = link.icon;
-                    const isActive = pathname === link.href;
+                    const target = link.children ? link.children[0].href : link.href;
+                    const n = link.children ? link.children.reduce((s, c) => s + (badgeCounts[c.href] || 0), badgeCounts[link.href] || 0) : badgeCounts[link.href] || 0;
                     return (
-                        <Link
-                            key={link.href}
-                            href={link.href}
-                            title={t(link.section ?? 'admin', link.translationKey) || link.label}
-                            className={cn(
-                                "flex items-center justify-center w-11 h-11 rounded-xl transition-all relative group",
-                                isActive
-                                    ? "bg-teal-500/10 text-teal-500"
-                                    : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-                            )}
-                        >
-                            <Icon size={20} />
-                            {(badgeCounts[link.href] || 0) > 0 && (
-                                <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-[#0F172A]" />
-                            )}
+                        <Link key={link.href} href={link.soon ? '#' : target} title={label(link)} aria-label={label(link)} aria-current={isLinkActive(link) ? 'page' : undefined}
+                            className={cn('relative w-10 h-10 rounded-lg flex items-center justify-center transition-colors', isLinkActive(link) ? 'bg-white/[0.08] text-[#2EC4B6]' : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04]')}>
+                            <Icon size={18} />
+                            {n > 0 && <span className="absolute top-1.5 end-1.5 w-2 h-2 bg-red-500 rounded-full" />}
                         </Link>
                     );
                 })}
@@ -202,76 +229,61 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
     }
 
     return (
-        <div className="mb-6">
-            <div 
-                className="px-6 py-2 mb-2 flex items-center justify-between group/header cursor-pointer" 
-                onClick={() => setExpanded(!expanded)}
-            >
-                <div className="flex items-center gap-2">
-                    <span className={cn(
-                        "text-[11px] font-semibold uppercase tracking-widest transition-all",
-                        hasActiveLink ? "text-teal-500" : "text-slate-500 group-hover/header:text-slate-400"
-                    )}>
-                        {t('admin', group.titleKey) || group.title}
-                    </span>
-                    {!expanded && group.links.some(l => (badgeCounts[l.href] || 0) > 0) && (
-                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                    )}
-                </div>
-                <ChevronDown size={14} className={cn("text-slate-600 transition-transform duration-300", expanded && "rotate-180")} />
-            </div>
-            
+        <div className="mb-3">
+            <button type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}
+                className="w-full px-2.5 h-7 flex items-center justify-between text-start rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
+                <span className={cn('text-[11px] font-semibold uppercase tracking-[0.08em]', hasActiveLink ? 'text-[#2EC4B6]' : 'text-slate-500')}>{t('admin', group.titleKey) || group.title}</span>
+                <ChevronDown size={13} className={cn('text-slate-600 transition-transform', expanded && 'rotate-180')} />
+            </button>
             {expanded && (
-                <div className="space-y-1.5 px-3">
+                <ul className="mt-0.5 space-y-0.5">
                     {group.links.map((link) => {
                         const Icon = link.icon;
-                        const isActive = pathname === link.href;
-                        // Links flagged with `soon: true` render as a
-                        // visually-disabled row with a SOON pill — no
-                        // navigation, just a roadmap signal.
                         if (link.soon) {
                             return (
-                                <div
-                                    key={link.href}
-                                    aria-disabled="true"
-                                    className="flex items-center justify-between px-4 h-[44px] text-[14px] font-medium rounded-xl text-slate-500 opacity-70 cursor-not-allowed select-none"
-                                    title="Coming soon"
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <Icon size={18} />
-                                        <span>{t(link.section ?? 'admin', link.translationKey) || link.label}</span>
+                                <li key={link.href}>
+                                    <div aria-disabled="true" className="flex items-center gap-2.5 h-9 px-2.5 text-[13.5px] font-medium rounded-lg text-slate-500 opacity-70 cursor-not-allowed select-none">
+                                        <Icon size={16} /><span className="truncate">{label(link)}</span>
+                                        <span className="ms-auto text-[9.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">Soon</span>{/* i18n-ignore: legacy roadmap pill */}
                                     </div>
-                                    <span className="text-[9px] font-black uppercase tracking-[0.18em] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                                        Soon
-                                    </span>
-                                </div>
+                                </li>
                             );
                         }
-
+                        if (link.children) {
+                            const open = !!openParents[link.href];
+                            const active = isLinkActive(link);
+                            const id = `nav-${link.href.replace(/\W+/g, '-')}`;
+                            return (
+                                <li key={link.href}>
+                                    <button type="button" onClick={() => toggleParent(link.href)} aria-expanded={open} aria-controls={id} className={cn(rowCls(false), 'w-full text-start', active && 'text-white')}>
+                                        <Icon size={16} className={cn(active && 'text-[#2EC4B6]')} /><span className="truncate">{label(link)}</span>
+                                        {!open && badge(link.children.reduce((s, c) => s + (badgeCounts[c.href] || 0), 0))}
+                                        <ChevronDown size={14} className={cn('text-slate-500 transition-transform', open ? 'rotate-180' : '', !open && link.children.some((c) => badgeCounts[c.href]) ? 'ms-1' : 'ms-auto')} />
+                                    </button>
+                                    {open && (
+                                        <ul id={id} className="mt-0.5 ms-[19px] ps-2.5 border-s border-white/10 space-y-0.5">
+                                            {link.children.map((c) => (
+                                                <li key={c.href}>
+                                                    <Link href={c.href} aria-current={childActive(c, pathname) ? 'page' : undefined} className={cn(rowCls(childActive(c, pathname)), 'h-8 text-[13px]', childActive(c, pathname) && 'text-[#2EC4B6]')}>
+                                                        <span className="truncate">{label(c)}</span>{badge(badgeCounts[c.href] || 0)}
+                                                    </Link>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                </li>
+                            );
+                        }
+                        const active = isLinkActive(link);
                         return (
-                            <Link
-                                key={link.href}
-                                href={link.href}
-                                className={cn(
-                                    "flex items-center justify-between px-4 h-[44px] text-[14px] font-medium transition-all rounded-xl",
-                                    isActive
-                                        ? "bg-teal-500/10 text-teal-500"
-                                        : "text-slate-400 hover:text-slate-200 hover:bg-white/5"
-                                )}
-                            >
-                                <div className="flex items-center gap-3">
-                                    <Icon size={18} />
-                                    <span>{t(link.section ?? 'admin', link.translationKey) || link.label}</span>
-                                </div>
-                                {(badgeCounts[link.href] || 0) > 0 && (
-                                    <div className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                                        {badgeCounts[link.href]}
-                                    </div>
-                                )}
-                            </Link>
+                            <li key={link.href}>
+                                <Link href={link.href} aria-current={active ? 'page' : undefined} className={rowCls(active)}>
+                                    <Icon size={16} className={cn(active && 'text-[#2EC4B6]')} /><span className="truncate">{label(link)}</span>{badge(badgeCounts[link.href] || 0)}
+                                </Link>
+                            </li>
                         );
                     })}
-                </div>
+                </ul>
             )}
         </div>
     );
@@ -281,7 +293,9 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const { user, logout, isAuthReady } = useAuth();
-    const [isOpen, setIsOpen] = React.useState(true); // Open by default
+    const [isOpen, setIsOpen] = React.useState(true); // Open by default on desktop
+    // Phones and tablets start with the menu closed and close it after navigating.
+    React.useEffect(() => { if (typeof window !== 'undefined' && window.innerWidth < 1024) setIsOpen(false); }, []);
     const [isNotificationsOpen, setIsNotificationsOpen] = React.useState(false);
     const [notifications, setNotifications] = React.useState<NotificationCounts>({
         pendingUsers: 0,
@@ -291,6 +305,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
     const [kycBlocked, setKycBlocked] = React.useState(false);
     const pathname = usePathname();
+    React.useEffect(() => { if (typeof window !== 'undefined' && window.innerWidth < 1024) setIsOpen(false); }, [pathname]);
     const isOwner = user?.role?.toUpperCase() === 'OWNER';
     const isTeamMember = ['ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'].includes(user?.role?.toUpperCase() || '') || isOwner;
 
@@ -383,7 +398,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const badgeCounts: Record<string, number> = {
         '/admin/users': notifications.pendingUsers,
-        '/admin/products': notifications.pendingProducts,
+        '/admin/products/submissions': notifications.pendingProducts,
         '/admin/orders': notifications.pendingOrders,
         '/admin/placements': notifications.pendingPlacements,
     };
@@ -428,229 +443,87 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <aside
                 style={{ backgroundColor: '#0F172A' }}
                 className={cn(
-                    "transition-all duration-500 flex flex-col z-[60] shrink-0",
-                    "fixed h-screen lg:h-auto lg:relative overflow-hidden shadow-2xl border-e border-white/5",
-                    isOpen ? "translate-x-0 w-[260px]" : "-translate-x-[120%] lg:translate-x-0 w-0 lg:w-[72px]"
+                    'transition-[width,transform] duration-300 flex flex-col z-[60] shrink-0 border-e border-white/5',
+                    'fixed inset-y-0 start-0 lg:relative overflow-hidden',
+                    isOpen ? 'translate-x-0 w-[232px]' : '-translate-x-[120%] rtl:translate-x-[120%] lg:translate-x-0 rtl:lg:translate-x-0 w-[232px] lg:w-[64px]'
                 )}>
-                {/* Sidebar Header */}
-                <div className="h-28 flex items-center px-8 border-b border-white/5">
-                    <Link href="/" className="flex items-center gap-4 group">
-                        <div className="w-12 h-12 bg-white rounded-2xl overflow-hidden flex items-center justify-center transition-all group-hover:scale-105 shadow-[0_0_40px_rgba(20,184,166,0.2)] border border-white/20">
-                            <img 
-                                src="/icon.png" 
-                                alt="Atlantis" 
-                                className="w-full h-full object-cover" 
-                            />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="font-heading font-black text-2xl tracking-tighter uppercase leading-none">
-                                <span className="text-white">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>
+                <div className={cn('h-14 flex items-center border-b border-white/5 shrink-0', isOpen ? 'px-4' : 'justify-center')}>
+                    <Link href="/admin" className="flex items-center gap-2.5 min-w-0" aria-label="Atlantis">{/* i18n-ignore: brand name */}
+                        <span className="w-8 h-8 rounded-lg bg-white overflow-hidden flex items-center justify-center shrink-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src="/brand/atlantis-mark.png" alt="" className="w-6 h-6 object-contain" />
+                        </span>
+                        {isOpen && (
+                            <span className="font-sans font-black text-[17px] tracking-tighter uppercase leading-none">
+                                <span className="text-white">ATLAN</span><span className="text-[#2EC4B6]">TIS.</span>{/* i18n-ignore: wordmark */}
                             </span>
-                            <span className="text-[9px] font-black uppercase tracking-[0.4em] text-[#14B8A6]/60 mt-1">Enterprise HQ</span>
-                        </div>
+                        )}
                     </Link>
                 </div>
 
-                {/* Sidebar Content.
-                    The "Owner Access" group used to render here above
-                    the main nav, but it only held a single redundant
-                    "Owner Dashboard" link — the OWNER already lands on
-                    /admin and has full access to everything else in
-                    the nav. Operator asked for it removed. */}
-                <nav id="tour-admin-nav" className="flex-1 py-6 px-4 space-y-1 overflow-y-auto no-scrollbar">
+                <nav id="tour-admin-nav" aria-label={t('admin', 'panelTitle')} className={cn('flex-1 py-3 overflow-y-auto no-scrollbar', isOpen ? 'px-2.5' : 'px-0')}>
                     {filteredSidebarGroups.map(group => (
                         <SidebarGroupComponent key={group.title} group={group} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} />
                     ))}
                 </nav>
 
-                {/* Sidebar Footer */}
-                <div className="p-4 mt-auto border-t border-white/5">
-                    {isOpen && (
-                        <div className="bg-white/[0.03] border border-white/5 rounded-[15px] p-5 mb-4">
-                            <div className="flex items-center justify-between mb-6">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-11 h-11 rounded-full ring-2 ring-[#14B8A6]/30 p-0.5 overflow-hidden">
-                                        {user?.avatar ? (
-                                            <img src={user.avatar} alt={user.name || 'User'} className="w-full h-full rounded-full object-cover" />
-                                        ) : (
-                                            <div className="w-full h-full rounded-full bg-slate-800 flex items-center justify-center text-[#14B8A6] font-black text-xs">
-                                                {user?.name?.[0] || 'A'}
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div className="flex flex-col">
-                                        <span className="text-[13px] font-black text-white truncate max-w-[130px]">{user?.name || 'Admin User'}</span>
-                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{user?.role || 'Super Admin'}</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <button
-                                onClick={async () => {
-                                    await logout();
-                                    window.location.href = '/auth/login';
-                                }}
-                                className="flex items-center justify-center gap-3 h-11 w-full bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white rounded-[12px] transition-all font-black uppercase text-[10px] tracking-widest border border-red-500/20"
-                            >
+                <div className={cn('border-t border-white/5 shrink-0', isOpen ? 'p-3' : 'py-3 flex justify-center')}>
+                    {isOpen ? (
+                        <div className="flex items-center gap-2.5">
+                            <span className="w-8 h-8 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center text-[#2EC4B6] text-[12px] font-semibold shrink-0">
+                                {user?.avatar
+                                    ? <img src={user.avatar} alt="" className="w-full h-full object-cover" /> /* eslint-disable-line @next/next/no-img-element */
+                                    : (user?.name?.[0] || 'A')}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-[13px] font-semibold text-white truncate">{user?.name}</span>
+                                <span className="block text-[11px] text-slate-500 truncate">{user?.role}</span>
+                            </span>
+                            <button type="button" onClick={async () => { await logout(); window.location.href = '/auth/login'; }} title={t('admin', 'signOut')} aria-label={t('admin', 'signOut')}
+                                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-300 hover:bg-red-500/10 outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
                                 <LogOut size={16} />
-                                Terminate Session
                             </button>
                         </div>
-                    )}
-                    
-                    {!isOpen && (
-                        <button
-                            onClick={async () => {
-                                await logout();
-                                window.location.href = '/auth/login';
-                            }}
-                            className="w-12 h-12 mx-auto flex items-center justify-center bg-red-500/10 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"
-                        >
-                            <LogOut size={20} />
+                    ) : (
+                        <button type="button" onClick={async () => { await logout(); window.location.href = '/auth/login'; }} title={t('admin', 'signOut')} aria-label={t('admin', 'signOut')}
+                            className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-300 hover:bg-red-500/10">
+                            <LogOut size={17} />
                         </button>
-                    )}
-
-                    {isOpen && (
-                        <div className="mt-4 px-4 py-2 text-center">
-                            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20">
-                                {t('footer', 'developedBy')}
-                            </p>
-                        </div>
                     )}
                 </div>
             </aside>
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
-                {/* Header Row - Perfect Balanced Proportions */}
-                <header className="h-20 bg-white border-b border-slate-200 flex items-center justify-between px-6 lg:px-8 z-40 shrink-0">
-                    <div className="flex items-center gap-6">
-                        <button 
-                            onClick={() => setIsOpen(!isOpen)}
-                            className="w-11 h-11 bg-[#14B8A6] text-white rounded-[12px] flex items-center justify-center shadow-lg shadow-[#14B8A6]/20 hover:scale-105 transition-all"
-                        >
-                            <Menu size={20} />
+                {isOpen && <div className="fixed inset-0 bg-black/50 z-50 lg:hidden" onClick={() => setIsOpen(false)} aria-hidden />}
+                <header className="h-14 bg-white border-b border-slate-200 flex items-center gap-2 px-3 sm:px-5 z-40 shrink-0">
+                    <button type="button" onClick={() => setIsOpen(!isOpen)} aria-label={t('admin', 'panelTitle')} aria-expanded={isOpen}
+                        className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-100 outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
+                        <Menu size={18} />
+                    </button>
+                    <div id="tour-admin-panel" className="min-w-0 flex-1">
+                        <p className="text-[14px] font-semibold text-[#0B1F3A] truncate">{isDeveloper ? 'Support HQ' : t('admin', 'panelTitle')}</p>{/* i18n-ignore: developer-only label */}
+                    </div>
+                    <Link href="/" title="Back to Home" aria-label="Back to Home" className="hidden sm:flex w-9 h-9 rounded-lg items-center justify-center text-slate-600 hover:bg-slate-100">{/* i18n-ignore: legacy tooltip */}
+                        <Home size={17} />
+                    </Link>
+                    <select value={locale} onChange={(e) => setLocale(e.target.value as Locale)} aria-label="Language"
+                        className="hidden sm:block h-9 max-w-[9rem] bg-transparent text-[13px] font-medium text-slate-600 rounded-lg ring-1 ring-inset ring-slate-200 px-2 outline-none focus:ring-2 focus:ring-[#2EC4B6] cursor-pointer">
+                        {LOCALES.map((code) => <option key={code} value={code} className="text-black bg-white">{LOCALE_META[code].name}</option>)}
+                    </select>
+                    {mounted && (
+                        <button type="button" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle Theme"
+                            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-100">
+                            {resolvedTheme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
                         </button>
-
-                        {/* Mobile Overlay / Backdrop */}
-                        {isOpen && (
-                            <div 
-                                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden transition-opacity duration-300"
-                                onClick={() => setIsOpen(false)}
-                            />
-                        )}
-
-                        <Link
-                            href="/"
-                            className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
-                            title="Back to Home"
-                        >
-                            <Home size={18} />
-                        </Link>
-                        {pathname !== '/admin' && (
-                            <Link
-                                href="/admin"
-                                className="w-10 h-10 rounded-xl bg-accent text-accent-foreground flex items-center justify-center hover:bg-primary hover:text-white transition-all shadow-sm"
-                                title="Back to Dashboard"
-                            >
-                                <LayoutDashboard size={18} />
-                            </Link>
-                        )}
-                        <div id="tour-admin-panel" className="flex flex-col">
-                            <h1 className="text-[#0F172A] font-semibold text-2xl tracking-tight uppercase leading-none">
-                                {isDeveloper ? 'Support HQ' : t('admin', 'panelTitle')}
-                            </h1>
-                            <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mt-1 opacity-80">
-                                {isDeveloper ? 'Commerce Resolution & Entity Verification' : t('admin', 'enterpriseAdmin')}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-3">
-                        {/* Language Switcher */}
-                        <select
-                            value={locale}
-                            onChange={(e) => setLocale(e.target.value as Locale)}
-                            className="bg-transparent dark:bg-transparent text-xs font-bold outline-none cursor-pointer text-[#555] dark:text-[#999] hover:text-[#0F1111] dark:hover:text-white border border-[#DDD] dark:border-white/10 rounded-md px-2 py-1.5 transition-all"
-                        >
-                            {LOCALES.map((code) => <option key={code} value={code} className="text-black bg-white">{LOCALE_META[code].name}</option>)}
-                        </select>
-
-                        {/* Theme Toggle */}
-                        {mounted && (
-                            <button
-                                onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
-                                className="p-2 rounded-md hover:bg-[#F3F3F3] dark:hover:bg-white/10 transition-all outline-none text-[#555] dark:text-[#999] hover:text-[#0F1111] dark:hover:text-white"
-                                aria-label="Toggle Theme"
-                            >
-                                {resolvedTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                            </button>
-                        )}
-
-                        {/* World Clock */}
-                        <WorldClock />
-
-                        <div className="h-6 w-[1px] bg-[#DDD] dark:bg-white/10" />
-
-                        {/* Unified Notification Bell */}
-                        <div id="tour-admin-alerts" className="flex items-center">
-                            <NotificationBell isLight={resolvedTheme !== 'dark'} />
-                        </div>
-
-                        <div className="h-6 w-[1px] bg-[#DDD] dark:bg-white/10" />
-
-                        <UserMenu role={user?.role || 'admin'} />
-                    </div>
+                    )}
+                    <span className="hidden md:block"><WorldClock /></span>
+                    <span id="tour-admin-alerts" className="flex items-center"><NotificationBell compact /></span>
+                    <UserMenu role={user?.role || 'admin'} />
                 </header>
 
-
-                {/* Scrollable Content with Perfect Spacing */}
-                <div className="flex-1 overflow-y-auto no-scrollbar bg-[#F8FAFC]">
-                    <div className="max-w-[1440px] mx-auto px-6 py-8 lg:py-10 min-h-full">
-                        {/* Global Action Banner */}
-                        {Object.values(notifications).some(v => v > 0) && (
-                            <motion.div 
-                                initial={{ opacity: 0, y: -20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="mb-8 p-4 bg-teal-50 border border-teal-200 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-sm"
-                            >
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-teal-600 text-white rounded-xl flex items-center justify-center animate-pulse">
-                                        <AlertCircle size={20} />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">Pending Actions Required</p>
-                                        <p className="text-[11px] text-slate-500 font-bold">The following items require your immediate attention to maintain platform flow.</p>
-                                    </div>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                    {notifications.pendingOrders > 0 && (
-                                        <Link href="/admin/orders" className="h-8 px-3 bg-white border border-teal-200 rounded-lg text-[10px] font-black text-teal-700 hover:bg-teal-600 hover:text-white transition-all flex items-center gap-2">
-                                            <ShoppingCart size={12} />
-                                            {notifications.pendingOrders} NEW ORDERS
-                                        </Link>
-                                    )}
-                                    {notifications.pendingProducts > 0 && (
-                                        <Link href="/admin/products" className="h-8 px-3 bg-white border border-teal-200 rounded-lg text-[10px] font-black text-teal-700 hover:bg-teal-600 hover:text-white transition-all flex items-center gap-2">
-                                            <Package size={12} />
-                                            {notifications.pendingProducts} PRODUCT REVIEWS
-                                        </Link>
-                                    )}
-                                    {notifications.pendingUsers > 0 && (
-                                        <Link href="/admin/users" className="h-8 px-3 bg-white border border-teal-200 rounded-lg text-[10px] font-black text-teal-700 hover:bg-teal-600 hover:text-white transition-all flex items-center gap-2">
-                                            <Users size={12} />
-                                            {notifications.pendingUsers} USER APPROVALS
-                                        </Link>
-                                    )}
-                                    {notifications.pendingPlacements > 0 && (
-                                        <Link href="/admin/placements" className="h-8 px-3 bg-white border border-teal-200 rounded-lg text-[10px] font-black text-teal-700 hover:bg-teal-600 hover:text-white transition-all flex items-center gap-2">
-                                            <Star size={12} />
-                                            {notifications.pendingPlacements} AD REQUESTS
-                                        </Link>
-                                    )}
-                                </div>
-                            </motion.div>
-                        )}
+                <div className="flex-1 overflow-y-auto bg-[#F6F8FA]">
+                    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 min-h-full">
                         {children}
                     </div>
                 </div>

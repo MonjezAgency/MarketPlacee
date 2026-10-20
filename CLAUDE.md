@@ -31,10 +31,18 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
 - Supplier entry point after sign-in: `/supplier` (business overview); the supplier tools live under `/supplier/*`.
   The old `/dashboard/supplier` and `/dashboard/supplier/*` URLs permanently redirect (308) to `/supplier` in `frontend/src/middleware.ts`.
 - Buyer area: `/dashboard/customer/*`. Staff: `/admin/*`.
-- Admin Products (`/admin/products`) has two server-backed tabs: Atlantis Catalog (products owned by staff accounts) and Supplier Submissions
-  (everything else); the rule is `backend/src/products/catalog-scope.ts`, never a display name. Product review view: `/admin/products/[id]`.
-  Every submission, decision and feedback message is a `ProductReviewEvent` row (`product-review.service.ts`); suppliers read it at
-  `/supplier/products/[id]/edit#feedback`. The Founder Overview figures are defined in `backend/src/admin/admin-overview.ts`.
+- Admin Products is a sidebar parent with two routes: `/admin/products/catalog` (Atlantis Catalog — products owned by staff
+  accounts) and `/admin/products/submissions` (Supplier Submissions — everything else); the rule is
+  `backend/src/products/catalog-scope.ts`, never a display name. `/admin/products` redirects. Review view: `/admin/products/[id]`.
+  Staff may edit Atlantis Catalog products only: edits, status overrides, resubmission, variant stock and creating under a
+  supplier account return 403 `SUPPLIER_OWNED` for supplier products (products.controller.ts `assertStaffMayEdit`).
+  Supplier products are approved, rejected or sent back with feedback; every step is a `ProductReviewEvent`
+  (`product-review.service.ts`) and the supplier reads it at `/supplier/products/[id]/edit#feedback`.
+- Catalog import (`/admin/products/catalog/import`, API `/admin-catalog/import/*`) is the supplier import wizard
+  (`components/supplier/import/ImportWizard.tsx`, `supplier-import.service.ts` with `mode.catalog`): rows owned by the platform
+  account, duplicates matched against staff-owned products only, complete rows published, incomplete rows drafts.
+- Founder Overview figures are defined in `backend/src/admin/admin-overview.ts`. Atlantis revenue = buyer price − supplier net on
+  lines with a recorded supplier price; net profit is unavailable (no cost records); payments = Stripe escrow records.
 - Unauthenticated requests to protected routes are sent to `/auth/login?redirect=<path>` (see `frontend/src/middleware.ts`).
 
 ## Before you finish

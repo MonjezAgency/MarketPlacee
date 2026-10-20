@@ -152,7 +152,7 @@ export class ProductsService {
         });
     }
 
-    async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false, options?: { preFetchedConfigs?: any[], preFetchedCategories?: string[], supplierKycStatus?: string, submit?: boolean, actorId?: string, noInference?: boolean }) {
+    async create(createProductDto: CreateProductDto, isAdmin: boolean = false, skipAi: boolean = false, options?: { preFetchedConfigs?: any[], preFetchedCategories?: string[], supplierKycStatus?: string, submit?: boolean, actorId?: string, actorRole?: string, noInference?: boolean }) {
         const dtoIn = createProductDto as any;
         if (dtoIn.ean !== undefined && dtoIn.ean !== null && String(dtoIn.ean).trim()) dtoIn.ean = normaliseBarcode(dtoIn.ean);
         if (dtoIn.weight) dtoIn.weight = normaliseWeight(dtoIn.weight) || String(dtoIn.weight).trim();
@@ -372,7 +372,7 @@ export class ProductsService {
             if (options?.actorId) this.logChanges(product.id, options.actorId, {}, { status: product.status }, 'Created').catch(() => {});
             // Notify Admins if created by supplier and it is ready for review
             if (!isAdmin && product.status === ProductStatus.PENDING) {
-                this.review?.record({ productId: product.id, action: 'SUBMITTED', statusAfter: product.status, actor: { id: options?.actorId ?? product.supplierId, role: 'SUPPLIER' } });
+                this.review?.record({ productId: product.id, action: 'SUBMITTED', statusAfter: product.status, actor: { id: options?.actorId ?? product.supplierId, role: options?.actorRole ?? 'SUPPLIER' } });
             }
             if (!isAdmin && product.supplierId && !skipAi && product.status === ProductStatus.PENDING) {
                 this.notificationsService.notifyAdmins(
@@ -761,18 +761,19 @@ export class ProductsService {
         // Kept with its author and time, so the supplier can still read it after the next resubmission clears adminNotes.
         await this.review?.record({ productId, action: 'CHANGES_REQUESTED', message: text, statusAfter: ProductStatus.NEEDS_CHANGES, actor });
 
-        // Notify the supplier in-app + by email so they don't miss the comment.
+        // Notify the supplier in-app + by email; the result is reported back so the reviewer knows whether it arrived.
+        const delivery = { inApp: false, email: false as boolean | null };
         if (product.supplierId) {
-            this.notificationsService.notifyUser(
+            delivery.inApp = await this.notificationsService.notifyUser(
                 product.supplierId,
                 'Atlantis sent you a comment on a product',
                 `Your product "${product.name}" needs changes before it can be approved.\n\nReason: ${text}\n\nFix the row in your inventory and click "Resend for Review".`,
                 'WARNING',
                 { productId: product.id, type: 'PRODUCT_NEEDS_CHANGES', link: ProductsService.supplierFeedbackLink(product.id) },
-            ).catch(() => {});
+            ).then(() => true, (e) => { this.logger.warn(`in-app notification failed for ${product.id}: ${e?.message}`); return false; });
         }
-        if ((product as any).supplier?.email) {
-            this.emailService.sendMail(
+        if (!(product as any).supplier?.email) delivery.email = null;
+        else delivery.email = await this.emailService.sendMail(
                 (product as any).supplier.email,
                 `Atlantis · "${product.name}" needs changes`,
                 `<div style="font-family:Inter,Arial,sans-serif;max-width:560px;margin:0 auto;padding:32px;color:#0F172A;">
@@ -783,10 +784,9 @@ export class ProductsService {
                     <p style="color:#475569;line-height:1.6;">Open your inventory, fix the row, then click <strong>Resend for Review</strong> to push it back to us.</p>
                     <p style="color:#94A3B8;font-size:12px;margin-top:32px;">— The Atlantis team</p>
                 </div>`,
-            ).catch(() => {});
-        }
+            ).then((r: any) => r === true, (e: any) => { this.logger.warn(`feedback email failed for ${product.id}: ${e?.message}`); return false; });
 
-        return updated;
+        return { ...updated, delivery };
     }
 
     /**
@@ -825,7 +825,7 @@ export class ProductsService {
         return updated;
     }
 
-    async updateStatus(id: string, status: ProductStatus, adminNotes?: string, actor?: ReviewActor | null) {
+    async updateStatus(id: string, status: ProductStatus, adminNotes?: string, actor?: ReviewActor | null, opts: { notify?: boolean } = {}) {
         if (status === ProductStatus.APPROVED) {
             const product = await this.findOne(id);
             if (!product) throw new BadRequestException('Product not found');
@@ -854,19 +854,20 @@ export class ProductsService {
         });
 
         // Notify Supplier on status change
-        if (updated.supplierId) {
+        if (updated.supplierId && opts.notify !== false) {
             const title = status === ProductStatus.APPROVED ? 'Product Approved' : 'Product Status Updated';
             const message = status === ProductStatus.APPROVED 
                 ? `Your product "${updated.name}" has been approved and is now live on the marketplace!`
                 : `Your product "${updated.name}" status has been updated to ${status}.`;
             
-            this.notificationsService.notifyUser(
+            const inApp = await this.notificationsService.notifyUser(
                 updated.supplierId,
                 title,
                 status === ProductStatus.REJECTED && adminNotes ? `${message}\n\nReason: ${adminNotes}` : message,
                 status === ProductStatus.APPROVED ? 'SUCCESS' : status === ProductStatus.REJECTED ? 'ERROR' : 'INFO',
                 { productId: updated.id, link: ProductsService.supplierFeedbackLink(updated.id) }
-            ).catch(() => {});
+            ).then(() => true, (e) => { this.logger.warn(`status notification failed for ${updated.id}: ${e?.message}`); return false; });
+            return { ...updated, delivery: { inApp, email: null } };
         }
 
         return updated;
@@ -1882,14 +1883,14 @@ export class ProductsService {
      * without one) by exact name — with the fields an import can change, so
      * the review can show old → new. Never another supplier's products.
      */
-    async findMineForImport(supplierId: string, codes: string[], names: string[]) {
+    async findMineForImport(supplierId: string | string[], codes: string[], names: string[]) {
         const eans = [...new Set(codes.map(normaliseBarcode).filter(Boolean))];
         const nm = [...new Set(names.map((n) => String(n || '').trim()).filter(Boolean))];
         if (!eans.length && !nm.length) return [];
         return this.prisma.product.findMany({
-            where: { supplierId, OR: [...(eans.length ? [{ ean: { in: eans } }] : []), ...(nm.length ? [{ name: { in: nm, mode: 'insensitive' as const } }] : [])] },
+            where: { supplierId: Array.isArray(supplierId) ? { in: supplierId } : supplierId, OR: [...(eans.length ? [{ ean: { in: eans } }] : []), ...(nm.length ? [{ name: { in: nm, mode: 'insensitive' as const } }] : [])] },
             select: {
-                id: true, name: true, ean: true, status: true, brand: true, category: true, weight: true, origin: true, exwLocation: true,
+                id: true, supplierId: true, name: true, ean: true, status: true, brand: true, category: true, weight: true, origin: true, exwLocation: true,
                 unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, moq: true, moqUnit: true, stock: true, shelfLife: true,
                 leadTime: true, basePrice: true, supplierPrice: true, supplierCurrency: true, unit: true, images: true,
             },

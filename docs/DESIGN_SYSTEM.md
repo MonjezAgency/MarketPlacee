@@ -92,6 +92,11 @@ Cards are `ring-1 ring-line` on `bg-surface`. Don't combine a ring, a border and
 - Numbers in tables, prices and counters: `tabular-nums`.
 - Sentence case for headings and buttons. No ALL CAPS except eyebrows.
 - **Workspace pages** (supplier hub, admin) use the compact 12–15 px sizes already in `components/supplier/ui.tsx`; keep them consistent with that file.
+- **Admin shell** (`app/admin/layout.tsx`): 232 px sidebar (64 px collapsed, closed by default below 1024 px), 56 px header,
+  36 px nav rows with 16 px icons, 13–13.5 px labels; content max 1400 px with `px-4 sm:px-6 py-5`. Parents with sub-pages
+  (Products) expand in place and stay open on their active route. No global banners above page content — each page shows
+  its own attention list. Changed 2026-10-20: the earlier 260 px sidebar, 80 px header and oversized logo/title made every
+  admin page feel zoomed in at 100% browser zoom.
 
 ## 3. Spacing and layout
 

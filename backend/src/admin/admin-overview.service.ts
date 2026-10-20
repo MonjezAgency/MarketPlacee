@@ -6,13 +6,15 @@ import { isRealImage, missingForPublish } from '../products/catalog-rules';
 import { STAFF_ROLES, scopeWhere } from '../products/catalog-scope';
 import { ProductReviewService } from '../products/product-review.service';
 import { catalogHealth, commercialSummary, datedEventsSummary, eligibleOrders, orderAttention, paymentsSummary, type OpenOrderFacts } from './admin-overview';
+import { casesForItem } from '../products/stock-ledger';
+import { within } from '../products/report-range';
 
 /**
  * Founder Overview (GET /dashboard/admin/overview). Read-only; definitions in
  * admin-overview.ts. Current counts ("now") and period figures are returned in
  * separate blocks and never mixed.
  */
-const COMPLETENESS_SELECT = { id: true, status: true, supplierId: true, name: true, brand: true, category: true, ean: true, origin: true, exwLocation: true, weight: true, basePrice: true, price: true, stock: true, unit: true, unitsPerCase: true, casesPerPallet: true, moq: true, moqUnit: true, images: true } as const;
+const COMPLETENESS_SELECT = { id: true, status: true, supplierId: true, stock: true, name: true, brand: true, category: true, ean: true, origin: true, exwLocation: true, weight: true, basePrice: true, price: true, unit: true, unitsPerCase: true, casesPerPallet: true, moq: true, moqUnit: true, images: true } as const;
 const img = (images: unknown) => (Array.isArray(images) ? images.find((x) => isRealImage(x) && /^https?:/i.test(String(x))) ?? null : null) as string | null;
 
 @Injectable()
@@ -34,7 +36,7 @@ export class AdminOverviewService {
         const staff = (await this.prisma.user.findMany({ where: { role: { in: [...STAFF_ROLES] as any } }, select: { id: true } })).map((u) => u.id);
         const catalogWhere = scopeWhere('catalog', staff), submissionsWhere = scopeWhere('submissions', staff);
 
-        const [users, products, orderCounts, openOrders, saleOrders, paidOrders, refundRows, cancelRows, cancelledTotal, cancelledWithRow, disputesOpen, offersPending, kycPending, paymentFailed, refundedOrders, decisions, submissionsCur, submissionsPrev, newSuppliersCur, newSuppliersPrev, submittingSuppliers] = await Promise.all([
+        const [users, products, orderCounts, openOrders, saleOrders, escrows, refundRows, cancelRows, cancelledTotal, cancelledWithRow, disputesOpen, offersPending, kycPending, paymentFailed, refundedOrders, decisions, submissionsCur, submissionsPrev, newSuppliersCur, newSuppliersPrev, submittingSuppliers, placedCur, placedPrev, markedPaid] = await Promise.all([
             this.prisma.user.groupBy({ by: ['role', 'status'], _count: { _all: true } }),
             this.prisma.product.findMany({ select: COMPLETENESS_SELECT }),
             Promise.all([this.prisma.order.count(), this.prisma.order.count({ where: { status: { in: ['PENDING', 'PAID', 'PROCESSING', 'SHIPPED'] as any } } })]),
@@ -45,12 +47,12 @@ export class AdminOverviewService {
             this.prisma.order.findMany({
                 where: { OR: [{ reviewStatus: 'APPROVED', status: { not: 'CANCELLED' as any } }, { reviewStatus: 'LEGACY', status: { in: [...LEGACY_CONFIRMED] as any } }] },
                 select: {
-                    id: true, status: true, reviewStatus: true, reviewedAt: true, createdAt: true, totalAmount: true, paymentStatus: true,
+                    id: true, status: true, reviewStatus: true, reviewedAt: true, createdAt: true, totalAmount: true, paymentStatus: true, customerId: true,
                     history: { where: { newStatus: { in: [...LEGACY_CONFIRMED] as any } }, orderBy: { createdAt: 'asc' }, take: 1, select: { createdAt: true } },
-                    items: { select: { productId: true, productNameSnapshot: true, quantity: true, price: true, supplierUnitPrice: true, product: { select: { name: true, images: true, supplierId: true, supplier: { select: { name: true, companyName: true } } } } } },
+                    items: { select: { productId: true, productNameSnapshot: true, quantity: true, price: true, supplierUnitPrice: true, stockCases: true, selectedTier: true, mixComposition: true, mixedLoadId: true, product: { select: { name: true, images: true, supplierId: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, supplier: { select: { name: true, companyName: true } } } } } },
                 },
             }),
-            this.prisma.order.findMany({ where: { paymentStatus: 'PAID' }, select: { totalAmount: true, paidAt: true } }),
+            this.prisma.escrowTransaction.findMany({ where: { status: { in: ['CAPTURED', 'RELEASED'] as any } }, select: { amount: true, currency: true, capturedAt: true } }),
             this.prisma.financialAuditLog.findMany({ where: { eventType: 'REFUND_ISSUED', status: 'OK', createdAt: { gte: since, lt: end } }, select: { createdAt: true, amount: true } }),
             this.prisma.orderStatusHistory.findMany({ where: { newStatus: 'CANCELLED' as any, createdAt: { gte: since, lt: end } }, select: { createdAt: true, orderId: true } }),
             this.prisma.order.count({ where: { status: 'CANCELLED' as any } }),
@@ -66,6 +68,9 @@ export class AdminOverviewService {
             this.prisma.user.count({ where: { role: 'SUPPLIER', createdAt: { gte: start, lt: end } } }),
             this.prisma.user.count({ where: { role: 'SUPPLIER', createdAt: { gte: range.previous.start, lt: range.previous.end } } }),
             this.prisma.product.groupBy({ by: ['supplierId'], where: { ...submissionsWhere, createdAt: { gte: start, lt: end } } }),
+            this.prisma.order.count({ where: { createdAt: { gte: start, lt: end } } }),
+            this.prisma.order.count({ where: { createdAt: { gte: range.previous.start, lt: range.previous.end } } }),
+            this.prisma.order.aggregate({ where: { paymentStatus: 'PAID' }, _count: { _all: true }, _sum: { totalAmount: true } }),
         ]);
 
         // ── People ─────────────────────────────────────────────────────────
@@ -93,10 +98,15 @@ export class AdminOverviewService {
         const eligible = eligibleOrders(saleOrders.map((o: any) => ({
             id: o.id, status: o.status, reviewStatus: o.reviewStatus, reviewedAt: o.reviewedAt, createdAt: o.createdAt, firstConfirmedAt: o.history?.[0]?.createdAt ?? null,
             totalAmount: o.totalAmount, paymentStatus: o.paymentStatus,
-            lines: o.items.map((i: any) => ({ productId: i.productId, name: i.product?.name || i.productNameSnapshot || '', image: img(i.product?.images), quantity: i.quantity, price: i.price, supplierUnitPrice: i.supplierUnitPrice, supplierId: i.product?.supplierId ?? null, supplierName: i.product?.supplier?.companyName || i.product?.supplier?.name || null })),
+            lines: o.items.map((i: any) => ({ productId: i.productId, name: i.product?.name || i.productNameSnapshot || '', image: img(i.product?.images), quantity: i.quantity, price: i.price, supplierUnitPrice: i.supplierUnitPrice, supplierId: i.product?.supplierId ?? null, supplierName: i.product?.supplier?.companyName || i.product?.supplier?.name || null, cases: casesForItem({ ...i, order: { status: o.status } }) })),
         })));
         const commercial = commercialSummary(eligible, range);
-        const payments = paymentsSummary(paidOrders, range);
+        const payments = paymentsSummary(escrows, range);
+        const customerOf = new Map(saleOrders.map((o: any) => [o.id, o.customerId]));
+        const buyersOrdering = new Set(eligible.filter((o) => within(o.recognizedAt, start, end)).map((o) => customerOf.get(o.id)).filter(Boolean)).size;
+        const allTimeProducts = new Set(eligible.flatMap((o) => o.lines.map((l) => l.productId).filter(Boolean))).size;
+        const allTimeCases = eligible.reduce((s, o) => s + o.lines.reduce((t, l) => t + (Number(l.cases) || 0), 0), 0);
+        const activeProducts = products.filter((p) => p.status === 'APPROVED' && (Number(p.stock) || 0) > 0).length;
         const outstanding = eligible.filter((o) => o.paymentStatus !== 'PAID');
         const refunds = datedEventsSummary(refundRows.map((r) => ({ at: r.createdAt, amount: r.amount })), range);
         const cancellations = datedEventsSummary(cancelRows.map((r) => ({ at: r.createdAt })), range);
@@ -105,18 +115,25 @@ export class AdminOverviewService {
             asOf: now.toISOString(),
             range: { preset: range.preset, from: range.fromDay, to: range.toDay, days: range.days, timeZone: range.timeZone, granularity: range.granularity, previous: { from: range.previous.fromDay, to: range.previous.toDay } },
             snapshot: {
-                people,
+                people: { ...people, buyers: { ...people.buyers, orderingInPeriod: buyersOrdering } },
                 products: {
+                    active: activeProducts,
+                    live: catalog.all.byStatus.APPROVED || 0,
                     total: catalog.all.total, byStatus: catalog.all.byStatus,
                     catalog: { total: catalog.catalog.total, byStatus: catalog.catalog.byStatus, missingInfo: catalog.catalog.missingInfo, missingImages: catalog.catalog.missingImages, liveIncomplete: catalog.catalog.liveIncomplete },
                     submissions: { total: catalog.submissions.total, byStatus: catalog.submissions.byStatus, missingInfo: catalog.submissions.missingInfo, missingImages: catalog.submissions.missingImages, liveIncomplete: catalog.submissions.liveIncomplete },
                     missingInfo: catalog.all.missingInfo, missingImages: catalog.all.missingImages,
                 },
-                orders: { total: orderCounts[0], open: orderCounts[1], cancelled: cancelledTotal, cancelledUndated: cancelledTotal - cancelledWithRow, ...attention },
+                sold: { products: allTimeProducts, cases: allTimeCases },
+                orders: { total: orderCounts[0], open: orderCounts[1], placedInPeriod: placedCur, placedPrevious: placedPrev, cancelled: cancelledTotal, cancelledUndated: cancelledTotal - cancelledWithRow, ...attention },
                 disputesOpen, offersPending, kycPending, paymentFailed, refundedOrders,
                 outstanding: { orders: outstanding.length, amount: Math.round(outstanding.reduce((s, o) => s + o.totalAmount, 0) * 100) / 100 },
             },
-            commercial: { currency: 'EUR', ...commercial, payments, refunds, cancellations },
+            commercial: {
+                currency: 'EUR', ...commercial, payments, refunds, cancellations,
+                markedPaid: { orders: markedPaid._count._all, amount: Math.round((markedPaid._sum.totalAmount || 0) * 100) / 100 },
+                netProfit: { available: false, missing: ['expenses', 'paymentFees', 'freightCosts', 'payouts'] },
+            },
             insights: {
                 submissions: { current: submissionsCur, previous: submissionsPrev, suppliers: submittingSuppliers.length },
                 newSuppliers: { current: newSuppliersCur, previous: newSuppliersPrev },

@@ -8,6 +8,16 @@ import { ImportEnrichmentService } from './import-enrichment.service';
 import { ImageLookupService } from './image-lookup.service';
 import { applyImportBrands } from './catalog-fields';
 import { ImageDiscoveryService } from './image-discovery.service';
+import type { ReviewActor } from './product-review.service';
+
+/**
+ * The same import, run by Atlantis staff into the Atlantis Catalog (admin-catalog
+ * controller). Rows are owned by the platform account; duplicates are matched
+ * against every staff-owned product, never against supplier catalogs, so a
+ * supplier's record is never touched. Complete rows are published (the admin
+ * single-product rule); incomplete rows stay drafts.
+ */
+export interface ImportMode { catalog?: { ownerIds: string[]; actor: ReviewActor } }
 
 /** Where a field's value comes from when the file has no column for it. */
 export interface ImportSource {
@@ -122,7 +132,7 @@ export class SupplierImportService {
     }
 
     /** Build and check every row; nothing is written. */
-    async validate(supplierId: string, req: ImportRequest, maxRows = MAX_IMPORT_ROWS_TOTAL) {
+    async validate(supplierId: string, req: ImportRequest, maxRows = MAX_IMPORT_ROWS_TOTAL, mode: ImportMode = {}) {
         const { mapping, sources } = this.checkRequest(req, maxRows);
         const opts = { currency: String(req.settings?.currency || 'EUR').toUpperCase(), moqUnit: String(req.settings?.moqUnit || 'CASE').toUpperCase(), unit: String(req.settings?.unit || 'piece').toLowerCase() };
         const shownPrices = req.settings?.pricePrecision === 'shown';
@@ -239,7 +249,7 @@ export class SupplierImportService {
         }
 
         // The supplier's own catalog: by barcode, or by exact name when a row has no barcode.
-        const existing = await this.products.findMineForImport(supplierId, [...byEan.keys()], items.filter((i) => !i.built.product.ean).map((i) => i.built.product.name));
+        const existing = await this.products.findMineForImport(mode.catalog ? mode.catalog.ownerIds : supplierId, [...byEan.keys()], items.filter((i) => !i.built.product.ean).map((i) => i.built.product.name));
         const exByEan = new Map(existing.filter((e: any) => e.ean).map((e: any) => [e.ean, e]));
         const exByName = new Map(existing.map((e: any) => [fold(e.name), e]));
         const onExisting = req.onExisting === 'update' ? 'update' : 'skip';
@@ -282,7 +292,7 @@ export class SupplierImportService {
                 images: it.images, imageStatus: p.images?.length ? 'from_link' : it.images.length ? 'from_file' : it.external ? 'from_lookup' : 'missing', externalImage: it.external?.url ?? null, page: it.page ?? null,
                 from: it.from, notes: b.notes, aux: b.aux,
                 errors: b.errors, missing: b.missing, warnings: b.warnings,
-                existing: ex ? { id: ex.id, name: ex.name, status: ex.status, hasPhoto: realImages(ex.images).length > 0 } : null, changes,
+                existing: ex ? { id: ex.id, supplierId: ex.supplierId, name: ex.name, status: ex.status, hasPhoto: realImages(ex.images).length > 0 } : null, changes,
             };
         });
         const count = (s: string) => rows.filter((r) => r.state === s).length;
@@ -308,8 +318,10 @@ export class SupplierImportService {
      * asked, updated with valid values only — an invalid row never touches a
      * saved product. The original spreadsheet row is kept with each product.
      */
-    async commit(supplierId: string, req: ImportRequest, files: { originalname: string; buffer: Buffer; mimetype: string; size: number }[] = []) {
-        const v = await this.validate(supplierId, req, MAX_COMMIT_ROWS);
+    async commit(supplierId: string, req: ImportRequest, files: { originalname: string; buffer: Buffer; mimetype: string; size: number }[] = [], mode: ImportMode = {}) {
+        const v = await this.validate(supplierId, req, MAX_COMMIT_ROWS, mode);
+        const catalog = mode.catalog;
+        const actorId = catalog?.actor.id || supplierId;
         // Media names are unique inside a workbook (xl/media/imageN.ext); uploads may arrive without the folder.
         const base = (p: string) => String(p || '').split('/').pop() || '';
         const photos = new Map(files.map((f) => [base(f.originalname), f]));
@@ -319,7 +331,7 @@ export class SupplierImportService {
             const it = v.built[i];
             const head = { key: r.key, sheet: r.sheet, row: r.row, name: r.name, ean: r.ean, ...(r.page ? { page: r.page } : {}) };
             if (r.state === 'error') { results.push({ ...head, outcome: 'failed', reasons: r.errors.map((e: any) => e.reason) }); continue; }
-            if (r.state === 'skip') { results.push({ ...head, outcome: 'skipped', productId: r.existing?.id, reasons: ['Already in your catalog (you chose to skip these).'] }); continue; }
+            if (r.state === 'skip') { results.push({ ...head, outcome: 'skipped', productId: r.existing?.id, reasons: [catalog ? 'Already in the Atlantis Catalog (you chose to skip these).' : 'Already in your catalog (you chose to skip these).'] }); continue; }
             if (r.state === 'unchanged') { results.push({ ...head, outcome: 'unchanged', productId: r.existing?.id }); continue; }
             const notes: string[] = [];
             try {
@@ -352,10 +364,13 @@ export class SupplierImportService {
                 let saved: any;
                 if (r.action === 'update') {
                     const patch = updatePatch(product, it.built.values);
-                    saved = await this.products.supplierUpdate(r.existing!.id, supplierId, patch, { submit: true });
+                    // A catalog product may belong to any staff account; update it as its own owner.
+                    saved = await this.products.supplierUpdate(r.existing!.id, catalog ? (r.existing as any).supplierId || supplierId : supplierId, patch, { submit: true });
+                    saved = await this.publishIfComplete(saved, catalog, { ...product, ...patch });
                     results.push({ ...head, outcome: 'updated', productId: saved.id, status: saved.status, changes: r.changes.map((c: any) => c.label), notes });
                 } else {
-                    saved = await this.products.create({ ...product, supplierId } as any, false, true, { submit: true, actorId: supplierId, noInference: true });
+                    saved = await this.products.create({ ...product, supplierId } as any, false, true, { submit: true, actorId, actorRole: catalog?.actor.role ?? 'SUPPLIER', noInference: true });
+                    saved = await this.publishIfComplete(saved, catalog, product);
                     // What the saved product still lacks — after any photo upload, so a failed photo is counted.
                     const missing = missingForPublish({ ...product, basePrice: product.price }).map((m) => m.label);
                     results.push({ ...head, outcome: 'created', productId: saved.id, status: saved.status, missing, imageMissing: !images.length, photoFromLookup: !!credits, notes });
@@ -363,7 +378,7 @@ export class SupplierImportService {
                 // Saved without a photo: look for one by barcode in the background (shares the review search's cache).
                 if (!images.length) this.discovery?.trigger(saved.id);
                 if (credits) await this.products.setImageCredits(saved.id, credits).catch((e) => this.logger.warn(`[import] image credit for ${saved.id}: ${e?.message}`));
-                await this.products.recordImportSource(saved.id, supplierId, { file: req.fileName, sheet: r.sheet, row: r.row, columns: it.original, ...(it.page ? { page: it.page, extracted: it.source } : {}), ...(it.edited && Object.keys(it.edited).length ? { editedBySupplier: it.edited } : {}), ...(credits ? { imageCredits: credits } : {}) })
+                await this.products.recordImportSource(saved.id, actorId, { file: req.fileName, sheet: r.sheet, row: r.row, columns: it.original, ...(it.page ? { page: it.page, extracted: it.source } : {}), ...(it.edited && Object.keys(it.edited).length ? { editedBySupplier: it.edited } : {}), ...(credits ? { imageCredits: credits } : {}) })
                     .catch((e) => this.logger.warn(`[import] source record for ${saved.id}: ${e?.message}`));
             } catch (e: any) {
                 const msg = e?.response?.message || e?.message || 'Could not save this row.';
@@ -371,15 +386,25 @@ export class SupplierImportService {
                 results.push({ ...head, outcome: 'failed', reasons: [Array.isArray(msg) ? msg.join(', ') : String(msg)], notes });
             }
         }
-        if (req.last) await this.notifyReviewers(supplierId, req.startedAt);
+        if (req.last && !catalog) await this.notifyReviewers(supplierId, req.startedAt);
         const count = (o: string) => results.filter((x) => x.outcome === o).length;
         return {
             summary: {
                 total: results.length, created: count('created'), updated: count('updated'), unchanged: count('unchanged'), skipped: count('skipped'), failed: count('failed'),
                 pendingReview: results.filter((x) => x.status === 'PENDING').length, drafts: results.filter((x) => x.status === 'DRAFT').length,
+                published: results.filter((x) => x.status === 'APPROVED' && (x.outcome === 'created' || x.outcome === 'updated')).length,
             },
             results,
         };
+    }
+
+    /** Catalog import: a complete row waiting for review is published (same rule as an admin creating one product). */
+    private async publishIfComplete(saved: any, catalog?: ImportMode['catalog'], row?: any) {
+        if (!catalog || saved?.status !== 'PENDING') return saved;
+        // The saved record when it is complete; otherwise the imported row (create returns only part of the record).
+        const facts = { ...(row || {}), ...saved, basePrice: saved.basePrice ?? row?.price ?? saved.price };
+        if (missingForPublish(facts).length) return saved;
+        return this.products.updateStatus(saved.id, 'APPROVED' as any, '', catalog.actor, { notify: false });
     }
 
     /** Store a row's pictures; a picture that can't be stored is reported, never silently dropped. */

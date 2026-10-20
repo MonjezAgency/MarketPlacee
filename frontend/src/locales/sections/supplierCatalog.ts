@@ -16,6 +16,7 @@ export default defineSection('supplierCatalog', [
     "src/components/supplier/import/ImportStep.tsx",
     "src/components/supplier/import/types.ts",
     "src/components/supplier/ProductEditor.tsx",
+    "src/components/supplier/import/ImportWizard.tsx",
     "src/components/supplier/DropZone.tsx",
     "src/components/supplier/PriceStockUpdateDialog.tsx",
     "src/components/supplier/StockAdjustDialog.tsx",

@@ -6,6 +6,7 @@ import { Badge, Button, Card, Notice, type Tone } from '@/components/supplier/ui
 import { cn } from '@/lib/utils';
 import { Trans } from '@/components/i18n/Trans';
 import { useLanguage } from '@/contexts/LanguageContext';
+import type { ImportTarget } from './api';
 import { categoryLabel, fieldLabel, listJoin, missingLabel, moqAmount, where, type FieldDef, type PhotoResult, type Review, type ReviewRow, type Source } from './types';
 import { PhotoChoice, PhotoSearchPanel, PhotoThumb, type PhotoSearchState } from './PhotoSearch';
 
@@ -24,7 +25,8 @@ const PAGE = 50;
 /** The rows a field's value can come from, in display order (price and barcode have alternatives). */
 const SOURCE_KEYS: Record<string, string[]> = { price: ['price', 'piecePrice', 'displayPrice'], ean: ['ean', 'eanPair'], stock: ['stock', 'stockPieces'] };
 
-export default function ReviewStep({ review, fields, multi, sources, photoUrl, onExisting, setOnExisting, onEditMapping, busy, headerOf, photos, picks, onPick, onFindPhotos }: {
+export default function ReviewStep({ target = 'supplier', review, fields, multi, sources, photoUrl, onExisting, setOnExisting, onEditMapping, busy, headerOf, photos, picks, onPick, onFindPhotos }: {
+    target?: ImportTarget;
     review: Review; fields: FieldDef[]; multi: boolean; sources: Record<string, Source>; headerOf: (key: string) => string;
     photoUrl: (path: string) => string | undefined; onExisting: 'skip' | 'update'; setOnExisting: (v: 'skip' | 'update') => void;
     onEditMapping: () => void; busy: boolean;
@@ -46,8 +48,8 @@ export default function ReviewStep({ review, fields, multi, sources, photoUrl, o
     const stored = review.mapping.filter((m) => m.stored);
     const recordOnly = review.mapping.filter((m) => !m.stored && !['rowNumber', 'orderQty'].includes(m.field));
     const tiles: [string, number, Tone, Filter][] = [
-        [tc('tileNewReview'), s.ready, 'success', 'ready'], [tc('tileNewDrafts'), s.draft, 'warning', 'draft'],
-        [tc('tileUpdates'), s.update, 'info', 'update'], [tc('tileWontImport'), s.error, 'danger', 'error'],
+        [(target === 'catalog' ? t('adminProducts', 'impTileNewPublish') : tc('tileNewReview')), s.ready, 'success', 'ready'], [tc('tileNewDrafts'), s.draft, 'warning', 'draft'],
+        [(target === 'catalog' ? t('adminProducts', 'impTileUpdates') : tc('tileUpdates')), s.update, 'info', 'update'], [tc('tileWontImport'), s.error, 'danger', 'error'],
     ];
     const tabs: [Filter, string, number][] = [['all', tc('filterAllRows'), s.total], ['ready', tc('filterReady'), s.ready], ['draft', tc('tabDrafts'), s.draft], ['update', tc('filterUpdates'), s.update], ['error', tc('filterErrors'), s.error], ['warnings', tc('filterWarnings'), s.withWarnings], ...(existingCount ? [['existing', tc('filterExisting'), existingCount] as [Filter, string, number]] : [])];
 
@@ -91,10 +93,10 @@ export default function ReviewStep({ review, fields, multi, sources, photoUrl, o
 
             {existingCount > 0 && (
                 <div className="rounded-xl ring-1 ring-line p-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px]">
-                    <span className="text-ink-2"><Trans text={tc('existingMatch', { count: existingCount, n: fmt.number(existingCount) })} tags={{ b: (c) => <b>{c}</b> }} /></span>
+                    <span className="text-ink-2"><Trans text={target === 'catalog' ? t('adminProducts', 'impExistingMatch', { count: existingCount, n: fmt.number(existingCount) }) : tc('existingMatch', { count: existingCount, n: fmt.number(existingCount) })} tags={{ b: (c) => <b>{c}</b> }} /></span>
                     <label className="inline-flex items-center gap-1.5"><input type="radio" name="exist" checked={onExisting === 'skip'} onChange={() => setOnExisting('skip')} className="accent-[#0E7C74]" /> {tc('leaveAsTheyAre')}</label>
                     <label className="inline-flex items-center gap-1.5"><input type="radio" name="exist" checked={onExisting === 'update'} onChange={() => setOnExisting('update')} className="accent-[#0E7C74]" /> {tc('updateWithFile')}</label>
-                    {onExisting === 'update' && <span className="w-full text-[12px] text-ink-3">{tc('updateRules')}</span>}
+                    {onExisting === 'update' && <span className="w-full text-[12px] text-ink-3">{(target === 'catalog' ? t('adminProducts', 'impUpdateRules') : tc('updateRules'))}</span>}
                 </div>
             )}
 

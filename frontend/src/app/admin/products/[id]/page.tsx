@@ -52,6 +52,14 @@ function ReviewView({ params }: { params: { id: string } }) {
     const status = String(p?.status || '');
     const editHref = `/admin/products/${params.id}/edit`;
 
+    /** What actually reached the supplier, as reported by the server (never assumed). */
+    const deliveryNotice = (d?: { inApp?: boolean; email?: boolean | null }) => {
+        if (!d) return;
+        if (d.inApp === false) toast.error(tp('deliveryInAppFailed'), { duration: 8000 });
+        else toast.success(tp(d.email === true ? 'deliveryBoth' : d.email === false ? 'deliveryInAppOnly' : 'deliveryInApp'));
+        if (d.email === false) toast.error(tp('deliveryEmailFailed'), { duration: 8000 });
+    };
+
     const act = async (kind: 'approve' | 'reject' | 'changes' | 'offline' | 'delete') => {
         if (!p) return;
         const msg = text.trim();
@@ -61,18 +69,18 @@ function ReviewView({ params }: { params: { id: string } }) {
         if (kind === 'delete' && !(await confirm({ title: tp('confirmDeleteTitle', { name: p.name }), body: tp('confirmDeleteBody'), confirm: tp('deleteProduct'), tone: 'danger' }))) return;
         setBusy(kind);
         try {
-            if (kind === 'approve') { await adminApi.approve(p.id); toast.success(tp(isCatalog ? 'toastPublished' : 'toastApprovedOne')); }
-            else if (kind === 'reject') { await adminApi.reject(p.id, msg); toast.success(tp('toastRejectedOne')); }
-            else if (kind === 'changes') { await adminApi.requestChanges(p.id, msg); toast.success(tp('toastChangesSent')); }
+            if (kind === 'approve') { const r = await adminApi.approve(p.id); toast.success(tp(isCatalog ? 'toastPublished' : 'toastApprovedSaved')); if (!isCatalog) deliveryNotice(r?.delivery); }
+            else if (kind === 'reject') { const r = await adminApi.reject(p.id, msg); toast.success(tp('toastRejectedSaved')); deliveryNotice(r?.delivery); }
+            else if (kind === 'changes') { const r = await adminApi.requestChanges(p.id, msg); toast.success(tp('toastChangesSaved')); deliveryNotice(r?.delivery); }
             else if (kind === 'offline') { await adminApi.setStatus(p.id, 'DRAFT'); toast.success(tp('toastOffline')); }
-            else if (kind === 'delete') { await adminApi.remove(p.id); toast.success(tp('toastDeleted')); router.push(`/admin/products?tab=${data?.scope}`); return; }
+            else if (kind === 'delete') { await adminApi.remove(p.id); toast.success(tp('toastDeleted')); router.push(`/admin/products/${data?.scope ?? 'submissions'}`); return; }
             setDialog(null); setText(''); load();
         } catch (e: any) {
             const m = e?.body?.message; toast.error(Array.isArray(m) ? m.join(' ') : m || e.message);
         } finally { setBusy(null); }
     };
 
-    if (error) return <div className="text-start"><BackLink href="/admin/products" label={tp('backToProducts')} /><ErrorState message={error} onRetry={load} /></div>;
+    if (error) return <div className="text-start"><BackLink href="/admin/products/submissions" label={tp('backToProducts')} /><ErrorState message={error} onRetry={load} /></div>;
     if (!data || !p) return <div className="space-y-4 text-start"><Skeleton className="h-9 w-72" /><div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]"><Skeleton className="h-96" /><Skeleton className="h-64" /></div></div>;
 
     const missingByField = new Set(data.missing.map((m) => m.field));
@@ -84,12 +92,19 @@ function ReviewView({ params }: { params: { id: string } }) {
     ];
     const value = (v: unknown, fmtFn?: (x: any) => React.ReactNode) => (v === null || v === undefined || v === '' ? <span className="text-ink-4">{tp('notProvided')}</span> : fmtFn ? fmtFn(v) : String(v));
     const canPublish = status !== 'APPROVED' && status !== 'REJECTED';
+    // Photo checks from stored facts only (count, generated placeholder, borrowed database photo); nothing is inferred from pixels.
+    const credits = (p.imageCredits || {}) as Record<string, { source?: string }>;
+    const imageWarnings = [
+        ...(p.images?.length === 0 ? [tp(p.placeholderOnly ? 'imgPlaceholder' : 'imgNone')] : []),
+        ...(p.images?.length === 1 ? [tp('imgOnlyOne')] : []),
+        ...(p.images?.some((u: string) => credits[u]) ? [tp('imgFromDatabase', { source: Object.values(credits).map((c) => c?.source).filter(Boolean)[0] || '—' })] : []),
+    ];
     const supplier = p.supplier;
 
     return (
         <div data-no-translate className="text-start -mt-2">
             <div className="flex flex-wrap items-center gap-3 mb-4">
-                <BackLink href={`/admin/products?tab=${data.scope}`} label={tp('backToProducts')} iconOnly />
+                <BackLink href={`/admin/products/${data.scope}`} label={tp('backToProducts')} iconOnly />
                 <div className="min-w-0 flex-1">
                     <p className="text-[12.5px] text-ink-3">{tp(isCatalog ? 'tabCatalog' : 'tabSubmissions')} · <bdi dir="ltr" className="font-mono text-[11.5px]">{p.id}</bdi></p>
                     <h1 className="font-sans text-[22px] leading-tight font-semibold text-heading truncate">{p.name}</h1>
@@ -133,11 +148,15 @@ function ReviewView({ params }: { params: { id: string } }) {
                                 <Row k={tp('barcode')} v={value(p.ean, (e) => <bdi dir="ltr" className="font-mono">{e}</bdi>)} />
                                 <Row k={tp('origin')} v={value(p.origin)} />
                                 <Row k={tp('exw')} v={value(p.exwLocation)} />
+                                <Row k={tp('supplierCountry')} v={value(p.supplier?.country)} />
                                 <Row k={tp('weight')} v={value(p.weight)} />
                                 <Row k={tp('created')} v={when(p.createdAt)} />
                                 <Row k={tp('updated')} v={when(p.updatedAt)} />
                             </dl>
                         </div>
+                        {imageWarnings.length > 0 && (
+                            <ul className="mt-3 space-y-1 text-[12.5px] text-amber-800">{imageWarnings.map((w) => <li key={w} className="flex items-start gap-1.5"><AlertCircle size={13} className="mt-0.5 shrink-0" />{w}</li>)}</ul>
+                        )}
                         {p.description ? <p className="mt-4 pt-3 border-t border-line text-[13.5px] text-ink-2 whitespace-pre-line max-w-prose">{p.description}</p> : <p className="mt-4 pt-3 border-t border-line text-[13px] text-ink-4">{tp('noDescription')}</p>}
                     </Card>
 
@@ -195,12 +214,12 @@ function ReviewView({ params }: { params: { id: string } }) {
                             {!isCatalog && status !== 'REJECTED' && <Button icon={<MessageSquare size={15} />} disabled={!!busy} onClick={() => { setText(''); setDialog('changes'); }}>{tp('requestChanges')}</Button>}
                             {!isCatalog && status !== 'REJECTED' && <Button variant="danger" icon={<XCircle size={15} />} disabled={!!busy} onClick={() => { setText(''); setDialog('reject'); }}>{tp('reject')}</Button>}
                             {isCatalog && status === 'APPROVED' && <Button icon={<EyeOff size={15} />} loading={busy === 'offline'} disabled={!!busy} onClick={() => act('offline')}>{tp('takeOffline')}</Button>}
-                            <Link href={editHref}><Button className="w-full" icon={<Pencil size={15} />}>{tp('editDetails')}</Button></Link>
+                            {isCatalog && <Link href={editHref}><Button className="w-full" icon={<Pencil size={15} />}>{tp('editDetails')}</Button></Link>}
                             {!data.canApprove && canPublish && <p className="text-[12.5px] text-amber-800">{tp('approveBlocked')}</p>}
                             {status === 'REJECTED' && <p className="text-[12.5px] text-ink-3">{tp('rejectedFinal')}</p>}
                         </div>
                         {isCatalog && <p className="mt-3 pt-3 border-t border-line text-[12px] text-ink-3">{tp('catalogLifecycle')}</p>}
-                        {!isCatalog && <p className="mt-3 pt-3 border-t border-line text-[12px] text-ink-3">{tp('submissionLifecycle')}</p>}
+                        {!isCatalog && <p className="mt-3 pt-3 border-t border-line text-[12px] text-ink-3">{tp('submissionLifecycle')} {tp('supplierOwnsData')}</p>}
                     </Card>
 
                     {/* Completeness */}
@@ -213,7 +232,7 @@ function ReviewView({ params }: { params: { id: string } }) {
                                         {miss ? <AlertCircle size={14} className="mt-0.5 shrink-0 text-amber-700" /> : <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600" />}
                                         <span className={cn('min-w-0', miss ? 'text-amber-900' : 'text-ink-2')}>
                                             {c.label}
-                                            {miss && <> — <Link href={`${editHref}#${FIELD_ANCHORS[c.field] || c.field}`} className="text-teal hover:underline">{tp('fixIt')}</Link>{miss.reason && miss.reason !== `${miss.label} is required.` && <span className="block text-[12px] text-ink-3">{miss.reason}</span>}</>}
+                                            {miss && <>{isCatalog ? <> — <Link href={`${editHref}#${FIELD_ANCHORS[c.field] || c.field}`} className="text-teal hover:underline">{tp('fixIt')}</Link></> : <> — <button type="button" onClick={() => { setText(tp('feedbackMissing', { field: c.label })); setDialog('changes'); }} className="text-teal hover:underline">{tp('askSupplier')}</button></>}{miss.reason && miss.reason !== `${miss.label} is required.` && <span className="block text-[12px] text-ink-3">{miss.reason}</span>}</>}
                                         </span>
                                     </li>
                                 );
@@ -235,7 +254,7 @@ function ReviewView({ params }: { params: { id: string } }) {
                                 <Row k={tp('theirCatalog')} v={tp('theirCatalogLine', { total: int(data.supplierCatalog.total) || '0', live: int(data.supplierCatalog.byStatus.APPROVED || 0) || '0', pending: int(data.supplierCatalog.byStatus.PENDING || 0) || '0' })} />
                             </dl>
                         ) : <p className="text-[13px] text-ink-3">{tp('noOwner')}</p>}
-                        {!isCatalog && supplier && <Link href={`/admin/products?tab=submissions&supplier=${supplier.id}`} className="mt-3 inline-block text-[12.5px] font-medium text-teal hover:underline">{tp('allFromSupplier')}</Link>}
+                        {!isCatalog && supplier && <Link href={`/admin/products/submissions?supplier=${supplier.id}`} className="mt-3 inline-block text-[12.5px] font-medium text-teal hover:underline">{tp('allFromSupplier')}</Link>}
                     </Card>
 
                     <Card>

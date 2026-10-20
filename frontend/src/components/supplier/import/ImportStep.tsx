@@ -8,16 +8,24 @@ import { cn } from '@/lib/utils';
 import { Trans } from '@/components/i18n/Trans';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { listJoin, where, type CommitResult, type Review } from './types';
+import type { ImportTarget } from './api';
+
+/** Wording that differs for the Atlantis Catalog import (adminProducts dictionary): rows are published, not sent to review. */
+const CATALOG_TEXT: Record<string, string> = { sumUpdates: 'impSumUpdates', sumReady: 'impSumReady', sumDraft: 'impSumDraft', importConfirm: 'impConfirm', resSentToReview: 'impResPublished', draftsHidden: 'impDraftsHidden', openYourDrafts: 'impOpenDrafts' };
+function useText(target: ImportTarget) {
+    const { t } = useLanguage();
+    return (k: string, v?: Record<string, string | number>) => (target === 'catalog' && CATALOG_TEXT[k] ? t('adminProducts', CATALOG_TEXT[k], v) : t('supplierCatalog', k, v));
+}
 
 export interface Progress { done: number; total: number; batch: number; batches: number }
 
 /** Confirm (explicitly), then follow the batches, then the honest per-row result. */
-export default function ImportStep({ review, onExisting, confirmed, setConfirmed, progress, results, error, multi, fileName }: {
-    review: Review; onExisting: 'skip' | 'update'; confirmed: boolean; setConfirmed: (v: boolean) => void;
+export default function ImportStep({ target = 'supplier', review, onExisting, confirmed, setConfirmed, progress, results, error, multi, fileName }: {
+    target?: ImportTarget; review: Review; onExisting: 'skip' | 'update'; confirmed: boolean; setConfirmed: (v: boolean) => void;
     progress: Progress | null; results: CommitResult[] | null; error: string | null; multi: boolean; fileName: string;
 }) {
     const { t, fmt } = useLanguage();
-    const tc = (k: string, v?: Record<string, string | number>) => t('supplierCatalog', k, v);
+    const tc = useText(target);
     const s = review.summary;
     const updates = onExisting === 'update' ? s.update : 0;
     if (!results && !progress) {
@@ -53,15 +61,16 @@ export default function ImportStep({ review, onExisting, confirmed, setConfirmed
             </Card>
         );
     }
-    return <Results results={results!} review={review} error={error} multi={multi} fileName={fileName} />;
+    return <Results target={target} results={results!} review={review} error={error} multi={multi} fileName={fileName} />;
 }
 
-function Results({ results, review, error, multi, fileName }: { results: CommitResult[]; review: Review; error: string | null; multi: boolean; fileName: string }) {
+function Results({ target, results, review, error, multi, fileName }: { target: ImportTarget; results: CommitResult[]; review: Review; error: string | null; multi: boolean; fileName: string }) {
     const { t, fmt, meta } = useLanguage();
-    const tc = (k: string, v?: Record<string, string | number>) => t('supplierCatalog', k, v);
+    const tc = useText(target);
     const int = (n: number) => fmt.number(n);
     const n = (o: CommitResult['outcome']) => results.filter((r) => r.outcome === o).length;
-    const pending = results.filter((r) => r.status === 'PENDING').length;
+    // Supplier import: complete rows go to Atlantis review. Catalog import: complete rows are published.
+    const pending = results.filter((r) => (target === 'catalog' ? r.status === 'APPROVED' && r.outcome === 'created' : r.status === 'PENDING')).length;
     const drafts = results.filter((r) => r.outcome === 'created' && r.status === 'DRAFT');
     const failed = results.filter((r) => r.outcome === 'failed');
     const notSent = review.rows.filter((r) => !results.some((x) => x.key === r.key));
@@ -95,7 +104,7 @@ function Results({ results, review, error, multi, fileName }: { results: CommitR
             {drafts.length > 0 && (
                 <Notice tone="warning" title={tc('draftsToFinish', { count: drafts.length })}>
                     {tc('draftsHidden', { details: topMissing(drafts, meta.intl) || tc('details') })}
-                    <span className="block mt-1"><Link href="/supplier/products?status=DRAFT" className="font-medium text-teal hover:underline">{tc('openYourDrafts')}</Link></span>
+                    <span className="block mt-1"><Link href={target === 'catalog' ? '/admin/products/catalog?status=DRAFT' : '/supplier/products?status=DRAFT'} className="font-medium text-teal hover:underline">{tc('openYourDrafts')}</Link></span>
                 </Notice>
             )}
             {withNotes.length > 0 && (

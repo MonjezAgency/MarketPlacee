@@ -55,7 +55,7 @@ describe('commercial summary', () => {
     });
     it('reports the Atlantis margin only when every line has a recorded supplier price', () => {
         const complete = commercialSummary([order('a', '2026-10-15T00:00:00Z', { totalAmount: 100, lines: [line({ price: 50, quantity: 2, supplierUnitPrice: 40 })] })], range);
-        expect(complete.current).toMatchObject({ supplierNet: 80, margin: 20, linesWithNet: 1, linesWithoutNet: 0 });
+        expect(complete.current).toMatchObject({ supplierNet: 80, margin: 20, revenueRecorded: 20, linesWithNet: 1, linesWithoutNet: 0 });
         const partial = commercialSummary([
             order('a', '2026-10-15T00:00:00Z', { totalAmount: 100, lines: [line({ supplierUnitPrice: 40 })] }),
             order('b', '2026-10-16T00:00:00Z', { totalAmount: 60, lines: [line({ supplierUnitPrice: null })] }),
@@ -63,29 +63,34 @@ describe('commercial summary', () => {
         expect(partial.current.margin).toBeNull();
         expect(partial.current.linesWithoutNet).toBe(1);
         expect(partial.current.supplierNet).toBe(80); // what is recorded, never estimated
+        expect(partial.current.revenueRecorded).toBe(20); // only the covered line
+        expect(partial.change.revenue).toBeNull(); // no comparison on partial coverage
     });
     it('ranks products by order value and suppliers by order value, with net only when complete', () => {
         const s = commercialSummary([
-            order('a', '2026-10-15T00:00:00Z', { lines: [line({ productId: 'p1', name: 'A', price: 10, quantity: 10, supplierId: 's1' }), line({ productId: 'p2', name: 'B', price: 100, quantity: 2, supplierId: 's2', supplierName: 'Supplier B', supplierUnitPrice: null })] }),
-            order('b', '2026-10-16T00:00:00Z', { lines: [line({ productId: 'p1', name: 'A', price: 10, quantity: 5, supplierId: 's1' })] }),
+            order('a', '2026-10-15T00:00:00Z', { lines: [line({ productId: 'p1', name: 'A', price: 10, quantity: 10, supplierId: 's1', cases: 10 }), line({ productId: 'p2', name: 'B', price: 100, quantity: 2, supplierId: 's2', supplierName: 'Supplier B', supplierUnitPrice: null, cases: 192 })] }),
+            order('b', '2026-10-16T00:00:00Z', { lines: [line({ productId: 'p1', name: 'A', price: 10, quantity: 5, supplierId: 's1', cases: 5 })] }),
         ], range);
-        expect(s.topProducts.map((p) => [p.productId, p.orderValue, p.units, p.orders])).toEqual([['p2', 200, 2, 1], ['p1', 150, 15, 2]]);
+        expect(s.topProducts.map((p) => [p.productId, p.orderValue, p.units, p.orders])).toEqual([['p2', 200, 192, 1], ['p1', 150, 15, 2]]);
+        expect(s.current).toMatchObject({ casesSold: 207, productsSold: 2, lines: 3 });
         expect(s.topSuppliers[0]).toMatchObject({ supplierId: 's2', orderValue: 200, supplierNet: null });
         expect(s.topSuppliers[1]).toMatchObject({ supplierId: 's1', orderValue: 150, supplierNet: 600, orders: 2 });
     });
 });
 
 describe('payments, refunds and cancellations', () => {
-    it('places payments by paidAt and reports undated PAID orders separately', () => {
+    it('counts Stripe-confirmed EUR payments by capture date; other currencies and undated records are never added', () => {
         const p = paymentsSummary([
-            { totalAmount: 100, paidAt: D('2026-10-15T00:00:00Z') },
-            { totalAmount: 40, paidAt: D('2026-10-10T00:00:00Z') },
-            { totalAmount: 7, paidAt: null },
+            { amount: 100, currency: 'EUR', capturedAt: D('2026-10-15T00:00:00Z') },
+            { amount: 40, currency: 'eur', capturedAt: D('2026-10-10T00:00:00Z') },
+            { amount: 7, currency: 'EUR', capturedAt: null },
+            { amount: 999, currency: 'USD', capturedAt: D('2026-10-15T00:00:00Z') },
         ], range);
-        expect(p.current).toEqual({ amount: 100, orders: 1 });
-        expect(p.previous).toEqual({ amount: 40, orders: 1 });
+        expect(p.current).toEqual({ amount: 100, payments: 1 });
+        expect(p.previous).toEqual({ amount: 40, payments: 1 });
         expect(p.change).toBeCloseTo(1.5, 4);
-        expect(p.undated).toEqual({ orders: 1, amount: 7 });
+        expect(p.excluded).toBe(2);
+        expect(paymentsSummary([], range)).toMatchObject({ current: { amount: 0, payments: 0 }, change: null, recordsEver: 0 });
     });
     it('counts dated events per period', () => {
         const r = datedEventsSummary([{ at: D('2026-10-14T00:00:00Z'), amount: 12 }, { at: D('2026-10-13T00:00:00Z'), amount: 5 }, { at: D('2026-09-01T00:00:00Z') }], range);

@@ -41,7 +41,7 @@ import { applyEditorCatalogFields } from './catalog-fields';
 import { ImageDiscoveryService } from './image-discovery.service';
 import { AdminProductsService } from './admin-products.service';
 import { ProductReviewService } from './product-review.service';
-import { parseScope } from './catalog-scope';
+import { parseScope, isStaffRole } from './catalog-scope';
 
 const STAFF_REVIEWERS = ['OWNER', 'ADMIN', 'MODERATOR', 'SUPPORT', 'EDITOR', 'DEVELOPER', 'LOGISTICS'];
 const actorOf = (req: any) => ({ id: req?.user?.sub ?? null, role: req?.user?.role ?? null });
@@ -97,6 +97,22 @@ export class ProductsController {
     }
 
     private readonly logger = new Logger(ProductsController.name);
+
+    /**
+     * Supplier-owned product data is edited only by its supplier. Staff review it
+     * (approve / reject / request changes) but may not overwrite its fields,
+     * override its status or add products under a supplier's account. Enforced
+     * here so a direct API call can't bypass the review UI. Atlantis Catalog
+     * products (owned by staff accounts) stay editable by staff.
+     */
+    private async assertStaffMayEdit(productId: string, req: any) {
+        if (!isStaffRole(req?.user?.role)) return; // suppliers are checked for ownership in the service
+        const p = await this.prisma.product.findUnique({ where: { id: productId }, select: { supplier: { select: { role: true } } } });
+        if (!p) throw new NotFoundException('Product not found');
+        if (!isStaffRole(p.supplier?.role)) {
+            throw new ForbiddenException({ code: 'SUPPLIER_OWNED', message: 'This product belongs to a supplier. Review it and request changes; only the supplier edits its details.' });
+        }
+    }
 
     /**
      * Keep an imported listing visible when no trustworthy catalog photo can
@@ -199,6 +215,8 @@ export class ProductsController {
             if (!product || product.supplierId !== req.user.sub) {
                 throw new ForbiddenException('You can only manage stock on your own products.');
             }
+        } else {
+            await this.assertStaffMayEdit(id, req);
         }
         return this.productsService.setVariantStock(id, body?.signature, body?.stock);
     }
@@ -416,6 +434,7 @@ export class ProductsController {
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER)
     async resend(@Param('id') id: string, @Request() req: any) {
+        await this.assertStaffMayEdit(id, req); // staff can't submit on a supplier's behalf
         return this.productsService.resendForReview(id, req.user.sub, (req.user.role || '').toUpperCase());
     }
 
@@ -435,6 +454,10 @@ export class ProductsController {
         let supplierId: string;
         if (isAdmin) {
             if (createProductDto.supplierId) {
+                // Only another staff (platform) account; a supplier's catalog is created by the supplier.
+                const owner = await this.prisma.user.findUnique({ where: { id: String(createProductDto.supplierId) }, select: { role: true } });
+                if (!owner) throw new BadRequestException('Unknown owner account.');
+                if (!isStaffRole(owner.role)) throw new ForbiddenException({ code: 'SUPPLIER_OWNED', message: 'Products in a supplier’s catalog are created by that supplier. Add this product to the Atlantis Catalog instead.' });
                 supplierId = createProductDto.supplierId;
             } else {
                 const platformId = await this.resolvePlatformSupplierId();
@@ -749,6 +772,8 @@ export class ProductsController {
         @Body() body: { status: ProductStatus; adminNotes?: string },
         @Request() req: any,
     ) {
+        // Catalog products only; supplier submissions are decided with approve / reject / comment (reason required, supplier notified).
+        await this.assertStaffMayEdit(id, req);
         return this.productsService.updateStatus(id, body.status, body.adminNotes, actorOf(req));
     }
 
@@ -766,6 +791,7 @@ export class ProductsController {
         // Admins bypass this gate — they edit during review and may
         // legitimately leave a field blank while triaging.
         const isAdmin = ['ADMIN', 'OWNER'].includes((req.user?.role || '').toUpperCase());
+        if (isAdmin) await this.assertStaffMayEdit(id, req);
         // Brand → canonical spelling (a new brand needs `newBrand: true`), origin → a recognised country.
         applyEditorCatalogFields(updateProductDto, await this.productsService.brandCatalogFor(isAdmin ? null : req.user.sub), { enforce: !isAdmin });
         if (!isAdmin) {
