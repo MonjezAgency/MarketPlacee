@@ -1,5 +1,5 @@
 import { resolveRange } from '../../products/report-range';
-import { catalogHealth, commercialSummary, datedEventsSummary, eligibleOrders, orderAttention, paymentsSummary, type EligibleOrder, type SaleLineFacts } from '../admin-overview';
+import { catalogHealth, commercialSummary, datedEventsSummary, eligibleOrders, mergeActivity, orderAttention, paymentsSummary, statusBreakdown, type EligibleOrder, type SaleLineFacts } from '../admin-overview';
 import { scopeOf, scopeWhere, parseScope } from '../../products/catalog-scope';
 
 /** Founder Overview: which orders count, what each figure is, and that nothing is estimated. */
@@ -138,5 +138,27 @@ describe('catalog health and scope', () => {
         expect(scopeWhere('submissions', [])).toEqual({});
         expect(parseScope('Catalog')).toBe('catalog');
         expect(parseScope('all')).toBeNull();
+    });
+});
+
+describe('status breakdown and activity', () => {
+    it('lists every order status in a fixed order with shares that add up', () => {
+        const b = statusBreakdown([{ status: 'DELIVERED', count: 3 }, { status: 'PENDING', count: 1 }]);
+        expect(b.total).toBe(4);
+        expect(b.rows.map((r) => r.status)).toEqual(['PENDING', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED']);
+        expect(b.rows.find((r) => r.status === 'DELIVERED')).toMatchObject({ count: 3, share: 0.75 });
+        expect(statusBreakdown([]).rows.every((r) => r.share === 0)).toBe(true);
+    });
+    it('merges activity from different records newest first and caps the list', () => {
+        const at = (d: string) => `2026-10-${d}T00:00:00.000Z`;
+        const out = mergeActivity([
+            [{ kind: 'ORDER_PLACED', at: at('10'), href: '/a', subject: 'A' }],
+            [{ kind: 'DISPUTE_OPENED', at: at('12'), href: '/b', subject: 'B' }, { kind: 'DISPUTE_OPENED', at: at('01'), href: '/c', subject: 'C' }],
+        ], 2);
+        expect(out.map((x) => x.subject)).toEqual(['B', 'A']);
+    });
+    it('carries Atlantis revenue per bucket from covered lines only', () => {
+        const s = commercialSummary([order('a', '2026-10-15T00:00:00Z', { lines: [line({ price: 50, quantity: 2, supplierUnitPrice: 40 }), line({ supplierUnitPrice: null })] })], range);
+        expect(s.series.find((b) => b.key === '2026-10-15')).toMatchObject({ revenue: 20, linesWithoutNet: 1 });
     });
 });

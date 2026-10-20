@@ -125,14 +125,19 @@ export function commercialSummary(all: EligibleOrder[], range: Pick<ResolvedRang
     const prev = all.filter((o) => within(o.recognizedAt, range.previous.start, range.previous.end));
     const current = periodTotals(cur), previous = periodTotals(prev);
 
-    const series = range.buckets.map((b) => ({ key: b.key, start: b.start.toISOString(), end: b.end.toISOString(), partial: b.partial, orderValue: 0, orders: 0 }));
+    const series = range.buckets.map((b) => ({ key: b.key, start: b.start.toISOString(), end: b.end.toISOString(), partial: b.partial, orderValue: 0, orders: 0, revenue: 0, linesWithoutNet: 0 }));
     for (const o of cur) {
         const i = bucketIndex(range, o.recognizedAt);
         if (i < 0) continue;
         series[i].orderValue += o.totalAmount;
         series[i].orders += 1;
+        // Atlantis revenue per bucket, from lines with a recorded supplier price (the rest are counted, never estimated).
+        for (const l of o.lines) {
+            if (l.supplierUnitPrice == null) { series[i].linesWithoutNet++; continue; }
+            series[i].revenue += ((Number(l.price) || 0) - l.supplierUnitPrice) * l.quantity;
+        }
     }
-    series.forEach((s) => { s.orderValue = r2(s.orderValue); });
+    series.forEach((s) => { s.orderValue = r2(s.orderValue); s.revenue = r2(s.revenue); });
 
     const products = new Map<string, { productId: string; name: string; image: string | null; orderValue: number; units: number; orders: Set<string> }>();
     const suppliers = new Map<string, { supplierId: string; name: string; orderValue: number; supplierNet: number; netComplete: boolean; orders: Set<string>; lines: number }>();
@@ -251,4 +256,21 @@ export function catalogHealth(products: { status: string; missing: number; hasIm
         missingImages: open.filter((p) => !p.hasImage).length,
         liveIncomplete: products.filter((p) => p.status === 'APPROVED' && p.missing > 0).length,
     };
+}
+
+/** Orders by their current status — the same six statuses the order pages use. */
+export const ORDER_STATUS_ORDER = ['PENDING', 'PAID', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'] as const;
+export function statusBreakdown(groups: { status: string; count: number }[]) {
+    const by = new Map(groups.map((g) => [g.status, g.count]));
+    const rows = ORDER_STATUS_ORDER.map((status) => ({ status, count: by.get(status) ?? 0 }));
+    const total = rows.reduce((t, r) => t + r.count, 0);
+    return { total, rows: rows.map((r) => ({ ...r, share: total ? Math.round((r.count / total) * 1000) / 1000 : 0 })) };
+}
+
+export type ActivityKind = 'ORDER_PLACED' | 'DISPUTE_OPENED' | 'ACCOUNT_REGISTERED' | 'PRODUCT_REVIEW';
+export interface ActivityItem { kind: ActivityKind; at: string; href: string; subject: string; detail?: string | null }
+
+/** Newest first, at most `limit`; items from different record types merged by their own timestamps. */
+export function mergeActivity(lists: ActivityItem[][], limit = 8): ActivityItem[] {
+    return lists.flat().sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
 }

@@ -5,7 +5,7 @@ import { LEGACY_CONFIRMED } from '../products/supplier-metrics';
 import { isRealImage, missingForPublish } from '../products/catalog-rules';
 import { STAFF_ROLES, scopeWhere } from '../products/catalog-scope';
 import { ProductReviewService } from '../products/product-review.service';
-import { catalogHealth, commercialSummary, datedEventsSummary, eligibleOrders, orderAttention, paymentsSummary, type OpenOrderFacts } from './admin-overview';
+import { catalogHealth, commercialSummary, datedEventsSummary, eligibleOrders, mergeActivity, orderAttention, paymentsSummary, statusBreakdown, type ActivityItem, type OpenOrderFacts } from './admin-overview';
 import { casesForItem } from '../products/stock-ledger';
 import { within } from '../products/report-range';
 
@@ -26,6 +26,36 @@ export class AdminOverviewService {
             if (e instanceof ReportRangeError) throw new BadRequestException({ code: e.code, message: e.message });
             throw e;
         }
+    }
+
+    /**
+     * Orders placed in the period by current status, the latest orders, and recent activity from
+     * real records only (orders, disputes, registrations, product review events). Nothing is synthesised.
+     */
+    private async feed(start: Date, end: Date) {
+        const [groups, recentOrders, orders, disputes, accounts, reviews] = await Promise.all([
+            this.prisma.order.groupBy({ by: ['status'], where: { createdAt: { gte: start, lt: end } }, _count: { _all: true } }),
+            this.prisma.order.findMany({
+                orderBy: { createdAt: 'desc' }, take: 6,
+                select: { id: true, createdAt: true, status: true, reviewStatus: true, totalAmount: true, paymentStatus: true, customer: { select: { name: true, companyName: true } }, _count: { select: { items: true } } },
+            }),
+            this.prisma.order.findMany({ orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, createdAt: true, totalAmount: true, customer: { select: { name: true, companyName: true } } } }),
+            this.prisma.dispute.findMany({ orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, createdAt: true, reason: true, orderId: true } }),
+            this.prisma.user.findMany({ where: { role: { in: ['SUPPLIER', 'CUSTOMER'] as any } }, orderBy: { createdAt: 'desc' }, take: 8, select: { id: true, createdAt: true, role: true, name: true, companyName: true, status: true } }),
+            this.prisma.productReviewEvent.findMany({ orderBy: { createdAt: 'desc' }, take: 8, select: { createdAt: true, action: true, actorRole: true, product: { select: { id: true, name: true } } } }),
+        ]);
+        const who = (u: { name?: string | null; companyName?: string | null } | null) => u?.companyName || u?.name || '';
+        const activity = mergeActivity([
+            orders.map((o): ActivityItem => ({ kind: 'ORDER_PLACED', at: o.createdAt.toISOString(), href: `/admin/orders/${o.id}`, subject: o.id.slice(0, 8).toUpperCase(), detail: who(o.customer) })),
+            disputes.map((d): ActivityItem => ({ kind: 'DISPUTE_OPENED', at: d.createdAt.toISOString(), href: '/admin/disputes', subject: d.orderId.slice(0, 8).toUpperCase(), detail: d.reason })),
+            accounts.map((u): ActivityItem => ({ kind: 'ACCOUNT_REGISTERED', at: u.createdAt.toISOString(), href: u.role === 'SUPPLIER' ? '/admin/suppliers' : '/admin/buyers', subject: who(u), detail: u.role })),
+            reviews.filter((r) => r.product).map((r): ActivityItem => ({ kind: 'PRODUCT_REVIEW', at: r.createdAt.toISOString(), href: `/admin/products/${r.product!.id}`, subject: r.product!.name, detail: r.action })),
+        ]);
+        return {
+            ordersByStatus: statusBreakdown((groups as any[]).map((g) => ({ status: g.status, count: g._count._all }))),
+            recentOrders: recentOrders.map((o) => ({ id: o.id, ref: o.id.slice(0, 8).toUpperCase(), createdAt: o.createdAt.toISOString(), status: o.status, reviewStatus: o.reviewStatus, paymentStatus: o.paymentStatus, total: o.totalAmount, lines: o._count.items, buyer: who(o.customer) })),
+            activity,
+        };
     }
 
     async overview(q: { range?: string; from?: string; to?: string; tz?: string } = {}, now = new Date()) {
@@ -134,6 +164,7 @@ export class AdminOverviewService {
                 markedPaid: { orders: markedPaid._count._all, amount: Math.round((markedPaid._sum.totalAmount || 0) * 100) / 100 },
                 netProfit: { available: false, missing: ['expenses', 'paymentFees', 'freightCosts', 'payouts'] },
             },
+            ...(await this.feed(start, end)),
             insights: {
                 submissions: { current: submissionsCur, previous: submissionsPrev, suppliers: submittingSuppliers.length },
                 newSuppliers: { current: newSuppliersCur, previous: newSuppliersPrev },
