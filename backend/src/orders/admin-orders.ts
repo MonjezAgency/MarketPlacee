@@ -123,8 +123,8 @@ export function buildOrderWhere(q: OrderListQuery, attentionIds: string[] | null
         const insensitive = { contains: term, mode: 'insensitive' as const };
         and.push({
             OR: [
-                // Order references are the first 8 characters of the id, shown upper-case; ids are stored lower-case.
-                { id: { contains: term.toLowerCase() } },
+                // Order references ("#0A2ECA1E") are the last 8 characters of the id, upper-case; ids are stored lower-case.
+                { id: { contains: term.replace(/^#/, '').toLowerCase() } },
                 { customer: { is: { OR: [{ name: insensitive }, { companyName: insensitive }, { email: insensitive }] } } },
                 { items: { some: { OR: [{ productNameSnapshot: insensitive }, { product: { is: { OR: [{ name: insensitive }, { ean: { contains: term } }] } } }] } } },
             ],
@@ -143,7 +143,8 @@ export function orderByFor(sort: OrderSort): Prisma.OrderOrderByWithRelationInpu
     }
 }
 
-export const orderRef = (id: string) => id.slice(0, 8).toUpperCase();
+/** The order reference buyers and suppliers see in emails, invoices and notifications: the last 8 characters of the id. */
+export const orderRef = (id: string) => id.slice(-8).toUpperCase();
 
 /** Every supplier on an order: product owners on its lines and the suppliers asked to confirm it. */
 export function supplierIdsOf(o: { items: { product?: { supplierId?: string | null } | null; mixedLoadSupplierId?: string | null }[]; confirmations?: { supplierId: string }[] }): string[] {
@@ -349,15 +350,140 @@ export function cleanVariants(v: unknown): Record<string, string> | null {
     return Object.keys(out).length ? out : null;
 }
 
+// ─── Loads ─────────────────────────────────────────────────────────────
+//
+// What the data model records about loads (orders.service.ts createOrder):
+//  MIXED_LOAD   one OrderItem per server-validated mixed pallet / truck (mixedLoadId set,
+//               MixedLoad.kind PALLET | TRUCK, quantity 1, price = the load's buyer price).
+//               mixComposition = one entry per product+variant in the load:
+//               { productId, name, variant, quantity, unit, cases, unitPrice, lineSubtotal,
+//                 discountPercent?, stockCases? } — unitPrice / lineSubtotal are BUYER prices: the
+//               quote that is stored is buyer-priced (pricing.ts priceLoad applies the mix markup
+//               before anything leaves the server). The supplier net of each product is not recorded.
+//  VARIANT_MIX  legacy "mix this truck" composer: one OrderItem for one product (productId set,
+//               no mixedLoadId), selectedTier pallet | truck, quantity 1, mixComposition
+//               [{ signature, quantity, unitPrice }] with unitPrice the buyer price per case
+//               (pallet mix) or per pallet (truck mix), as quoted at order time.
+//  STANDARD     every other OrderItem: one product, quantity × selectedTier (case/pallet/truck).
+// Nothing records how standard lines are consolidated into physical vehicles, so each
+// standard line is its own entry and the page says so. "Mixed" is never inferred from an
+// order having several products — only from mixedLoadId / mixComposition.
+
+export type LoadType = 'MIXED_LOAD' | 'VARIANT_MIX' | 'STANDARD';
+
+export interface CompositionEntry {
+    productId: string | null; name: string | null; variant: string | null;
+    quantity: number | null; unit: string | null; cases: number | null; stockCases: number | null;
+    discountPercent: number | null;
+    /** Supplier net of the entry: never recorded on mixed loads, so always null (kept for the response shape; removed by redactNet). */
+    supplierUnitPrice: number | null; supplierLineTotal: number | null;
+    /** Buyer price of this entry as recorded at order time (null when not recorded). */
+    unitPrice: number | null; lineTotal: number | null;
+}
+
+const num = (v: unknown): number | null => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
+
+/** Normalises a stored mixComposition (either shape above). Null when there is none. */
+export function normaliseComposition(raw: unknown, line: { mixedLoad: boolean; tier: string | null; buyerTotal: number }): CompositionEntry[] | null {
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+    const tier = String(line.tier || '').toLowerCase();
+    // Legacy entries carry no unit: the composer filled a pallet with cases and a truck with pallets.
+    const legacyUnit = tier === 'pallet' ? 'case' : tier === 'truck' ? 'pallet' : null;
+    const entries = raw.map((c: any): CompositionEntry => {
+        const quantity = num(c?.quantity);
+        const unit = text(c?.unit) ?? (line.mixedLoad ? null : legacyUnit);
+        const unitPrice = num(c?.unitPrice);
+        const recordedSubtotal = num(c?.lineSubtotal);
+        return {
+            productId: text(c?.productId), name: text(c?.name), variant: text(c?.variant) ?? text(c?.signature),
+            quantity, unit,
+            cases: num(c?.cases) ?? (!line.mixedLoad && unit === 'case' ? quantity : null),
+            stockCases: num(c?.stockCases), discountPercent: num(c?.discountPercent),
+            supplierUnitPrice: null, supplierLineTotal: null,
+            unitPrice,
+            lineTotal: recordedSubtotal ?? (unitPrice != null && quantity != null ? r2(unitPrice * quantity) : null),
+        };
+    });
+    void line.buyerTotal;
+    return entries;
+}
+
+export interface LoadLine {
+    id: string; tier: string | null; quantity: number; lineTotal: number;
+    supplierLineTotal?: number | null;
+    mixedLoadId?: string | null; mixedLoad: { id: string; kind: string } | null;
+    mixComposition: CompositionEntry[] | null;
+    supplier: { id: string; name: string | null } | null;
+}
+
+export interface OrderLoad {
+    /** The OrderItem id this load is recorded on. */
+    lineId: string;
+    type: LoadType;
+    /** PALLET | TRUCK for mixed loads: from MixedLoad.kind, else from the line's tier; null when neither is recorded. */
+    mixedKind: 'PALLET' | 'TRUCK' | null;
+    /** MIXED_LOAD only: whether the MixedLoad record still exists. */
+    loadRecordFound: boolean | null;
+    tier: string | null; quantity: number;
+    entries: number;
+    buyerTotal: number;
+    /** OWNER / ADMIN only: supplier net of the load, null when any part of it is not recorded. */
+    supplierNet: number | null;
+}
+
+const kindOf = (k: unknown): 'PALLET' | 'TRUCK' | null => { const s = String(k || '').toUpperCase(); return s === 'PALLET' || s === 'TRUCK' ? s : null; };
+
+/** One entry per OrderItem, typed from what the record says (never from the number of products). */
+export function buildLoads(lines: LoadLine[]): OrderLoad[] {
+    return lines.map((l) => {
+        const isMixedLoad = !!(l.mixedLoadId || l.mixedLoad);
+        const comp = l.mixComposition && l.mixComposition.length ? l.mixComposition : null;
+        const type: LoadType = isMixedLoad ? 'MIXED_LOAD' : comp ? 'VARIANT_MIX' : 'STANDARD';
+        const tierKind = kindOf(l.tier === 'truck' ? 'TRUCK' : l.tier === 'pallet' ? 'PALLET' : null);
+        return {
+            lineId: l.id, type,
+            mixedKind: type === 'STANDARD' ? null : (kindOf(l.mixedLoad?.kind) ?? tierKind),
+            loadRecordFound: type === 'MIXED_LOAD' ? !!l.mixedLoad : null,
+            tier: l.tier, quantity: l.quantity,
+            entries: comp ? comp.length : 1,
+            buyerTotal: r2(l.lineTotal),
+            // Only a supplier price recorded on the order line counts; mixed-load contents carry buyer prices.
+            supplierNet: l.supplierLineTotal != null ? r2(l.supplierLineTotal) : null,
+        };
+    });
+}
+
+/** Order-level totals over the loads; supplier net only when every load records it. */
+export function loadTotals(loads: OrderLoad[]) {
+    const missing = loads.filter((l) => l.supplierNet == null).length;
+    return {
+        loads: loads.length,
+        mixedLoads: loads.filter((l) => l.type === 'MIXED_LOAD').length,
+        variantMixes: loads.filter((l) => l.type === 'VARIANT_MIX').length,
+        standardLines: loads.filter((l) => l.type === 'STANDARD').length,
+        buyerTotal: r2(loads.reduce((s, l) => s + l.buyerTotal, 0)),
+        supplierNet: loads.length && missing === 0 ? r2(loads.reduce((s, l) => s + (l.supplierNet as number), 0)) : null,
+        loadsWithoutNet: missing,
+    };
+}
+
 /**
  * Staff without net-price access (support, moderation, logistics) get the same
  * detail without supplier net prices or the Atlantis markup. Applied to the
- * whole response, including the workflow terms.
+ * whole response, including the workflow terms and the mixed-load contents.
  */
 export function redactNet<T extends Record<string, any>>(detail: T): T {
-    const strip = (lines: any) => (Array.isArray(lines) ? lines.map((l: any) => { const { supplierUnitPrice: _a, supplierLineTotal: _b, ...rest } = l || {}; return rest; }) : lines);
+    const stripOne = (l: any) => { const { supplierUnitPrice: _a, supplierLineTotal: _b, ...rest } = l || {}; return rest; };
+    const strip = (lines: any) => (Array.isArray(lines) ? lines.map((l: any) => {
+        const rest: any = stripOne(l);
+        if (Array.isArray(rest.mixComposition)) rest.mixComposition = rest.mixComposition.map(stripOne);
+        return rest;
+    }) : lines);
     const terms = (t: any) => (t && typeof t === 'object' ? { ...t, lines: strip(t.lines) } : t);
     const out: any = { ...detail, netVisible: false, lines: strip(detail.lines) };
+    if (Array.isArray(out.loads)) out.loads = out.loads.map((l: any) => ({ ...l, supplierNet: null }));
+    if (out.loadTotals) out.loadTotals = { ...out.loadTotals, supplierNet: null, loadsWithoutNet: null };
     if (out.money) out.money = { ...out.money, supplierNet: null, markupOnRecordedLines: null, linesWithNet: null, linesWithoutNet: null };
     // The card record's fee / supplier split reveals the margin too.
     if (out.payment?.card) out.payment = { ...out.payment, card: { ...out.payment.card, platformFee: null, supplierAmount: null } };

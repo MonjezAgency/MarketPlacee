@@ -54,12 +54,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
-import { UserMenu } from '@/components/dashboard/UserMenu';
-import { useTheme } from 'next-themes';
+import AdminAccountMenu from '@/components/admin/AdminAccountMenu';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { LOCALES, LOCALE_META, type Locale } from '@/locales/config';
-import { GuidedTour } from '@/components/ui/GuidedTour';
-import { WorldClock } from '@/components/dashboard/WorldClock';
 
 interface SidebarGroup {
     title: string;
@@ -68,7 +64,7 @@ interface SidebarGroup {
     links: SidebarLink[];
 }
 /** `section`: dictionary section of translationKey when it isn't `admin`. `children`: a parent that expands (no page of its own). */
-interface SidebarLink { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean; section?: 'promotions' | 'adminProducts' | 'adminUsers'; children?: SidebarLink[] }
+interface SidebarLink { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean; section?: 'promotions' | 'adminProducts' | 'adminUsers' | 'adminNav'; children?: SidebarLink[] }
 
 // Owner-only group — بيظهر بس لـ OWNER
 const OWNER_GROUP: SidebarGroup = {
@@ -94,12 +90,11 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
                     { label: 'Supplier Submissions', translationKey: 'tabSubmissions', section: 'adminProducts', href: '/admin/products/submissions', icon: Package },
                 ],
             },
-            { label: 'Approve Offers', translationKey: 'approveOffers', href: '/admin/wholesale-offers', icon: CheckCircle2 },
-            { label: 'Special offers', translationKey: 'nav', section: 'promotions', href: '/admin/promotions', icon: Tag },
-            { label: 'Global Orders', translationKey: 'orders', href: '/admin/orders', icon: ShoppingCart },
+            { label: 'Orders', translationKey: 'orders', section: 'adminNav', href: '/admin/orders', icon: ShoppingCart },
+            // One Offers entry: supplier offers to review and Atlantis special offers, as two tabs (/admin/wholesale-offers and /admin/promotions redirect).
+            { label: 'Offers', translationKey: 'offers', section: 'adminNav', href: '/admin/offers', icon: Tag },
             { label: 'Target Prices', translationKey: 'targetPriceRequests', href: '/admin/target-prices', icon: Target },
-            { label: 'Delivery Countries', translationKey: 'deliveryCountries', href: '/admin/delivery', icon: Globe2 },
-            { label: 'Hubs & Freight Rates', translationKey: 'hubsRates', href: '/admin/fulfillment', icon: Truck },
+            // Delivery countries, hubs and freight rates now live in Settings (/admin/delivery and /admin/fulfillment redirect there).
             // One Users entry replaces Suppliers, Buyers and User Directory; /admin/suppliers and /admin/buyers redirect there.
             { label: 'Users', translationKey: 'nav', section: 'adminUsers', href: '/admin/users', icon: Users },
             { label: 'Finance & Logistics', translationKey: 'groupFinance', href: '/admin/finance', icon: DollarSign },
@@ -114,11 +109,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             { label: 'Email Analytics', translationKey: 'emailAnalytics', href: '/admin/email-analytics', icon: Activity },
             { label: 'Email Setup & Preview', translationKey: 'emailSetup', href: '/admin/email-setup', icon: MailCheck },
             { label: 'Coupons & Codes', translationKey: 'coupons', href: '/admin/coupons', icon: Ticket },
-            // Homepage banners — visual placement map where admin clicks
-            // a section, sees the recommended dimensions, and uploads /
-            // swaps the image inline. Same UX as the old supplier ads
-            // map but for static homepage hero / featured banners.
-            { label: 'Homepage Banners', translationKey: 'homepageBanners', href: '/admin/banners', icon: ImageIcon },
+            // Homepage banners left the sidebar; the page (/admin/banners) still manages the live banners and is linked from Settings.
             // Ads & Placements is paused — full self-service ads flow will
             // return after the bidding engine is in place. Renders as a
             // disabled "SOON" pill so the operator can still see it on
@@ -131,7 +122,7 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
         titleKey: 'groupSupport',
         icon: LifeBuoy,
         links: [
-            { label: 'Support Overview', translationKey: 'overview', href: '/admin/support', icon: LayoutDashboard },
+            { label: 'Support HQ', translationKey: 'supportHq', section: 'adminNav', href: '/admin/support', icon: LifeBuoy },
             { label: 'Dispute Center', translationKey: 'disputes', href: '/admin/disputes', icon: AlertCircle },
             { label: 'KYC Verification', translationKey: 'kycQueue', href: '/admin/kyc', icon: ShieldCheck },
         ]
@@ -145,15 +136,9 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             { label: 'Invite Center', translationKey: 'inviteCenter', href: '/admin/invite', icon: UserPlus },
         ]
     },
-    {
-        title: 'REPORTS & SYSTEM',
-        titleKey: 'groupSystem',
-        icon: Wrench,
-        links: [
-            { label: 'System Settings', translationKey: 'settings', href: '/admin/settings', icon: Settings },
-        ]
-    },
 ];
+/** Settings is a direct destination, not a group with one child. */
+const SETTINGS_LINK: SidebarLink = { label: 'Settings', translationKey: 'settings', section: 'adminNav', href: '/admin/settings', icon: Settings };
 
 interface NotificationCounts {
     pendingUsers: number;
@@ -174,7 +159,7 @@ function childActive(child: SidebarLink, pathname: string) {
 }
 const EXPANDED_KEY = 'atl-admin-nav-expanded';
 
-function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group: SidebarGroup; isOpen: boolean; pathname: string; badgeCounts: Record<string, number> }) {
+function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts, bare }: { group: SidebarGroup; isOpen: boolean; pathname: string; badgeCounts: Record<string, number>; bare?: boolean }) {
     const { t } = useLanguage();
     const label = (l: SidebarLink) => t(l.section ?? 'admin', l.translationKey) || l.label;
     const isLinkActive = (l: SidebarLink) => (l.children ? l.children.some((c) => childActive(c, pathname)) : linkActive(l.href, pathname));
@@ -223,11 +208,11 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts }: { group
 
     return (
         <div className="mb-3">
-            <button type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}
+            {!bare && <button type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}
                 className="w-full px-2.5 h-7 flex items-center justify-between text-start rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
                 <span className={cn('text-[11px] font-semibold uppercase tracking-[0.08em]', hasActiveLink ? 'text-[#2EC4B6]' : 'text-slate-500')}>{t('admin', group.titleKey) || group.title}</span>
                 <ChevronDown size={13} className={cn('text-slate-600 transition-transform', expanded && 'rotate-180')} />
-            </button>
+            </button>}
             {expanded && (
                 <ul className="mt-0.5 space-y-0.5">
                     {group.links.map((link) => {
@@ -322,35 +307,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         const interval = setInterval(fetchCounts, 30000); // Polling every 30s
         return () => clearInterval(interval);
     }, [user, isTeamMember]);
-    const { resolvedTheme, setTheme } = useTheme();
-    const { locale, setLocale, t } = useLanguage();
-    const [mounted, setMounted] = React.useState(false);
-    const [showTour, setShowTour] = React.useState(false);
-
-    React.useEffect(() => {
-        setMounted(true);
-        if (!user?.id) return;
-        const tourKey = `atlantis-tour-admin-${user.id}`;
-        const hasSeenTour = localStorage.getItem(tourKey);
-        if (!hasSeenTour) {
-            const timer = setTimeout(() => setShowTour(true), 2000);
-            return () => clearTimeout(timer);
-        }
-    }, [user]);
-
-    const tourSteps = [
-        {
-            targetId: 'tour-admin-nav',
-            title: 'Enterprise Registry',
-            description: 'Manage the complete B2B registry including Suppliers, Buyers, and Multi-Currency Product Catalogs.'
-        },
-        {
-            targetId: 'tour-admin-alerts',
-            title: 'Action Center',
-            description: 'Execute pending approvals for high-value transactions and new entity registrations here.'
-        }
-    ];
-
+    const { t } = useLanguage();
     // ... (keep role logic)
 
 
@@ -375,7 +332,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
     const getFilteredSidebarGroups = () => {
         if (isDeveloper) {
-            return SIDEBAR_GROUPS.filter(g => ['Dashboard', 'Support', 'System'].includes(g.title));
+            return SIDEBAR_GROUPS.filter(g => g.titleKey === 'groupSupport');
         }
         return SIDEBAR_GROUPS;
     };
@@ -441,7 +398,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     isOpen ? 'translate-x-0 w-[232px]' : '-translate-x-[120%] rtl:translate-x-[120%] lg:translate-x-0 rtl:lg:translate-x-0 w-[232px] lg:w-[64px]'
                 )}>
                 <div className={cn('h-14 flex items-center border-b border-white/5 shrink-0', isOpen ? 'px-4' : 'justify-center')}>
-                    <Link href="/admin" className="flex items-center gap-2.5 min-w-0" aria-label="Atlantis">{/* i18n-ignore: brand name */}
+                    <Link href="/" className="flex items-center gap-2.5 min-w-0 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]" aria-label={t('adminNav', 'marketplaceHome')}>
                         <span className="w-8 h-8 rounded-lg bg-white overflow-hidden flex items-center justify-center shrink-0">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src="/brand/atlantis-mark.png" alt="" className="w-6 h-6 object-contain" />
@@ -458,31 +415,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     {filteredSidebarGroups.map(group => (
                         <SidebarGroupComponent key={group.title} group={group} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} />
                     ))}
+                    <SidebarGroupComponent group={{ title: '', titleKey: '', icon: Settings, links: [SETTINGS_LINK] }} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} bare />
                 </nav>
 
-                <div className={cn('border-t border-white/5 shrink-0', isOpen ? 'p-3' : 'py-3 flex justify-center')}>
-                    {isOpen ? (
-                        <div className="flex items-center gap-2.5">
-                            <span className="w-8 h-8 rounded-full overflow-hidden bg-slate-800 flex items-center justify-center text-[#2EC4B6] text-[12px] font-semibold shrink-0">
-                                {user?.avatar
-                                    ? <img src={user.avatar} alt="" className="w-full h-full object-cover" /> /* eslint-disable-line @next/next/no-img-element */
-                                    : (user?.name?.[0] || 'A')}
-                            </span>
-                            <span className="min-w-0 flex-1">
-                                <span className="block text-[13px] font-semibold text-white truncate">{user?.name}</span>
-                                <span className="block text-[11px] text-slate-500 truncate">{user?.role}</span>
-                            </span>
-                            <button type="button" onClick={async () => { await logout(); window.location.href = '/auth/login'; }} title={t('admin', 'signOut')} aria-label={t('admin', 'signOut')}
-                                className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-300 hover:bg-red-500/10 outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
-                                <LogOut size={16} />
-                            </button>
-                        </div>
-                    ) : (
-                        <button type="button" onClick={async () => { await logout(); window.location.href = '/auth/login'; }} title={t('admin', 'signOut')} aria-label={t('admin', 'signOut')}
-                            className="w-10 h-10 rounded-lg flex items-center justify-center text-slate-400 hover:text-red-300 hover:bg-red-500/10">
-                            <LogOut size={17} />
-                        </button>
-                    )}
+                <div className={cn('border-t border-white/5 shrink-0', isOpen ? 'p-2.5' : 'py-3')}>
+                    <AdminAccountMenu user={user} collapsed={!isOpen} onSignOut={async () => { await logout(); window.location.href = '/auth/login'; }} />
                 </div>
             </aside>
 
@@ -497,22 +434,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <div id="tour-admin-panel" className="min-w-0 flex-1">
                         <p className="text-[14px] font-semibold text-[#0B1F3A] truncate">{isDeveloper ? 'Support HQ' : t('admin', 'panelTitle')}</p>{/* i18n-ignore: developer-only label */}
                     </div>
-                    <Link href="/" title="Back to Home" aria-label="Back to Home" className="hidden sm:flex w-9 h-9 rounded-lg items-center justify-center text-slate-600 hover:bg-slate-100">{/* i18n-ignore: legacy tooltip */}
-                        <Home size={17} />
-                    </Link>
-                    <select value={locale} onChange={(e) => setLocale(e.target.value as Locale)} aria-label="Language"
-                        className="hidden sm:block h-9 max-w-[9rem] bg-transparent text-[13px] font-medium text-slate-600 rounded-lg ring-1 ring-inset ring-slate-200 px-2 outline-none focus:ring-2 focus:ring-[#2EC4B6] cursor-pointer">
-                        {LOCALES.map((code) => <option key={code} value={code} className="text-black bg-white">{LOCALE_META[code].name}</option>)}
-                    </select>
-                    {mounted && (
-                        <button type="button" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')} aria-label="Toggle Theme"
-                            className="w-9 h-9 rounded-lg flex items-center justify-center text-slate-600 hover:bg-slate-100">
-                            {resolvedTheme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-                        </button>
-                    )}
-                    <span className="hidden md:block"><WorldClock /></span>
+                    {/* Language, theme, settings and sign-out live in the account menu (sidebar footer); the logo goes to the marketplace home. */}
                     <span id="tour-admin-alerts" className="flex items-center"><NotificationBell /></span>
-                    <UserMenu role={user?.role || 'admin'} />
                 </header>
 
                 <div className="flex-1 overflow-y-auto bg-[#F6F8FA]">
@@ -521,19 +444,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     </div>
                 </div>
             </main>
-
-            <GuidedTour 
-                show={showTour}
-                steps={tourSteps}
-                onComplete={() => {
-                    localStorage.setItem(`atlantis-tour-admin-${user?.id}`, 'true');
-                    setShowTour(false);
-                }}
-                onDismiss={() => {
-                    localStorage.setItem(`atlantis-tour-admin-${user?.id}`, 'true');
-                    setShowTour(false);
-                }}
-            />
         </div>
     );
 }

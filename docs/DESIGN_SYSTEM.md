@@ -97,6 +97,12 @@ Cards are `ring-1 ring-line` on `bg-surface`. Don't combine a ring, a border and
   (Products) expand in place and stay open on their active route. No global banners above page content — each page shows
   its own attention list. Changed 2026-10-20: the earlier 260 px sidebar, 80 px header and oversized logo/title made every
   admin page feel zoomed in at 100% browser zoom.
+  Header holds only the menu toggle, the page context and the notification bell. Language, theme (light / dark / system),
+  Settings and Sign out live in one account menu on the sidebar profile (`components/admin/AdminAccountMenu.tsx`, rendered in a
+  portal so the collapsed sidebar doesn't clip it; its position is measured geometry, like the product tour). The logo opens the
+  marketplace home. Settings is a direct link, never a group with one child. Changed 2026-10-20: the header repeated home,
+  language, theme, a world clock and a second account menu; the legacy `GuidedTour` was removed from admin because its card
+  opened off-screen and could not be dismissed.
 
 ## 3. Spacing and layout
 

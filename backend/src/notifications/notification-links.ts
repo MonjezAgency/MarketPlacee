@@ -25,7 +25,7 @@ export function notificationLink(role: string | null | undefined, data: Notifica
         if (r === 'SUPPLIER') return data.productId ? `/supplier/products/${data.productId}/edit` : '/supplier/products';
         return '/dashboard/customer/targets';
     }
-    if (data.offerId && staff) return '/admin/wholesale-offers';
+    if (data.offerId && staff) return '/admin/offers?tab=supplier';
     if (data.productId) {
         if (staff) return `/admin/products/${data.productId}`;
         if (r === 'SUPPLIER') return `/supplier/products/${data.productId}/edit${data.type === 'LOW_STOCK' ? '' : '#feedback'}`;

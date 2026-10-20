@@ -2,7 +2,8 @@
 
 import * as React from 'react';
 import toast from 'react-hot-toast';
-import { Ban, CheckCircle2, RotateCcw, XCircle } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Ban, CheckCircle2, ChevronLeft, ChevronRight, Info, RotateCcw, XCircle } from 'lucide-react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Badge, Button, useConfirm, type Tone } from '@/components/supplier/ui';
 import { adminUsersApi, isMarketAccount, type AccountStatus } from '@/lib/admin-users-api';
@@ -91,5 +92,76 @@ export function Avatar({ name, src, size = 32 }: { name: string; src?: string | 
             {/* eslint-disable-next-line @next/next/no-img-element */}
             {ok ? <img src={src!} alt="" className="w-full h-full object-cover" /> : initials(name)}
         </span>
+    );
+}
+
+/**
+ * A table row that opens `href`: click anywhere on it, or focus it and press
+ * Enter. Clicks on inner controls (checkboxes, buttons, links, labels, inputs)
+ * keep their own behaviour and never navigate. Ctrl/⌘-click opens a new tab.
+ */
+export function useRowNav() {
+    const router = useRouter();
+    return React.useCallback((href: string, label: string) => ({
+        tabIndex: 0,
+        'aria-label': label,
+        className: 'cursor-pointer focus-visible:outline-none focus-visible:bg-teal-soft/60 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal',
+        onClick: (e: React.MouseEvent<HTMLElement>) => {
+            if ((e.target as HTMLElement).closest('a,button,input,select,textarea,label,[data-row-ignore]')) return;
+            if (window.getSelection()?.toString()) return; // selecting text, not opening
+            if (e.metaKey || e.ctrlKey) { window.open(href, '_blank', 'noopener'); return; }
+            router.push(href);
+        },
+        onKeyDown: (e: React.KeyboardEvent<HTMLElement>) => {
+            if (e.target !== e.currentTarget) return;
+            if (e.key === 'Enter') { e.preventDefault(); router.push(href); }
+        },
+    }), [router]);
+}
+
+/** A small "i" button that explains a figure. Opens on hover, focus or click; Esc closes. */
+export function InfoTip({ label, children }: { label: string; children: React.ReactNode }) {
+    const tu = useTu();
+    const [open, setOpen] = React.useState(false);
+    const id = React.useId();
+    const ref = React.useRef<HTMLSpanElement>(null);
+    React.useEffect(() => {
+        if (!open) return;
+        const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+        const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false); };
+        document.addEventListener('keydown', onKey);
+        document.addEventListener('mousedown', onDown);
+        return () => { document.removeEventListener('keydown', onKey); document.removeEventListener('mousedown', onDown); };
+    }, [open]);
+    return (
+        <span ref={ref} className="relative inline-flex align-middle" onMouseEnter={() => setOpen(true)} onMouseLeave={() => setOpen(false)}>
+            <button type="button" aria-label={tu('infoAbout', { label })} aria-expanded={open} aria-describedby={open ? id : undefined}
+                onClick={() => setOpen((o) => !o)} onFocus={() => setOpen(true)} onBlur={() => setOpen(false)}
+                className="w-5 h-5 rounded-full inline-flex items-center justify-center text-ink-4 hover:text-ink-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal">
+                <Info size={13} aria-hidden />
+            </button>
+            {open && (
+                <span id={id} role="tooltip" className="absolute z-30 top-full mt-1 start-1/2 -translate-x-1/2 rtl:translate-x-1/2 w-64 max-w-[80vw] rounded-lg bg-heading text-white text-[12.5px] leading-snug font-normal px-3 py-2 shadow-float text-start">
+                    {children}
+                </span>
+            )}
+        </span>
+    );
+}
+
+/** Previous / "Page x of y" / Next for server-paginated lists. */
+export function Pager({ page, pages, total, onPage, loading, from, to }: { page: number; pages: number; total: number; onPage: (p: number) => void; loading?: boolean; from: number; to: number }) {
+    const tu = useTu();
+    const { fmt } = useLanguage();
+    if (total <= 0) return null;
+    return (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 border-t border-line text-[13px] text-ink-3">
+            <span className="tabular-nums">{tu('rangeOf', { from: fmt.number(from), to: fmt.number(to), total: fmt.number(total) })}</span>
+            <nav aria-label={tu('pagination')} className="flex items-center gap-1">
+                <Button size="sm" variant="ghost" icon={<ChevronLeft size={15} className="rtl:rotate-180" />} disabled={page <= 1 || loading} onClick={() => onPage(page - 1)}>{tu('previous')}</Button>
+                <span className="px-2 tabular-nums" aria-live="polite">{tu('pageOf', { page: fmt.number(page), pages: fmt.number(pages) })}</span>
+                <Button size="sm" variant="ghost" disabled={page >= pages || loading} onClick={() => onPage(page + 1)}>{tu('next')} <ChevronRight size={15} className="rtl:rotate-180" /></Button>
+            </nav>
+        </div>
     );
 }

@@ -53,7 +53,11 @@ const toInput = (iso: string) => new Date(iso).toISOString().slice(0, 16);
 /** <input type="datetime-local"> value, read as UTC → ISO instant. */
 const fromInput = (v: string) => (v ? `${v}:00Z` : '');
 
-export default function PromotionsManager({ mode }: { mode: Mode }) {
+/**
+ * `embedded`: rendered inside a page that already has the h1 (admin Offers →
+ * Special offers tab), so the title becomes a toolbar line with the same action.
+ */
+export default function PromotionsManager({ mode, embedded = false }: { mode: Mode; embedded?: boolean }) {
     const { t, fmt } = useLanguage();
     const tr = React.useCallback((k: string, v?: Record<string, string | number>) => t(S, k, v), [t]);
     const utc = useUtcTime();
@@ -99,8 +103,15 @@ export default function PromotionsManager({ mode }: { mode: Mode }) {
     const counts = data?.counts || {};
     return (
         <div data-no-translate className="text-start">
-            <PageHeader title={tr('title')} description={tr(mode === 'admin' ? 'leadAdmin' : 'leadSupplier')}
-                actions={<Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditing('new')}>{tr('newOffer')}</Button>} />
+            {embedded ? (
+                <div className="flex flex-col gap-3 mb-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-[13.5px] text-ink-3 max-w-[70ch]">{tr(mode === 'admin' ? 'leadAdmin' : 'leadSupplier')}</p>
+                    <Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditing('new')} className="shrink-0">{tr('newOffer')}</Button>
+                </div>
+            ) : (
+                <PageHeader title={tr('title')} description={tr(mode === 'admin' ? 'leadAdmin' : 'leadSupplier')}
+                    actions={<Button variant="primary" icon={<Plus size={15} />} onClick={() => setEditing('new')}>{tr('newOffer')}</Button>} />
+            )}
 
             {notice && <div className="mb-4"><Notice tone="success" onClose={() => setNotice(null)}>{notice}</Notice></div>}
 

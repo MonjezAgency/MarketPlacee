@@ -84,7 +84,7 @@ export default function AdminOverviewPage() {
         { key: 'attLegacy', count: s.orders.legacyPending, href: '/admin/orders', icon: ShoppingCart, tone: 'warning' },
         { key: 'attDisputes', count: s.disputesOpen, href: '/admin/disputes', icon: Scale, tone: 'danger' },
         { key: 'attPaymentFailed', count: s.paymentFailed, href: '/admin/orders', icon: Receipt, tone: 'danger' },
-        { key: 'attOffers', count: s.offersPending, href: '/admin/wholesale-offers', icon: CheckCircle2, tone: 'warning' },
+        { key: 'attOffers', count: s.offersPending, href: '/admin/offers?tab=supplier', icon: CheckCircle2, tone: 'warning' },
         { key: 'attSupplierAccounts', count: s.people.suppliers.pendingApproval, href: '/admin/users?status=PENDING_APPROVAL', icon: UserPlus, tone: 'warning' },
         { key: 'attBuyerAccounts', count: s.people.buyers.pendingApproval, href: '/admin/users?status=PENDING_APPROVAL', icon: UserPlus, tone: 'warning' },
         { key: 'attKyc', count: s.kycPending, href: '/admin/kyc', icon: ClipboardCheck, tone: 'warning' },

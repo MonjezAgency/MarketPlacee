@@ -1,5 +1,6 @@
 import { Controller, Get, Post, Body, UseGuards, Request, Param, Patch, Query } from '@nestjs/common';
 import { ChatService } from './chat.service';
+import { ChatGateway } from './chat.gateway';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
@@ -10,13 +11,20 @@ const CHAT_STAFF = ['ADMIN', 'SUPPORT', 'DEVELOPER', 'LOGISTICS', 'OWNER'];
 @Controller('chat')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(private readonly chatService: ChatService, private readonly gateway: ChatGateway) {}
 
   @Post('send')
   async sendMessage(@Request() req, @Body() data: { content?: string; imageUrl?: string; receiverId?: string }) {
     // Only support staff may address a message to a user; anyone else writes to support.
     const staff = CHAT_STAFF.includes(String(req.user.role || '').toUpperCase());
-    return this.chatService.sendMessage(req.user.sub, { ...data, receiverId: staff ? data?.receiverId : undefined });
+    const receiverId = staff ? data?.receiverId : undefined;
+    if (receiverId) await this.chatService.assertAccessGeneral(req.user.role, receiverId);
+    const result: any = await this.chatService.sendMessage(req.user.sub, { ...data, receiverId });
+    if (receiverId) {
+      // Same live updates the socket path sends; a missed push never fails the send.
+      try { this.gateway.emitToUser(receiverId, 'new_message', result); this.gateway.emitToSupport('conversation_updated', { userId: receiverId, message: result }); } catch { /* offline */ }
+    }
+    return result;
   }
 
   @Get('messages')
@@ -33,18 +41,21 @@ export class ChatController {
   @Patch('admin/switch/:userId')
   @Roles(Role.ADMIN, Role.SUPPORT, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
   async switchToHuman(@Param('userId') userId: string, @Request() req) {
+    await this.chatService.assertAccessGeneral(req.user.role, userId);
     return this.chatService.switchToHuman(userId, req.user.sub);
   }
 
   @Patch('admin/switch-ai/:userId')
   @Roles(Role.ADMIN, Role.SUPPORT, Role.DEVELOPER, Role.LOGISTICS, Role.OWNER)
   async switchToAI(@Param('userId') userId: string, @Request() req) {
+    await this.chatService.assertAccessGeneral(req.user.role, userId);
     return this.chatService.switchToAI(userId, req.user.sub);
   }
 
   @Get('admin/messages/:userId')
   @Roles(Role.ADMIN, Role.SUPPORT, Role.DEVELOPER, Role.LOGISTICS)
-  async getUserMessages(@Param('userId') userId: string) {
+  async getUserMessages(@Param('userId') userId: string, @Request() req) {
+    await this.chatService.assertAccessGeneral(req.user.role, userId);
     return this.chatService.getMessagesForUser(userId);
   }
 

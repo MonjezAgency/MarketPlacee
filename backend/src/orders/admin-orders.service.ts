@@ -4,8 +4,8 @@ import { OrdersService, ORDER_TRANSITIONS } from './orders.service';
 import { isRealImage } from '../products/catalog-rules';
 import type { OpenOrderFacts } from '../admin/admin-overview';
 import {
-    CSV_HEADER, EXPORT_MAX_ROWS, OrderListQueryError, attentionQueues, buildOrderWhere, buildTimeline, cleanVariants, moneySummary,
-    nextAction, orderByFor, orderRef, ordersPerKey, parseOrderListQuery, redactNet, statusCounts, statusOptions, supplierIdsOf, toCsv,
+    CSV_HEADER, EXPORT_MAX_ROWS, OrderListQueryError, attentionQueues, buildLoads, buildOrderWhere, buildTimeline, cleanVariants, loadTotals, moneySummary,
+    nextAction, normaliseComposition, orderByFor, orderRef, ordersPerKey, parseOrderListQuery, redactNet, statusCounts, statusOptions, supplierIdsOf, toCsv,
     type OrderListQuery,
 } from './admin-orders';
 
@@ -132,7 +132,7 @@ export class AdminOrdersService {
                 customer: { select: { id: true, name: true, companyName: true, email: true, emailVerified: true, phone: true, country: true, status: true, kycStatus: true, createdAt: true } },
                 items: {
                     orderBy: { id: 'asc' },
-                    include: { product: { select: { id: true, name: true, images: true, brand: true, ean: true, unit: true, supplierId: true, supplier: { select: { id: true, name: true, companyName: true } } } } },
+                    include: { product: { select: { id: true, name: true, images: true, brand: true, ean: true, unit: true, unitsPerCase: true, casesPerPallet: true, palletsPerShipment: true, weight: true, supplierId: true, supplier: { select: { id: true, name: true, companyName: true } } } } },
                 },
                 history: { orderBy: { createdAt: 'asc' } },
                 confirmations: { orderBy: [{ termsVersion: 'asc' }, { requestedAt: 'asc' }] },
@@ -150,13 +150,15 @@ export class AdminOrdersService {
         const loads = loadIds.length ? await this.prisma.mixedLoad.findMany({ where: { id: { in: loadIds } }, select: { id: true, kind: true, supplierId: true } }) : [];
         const loadById = new Map(loads.map((l) => [l.id, l]));
         const compIds = [...new Set(o.items.flatMap((i: any) => (Array.isArray(i.mixComposition) ? i.mixComposition.map((c: any) => c?.productId).filter(Boolean) : [])))] as string[];
-        const compProducts = compIds.length ? await this.prisma.product.findMany({ where: { id: { in: compIds } }, select: { id: true, name: true, ean: true, images: true, brand: true } }) : [];
+        const compProducts = compIds.length ? await this.prisma.product.findMany({ where: { id: { in: compIds } }, select: { id: true, name: true, ean: true, images: true, brand: true, unit: true, unitsPerCase: true, casesPerPallet: true, supplierId: true } }) : [];
         const compById = new Map(compProducts.map((p) => [p.id, p]));
 
         const supplierIds = supplierIdsOf({ items: o.items.map((i: any) => ({ product: i.product, mixedLoadSupplierId: i.mixedLoadId ? loadById.get(i.mixedLoadId)?.supplierId ?? null : null })), confirmations: o.confirmations });
+        // Display only: suppliers of products inside mixed loads (the workflow facts above stay as the list computes them).
+        const displaySupplierIds = [...new Set([...supplierIds, ...compProducts.map((p) => p.supplierId).filter(Boolean)])] as string[];
         const actorIds = [...new Set([...o.history.map((h: any) => h.changedById), o.reviewedById].filter(Boolean))] as string[];
         const [supplierUsers, actors] = await Promise.all([
-            supplierIds.length ? this.prisma.user.findMany({ where: { id: { in: supplierIds } }, select: { id: true, name: true, companyName: true, email: true, emailVerified: true, phone: true, country: true, status: true, kycStatus: true, role: true } }) : Promise.resolve([] as any[]),
+            displaySupplierIds.length ? this.prisma.user.findMany({ where: { id: { in: displaySupplierIds } }, select: { id: true, name: true, companyName: true, email: true, emailVerified: true, phone: true, country: true, status: true, kycStatus: true, role: true } }) : Promise.resolve([] as any[]),
             this.userNames(actorIds),
         ]);
         const supplierName = new Map(supplierUsers.map((u: any) => [u.id, who(u) || 'Supplier']));
@@ -165,14 +167,17 @@ export class AdminOrdersService {
         const lines = o.items.map((i: any) => {
             const load = i.mixedLoadId ? loadById.get(i.mixedLoadId) : null;
             const supId = i.product?.supplierId ?? load?.supplierId ?? null;
-            const comp = Array.isArray(i.mixComposition) ? i.mixComposition.map((c: any) => {
-                const p = c?.productId ? compById.get(c.productId) : null;
+            const lineTotal = Math.round(i.price * i.quantity * 100) / 100;
+            const comp = normaliseComposition(i.mixComposition, { mixedLoad: !!i.mixedLoadId, tier: i.selectedTier ?? null, buyerTotal: lineTotal });
+            const entries = comp ? comp.map((c) => {
+                const p = c.productId ? compById.get(c.productId) : (i.product ?? null);
+                const sid = (p as any)?.supplierId ?? supId;
                 return {
-                    productId: c?.productId ?? null, name: c?.name ?? p?.name ?? null, signature: typeof c?.signature === 'string' ? c.signature : null,
-                    variant: c?.variant ?? null, quantity: Number.isFinite(Number(c?.quantity)) ? Number(c.quantity) : null, unit: c?.unit ?? null,
-                    cases: Number.isFinite(Number(c?.cases)) ? Number(c.cases) : null, unitPrice: Number.isFinite(Number(c?.unitPrice)) ? Number(c.unitPrice) : null,
-                    lineSubtotal: Number.isFinite(Number(c?.lineSubtotal)) ? Number(c.lineSubtotal) : null, discountPercent: c?.discountPercent ?? null,
-                    ean: p?.ean ?? null, image: firstImage(p?.images),
+                    ...c, name: c.name ?? (c.productId ? p?.name ?? null : null),
+                    ean: p?.ean ?? null, brand: p?.brand ?? null, image: firstImage(p?.images), productUnit: (p as any)?.unit ?? null,
+                    packaging: { unitsPerCase: (p as any)?.unitsPerCase ?? null, casesPerPallet: (p as any)?.casesPerPallet ?? null },
+                    productExists: c.productId ? !!compById.get(c.productId) : !!i.product,
+                    supplier: sid ? { id: sid, name: supplierName.get(sid) ?? null } : null,
                 };
             }) : null;
             return {
@@ -180,16 +185,19 @@ export class AdminOrdersService {
                 productId: i.productId ?? null, productExists: !!i.product,
                 name: i.productNameSnapshot || i.product?.name || null,
                 image: firstImage(i.product?.images), ean: i.product?.ean ?? null, brand: i.product?.brand ?? null, productUnit: i.product?.unit ?? null,
-                tier: i.selectedTier ?? null, quantity: i.quantity, unitPrice: i.price, lineTotal: Math.round(i.price * i.quantity * 100) / 100,
+                packaging: i.product ? { unitsPerCase: i.product.unitsPerCase ?? null, casesPerPallet: i.product.casesPerPallet ?? null, palletsPerShipment: i.product.palletsPerShipment ?? null, weight: i.product.weight ?? null } : null,
+                tier: i.selectedTier ?? null, quantity: i.quantity, unitPrice: i.price, lineTotal,
                 supplierUnitPrice: i.supplierUnitPrice ?? null,
                 supplierLineTotal: i.supplierUnitPrice == null ? null : Math.round(i.supplierUnitPrice * i.quantity * 100) / 100,
                 promotionPercent: i.promotionPercent ?? null, stockCases: i.stockCases ?? null,
-                selectedVariants: cleanVariants(i.selectedVariants), mixComposition: comp && comp.length ? comp : null,
+                selectedVariants: cleanVariants(i.selectedVariants), mixComposition: entries && entries.length ? entries : null,
+                mixedLoadId: i.mixedLoadId ?? null,
                 mixedLoad: load ? { id: load.id, kind: load.kind } : null,
                 supplier: supId ? { id: supId, name: supplierName.get(supId) ?? null } : null,
             };
         });
 
+        const orderLoads = buildLoads(lines);
         const money = moneySummary({ totalAmount: o.totalAmount, shippingCost: o.shippingCost, coupon: terms?.coupon ?? o.submittedTerms?.coupon ?? null, freightStatus: terms?.freight?.status ?? null }, o.items.map((i: any) => ({ quantity: i.quantity, price: i.price, supplierUnitPrice: i.supplierUnitPrice ?? null })));
         const facts = { id: o.id, status: o.status, reviewStatus: o.reviewStatus, termsVersion: o.termsVersion, buyerAcceptedVersion: o.buyerAcceptedVersion, supplierIds, confirmations: o.confirmations };
         const supplierLabel = (sid: string) => supplierName.get(sid) || 'Supplier';
@@ -208,10 +216,11 @@ export class AdminOrdersService {
             },
             money,
             lines,
+            loads: orderLoads, loadTotals: loadTotals(orderLoads),
             buyer: o.customer ? { ...o.customer, createdAt: o.customer.createdAt.toISOString() } : null,
-            suppliers: supplierIds.map((sid) => {
+            suppliers: displaySupplierIds.map((sid) => {
                 const u: any = supplierUsers.find((x: any) => x.id === sid);
-                const mine = lines.filter((l: any) => l.supplier?.id === sid);
+                const mine = lines.filter((l: any) => l.supplier?.id === sid || (l.mixComposition || []).some((c: any) => c.supplier?.id === sid));
                 return u ? { id: u.id, name: u.name, companyName: u.companyName, email: u.email, emailVerified: u.emailVerified, phone: u.phone, country: u.country, status: u.status, kycStatus: u.kycStatus, role: u.role, lines: mine.length } : { id: sid, name: null, companyName: null, email: null, emailVerified: false, phone: null, country: null, status: null, kycStatus: null, role: null, lines: mine.length };
             }),
             logistics: {

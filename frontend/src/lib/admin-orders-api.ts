@@ -40,21 +40,38 @@ export interface OrderListParams {
 }
 
 export interface CompositionEntry {
-    productId: string | null; name: string | null; signature: string | null; variant: string | null;
-    quantity: number | null; unit: string | null; cases: number | null; unitPrice: number | null; lineSubtotal: number | null;
-    discountPercent: number | null; ean: string | null; image: string | null;
+    productId: string | null; name: string | null; variant: string | null;
+    quantity: number | null; unit: string | null; cases: number | null; stockCases: number | null; discountPercent: number | null;
+    /** Admin / owner only (absent for other staff): the supplier's price and value of this entry. */
+    supplierUnitPrice?: number | null; supplierLineTotal?: number | null;
+    /** Buyer price: the recorded load price shared out by the recorded supplier values; null when one is missing. */
+    unitPrice: number | null; lineTotal: number | null;
+    ean: string | null; brand: string | null; image: string | null; productUnit: string | null; productExists: boolean;
+    packaging: { unitsPerCase: number | null; casesPerPallet: number | null };
+    supplier: { id: string; name: string | null } | null;
 }
 export interface AdminOrderLine {
     id: string; kind: 'product' | 'mixed'; productId: string | null; productExists: boolean; name: string | null;
     image: string | null; ean: string | null; brand: string | null; productUnit: string | null;
+    /** Current product record (not a snapshot of the order). Null when the product no longer exists. */
+    packaging: { unitsPerCase: number | null; casesPerPallet: number | null; palletsPerShipment: number | null; weight: string | null } | null;
     tier: string | null; quantity: number; unitPrice: number; lineTotal: number;
     /** Admin / owner only (absent for other staff). */
     supplierUnitPrice?: number | null; supplierLineTotal?: number | null;
     promotionPercent: number | null; stockCases: number | null;
     selectedVariants: Record<string, string> | null; mixComposition: CompositionEntry[] | null;
+    mixedLoadId: string | null;
     mixedLoad: { id: string; kind: string } | null;
     supplier: { id: string; name: string | null } | null;
 }
+export type LoadType = 'MIXED_LOAD' | 'VARIANT_MIX' | 'STANDARD';
+export interface OrderLoad {
+    lineId: string; type: LoadType; mixedKind: 'PALLET' | 'TRUCK' | null; loadRecordFound: boolean | null;
+    tier: string | null; quantity: number; entries: number; buyerTotal: number;
+    /** Null for staff without net access, or when not recorded. */
+    supplierNet: number | null;
+}
+export interface LoadTotals { loads: number; mixedLoads: number; variantMixes: number; standardLines: number; buyerTotal: number; supplierNet: number | null; loadsWithoutNet: number | null }
 export interface Party {
     id: string; name: string | null; companyName: string | null; email: string | null; emailVerified: boolean; phone: string | null;
     country: string | null; status: string | null; kycStatus: string | null;
@@ -82,6 +99,8 @@ export interface AdminOrderDetail {
         supplierNet: number | null; markupOnRecordedLines: number | null; linesWithNet: number | null; linesWithoutNet: number | null;
     };
     lines: AdminOrderLine[];
+    loads: OrderLoad[];
+    loadTotals: LoadTotals;
     buyer: (Party & { createdAt: string }) | null;
     suppliers: (Party & { role: string | null; lines: number })[];
     logistics: {
@@ -111,6 +130,10 @@ async function json<T>(res: Response): Promise<T> {
 }
 const send = (path: string, method: 'POST' | 'PATCH' | 'DELETE', body?: unknown) =>
     apiFetch(path, { method, headers: { 'Content-Type': 'application/json' }, ...(body === undefined ? {} : { body: JSON.stringify(body) }) }).then((r) => json<any>(r));
+
+/** The Support workspace conversation with one account, opened from an order (contract owned by /admin/support). */
+export const supportChatHref = (userId: string, orderId: string) =>
+    `/admin/support?view=chat&user=${encodeURIComponent(userId)}&order=${encodeURIComponent(orderId)}`;
 
 export function orderQuery(q: OrderListParams): string {
     const p = new URLSearchParams();

@@ -54,7 +54,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.userSockets.set(userId, client.id);
 
       // Support/Admin join shared support room
-      const supportRoles = ['ADMIN', 'SUPPORT', 'DEVELOPER', 'LOGISTICS'];
+      const supportRoles = ['ADMIN', 'SUPPORT', 'DEVELOPER', 'LOGISTICS', 'OWNER'];
       if (supportRoles.includes(payload.role)) {
         client.join('support-room');
       }
@@ -83,6 +83,8 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     // Only support staff may address a message to a specific user.
     const staff = ['ADMIN', 'SUPPORT', 'DEVELOPER', 'LOGISTICS', 'OWNER'].includes(String(client.data.role || '').toUpperCase());
     if (!staff) data = { ...data, receiverId: undefined };
+    // Developers and logistics only write in conversations routed to their team.
+    if (data.receiverId && !(await this.chatService.canAccessGeneral(client.data.role, data.receiverId))) return { error: 'FORBIDDEN' };
 
     const result = await this.chatService.sendMessage(senderId, data);
 

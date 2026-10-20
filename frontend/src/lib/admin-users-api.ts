@@ -2,7 +2,7 @@ import { apiFetch } from '@/lib/api';
 import { ApiError } from '@/lib/supplier-api';
 
 /**
- * Admin → Users. Reads come from GET /admin/users/list and GET /admin/users/:id
+ * Admin → Users. Reads come from GET /admin/users/list, GET /admin/users/:id and its tabs
  * (backend/src/admin/admin-users.*, ADMIN/OWNER, non-sensitive fields only).
  * Account actions call the existing /users endpoints unchanged.
  */
@@ -34,19 +34,40 @@ export interface UserProfile {
     onboardingCompleted: boolean; twoFactorEnabled: boolean; createdAt: string; updatedAt: string;
 }
 
+/** Money for one account, defined in backend/src/admin/admin-users-activity.ts. Null = hidden or not recorded. */
+export interface AccountMoney {
+    currency: 'EUR'; countedOrders: number; grossValue: number; supplierNet: number | null; margin: number | null;
+    linesCounted: number; linesWithoutNet: number; netVisible: boolean;
+}
+
+export interface ReviewDecision { id: string; action: string; message: string | null; statusAfter: string | null; createdAt: string; product: { id: string; name: string }; by: 'atlantis' | 'system'; actorName: string | null }
+
 export interface UserDetail {
     user: UserProfile;
+    netVisible: boolean;
     kycDocuments: { id: string; documentType: string; status: string; adminNotes: string | null; createdAt: string; updatedAt: string }[];
     supplier: null | {
-        products: { total: number; byStatus: Record<string, number>; recent: { id: string; name: string; brand: string | null; status: string; image: string | null; stock: number; updatedAt: string }[] };
-        reviewDecisions: { id: string; action: string; message: string | null; statusAfter: string | null; createdAt: string; product: { id: string; name: string }; by: 'atlantis' | 'system'; actorName: string | null }[];
-        orders: { total: number; recent: { id: string; createdAt: string; status: string; reviewStatus: string; paymentStatus: string; buyer: { id: string; name: string } | null; supplierLines: number }[] };
+        products: { total: number; byStatus: Record<string, number> };
+        offers: { total: number; byStatus: Record<string, number> };
+        orders: { total: number };
+        reviews: { total: number; average: number | null };
+        reviewDecisions: ReviewDecision[];
+        money: AccountMoney;
     };
     buyer: null | {
-        orders: { total: number; byStatus: Record<string, number>; recent: { id: string; createdAt: string; status: string; reviewStatus: string; paymentStatus: string; totalAmount: number; lines: number }[] };
-        targetPrices: { total: number; recent: { id: string; ref: string; status: string; targetCasePrice: number; quantity: number; quantityUnit: string; createdAt: string; product: { id: string; name: string } | null }[] };
+        orders: { total: number; byStatus: Record<string, number>; awaitingReview: number };
+        targetPrices: { total: number; byStatus: Record<string, number> };
+        reviews: { total: number };
+        money: AccountMoney;
     };
 }
+
+export interface Paged<T> { data: T[]; total: number; page: number; limit: number; pages: number }
+export interface ProductTabRow { id: string; name: string; ean: string | null; brand: string | null; status: string; image: string | null; stock: number; unit: string | null; updatedAt: string; netPrice: number | null }
+export interface OfferTabRow { id: string; status: string; unit: string; quantity: number; validUntil: string | null; createdAt: string; product: { id: string; name: string } | null; pricePerUnit: number | null }
+export interface OrderTabRow { id: string; createdAt: string; status: string; reviewStatus: string; paymentStatus: string; buyer: { id: string; name: string } | null; lines: number; totalAmount: number | null }
+export interface TargetTabRow { id: string; ref: string; status: string; targetCasePrice: number; quantity: number; quantityUnit: string; createdAt: string; product: { id: string; name: string } | null }
+export interface ReviewTabRow { id: string; rating: number; comment: string | null; createdAt: string; product: { id: string; name: string } | null; author: { id: string; name: string } | null }
 
 async function json<T>(res: Response): Promise<T> {
     const body = await res.json().catch(() => null);
@@ -64,9 +85,20 @@ const qs = (q: Record<string, string | number | undefined>) => {
     return p.toString();
 };
 
+const tab = <T,>(id: string, name: string, q: Record<string, string | number | undefined>) =>
+    apiFetch(`/admin/users/${encodeURIComponent(id)}/${name}?${qs(q)}`, { cache: 'no-store' }).then((r) => json<T>(r));
+
+export const PAGE_SIZES = [25, 50, 100] as const;
+
 export const adminUsersApi = {
     list: (q: Record<string, string | number | undefined>) => apiFetch(`/admin/users/list?${qs(q)}`, { cache: 'no-store' }).then((r) => json<UserPage>(r)),
     detail: (id: string) => apiFetch(`/admin/users/${encodeURIComponent(id)}`, { cache: 'no-store' }).then((r) => json<UserDetail>(r)),
+    /** Account tabs, 14 per page (GET /admin/users/:id/<tab>). */
+    products: (id: string, q: { page: number; status?: string }) => tab<Paged<ProductTabRow> & { netVisible: boolean }>(id, 'products', q),
+    offers: (id: string, q: { page: number }) => tab<Paged<OfferTabRow> & { netVisible: boolean }>(id, 'offers', q),
+    orders: (id: string, q: { page: number }) => tab<Paged<OrderTabRow>>(id, 'orders', q),
+    targetPrices: (id: string, q: { page: number }) => tab<Paged<TargetTabRow>>(id, 'target-prices', q),
+    reviews: (id: string, q: { page: number }) => tab<Paged<ReviewTabRow>>(id, 'reviews', q),
     /** Existing endpoint (OWNER/ADMIN/MODERATOR): approve = ACTIVE, reject = REJECTED, block = BLOCKED, unblock = ACTIVE. */
     setStatus: (id: string, status: 'ACTIVE' | 'REJECTED' | 'BLOCKED') => post(`/users/${encodeURIComponent(id)}/status`, { status }).then((r) => json<unknown>(r)),
     /** Existing bulk endpoints: approve (OWNER/ADMIN/MODERATOR), block (OWNER/ADMIN). */

@@ -4,18 +4,19 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Ban, CheckCircle2, ChevronLeft, ChevronRight, Eye, Search, Users } from 'lucide-react';
+import { Ban, CheckCircle2, Search, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button, Card, ConfirmProvider, EmptyState, ErrorState, PageHeader, Skeleton, inputCls, selectCls, useConfirm } from '@/components/supplier/ui';
-import { adminUsersApi, isMarketAccount, KYC_STATUSES, ROLES, STATUSES, USER_SORTS, type UserPage, type UserRow } from '@/lib/admin-users-api';
-import { Avatar, KycBadge, RoleBadge, StatusBadge, kycLabel, roleLabel, statusLabel, useTu } from './userUi';
+import { adminUsersApi, isMarketAccount, KYC_STATUSES, PAGE_SIZES, ROLES, STATUSES, USER_SORTS, type UserPage, type UserRow } from '@/lib/admin-users-api';
+import { Avatar, KycBadge, Pager, RoleBadge, StatusBadge, kycLabel, roleLabel, statusLabel, useRowNav, useTu } from './userUi';
 
 /**
  * Admin → Users (/admin/users): every account in one directory — buyers,
  * suppliers and staff — with search, filters, sorting and server-side pages
- * (GET /admin/users/list). Old /admin/buyers and /admin/suppliers links
- * redirect here with the role filter set.
+ * (GET /admin/users/list, 25 / 50 / 100 per page). Clicking a row (or Enter
+ * on a focused row) opens the account; checkboxes don't. Old /admin/buyers and
+ * /admin/suppliers links redirect here with the role filter set.
  */
 const STATUS_TABS = ['', 'PENDING_APPROVAL', 'ACTIVE', 'REJECTED', 'BLOCKED'];
 
@@ -29,6 +30,7 @@ function Directory() {
     const confirm = useConfirm();
     const { fmt } = useLanguage();
     const tu = useTu();
+    const rowNav = useRowNav();
     const int = (n: number | null | undefined) => (n === null || n === undefined ? '—' : fmt.number(n));
 
     const initialRole = (params.get('role') || '').toUpperCase();
@@ -40,6 +42,7 @@ function Directory() {
     const [kyc, setKyc] = React.useState((KYC_STATUSES as readonly string[]).includes(params.get('kyc') || '') ? (params.get('kyc') as string) : '');
     const [sort, setSort] = React.useState((USER_SORTS as readonly string[]).includes(params.get('sort') || '') ? (params.get('sort') as string) : 'newest');
     const [page, setPage] = React.useState(Number(params.get('page')) || 1);
+    const [limit, setLimit] = React.useState<number>((PAGE_SIZES as readonly number[]).includes(Number(params.get('limit'))) ? Number(params.get('limit')) : 25);
     const [data, setData] = React.useState<UserPage | null>(null);
     const [error, setError] = React.useState<string | null>(null);
     const [loading, setLoading] = React.useState(true);
@@ -48,21 +51,21 @@ function Directory() {
 
     React.useEffect(() => { const h = setTimeout(() => setDebouncedQ(q), 300); return () => clearTimeout(h); }, [q]);
     const first = React.useRef(true);
-    React.useEffect(() => { if (first.current) { first.current = false; return; } setPage(1); }, [debouncedQ, role, status, country, kyc, sort]);
+    React.useEffect(() => { if (first.current) { first.current = false; return; } setPage(1); }, [debouncedQ, role, status, country, kyc, sort, limit]);
     React.useEffect(() => {
         const u = new URLSearchParams();
         if (debouncedQ) u.set('q', debouncedQ); if (role) u.set('role', role); if (status) u.set('status', status); if (country) u.set('country', country);
-        if (kyc) u.set('kyc', kyc); if (sort !== 'newest') u.set('sort', sort); if (page > 1) u.set('page', String(page));
+        if (kyc) u.set('kyc', kyc); if (sort !== 'newest') u.set('sort', sort); if (page > 1) u.set('page', String(page)); if (limit !== 25) u.set('limit', String(limit));
         router.replace(u.toString() ? `/admin/users?${u}` : '/admin/users', { scroll: false });
-    }, [debouncedQ, role, status, country, kyc, sort, page, router]);
+    }, [debouncedQ, role, status, country, kyc, sort, page, limit, router]);
 
     const load = React.useCallback(() => {
         setLoading(true); setError(null);
-        adminUsersApi.list({ q: debouncedQ, role, status, country, kyc, sort, page, limit: 25 })
+        adminUsersApi.list({ q: debouncedQ, role, status, country, kyc, sort, page, limit })
             .then((d) => { setData(d); setSelected(new Set()); })
             .catch((e) => setError(e.message))
             .finally(() => setLoading(false));
-    }, [debouncedQ, role, status, country, kyc, sort, page]);
+    }, [debouncedQ, role, status, country, kyc, sort, page, limit]);
     React.useEffect(() => { load(); }, [load]);
 
     const clearFilters = () => { setQ(''); setRole(''); setStatus(''); setCountry(''); setKyc(''); };
@@ -175,46 +178,40 @@ function Directory() {
                                 <thead>
                                     <tr className="text-[12px] text-ink-3 bg-surface-2/60 border-b border-line">
                                         <th className="w-10 ps-4 py-2"><input type="checkbox" aria-label={tu('selectAllOnPage')} checked={allOnPage} disabled={!selectable.length} onChange={toggleAll} className="w-4 h-4 accent-[#0E7C74]" /></th>
-                                        <th className="text-start font-medium px-2 py-2">{tu('colUser')}</th>
+                                        <th className="text-start font-medium px-2 py-2">{tu('colName')}</th>
                                         <th className="text-start font-medium px-2 py-2">{tu('colCompany')}</th>
+                                        <th className="text-start font-medium px-2 py-2">{tu('email')}</th>
+                                        <th className="text-start font-medium px-2 py-2">{tu('country')}</th>
                                         <th className="text-start font-medium px-2 py-2">{tu('role')}</th>
-                                        <th className="text-start font-medium px-2 py-2 hidden xl:table-cell">{tu('country')}</th>
                                         <th className="text-start font-medium px-2 py-2">{tu('colStatus')}</th>
-                                        <th className="text-start font-medium px-2 py-2">{tu('kyc')}</th>
-                                        <th className="text-start font-medium px-2 py-2">{tu('colActivity')}</th>
                                         <th className="text-start font-medium px-2 py-2">{tu('colRegistered')}</th>
-                                        <th className="text-end font-medium pe-4 py-2"><span className="sr-only">{tu('actions')}</span></th>
+                                        <th className="text-start font-medium pe-4 ps-2 py-2">{tu('colActivity')}</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {rows.map((u) => (
-                                        <tr key={u.id} className={cn('border-b border-line last:border-0 hover:bg-surface-2/40', selected.has(u.id) && 'bg-teal-soft/50')}>
-                                            <td className="ps-4 py-2.5">
-                                                {isMarketAccount(u.role) && <input type="checkbox" aria-label={tu('selectName', { name: u.name })} checked={selected.has(u.id)} onChange={() => toggle(u.id)} className="w-4 h-4 accent-[#0E7C74]" />}
-                                            </td>
-                                            <td className="px-2 py-2.5 max-w-[280px]">
-                                                <Link href={`/admin/users/${u.id}`} className="flex items-center gap-2.5 min-w-0 group">
-                                                    <Avatar name={u.name} src={u.avatar} />
-                                                    <span className="min-w-0">
-                                                        <span className="block truncate font-medium text-ink group-hover:underline">{u.name}</span>
-                                                        <bdi dir="ltr" className="block truncate text-[12px] text-ink-3">{u.email}</bdi>
+                                    {rows.map((u) => {
+                                        const nav = rowNav(`/admin/users/${u.id}`, tu('viewName', { name: u.name }));
+                                        return (
+                                            <tr key={u.id} {...nav} className={cn(nav.className, 'border-b border-line last:border-0 hover:bg-surface-2/50', selected.has(u.id) && 'bg-teal-soft/50')}>
+                                                <td className="ps-4 py-2" data-row-ignore>
+                                                    {isMarketAccount(u.role) && <input type="checkbox" aria-label={tu('selectName', { name: u.name })} checked={selected.has(u.id)} onChange={() => toggle(u.id)} className="w-4 h-4 accent-[#0E7C74]" />}
+                                                </td>
+                                                <td className="px-2 py-2 max-w-[240px]">
+                                                    <span className="flex items-center gap-2.5 min-w-0">
+                                                        <Avatar name={u.name} src={u.avatar} size={28} />
+                                                        <Link href={`/admin/users/${u.id}`} tabIndex={-1} className="truncate font-medium text-ink hover:underline">{u.name}</Link>
                                                     </span>
-                                                </Link>
-                                            </td>
-                                            <td className="px-2 py-2.5 max-w-[200px] truncate text-ink-2">{u.companyName || <span className="text-ink-4">—</span>}</td>
-                                            <td className="px-2 py-2.5"><RoleBadge role={u.role} /></td>
-                                            <td className="px-2 py-2.5 hidden xl:table-cell text-ink-2">{u.country || <span className="text-ink-4">—</span>}</td>
-                                            <td className="px-2 py-2.5"><StatusBadge status={u.status} /></td>
-                                            <td className="px-2 py-2.5"><KycBadge status={u.kycStatus} /></td>
-                                            <td className="px-2 py-2.5">{activity(u)}</td>
-                                            <td className="px-2 py-2.5 text-[12.5px] text-ink-3 whitespace-nowrap tabular-nums">{fmt.date(u.createdAt)}</td>
-                                            <td className="pe-4 py-2.5">
-                                                <div className="flex justify-end">
-                                                    <Link href={`/admin/users/${u.id}`} title={tu('view')} aria-label={tu('viewName', { name: u.name })} className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal"><Eye size={15} /></Link>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
+                                                </td>
+                                                <td className="px-2 py-2 max-w-[200px] truncate text-ink-2">{u.companyName || <span className="text-ink-4">—</span>}</td>
+                                                <td className="px-2 py-2 max-w-[240px] truncate text-ink-2"><bdi dir="ltr">{u.email}</bdi></td>
+                                                <td className="px-2 py-2 text-ink-2">{u.country || <span className="text-ink-4">—</span>}</td>
+                                                <td className="px-2 py-2"><RoleBadge role={u.role} /></td>
+                                                <td className="px-2 py-2"><StatusBadge status={u.status} /></td>
+                                                <td className="px-2 py-2 text-[12.5px] text-ink-3 whitespace-nowrap tabular-nums">{fmt.date(u.createdAt)}</td>
+                                                <td className="pe-4 ps-2 py-2">{activity(u)}</td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -247,12 +244,16 @@ function Directory() {
                 )}
 
                 {data && data.total > 0 && (
-                    <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-t border-line text-[13px] text-ink-3">
-                        <span>{tu('rangeOf', { from: int((data.page - 1) * data.limit + 1), to: int(Math.min(data.page * data.limit, data.total)), total: int(data.total) })}</span>
-                        <div className="flex items-center gap-1">
-                            <Button size="sm" variant="ghost" icon={<ChevronLeft size={15} className="rtl:rotate-180" />} disabled={page <= 1 || loading} onClick={() => setPage((p) => p - 1)}>{tu('previous')}</Button>
-                            <span className="px-2 tabular-nums">{tu('pageOf', { page: int(data.page), pages: int(data.pages) })}</span>
-                            <Button size="sm" variant="ghost" disabled={page >= data.pages || loading} onClick={() => setPage((p) => p + 1)}>{tu('next')} <ChevronRight size={15} className="rtl:rotate-180" /></Button>
+                    <div className="flex flex-wrap items-center gap-x-4 border-t border-line">
+                        <label className="flex items-center gap-2 ps-4 py-2 text-[13px] text-ink-3">
+                            {tu('perPage')}
+                            <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} className={cn(selectCls, 'h-9 w-[84px] text-[13px]')}>
+                                {PAGE_SIZES.map((n) => <option key={n} value={n}>{int(n)}</option>)}
+                            </select>
+                        </label>
+                        <div className="flex-1 min-w-0 [&>div]:border-t-0">
+                            <Pager page={data.page} pages={data.pages} total={data.total} loading={loading} onPage={setPage}
+                                from={(data.page - 1) * data.limit + 1} to={Math.min(data.page * data.limit, data.total)} />
                         </div>
                     </div>
                 )}

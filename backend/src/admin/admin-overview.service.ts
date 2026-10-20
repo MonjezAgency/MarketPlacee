@@ -46,14 +46,14 @@ export class AdminOverviewService {
         ]);
         const who = (u: { name?: string | null; companyName?: string | null } | null) => u?.companyName || u?.name || '';
         const activity = mergeActivity([
-            orders.map((o): ActivityItem => ({ kind: 'ORDER_PLACED', at: o.createdAt.toISOString(), href: `/admin/orders/${o.id}`, subject: o.id.slice(0, 8).toUpperCase(), detail: who(o.customer) })),
-            disputes.map((d): ActivityItem => ({ kind: 'DISPUTE_OPENED', at: d.createdAt.toISOString(), href: '/admin/disputes', subject: d.orderId.slice(0, 8).toUpperCase(), detail: d.reason })),
+            orders.map((o): ActivityItem => ({ kind: 'ORDER_PLACED', at: o.createdAt.toISOString(), href: `/admin/orders/${o.id}`, subject: o.id.slice(-8).toUpperCase(), detail: who(o.customer) })),
+            disputes.map((d): ActivityItem => ({ kind: 'DISPUTE_OPENED', at: d.createdAt.toISOString(), href: '/admin/disputes', subject: d.orderId.slice(-8).toUpperCase(), detail: d.reason })),
             accounts.map((u): ActivityItem => ({ kind: 'ACCOUNT_REGISTERED', at: u.createdAt.toISOString(), href: `/admin/users/${u.id}`, subject: who(u), detail: u.role })),
             reviews.filter((r) => r.product).map((r): ActivityItem => ({ kind: 'PRODUCT_REVIEW', at: r.createdAt.toISOString(), href: `/admin/products/${r.product!.id}`, subject: r.product!.name, detail: r.action })),
         ]);
         return {
             ordersByStatus: statusBreakdown((groups as any[]).map((g) => ({ status: g.status, count: g._count._all }))),
-            recentOrders: recentOrders.map((o) => ({ id: o.id, ref: o.id.slice(0, 8).toUpperCase(), createdAt: o.createdAt.toISOString(), status: o.status, reviewStatus: o.reviewStatus, paymentStatus: o.paymentStatus, total: o.totalAmount, lines: o._count.items, buyer: who(o.customer) })),
+            recentOrders: recentOrders.map((o) => ({ id: o.id, ref: o.id.slice(-8).toUpperCase(), createdAt: o.createdAt.toISOString(), status: o.status, reviewStatus: o.reviewStatus, paymentStatus: o.paymentStatus, total: o.totalAmount, lines: o._count.items, buyer: who(o.customer) })),
             activity,
         };
     }

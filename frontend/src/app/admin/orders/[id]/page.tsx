@@ -4,16 +4,17 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ArrowLeft, BellRing, ClipboardList, ExternalLink, FileText, MessageSquare, Printer, Trash2, Truck } from 'lucide-react';
-import { cn, prettifyVariantSignature } from '@/lib/utils';
+import { ArrowLeft, BellRing, ClipboardList, ExternalLink, FileText, MapPin, MessageSquare, Printer, Trash2, Truck } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { AdminWorkflowPanel } from '@/components/orders/AdminWorkflowPanel';
 import { DeliveryBreakdown } from '@/components/orders/DeliveryBreakdown';
 import { NextActionCell, PaymentBadge } from '@/components/admin/OrderBadges';
+import { LoadsSection } from '@/components/admin/orders/LoadsSection';
 import {
-    Badge, Button, Card, ConfirmProvider, Dialog, EmptyState, ErrorState, Field, Notice, ORDER_STATUS, Skeleton, StatusBadge, Thumb, inputCls, useConfirm, type Tone,
+    Badge, Button, Card, ConfirmProvider, Dialog, EmptyState, ErrorState, Field, Notice, ORDER_STATUS, Skeleton, StatusBadge, inputCls, useConfirm, type Tone,
 } from '@/components/supplier/ui';
-import { adminOrdersApi, type AdminOrderDetail, type AdminOrderLine, type Party, type TimelineEvent } from '@/lib/admin-orders-api';
+import { adminOrdersApi, supportChatHref, type AdminOrderDetail, type Party, type TimelineEvent } from '@/lib/admin-orders-api';
 
 /**
  * Admin → Order detail (/admin/orders/[id]). Everything shown is a recorded
@@ -40,7 +41,6 @@ const KYC_KEY: Record<string, string> = { UNVERIFIED: 'kycUnverified', PENDING: 
 const DISPUTE_KEY: Record<string, string> = { OPEN: 'dispOpen', UNDER_REVIEW: 'dispReview', RESOLVED_REFUND: 'dispRefund', RESOLVED_NO_REFUND: 'dispNoRefund', CLOSED: 'dispClosed' };
 const INSPECTION_KEY: Record<string, string> = { SCHEDULED: 'inspScheduled', PASSED: 'inspPassed', PASSED_WITH_FINDINGS: 'inspFindings', FAILED: 'inspFailed' };
 const FREIGHT_KEY: Record<string, string> = { priced: 'freightPriced', set_by_atlantis: 'freightSet', quote_required: 'freightQuote' };
-const QTY_KEY: Record<string, string> = { case: 'qtyCase', pallet: 'qtyPallet', truck: 'qtyTruck' };
 
 export default function AdminOrderDetailPage() {
     return <ConfirmProvider><OrderDetail /></ConfirmProvider>;
@@ -153,15 +153,15 @@ function OrderDetail() {
                         <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-x-6 gap-y-2 text-[13px]">
                             <Meta label={tl('created')} value={when(o.createdAt)} />
                             <Meta label={tl('lastUpdated')} value={when(o.updatedAt)} />
-                            <Meta label={tl('buyer')} value={o.buyer ? <Link href={`/admin/buyers?focus=${o.buyer.id}`} className="text-teal font-medium hover:underline">{buyerName}</Link> : buyerName} />
-                            <Meta label={tl('suppliersLabel', { count: o.suppliers.length })} value={o.suppliers.length ? o.suppliers.map((s) => s.companyName || s.name || tl('unnamedSupplier')).join(', ') : tl('noSupplier')} />
+                            <Meta label={tl('buyer')} value={o.buyer ? <a href="#buyer" className="text-teal font-medium hover:underline">{buyerName}</a> : buyerName} />
+                            <Meta label={tl('suppliersLabel', { count: o.suppliers.length })} value={o.suppliers.length ? <a href="#suppliers" className="text-teal font-medium hover:underline">{o.suppliers.map((s) => s.companyName || s.name || tl('unnamedSupplier')).join(', ')}</a> : tl('noSupplier')} />
                             {o.reviewedAt && <Meta label={o.reviewStatus === 'REJECTED' ? tl('rejectedAt') : tl('approvedAt')} value={<>{when(o.reviewedAt)}{o.reviewedBy ? <span className="text-ink-3"> · {tl('byName', { name: o.reviewedBy })}</span> : null}</>} />}
                             <Meta label={tl('orderId')} value={<bdi dir="ltr" className="font-mono text-[12px] break-all">{o.id}</bdi>} />
                         </dl>
                     </div>
                     <div className="no-print flex flex-wrap items-center gap-2 lg:justify-end lg:max-w-[46%]">
                         <Button size="sm" icon={<Printer size={14} />} onClick={() => window.print()}>{tl('print')}</Button>
-                        {o.buyer && <Link href={`/admin/support?search=${o.buyer.id}`}><Button size="sm" icon={<MessageSquare size={14} />}>{tl('messageBuyer')}</Button></Link>}
+                        {o.buyer && <Link href={supportChatHref(o.buyer.id, o.id)} className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg text-[12.5px] font-semibold bg-surface text-ink ring-1 ring-inset ring-line-strong hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]"><MessageSquare size={14} aria-hidden />{tl('messageBuyer')}</Link>}
                         {o.status === 'SHIPPED' && <Button size="sm" icon={<BellRing size={14} />} loading={busy === 'notify'} onClick={notifyArrival}>{tl('notifyArrival')}</Button>}
                         <Button size="sm" variant="ghost" className="text-red-700 hover:bg-red-50" icon={<Trash2 size={14} />} loading={busy === 'delete'} onClick={removeOrder}>{tl('deleteOrder')}</Button>
                     </div>
@@ -187,26 +187,38 @@ function OrderDetail() {
                 {actionable.filter((x) => x.blocker).map((x) => <p key={x.to} className="mt-2 text-[12.5px] text-amber-800" lang="en">{x.blocker}</p>)}
             </section>
 
+            {o.workflow && (
+                <div className="no-print">
+                    <AdminWorkflowPanel orderId={o.id} status={o.status} workflow={o.workflow} inspections={o.inspections} onChange={load}
+                        items={o.lines.map((l) => ({ id: l.id, quantity: l.quantity, unitPrice: l.unitPrice, product: { name: l.name || undefined } }))} />
+                </div>
+            )}
+
+            <nav aria-label={tl('sectionsNav')} className="no-print flex flex-wrap gap-1 text-[12.5px]">
+                {[['summary', 'summaryTitle'], ['products', 'productsLoadsTitle'], ['buyer', 'buyerInfo'], ['suppliers', 'suppliersTitle'], ['destination', 'destinationTitle'], ['logistics', 'logisticsTitle'], ['payment', 'paymentTitle'], ['documents', 'documentsTitle'], ['activity', 'timelineTitle']].map(([id, key]) => (
+                    <a key={id} href={`#${id}`} className="h-7 inline-flex items-center px-2.5 rounded-full ring-1 ring-inset ring-line text-ink-2 hover:bg-surface-2 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">{tl(key)}</a>
+                ))}
+            </nav>
+
+            <SummaryCard o={o} tl={tl} eur={eur} />
+
             <div className="grid gap-4 lg:grid-cols-3 items-start">
                 <div className="lg:col-span-2 space-y-4 min-w-0">
-                    {o.workflow && (
-                        <div className="no-print">
-                            <AdminWorkflowPanel orderId={o.id} status={o.status} workflow={o.workflow} inspections={o.inspections} onChange={load}
-                                items={o.lines.map((l) => ({ id: l.id, quantity: l.quantity, unitPrice: l.unitPrice, product: { name: l.name || undefined } }))} />
-                        </div>
-                    )}
-
-                    <LinesCard o={o} tl={tl} eur={eur} />
+                    <LoadsSection o={o} tl={tl} eur={eur} />
+                    <DestinationCard o={o} tl={tl} />
                     <LogisticsCard o={o} tl={tl} eur={eur} when={when} onSaved={load} />
                     <TimelineCard events={o.timeline} tl={tl} when={when} statusLabel={statusLabel} />
                 </div>
 
                 <div className="space-y-4 min-w-0">
-                    <MoneyCard o={o} tl={tl} eur={eur} money={money} when={when} />
-                    <PartyCard title={tl('buyerInfo')} party={o.buyer} tl={tl} when={when} href={o.buyer ? `/admin/buyers?focus=${o.buyer.id}` : null} />
-                    {o.suppliers.length === 0
-                        ? <Card title={tl('supplierInfo')}><p className="text-[13px] text-ink-3">{tl('noSupplierRecorded')}</p></Card>
-                        : o.suppliers.map((s) => <PartyCard key={s.id} title={tl('supplierInfoN', { count: s.lines })} party={s} tl={tl} when={when} href={`/admin/suppliers?id=${s.id}`} />)}
+                    <div id="buyer" className="scroll-mt-20"><PartyCard title={tl('buyerInfo')} party={o.buyer} orderId={o.id} tl={tl} when={when} messageLabel={tl('messageBuyer')} /></div>
+                    <div id="suppliers" className="scroll-mt-20 space-y-4">
+                        {o.suppliers.length === 0
+                            ? <Card title={tl('suppliersTitle')}><p className="text-[13px] text-ink-3">{tl('noSupplierRecorded')}</p></Card>
+                            : o.suppliers.map((s) => <PartyCard key={s.id} title={tl('supplierInfoN', { count: s.lines })} party={s} orderId={o.id} tl={tl} when={when} messageLabel={tl('messageSupplier')} />)}
+                    </div>
+                    <PaymentCard o={o} tl={tl} eur={eur} money={money} when={when} />
+                    <DocumentsCard o={o} tl={tl} money={money} when={when} />
                     {o.disputes.length > 0 && (
                         <Card title={tl('disputes')} actions={<Link href="/admin/disputes" className="no-print text-[13px] text-teal font-medium hover:underline">{tl('openDisputes')}</Link>}>
                             <ul className="space-y-2.5 text-[13px]">
@@ -255,177 +267,104 @@ function Row({ label, children, strong }: { label: React.ReactNode; children: Re
     );
 }
 
-function qty(tl: Tl, quantity: number | null, unit: string | null) {
-    if (quantity == null) return tl('notRecorded');
-    const key = unit ? QTY_KEY[String(unit).toLowerCase()] : null;
-    if (key) return tl(key, { count: quantity });
-    return unit ? tl('qtyOther', { count: quantity, unit }) : tl('qtyNoUnit', { count: quantity });
-}
+type Eur = (n: number | null | undefined) => string;
+type When = (d: string | null | undefined) => string | null;
+type MoneyFmt = (n: number, c: string) => string;
 
-function LinesCard({ o, tl, eur }: { o: AdminOrderDetail; tl: Tl; eur: (n: number | null | undefined) => string }) {
-    return (
-        <Card title={tl('linesTitle', { count: o.lines.length })} description={tl('linesDesc')} bodyClassName="p-0">
-            <div className="overflow-x-auto">
-                <table className="w-full min-w-[720px] text-[13px]">
-                    <thead>
-                        <tr className="text-[12px] text-ink-3 bg-surface-2/60 border-y border-line">
-                            <th className="text-start font-medium ps-4 pe-2 py-2">{tl('colProduct')}</th>
-                            <th className="text-start font-medium px-2 py-2">{tl('colQuantity')}</th>
-                            <th className="text-end font-medium px-2 py-2">{tl('colUnitPrice')}</th>
-                            <th className="text-end font-medium px-2 py-2">{tl('colLineTotal')}</th>
-                            {o.netVisible && <th className="text-end font-medium px-2 pe-4 py-2">{tl('colNet')}</th>}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {o.lines.map((l) => <LineRow key={l.id} l={l} netVisible={o.netVisible} tl={tl} eur={eur} />)}
-                    </tbody>
-                </table>
-            </div>
-        </Card>
-    );
-}
-
-function LineRow({ l, netVisible, tl, eur }: { l: AdminOrderLine; netVisible: boolean; tl: Tl; eur: (n: number | null | undefined) => string }) {
-    const name = l.name || (l.kind === 'mixed' ? tl('mixedLoad') : tl('deletedProduct'));
-    return (
-        <tr className="border-b border-line last:border-0 align-top">
-            <td className="ps-4 pe-2 py-3">
-                <div className="flex gap-3 min-w-0">
-                    <Thumb src={l.image} alt={name} size={44} />
-                    <div className="min-w-0">
-                        {l.productId && l.productExists
-                            ? <Link href={`/admin/products/${l.productId}`} className="font-medium text-ink hover:underline">{name}</Link>
-                            : <span className="font-medium text-ink">{name}</span>}
-                        <p className="text-[12px] text-ink-3">
-                            {l.brand}
-                            {l.ean ? <>{l.brand ? ' · ' : ''}{tl('ean')} <bdi dir="ltr" className="font-mono">{l.ean}</bdi></> : l.kind === 'product' ? <>{l.brand ? ' · ' : ''}{tl('noEan')}</> : null}
-                        </p>
-                        <p className="text-[12px] text-ink-3">{l.supplier ? tl('supplierIs', { name: l.supplier.name || tl('unnamedSupplier') }) : tl('noSupplierRecorded')}</p>
-                        {!l.productExists && l.kind === 'product' && <p className="text-[12px] text-amber-800">{tl('productRemoved')}</p>}
-                        {(l.selectedVariants || l.promotionPercent) && (
-                            <div className="mt-1.5 flex flex-wrap gap-1">
-                                {l.selectedVariants && Object.entries(l.selectedVariants).map(([k, v]) => <Badge key={k}><span className="text-ink-3">{k}:</span> {v}</Badge>)}
-                                {l.promotionPercent ? <Badge tone="brand">{tl('specialOffer', { percent: l.promotionPercent })}</Badge> : null}
-                            </div>
-                        )}
-                        {l.mixComposition && (
-                            <div className="mt-2 rounded-lg ring-1 ring-line bg-surface-2/50 p-2.5">
-                                <p className="text-[12px] font-medium text-ink-2">{l.mixedLoad ? tl(l.mixedLoad.kind === 'TRUCK' ? 'mixTruck' : 'mixPallet') : tl('mixComposition')}</p>
-                                <ul className="mt-1 space-y-1">
-                                    {l.mixComposition.map((c, i) => (
-                                        <li key={i} className="flex flex-wrap items-baseline justify-between gap-x-3 text-[12px]">
-                                            <span className="min-w-0 text-ink">
-                                                {c.name || prettifyVariantSignature(c.signature || '') || tl('variant')}
-                                                {c.variant ? <span className="text-ink-3"> · {c.variant}</span> : null}
-                                                {c.signature && c.name ? <span className="text-ink-3"> · {prettifyVariantSignature(c.signature)}</span> : null}
-                                                {c.ean ? <span className="text-ink-3"> · <bdi dir="ltr" className="font-mono">{c.ean}</bdi></span> : null}
-                                            </span>
-                                            <span className="tabular-nums text-ink-2">
-                                                {qty(tl, c.quantity, c.unit)}
-                                                {c.cases != null && c.unit !== 'case' ? <span className="text-ink-3"> · {tl('qtyCase', { count: c.cases })}</span> : null}
-                                                {c.lineSubtotal != null ? <span className="text-ink-3"> · {eur(c.lineSubtotal)}</span> : null}
-                                            </span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </td>
-            <td className="px-2 py-3 whitespace-nowrap">
-                <span className="text-ink">{qty(tl, l.quantity, l.tier)}</span>
-                {!l.tier && <span className="block text-[12px] text-ink-4">{tl('tierNotRecorded')}</span>}
-                {l.stockCases != null && <span className="block text-[12px] text-ink-3">{tl('stockCases', { count: l.stockCases })}</span>}
-            </td>
-            <td className="px-2 py-3 text-end tabular-nums whitespace-nowrap">{eur(l.unitPrice)}</td>
-            <td className="px-2 py-3 text-end tabular-nums whitespace-nowrap font-medium text-ink">{eur(l.lineTotal)}</td>
-            {netVisible && (
-                <td className="px-2 pe-4 py-3 text-end tabular-nums whitespace-nowrap">
-                    {l.supplierUnitPrice == null ? <NotRecorded tl={tl} /> : <>{eur(l.supplierUnitPrice)}<span className="block text-[12px] text-ink-3">{eur(l.supplierLineTotal)}</span></>}
-                </td>
-            )}
-        </tr>
-    );
-}
-
-function MoneyCard({ o, tl, eur, money, when }: { o: AdminOrderDetail; tl: Tl; eur: (n: number | null | undefined) => string; money: (n: number, c: string) => string; when: (d: string | null | undefined) => string | null }) {
+/** Order summary: the recorded money on the order and what it consists of. */
+function SummaryCard({ o, tl, eur }: { o: AdminOrderDetail; tl: Tl; eur: Eur }) {
     const m = o.money;
-    const card = o.payment.card;
+    const t = o.loadTotals;
+    const Fig = ({ label, children, hint }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) => (
+        <div className="min-w-0 rounded-lg bg-surface-2/60 px-3 py-2.5">
+            <dt className="text-[12px] text-ink-3">{label}</dt>
+            <dd className="mt-0.5 text-[16px] font-semibold text-heading tabular-nums">{children}</dd>
+            {hint && <dd className="text-[12px] text-ink-3">{hint}</dd>}
+        </div>
+    );
     return (
-        <Card title={tl('moneyTitle')} description={tl('moneyDesc')}>
-            <dl>
-                <Row label={tl('linesSubtotal')}>{eur(m.linesSubtotal)}</Row>
-                {m.coupon && <Row label={<>{tl('coupon')} <bdi dir="ltr" className="font-mono text-[12px]">{m.coupon}</bdi></>}>{m.couponDiscount != null ? `−${eur(m.couponDiscount)}` : '—'}</Row>}
-                <Row label={tl('goodsTotal')} strong>{eur(m.goodsTotal)}</Row>
-                <Row label={<>{tl('deliveryCharge')}<span className="block text-[12px] text-ink-4">{tl(FREIGHT_KEY[m.freightStatus])}</span></>}>{m.freight != null ? eur(m.freight) : <span className="text-ink-3">{tl('quotedAfter')}</span>}</Row>
-                <Row label={tl('vat')}><NotRecorded tl={tl} /></Row>
-                <Row label={tl('totalWithDelivery')} strong>{m.totalWithFreight != null ? eur(m.totalWithFreight) : <span className="text-[13px] font-normal text-ink-3">{tl('totalPendingDelivery')}</span>}</Row>
+        <Card id="summary" className="scroll-mt-20" title={tl('summaryTitle')} description={tl('moneyDesc')}>
+            <dl className="grid gap-2 grid-cols-2 lg:grid-cols-4">
+                <Fig label={tl('linesSubtotal')} hint={m.coupon ? <>{tl('coupon')} <bdi dir="ltr" className="font-mono">{m.coupon}</bdi>{m.couponDiscount != null ? ` −${eur(m.couponDiscount)}` : ''}</> : undefined}>{eur(m.linesSubtotal)}</Fig>
+                <Fig label={tl('goodsTotal')}>{eur(m.goodsTotal)}</Fig>
+                <Fig label={tl('deliveryCharge')} hint={tl(FREIGHT_KEY[m.freightStatus])}>{m.freight != null ? eur(m.freight) : <span className="text-[13px] font-normal text-ink-3">{tl('quotedAfter')}</span>}</Fig>
+                <Fig label={tl('totalWithDelivery')} hint={<>{tl('vat')}: {tl('notRecorded')}</>}>{m.totalWithFreight != null ? eur(m.totalWithFreight) : <span className="text-[13px] font-normal text-ink-3">{tl('totalPendingDelivery')}</span>}</Fig>
             </dl>
-            {m.unexplainedDifference != null && <p className="mt-2 text-[12.5px] text-amber-800">{tl('unexplainedDiff', { amount: eur(m.unexplainedDifference) })}</p>}
-
+            <p className="mt-3 text-[12.5px] text-ink-3">
+                {tl('summaryComposition', { loads: t.loads, mixed: t.mixedLoads + t.variantMixes, suppliers: o.suppliers.length })} · {tl('currencyEur')}
+            </p>
+            {m.unexplainedDifference != null && <p className="mt-1 text-[12.5px] text-amber-800">{tl('unexplainedDiff', { amount: eur(m.unexplainedDifference) })}</p>}
             {o.netVisible && (
-                <div className="mt-4 border-t border-line pt-3">
+                <div className="mt-3 border-t border-line pt-3">
                     <p className="text-[12px] font-medium text-ink-3">{tl('netTitle')}</p>
-                    <dl>
+                    <dl className="grid sm:grid-cols-2 gap-x-6">
                         <Row label={tl('supplierNet')}>{m.supplierNet != null ? eur(m.supplierNet) : <NotRecorded tl={tl} />}</Row>
                         <Row label={tl('markup')}>{m.markupOnRecordedLines != null ? eur(m.markupOnRecordedLines) : <NotRecorded tl={tl} />}</Row>
                     </dl>
                     {!!m.linesWithoutNet && <p className="mt-1 text-[12.5px] text-amber-800">{tl('linesWithoutNet', { count: m.linesWithoutNet })}</p>}
                 </div>
             )}
-
-            <div className="mt-4 border-t border-line pt-3">
-                <p className="text-[12px] font-medium text-ink-3">{tl('paymentTitle')}</p>
-                <dl>
-                    <Row label={tl('paymentStatus')}><PaymentBadge value={o.payment.status} tl={tl} /></Row>
-                    <Row label={tl('paidAt')}>{when(o.payment.paidAt) ?? <NotRecorded tl={tl} />}</Row>
-                </dl>
-                {card ? (
-                    <div className="mt-2 rounded-lg ring-1 ring-line p-2.5">
-                        <p className="text-[12.5px] font-medium text-ink-2">{tl('cardRecord')}</p>
-                        <dl>
-                            <Row label={tl('cardStatus')}>{CARD_KEY[card.status] ? tl(CARD_KEY[card.status]) : card.status}</Row>
-                            <Row label={tl('cardAmount')}>{money(card.amount, card.currency)}</Row>
-                            <Row label={tl('cardCapturedAt')}>{when(card.capturedAt) ?? <NotRecorded tl={tl} />}</Row>
-                            <Row label={tl('cardReleasedAt')}>{when(card.releasedAt) ?? <NotRecorded tl={tl} />}</Row>
-                            {o.netVisible && card.platformFee != null && <Row label={tl('cardFee')}>{money(card.platformFee, card.currency)}</Row>}
-                            {o.netVisible && card.supplierAmount != null && <Row label={tl('cardSupplierAmount')}>{money(card.supplierAmount, card.currency)}</Row>}
-                        </dl>
-                    </div>
-                ) : <p className="mt-1 text-[12.5px] text-ink-3">{o.payment.cardPaymentStarted ? tl('cardStartedNoRecord') : tl('noCardRecord')}</p>}
-            </div>
-
-            <div className="mt-4 border-t border-line pt-3">
-                <p className="text-[12px] font-medium text-ink-3">{tl('documentsTitle')}</p>
-                {o.documents.invoices.length === 0 && !o.documents.supplierInvoiceUrl && <p className="mt-1 text-[12.5px] text-ink-3">{tl('noInvoices')}</p>}
-                <ul className="mt-1 space-y-2">
-                    {o.documents.invoices.map((inv) => (
-                        <li key={inv.id} className="text-[13px]">
-                            <span className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="inline-flex items-center gap-1.5 text-ink"><FileText size={14} className="text-ink-4" aria-hidden /><bdi dir="ltr" className="font-mono text-[12.5px]">{inv.invoiceNumber}</bdi></span>
-                                <Badge tone={inv.status === 'PAID' ? 'success' : inv.status === 'OVERDUE' ? 'warning' : 'neutral'}>{INVOICE_KEY[inv.status] ? tl(INVOICE_KEY[inv.status]) : inv.status}</Badge>
-                            </span>
-                            <span className="block text-[12px] text-ink-3">{tl('invoiceLine', { date: when(inv.createdAt) || '—', amount: money(inv.amount, inv.currency), tax: money(inv.tax, inv.currency), total: money(inv.totalAmount, inv.currency) })}</span>
-                            {inv.pdfUrl ? <a href={inv.pdfUrl} target="_blank" rel="noopener noreferrer" className="no-print text-[12.5px] text-teal font-medium hover:underline inline-flex items-center gap-1">{tl('openPdf')}<ExternalLink size={12} aria-hidden /></a> : <span className="block text-[12px] text-ink-4">{tl('noPdfStored')}</span>}
-                        </li>
-                    ))}
-                    {o.documents.supplierInvoiceUrl && (
-                        <li className="text-[13px]">
-                            <a href={o.documents.supplierInvoiceUrl} target="_blank" rel="noopener noreferrer" className="text-teal font-medium hover:underline inline-flex items-center gap-1">{tl('supplierDocument')}<ExternalLink size={12} aria-hidden /></a>
-                            <span className="block text-[12px] text-ink-3">{tl('supplierDocumentHint')}</span>
-                        </li>
-                    )}
-                </ul>
-            </div>
         </Card>
     );
 }
 
-function PartyCard({ title, party, tl, when, href }: { title: string; party: (Party & { createdAt?: string; role?: string | null }) | null; tl: Tl; when: (d: string | null | undefined) => string | null; href: string | null }) {
+function PaymentCard({ o, tl, money, when }: { o: AdminOrderDetail; tl: Tl; eur: Eur; money: MoneyFmt; when: When }) {
+    const card = o.payment.card;
+    return (
+        <Card id="payment" className="scroll-mt-20" title={tl('paymentTitle')}>
+            <dl>
+                <Row label={tl('paymentStatus')}><PaymentBadge value={o.payment.status} tl={tl} /></Row>
+                <Row label={tl('paidAt')}>{when(o.payment.paidAt) ?? <NotRecorded tl={tl} />}</Row>
+            </dl>
+            {card ? (
+                <div className="mt-2 rounded-lg ring-1 ring-line p-2.5">
+                    <p className="text-[12.5px] font-medium text-ink-2">{tl('cardRecord')}</p>
+                    <dl>
+                        <Row label={tl('cardStatus')}>{CARD_KEY[card.status] ? tl(CARD_KEY[card.status]) : card.status}</Row>
+                        <Row label={tl('cardAmount')}>{money(card.amount, card.currency)}</Row>
+                        <Row label={tl('cardCapturedAt')}>{when(card.capturedAt) ?? <NotRecorded tl={tl} />}</Row>
+                        <Row label={tl('cardReleasedAt')}>{when(card.releasedAt) ?? <NotRecorded tl={tl} />}</Row>
+                        {o.netVisible && card.platformFee != null && <Row label={tl('cardFee')}>{money(card.platformFee, card.currency)}</Row>}
+                        {o.netVisible && card.supplierAmount != null && <Row label={tl('cardSupplierAmount')}>{money(card.supplierAmount, card.currency)}</Row>}
+                    </dl>
+                </div>
+            ) : <p className="mt-1 text-[12.5px] text-ink-3">{o.payment.cardPaymentStarted ? tl('cardStartedNoRecord') : tl('noCardRecord')}</p>}
+        </Card>
+    );
+}
+
+function DocumentsCard({ o, tl, money, when }: { o: AdminOrderDetail; tl: Tl; money: MoneyFmt; when: When }) {
+    return (
+        <Card id="documents" className="scroll-mt-20" title={tl('documentsTitle')}>
+            {o.documents.invoices.length === 0 && !o.documents.supplierInvoiceUrl && <p className="text-[12.5px] text-ink-3">{tl('noInvoices')}</p>}
+            <ul className="space-y-2.5">
+                {o.documents.invoices.map((inv) => (
+                    <li key={inv.id} className="text-[13px]">
+                        <span className="flex flex-wrap items-center justify-between gap-2">
+                            <span className="inline-flex items-center gap-1.5 text-ink"><FileText size={14} className="text-ink-4" aria-hidden /><bdi dir="ltr" className="font-mono text-[12.5px]">{inv.invoiceNumber}</bdi></span>
+                            <Badge tone={inv.status === 'PAID' ? 'success' : inv.status === 'OVERDUE' ? 'warning' : 'neutral'}>{INVOICE_KEY[inv.status] ? tl(INVOICE_KEY[inv.status]) : inv.status}</Badge>
+                        </span>
+                        <span className="block text-[12px] text-ink-3">{tl('invoiceLine', { date: when(inv.createdAt) || '—', amount: money(inv.amount, inv.currency), tax: money(inv.tax, inv.currency), total: money(inv.totalAmount, inv.currency) })}</span>
+                        {inv.pdfUrl && /^https:\/\//.test(inv.pdfUrl)
+                            ? <a href={inv.pdfUrl} target="_blank" rel="noopener noreferrer" className="no-print text-[12.5px] text-teal font-medium hover:underline inline-flex items-center gap-1">{tl('openPdf')}<ExternalLink size={12} aria-hidden /></a>
+                            : <span className="block text-[12px] text-ink-4">{tl('noPdfStored')}</span>}
+                    </li>
+                ))}
+                {o.documents.supplierInvoiceUrl && (
+                    <li className="text-[13px]">
+                        <a href={o.documents.supplierInvoiceUrl} target="_blank" rel="noopener noreferrer" className="text-teal font-medium hover:underline inline-flex items-center gap-1">{tl('supplierDocument')}<ExternalLink size={12} aria-hidden /></a>
+                        <span className="block text-[12px] text-ink-3">{tl('supplierDocumentHint')}</span>
+                    </li>
+                )}
+            </ul>
+        </Card>
+    );
+}
+
+function PartyCard({ title, party, orderId, tl, when, messageLabel }: { title: string; party: (Party & { createdAt?: string; role?: string | null }) | null; orderId: string; tl: Tl; when: When; messageLabel: string }) {
     if (!party) return <Card title={title}><p className="text-[13px] text-ink-3">{tl('accountMissing')}</p></Card>;
     return (
-        <Card title={title} actions={href ? <Link href={href} className="no-print text-[13px] text-teal font-medium hover:underline">{tl('openAccount')}</Link> : undefined}>
+        <Card title={title} actions={<Link href={`/admin/users/${party.id}`} className="no-print text-[13px] text-teal font-medium hover:underline">{tl('openAccount')}</Link>}>
             <dl className="space-y-2 text-[13px]">
                 <div>
                     <dt className="sr-only">{tl('name')}</dt>
@@ -452,7 +391,28 @@ function PartyCard({ title, party, tl, when, href }: { title: string; party: (Pa
                 </div>
                 {party.createdAt && <p className="text-[12px] text-ink-3">{tl('memberSince', { date: when(party.createdAt) || '—' })}</p>}
             </dl>
-            <Link href={`/admin/support?search=${party.id}`} className="no-print mt-3 inline-flex items-center gap-1.5 text-[13px] text-teal font-medium hover:underline"><MessageSquare size={14} aria-hidden />{tl('sendMessage')}</Link>
+            <Link href={supportChatHref(party.id, orderId)} className="no-print mt-3 inline-flex items-center gap-1.5 text-[13px] text-teal font-medium hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6] rounded"><MessageSquare size={14} aria-hidden />{messageLabel}</Link>
+        </Card>
+    );
+}
+
+function DestinationCard({ o, tl }: { o: AdminOrderDetail; tl: Tl }) {
+    const lg = o.logistics;
+    const a = lg.shippingAddress;
+    const addressLines = a ? [a.name, a.company, a.street, [a.postal, a.city].filter(Boolean).join(' '), a.country].filter((x) => x && String(x).trim()) : [];
+    return (
+        <Card id="destination" className="scroll-mt-20" title={tl('destinationTitle')}>
+            <dl className="grid gap-4 sm:grid-cols-2 text-[13px]">
+                <div>
+                    <dt className="text-[12px] text-ink-3">{tl('deliveryCountry')}</dt>
+                    <dd className="flex items-center gap-1.5 text-ink"><MapPin size={14} className="text-ink-4" aria-hidden />{lg.destinationCountry ? <bdi dir="ltr">{lg.destinationCountry}</bdi> : <NotRecorded tl={tl} />}{a?.country && a.country !== lg.destinationCountry ? <span className="text-ink-3"> · {a.country}</span> : null}</dd>
+                </div>
+                <div>
+                    <dt className="text-[12px] text-ink-3">{tl('deliveryAddress')}</dt>
+                    <dd className="text-ink">{addressLines.length ? addressLines.map((x, i) => <span key={i} className="block">{x}</span>) : <NotRecorded tl={tl} />}</dd>
+                </div>
+            </dl>
+            <p className="mt-3 text-[12.5px] text-ink-3">{tl('destinationNote')}</p>
         </Card>
     );
 }
@@ -485,23 +445,11 @@ function LogisticsCard({ o, tl, eur, when, onSaved }: { o: AdminOrderDetail; tl:
             onSaved();
         } catch (e: any) { toast.error(e.message || tl('actionFailed')); } finally { setSaving(false); }
     };
-    const a = lg.shippingAddress;
-    const addressLines = a ? [a.name, a.company, a.street, [a.postal, a.city].filter(Boolean).join(' '), a.country].filter((x) => x && String(x).trim()) : [];
 
     return (
-        <Card title={tl('logisticsTitle')} description={tl('logisticsDesc')}>
-            <div className="grid gap-4 sm:grid-cols-2">
-                <dl className="space-y-2 text-[13px]">
-                    <div>
-                        <dt className="text-[12px] text-ink-3">{tl('deliveryAddress')}</dt>
-                        <dd className="text-ink">{addressLines.length ? addressLines.map((x, i) => <span key={i} className="block">{x}</span>) : <NotRecorded tl={tl} />}</dd>
-                    </div>
-                    <div>
-                        <dt className="text-[12px] text-ink-3">{tl('deliveryCountry')}</dt>
-                        <dd>{lg.destinationCountry ? <bdi dir="ltr">{lg.destinationCountry}</bdi> : <NotRecorded tl={tl} />}</dd>
-                    </div>
-                </dl>
-                <dl className="space-y-2 text-[13px]">
+        <Card id="logistics" className="scroll-mt-20" title={tl('logisticsTitle')} description={tl('logisticsDesc')}>
+            <div>
+                <dl className="grid gap-x-6 gap-y-2 sm:grid-cols-3 text-[13px]">
                     <div>
                         <dt className="text-[12px] text-ink-3">{tl('buyerCarrier')}</dt>
                         <dd>{lg.customerShippingCompany || <NotRecorded tl={tl} />}</dd>
@@ -591,7 +539,7 @@ function TimelineCard({ events, tl, when, statusLabel }: { events: TimelineEvent
         }
     };
     return (
-        <Card title={tl('timelineTitle')} description={tl('timelineDesc')}>
+        <Card id="activity" className="scroll-mt-20" title={tl('timelineTitle')} description={tl('timelineDesc')}>
             {events.length === 0 ? <p className="text-[13px] text-ink-3">{tl('timelineEmpty')}</p> : (
                 <ol className="relative space-y-3 ms-1.5 border-s border-line ps-4">
                     {events.map((e, i) => (

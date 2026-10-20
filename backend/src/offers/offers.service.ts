@@ -6,6 +6,16 @@ import { EmailService } from '../email/email.service';
 import { EmailTrackingService } from '../email-tracking/email-tracking.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as XLSX from 'xlsx';
+import { isStaffRole } from '../products/catalog-scope';
+
+/**
+ * Admin read model: marks offers posted by a staff account (Atlantis's own,
+ * auto-approved at creation) with the same staff rule as the Products scopes
+ * (products/catalog-scope.ts), so the admin page never guesses from a name.
+ */
+export function withSource<T extends { supplier?: { role?: unknown } | null }>(o: T): T & { postedByStaff: boolean } {
+    return { ...o, postedByStaff: isStaffRole(o?.supplier?.role) };
+}
 
 interface OfferInput {
     productId?: string;
@@ -317,7 +327,7 @@ export class OffersService {
     async listAll(status?: string) {
         const where: any = {};
         if (status) where.status = status;
-        return this.prisma.offer.findMany({
+        const rows = await this.prisma.offer.findMany({
             where,
             orderBy: { createdAt: 'desc' },
             include: {
@@ -325,6 +335,7 @@ export class OffersService {
                 supplier: { select: { id: true, name: true, email: true, companyName: true, role: true } },
             },
         });
+        return rows.map(withSource);
     }
 
     async findById(id: string) {
@@ -354,21 +365,33 @@ export class OffersService {
             where: { id },
             data: { status: 'APPROVED', approvedAt: new Date(), approvedBy: adminId },
         });
-        await this.blastApprovedOffer(id);
-        return this.findById(id);
+        // The approval is recorded first; the email step reports what it
+        // actually delivered. If that step fails, the offer stays approved
+        // and the caller is told the emails were not sent (emailBlast: null)
+        // instead of receiving an error for an approval that did happen.
+        let emailBlast: { total: number; successCount: number } | null = null;
+        try {
+            emailBlast = await this.blastApprovedOffer(id);
+        } catch (err) {
+            this.logger.warn(`Offer ${id} approved but the email step failed: ${(err as any)?.message}`);
+        }
+        return { ...withSource(await this.findById(id)), emailBlast };
     }
 
     async reject(id: string, adminId: string, reason?: string) {
         await this.findById(id);
-        return this.prisma.offer.update({
+        await this.prisma.offer.update({
             where: { id },
             data: {
                 status: 'REJECTED',
-                adminNotes: reason || 'Rejected by admin',
+                adminNotes: reason?.trim() || 'Rejected by admin',
                 approvedAt: new Date(),
                 approvedBy: adminId,
             },
         });
+        // Same shape as the admin list row (product + supplier), so the
+        // review page can replace the row with what the server stored.
+        return withSource(await this.findById(id));
     }
 
     async deleteOne(id: string, requesterId: string, requesterRole: string) {

@@ -12,6 +12,13 @@ export class ChatService {
   ) {}
 
   async sendMessage(senderId: string, data: { content?: string; imageUrl?: string; receiverId?: string }) {
+    if (!String(data?.content ?? '').trim() && !data?.imageUrl) throw new BadRequestException('Write a message first.');
+    if (String(data?.content ?? '').length > 4000) throw new BadRequestException('Messages can be up to 4,000 characters.');
+    if (data?.receiverId) {
+      // Staff writing to a user: the user must exist (otherwise the message would be stored for nobody).
+      const receiver = await this.prisma.user.findUnique({ where: { id: data.receiverId }, select: { id: true } });
+      if (!receiver) throw new NotFoundException('That user doesn’t exist.');
+    }
     const user = await this.prisma.user.findUnique({
       where: { id: senderId },
       include: {
@@ -174,7 +181,7 @@ export class ChatService {
      return this.prisma.supportMessage.findMany({
        where: {
          OR: [
-           { senderId: userId, receiverId: null }, // User to Support
+           { senderId: userId, receiverId: null, orderId: null }, // User to Support (order threads are separate)
            { receiverId: userId } // Support to User
          ]
        },
@@ -346,13 +353,33 @@ export class ChatService {
   }
 
   /**
+   * May this staff role open a user's general support conversation?
+   * ADMIN, SUPPORT and OWNER: every conversation. DEVELOPER and LOGISTICS: only
+   * conversations routed to their team (the same rule as the conversation list).
+   * Anyone else: none.
+   */
+  async canAccessGeneral(role: string | undefined, userId: string) {
+    const r = String(role || '').toUpperCase();
+    if (r === 'ADMIN' || r === 'SUPPORT' || r === 'OWNER') return true;
+    if (r !== 'DEVELOPER' && r !== 'LOGISTICS') return false;
+    const routed = await this.prisma.supportMessage.count({
+      where: { orderId: null, assignedTeam: r, OR: [{ senderId: userId, receiverId: null }, { receiverId: userId }] },
+    });
+    return routed > 0;
+  }
+
+  async assertAccessGeneral(role: string | undefined, userId: string) {
+    if (!(await this.canAccessGeneral(role, userId))) throw new ForbiddenException('This conversation isn’t assigned to your team.');
+  }
+
+  /**
    * Switch conversation from bot to human agent.
    * Marks all bot messages in this thread as handed over.
    */
   async switchToHuman(userId: string, agentId: string) {
     // Mark the conversation thread as handed over
     await this.prisma.supportMessage.updateMany({
-      where: { senderId: userId, receiverId: null },
+      where: { senderId: userId, receiverId: null, orderId: null },
       data: { isHandedOver: true, handedOverBy: agentId },
     });
 
@@ -375,7 +402,7 @@ export class ChatService {
   async switchToAI(userId: string, agentId: string) {
     // Reset handover status
     await this.prisma.supportMessage.updateMany({
-      where: { senderId: userId, receiverId: null },
+      where: { senderId: userId, receiverId: null, orderId: null },
       data: { isHandedOver: false, handedOverBy: null },
     });
 
@@ -398,7 +425,7 @@ export class ChatService {
    * Get all conversations for support panel with unread count + handover status.
    */
   async getConversationsWithStatus(userRole: string) {
-    const where: any = { receiverId: null };
+    const where: any = { receiverId: null, orderId: null };
     if (userRole === 'DEVELOPER') where.assignedTeam = 'DEVELOPER';
     else if (userRole === 'LOGISTICS') where.assignedTeam = 'LOGISTICS';
     else if (userRole !== 'ADMIN' && userRole !== 'SUPPORT' && userRole !== 'OWNER') return [];
@@ -418,12 +445,12 @@ export class ChatService {
       latestMessages.map(async (m) => {
         const [unreadCount, lastMsg, handedOver] = await Promise.all([
           this.prisma.supportMessage.count({
-            where: { senderId: m.senderId, receiverId: null, isRead: false },
+            where: { senderId: m.senderId, receiverId: null, orderId: null, isRead: false },
           }),
           this.prisma.supportMessage.findFirst({
             where: {
               OR: [
-                { senderId: m.senderId, receiverId: null },
+                { senderId: m.senderId, receiverId: null, orderId: null },
                 { receiverId: m.senderId },
               ],
             },
@@ -431,7 +458,7 @@ export class ChatService {
             select: { content: true, isBot: true, createdAt: true },
           }),
           this.prisma.supportMessage.findFirst({
-            where: { senderId: m.senderId, isHandedOver: true },
+            where: { senderId: m.senderId, orderId: null, isHandedOver: true },
             select: { isHandedOver: true },
           }),
         ]);

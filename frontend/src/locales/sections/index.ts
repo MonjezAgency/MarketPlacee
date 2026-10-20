@@ -20,7 +20,12 @@ import productReview from './productReview';
 import notificationsCenter from './notificationsCenter';
 import adminUsers from './adminUsers';
 import adminOrders from './adminOrders';
+import adminNav from './adminNav';
+import adminOffers from './adminOffers';
+import adminSupport from './adminSupport';
+import adminSettings from './adminSettings';
+import adminFinance from './adminFinance';
 
 /** Every area dictionary (see define.ts). Order doesn't matter; names must be unique. */
-export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, catalogImport, targetsPage, productTour, catalogFields, supplierOverview, imageDiscovery, targetPrice, promotions, adminOverview, adminProducts, productReview, notificationsCenter, adminUsers, adminOrders] as const;
+export const SECTIONS = [landing, supplierShell, supplierCatalog, supplierOps, supplierMoney, buyerAccount, support, legacySupplier, catalogImport, targetsPage, productTour, catalogFields, supplierOverview, imageDiscovery, targetPrice, promotions, adminOverview, adminProducts, productReview, notificationsCenter, adminUsers, adminOrders, adminNav, adminOffers, adminSupport, adminSettings, adminFinance] as const;
 export type SectionName = (typeof SECTIONS)[number]['name'];

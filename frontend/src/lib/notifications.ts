@@ -33,7 +33,7 @@ export function notificationHref(n: AppNotification, role?: string | null): stri
         if (r === 'SUPPLIER') return d.productId ? `/supplier/products/${encodeURIComponent(String(d.productId))}/edit` : '/supplier/products';
         return '/dashboard/customer/targets';
     }
-    if (d.offerId && staff) return '/admin/wholesale-offers';
+    if (d.offerId && staff) return '/admin/offers?tab=supplier';
     if (d.productId) {
         const id = encodeURIComponent(String(d.productId));
         if (staff) return `/admin/products/${id}`;
@@ -49,7 +49,7 @@ export function notificationHref(n: AppNotification, role?: string | null): stri
 export const KINDS = [
     'TARGET_CREATED', 'TARGET_INTEREST_SUPPLIER', 'TARGET_WITHDRAWN', 'TARGET_RESPONDED', 'TARGET_ACCEPTED', 'TARGET_DECLINED', 'TARGET_REACHED',
     'PRODUCT_SUBMITTED', 'PRODUCT_RESUBMITTED', 'PRODUCT_CHANGES_REQUESTED', 'PRODUCT_APPROVED', 'PRODUCT_REJECTED', 'PRODUCT_STATUS',
-    'STOCK_OUT', 'STOCK_LOW', 'AI_ORDER_PENDING', 'AI_KYC_REQUIRED', 'AI_PRODUCT_REJECTED', 'AI_LOW_STOCK',
+    'STOCK_OUT', 'STOCK_LOW', 'AI_ORDER_PENDING', 'AI_KYC_REQUIRED', 'AI_PRODUCT_REJECTED', 'AI_LOW_STOCK', 'SUPPORT_ROUTED',
     'ORDER_NEW_SUPPLIER', 'ORDER_NEW_ADMIN', 'ORDER_READY', 'ORDER_SUPPLIER_DECLINED_LINES', 'ORDER_SUPPLIER_REJECTED', 'ORDER_CONFIRMED', 'ORDER_CONFIRMED_ACCEPT',
     'ORDER_CONFIRM_REQUEST', 'ORDER_CHANGED_SUPPLIER', 'ORDER_CHANGED_BUYER', 'ORDER_TERMS_ACCEPTED', 'ORDER_CONFIRM_EXPIRED', 'ORDER_DELIVERY_QUOTED', 'ORDER_DELIVERY_REMOVED',
     'ORDER_INSPECTION_PASSED', 'ORDER_INSPECTION_FAILED', 'ORDER_INSPECTION_ISSUES', 'ORDER_STATUS_BUYER', 'ORDER_STATUS_SUPPLIER', 'ORDER_STATUS_BY_SUPPLIER',
@@ -90,7 +90,7 @@ export function notificationText(n: AppNotification, t: T, money?: (eur: number)
             ref: String(p.ref ?? d.targetRef ?? ''), product: String(p.product ?? ''),
             cases: Number(p.cases) || 0, price: p.price != null && p.price !== '' && Number.isFinite(Number(p.price)) ? (money ? money(Number(p.price)) : String(p.price)) : '',
             reason: String(p.reason ?? p.message ?? '').trim(),
-            min: Number(p.min) || 0, units: Number(p.units) || 0, version: String(p.version ?? ''), buyer: String(p.buyer ?? ''), actor: String(p.actor ?? ''),
+            min: Number(p.min) || 0, units: Number(p.units) || 0, version: String(p.version ?? ''), buyer: String(p.buyer ?? ''), actor: String(p.actor ?? ''), name: String(p.name ?? ''), team: String(p.team ?? ''),
             status: ORDER_STATUSES.includes(String(p.status)) ? t('notificationsCenter', `st_${p.status}`) : String(p.status ?? ''),
         };
         const title = t('notificationsCenter', `${kind}_t`, vars);

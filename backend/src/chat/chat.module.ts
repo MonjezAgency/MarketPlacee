@@ -4,6 +4,8 @@ import { ChatService } from './chat.service';
 import { ChatController } from './chat.controller';
 import { BotService } from './bot.service';
 import { ChatGateway } from './chat.gateway';
+import { SupportHqService } from './support-hq.service';
+import { SupportHqController } from './support-hq.controller';
 import { PrismaModule } from '../common/prisma.module';
 
 @Module({
@@ -13,8 +15,8 @@ import { PrismaModule } from '../common/prisma.module';
       secret: process.env.JWT_SECRET,
     }),
   ],
-  controllers: [ChatController],
-  providers: [ChatService, BotService, ChatGateway],
+  controllers: [ChatController, SupportHqController],
+  providers: [ChatService, BotService, ChatGateway, SupportHqService],
   exports: [ChatService, ChatGateway],
 })
 export class ChatModule {}

@@ -1,5 +1,5 @@
 import {
-    attentionQueues, buildOrderWhere, buildTimeline, cleanVariants, csvCell, moneySummary, nextAction, orderByFor, orderRef, ordersPerKey,
+    attentionQueues, buildLoads, buildOrderWhere, loadTotals, normaliseComposition, buildTimeline, cleanVariants, csvCell, moneySummary, nextAction, orderByFor, orderRef, ordersPerKey,
     parseBound, parseOrderListQuery, redactNet, statusCounts, statusOptions, supplierIdsOf, toCsv, OrderListQueryError,
 } from '../admin-orders';
 import { orderAttention, type OpenOrderFacts } from '../../admin/admin-overview';
@@ -58,7 +58,7 @@ describe('filters and sorting', () => {
         expect(orderByFor('total_asc')[0]).toEqual({ totalAmount: 'asc' });
     });
     it('order reference is the first 8 characters, upper-case (same as the Founder Overview)', () => {
-        expect(orderRef('a1b2c3d4-0000-1111-2222-333344445555')).toBe('A1B2C3D4');
+        expect(orderRef('a1b2c3d4-0000-1111-2222-333344445555')).toBe('44445555');
     });
 });
 
@@ -210,5 +210,59 @@ describe('detail helpers', () => {
         expect(d.money).toMatchObject({ goodsTotal: 100, supplierNet: null, markupOnRecordedLines: null });
         expect(d.payment.card).toMatchObject({ amount: 100, platformFee: null, supplierAmount: null });
         expect(d.lines[0]).toEqual({ id: 'i1', unitPrice: 50 });
+    });
+});
+
+describe('loads', () => {
+    const line = (o: Record<string, any>) => ({ id: 'i', tier: 'pallet', quantity: 2, lineTotal: 200, supplierLineTotal: 160, mixedLoadId: null, mixedLoad: null, mixComposition: null, supplier: null, ...o });
+    it('reads a server-validated mixed load: the stored contents are buyer prices; supplier net is not recorded', () => {
+        // priceLoad stores buyer-priced lines (mix markup applied), e.g. 400 cases × €14.26 = €5,704.
+        const comp = normaliseComposition([
+            { productId: 'p1', name: 'Choco cake', variant: 'Flavour=Diet', quantity: 5, unit: 'pallet', cases: 400, unitPrice: 14.26, lineSubtotal: 5704 },
+            { productId: 'p2', name: 'Wafer', quantity: 5, unit: 'pallet', cases: 400, unitPrice: 9.2, lineSubtotal: 3680, discountPercent: 5 },
+        ], { mixedLoad: true, tier: 'truck', buyerTotal: 9384 })!;
+        expect(comp[0]).toMatchObject({ variant: 'Flavour=Diet', quantity: 5, unit: 'pallet', cases: 400, unitPrice: 14.26, lineTotal: 5704, supplierUnitPrice: null, supplierLineTotal: null });
+        expect(comp[1]).toMatchObject({ discountPercent: 5, lineTotal: 3680 });
+        expect(comp[0].lineTotal! + comp[1].lineTotal!).toBeCloseTo(9384, 2);
+        const [load] = buildLoads([line({ id: 'm1', tier: 'truck', quantity: 1, lineTotal: 9384, supplierLineTotal: null, mixedLoadId: 'L1', mixedLoad: { id: 'L1', kind: 'TRUCK' }, mixComposition: comp })]);
+        expect(load).toMatchObject({ lineId: 'm1', type: 'MIXED_LOAD', mixedKind: 'TRUCK', loadRecordFound: true, entries: 2, buyerTotal: 9384, supplierNet: null });
+    });
+    it('reads the legacy variant mix: no unit recorded, so the unit comes from how the composer filled the tier', () => {
+        const truck = normaliseComposition([{ signature: 'Flavour=Diet', quantity: 4, unitPrice: 500 }, { signature: 'Flavour=Regular', quantity: 6, unitPrice: 450 }], { mixedLoad: false, tier: 'truck', buyerTotal: 4700 })!;
+        expect(truck[0]).toMatchObject({ variant: 'Flavour=Diet', unit: 'pallet', cases: null, unitPrice: 500, lineTotal: 2000, supplierLineTotal: null });
+        const pallet = normaliseComposition([{ signature: 'A', quantity: 20, unitPrice: 9 }], { mixedLoad: false, tier: 'pallet', buyerTotal: 180 })!;
+        expect(pallet[0]).toMatchObject({ unit: 'case', cases: 20, lineTotal: 180 });
+        const [load] = buildLoads([line({ tier: 'truck', quantity: 1, lineTotal: 4700, supplierLineTotal: null, mixComposition: truck })]);
+        expect(load).toMatchObject({ type: 'VARIANT_MIX', mixedKind: 'TRUCK', loadRecordFound: null, entries: 2, supplierNet: null });
+    });
+    it('keeps missing apart from zero, and a recorded supplier price on the order line still counts', () => {
+        const comp = normaliseComposition([{ productId: 'p1', quantity: 3, unit: 'case' }, { productId: 'p2', quantity: 0, unit: 'case', unitPrice: 0, lineSubtotal: 0 }], { mixedLoad: true, tier: 'pallet', buyerTotal: 100 })!;
+        expect(comp[0]).toMatchObject({ unitPrice: null, lineTotal: null });
+        expect(comp[1]).toMatchObject({ quantity: 0, unitPrice: 0, lineTotal: 0 });
+        const [gone] = buildLoads([line({ mixedLoadId: 'gone', mixedLoad: null, tier: 'truck', supplierLineTotal: null, mixComposition: comp })]);
+        expect(gone).toMatchObject({ type: 'MIXED_LOAD', mixedKind: 'TRUCK', loadRecordFound: false, supplierNet: null });
+        const [recorded] = buildLoads([line({ mixedLoadId: 'L', mixedLoad: { id: 'L', kind: 'PALLET' }, supplierLineTotal: 90, mixComposition: comp })]);
+        expect(recorded.supplierNet).toBe(90);
+        expect(normaliseComposition(null, { mixedLoad: false, tier: null, buyerTotal: 1 })).toBeNull();
+        expect(normaliseComposition([], { mixedLoad: false, tier: null, buyerTotal: 1 })).toBeNull();
+    });
+    it('several products are never called a mixed load: each standard line is its own entry', () => {
+        const loads = buildLoads([line({ id: 'a', tier: 'truck', quantity: 1 }), line({ id: 'b', tier: 'case', quantity: 40, lineTotal: 400, supplierLineTotal: null }), line({ id: 'c', tier: null })]);
+        expect(loads.map((l) => [l.type, l.mixedKind, l.tier])).toEqual([['STANDARD', null, 'truck'], ['STANDARD', null, 'case'], ['STANDARD', null, null]]);
+        const t = loadTotals(loads);
+        expect(t).toMatchObject({ loads: 3, mixedLoads: 0, variantMixes: 0, standardLines: 3, buyerTotal: 800, supplierNet: null, loadsWithoutNet: 1 });
+        expect(loadTotals(buildLoads([line({})]))).toMatchObject({ buyerTotal: 200, supplierNet: 160, loadsWithoutNet: 0 });
+        expect(loadTotals([])).toMatchObject({ loads: 0, buyerTotal: 0, supplierNet: null });
+    });
+    it('redaction removes supplier values inside mixed loads and on the loads too', () => {
+        const comp = normaliseComposition([{ productId: 'p1', quantity: 1, unit: 'case', unitPrice: 12, lineSubtotal: 12 }], { mixedLoad: true, tier: 'pallet', buyerTotal: 12 });
+        const loads = buildLoads([line({ mixedLoadId: 'L', mixedLoad: { id: 'L', kind: 'PALLET' }, supplierLineTotal: 10, mixComposition: comp })]);
+        const d = redactNet({ netVisible: true, lines: [{ id: 'i', unitPrice: 12, supplierUnitPrice: null, mixComposition: comp }], loads, loadTotals: loadTotals(loads), money: {} });
+        const s = JSON.stringify(d);
+        expect(s).not.toContain('supplierUnitPrice');
+        expect(s).not.toContain('supplierLineTotal');
+        expect(d.loads[0].supplierNet).toBeNull();
+        expect(d.loadTotals.supplierNet).toBeNull();
+        expect(d.lines[0].mixComposition[0]).toMatchObject({ lineTotal: 12, unitPrice: 12 });
     });
 });

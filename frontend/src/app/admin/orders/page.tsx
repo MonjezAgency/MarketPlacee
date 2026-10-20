@@ -4,10 +4,11 @@ import * as React from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { AlertTriangle, ArrowDown, ArrowUp, ChevronLeft, ChevronRight, ClipboardList, Download, Search } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Check, ChevronLeft, ChevronRight, ClipboardList, Download, Search, SlidersHorizontal, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button, Card, EmptyState, ErrorState, Notice, PageHeader, Skeleton, StatusBadge, inputCls, selectCls } from '@/components/supplier/ui';
+import { FilterPopover } from '@/components/admin/orders/FilterPopover';
 import { NextActionCell, PAYMENT_KEY, PaymentBadge } from '@/components/admin/OrderBadges';
 import {
     EXPORT_MAX_ROWS, ORDER_SORTS, ORDER_STATUSES, adminOrdersApi,
@@ -103,6 +104,33 @@ function OrdersList() {
     const c = data?.counts;
     const att = c?.attention;
     const rows = data?.data ?? [];
+
+    // Filters behind the "Filters" button (search, payment and sort sit in the toolbar; status on the cards).
+    const moreCount = [attention, supplier, buyer].filter(Boolean).length + (fromDay || toDay ? 1 : 0);
+    const dayLabel = (d: string) => (DAY_RE.test(d) ? fmt.date(`${d}T12:00:00`, { day: 'numeric', month: 'short', year: 'numeric' }) : d);
+    const queueKey = QUEUES.find((x) => x.id === attention)?.key;
+    const chips: { id: string; name: string; value: string; clear: () => void }[] = [];
+    if (debouncedQ) chips.push({ id: 'q', name: tl('search'), value: debouncedQ, clear: () => setQ('') });
+    if (status) chips.push({ id: 'status', name: tl('filterStatus'), value: STATUS_CARD_KEY[status] ? tl(STATUS_CARD_KEY[status]) : status, clear: () => setStatus('') });
+    if (attention) chips.push({ id: 'attention', name: tl('filterQueue'), value: queueKey ? tl(queueKey) : attention, clear: () => setAttention('') });
+    if (paymentStatus) chips.push({ id: 'pay', name: tl('filterPayment'), value: PAYMENT_KEY[paymentStatus] ? tl(PAYMENT_KEY[paymentStatus]) : paymentStatus, clear: () => setPaymentStatus('') });
+    if (supplier) chips.push({ id: 'supplier', name: tl('filterSupplier'), value: data?.facets.suppliers.find((s) => s.id === supplier)?.name || tl('unnamedSupplier'), clear: () => setSupplier('') });
+    if (buyer) chips.push({ id: 'buyer', name: tl('filterBuyer'), value: data?.facets.buyers.find((b) => b.id === buyer)?.name || tl('unknownBuyer'), clear: () => setBuyer('') });
+    if (fromDay || toDay) chips.push({
+        id: 'dates', name: tl('dateCreated'),
+        value: fromDay && toDay ? tl('dateBetween', { from: dayLabel(fromDay), to: dayLabel(toDay) }) : fromDay ? tl('dateSince', { from: dayLabel(fromDay) }) : tl('dateUntil', { to: dayLabel(toDay) }),
+        clear: () => { setFromDay(''); setToDay(''); },
+    });
+
+    /** Whole-row navigation; clicks on links, buttons and form controls inside the row keep their own behaviour. */
+    const openRow = (e: React.MouseEvent<HTMLTableRowElement>, id: string) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('a,button,input,select,textarea,label,[data-row-stop]')) return;
+        if (typeof window !== 'undefined' && window.getSelection()?.toString()) return; // selecting text, not opening
+        const href = `/admin/orders/${id}`;
+        if (e.metaKey || e.ctrlKey || e.button === 1) { window.open(href, '_blank', 'noopener'); return; }
+        router.push(href);
+    };
     const toggleSort = (field: 'created' | 'total') => {
         if (field === 'created') setSort((s) => (s === 'newest' ? 'oldest' : 'newest'));
         else setSort((s) => (s === 'total_desc' ? 'total_asc' : 'total_desc'));
@@ -121,9 +149,10 @@ function OrdersList() {
     return (
         <div data-no-translate className="text-start -mt-2">
             <PageHeader title={tl('title')} description={tl('subtitle')}
-                actions={<Button icon={<Download size={15} />} loading={exporting} disabled={!data || data.total === 0 || rangeInvalid} onClick={exportCsv}>{tl('exportCsv')}</Button>} />
+                actions={<Button icon={<Download size={15} />} loading={exporting} disabled={!data || data.total === 0 || rangeInvalid} onClick={exportCsv}
+                    title={filtersActive ? tl('exportFilteredHint', { count: data?.total ?? 0 }) : tl('exportAllHint')}>{tl('exportCsv')}</Button>} />
 
-            {/* Summary — current counts over all orders, from the server */}
+            {/* Summary — current counts over all orders, from the server. Each card is the status filter. */}
             <section aria-label={tl('summaryAria')} className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 mb-2">
                 <SummaryCard label={tl('cardAll')} value={c ? int(c.total) : null} active={!status && !attention} onClick={() => { setStatus(''); setAttention(''); }} />
                 {ORDER_STATUSES.map((s) => (
@@ -136,50 +165,78 @@ function OrdersList() {
             <p className="mb-4 text-[12.5px] text-ink-3">{data ? tl('countsNote', { time: fmt.date(data.asOf, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) }) : ' '}</p>
 
             <Card bodyClassName="p-0">
-                <div className="flex flex-col gap-2 p-3 sm:p-4 border-b border-line">
-                    <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
-                        <label className="relative sm:col-span-2">
+                <div className="flex flex-col gap-2 px-3 py-2.5 sm:px-4 border-b border-line">
+                    <div role="toolbar" aria-label={tl('toolbarAria')} className="flex flex-wrap items-center gap-2">
+                        <label className="relative flex-1 min-w-[220px]">
                             <span className="sr-only">{tl('search')}</span>
                             <Search size={15} className="absolute start-3 top-1/2 -translate-y-1/2 text-ink-4" aria-hidden />
-                            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl('searchPh')} className={cn(inputCls, 'ps-9')} />
+                            <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={tl('searchPh')} className={cn(inputCls, 'h-9 ps-9 text-[13.5px]')} />
                         </label>
-                        <select aria-label={tl('filterStatus')} value={status} onChange={(e) => { setAttention(''); setStatus(e.target.value); }} className={selectCls}>
-                            <option value="">{tl('allStatuses')}</option>
-                            {ORDER_STATUSES.map((s) => <option key={s} value={s}>{tl(STATUS_CARD_KEY[s])}{c ? ` (${int(c.byStatus[s])})` : ''}</option>)}
-                        </select>
-                        <select aria-label={tl('filterQueue')} value={attention} onChange={(e) => setAttention(e.target.value)} className={selectCls}>
-                            <option value="">{tl('allQueues')}</option>
-                            {QUEUES.map((x) => <option key={x.id} value={x.id}>{tl(x.key)}{att ? ` (${int(queueCount(x.id, att))})` : ''}</option>)}
-                        </select>
-                        <select aria-label={tl('filterPayment')} value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className={selectCls}>
+                        <select aria-label={tl('filterPayment')} value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} className={cn(selectCls, 'h-9 w-auto min-w-[170px] text-[13.5px]')}>
                             <option value="">{tl('allPayments')}</option>
                             {(data?.facets.paymentStatuses ?? []).map((p) => <option key={p.value} value={p.value}>{PAYMENT_KEY[p.value] ? tl(PAYMENT_KEY[p.value]) : p.value} ({int(p.count)})</option>)}
+                            {paymentStatus && !(data?.facets.paymentStatuses ?? []).some((p) => p.value === paymentStatus) && <option value={paymentStatus}>{PAYMENT_KEY[paymentStatus] ? tl(PAYMENT_KEY[paymentStatus]) : paymentStatus}</option>}
                         </select>
-                        <select aria-label={tl('filterSupplier')} value={supplier} onChange={(e) => setSupplier(e.target.value)} className={selectCls}>
-                            <option value="">{tl('allSuppliers')}</option>
-                            {(data?.facets.suppliers ?? []).map((s) => <option key={s.id} value={s.id}>{s.name} ({int(s.count)})</option>)}
-                        </select>
-                        <select aria-label={tl('filterBuyer')} value={buyer} onChange={(e) => setBuyer(e.target.value)} className={selectCls}>
-                            <option value="">{tl('allBuyers')}</option>
-                            {(data?.facets.buyers ?? []).map((b) => <option key={b.id} value={b.id}>{b.name} ({int(b.count)})</option>)}
-                        </select>
-                        <select aria-label={tl('sort')} value={sort} onChange={(e) => setSort(e.target.value)} className={selectCls}>
+                        <select aria-label={tl('sort')} value={sort} onChange={(e) => setSort(e.target.value)} className={cn(selectCls, 'h-9 w-auto min-w-[160px] text-[13.5px]')}>
                             {ORDER_SORTS.map((o) => <option key={o} value={o}>{tl(`sort_${o}`)}</option>)}
                         </select>
+                        <FilterPopover label={tl('filtersButton')} count={moreCount} title={tl('filtersTitle')} doneLabel={tl('filtersDone')} clearLabel={tl('clearMoreFilters')}
+                            onClear={moreCount ? () => { setSupplier(''); setBuyer(''); setAttention(''); setFromDay(''); setToDay(''); } : undefined}
+                            icon={<SlidersHorizontal size={15} aria-hidden />}>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <label className="flex flex-col gap-1 text-[12.5px] font-medium text-ink-2">
+                                    {tl('filterQueue')}
+                                    <select data-autofocus value={attention} onChange={(e) => { setAttention(e.target.value); if (e.target.value) setStatus(''); }} className={cn(selectCls, 'h-9 text-[13.5px] font-normal')}>
+                                        <option value="">{tl('allQueues')}</option>
+                                        {QUEUES.map((x) => <option key={x.id} value={x.id}>{tl(x.key)}{att ? ` (${int(queueCount(x.id, att))})` : ''}</option>)}
+                                    </select>
+                                </label>
+                                <label className="flex flex-col gap-1 text-[12.5px] font-medium text-ink-2">
+                                    {tl('filterSupplier')}
+                                    <select value={supplier} onChange={(e) => setSupplier(e.target.value)} className={cn(selectCls, 'h-9 text-[13.5px] font-normal')}>
+                                        <option value="">{tl('allSuppliers')}</option>
+                                        {(data?.facets.suppliers ?? []).map((s) => <option key={s.id} value={s.id}>{s.name} ({int(s.count)})</option>)}
+                                    </select>
+                                </label>
+                                <label className="flex flex-col gap-1 text-[12.5px] font-medium text-ink-2 sm:col-span-2">
+                                    {tl('filterBuyer')}
+                                    <select value={buyer} onChange={(e) => setBuyer(e.target.value)} className={cn(selectCls, 'h-9 text-[13.5px] font-normal')}>
+                                        <option value="">{tl('allBuyers')}</option>
+                                        {(data?.facets.buyers ?? []).map((b) => <option key={b.id} value={b.id}>{b.name} ({int(b.count)})</option>)}
+                                    </select>
+                                </label>
+                                <fieldset className="sm:col-span-2">
+                                    <legend className="text-[12.5px] font-medium text-ink-2">{tl('dateCreated')}</legend>
+                                    <div className="mt-1 grid grid-cols-2 gap-2">
+                                        <label className="flex flex-col gap-1 text-[12px] text-ink-3">
+                                            {tl('dateFrom')}
+                                            <input type="date" value={fromDay} max={toDay || undefined} onChange={(e) => setFromDay(e.target.value)} className={cn(inputCls, 'h-9 text-[13.5px]')} />
+                                        </label>
+                                        <label className="flex flex-col gap-1 text-[12px] text-ink-3">
+                                            {tl('dateTo')}
+                                            <input type="date" value={toDay} min={fromDay || undefined} onChange={(e) => setToDay(e.target.value)} className={cn(inputCls, 'h-9 text-[13.5px]')} aria-invalid={rangeInvalid || undefined} />
+                                        </label>
+                                    </div>
+                                    <p className="mt-1 text-[12px] text-ink-3">{tl('dateHint')}</p>
+                                    {rangeInvalid && <p className="mt-1 text-[12.5px] text-red-700">{tl('rangeInvalid')}</p>}
+                                </fieldset>
+                            </div>
+                        </FilterPopover>
                     </div>
-                    <div className="flex flex-wrap items-end gap-2">
-                        <label className="flex flex-col gap-1 text-[12.5px] text-ink-3">
-                            {tl('dateFrom')}
-                            <input type="date" value={fromDay} max={toDay || undefined} onChange={(e) => setFromDay(e.target.value)} className={cn(inputCls, 'w-[170px]')} />
-                        </label>
-                        <label className="flex flex-col gap-1 text-[12.5px] text-ink-3">
-                            {tl('dateTo')}
-                            <input type="date" value={toDay} min={fromDay || undefined} onChange={(e) => setToDay(e.target.value)} className={cn(inputCls, 'w-[170px]')} aria-invalid={rangeInvalid || undefined} />
-                        </label>
-                        <span className="pb-2.5 text-[12.5px] text-ink-3">{tl('dateHint')}</span>
-                        <span className="flex-1" />
-                        {filtersActive && <Button size="sm" variant="ghost" onClick={clearFilters}>{tl('clearFilters')}</Button>}
-                    </div>
+                    {chips.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-1.5" aria-label={tl('activeFilters')} role="group">
+                            {chips.map((chip) => (
+                                <span key={chip.id} className="inline-flex items-center gap-1 h-7 ps-2.5 pe-1 rounded-full bg-teal-soft text-[12.5px] text-ink ring-1 ring-inset ring-teal/20 max-w-full">
+                                    <span className="truncate"><span className="text-ink-3">{chip.name}:</span> {chip.value}</span>
+                                    <button type="button" onClick={chip.clear} aria-label={tl('removeFilter', { name: chip.name, value: chip.value })}
+                                        className="inline-flex items-center justify-center w-5 h-5 rounded-full text-ink-3 hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal">
+                                        <X size={12} aria-hidden />
+                                    </button>
+                                </span>
+                            ))}
+                            <button type="button" onClick={clearFilters} className="h-7 px-2 rounded-md text-[12.5px] font-medium text-teal hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal">{tl('clearAll')}</button>
+                        </div>
+                    )}
                     {rangeInvalid && <p role="alert" className="text-[12.5px] text-red-700">{tl('rangeInvalid')}</p>}
                 </div>
 
@@ -196,7 +253,7 @@ function OrdersList() {
                 ) : (
                     <>
                         <div className="hidden lg:block overflow-x-auto">
-                            <table className={cn('w-full min-w-[1080px] text-[13.5px]', loading && 'opacity-60')}>
+                            <table className={cn('w-full min-w-[1040px] text-[13.5px]', loading && 'opacity-60')}>
                                 <thead>
                                     <tr className="text-[12px] text-ink-3 bg-surface-2/60 border-b border-line">
                                         <th className="text-start font-medium ps-4 pe-2 py-2">{tl('colOrder')}</th>
@@ -215,9 +272,11 @@ function OrdersList() {
                                 </thead>
                                 <tbody>
                                     {rows.map((o) => (
-                                        <tr key={o.id} className="border-b border-line last:border-0 hover:bg-surface-2/40 align-top">
+                                        <tr key={o.id} onClick={(e) => openRow(e, o.id)} onAuxClick={(e) => { if (e.button === 1) openRow(e, o.id); }}
+                                            className="group border-b border-line last:border-0 align-top cursor-pointer transition-colors hover:bg-surface-2 focus-within:bg-surface-2">
                                             <td className="ps-4 pe-2 py-2.5 whitespace-nowrap">
-                                                <Link href={`/admin/orders/${o.id}`} className="font-medium text-ink hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal rounded">
+                                                <Link href={`/admin/orders/${o.id}`} onClick={(e) => e.stopPropagation()} aria-label={tl('openOrderAria', { ref: o.ref })}
+                                                    className="font-medium text-ink group-hover:text-teal hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal rounded">
                                                     <bdi dir="ltr" className="font-mono text-[13px]">#{o.ref}</bdi>
                                                 </Link>
                                                 <span className="block text-[12px] text-ink-3">{tl('linesCount', { count: o.lines })}</span>
@@ -288,11 +347,12 @@ function queueCount(id: string, a: NonNullable<AdminOrderPage['counts']['attenti
 function SummaryCard({ label, value, hint, active, onClick, tone }: { label: string; value: string | null; hint?: string; active: boolean; onClick: () => void; tone?: 'warning' }) {
     return (
         <button type="button" aria-pressed={active} onClick={onClick}
-            className={cn('text-start rounded-xl bg-surface ring-1 px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal',
-                active ? 'ring-2 ring-heading' : 'ring-line hover:ring-line-strong', tone === 'warning' && !active && 'ring-amber-200 bg-amber-50/50')}>
-            <span className={cn('flex items-center gap-1 text-[12px] font-medium', tone === 'warning' ? 'text-amber-800' : 'text-ink-3')}>
+            className={cn('relative text-start rounded-xl ring-1 px-3 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]',
+                active ? 'ring-2 ring-heading bg-teal-soft' : tone === 'warning' ? 'ring-amber-200 bg-amber-50/50 hover:ring-amber-300' : 'bg-surface ring-line hover:ring-line-strong hover:bg-surface-2')}>
+            <span className={cn('flex items-center gap-1 pe-4 text-[12px] font-medium', tone === 'warning' ? 'text-amber-800' : active ? 'text-ink' : 'text-ink-3')}>
                 {tone === 'warning' && <AlertTriangle size={12} aria-hidden />}{label}
             </span>
+            {active && <Check size={14} className="absolute top-2.5 end-2.5 text-heading" aria-hidden />}
             {value === null ? <Skeleton className="mt-1 h-6 w-12" /> : <span className="mt-0.5 block text-[20px] leading-7 font-semibold text-heading tabular-nums">{value}</span>}
             {hint && <span className="block text-[11.5px] leading-4 text-ink-3">{hint}</span>}
         </button>

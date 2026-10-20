@@ -1,12 +1,15 @@
-'use client';
+import { redirect } from 'next/navigation';
 
-import PromotionsManager from '@/components/promotions/PromotionsManager';
-
-/** /admin/promotions — special offers on any product (net and buyer prices). */
-export default function AdminPromotionsPage() {
-    return (
-        <div className="max-w-[1280px] mx-auto p-4 sm:p-6">
-            <PromotionsManager mode="admin" />
-        </div>
-    );
+/**
+ * Special offers moved to Admin → Offers (tab "Special offers").
+ * Query parameters (e.g. ?id=) are kept; the tab is set here.
+ */
+export default function AdminPromotionsRedirect({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+    const u = new URLSearchParams();
+    for (const [k, v] of Object.entries(searchParams || {})) {
+        if (k === 'tab' || v === undefined) continue;
+        for (const one of Array.isArray(v) ? v : [v]) u.append(k, one);
+    }
+    u.set('tab', 'special');
+    redirect(`/admin/offers?${u}`);
 }

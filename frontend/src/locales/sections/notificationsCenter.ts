@@ -85,11 +85,15 @@ const en = {
     AI_PRODUCT_REJECTED_b: "{product} was rejected. Review the feedback and create a corrected listing.",
     AI_LOW_STOCK_t: "Low stock",
     AI_LOW_STOCK_b: "{product} has only {units} units left. Consider restocking soon.",
+    SUPPORT_ROUTED_t: "Support conversation routed to your team",
+    SUPPORT_ROUTED_b: "{name}’s support conversation was routed to {team}.",
 };
 
 export default defineSection('notificationsCenter', ['src/components/ui/NotificationBell.tsx', 'src/lib/notifications.ts', 'src/app/dashboard/customer/notifications/page.tsx'], {
     en,
     ar: {
+        SUPPORT_ROUTED_t: "تم تحويل محادثة دعم إلى فريقك",
+        SUPPORT_ROUTED_b: "تم تحويل محادثة الدعم الخاصة بـ {name} إلى فريق {team}.",
         AI_ORDER_PENDING_t: "الطلب {ref} لا يزال معلّقًا",
         AI_ORDER_PENDING_b: "طلبك في الانتظار منذ أكثر من يوم. أكمل الخطوة التالية في صفحة الطلب أو تواصل مع الدعم.",
         AI_KYC_REQUIRED_t: "مطلوب التحقق من الهوية",
@@ -171,6 +175,8 @@ export default defineSection('notificationsCenter', ['src/components/ui/Notifica
         PRODUCT_STATUS_t: 'تغيّرت حالة المنتج', PRODUCT_STATUS_b: 'تغيّرت حالة مراجعة {product}.',
     },
     fr: {
+        SUPPORT_ROUTED_t: "Conversation de support transférée à votre équipe",
+        SUPPORT_ROUTED_b: "La conversation de support de {name} a été transférée à {team}.",
         AI_ORDER_PENDING_t: "La commande {ref} est toujours en attente",
         AI_ORDER_PENDING_b: "Votre commande attend depuis plus d’un jour. Effectuez l’étape suivante sur la page de la commande ou contactez le support.",
         AI_KYC_REQUIRED_t: "Vérification d’identité requise",
@@ -252,6 +258,8 @@ export default defineSection('notificationsCenter', ['src/components/ui/Notifica
         PRODUCT_STATUS_t: 'Statut du produit modifié', PRODUCT_STATUS_b: 'Le statut de vérification de {product} a changé.',
     },
     ro: {
+        SUPPORT_ROUTED_t: "Conversație de asistență direcționată către echipa dumneavoastră",
+        SUPPORT_ROUTED_b: "Conversația de asistență a lui {name} a fost direcționată către {team}.",
         AI_ORDER_PENDING_t: "Comanda {ref} este încă în așteptare",
         AI_ORDER_PENDING_b: "Comanda dumneavoastră așteaptă de mai mult de o zi. Finalizați pasul următor pe pagina comenzii sau contactați asistența.",
         AI_KYC_REQUIRED_t: "Este necesară verificarea identității",
@@ -333,6 +341,8 @@ export default defineSection('notificationsCenter', ['src/components/ui/Notifica
         PRODUCT_STATUS_t: 'Starea produsului s-a schimbat', PRODUCT_STATUS_b: 'Starea verificării pentru {product} s-a schimbat.',
     },
     it: {
+        SUPPORT_ROUTED_t: "Conversazione di assistenza assegnata al tuo team",
+        SUPPORT_ROUTED_b: "La conversazione di assistenza di {name} è stata assegnata a {team}.",
         AI_ORDER_PENDING_t: "L’ordine {ref} è ancora in sospeso",
         AI_ORDER_PENDING_b: "Il tuo ordine è in attesa da più di un giorno. Completa il passaggio successivo nella pagina dell’ordine o contatta l’assistenza.",
         AI_KYC_REQUIRED_t: "Verifica dell’identità necessaria",
@@ -414,6 +424,8 @@ export default defineSection('notificationsCenter', ['src/components/ui/Notifica
         PRODUCT_STATUS_t: 'Stato del prodotto cambiato', PRODUCT_STATUS_b: 'Lo stato di revisione di {product} è cambiato.',
     },
     es: {
+        SUPPORT_ROUTED_t: "Conversación de soporte asignada a tu equipo",
+        SUPPORT_ROUTED_b: "La conversación de soporte de {name} se asignó a {team}.",
         AI_ORDER_PENDING_t: "El pedido {ref} sigue pendiente",
         AI_ORDER_PENDING_b: "Tu pedido lleva más de un día en espera. Completa el siguiente paso en la página del pedido o contacta con soporte.",
         AI_KYC_REQUIRED_t: "Se necesita verificar tu identidad",
@@ -495,6 +507,8 @@ export default defineSection('notificationsCenter', ['src/components/ui/Notifica
         PRODUCT_STATUS_t: 'Cambio de estado del producto', PRODUCT_STATUS_b: 'Ha cambiado el estado de revisión de {product}.',
     },
     pt: {
+        SUPPORT_ROUTED_t: "Conversa de apoio encaminhada para a sua equipa",
+        SUPPORT_ROUTED_b: "A conversa de apoio de {name} foi encaminhada para {team}.",
         AI_ORDER_PENDING_t: "A encomenda {ref} continua pendente",
         AI_ORDER_PENDING_b: "A sua encomenda aguarda há mais de um dia. Conclua o passo seguinte na página da encomenda ou contacte o apoio.",
         AI_KYC_REQUIRED_t: "É necessária a verificação de identidade",
