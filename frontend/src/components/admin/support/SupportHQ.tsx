@@ -4,15 +4,17 @@ import * as React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { io } from 'socket.io-client';
-import { AlertCircle, ArrowUpRight, BookOpen, ClipboardList, MessageCircle, Search, ShieldCheck, Users } from 'lucide-react';
+import { ArrowUpRight, BookOpen, ClipboardList, MessageCircle, Search, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { getToken } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { inputCls } from '@/components/supplier/ui';
-import { KYC_REVIEW_ROLES, supportHqApi, type HqStats, type Inbox, type InboxThread } from '@/lib/admin-support-api';
+import { DISPUTE_ROLES, HQ_CHAT_ROLES, KYC_REVIEW_ROLES, supportHqApi, type HqStats, type Inbox, type InboxThread } from '@/lib/admin-support-api';
 import { ConversationList, type ListFilter } from './ConversationList';
 import { ThreadPanel } from './ThreadPanel';
-import { DisputesPanel, KycPanel, SupportOverview } from './SupportOverview';
+import { SupportOverview } from './SupportOverview';
+import { DisputesWorkspace } from '@/components/admin/disputes/DisputesWorkspace';
+import { KycReview } from '@/components/admin/kyc/KycReview';
 import { useTs } from './hqUi';
 
 type View = 'overview' | 'chat' | 'orders' | 'disputes' | 'kyc';
@@ -25,6 +27,11 @@ const UUIDISH = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * Deep links: ?view=chat&user=<userId>[&order=<orderId>] opens that exact
  * conversation (order: that order's thread with this buyer or supplier,
  * verified by the server). The legacy ?search=<userId> opens the same way.
+ * ?view=disputes&id=<disputeId> opens a dispute; ?view=kyc&id=<documentId>
+ * (or &user=<userId>, that account's latest submission) opens a KYC document.
+ * `tab` is accepted as an alias of `view` (the /admin/disputes and /admin/kyc
+ * redirects use it). The Disputes and KYC tabs appear only for the roles their
+ * endpoints allow (DISPUTE_ROLES, KYC_REVIEW_ROLES).
  * The live-chat workspace fills the viewport: list and thread scroll on
  * their own, the composer stays at the bottom.
  */
@@ -36,14 +43,21 @@ export function SupportHQ() {
     const { user } = useAuth();
     const role = String(user?.role || '').toUpperCase();
     const canKyc = KYC_REVIEW_ROLES.includes(role);
+    const canDisputes = DISPUTE_ROLES.includes(role);
+    // Conversations (Overview, Live chat, Orders) follow the Support HQ endpoints; a role without them (MODERATOR) gets its review tabs only.
+    const canChat = HQ_CHAT_ROLES.includes(role);
 
     const legacy = sp.get('search') || '';
+    const rawView = (sp.get('view') || sp.get('tab')) as View | null;
+    const allowed = (v: View) => (v !== 'kyc' || canKyc) && (v !== 'disputes' || canDisputes) && (canChat || v === 'kyc' || v === 'disputes');
+    const fallback: View = canChat ? 'chat' : canKyc ? 'kyc' : 'disputes';
+    const view: View = rawView && VIEWS.includes(rawView) && allowed(rawView) ? rawView : fallback;
     const target = React.useMemo(() => {
+        if (view !== 'chat' && view !== 'orders') return null;
         const u = sp.get('user') || (UUIDISH.test(legacy) ? legacy : '');
         return u ? { userId: u, orderId: sp.get('order') || null } : null;
-    }, [sp, legacy]);
-    const rawView = sp.get('view') as View | null;
-    const view: View = rawView && VIEWS.includes(rawView) && (rawView !== 'kyc' || canKyc) ? rawView : 'chat';
+    }, [sp, legacy, view]);
+    const recordId = sp.get('id') || sp.get('doc') || null;
 
     const [inbox, setInbox] = React.useState<Inbox | null>(null);
     const [inboxError, setInboxError] = React.useState<string | null>(null);
@@ -63,24 +77,28 @@ export function SupportHQ() {
     }, [ts]);
     const refresh = React.useCallback(() => { loadInbox(); loadStats(); }, [loadInbox, loadStats]);
 
-    React.useEffect(() => { refresh(); }, [refresh]);
+    React.useEffect(() => { if (canChat) refresh(); }, [refresh, canChat]);
     // New messages: socket events where they arrive, and a 30 s refresh as a fallback (order messages are sent over HTTP).
     React.useEffect(() => {
+        if (!canChat) return;
         const id = window.setInterval(refresh, 30_000);
         const tok = getToken();
         const socket = tok ? io(`${SOCKET_BASE}/chat`, { auth: { token: tok }, transports: ['websocket', 'polling'] }) : null;
         socket?.on('new_inquiry', refresh);
         socket?.on('conversation_updated', refresh);
         return () => { window.clearInterval(id); socket?.disconnect(); };
-    }, [refresh]);
+    }, [refresh, canChat]);
     React.useEffect(() => { if (view === 'orders') setFilter('orders'); }, [view]);
 
-    const go = React.useCallback((v: View, t?: { userId: string; orderId: string | null } | null) => {
+    const go = React.useCallback((v: View, t?: { userId: string; orderId: string | null } | null, id?: string | null) => {
         const q = new URLSearchParams();
         q.set('view', v);
         if (t) { q.set('user', t.userId); if (t.orderId) q.set('order', t.orderId); }
+        if (id) q.set('id', id);
         router.replace(`${pathname}?${q.toString()}`, { scroll: false });
     }, [router, pathname]);
+    const selectDispute = React.useCallback((id: string | null) => go('disputes', null, id), [go]);
+    const selectKyc = React.useCallback((id: string | null) => go('kyc', null, id), [go]);
     const open = (t: InboxThread) => go(view === 'orders' ? 'orders' : 'chat', { userId: t.participantId, orderId: t.orderId });
 
     const threads = inbox?.threads ?? [];
@@ -89,10 +107,12 @@ export function SupportHQ() {
     const awaiting = stats?.awaitingTeam.total ?? threads.filter((t) => t.awaitingTeam).length;
 
     const tabs: { id: View; label: string; count?: number; tone?: 'warning' | 'danger' }[] = [
-        { id: 'overview', label: ts('tabOverview') },
-        { id: 'chat', label: ts('tabLiveChat'), count: awaiting || undefined, tone: 'warning' },
-        ...(inbox?.ordersVisible !== false ? [{ id: 'orders' as const, label: ts('tabOrders') }] : []),
-        { id: 'disputes', label: ts('tabDisputes'), count: stats?.openDisputes || undefined, tone: 'danger' },
+        ...(canChat ? [
+            { id: 'overview' as const, label: ts('tabOverview') },
+            { id: 'chat' as const, label: ts('tabLiveChat'), count: awaiting || undefined, tone: 'warning' as const },
+            ...(inbox?.ordersVisible !== false ? [{ id: 'orders' as const, label: ts('tabOrders') }] : []),
+        ] : []),
+        ...(canDisputes ? [{ id: 'disputes' as const, label: ts('tabDisputes'), count: stats?.openDisputes || undefined, tone: 'danger' as const }] : []),
         ...(canKyc ? [{ id: 'kyc' as const, label: ts('tabKyc'), count: stats?.kycPending.available ? stats.kycPending.count || undefined : undefined, tone: 'warning' as const }] : []),
     ];
     const workspace = view === 'chat' || view === 'orders';
@@ -149,21 +169,20 @@ export function SupportHQ() {
                     </div>
                 </div>
             ) : view === 'overview' ? (
-                <SupportOverview stats={stats} statsError={statsError} onRetry={loadStats} threads={threads} onOpen={(t) => go('chat', { userId: t.participantId, orderId: t.orderId })} onView={(v) => go(v)} />
-            ) : view === 'disputes' ? <DisputesPanel /> : view === 'kyc' && canKyc ? <KycPanel /> : null}
+                <SupportOverview stats={stats} statsError={statsError} onRetry={loadStats} threads={threads} onOpen={(t) => go('chat', { userId: t.participantId, orderId: t.orderId })} onView={(v) => go(v)} canDisputes={canDisputes} />
+            ) : view === 'disputes' && canDisputes ? <DisputesWorkspace role={role} selectedId={recordId} onSelect={selectDispute} />
+                : view === 'kyc' && canKyc ? <KycReview role={role} selectedId={recordId} userId={recordId ? null : sp.get('user')} onSelect={selectKyc} /> : null}
 
-            <QuickLinks role={role} canKyc={canKyc} />
+            <QuickLinks role={role} />
         </div>
     );
 }
 
-/** Real destinations only, kept small under the workspace. */
-function QuickLinks({ role, canKyc }: { role: string; canKyc: boolean }) {
+/** Real destinations only, kept small under the workspace. Disputes and KYC are tabs of this page. */
+function QuickLinks({ role }: { role: string }) {
     const ts = useTs();
     const admin = role === 'ADMIN' || role === 'OWNER';
     const links = [
-        { href: '/admin/disputes', label: ts('qlDisputes'), icon: AlertCircle },
-        ...(canKyc ? [{ href: '/admin/kyc', label: ts('qlKyc'), icon: ShieldCheck }] : []),
         ...(admin ? [{ href: '/admin/orders', label: ts('qlOrders'), icon: ClipboardList }, { href: '/admin/users', label: ts('qlUsers'), icon: Users }] : []),
         { href: '/help', label: ts('qlHelp'), icon: BookOpen },
     ];

@@ -1,16 +1,17 @@
 import { defineSection } from './define';
 
 /**
- * Admin → Offers (/admin/offers): one page, two tabs that are never merged —
- * "Supplier offers" (wholesale Offer records suppliers submit for review) and
- * "Special offers" (Atlantis Promotions; that tab's own text lives in the
+ * Admin → Offers: a sidebar parent with two pages that are never merged —
+ * /admin/offers/supplier (wholesale Offer records suppliers submit for review) and
+ * /admin/offers/special (Atlantis Promotions; that page's own text lives in the
  * `promotions` section, shared with the supplier page).
  */
-export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 'src/components/admin/offers/SupplierOffersReview.tsx'], {
+export default defineSection('adminOffers', ['src/app/admin/offers/supplier/page.tsx', 'src/components/admin/offers/SupplierOffersReview.tsx'], {
     en: {
         submittedOn: 'Submitted {date}',
         title: 'Offers',
         subtitle: 'Review the wholesale offers suppliers submit, and manage Atlantis special offers. They are separate: a special offer is a temporary discount on a product’s net price.',
+        supplierLead: "Wholesale offers that suppliers submit on their approved products. Review each one and approve or reject it; the supplier sees your decision.",
         tabsAria: 'Offer type',
         tabSupplier: 'Supplier offers',
         tabSpecial: 'Special offers',
@@ -45,7 +46,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         openSupplierAria: 'Open the supplier account {name}',
         approve: 'Approve', reject: 'Reject',
         approveAria: 'Approve the offer on {name}', rejectAria: 'Reject the offer on {name}',
-        readOnly: 'You can view this queue. Only owners and admins can approve or reject offers.',
+        readOnly: 'You can view this queue. Only owners, admins and moderators can approve or reject offers.',
         priceNote: 'Prices are the supplier’s offer price in euros for one unit of the tier shown.',
         approveTitle: 'Approve this offer?',
         approveBody: 'The offer on {name} goes live, and Atlantis emails it to active newsletter subscribers and to accounts that opted in to marketing emails. Sent emails can’t be recalled.',
@@ -75,6 +76,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         submittedOn: 'أُرسل في {date}',
         title: 'العروض',
         subtitle: 'راجع عروض الجملة التي يرسلها المورّدون، وأدِر العروض الخاصة من Atlantis. هما أمران منفصلان: العرض الخاص خصم مؤقت على السعر الصافي للمنتج.',
+        supplierLead: "عروض الجملة التي يرسلها المورّدون على منتجاتهم المعتمدة. راجِع كل عرض ووافق عليه أو ارفضه، وسيرى المورّد قرارك.",
         tabsAria: 'نوع العرض',
         tabSupplier: 'عروض المورّدين',
         tabSpecial: 'العروض الخاصة',
@@ -109,7 +111,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         openSupplierAria: 'فتح حساب المورّد {name}',
         approve: 'قبول', reject: 'رفض',
         approveAria: 'قبول العرض على {name}', rejectAria: 'رفض العرض على {name}',
-        readOnly: 'يمكنك عرض هذه القائمة. يقتصر قبول العروض أو رفضها على المالكين والمشرفين.',
+        readOnly: 'يمكنك عرض هذه القائمة. يقتصر قبول العروض أو رفضها على المالكين والمسؤولين والمشرفين.',
         priceNote: 'الأسعار هي سعر عرض المورّد باليورو لوحدة واحدة من المستوى المعروض.',
         approveTitle: 'قبول هذا العرض؟',
         approveBody: 'يصبح العرض على {name} متاحًا، وترسله Atlantis بالبريد الإلكتروني إلى مشتركي النشرة النشطين وإلى الحسابات التي وافقت على رسائل التسويق. لا يمكن استرجاع الرسائل بعد إرسالها.',
@@ -139,6 +141,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         submittedOn: 'Soumise le {date}',
         title: 'Offres',
         subtitle: 'Examinez les offres de gros soumises par les fournisseurs et gérez les offres spéciales Atlantis. Ce sont deux choses distinctes : une offre spéciale est une remise temporaire sur le prix net d’un produit.',
+        supplierLead: "Offres de gros soumises par les fournisseurs sur leurs produits approuvés. Examinez chacune et approuvez-la ou refusez-la ; le fournisseur voit votre décision.",
         tabsAria: 'Type d’offre',
         tabSupplier: 'Offres fournisseurs',
         tabSpecial: 'Offres spéciales',
@@ -173,7 +176,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         openSupplierAria: 'Ouvrir le compte fournisseur {name}',
         approve: 'Approuver', reject: 'Refuser',
         approveAria: 'Approuver l’offre sur {name}', rejectAria: 'Refuser l’offre sur {name}',
-        readOnly: 'Vous pouvez consulter cette file. Seuls les propriétaires et les administrateurs peuvent approuver ou refuser des offres.',
+        readOnly: 'Vous pouvez consulter cette file. Seuls les propriétaires, les administrateurs et les modérateurs peuvent approuver ou refuser des offres.',
         priceNote: 'Les prix sont le prix proposé par le fournisseur, en euros, pour une unité du niveau indiqué.',
         approveTitle: 'Approuver cette offre ?',
         approveBody: 'L’offre sur {name} devient visible et Atlantis l’envoie par e-mail aux abonnés actifs de la newsletter et aux comptes ayant accepté les e-mails marketing. Les e-mails envoyés ne peuvent pas être rappelés.',
@@ -203,6 +206,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         submittedOn: 'Trimisă la {date}',
         title: 'Oferte',
         subtitle: 'Verificați ofertele en-gros trimise de furnizori și gestionați ofertele speciale Atlantis. Sunt separate: o ofertă specială este o reducere temporară la prețul net al unui produs.',
+        supplierLead: "Ofertele en-gros trimise de furnizori pentru produsele lor aprobate. Verificați fiecare ofertă și aprobați-o sau respingeți-o; furnizorul vede decizia dumneavoastră.",
         tabsAria: 'Tipul ofertei',
         tabSupplier: 'Oferte de la furnizori',
         tabSpecial: 'Oferte speciale',
@@ -237,7 +241,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         openSupplierAria: 'Deschideți contul furnizorului {name}',
         approve: 'Aprobați', reject: 'Respingeți',
         approveAria: 'Aprobați oferta pentru {name}', rejectAria: 'Respingeți oferta pentru {name}',
-        readOnly: 'Puteți vizualiza această listă. Doar proprietarii și administratorii pot aproba sau respinge oferte.',
+        readOnly: 'Puteți vizualiza această listă. Doar proprietarii, administratorii și moderatorii pot aproba sau respinge oferte.',
         priceNote: 'Prețurile sunt prețul ofertei furnizorului, în euro, pentru o unitate din nivelul afișat.',
         approveTitle: 'Aprobați această ofertă?',
         approveBody: 'Oferta pentru {name} devine activă, iar Atlantis o trimite prin e-mail abonaților activi la newsletter și conturilor care au acceptat e-mailurile de marketing. E-mailurile trimise nu pot fi retrase.',
@@ -267,6 +271,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         submittedOn: 'Inviata il {date}',
         title: 'Offerte',
         subtitle: 'Esamina le offerte all’ingrosso inviate dai fornitori e gestisci le offerte speciali Atlantis. Sono separate: un’offerta speciale è uno sconto temporaneo sul prezzo netto di un prodotto.',
+        supplierLead: "Offerte all’ingrosso inviate dai fornitori sui loro prodotti approvati. Esamina ciascuna e approvala o rifiutala; il fornitore vede la tua decisione.",
         tabsAria: 'Tipo di offerta',
         tabSupplier: 'Offerte dei fornitori',
         tabSpecial: 'Offerte speciali',
@@ -301,7 +306,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         openSupplierAria: 'Apri l’account del fornitore {name}',
         approve: 'Approva', reject: 'Rifiuta',
         approveAria: 'Approva l’offerta su {name}', rejectAria: 'Rifiuta l’offerta su {name}',
-        readOnly: 'Puoi consultare questa coda. Solo i proprietari e gli amministratori possono approvare o rifiutare le offerte.',
+        readOnly: 'Puoi consultare questa coda. Solo i proprietari, gli amministratori e i moderatori possono approvare o rifiutare le offerte.',
         priceNote: 'I prezzi sono il prezzo offerto dal fornitore, in euro, per un’unità del livello indicato.',
         approveTitle: 'Approvare questa offerta?',
         approveBody: 'L’offerta su {name} diventa attiva e Atlantis la invia via email agli iscritti attivi alla newsletter e agli account che hanno accettato le email di marketing. Le email inviate non possono essere ritirate.',
@@ -331,6 +336,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         submittedOn: 'Enviada el {date}',
         title: 'Ofertas',
         subtitle: 'Revisa las ofertas mayoristas que envían los proveedores y gestiona las ofertas especiales de Atlantis. Son cosas distintas: una oferta especial es un descuento temporal sobre el precio neto de un producto.',
+        supplierLead: "Ofertas mayoristas que los proveedores envían sobre sus productos aprobados. Revisa cada una y apruébala o recházala; el proveedor ve tu decisión.",
         tabsAria: 'Tipo de oferta',
         tabSupplier: 'Ofertas de proveedores',
         tabSpecial: 'Ofertas especiales',
@@ -365,7 +371,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         openSupplierAria: 'Abrir la cuenta del proveedor {name}',
         approve: 'Aprobar', reject: 'Rechazar',
         approveAria: 'Aprobar la oferta de {name}', rejectAria: 'Rechazar la oferta de {name}',
-        readOnly: 'Puedes consultar esta cola. Solo los propietarios y los administradores pueden aprobar o rechazar ofertas.',
+        readOnly: 'Puedes consultar esta cola. Solo los propietarios, los administradores y los moderadores pueden aprobar o rechazar ofertas.',
         priceNote: 'Los precios son el precio de oferta del proveedor, en euros, por una unidad del nivel indicado.',
         approveTitle: '¿Aprobar esta oferta?',
         approveBody: 'La oferta de {name} se publica y Atlantis la envía por correo electrónico a los suscriptores activos del boletín y a las cuentas que aceptaron los correos de marketing. Los correos enviados no se pueden recuperar.',
@@ -395,6 +401,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         submittedOn: 'Enviada a {date}',
         title: 'Ofertas',
         subtitle: 'Reveja as ofertas grossistas enviadas pelos fornecedores e faça a gestão das ofertas especiais da Atlantis. São coisas distintas: uma oferta especial é um desconto temporário sobre o preço líquido de um produto.',
+        supplierLead: "Ofertas grossistas que os fornecedores enviam sobre os seus produtos aprovados. Reveja cada uma e aprove-a ou rejeite-a; o fornecedor vê a sua decisão.",
         tabsAria: 'Tipo de oferta',
         tabSupplier: 'Ofertas de fornecedores',
         tabSpecial: 'Ofertas especiais',
@@ -429,7 +436,7 @@ export default defineSection('adminOffers', ['src/app/admin/offers/page.tsx', 's
         openSupplierAria: 'Abrir a conta do fornecedor {name}',
         approve: 'Aprovar', reject: 'Rejeitar',
         approveAria: 'Aprovar a oferta de {name}', rejectAria: 'Rejeitar a oferta de {name}',
-        readOnly: 'Pode consultar esta fila. Apenas os proprietários e os administradores podem aprovar ou rejeitar ofertas.',
+        readOnly: 'Pode consultar esta fila. Apenas os proprietários, os administradores e os moderadores podem aprovar ou rejeitar ofertas.',
         priceNote: 'Os preços são o preço de oferta do fornecedor, em euros, por uma unidade do nível indicado.',
         approveTitle: 'Aprovar esta oferta?',
         approveBody: 'A oferta de {name} fica ativa e a Atlantis envia-a por e-mail aos subscritores ativos da newsletter e às contas que aceitaram e-mails de marketing. Os e-mails enviados não podem ser recuperados.',

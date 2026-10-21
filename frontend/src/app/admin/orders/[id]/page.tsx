@@ -220,7 +220,7 @@ function OrderDetail() {
                     <PaymentCard o={o} tl={tl} eur={eur} money={money} when={when} />
                     <DocumentsCard o={o} tl={tl} money={money} when={when} />
                     {o.disputes.length > 0 && (
-                        <Card title={tl('disputes')} actions={<Link href="/admin/disputes" className="no-print text-[13px] text-teal font-medium hover:underline">{tl('openDisputes')}</Link>}>
+                        <Card title={tl('disputes')} actions={<Link href="/admin/support?view=disputes" className="no-print text-[13px] text-teal font-medium hover:underline">{tl('openDisputes')}</Link>}>
                             <ul className="space-y-2.5 text-[13px]">
                                 {o.disputes.map((d) => (
                                     <li key={d.id} className="flex flex-col gap-0.5">

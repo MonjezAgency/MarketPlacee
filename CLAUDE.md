@@ -53,6 +53,18 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   `lib/notifications.ts`) render them in the reader's language (keys in `locales/sections/notificationsCenter.ts`);
   `data.dedupeKey` stores an event once; links are derived for the recipient's role in `backend/src/notifications/notification-links.ts`.
   Supplier notifications never carry a buyer, a target price or a buyer price.
+- Admin access by role: `frontend/src/lib/admin-access.ts` (sidebar, direct-URL guard, `canDo` for buttons) mirrors the backend
+  `@Roles` (`backend/src/admin/staff-access.ts`); the server is the authority and re-reads the role from the database on each request.
+  Team Members (`/admin/team`) holds invitations (hashed single-use links, `/auth/team-invite`); `/admin/invite` redirects there.
+- Support HQ (`/admin/support`) also holds Disputes and KYC review; `/admin/disputes` and `/admin/kyc` redirect there. Dispute
+  refund decisions are OWNER/ADMIN only; supplier net prices are stripped from dispute responses for everyone else.
+- Offers is a sidebar parent: `/admin/offers/supplier` (wholesale offers to review) and `/admin/offers/special` (Promotions).
+- Coupons: rules in `backend/src/coupons/coupon-rules.ts`, applied only in `OrdersService.priceCart`; one order-level discount on
+  eligible lines after line discounts, funded by the Atlantis margin; redemptions recorded per order (`CouponRedemption`).
+- Marketing email: every marketing send goes through `backend/src/newsletter/marketing-consent.service.ts` (recorded consent,
+  no suppression); unsubscribes live in `MarketingSuppression` and survive re-import. Transactional email is separate.
+- Target prices: buyer ↔ Atlantis sourcing desk negotiation (`target-prices.service.ts`); suppliers never see targets or buyers;
+  an agreed price is not applied at checkout yet (needs owner approval).
 - Unauthenticated requests to protected routes are sent to `/auth/login?redirect=<path>` (see `frontend/src/middleware.ts`).
 
 ## Before you finish

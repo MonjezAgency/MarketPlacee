@@ -1,4 +1,6 @@
 'use client';
+import { canDo } from '@/lib/admin-access';
+import { useAuth } from '@/lib/auth';
 
 import * as React from 'react';
 import toast from 'react-hot-toast';
@@ -57,7 +59,9 @@ export function AccountActions({ user, onDone, size = 'md' }: { user: { id: stri
     const tu = useTu();
     const confirm = useConfirm();
     const [busy, setBusy] = React.useState<AccountAction | null>(null);
-    const actions = actionsFor(user.role, user.status);
+    const { user: me } = useAuth();
+    // Approve / reject / block are OWNER / ADMIN on the server; other staff don't get buttons the server would refuse.
+    const actions = canDo(me?.role, 'accountDecisions') ? actionsFor(user.role, user.status) : [];
     if (!actions.length) return null;
     const fromPending = user.status === 'PENDING_APPROVAL';
     const run = async (a: AccountAction) => {

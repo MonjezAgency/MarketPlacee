@@ -63,13 +63,13 @@ export class OffersController {
     }
 
     @Patch(':id/approve')
-    @Roles(Role.ADMIN, Role.OWNER)
+    @Roles(Role.ADMIN, Role.OWNER, Role.MODERATOR) // moderators review supplier offers
     async approve(@Param('id') id: string, @Req() req: any) {
         return this.svc.approve(id, req.user.sub);
     }
 
     @Patch(':id/reject')
-    @Roles(Role.ADMIN, Role.OWNER)
+    @Roles(Role.ADMIN, Role.OWNER, Role.MODERATOR)
     async reject(@Param('id') id: string, @Req() req: any, @Body('reason') reason?: string) {
         return this.svc.reject(id, req.user.sub, reason);
     }

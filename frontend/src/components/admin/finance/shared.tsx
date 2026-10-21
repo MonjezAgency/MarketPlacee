@@ -1,10 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Info, Loader2, Search, X } from 'lucide-react';
+import { Info, Loader2, Lock, Search, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
-import { inputCls } from '@/components/supplier/ui';
+import { EmptyState, inputCls } from '@/components/supplier/ui';
 import { cn } from '@/lib/utils';
 
 /** Text from the adminFinance dictionary. */
@@ -38,6 +38,26 @@ export async function readError(res: Response, fallback: string) {
     if (Array.isArray(m)) return m.join(' ');
     if (typeof m === 'string' && m) return m;
     return fallback;
+}
+
+/** A failed list load. `forbidden` = the server refused this role (403): show the permission state, not "try again". */
+export class LoadError extends Error {
+    constructor(message: string, readonly forbidden = false) { super(message); }
+}
+
+/** GET a JSON list for a finance tab; non-2xx becomes a LoadError (403 → forbidden). */
+export async function fetchList(path: string, fallback: string): Promise<unknown[]> {
+    const r = await apiFetch(path, { cache: 'no-store' });
+    if (r.status === 403) throw new LoadError(fallback, true);
+    if (!r.ok) throw new LoadError(await readError(r, fallback));
+    const d = await r.json().catch(() => null);
+    return Array.isArray(d) ? d : [];
+}
+
+/** Shown when the API answers 403: access is decided by the server, never by hiding a tab. */
+export function NoAccessState() {
+    const tf = useTf();
+    return <div role="status"><EmptyState icon={<Lock size={20} />} title={tf('noAccessTitle')}>{tf('noAccessBody')}</EmptyState></div>;
 }
 
 /** Small accessible tooltip: hover or keyboard focus shows the text; Esc hides it. */

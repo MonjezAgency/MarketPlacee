@@ -1,31 +1,28 @@
 import {
-    Controller, Post, Get, Delete, Body, Param, Req, UseGuards, UseInterceptors,
-    UploadedFile, Query, Logger, BadRequestException, Res
+    Controller, Post, Get, Patch, Delete, Body, Param, Req, UseGuards, UseInterceptors,
+    UploadedFile, Query, BadRequestException, Res,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
-import { OptionalJwtAuthGuard } from '../auth/optional-jwt.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { NewsletterService } from './newsletter.service';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt.guard';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
+import { NewsletterService } from './newsletter.service';
+import { NewsletterContactsService } from './newsletter-contacts.service';
+import { NewsletterCampaignsService } from './newsletter-campaigns.service';
 
+/** Public newsletter endpoints: sign-up (double opt-in), confirm, unsubscribe. */
 @Controller('newsletter')
 export class NewsletterController {
-    private readonly logger = new Logger(NewsletterController.name);
-
-    constructor(private readonly newsletterService: NewsletterService) {
-        this.logger.log('NewsletterController loaded — POST /newsletter/subscribe is registered');
-    }
+    constructor(private readonly newsletterService: NewsletterService) {}
 
     /** Public sign-up (double opt-in). `consent` must be the user's explicit tick. */
     @Post('subscribe')
     @UseGuards(OptionalJwtAuthGuard)
     @Throttle({ default: { limit: 5, ttl: 60_000 } })
     async subscribe(@Body() body: { email: string; source?: string; region?: string; name?: string; consent?: boolean; policyVersion?: string }, @Req() req: any) {
-        if (!body || !body.email) {
-            throw new BadRequestException('Email is required');
-        }
+        if (!body || !body.email) throw new BadRequestException('Email is required');
         return this.newsletterService.subscribe(body.email, body.source, body.region, body.name, { consent: body.consent === true, policyVersion: body.policyVersion, userId: req?.user?.sub ?? null });
     }
 
@@ -35,129 +32,115 @@ export class NewsletterController {
         return this.newsletterService.confirm(String(body?.token || ''));
     }
 
+    /** Unsubscribe by the per-recipient token from a marketing email, or by address (form). Always public. */
     @Post('unsubscribe')
     @Throttle({ default: { limit: 20, ttl: 60_000 } })
-    unsubscribe(@Body() body: { token?: string; email?: string }) {
-        return this.newsletterService.unsubscribe({ token: body?.token, email: body?.email });
+    unsubscribe(@Body() body: { token?: string; email?: string; method?: string }) {
+        return this.newsletterService.unsubscribe({ token: body?.token, email: body?.email, method: body?.method });
     }
 
-    /** CSV of marketing-eligible subscribers with consent data (admins only). */
-    @Get('export')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'OWNER')
-    async export(@Res() res: any) {
-        const csv = await this.newsletterService.exportCsv();
-        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-        res.setHeader('Content-Disposition', `attachment; filename="atlantis-newsletter-subscribers-${new Date().toISOString().slice(0, 10)}.csv"`);
-        res.send('\uFEFF' + csv);
-    }
-
-    @Get()
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'OWNER')
-    async findAll(@Query('includeHidden') includeHidden?: string) {
-        return this.newsletterService.findAll(includeHidden === 'true');
-    }
-
-    @Delete(':id')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'OWNER')
-    async remove(@Param('id') id: string) {
-        return this.newsletterService.remove(id);
-    }
-
-    /**
-     * Bulk action endpoint. The admin Newsletter UI selects N rows and
-     * fires this once with the chosen action: delete (permanent),
-     * hide (soft archive), block (kept on file but cannot receive),
-     * unhide / unblock (revert to ACTIVE).
-     */
-    @Post('bulk-action')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'OWNER')
-    async bulkAction(@Body() body: { ids: string[]; action: string }) {
-        const action = String(body?.action || '').toLowerCase();
-        if (!['delete', 'hide', 'block', 'unhide', 'unblock'].includes(action)) {
-            throw new BadRequestException('Unknown action. Allowed: delete, hide, block, unhide, unblock.');
-        }
-        return this.newsletterService.bulkAction(body.ids || [], action as any);
-    }
-
-    /**
-     * Bulk-upload a CSV / XLS / XLSX of clients. The sheet is expected
-     * to have at minimum an Email column; Name / Region are optional.
-     * Returns a per-row report with created/updated/skipped counts so
-     * the admin sees exactly which rows failed and why.
-     */
-    @Post('bulk-upload')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'OWNER')
-    @UseInterceptors(FileInterceptor('file'))
-    async bulkUpload(
-        @UploadedFile() file: any,
-        @Body('source') source?: string,
-    ) {
-        if (!file?.buffer) {
-            throw new BadRequestException('Upload a CSV / Excel file under the "file" field.');
-        }
-        return this.newsletterService.bulkUpload(file.buffer, source || 'Bulk Upload');
-    }
-
-    @Post('send-campaign')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'OWNER')
-    async sendCampaign(
-        @Body() body: {
-            subject: string;
-            content?: string;
-            html?: string;
-            blocks?: any[];
-            audience?: 'PLATFORM' | 'NEWSLETTER';
-        },
-        @Req() req: any,
-    ) {
-        return this.newsletterService.sendCampaign(body.subject, body.content, {
-            html: body.html,
-            blocks: body.blocks,
-            audience: body.audience,
-            sentBy: req.user?.sub,
-        });
-    }
-
-    /**
-     * Diagnostic — fires one email through the same pipeline campaigns
-     * use and returns the provider response. Useful when "Send" reports
-     * 0/N delivered — call this with the admin's own email to see the
-     * actual failure (Resend domain unverified, SMTP blocked, etc.).
-     */
+    /** Transport diagnostic used by Admin → Email setup (not marketing content). */
     @Post('test-email')
     @UseGuards(JwtAuthGuard, RolesGuard)
     @Roles('ADMIN', 'OWNER')
     async testEmail(@Body() body: { to: string }) {
         return this.newsletterService.sendTestEmail(body?.to);
     }
+}
 
-    /** Past campaigns (history page). */
+/**
+ * Admin Newsletter Hub. Managing contacts, exporting, campaigns and sending
+ * are OWNER/ADMIN only (OWNER passes every RolesGuard check).
+ */
+@Controller('newsletter/admin')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('ADMIN', 'OWNER')
+export class NewsletterAdminController {
+    constructor(
+        private readonly contacts: NewsletterContactsService,
+        private readonly campaigns: NewsletterCampaignsService,
+    ) {}
+
+    // ── Contacts ──
+    @Get('contacts')
+    listContacts(@Query() q: any) { return this.contacts.list(q || {}); }
+
+    @Get('contacts/export')
+    async exportContacts(@Res() res: any) {
+        const csv = await this.contacts.exportCsv();
+        res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+        res.setHeader('Content-Disposition', `attachment; filename="atlantis-contacts-${new Date().toISOString().slice(0, 10)}.csv"`);
+        res.setHeader('Cache-Control', 'no-store');
+        res.send('﻿' + csv);
+    }
+
+    @Get('contacts/:id')
+    contactDetail(@Param('id') id: string) { return this.contacts.detail(id); }
+
+    @Post('contacts')
+    addContact(@Body() body: any, @Req() req: any) { return this.contacts.add(body, req.user?.sub); }
+
+    @Patch('contacts/:id')
+    updateContact(@Param('id') id: string, @Body() body: any) { return this.contacts.update(id, body); }
+
+    @Post('contacts/:id/consent')
+    recordConsent(@Param('id') id: string, @Body() body: any, @Req() req: any) { return this.contacts.recordConsent(id, body, req.user?.sub); }
+
+    @Post('contacts/bulk')
+    bulk(@Body() body: { ids: string[]; action: string }, @Req() req: any) { return this.contacts.bulk(body?.ids, String(body?.action || '').toLowerCase(), req.user?.sub); }
+
+    @Post('contacts/import/parse')
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+    parseImport(@UploadedFile() file: any) {
+        if (!file?.buffer) throw new BadRequestException('Upload a CSV or Excel file in the "file" field.');
+        return this.contacts.parseFile(file.buffer);
+    }
+
+    @Post('contacts/import/preview')
+    previewImport(@Body() body: any) { return this.contacts.previewImport(body); }
+
+    @Post('contacts/import/commit')
+    commitImport(@Body() body: any, @Req() req: any) { return this.contacts.commitImport(body, req.user?.sub); }
+
+    // ── Campaigns ──
+    @Get('products')
+    products(@Query('q') q?: string) { return this.campaigns.searchProducts(q || ''); }
+
     @Get('campaigns')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'OWNER')
-    async listCampaigns() {
-        return this.newsletterService.listCampaigns();
-    }
+    listCampaigns() { return this.campaigns.list(); }
 
-    /** Single campaign — used to re-open in the builder. */
+    @Post('campaigns')
+    createCampaign(@Body() body: any, @Req() req: any) { return this.campaigns.create(body || {}, req.user?.sub); }
+
     @Get('campaigns/:id')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'OWNER')
-    async getCampaign(@Param('id') id: string) {
-        return this.newsletterService.getCampaign(id);
+    getCampaign(@Param('id') id: string) { return this.campaigns.get(id); }
+
+    @Patch('campaigns/:id')
+    updateCampaign(@Param('id') id: string, @Body() body: any) { return this.campaigns.update(id, body || {}); }
+
+    @Delete('campaigns/:id')
+    deleteCampaign(@Param('id') id: string) { return this.campaigns.remove(id); }
+
+    @Post('campaigns/:id/duplicate')
+    duplicateCampaign(@Param('id') id: string, @Req() req: any) { return this.campaigns.duplicate(id, req.user?.sub); }
+
+    @Get('campaigns/:id/preview')
+    previewCampaign(@Param('id') id: string) { return this.campaigns.preview(id); }
+
+    @Get('campaigns/:id/audience')
+    campaignAudience(@Param('id') id: string) { return this.campaigns.audience(id); }
+
+    @Post('campaigns/:id/test')
+    @Throttle({ default: { limit: 10, ttl: 60_000 } })
+    testCampaign(@Param('id') id: string, @Req() req: any) { return this.campaigns.sendTest(id, req.user?.sub); }
+
+    @Post('campaigns/:id/send')
+    sendCampaign(@Param('id') id: string, @Body() body: { expectedRecipients?: number }, @Req() req: any) {
+        const n = Number(body?.expectedRecipients);
+        if (!Number.isInteger(n) || n < 1) throw new BadRequestException('Confirm the number of recipients before sending.');
+        return this.campaigns.send(id, req.user?.sub, n);
     }
 
-    /** Delete from history. */
-    @Delete('campaigns/:id')
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles('ADMIN', 'OWNER')
-    async deleteCampaign(@Param('id') id: string) {
-        return this.newsletterService.deleteCampaign(id);
-    }
+    @Post('campaigns/:id/resume')
+    resumeCampaign(@Param('id') id: string) { return this.campaigns.resume(id); }
 }

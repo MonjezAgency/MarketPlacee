@@ -17,7 +17,7 @@ export class AdminOrdersController {
 
     /** Paged, filtered, sorted orders + status counts, "requiring action" queues and filter facets. */
     @Get('list')
-    @Roles(Role.ADMIN, Role.OWNER)
+    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT, Role.LOGISTICS) // read-only; rows carry no supplier net or markup
     list(@Query() q: Record<string, string>) {
         return this.adminOrders.list(q);
     }
@@ -43,7 +43,7 @@ export class AdminOrdersController {
      * (support, moderation, logistics) get it without supplier net prices or the markup.
      */
     @Get(':id/detail')
-    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT, Role.MODERATOR, Role.LOGISTICS)
+    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT, Role.LOGISTICS)
     detail(@Param('id') id: string, @Request() req) {
         const role = String(req.user?.role || '').toUpperCase();
         return this.adminOrders.detail(id, { netVisible: role === 'ADMIN' || role === 'OWNER' });

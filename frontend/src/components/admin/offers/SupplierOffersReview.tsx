@@ -5,8 +5,8 @@
  * (backend model Offer, backend/src/offers). Data: GET /offers (staff roles;
  * every row carries `postedByStaff`, computed on the server with the same staff
  * rule as the Products scopes). Approve / reject: PATCH /offers/:id/approve|reject,
- * allowed for OWNER and ADMIN only (offers.controller.ts) — other staff see the
- * queue read-only. Each decision replaces the row with the record the server
+ * allowed for OWNER, ADMIN and MODERATOR (offers.controller.ts) — other staff
+ * see the queue read-only. Each decision replaces the row with the record the server
  * returns; approval also reports how many offer emails were actually delivered.
  * Only fields that are recorded on the offer (or its product) are shown.
  */
@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { Check, Inbox, Search, X } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { canDo } from '@/lib/admin-access';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 import {
@@ -68,7 +69,8 @@ const UNIT_KEYS: Record<string, { price: string; qty: string }> = {
     pallet: { price: 'pricePallet', qty: 'qtyPallet' },
     carton: { price: 'priceCarton', qty: 'qtyCarton' },
 };
-const MANAGER_ROLES = ['OWNER', 'ADMIN'];
+/** Roles allowed to approve / reject (offers.controller.ts; MODERATOR per the owner's role matrix). */
+const MANAGER_ROLES = ['OWNER', 'ADMIN', 'MODERATOR'];
 
 const asArray = (raw: any): AdminOffer[] => (Array.isArray(raw) ? raw : Array.isArray(raw?.data) ? raw.data : []);
 const present = (v: unknown) => v !== null && v !== undefined && String(v).trim() !== '';
@@ -97,7 +99,7 @@ export default function SupplierOffersReview({ status, q, source, focusId, onCha
     const { t, fmt } = useLanguage();
     const tl = React.useCallback((k: string, v?: Record<string, string | number>) => t(S, k, v), [t]);
     const { user } = useAuth();
-    const canDecide = MANAGER_ROLES.includes(String(user?.role || '').toUpperCase());
+    const canDecide = canDo(user?.role, 'reviewOffers');
     const eur = (n: number) => fmt.number(Number(n), { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
     const [offers, setOffers] = React.useState<AdminOffer[] | null>(null);

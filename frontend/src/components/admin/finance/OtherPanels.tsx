@@ -8,24 +8,24 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { COUNTRIES } from '@/lib/countries';
 import { Badge, Button, Card, Dialog, EmptyState, ErrorState, Field, Notice, Skeleton, inputCls, selectCls, useConfirm, type Tone } from '@/components/supplier/ui';
 import { cn } from '@/lib/utils';
-import { AccountPicker, httpsUrl, readError, useTf, useUserNames, type AccountOption } from './shared';
+import { AccountPicker, LoadError, NoAccessState, fetchList, httpsUrl, readError, useTf, useUserNames, type AccountOption } from './shared';
 
 type Msg = { tone: 'success' | 'danger'; text: string } | null;
 
-/** GET a finance list; errors become a message. */
+/** GET a finance list; errors become a message, a 403 becomes the permission state. */
 function useList<T>(path: string) {
     const tf = useTf();
     const [rows, setRows] = React.useState<T[] | null>(null);
     const [error, setError] = React.useState<string | null>(null);
+    const [forbidden, setForbidden] = React.useState(false);
     const load = React.useCallback(() => {
         setError(null);
-        apiFetch(path, { cache: 'no-store' })
-            .then(async (r) => { if (!r.ok) throw new Error(await readError(r, tf('loadFailed'))); return r.json(); })
-            .then((d) => setRows(Array.isArray(d) ? d : []))
-            .catch((e) => setError(e.message));
+        fetchList(path, tf('loadFailed'))
+            .then((d) => { setForbidden(false); setRows(d as T[]); })
+            .catch((e) => { if (e instanceof LoadError && e.forbidden) setForbidden(true); else setError(e?.message || tf('loadFailed')); });
     }, [path, tf]);
     React.useEffect(() => { load(); }, [load]);
-    return { rows, error, load };
+    return { rows, error, forbidden, load };
 }
 
 function AccountName({ id, names }: { id: string; names: ReturnType<typeof useUserNames> }) {
@@ -52,7 +52,7 @@ export function CreditTermsPanel({ canWrite }: { canWrite: boolean }) {
     const tf = useTf();
     const { fmt } = useLanguage();
     const confirm = useConfirm();
-    const { rows, error, load } = useList<CreditTerm>('/finance/credit-terms');
+    const { rows, error, forbidden, load } = useList<CreditTerm>('/finance/credit-terms');
     const names = useUserNames((rows || []).map((r) => r.userId));
     const [edit, setEdit] = React.useState<CreditTerm | 'new' | null>(null);
     const [msg, setMsg] = React.useState<Msg>(null);
@@ -70,10 +70,11 @@ export function CreditTermsPanel({ canWrite }: { canWrite: boolean }) {
     };
 
     return (
-        <Card title={tf('ctTitle')} description={tf('ctLead')} actions={canWrite ? <Button variant="primary" icon={<Plus size={14} />} onClick={() => setEdit('new')}>{tf('ctAdd')}</Button> : undefined}>
+        <Card title={tf('ctTitle')} description={tf('ctLead')} actions={canWrite && !forbidden ? <Button variant="primary" icon={<Plus size={14} />} onClick={() => setEdit('new')}>{tf('ctAdd')}</Button> : undefined}>
             <div aria-live="polite">{msg && <div className="mb-3"><Notice tone={msg.tone} onClose={() => setMsg(null)}>{msg.text}</Notice></div>}</div>
+            {forbidden && <NoAccessState />}
             {error && <ErrorState message={error} onRetry={load} />}
-            {!rows && !error && <div className="space-y-2" aria-busy="true"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>}
+            {!rows && !error && !forbidden && <div className="space-y-2" aria-busy="true"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>}
             {rows && (rows.length === 0 ? <EmptyState icon={<CreditCard size={20} />} title={tf('ctEmptyTitle')}>{tf('ctEmptyBody')}</EmptyState> : (
                 <div className="overflow-x-auto -mx-4 sm:-mx-5">
                     <table className="w-full min-w-[760px] text-[13.5px]">
@@ -103,7 +104,7 @@ export function CreditTermsPanel({ canWrite }: { canWrite: boolean }) {
                     </table>
                 </div>
             ))}
-            <p className="mt-3 text-[12.5px] text-ink-3">{tf('ctFootnote')}</p>
+            {!forbidden && <p className="mt-3 text-[12.5px] text-ink-3">{tf('ctFootnote')}</p>}
             {edit && <CreditDialog term={edit === 'new' ? null : edit} name={edit !== 'new' ? names[edit.userId] : null} onClose={() => setEdit(null)} onSaved={() => { setEdit(null); setMsg({ tone: 'success', text: tf('ctSaved') }); load(); }} />}
         </Card>
     );
@@ -168,7 +169,7 @@ export function TaxExemptionsPanel({ canWrite }: { canWrite: boolean }) {
     const tf = useTf();
     const { fmt } = useLanguage();
     const confirm = useConfirm();
-    const { rows, error, load } = useList<Exemption>('/finance/tax-exemptions');
+    const { rows, error, forbidden, load } = useList<Exemption>('/finance/tax-exemptions');
     const names = useUserNames((rows || []).map((r) => r.userId));
     const [busy, setBusy] = React.useState<string | null>(null);
     const [msg, setMsg] = React.useState<Msg>(null);
@@ -188,8 +189,9 @@ export function TaxExemptionsPanel({ canWrite }: { canWrite: boolean }) {
     return (
         <Card title={tf('teTitle')} description={tf('teLead')}>
             <div aria-live="polite">{msg && <div className="mb-3"><Notice tone={msg.tone} onClose={() => setMsg(null)}>{msg.text}</Notice></div>}</div>
+            {forbidden && <NoAccessState />}
             {error && <ErrorState message={error} onRetry={load} />}
-            {!rows && !error && <div className="space-y-2" aria-busy="true"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>}
+            {!rows && !error && !forbidden && <div className="space-y-2" aria-busy="true"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>}
             {rows && (rows.length === 0 ? <EmptyState icon={<ShieldCheck size={20} />} title={tf('teEmptyTitle')}>{tf('teEmptyBody')}</EmptyState> : (
                 <ul className="divide-y divide-line -mx-4 sm:-mx-5 border-y border-line">
                     {rows.map((x) => {
@@ -231,7 +233,7 @@ interface Location { id: string; name: string; address: string; city: string; co
 export function DispatchLocationsPanel({ canWrite }: { canWrite: boolean }) {
     const tf = useTf();
     const confirm = useConfirm();
-    const { rows, error, load } = useList<Location>('/finance/warehouses');
+    const { rows, error, forbidden, load } = useList<Location>('/finance/warehouses');
     const names = useUserNames((rows || []).map((r) => r.supplierId));
     const [adding, setAdding] = React.useState(false);
     const [msg, setMsg] = React.useState<Msg>(null);
@@ -249,10 +251,11 @@ export function DispatchLocationsPanel({ canWrite }: { canWrite: boolean }) {
     };
 
     return (
-        <Card title={tf('dlTitle')} description={tf('dlLead')} actions={canWrite ? <Button variant="primary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>{tf('dlAdd')}</Button> : undefined}>
+        <Card title={tf('dlTitle')} description={tf('dlLead')} actions={canWrite && !forbidden ? <Button variant="primary" icon={<Plus size={14} />} onClick={() => setAdding(true)}>{tf('dlAdd')}</Button> : undefined}>
             <div aria-live="polite">{msg && <div className="mb-3"><Notice tone={msg.tone} onClose={() => setMsg(null)}>{msg.text}</Notice></div>}</div>
+            {forbidden && <NoAccessState />}
             {error && <ErrorState message={error} onRetry={load} />}
-            {!rows && !error && <div className="space-y-2" aria-busy="true"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>}
+            {!rows && !error && !forbidden && <div className="space-y-2" aria-busy="true"><Skeleton className="h-12" /><Skeleton className="h-12" /></div>}
             {rows && (rows.length === 0 ? <EmptyState icon={<MapPin size={20} />} title={tf('dlEmptyTitle')}>{tf('dlEmptyBody')}</EmptyState> : (
                 <ul className="divide-y divide-line -mx-4 sm:-mx-5 border-y border-line">
                     {rows.map((w) => (
@@ -267,6 +270,7 @@ export function DispatchLocationsPanel({ canWrite }: { canWrite: boolean }) {
                     ))}
                 </ul>
             ))}
+            {!forbidden && <p className="mt-3 text-[12.5px] text-ink-3">{tf('dlCalcNote')}</p>}
             {adding && <LocationDialog onClose={() => setAdding(false)} onSaved={() => { setAdding(false); setMsg({ tone: 'success', text: tf('dlSaved') }); load(); }} />}
         </Card>
     );

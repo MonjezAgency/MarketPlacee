@@ -5,6 +5,10 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../common/prisma.service';
 import { CryptoService } from '../security/crypto.service';
 import { EmailService } from '../email/email.service';
+import { Actor, checkAccountAction, DENIAL_MESSAGE } from '../admin/staff-access';
+import { forgetUser } from '../auth/jwt.strategy';
+
+const SETTABLE_STATUSES = new Set(['PENDING_APPROVAL', 'ACTIVE', 'REJECTED', 'BLOCKED']);
 
 @Injectable()
 export class UsersService {
@@ -135,7 +139,19 @@ export class UsersService {
         };
     }
 
-    async approveAllPending() {
+    /**
+     * Account actions by staff: never on yourself, never on the owner, and team accounts
+     * only by the owner/admin rules in admin/staff-access.ts. Throws 403 with the reason.
+     */
+    private async assertMayAct(actor: Actor | undefined, id: string) {
+        if (!actor) return;
+        const target = await this.prisma.user.findUnique({ where: { id }, select: { id: true, role: true } });
+        if (!target) return; // the action itself reports "not found"
+        const d = checkAccountAction(actor, { id: target.id, role: String(target.role) });
+        if (d) throw new ForbiddenException({ code: d, message: DENIAL_MESSAGE[d] });
+    }
+
+    async approveAllPending(actor?: Actor) {
         const pending = await this.prisma.user.findMany({
             where: { 
                 status: 'PENDING_APPROVAL',
@@ -149,7 +165,7 @@ export class UsersService {
 
         for (const user of pending) {
             try {
-                await this.updateStatus(user.id, 'ACTIVE');
+                await this.updateStatus(user.id, 'ACTIVE', actor);
                 approved++;
             } catch (err) {
                 console.error(`[ADMIN_BULK_APPROVE_ERROR] Failed for user ${user.id}:`, err.message);
@@ -160,12 +176,15 @@ export class UsersService {
         return { approved, failed, total: pending.length };
     }
 
-    async updateStatus(id: string, status: any) {
+    async updateStatus(id: string, status: any, actor?: Actor) {
+        if (!SETTABLE_STATUSES.has(String(status))) throw new ForbiddenException({ code: 'INVALID_STATUS', message: 'Unknown account status.' });
+        await this.assertMayAct(actor, id);
         const user = await this.prisma.user.findUnique({ where: { id } });
         const updated = await this.prisma.user.update({
             where: { id },
             data: { status },
         });
+        forgetUser(id); // a block applies on the next request, not when the 30-day token expires
 
         // Trigger welcome/approval email if user is activated from pending state
         if (status === 'ACTIVE' && user && user.status === 'PENDING_APPROVAL') {
@@ -180,7 +199,9 @@ export class UsersService {
         return updated;
     }
 
-    async deleteUser(id: string) {
+    async deleteUser(id: string, actor?: Actor) {
+        await this.assertMayAct(actor, id);
+        forgetUser(id);
         try {
             // 1. Try to hard delete first (works if no orders/products exist)
             return await this.prisma.user.delete({
@@ -213,11 +234,11 @@ export class UsersService {
         }
     }
 
-    async bulkUpdateStatus(ids: string[], status: string) {
+    async bulkUpdateStatus(ids: string[], status: string, actor?: Actor) {
         const results = { updated: 0, failed: 0 };
         for (const id of ids) {
             try {
-                await this.updateStatus(id, status);
+                await this.updateStatus(id, status, actor);
                 results.updated++;
             } catch (err) {
                 console.error(`[BULK_UPDATE_ERROR] User ${id}:`, err.message);
@@ -227,11 +248,11 @@ export class UsersService {
         return results;
     }
 
-    async bulkDelete(ids: string[]) {
+    async bulkDelete(ids: string[], actor?: Actor) {
         const results = { deleted: 0, failed: 0 };
         for (const id of ids) {
             try {
-                await this.deleteUser(id);
+                await this.deleteUser(id, actor);
                 results.deleted++;
             } catch (err) {
                 console.error(`[BULK_DELETE_ERROR] User ${id}:`, err.message);

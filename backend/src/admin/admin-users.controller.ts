@@ -15,7 +15,7 @@ import { AdminUsersService } from './admin-users.service';
  */
 @Controller('admin/users')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(Role.ADMIN, Role.OWNER)
+@Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT) // support reads accounts to help; net prices and margin stay OWNER/ADMIN (canSeeNet)
 export class AdminUsersController {
     constructor(private readonly svc: AdminUsersService) {}
 

@@ -4,9 +4,10 @@ import { OffersService } from './offers.service';
 import { EmailModule } from '../email/email.module';
 import { EmailTrackingModule } from '../email-tracking/email-tracking.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { MarketingConsentModule } from '../newsletter/marketing-consent.module';
 
 @Module({
-    imports: [EmailModule, EmailTrackingModule, NotificationsModule],
+    imports: [EmailModule, EmailTrackingModule, NotificationsModule, MarketingConsentModule],
     controllers: [OffersController],
     providers: [OffersService],
     exports: [OffersService],

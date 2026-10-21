@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { canDo } from '@/lib/admin-access';
+import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -70,7 +72,9 @@ function Directory() {
 
     const clearFilters = () => { setQ(''); setRole(''); setStatus(''); setCountry(''); setKyc(''); };
     const rows = data?.data ?? [];
-    const selectable = rows.filter((r) => isMarketAccount(r.role));
+    const { user: me } = useAuth();
+    const canDecide = canDo(me?.role, 'accountDecisions');
+    const selectable = canDecide ? rows.filter((r) => isMarketAccount(r.role)) : [];
     const allOnPage = selectable.length > 0 && selectable.every((r) => selected.has(r.id));
     const toggleAll = () => setSelected(allOnPage ? new Set() : new Set(selectable.map((r) => r.id)));
     const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });

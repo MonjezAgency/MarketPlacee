@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { TeamController } from './team.controller';
+import { TeamInvitationsController } from './team-invitations.controller';
+import { TeamService } from './team.service';
 import { EmailModule } from '../email/email.module';
 import { ExcelService } from './excel.service';
 import { ProductsModule } from '../products/products.module';
@@ -22,8 +24,8 @@ import { AiAgentModule } from '../ai-agent/ai-agent.module';
 
 @Module({
     imports: [ProductsModule, EmailModule, PrismaModule, AiAgentModule],
-    providers: [AdminService, ExcelService, DashboardService, AdminOverviewService, AnalyticsService, AuditService, AppConfigService, AdminUsersService],
-    controllers: [TeamController, DashboardController, AuditController, AppConfigController, AdminUsersController],
+    providers: [AdminService, TeamService, ExcelService, DashboardService, AdminOverviewService, AnalyticsService, AuditService, AppConfigService, AdminUsersService],
+    controllers: [TeamController, TeamInvitationsController, DashboardController, AuditController, AppConfigController, AdminUsersController],
     exports: [ExcelService, DashboardService, AnalyticsService, AuditService, AppConfigService],
 })
 export class AdminModule { }

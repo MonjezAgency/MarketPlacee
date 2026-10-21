@@ -35,16 +35,16 @@ export class PriceHistoryService {
         }
     }
 
-    /** Buyers with an open target at or above the new listed price are told once. */
+    /** Buyers with an open target at or above the new listed price are told once per target (a revised target can be told again). */
     private async notifyTargetsReached(productId: string, price: number) {
         const reqs = await (this.prisma as any).targetPriceRequest.findMany({
             where: { productId, status: { in: ['OPEN', 'RESPONDED'] }, reachedNotifiedAt: null, targetCasePrice: { gte: price } },
-            select: { id: true, ref: true, buyerId: true, product: { select: { name: true } } },
+            select: { id: true, ref: true, buyerId: true, targetCasePrice: true, product: { select: { name: true } } },
         });
         for (const r of reqs) {
             const claimed = await (this.prisma as any).targetPriceRequest.updateMany({ where: { id: r.id, reachedNotifiedAt: null }, data: { reachedNotifiedAt: new Date() } });
             if (!claimed.count) continue;
-            this.notifications.notifyUser(r.buyerId, 'Price reached your target', `${r.product?.name} is now listed at €${price.toFixed(2)} per case — at or below your target (${r.ref}).`, 'SUCCESS', { productId, targetPriceRequestId: r.id, targetRef: r.ref, kind: 'TARGET_REACHED', params: { ref: r.ref, product: r.product?.name ?? '', price: Math.round(price * 100) / 100 }, dedupeKey: `target:${r.id}:reached` }).catch(() => {});
+            this.notifications.notifyUser(r.buyerId, 'Price reached your target', `${r.product?.name} is now listed at €${price.toFixed(2)} per case — at or below your target (${r.ref}).`, 'SUCCESS', { productId, targetPriceRequestId: r.id, targetRef: r.ref, link: `/dashboard/customer/targets?ref=${encodeURIComponent(r.ref)}`, kind: 'TARGET_REACHED', params: { ref: r.ref, product: r.product?.name ?? '', price: Math.round(price * 100) / 100 }, dedupeKey: `target:${r.id}:reached:${r.targetCasePrice}` }).catch(() => {});
         }
     }
 

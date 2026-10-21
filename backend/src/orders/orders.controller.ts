@@ -57,7 +57,7 @@ export class OrdersController {
      * uploads since the bucket accepts any mime type.
      */
     @Post(':id/supplier-invoice')
-    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS)
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.LOGISTICS) // support/moderation read orders; they don't attach invoices
     @UseGuards(PolicyGuard)
     @CheckOwnership('ORDER')
     @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
@@ -90,7 +90,7 @@ export class OrdersController {
 
     /** Remove the attached invoice from the order. */
     @Delete(':id/supplier-invoice')
-    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS)
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.LOGISTICS)
     @UseGuards(PolicyGuard)
     @CheckOwnership('ORDER')
     async removeSupplierInvoice(@Param('id') id: string) {
@@ -225,7 +225,7 @@ export class OrdersController {
     }
 
     @Patch(':id/status')
-    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.MODERATOR, Role.SUPPORT, Role.LOGISTICS)
+    @Roles(Role.SUPPLIER, Role.ADMIN, Role.OWNER, Role.LOGISTICS) // SUPPORT/MODERATOR may read orders, not change them
     @UseGuards(PolicyGuard)
     @CheckOwnership('ORDER')
     async updateStatus(
@@ -303,7 +303,7 @@ export class OrdersController {
     }
 
     @Get(':id/workflow')
-    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT, Role.MODERATOR, Role.LOGISTICS)
+    @Roles(Role.ADMIN, Role.OWNER, Role.SUPPORT, Role.LOGISTICS)
     workflow(@Param('id') id: string) {
         return this.ordersService.workflowForAdmin(id);
     }

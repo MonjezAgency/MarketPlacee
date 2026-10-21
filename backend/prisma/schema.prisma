@@ -638,18 +638,66 @@ model SecurityConfig {
   updatedAt   DateTime @updatedAt
 }
 
+/// Promo codes buyers enter at checkout. Rules (backend/src/coupons/coupon-rules.ts) are applied only on the
+/// server, in OrdersService.priceCart (quote and order creation); the discount comes off the goods subtotal
+/// after line discounts and is funded by the Atlantis margin (supplier net prices never change).
 model Coupon {
   id              String   @id @default(uuid())
   code            String   @unique
+  /// PERCENT coupons: 1–100. FIXED coupons store 0 here and the EUR amount in amountOff.
   discountPercent Float
+  /// End of the validity window (UTC). Kept under its original name; coupons are refused after it.
   expirationDate  DateTime
 
-  placementId String
-  placement   ProductPlacement @relation(fields: [placementId], references: [id])
+  /// Legacy: coupons created "for an offer" before scopes existed. Optional since 2026-10 (new coupons use scope);
+  /// a legacy coupon applies to that placement's product only.
+  placementId String?
+  placement   ProductPlacement? @relation(fields: [placementId], references: [id], onDelete: Restrict)
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// PERCENT | FIXED. Null = PERCENT (coupons created before 2026-10).
+  discountType     String?
+  /// FIXED coupons: EUR off the eligible goods, capped at the eligible amount.
+  amountOff        Float?
+  /// Start of the validity window (UTC). Null = valid from creation.
+  startsAt         DateTime?
+  /// Minimum goods subtotal (EUR, after line discounts, before the coupon). Null = none.
+  minOrderAmount   Float?
+  /// Total orders that may use the code. Null = unlimited. Enforced atomically against usedCount at order creation.
+  usageLimit       Int?
+  /// Orders one buyer account may place with the code. Null = unlimited.
+  perCustomerLimit Int?
+  /// Orders created with the code since redemption tracking began (one per CouponRedemption).
+  usedCount        Int      @default(0)
+  /// ALL | CATEGORY | PRODUCTS. Null = legacy (placement product).
+  scope            String?
+  /// CATEGORY scope: Product.category values (any of them).
+  categories       String[] @default([])
+  /// Internal note / campaign name (admins only, never shown to buyers).
+  description      String?
+  /// PRODUCTS scope: Product ids.
+  productIds       String[] @default([])
+  createdById      String?
+
+  redemptions CouponRedemption[]
+}
+
+/// One row per order created with a coupon (a "redemption"). Written in the order's transaction; never released
+/// when the order is later rejected or cancelled (the use counted when the order request was placed).
+model CouponRedemption {
+  id         String   @id @default(uuid())
+  couponId   String
+  coupon     Coupon   @relation(fields: [couponId], references: [id])
+  orderId    String   @unique
+  customerId String
+  /// EUR taken off the order's goods total.
+  discount   Float
+  createdAt  DateTime @default(now())
+
+  @@index([couponId, customerId])
 }
 
 model AppConfig {
@@ -1067,8 +1115,101 @@ model Campaign {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // ── Campaign builder (additive, 2026-10). Status for new rows is set explicitly:
+  // DRAFT → SENDING → SENT (every attempted recipient accepted by the provider) |
+  // PARTIAL (some accepted, some failed) | FAILED (none accepted). "Sent" means
+  // accepted by the provider, never "delivered" (no provider delivery reports).
+  preheader     String?
+  template      String?  // BLANK | ANNOUNCEMENT | PRODUCTS
+  content       Json?    // structured builder state (headline, paragraphs, CTA, productIds)
+  audienceSpec  Json?    // { audience: NEWSLETTER | ACCOUNTS | ALL, roles?, region?, source? }
+  failedCount   Int      @default(0)
+  skippedCount  Int      @default(0)
+  lastError     String?
+  createdBy     String?
+  sendStartedAt DateTime?
+  sentAt        DateTime? // when the send run finished
+  lastTestAt    DateTime?
+  lastTestResult String?
+  recipients    CampaignRecipient[]
+
   @@index([createdAt])
   @@index([status])
+}
+
+/**
+ * One row per (campaign, normalised email): makes sending idempotent (a
+ * recipient is attempted at most once per campaign, even if a send is resumed)
+ * and records the provider's answer. ACCEPTED = the provider accepted the
+ * message; nothing here claims delivery.
+ */
+model CampaignRecipient {
+  id          String    @id @default(uuid())
+  campaignId  String
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  email       String    // normalised (trimmed, lowercased)
+  status      String    @default("PENDING") // PENDING | ACCEPTED | FAILED | SKIPPED
+  skipReason  String?   // consent / suppression reason when the pre-send check said no
+  error       String?
+  provider    String?
+  providerId  String?
+  attemptedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([campaignId, email])
+  @@index([campaignId, status])
+}
+
+/**
+ * Marketing suppression by normalised email, kept apart from the contact row so
+ * deleting, re-importing or re-adding a contact can never undo an unsubscribe.
+ * Lifted only by the person's own explicit opt-in (confirmed newsletter
+ * sign-up, or switching marketing emails back on in their own account).
+ */
+model MarketingSuppression {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  reason             String    // UNSUBSCRIBED | BOUNCED | COMPLAINED | BLOCKED
+  source             String?   // LINK | ONE_CLICK | EMAIL_FORM | ADMIN | PROVIDER
+  suppressedAt       DateTime  @default(now())
+  // True when the unsubscribe also switched the matching account's
+  // marketingEmails preference off, so a later "on" can only be the user's own choice.
+  accountPrefCleared Boolean   @default(false)
+  liftedAt           DateTime?
+  liftedReason       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@index([reason])
+}
+
+/** Append-only consent history per normalised email (subscribe, confirm, unsubscribe, admin actions). */
+model MarketingConsentEvent {
+  id         String   @id @default(uuid())
+  email      String
+  type       String   // SUBSCRIBE_REQUESTED | CONFIRMED | UNSUBSCRIBED | RESUBSCRIBED | ADMIN_ADDED | IMPORTED | CONSENT_RECORDED | BLOCKED | UNBLOCKED | ARCHIVED | RESTORED | DELETED
+  source     String?
+  actorId    String?
+  campaignId String?
+  offerId    String?
+  detail     Json?
+  createdAt  DateTime @default(now())
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+/** Random per-recipient unsubscribe token (only its SHA-256 is stored). */
+model MarketingUnsubscribeToken {
+  id         String    @id @default(uuid())
+  tokenHash  String    @unique
+  email      String
+  campaignId String?
+  offerId    String?
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([email])
 }
 
 /**
@@ -1144,6 +1285,18 @@ model NewsletterSubscriber {
   unsubscribedAt   DateTime?
   userId           String?   // linked account, when signed in at sign-up
 
+  // ── Contact management (additive, 2026-10) ──
+  company             String?
+  // How marketing consent was obtained: FORM_DOUBLE_OPT_IN (confirmed sign-up),
+  // ADMIN_RECORDED (an admin entered the basis in consentEvidence), NONE (no
+  // basis: imported / manual contacts are not sendable). Null on older rows.
+  consentBasis        String?
+  consentEvidence     String?
+  consentRecordedById String?
+  consentRecordedAt   DateTime?  // when the admin recorded the basis (not when consent was given)
+  addedById           String?
+  lastImportedAt      DateTime?
+
   @@index([email])
   @@index([status])
 }
@@ -1176,7 +1329,18 @@ model TargetPriceRequest {
   respondedAt     DateTime?
   respondedById   String?
   reachedNotifiedAt DateTime?               // buyer told the listed price reached the target
-  history         Json      @default("[]")   // [{status, at, by, note}]
+  // Negotiation (additive, 2026-10-21; null on older requests). Stored statuses are unchanged:
+  // ACCEPTED = agreed (the desk accepted the target as asked, or the buyer accepted the desk's counter);
+  // DECLINED = closed by the desk or by the buyer declining a counter (buyerDecision tells which).
+  listedCasePriceAtRequest Float?           // listed BUYER price per case (EUR) when the request was sent
+  originalTargetCasePrice  Float?           // first target, kept when the buyer sends a revised target
+  counterQuantityCases     Int?             // cases the desk's counter applies to (null = the requested quantity)
+  buyerDecision            String?          // ACCEPTED | DECLINED | REVISED — the buyer's answer to the current desk reply
+  buyerDecidedAt           DateTime?
+  agreedCasePrice          Float?           // agreed buyer price per case (EUR), set only when status becomes ACCEPTED
+  agreedQuantityCases      Int?
+  agreedAt                 DateTime?
+  history         Json      @default("[]")   // [{status, at, by, note, action?, price?, cases?}]
   idempotencyKey  String?   @unique
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -1210,6 +1374,19 @@ model InviteToken {
   used      Boolean  @default(false)
   createdBy String?  // admin user id
   createdAt DateTime @default(now())
+  /// Team invitations (kind = "STAFF", backend/src/admin/team.service.ts): `token` holds the
+  /// SHA-256 of the link secret, never the secret itself. The rest are null on older rows.
+  kind           String?
+  name           String?
+  /// SENDING | SENT | FAILED. Only a SENT invitation can be accepted.
+  emailStatus    String?
+  emailError     String?
+  sentAt         DateTime?
+  usedAt         DateTime?
+  revokedAt      DateTime?
+  revokedBy      String?
+  acceptedUserId String?
+  updatedAt      DateTime? @updatedAt
 
   @@index([token])
   @@index([email])

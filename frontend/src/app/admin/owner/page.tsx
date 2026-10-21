@@ -450,9 +450,9 @@ export default function OwnerDashboard() {
                             </h3>
                             <div className="grid grid-cols-2 gap-2">
                                 {[
-                                    { label: 'موافقة KYC', href: '/admin/kyc', color: 'bg-purple-50 dark:bg-purple-900/20 text-purple-700' },
+                                    { label: 'موافقة KYC', href: '/admin/support?view=kyc', color: 'bg-purple-50 dark:bg-purple-900/20 text-purple-700' },
                                     { label: 'الطلبات', href: '/admin/orders', color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-700' },
-                                    { label: 'النزاعات', href: '/admin/disputes', color: 'bg-red-50 dark:bg-red-900/20 text-red-700' },
+                                    { label: 'النزاعات', href: '/admin/support?view=disputes', color: 'bg-red-50 dark:bg-red-900/20 text-red-700' },
                                     { label: 'الأمان', href: '/admin/security', color: 'bg-gray-50 dark:bg-gray-900/20 text-gray-700' },
                                     { label: 'المالية', href: '/admin/finance', color: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700' },
                                     { label: 'الإعدادات', href: '/admin/settings', color: 'bg-orange-50 dark:bg-orange-900/20 text-orange-700' },

@@ -82,12 +82,12 @@ export default function AdminOverviewPage() {
         { key: 'attReady', count: s.orders.readyForApproval, href: '/admin/orders', icon: ShoppingCart, tone: 'danger' },
         { key: 'attDecision', count: s.orders.needsDecision, href: '/admin/orders', icon: ShoppingCart, tone: 'danger' },
         { key: 'attLegacy', count: s.orders.legacyPending, href: '/admin/orders', icon: ShoppingCart, tone: 'warning' },
-        { key: 'attDisputes', count: s.disputesOpen, href: '/admin/disputes', icon: Scale, tone: 'danger' },
+        { key: 'attDisputes', count: s.disputesOpen, href: '/admin/support?view=disputes', icon: Scale, tone: 'danger' },
         { key: 'attPaymentFailed', count: s.paymentFailed, href: '/admin/orders', icon: Receipt, tone: 'danger' },
-        { key: 'attOffers', count: s.offersPending, href: '/admin/offers?tab=supplier', icon: CheckCircle2, tone: 'warning' },
+        { key: 'attOffers', count: s.offersPending, href: '/admin/offers/supplier', icon: CheckCircle2, tone: 'warning' },
         { key: 'attSupplierAccounts', count: s.people.suppliers.pendingApproval, href: '/admin/users?status=PENDING_APPROVAL', icon: UserPlus, tone: 'warning' },
         { key: 'attBuyerAccounts', count: s.people.buyers.pendingApproval, href: '/admin/users?status=PENDING_APPROVAL', icon: UserPlus, tone: 'warning' },
-        { key: 'attKyc', count: s.kycPending, href: '/admin/kyc', icon: ClipboardCheck, tone: 'warning' },
+        { key: 'attKyc', count: s.kycPending, href: '/admin/support?view=kyc', icon: ClipboardCheck, tone: 'warning' },
         { key: 'attLiveIncompleteSub', count: s.products.submissions.liveIncomplete, href: '/admin/products/submissions?status=APPROVED&attention=missing', icon: FileWarning, tone: 'warning' },
         { key: 'attLiveIncompleteCatalog', count: s.products.catalog.liveIncomplete, href: '/admin/products/catalog?status=APPROVED&attention=missing', icon: FileWarning, tone: 'warning' },
         { key: 'attCatalogMissing', count: s.products.catalog.missingInfo, href: '/admin/products/catalog?attention=missing', icon: FileWarning, tone: 'neutral' },
@@ -141,7 +141,7 @@ export default function AdminOverviewPage() {
                         value={int(s?.people.suppliers.total)} foot={s ? [tr('suppliersActive', { active: int(s.people.suppliers.active), live: int(s.people.suppliers.withLiveProducts) })] : []} />
                     <Kpi small icon={Users} tone="info" loading={first} label={tr('buyers')} info={tr('defBuyers')} href="/admin/users?role=CUSTOMER"
                         value={int(s?.people.buyers.total)} foot={s ? [tr('buyersActive', { active: int(s.people.buyers.active) }), tr('buyersOrdering', { count: s.people.buyers.orderingInPeriod })] : []} />
-                    <Kpi small icon={Scale} tone={s?.disputesOpen ? 'danger' : 'neutral'} loading={first} label={tr('openDisputes')} info={tr('defDisputes')} href="/admin/disputes"
+                    <Kpi small icon={Scale} tone={s?.disputesOpen ? 'danger' : 'neutral'} loading={first} label={tr('openDisputes')} info={tr('defDisputes')} href="/admin/support?view=disputes"
                         value={int(s?.disputesOpen)} foot={s ? [tr('cancelledLine', { count: int(s.orders.cancelled) })] : []} />
                 </div>
 
@@ -376,7 +376,7 @@ const QUICK: { href: string; key: string; icon: React.ElementType }[] = [
     { href: '/admin/products/new', key: 'qaAddProduct', icon: PackagePlus },
     { href: '/admin/products/catalog/import', key: 'qaImport', icon: Upload },
     { href: '/admin/users?status=PENDING_APPROVAL', key: 'qaAccounts', icon: UserPlus },
-    { href: '/admin/disputes', key: 'qaDisputes', icon: Ban },
+    { href: '/admin/support?view=disputes', key: 'qaDisputes', icon: Ban },
 ];
 
 function activityTitle(a: any, tr: (k: string, v?: Record<string, string | number>) => string) {

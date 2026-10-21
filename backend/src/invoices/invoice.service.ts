@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { FinancialAuditService } from '../common/financial-audit.service';
+import { BUYER_INVOICE_ORDER_SELECT, isInvoiceStaff } from './invoice-access';
 
 @Injectable()
 export class InvoiceService {
@@ -48,6 +49,8 @@ export class InvoiceService {
         });
 
         const subtotal = order.totalAmount;
+        // Known gap (Marketplace_Gap_Register TX-09 / DES-08): a flat 5% "tax", not VAT by
+        // destination; freight excluded. Changing it needs owner approval.
         const taxRate = exemption ? 0 : 0.05; // 5% default tax, 0 if exempt
         const tax = subtotal * taxRate;
         const totalAmount = subtotal + tax;
@@ -86,7 +89,7 @@ export class InvoiceService {
             where: { userId: customerId, status: 'APPROVED' },
         });
 
-        const taxRate = exemption ? 0 : 0.05;
+        const taxRate = exemption ? 0 : 0.05; // same known gap as createInvoiceForOrder (TX-09)
         const tax = amount * taxRate;
         const totalAmount = amount + tax;
         const invoiceNumber = await this.generateInvoiceNumber();
@@ -117,7 +120,8 @@ export class InvoiceService {
     async getInvoicesByBuyer(customerId: string) {
         return this.prisma.invoice.findMany({
             where: { customerId },
-            include: { order: true },
+            // A reference only: the full order carries supplier ids and net prices (DES-07).
+            include: { order: { select: BUYER_INVOICE_ORDER_SELECT } },
             orderBy: { createdAt: 'desc' },
         });
     }
@@ -132,7 +136,7 @@ export class InvoiceService {
         });
     }
 
-    async markAsPaid(id: string) {
+    async markAsPaid(id: string, actorId?: string) {
         const invoice = await this.prisma.invoice.findUnique({ where: { id } });
         if (!invoice) throw new NotFoundException('Invoice not found');
 
@@ -147,10 +151,35 @@ export class InvoiceService {
             });
         }
 
-        return this.prisma.invoice.update({
+        const paid = await this.prisma.invoice.update({
             where: { id },
             data: { status: 'PAID', paidAt: new Date() },
         });
+
+        await this.audit.log({
+            eventType: 'INVOICE_PAID',
+            orderId:   invoice.orderId ?? undefined,
+            userId:    invoice.customerId,
+            amount:    invoice.totalAmount,
+            currency:  invoice.currency,
+            metadata:  { invoiceNumber: invoice.invoiceNumber, invoiceId: id, markedBy: actorId ?? null, previousStatus: invoice.status },
+        });
+
+        return paid;
+    }
+
+    /**
+     * One invoice for the caller: staff get the full view; a buyer gets their own
+     * invoice with an order reference only. Anyone else gets 404 (no existence leak).
+     */
+    async getInvoiceFor(id: string, user: { sub: string; role?: string }) {
+        if (isInvoiceStaff(user?.role)) return this.getInvoice(id);
+        const invoice = await this.prisma.invoice.findUnique({
+            where: { id },
+            include: { order: { select: BUYER_INVOICE_ORDER_SELECT } },
+        });
+        if (!invoice || invoice.customerId !== user?.sub) throw new NotFoundException('Invoice not found');
+        return invoice;
     }
 
     async getInvoice(id: string) {

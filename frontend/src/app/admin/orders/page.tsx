@@ -1,6 +1,8 @@
 'use client';
 
 import * as React from 'react';
+import { canDo } from '@/lib/admin-access';
+import { useAuth } from '@/lib/auth';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
@@ -91,6 +93,8 @@ function OrdersList() {
     const filtersActive = !!(debouncedQ || status || paymentStatus || supplier || buyer || fromDay || toDay || attention);
     const clearFilters = () => { setQ(''); setStatus(''); setPaymentStatus(''); setSupplier(''); setBuyer(''); setFromDay(''); setToDay(''); setAttention(''); };
 
+    const { user: me } = useAuth();
+    const canExport = canDo(me?.role, 'exportOrders');
     const exportCsv = async () => {
         setExporting(true);
         try {
@@ -149,7 +153,7 @@ function OrdersList() {
     return (
         <div data-no-translate className="text-start -mt-2">
             <PageHeader title={tl('title')} description={tl('subtitle')}
-                actions={<Button icon={<Download size={15} />} loading={exporting} disabled={!data || data.total === 0 || rangeInvalid} onClick={exportCsv}
+                actions={canExport && <Button icon={<Download size={15} />} loading={exporting} disabled={!data || data.total === 0 || rangeInvalid} onClick={exportCsv}
                     title={filtersActive ? tl('exportFilteredHint', { count: data?.total ?? 0 }) : tl('exportAllHint')}>{tl('exportCsv')}</Button>} />
 
             {/* Summary — current counts over all orders, from the server. Each card is the status filter. */}

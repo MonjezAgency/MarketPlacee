@@ -7,7 +7,7 @@ import { apiFetch } from '@/lib/api';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Badge, Button, Dialog, EmptyState, ErrorState, Notice, Skeleton, inputCls, selectCls, useConfirm, type Tone } from '@/components/supplier/ui';
 import { cn } from '@/lib/utils';
-import { InfoTip, httpsUrl, readError, useMoney, useTf } from './shared';
+import { InfoTip, LoadError, NoAccessState, fetchList, httpsUrl, readError, useMoney, useTf } from './shared';
 import { ManualInvoiceDialog } from './ManualInvoiceDialog';
 
 /** One row of GET /invoices (invoice.service.ts getAllInvoices), as recorded. */
@@ -43,6 +43,7 @@ export function InvoicesPanel({ canWrite }: { canWrite: boolean }) {
     const confirm = useConfirm();
     const [rows, setRows] = React.useState<InvoiceRow[] | null>(null);
     const [error, setError] = React.useState<string | null>(null);
+    const [forbidden, setForbidden] = React.useState(false);
     const [q, setQ] = React.useState('');
     const [status, setStatus] = React.useState('');
     const [page, setPage] = React.useState(1);
@@ -54,10 +55,9 @@ export function InvoicesPanel({ canWrite }: { canWrite: boolean }) {
 
     const load = React.useCallback(() => {
         setError(null);
-        apiFetch('/invoices', { cache: 'no-store' })
-            .then(async (r) => { if (!r.ok) throw new Error(await readError(r, tf('loadFailed'))); return r.json(); })
-            .then((d) => setRows(Array.isArray(d) ? d : []))
-            .catch((e) => setError(e.message));
+        fetchList('/invoices', tf('loadFailed'))
+            .then((d) => { setForbidden(false); setRows(d as InvoiceRow[]); })
+            .catch((e) => { if (e instanceof LoadError && e.forbidden) setForbidden(true); else setError(e?.message || tf('loadFailed')); });
     }, [tf]);
     React.useEffect(() => { load(); }, [load]);
 
@@ -119,6 +119,8 @@ export function InvoicesPanel({ canWrite }: { canWrite: boolean }) {
         </span>
     );
 
+    if (forbidden) return <section className="rounded-xl bg-surface ring-1 ring-line" aria-label={tf('invoicesTitle')}><NoAccessState /></section>;
+
     return (
         <div className="space-y-4">
             <section aria-label={tf('metricsAria')} className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
@@ -137,6 +139,7 @@ export function InvoicesPanel({ canWrite }: { canWrite: boolean }) {
                 ))}
             </section>
             {rows && metrics[0].sums.length > 1 && <Notice tone="info">{tf('mixedCurrencies')}</Notice>}
+            <Notice tone="info">{tf('integrationNote')}</Notice>
 
             <section className="rounded-xl bg-surface ring-1 ring-line shadow-[0_1px_2px_rgba(15,23,42,0.04)]" aria-labelledby="inv-title">
                 <div className="flex flex-wrap items-start justify-between gap-3 px-4 sm:px-5 pt-4">

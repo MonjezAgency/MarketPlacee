@@ -43,7 +43,16 @@ function makeService(opts: { recipients?: number; failSend?: boolean; blastThrow
         wrapLinks: jest.fn((html: string) => html),
         trackingPixelHtml: jest.fn(() => ''),
     };
-    const svc = new OffersService(prisma, email, tracking, {} as any);
+    // Central consent check (newsletter/marketing-consent.service.ts) double: the
+    // audience comes from it, and every address passes its pre-send gate.
+    const consent: any = {
+        eligibleRecipients: jest.fn(async () => {
+            if (opts.blastThrows) throw new Error('db down');
+            return { recipients: Array.from({ length: opts.recipients ?? 2 }, (_, i) => ({ email: `n${i}@x.test`, name: null, basis: 'FORM_DOUBLE_OPT_IN', accountRole: null })), excluded: {}, considered: opts.recipients ?? 2 };
+        }),
+        prepareSend: jest.fn(async () => ({ ok: true, unsubscribeUrl: 'https://x.test/unsubscribe?token=t', oneClickUrl: 'https://x.test/unsubscribe/one-click?token=t' })),
+    };
+    const svc = new OffersService(prisma, email, tracking, {} as any, consent);
     (svc as any).logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
     jest.spyOn(svc as any, 'renderOfferEmail').mockReturnValue('<html><body>offer</body></html>');
     return { svc, offers, prisma, email };

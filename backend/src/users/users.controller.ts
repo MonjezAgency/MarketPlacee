@@ -17,6 +17,8 @@ import * as bcrypt from 'bcrypt';
 
 // Phone validation: optional + prefix, 8-15 digits. Stripped of spaces/dashes.
 const PHONE_RE = /^\+?\d{8,15}$/;
+/** The signed-in staff member acting on an account (role from the database, see jwt.strategy). */
+const actorOf = (req: any) => ({ id: String(req.user?.sub || ''), role: String(req.user?.role || '') });
 
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -215,36 +217,37 @@ export class UsersController {
         };
     }
 
+    // Account approval is an OWNER/ADMIN decision (role matrix: frontend/src/lib/admin-access.ts).
     @Post('approve-all')
-    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
-    async approveAll() {
-        return this.usersService.approveAllPending();
+    @Roles(Role.OWNER, Role.ADMIN)
+    async approveAll(@Request() req) {
+        return this.usersService.approveAllPending(actorOf(req));
     }
 
     @Post(':id/status')
-    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
-    async updateStatus(@Param('id') id: string, @Body('status') status: string) {
-        return this.usersService.updateStatus(id, status);
+    @Roles(Role.OWNER, Role.ADMIN)
+    async updateStatus(@Param('id') id: string, @Body('status') status: string, @Request() req) {
+        return this.usersService.updateStatus(id, status, actorOf(req));
     }
 
     @Post('bulk-approve')
-    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
-    async bulkApprove(@Body('ids') ids: string[]) {
-        const result = await this.usersService.bulkUpdateStatus(ids, 'ACTIVE');
+    @Roles(Role.OWNER, Role.ADMIN)
+    async bulkApprove(@Body('ids') ids: string[], @Request() req) {
+        const result = await this.usersService.bulkUpdateStatus(ids, 'ACTIVE', actorOf(req));
         return { message: `Successfully approved ${result.updated} users`, ...result };
     }
 
     @Post('bulk-block')
     @Roles(Role.OWNER, Role.ADMIN)
-    async bulkBlock(@Body('ids') ids: string[]) {
-        const result = await this.usersService.bulkUpdateStatus(ids, 'BLOCKED');
+    async bulkBlock(@Body('ids') ids: string[], @Request() req) {
+        const result = await this.usersService.bulkUpdateStatus(ids, 'BLOCKED', actorOf(req));
         return { message: `Successfully blocked ${result.updated} users`, ...result };
     }
 
     @Post('bulk-delete')
     @Roles(Role.OWNER, Role.ADMIN)
-    async bulkDelete(@Body('ids') ids: string[]) {
-        const result = await this.usersService.bulkDelete(ids);
+    async bulkDelete(@Body('ids') ids: string[], @Request() req) {
+        const result = await this.usersService.bulkDelete(ids, actorOf(req));
         return { message: `Successfully deleted ${result.deleted} users`, ...result };
     }
 
@@ -263,8 +266,8 @@ export class UsersController {
 
     @Delete(':id')
     @Roles(Role.OWNER, Role.ADMIN)
-    async deleteUser(@Param('id') id: string) {
-        await this.usersService.deleteUser(id);
+    async deleteUser(@Param('id') id: string, @Request() req) {
+        await this.usersService.deleteUser(id, actorOf(req));
         return { message: 'User deleted successfully' };
     }
 

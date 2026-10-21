@@ -24,7 +24,12 @@ function makeDb() {
         appConfig: { findUnique: jest.fn(async () => null) },
         orderSupplierConfirmation: { createMany: jest.fn(async ({ data }: any) => { state.confirmations.push(...data); return { count: data.length }; }) },
         offer: { findMany: jest.fn(async () => state.offers ?? []) },
-        coupon: { findUnique: jest.fn(async ({ where }: any) => state.coupons.get(where.code) ?? null) },
+        coupon: {
+            findUnique: jest.fn(async ({ where }: any) => state.coupons.get(where.code) ?? null),
+            // Coupon redemption (coupons/coupon-redemption.ts): conditional usedCount increment.
+            updateMany: jest.fn(async () => ({ count: 1 })),
+        },
+        couponRedemption: { count: jest.fn(async () => 0), create: jest.fn(async ({ data }: any) => data) },
         product: {
             findMany: jest.fn(async ({ where }: any) => where.id.in.map((id: string) => state.products.get(id)).filter(Boolean)),
             updateMany: jest.fn(async ({ where, data }: any) => {

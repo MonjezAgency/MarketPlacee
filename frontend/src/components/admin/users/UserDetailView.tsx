@@ -335,7 +335,7 @@ function ProfileCard({ data }: { data: UserDetail }) {
         </div>
     );
     return (
-        <Card title={tu('profileTitle')} actions={<Link href="/admin/kyc" className="text-[12.5px] font-medium text-teal hover:underline">{tu('openKyc')}</Link>}>
+        <Card title={tu('profileTitle')} actions={<Link href={`/admin/support?view=kyc&user=${encodeURIComponent(String(data.user.id))}`} className="text-[12.5px] font-medium text-teal hover:underline">{tu('openKyc')}</Link>}>
             <dl>
                 {row(tu('colCompany'), u.companyName)}
                 {row(tu('website'), u.website ? (site ? <a href={site} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-teal font-medium hover:underline"><bdi dir="ltr" className="break-all">{u.website}</bdi><ExternalLink size={12} /></a> : <bdi dir="ltr">{u.website}</bdi>) : null)}

@@ -55,6 +55,7 @@ import {
 import { useAuth } from '@/lib/auth';
 import { cn } from '@/lib/utils';
 import AdminAccountMenu from '@/components/admin/AdminAccountMenu';
+import { canAccessAdminPath, defaultAdminPath } from '@/lib/admin-access';
 import { useLanguage } from '@/contexts/LanguageContext';
 
 interface SidebarGroup {
@@ -62,9 +63,11 @@ interface SidebarGroup {
     titleKey: string;
     icon: React.ElementType;
     links: SidebarLink[];
+    /** A single direct item: no heading, no collapse. */
+    bare?: boolean;
 }
 /** `section`: dictionary section of translationKey when it isn't `admin`. `children`: a parent that expands (no page of its own). */
-interface SidebarLink { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean; section?: 'promotions' | 'adminProducts' | 'adminUsers' | 'adminNav'; children?: SidebarLink[] }
+interface SidebarLink { label: string; translationKey: string; href: string; icon: React.ElementType; locked?: boolean; soon?: boolean; section?: 'promotions' | 'adminProducts' | 'adminUsers' | 'adminNav' | 'adminOffers'; children?: SidebarLink[] }
 
 // Owner-only group — بيظهر بس لـ OWNER
 const OWNER_GROUP: SidebarGroup = {
@@ -92,7 +95,13 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
             },
             { label: 'Orders', translationKey: 'orders', section: 'adminNav', href: '/admin/orders', icon: ShoppingCart },
             // One Offers entry: supplier offers to review and Atlantis special offers, as two tabs (/admin/wholesale-offers and /admin/promotions redirect).
-            { label: 'Offers', translationKey: 'offers', section: 'adminNav', href: '/admin/offers', icon: Tag },
+            {
+                label: 'Offers', translationKey: 'offers', section: 'adminNav', href: '/admin/offers', icon: Tag,
+                children: [
+                    { label: 'Supplier offers', translationKey: 'tabSupplier', section: 'adminOffers', href: '/admin/offers/supplier', icon: Tag },
+                    { label: 'Special offers', translationKey: 'tabSpecial', section: 'adminOffers', href: '/admin/offers/special', icon: Tag },
+                ],
+            },
             { label: 'Target Prices', translationKey: 'targetPriceRequests', href: '/admin/target-prices', icon: Target },
             // Delivery countries, hubs and freight rates now live in Settings (/admin/delivery and /admin/fulfillment redirect there).
             // One Users entry replaces Suppliers, Buyers and User Directory; /admin/suppliers and /admin/buyers redirect there.
@@ -120,20 +129,21 @@ const SIDEBAR_GROUPS: SidebarGroup[] = [
     {
         title: 'SUPPORT & KYC',
         titleKey: 'groupSupport',
+        bare: true,
         icon: LifeBuoy,
         links: [
+            // Disputes and KYC review live inside Support HQ; /admin/disputes and /admin/kyc redirect there.
             { label: 'Support HQ', translationKey: 'supportHq', section: 'adminNav', href: '/admin/support', icon: LifeBuoy },
-            { label: 'Dispute Center', translationKey: 'disputes', href: '/admin/disputes', icon: AlertCircle },
-            { label: 'KYC Verification', translationKey: 'kycQueue', href: '/admin/kyc', icon: ShieldCheck },
         ]
     },
     {
         title: 'ADMINISTRATION',
         titleKey: 'groupUsers',
+        bare: true,
         icon: Shield,
         links: [
-            { label: 'Internal Team', translationKey: 'teamMembers', href: '/admin/team', icon: KeyRound },
-            { label: 'Invite Center', translationKey: 'inviteCenter', href: '/admin/invite', icon: UserPlus },
+            // Invitations are managed inside Team Members; /admin/invite redirects there.
+            { label: 'Team Members', translationKey: 'teamMembers', href: '/admin/team', icon: KeyRound },
         ]
     },
 ];
@@ -207,7 +217,7 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts, bare }: {
     }
 
     return (
-        <div className="mb-3">
+        <div className={bare ? 'mb-0.5' : 'mb-3'}>
             {!bare && <button type="button" onClick={() => setExpanded(!expanded)} aria-expanded={expanded}
                 className="w-full px-2.5 h-7 flex items-center justify-between text-start rounded-md outline-none focus-visible:ring-2 focus-visible:ring-[#2EC4B6]">
                 <span className={cn('text-[11px] font-semibold uppercase tracking-[0.08em]', hasActiveLink ? 'text-[#2EC4B6]' : 'text-slate-500')}>{t('admin', group.titleKey) || group.title}</span>
@@ -329,14 +339,28 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
 
     const isDeveloper = (user?.role || '').toUpperCase() === 'DEVELOPER';
+    const role = user?.role || '';
 
-    const getFilteredSidebarGroups = () => {
-        if (isDeveloper) {
-            return SIDEBAR_GROUPS.filter(g => g.titleKey === 'groupSupport');
+    // The sidebar shows only what this role may open (lib/admin-access.ts mirrors the backend @Roles; the server stays the authority).
+    const mayOpen = (href: string) => canAccessAdminPath(role, href);
+    const filterLink = (l: SidebarLink): SidebarLink | null => {
+        if (l.children) {
+            const kids = l.children.filter((c) => mayOpen(c.href));
+            return kids.length ? { ...l, children: kids } : null;
         }
-        return SIDEBAR_GROUPS;
+        return mayOpen(l.href) ? l : null;
     };
-    const filteredSidebarGroups = getFilteredSidebarGroups();
+    const filteredSidebarGroups = SIDEBAR_GROUPS
+        .map((g) => ({ ...g, links: g.links.map(filterLink).filter((l): l is SidebarLink => !!l) }))
+        .filter((g) => g.links.length > 0);
+    const showSettings = mayOpen(SETTINGS_LINK.href);
+    const pathAllowed = canAccessAdminPath(role, pathname);
+    const homeForRole = defaultAdminPath(role);
+    // /admin itself is the Overview (owner/admin): other roles land on their first page instead.
+    React.useEffect(() => {
+        if (!isAuthReady || !user || !isTeamMember) return;
+        if (pathname === '/admin' && !pathAllowed && homeForRole) router.replace(homeForRole);
+    }, [isAuthReady, user, isTeamMember, pathname, pathAllowed, homeForRole, router]);
 
     // KYC enforcement is for SUPPLIERS and BUYERS — never for platform staff.
     // Everyone in /admin (OWNER + ADMIN + MODERATOR + EDITOR + SUPPORT +
@@ -413,9 +437,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
                 <nav id="tour-admin-nav" aria-label={t('admin', 'panelTitle')} className={cn('flex-1 py-3 overflow-y-auto no-scrollbar', isOpen ? 'px-2.5' : 'px-0')}>
                     {filteredSidebarGroups.map(group => (
-                        <SidebarGroupComponent key={group.title} group={group} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} />
+                        <SidebarGroupComponent key={group.title} group={group} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} bare={group.bare} />
                     ))}
-                    <SidebarGroupComponent group={{ title: '', titleKey: '', icon: Settings, links: [SETTINGS_LINK] }} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} bare />
+                    {showSettings && <SidebarGroupComponent group={{ title: '', titleKey: '', icon: Settings, links: [SETTINGS_LINK] }} isOpen={isOpen} pathname={pathname} badgeCounts={badgeCounts} bare />}
                 </nav>
 
                 <div className={cn('border-t border-white/5 shrink-0', isOpen ? 'p-2.5' : 'py-3')}>
@@ -440,7 +464,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
                 <div className="flex-1 overflow-y-auto bg-[#F6F8FA]">
                     <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-5 min-h-full">
-                        {children}
+                        {pathAllowed ? children : pathname === '/admin' && homeForRole ? null : (
+                            // A direct link to a page this role can't use: say so instead of rendering a page whose calls the server would refuse.
+                            <div role="alert" className="mx-auto mt-16 max-w-md rounded-2xl bg-surface ring-1 ring-line p-8 text-center">
+                                <span className="mx-auto mb-3 grid h-11 w-11 place-items-center rounded-full bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300"><Lock size={20} aria-hidden /></span>
+                                <h1 className="text-[18px] font-semibold text-heading">{t('adminNav', 'noAccessTitle')}</h1>
+                                <p className="mt-1.5 text-[13.5px] text-ink-3">{t('adminNav', 'noAccessBody')}</p>
+                                {homeForRole && <Link href={homeForRole} className="mt-4 inline-flex h-9 items-center rounded-lg bg-heading px-4 text-[13px] font-medium text-white hover:opacity-90">{t('adminNav', 'noAccessHome')}</Link>}
+                            </div>
+                        )}
                     </div>
                 </div>
             </main>

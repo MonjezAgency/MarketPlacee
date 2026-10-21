@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
+import type { FinanceActor, WarehouseInput } from './finance-access';
 
 @Injectable()
 export class FinanceService {
@@ -31,6 +32,14 @@ export class FinanceService {
 
     async getCreditTerm(userId: string) {
         return this.prisma.creditTerm.findUnique({ where: { userId } });
+    }
+
+    /** A buyer's own term: only the fields that describe their terms (no approver id). */
+    async getOwnCreditTerm(userId: string) {
+        return this.prisma.creditTerm.findUnique({
+            where: { userId },
+            select: { creditLimit: true, usedCredit: true, paymentTermDays: true, status: true, updatedAt: true },
+        });
     }
 
     async getAllCreditTerms() {
@@ -79,6 +88,15 @@ export class FinanceService {
         return this.prisma.taxExemption.findMany({
             where,
             orderBy: { createdAt: 'desc' },
+        });
+    }
+
+    /** A buyer's own exemption requests (no reviewer id). */
+    async getOwnTaxExemptions(userId: string) {
+        return this.prisma.taxExemption.findMany({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true, certificateUrl: true, certificateType: true, status: true, validFrom: true, validUntil: true, notes: true, createdAt: true, updatedAt: true },
         });
     }
 
@@ -145,6 +163,50 @@ export class FinanceService {
 
     async deleteWarehouse(id: string) {
         return this.prisma.warehouse.delete({ where: { id } });
+    }
+
+    // ─── Dispatch locations, scoped to the caller ───────────
+    // Staff (OWNER/ADMIN; LOGISTICS may only list) act on any supplier's locations; a
+    // supplier only ever reaches rows whose supplierId is their own token id. Someone
+    // else's row answers 404, so ids can't be probed.
+
+    async listWarehousesFor(actor: FinanceActor, supplierIdQuery?: string) {
+        if (actor.role === 'SUPPLIER') return this.getWarehousesBySupplier(actor.id);
+        if (supplierIdQuery) return this.getWarehousesBySupplier(supplierIdQuery);
+        return this.getAllWarehouses();
+    }
+
+    private async ownedWarehouse(actor: FinanceActor, id: string) {
+        const w = await this.prisma.warehouse.findUnique({ where: { id } });
+        if (!w || (!actor.staff && w.supplierId !== actor.id)) throw new NotFoundException('Location not found');
+        return w;
+    }
+
+    async createWarehouseFor(actor: FinanceActor, data: WarehouseInput) {
+        const supplierId = actor.staff ? data.supplierId : actor.id;
+        if (!supplierId) throw new BadRequestException('supplierId is required.');
+        if (actor.staff) {
+            const owner = await this.prisma.user.findUnique({ where: { id: supplierId }, select: { role: true } });
+            if (!owner || owner.role !== 'SUPPLIER') throw new BadRequestException('Choose a supplier account.');
+        }
+        return this.createWarehouse({
+            name: data.name!, address: data.address!, city: data.city!, country: data.country!,
+            zipCode: data.zipCode, latitude: data.latitude, longitude: data.longitude, isDefault: data.isDefault, supplierId,
+        });
+    }
+
+    async updateWarehouseFor(actor: FinanceActor, id: string, data: WarehouseInput) {
+        const w = await this.ownedWarehouse(actor, id);
+        const { supplierId: _ignored, ...fields } = data;
+        if (fields.isDefault) {
+            await this.prisma.warehouse.updateMany({ where: { supplierId: w.supplierId, NOT: { id } }, data: { isDefault: false } });
+        }
+        return this.updateWarehouse(id, fields);
+    }
+
+    async deleteWarehouseFor(actor: FinanceActor, id: string) {
+        await this.ownedWarehouse(actor, id);
+        return this.deleteWarehouse(id);
     }
 
     // ─── Revenue Reports ───────────────────────────────────

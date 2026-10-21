@@ -9,10 +9,18 @@ import {
     UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Role } from '@prisma/client';
+import { RolesGuard } from '../auth/roles.guard';
+import { Roles } from '../auth/roles.decorator';
 import { DiscountsService } from './discounts.service';
 
+/**
+ * Tiered pricing and customer-group discounts: an Atlantis pricing tool, OWNER/ADMIN only.
+ * Before, any signed-in account (a buyer included) could create tiers or join a discount group.
+ */
 @Controller('discounts')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles(Role.OWNER, Role.ADMIN)
 export class DiscountsController {
     constructor(private readonly discountsService: DiscountsService) {}
 

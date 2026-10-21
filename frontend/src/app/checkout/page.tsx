@@ -73,6 +73,9 @@ export default function CheckoutPage() {
     // Coupon State
     const [couponCode, setCouponCode] = useState('');
     const [couponDiscount, setCouponDiscount] = useState(0);
+    // Fixed-EUR coupons: the amount (the server quote decides what is actually taken off).
+    const [couponAmountOff, setCouponAmountOff] = useState<number | null>(null);
+    const [couponScoped, setCouponScoped] = useState(false);
     const [couponApplied, setCouponApplied] = useState('');
     const [couponError, setCouponError] = useState('');
     const [isValidatingCoupon, setIsValidatingCoupon] = useState(false);
@@ -173,24 +176,34 @@ export default function CheckoutPage() {
         setIsValidatingCoupon(true);
         try {
             
-            const res = await apiFetch(`/coupons/validate/${couponCode.trim()}`);
+            const res = await apiFetch(`/coupons/validate/${encodeURIComponent(couponCode.trim())}`);
             const data = await res.json();
-            if (!res.ok) { setCouponError(data.message || 'Invalid coupon'); return; }
-            setCouponDiscount(data.discountPercent);
+            if (!res.ok) { setCouponError(couponReason(data) || 'Invalid coupon'); return; }
+            setCouponDiscount(Number(data.discountPercent) || 0);
+            setCouponAmountOff(data.discountType === 'FIXED' ? Number(data.amountOff) || 0 : null);
+            setCouponScoped(!!data.scope && data.scope !== 'ALL');
             setCouponApplied(data.code);
             setCouponCode('');
         } catch (_e) { setCouponError('Could not validate coupon'); }
         finally { setIsValidatingCoupon(false); }
     };
 
-    const removeCoupon = () => { setCouponDiscount(0); setCouponApplied(''); setCouponError(''); };
+    const removeCoupon = () => { setCouponDiscount(0); setCouponAmountOff(null); setCouponScoped(false); setCouponApplied(''); setCouponError(''); };
+    // The server's refusal reason in the buyer's language (its own message as the fallback).
+    const couponReason = (e: any) => {
+        const r = e?.reason ?? e?.body?.reason;
+        if (!r) return typeof e?.message === 'string' ? e.message : '';
+        return t('adminCoupons', `checkoutReason_${r}`, { amount: formatPrice(Number(e?.minOrderAmount ?? e?.body?.minOrderAmount) || 0, currency) }) || e?.message || '';
+    };
+    // Refused by the quote or the order (expired, used up, nothing eligible…): drop it, say why, price without it.
+    const refuseCoupon = (e: any) => { removeCoupon(); setCouponError(couponReason(e)); };
 
     React.useEffect(() => {
         if (!items.length) return;
         // The destination lets the server price delivery with the same calculation the order uses.
         quoteCart(items, couponApplied || undefined, destCheck?.supported ? destCheck.code || undefined : undefined)
             .then((q) => { setQuote(q); setQuoteError(q.ready ? '' : 'Some cart lines need attention — return to the cart to fix them.'); })
-            .catch((e) => { if (e?.code === 'NOT_DEPLOYED') setLegacyPricing(true); else setQuoteError(e?.message || 'Could not price your order.'); });
+            .catch((e) => { if (e?.code === 'NOT_DEPLOYED') setLegacyPricing(true); else if (e?.code === 'INVALID_COUPON') refuseCoupon(e); else setQuoteError(e?.message || 'Could not price your order.'); });
     }, [items, couponApplied, destCheck?.code, destCheck?.supported]);
     const delivery = quote?.fulfillment ?? null;
     const freight = delivery?.status === 'priced' ? delivery.freightTotal : null;
@@ -249,6 +262,8 @@ export default function CheckoutPage() {
                 if (err?.code === 'DESTINATION_UNSUPPORTED' || err?.code === 'DESTINATION_REQUIRED') {
                     setDestCheck({ supported: false, code: err.country ?? null, name: null, message: err.message });
                     setStep(1);
+                } else if (err?.code === 'INVALID_COUPON') {
+                    refuseCoupon(err);
                 } else if (err?.code === 'PRICE_CHANGED') {
                     // Show the server figures and let the buyer confirm again.
                     const q = await quoteCart(items, couponApplied || undefined).catch(() => null);
@@ -626,7 +641,7 @@ export default function CheckoutPage() {
                                             <div className="flex items-center gap-2">
                                                 <Tag size={14} className="text-accent" />
                                                 <span className="text-sm font-bold text-accent">{couponApplied}</span>
-                                                <span className="text-xs text-accent/80">−{couponDiscount}%</span>
+                                                <span className="text-xs text-accent/80">−{couponAmountOff != null ? formatPrice(couponAmountOff, currency) : `${couponDiscount}%`}</span>
                                             </div>
                                             <button onClick={removeCoupon} className="text-muted-foreground hover:text-red-500 transition-colors">
                                                 <X size={14} />
@@ -659,9 +674,12 @@ export default function CheckoutPage() {
                                         <span className="text-muted-foreground font-medium">Batch Value</span>
                                         <span className="font-heading font-bold text-base">{formatPrice(total, currency)}</span>
                                     </div>
-                                    {couponDiscount > 0 && (
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-accent font-medium">Coupon ({couponDiscount}% off)</span>
+                                    {couponApplied && discountAmount > 0 && (
+                                        <div className="flex justify-between items-center gap-3">
+                                            <span className="text-accent font-medium">
+                                                {t('adminCoupons', 'checkoutCouponLine', { code: couponApplied })}
+                                                {couponScoped && <span className="block text-xs font-normal text-accent/80">{t('adminCoupons', 'checkoutScoped')}</span>}
+                                            </span>
                                             <span className="text-accent font-heading font-bold">-{formatPrice(discountAmount, currency)}</span>
                                         </div>
                                     )}

@@ -21,7 +21,7 @@ export function notificationHref(n: AppNotification, role?: string | null): stri
     if (internal(d.link)) return d.link;
     const r = String(role || '').toUpperCase();
     const staff = isStaff(r);
-    if (d.disputeId && staff) return '/admin/disputes';
+    if (d.disputeId && staff) return `/admin/support?view=disputes&id=${encodeURIComponent(String(d.disputeId))}`;
     if (d.orderId) {
         const id = encodeURIComponent(String(d.orderId));
         if (staff) return `/admin/orders/${id}`;
@@ -33,7 +33,7 @@ export function notificationHref(n: AppNotification, role?: string | null): stri
         if (r === 'SUPPLIER') return d.productId ? `/supplier/products/${encodeURIComponent(String(d.productId))}/edit` : '/supplier/products';
         return '/dashboard/customer/targets';
     }
-    if (d.offerId && staff) return '/admin/offers?tab=supplier';
+    if (d.offerId && staff) return '/admin/offers/supplier';
     if (d.productId) {
         const id = encodeURIComponent(String(d.productId));
         if (staff) return `/admin/products/${id}`;
@@ -41,13 +41,14 @@ export function notificationHref(n: AppNotification, role?: string | null): stri
         return `/products/${id}`;
     }
     if (d.userId && staff) return `/admin/users/${encodeURIComponent(String(d.userId))}`;
-    if (staff && /\bkyc\b/i.test(`${n.title}`)) return '/admin/kyc';
+    if (staff && /\bkyc\b/i.test(`${n.title}`)) return '/admin/support?view=kyc';
     return null;
 }
 
 /** Event kinds the server records; each has `<KIND>_t` (title) and `<KIND>_b` (body) in the notificationsCenter section. */
 export const KINDS = [
     'TARGET_CREATED', 'TARGET_INTEREST_SUPPLIER', 'TARGET_WITHDRAWN', 'TARGET_RESPONDED', 'TARGET_ACCEPTED', 'TARGET_DECLINED', 'TARGET_REACHED',
+    'TARGET_COUNTERED', 'TARGET_COUNTER_ACCEPTED', 'TARGET_COUNTER_DECLINED', 'TARGET_REVISED',
     'PRODUCT_SUBMITTED', 'PRODUCT_RESUBMITTED', 'PRODUCT_CHANGES_REQUESTED', 'PRODUCT_APPROVED', 'PRODUCT_REJECTED', 'PRODUCT_STATUS',
     'STOCK_OUT', 'STOCK_LOW', 'AI_ORDER_PENDING', 'AI_KYC_REQUIRED', 'AI_PRODUCT_REJECTED', 'AI_LOW_STOCK', 'SUPPORT_ROUTED',
     'ORDER_NEW_SUPPLIER', 'ORDER_NEW_ADMIN', 'ORDER_READY', 'ORDER_SUPPLIER_DECLINED_LINES', 'ORDER_SUPPLIER_REJECTED', 'ORDER_CONFIRMED', 'ORDER_CONFIRMED_ACCEPT',

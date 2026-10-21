@@ -16,6 +16,8 @@ import { bestDiscount } from '../promotions/promotion-rules';
 import { casesForItem, supplierLineValue } from '../products/stock-ledger';
 import { minOrderCases } from '../common/markups';
 import { FulfillmentService } from '../fulfillment/fulfillment.service';
+import { CouponRefusal, applyCoupon, normalizeCode, scopeOf } from '../coupons/coupon-rules';
+import { recordRedemption, refusalToHttp, type AppliedCoupon } from '../coupons/coupon-redemption';
 import { DEFAULT_CONFIRM_HOURS, answeredVersion, approvalBlocker, buyerMustAccept, confirmationState, partyStatus, supplierView, termsHash, workflowBlocker, type Terms } from './order-workflow';
 
 const STATUS_LABELS: Record<OrderStatus, string> = {
@@ -291,16 +293,30 @@ export class OrdersService {
             }
         }
         const subtotal = round2(lines.reduce((s, l) => s + l.lineTotal, 0));
-        let discountPercent = 0, appliedCoupon: string | null = null;
-        if (couponCode && String(couponCode).trim()) {
-            const c = await db.coupon.findUnique({ where: { code: String(couponCode).trim() } }).catch(() => null);
-            if (!c || !c.isActive || (c.expirationDate && new Date(c.expirationDate).getTime() < Date.now())) {
-                throw new BadRequestException({ code: 'INVALID_COUPON', message: 'That promo code is not valid.' });
+        // Coupon: one per order, one order-level discount on the eligible lines after line discounts
+        // (rules and rounding in coupons/coupon-rules.ts). Refusals carry a reason the buyer can act on.
+        let discountPercent = 0, discount = 0, appliedCoupon: string | null = null, couponApplied: AppliedCoupon | null = null;
+        if (couponCode && normalizeCode(couponCode)) {
+            const c = await db.coupon.findUnique({ where: { code: normalizeCode(couponCode) }, include: { placement: { select: { productId: true } } } }).catch(() => null);
+            try {
+                const customerUses = c?.perCustomerLimit != null ? await db.couponRedemption.count({ where: { couponId: c.id, customerId } }) : null;
+                const scope = c ? scopeOf(c) : null;
+                const categories = new Map<string, string | null>();
+                if (scope?.scope === 'CATEGORY') {
+                    const ids = [...new Set(lines.filter((l) => l.productId && !l.mixedLoadId && !l.error).map((l) => l.productId as string))];
+                    const rows = ids.length ? await db.product.findMany({ where: { id: { in: ids } }, select: { id: true, category: true } }) : [];
+                    for (const r of rows) categories.set(r.id, r.category ?? null);
+                }
+                const r = applyCoupon(c, lines, subtotal, (id) => categories.get(id), { customerUses });
+                discount = r.discount;
+                discountPercent = r.discountPercent;
+                appliedCoupon = c!.code;
+                couponApplied = { id: c!.id, code: c!.code, discount, usageLimit: c!.usageLimit ?? null, perCustomerLimit: c!.perCustomerLimit ?? null };
+            } catch (e) {
+                if (e instanceof CouponRefusal) refusalToHttp(e);
+                throw e;
             }
-            discountPercent = Math.max(0, Math.min(100, Number(c.discountPercent) || 0));
-            appliedCoupon = c.code;
         }
-        const discount = round2(subtotal * discountPercent / 100);
         // Delivery for the priced lines, from the one shared calculation (no rate → quoted after the order).
         let fulfillment: any = null;
         if (this.fulfillment) {
@@ -309,7 +325,7 @@ export class OrdersService {
             const all = extra.length ? new Map([...products, ...(await this.mixedLoads.loadProducts(extra, db))]) : products;
             fulfillment = ok.length ? await this.fulfillment.forQuote(ok, all, opts.destination ?? null) : null;
         }
-        return { lines, subtotal, discountPercent, discount, coupon: appliedCoupon, total: round2(subtotal - discount), markups, fulfillment };
+        return { lines, subtotal, discountPercent, discount, coupon: appliedCoupon, couponApplied, total: round2(Math.max(0, subtotal - discount)), markups, fulfillment };
     }
 
     /** Deepest approved, unexpired offer per product (same rule the product page uses). */
@@ -420,10 +436,12 @@ export class OrdersService {
                                 promotionPercent: l.promotion?.discountPercent ?? null,
                             })),
                         },
-                        history: { create: { newStatus: OrderStatus.PENDING, changedById: customerId, reason: quote.coupon ? `Order created (promo ${quote.coupon} −${quote.discountPercent}%)` : 'Order created' } },
+                        history: { create: { newStatus: OrderStatus.PENDING, changedById: customerId, reason: quote.coupon ? `Order created (promo ${quote.coupon} −${quote.discount.toFixed(2)} EUR${quote.discountPercent ? `, ${quote.discountPercent}%` : ''})` : 'Order created' } },
                     },
                     include: { items: true, history: true, customer: { select: { email: true, name: true } } },
                 });
+                // Coupon redemption: atomic usage-limit check + per-buyer limit + one record per order (rolls the order back if refused).
+                if (quote.couponApplied) await recordRedemption(tx, quote.couponApplied, created.id, customerId);
                 // Every supplier on the order must explicitly accept these exact terms before Atlantis can approve.
                 const deadline = new Date(Date.now() + (await this.confirmHours()) * 3600_000);
                 const supplierIds = [...new Set(quote.lines.map((l: any) => l.supplierId).filter(Boolean))] as string[];

@@ -7,6 +7,8 @@ import { EmailTrackingService } from '../email-tracking/email-tracking.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import * as XLSX from 'xlsx';
 import { isStaffRole } from '../products/catalog-scope';
+import { MarketingConsentService } from '../newsletter/marketing-consent.service';
+import { maskEmail } from '../newsletter/marketing-consent';
 
 /**
  * Admin read model: marks offers posted by a staff account (Atlantis's own,
@@ -55,6 +57,7 @@ export class OffersService {
         private emailService: EmailService,
         private emailTracking: EmailTrackingService,
         private notifications: NotificationsService,
+        private marketingConsent: MarketingConsentService,
     ) {}
 
     /**
@@ -415,36 +418,24 @@ export class OffersService {
         const product = (offer as any).product;
         const supplier = (offer as any).supplier;
 
-        // Marketing consent only: ACTIVE newsletter subscribers, plus accounts
-        // that explicitly switched marketing emails on. Anyone unsubscribed,
-        // pending, bounced or blocked is excluded.
-        const [subs, users] = await Promise.all([
-            this.prisma.newsletterSubscriber.findMany({ select: { email: true, name: true, status: true, unsubscribeToken: true } as any }),
-            this.prisma.user.findMany({ where: { status: 'ACTIVE' }, select: { email: true, name: true, notificationPrefs: true } }),
-        ]);
-        const suppressed = new Set((subs as any[]).filter((s) => s.status !== 'ACTIVE').map((s) => String(s.email).toLowerCase()));
-        const seen = new Set<string>();
-        const recipients: { email: string; name: string | null; unsubscribeToken?: string | null }[] = [];
-        for (const r of subs as any[]) {
-            const e = (r.email || '').toLowerCase().trim();
-            if (r.status !== 'ACTIVE' || !e || seen.has(e)) continue;
-            seen.add(e); recipients.push({ email: r.email, name: r.name ?? null, unsubscribeToken: r.unsubscribeToken ?? null });
-        }
-        for (const u of users as any[]) {
-            const e = (u.email || '').toLowerCase().trim();
-            if (!e || seen.has(e) || suppressed.has(e) || (u.notificationPrefs as any)?.marketingEmails !== true) continue;
-            seen.add(e); recipients.push({ email: u.email, name: u.name ?? null });
-        }
+        // Audience: confirmed newsletter subscribers and accounts that switched
+        // marketing emails on, decided by the central consent check
+        // (newsletter/marketing-consent.ts). Each address is checked again
+        // right before its send.
+        const audience = await this.marketingConsent.eligibleRecipients({ audience: 'ALL' });
+        const recipients = audience.recipients;
 
         const subject = `New Atlantis offer: ${product.name}`;
         const html = this.renderOfferEmail(offer, product, supplier);
 
         let successCount = 0;
+        let attempted = 0;
         for (const r of recipients) {
             try {
-                // Per-recipient tracking. Pixel + click rewrites are
-                // injected into the offer email exactly the same way
-                // the campaign sender does it.
+                // Central pre-send gate: consent + suppression right now, and a per-recipient unsubscribe token.
+                const gate = await this.marketingConsent.prepareSend(r.email, { offerId });
+                if (!gate.ok) continue;
+                attempted++;
                 const trackingId = await this.emailTracking.registerSentEmail({
                     recipient: r.email,
                     subject,
@@ -455,19 +446,19 @@ export class OffersService {
                     /<\/body>/i,
                     `${this.emailTracking.trackingPixelHtml(trackingId)}</body>`,
                 );
-                const base = process.env.FRONTEND_URL || 'https://www.atlantisfmcg.com';
-                const unsubscribeUrl = r.unsubscribeToken ? `${base}/unsubscribe?token=${encodeURIComponent(r.unsubscribeToken)}` : `${base}/unsubscribe?email=${encodeURIComponent(r.email)}`;
-                const withUnsub = trackedHtml.replace(/<\/body>/i, `<p style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#94A3B8;margin:16px 0"><a href="${unsubscribeUrl}" style="color:#64748B">Unsubscribe from marketing emails</a></p></body>`);
-                const res = await this.emailService.sendMailDetailed(r.email, subject, withUnsub, { unsubscribeUrl });
+                const withUnsub = trackedHtml.replace(/<\/body>/i, `<p style="text-align:center;font-family:Arial,sans-serif;font-size:12px;color:#64748B;margin:16px 0"><a href="${gate.unsubscribeUrl}" style="color:#334155">Unsubscribe from marketing emails</a></p></body>`);
+                const res = await this.emailService.sendMailDetailed(r.email, subject, withUnsub, { unsubscribeUrl: gate.oneClickUrl });
                 if (res.success) successCount++;
-                else this.logger.warn(`Offer email to ${r.email.replace(/^(.{2}).*@/, '$1***@')} failed: ${res.error}`);
+                else this.logger.warn(`Offer email to ${maskEmail(r.email)} failed: ${res.error}`);
             } catch (err) {
-                this.logger.warn(`Failed to email ${r.email}: ${(err as any)?.message}`);
+                this.logger.warn(`Failed to email ${maskEmail(r.email)}: ${(err as any)?.message}`);
             }
         }
 
-        this.logger.log(`Blasted offer ${offerId}: ${successCount}/${recipients.length} delivered`);
-        return { total: recipients.length, successCount };
+        // total = recipients the pre-send check allowed and that were attempted
+        // (addresses that became ineligible between the audience query and their send are not counted).
+        this.logger.log(`Blasted offer ${offerId}: ${successCount}/${attempted} accepted by the provider`);
+        return { total: attempted, successCount };
     }
 
     /**

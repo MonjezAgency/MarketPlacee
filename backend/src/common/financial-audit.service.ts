@@ -10,7 +10,8 @@ export type FinancialEventType =
     | 'ESCROW_REFUNDED'
     | 'PAYOUT_SENT'
     | 'REFUND_ISSUED'
-    | 'INVOICE_GENERATED';
+    | 'INVOICE_GENERATED'
+    | 'INVOICE_PAID';
 
 export interface FinancialAuditEntry {
     eventType:  FinancialEventType;

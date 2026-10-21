@@ -104,6 +104,10 @@ export default function TargetPriceDialog({ open, onClose, product, listedCasePr
         finally { setBusy(false); }
     };
 
+    // Only compared when the typed figure is already in the listing's basis (EUR per case, or per piece × pieces per case).
+    const typedCaseEur = currency === 'EUR' && p > 0 ? (basis === 'PIECE' ? (upc ? p * upc : 0) : p) : 0;
+    const atOrAboveListed = !!listedCasePrice && typedCaseEur > 0 && typedCaseEur >= listedCasePrice;
+
     const unitLabel = (u: Unit) => tt(u === 'CASE' ? 'unitCases' : u === 'PALLET' ? 'unitPallets' : 'unitTrucks');
     const priceText = p > 0 ? `${currency} ${p.toFixed(2)} ${tt(basis === 'CASE' ? 'perCase' : 'perPiece')}` : '—';
 
@@ -121,7 +125,7 @@ export default function TargetPriceDialog({ open, onClose, product, listedCasePr
                 <div className="space-y-3 text-[14px] text-ink-2">
                     <p className="flex items-center gap-2 text-emerald-700 font-medium"><CheckCircle2 size={18} /> {tt('doneRef', { ref: done.ref })}</p>
                     <p>{tt('doneBody', { price: formatPrice(done.targetCasePrice), cases: done.quantityCases })}</p>
-                    <p>{tt('doneWatch')} <Link href="/dashboard/customer/targets" className="text-teal font-semibold hover:underline">{tt('doneLink')}</Link></p>
+                    <p>{tt('doneWatch')} <Link href={`/dashboard/customer/targets?ref=${encodeURIComponent(done.ref)}`} className="text-teal font-semibold hover:underline">{tt('doneLink')}</Link></p>
                 </div>
             ) : step === 'review' ? (
                 <div className="space-y-4">
@@ -133,6 +137,7 @@ export default function TargetPriceDialog({ open, onClose, product, listedCasePr
                         <dt className="text-ink-3">{tt('country')}</dt><dd className="text-end text-ink-2">{countryLabel ? `${countryLabel.flag} ${countryLabel.label}` : tt('notSet')}</dd>
                         {message.trim() && <><dt className="text-ink-3">{tt('message')}</dt><dd className="text-end text-ink-2 break-words">{message.trim()}</dd></>}
                     </dl>
+                    {atOrAboveListed && <Notice tone="warning">{tt('atOrAbove')}</Notice>}
                     {currency !== 'EUR' && <p className="text-[12.5px] text-ink-3">{tt('convertNote')}</p>}
                     {error && <Notice tone="danger">{error}</Notice>}
                     <p className="text-[12.5px] text-ink-3">{tt('privacy')}</p>

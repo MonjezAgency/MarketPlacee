@@ -4,7 +4,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt.guard';
 import { RolesGuard } from '../auth/roles.guard';
 import { Roles } from '../auth/roles.decorator';
-import { TargetPricesService, TP_STAFF, type TargetPriceInput } from './target-prices.service';
+import { TargetPricesService, TP_STAFF, type DecisionInput, type RespondInput, type TargetPriceInput } from './target-prices.service';
 import { PriceHistoryService } from './price-history.service';
 import { OfferCompareService } from './offer-compare.service';
 
@@ -54,15 +54,30 @@ export class TargetPricesController {
         return this.svc.withdraw(req.user.sub, id);
     }
 
+    /** The buyer's answer to a counter-offer: ACCEPT / DECLINE / REVISE — only on their own request. */
+    @Patch(':id/decision')
+    @Roles('CUSTOMER', 'SUPPLIER')
+    @Throttle({ default: { limit: 20, ttl: 60_000 } })
+    decide(@Request() req, @Param('id') id: string, @Body() body: DecisionInput) {
+        return this.svc.decide(req.user.sub, id, body || ({} as any));
+    }
+
     @Get()
     @Roles(...(TP_STAFF as any))
     list(@Query() q: any) {
         return this.svc.list(q);
     }
 
-    @Patch(':id/respond')
+    /** Staff detail with the negotiation history. Declared after `mine` so that path isn't read as an id. */
+    @Get(':id')
     @Roles(...(TP_STAFF as any))
-    respond(@Request() req, @Param('id') id: string, @Body() body: any) {
-        return this.svc.respond(req.user.sub, id, body);
+    detail(@Param('id') id: string) {
+        return this.svc.detail(id);
+    }
+
+    @Patch(':id/respond')
+    @Roles('ADMIN' as any, 'OWNER' as any) // answering a target price is a pricing decision; other staff read only
+    respond(@Request() req, @Param('id') id: string, @Body() body: RespondInput) {
+        return this.svc.respond(req.user.sub, id, body || ({} as any));
     }
 }

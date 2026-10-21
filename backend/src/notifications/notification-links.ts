@@ -13,7 +13,7 @@ export function notificationLink(role: string | null | undefined, data: Notifica
     if (typeof data.link === 'string' && data.link.startsWith('/') && !data.link.startsWith('//')) return data.link;
     const r = String(role || '').toUpperCase();
     const staff = STAFF.has(r);
-    if (data.disputeId && staff) return '/admin/disputes';
+    if (data.disputeId && staff) return `/admin/support?view=disputes&id=${encodeURIComponent(String(data.disputeId))}`;
     if (data.orderId) {
         const id = String(data.orderId);
         if (staff) return `/admin/orders/${id}`;
@@ -25,7 +25,7 @@ export function notificationLink(role: string | null | undefined, data: Notifica
         if (r === 'SUPPLIER') return data.productId ? `/supplier/products/${data.productId}/edit` : '/supplier/products';
         return '/dashboard/customer/targets';
     }
-    if (data.offerId && staff) return '/admin/offers?tab=supplier';
+    if (data.offerId && staff) return '/admin/offers/supplier';
     if (data.productId) {
         if (staff) return `/admin/products/${data.productId}`;
         if (r === 'SUPPLIER') return `/supplier/products/${data.productId}/edit${data.type === 'LOW_STOCK' ? '' : '#feedback'}`;

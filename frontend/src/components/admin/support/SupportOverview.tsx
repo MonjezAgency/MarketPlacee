@@ -1,13 +1,11 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
 import { AlertCircle, ArrowRight, Clock, Hourglass, MessageCircle, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useLanguage } from '@/contexts/LanguageContext';
 import { Card, EmptyState, ErrorState, Notice, Skeleton, Stat } from '@/components/supplier/ui';
 import { useWhen } from '@/components/support/messages';
-import { orderRef, supportHqApi, type DisputeRow, type HqStats, type InboxThread, type KycRow } from '@/lib/admin-support-api';
+import { orderRef, type HqStats, type InboxThread } from '@/lib/admin-support-api';
 import { InfoTip, RoleChip, StateChips, displayName, useDuration, useTs } from './hqUi';
 
 /** Metric label with its definition in an info tooltip. */
@@ -16,9 +14,9 @@ function Label({ text, tip }: { text: string; tip: string }) {
 }
 
 /** Overview: figures computed by GET /chat/admin/hq/stats, and the conversations waiting for a person. */
-export function SupportOverview({ stats, statsError, onRetry, threads, onOpen, onView }: {
+export function SupportOverview({ stats, statsError, onRetry, threads, onOpen, onView, canDisputes }: {
     stats: HqStats | null; statsError: string | null; onRetry: () => void;
-    threads: InboxThread[]; onOpen: (t: InboxThread) => void; onView: (v: 'disputes' | 'kyc' | 'chat') => void;
+    threads: InboxThread[]; onOpen: (t: InboxThread) => void; onView: (v: 'disputes' | 'kyc' | 'chat') => void; canDisputes: boolean;
 }) {
     const ts = useTs();
     const dur = useDuration();
@@ -32,7 +30,7 @@ export function SupportOverview({ stats, statsError, onRetry, threads, onOpen, o
             <div className={cn('grid gap-3 grid-cols-1 sm:grid-cols-2', stats?.kycPending.available ? 'xl:grid-cols-5' : 'xl:grid-cols-4')}>
                 <Stat loading={loading} icon={<AlertCircle size={17} />} tone={stats?.openDisputes ? 'danger' : 'neutral'}
                     label={ts('mOpenDisputes')} value={stats ? stats.openDisputes : '—'}
-                    hint={stats ? ts('mOpenDisputesHint', { count: stats.disputesUnderReview }) : undefined} href="/admin/disputes" />
+                    hint={stats ? ts('mOpenDisputesHint', { count: stats.disputesUnderReview }) : undefined} href={canDisputes ? '/admin/support?view=disputes' : undefined} />
                 <Stat loading={loading} icon={<Hourglass size={17} />} tone={stats?.awaitingTeam.total ? 'warning' : 'neutral'}
                     label={<Label text={ts('mWaiting')} tip={ts('mWaitingTip')} /> as unknown as string} value={stats ? stats.awaitingTeam.total : '—'}
                     hint={stats ? ts('mSplit', { support: stats.awaitingTeam.support, order: stats.awaitingTeam.order }) : undefined} />
@@ -41,7 +39,7 @@ export function SupportOverview({ stats, statsError, onRetry, threads, onOpen, o
                     hint={stats ? ts('mSplit', { support: stats.active.support, order: stats.active.order }) : undefined} />
                 {stats?.kycPending.available && (
                     <Stat icon={<ShieldCheck size={17} />} tone={stats.kycPending.count ? 'warning' : 'neutral'}
-                        label={<Label text={ts('mKyc')} tip={ts('mKycTip')} /> as unknown as string} value={stats.kycPending.count} hint={ts('mKycHint')} />
+                        label={<Label text={ts('mKyc')} tip={ts('mKycTip')} /> as unknown as string} value={stats.kycPending.count} hint={ts('mKycHint')} href="/admin/support?view=kyc" />
                 )}
                 <Stat loading={loading} icon={<Clock size={17} />}
                     label={<Label text={ts('mFirstResponse')} tip={ts('mFirstResponseTip', { days: 30 })} /> as unknown as string}
@@ -76,83 +74,5 @@ export function SupportOverview({ stats, statsError, onRetry, threads, onOpen, o
                         )}
             </Card>
         </div>
-    );
-}
-
-/** Disputes tab: OPEN and UNDER_REVIEW disputes from GET /disputes (decisions stay in the Dispute Center). */
-export function DisputesPanel() {
-    const ts = useTs();
-    const { fmt } = useLanguage();
-    const [rows, setRows] = React.useState<DisputeRow[] | null>(null);
-    const [error, setError] = React.useState<string | null>(null);
-    const load = React.useCallback(async () => {
-        setError(null);
-        try {
-            const [open, review] = await Promise.all([supportHqApi.disputes('OPEN'), supportHqApi.disputes('UNDER_REVIEW')]);
-            setRows([...(open.data || []), ...(review.data || [])]);
-        } catch (e: any) { setError(e?.message || ts('loadFailed')); }
-    }, [ts]);
-    React.useEffect(() => { load(); }, [load]);
-    return (
-        <Card title={ts('disputesTitle')} description={ts('disputesDesc')} bodyClassName="px-0 py-0"
-            actions={<Link href="/admin/disputes" className="inline-flex items-center gap-1 text-[13px] font-medium text-teal hover:underline">{ts('openDisputeCenter')} <ArrowRight size={13} className="rtl:rotate-180" aria-hidden /></Link>}>
-            {error ? <div className="p-4"><ErrorState message={error} onRetry={load} /></div>
-                : !rows ? <div className="p-4 space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
-                    : !rows.length ? <EmptyState icon={<AlertCircle size={20} />} title={ts('disputesEmpty')}>{ts('disputesEmptyBody')}</EmptyState>
-                        : (
-                            <div className="overflow-x-auto border-t border-line mt-3">
-                                <table className="w-full min-w-[560px] text-[13px]">
-                                    <thead><tr className="text-start text-[12.5px] text-ink-3"><th className="py-2 px-4 text-start font-medium">{ts('colOrder')}</th><th className="py-2 px-4 text-start font-medium">{ts('colBuyer')}</th><th className="py-2 px-4 text-start font-medium">{ts('colReason')}</th><th className="py-2 px-4 text-start font-medium">{ts('colStatus')}</th><th className="py-2 px-4 text-start font-medium">{ts('colOpened')}</th></tr></thead>
-                                    <tbody>
-                                        {rows.map((d) => (
-                                            <tr key={d.id} className="border-t border-line">
-                                                <td className="py-2 px-4"><bdi dir="ltr" className="font-mono">{orderRef(d.orderId)}</bdi></td>
-                                                <td className="py-2 px-4">
-                                                    {d.order?.customer ? <Link href={`/admin/support?view=chat&user=${encodeURIComponent(d.order.customer.id)}&order=${encodeURIComponent(d.orderId)}`} className="text-teal font-medium hover:underline">{d.order.customer.name}</Link> : '—'}
-                                                </td>
-                                                <td className="py-2 px-4 text-ink-2">{d.reason}</td>
-                                                <td className="py-2 px-4">{d.status === 'OPEN' ? ts('disputeOpen') : ts('disputeReview')}</td>
-                                                <td className="py-2 px-4 text-ink-3">{fmt.date(d.createdAt, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        )}
-        </Card>
-    );
-}
-
-/** KYC tab (reviewers only): documents the automatic check left for a person (GET /kyc/admin/pending). Decisions stay in KYC Verification. */
-export function KycPanel() {
-    const ts = useTs();
-    const { fmt } = useLanguage();
-    const [rows, setRows] = React.useState<KycRow[] | null>(null);
-    const [error, setError] = React.useState<string | null>(null);
-    const load = React.useCallback(async () => {
-        setError(null);
-        try { setRows(await supportHqApi.kycPending()); } catch (e: any) { setError(e?.message || ts('loadFailed')); }
-    }, [ts]);
-    React.useEffect(() => { load(); }, [load]);
-    return (
-        <Card title={ts('kycTitle')} description={ts('kycDesc')} bodyClassName="px-0 py-0"
-            actions={<Link href="/admin/kyc" className="inline-flex items-center gap-1 text-[13px] font-medium text-teal hover:underline">{ts('openKyc')} <ArrowRight size={13} className="rtl:rotate-180" aria-hidden /></Link>}>
-            {error ? <div className="p-4"><ErrorState message={error} onRetry={load} /></div>
-                : !rows ? <div className="p-4 space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-10" />)}</div>
-                    : !rows.length ? <EmptyState icon={<ShieldCheck size={20} />} title={ts('kycEmpty')}>{ts('kycEmptyBody')}</EmptyState>
-                        : (
-                            <ul className="divide-y divide-line border-t border-line mt-3">
-                                {rows.map((k) => (
-                                    <li key={k.id} className="px-4 sm:px-5 py-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
-                                        <span className="font-medium text-heading">{k.user?.name || ts('unknownUser')}</span>
-                                        {k.user && <RoleChip role={k.user.role} />}
-                                        {k.user?.email && <bdi dir="ltr" className="text-ink-3">{k.user.email}</bdi>}
-                                        <span className="text-ink-3">{k.adminNotes?.startsWith('AI flagged') ? ts('kycFlagged') : ts('kycWaiting')}</span>
-                                        <span className="ms-auto text-ink-4">{fmt.date(k.createdAt, { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-        </Card>
     );
 }

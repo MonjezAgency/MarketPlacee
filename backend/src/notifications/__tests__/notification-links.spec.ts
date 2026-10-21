@@ -18,10 +18,10 @@ describe('notification destinations by recipient role', () => {
         expect(notificationLink('SUPPLIER', { productId: 'p' })).toBe('/supplier/products/p/edit#feedback');
         expect(notificationLink('SUPPLIER', { productId: 'p', type: 'LOW_STOCK' })).toBe('/supplier/products/p/edit');
         expect(notificationLink('CUSTOMER', { productId: 'p' })).toBe('/products/p');
-        expect(notificationLink('ADMIN', { offerId: 'x' })).toBe('/admin/offers?tab=supplier');
+        expect(notificationLink('ADMIN', { offerId: 'x' })).toBe('/admin/offers/supplier');
     });
     it('sends staff to disputes and accounts; never sends buyers or suppliers to another account', () => {
-        expect(notificationLink('ADMIN', { disputeId: 'd', orderId: 'o' })).toBe('/admin/disputes');
+        expect(notificationLink('ADMIN', { disputeId: 'd', orderId: 'o' })).toBe('/admin/support?view=disputes&id=d');
         expect(notificationLink('CUSTOMER', { disputeId: 'd', orderId: 'o' })).toBe('/dashboard/customer/orders/o');
         expect(notificationLink('OWNER', { userId: 'u1' })).toBe('/admin/users/u1');
         expect(notificationLink('SUPPLIER', { userId: 'u1' })).toBeNull();

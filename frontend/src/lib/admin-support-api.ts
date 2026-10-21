@@ -54,8 +54,6 @@ export interface Thread {
     order: OrderSummary | null;
 }
 
-export interface DisputeRow { id: string; orderId: string; reason: string; status: string; createdAt: string; order?: { customer?: { id: string; name: string } | null } | null }
-export interface KycRow { id: string; documentType: string; status: string; createdAt: string; adminNotes: string | null; user: { id: string; name: string; email: string; role: string } | null }
 
 async function json<T>(res: Response): Promise<T> {
     const body = await res.json().catch(() => null);
@@ -82,9 +80,90 @@ export const supportHqApi = {
     assign: (userId: string, team: Team) => send(`/chat/admin/hq/conversations/${encodeURIComponent(userId)}/team`, 'PATCH', { team }).then((r) => json<{ ok: boolean; team: string; changed: boolean; notified?: number }>(r)),
     takeOver: (userId: string) => send(`/chat/admin/hq/conversations/${encodeURIComponent(userId)}/take-over`, 'POST').then((r) => json<any>(r)),
     handBack: (userId: string) => send(`/chat/admin/hq/conversations/${encodeURIComponent(userId)}/hand-back`, 'POST').then((r) => json<any>(r)),
-    disputes: (status: 'OPEN' | 'UNDER_REVIEW') => apiFetch(`/disputes?page=1&limit=50&status=${status}`).then((r) => json<{ data: DisputeRow[]; total: number }>(r)),
-    kycPending: () => apiFetch('/kyc/admin/pending').then((r) => json<KycRow[]>(r)),
 };
 
 export const orderRef = (id: string) => `#${id.slice(-8).toUpperCase()}`;
+
+// ─── Roles (mirror the backend @Roles; the server stays the authority) ────────
+/** KycController admin/* (all reads and verify / reject / revoke): OWNER, ADMIN, MODERATOR. */
 export const KYC_REVIEW_ROLES = ['OWNER', 'ADMIN', 'MODERATOR'];
+/** Roles the Support HQ conversation endpoints allow (backend/src/chat/support-hq.controller.ts). */
+export const HQ_CHAT_ROLES = ['OWNER', 'ADMIN', 'SUPPORT', 'DEVELOPER', 'LOGISTICS'];
+/** DisputesController GET / , GET stats, PATCH :id/resolve, PATCH :id/status: the same six roles for reading and deciding. */
+export const DISPUTE_ROLES = ['OWNER', 'ADMIN', 'SUPPORT'];
+/** Roles allowed to decide a dispute (refund / no refund): OWNER and ADMIN only, because a refund decision moves money. Support views and marks under review. */
+export const DISPUTE_DECIDE_ROLES = ['OWNER', 'ADMIN'];
+/** Roles allowed to decide on KYC documents (identical to KYC_REVIEW_ROLES today). */
+export const KYC_DECIDE_ROLES = KYC_REVIEW_ROLES;
+/** AdminOrdersController GET :id/detail (order link, suppliers and payment facts in the dispute view). */
+export const ORDER_DETAIL_ROLES = ['OWNER', 'ADMIN', 'SUPPORT', 'LOGISTICS'];
+/** AdminUsersController (the /admin/users pages). */
+export const USER_DETAIL_ROLES = ['OWNER', 'ADMIN', 'SUPPORT'];
+
+// ─── Disputes (backend/src/disputes) ─────────────────────────────────────────
+export const DISPUTE_STATUSES = ['OPEN', 'UNDER_REVIEW', 'RESOLVED_REFUND', 'RESOLVED_NO_REFUND', 'CLOSED'] as const;
+export type DisputeStatus = (typeof DISPUTE_STATUSES)[number];
+export type DisputeDecision = 'RESOLVED_REFUND' | 'RESOLVED_NO_REFUND';
+/** Only the fields the workspace reads. The server sends more; nothing else is shown. */
+export interface Dispute {
+    id: string; orderId: string; customerId: string; reason: string; description: string; evidence: string[];
+    status: DisputeStatus; resolution: string | null; resolvedBy: string | null; resolvedAt: string | null; createdAt: string; updatedAt: string;
+    order?: { id: string; status: string; customer?: { id: string; name: string | null; email: string | null } | null; items?: { product?: { name: string } | null }[] } | null;
+}
+export interface DisputePage { data: Dispute[]; total: number; page: number; limit: number; totalPages: number }
+export interface DisputeStats { open: number; underReview: number; resolvedRefund: number; resolvedNoRefund: number; total: number }
+/** The parts of GET /orders/admin/:id/detail the dispute view uses (already redacted by role on the server). */
+export interface DisputeOrderFacts {
+    id: string; status: string; reviewStatus: string;
+    payment: { status: string | null; paidAt: string | null; card: { status: string; capturedAt: string | null; releasedAt: string | null } | null } | null;
+    suppliers: { id: string; name: string | null; companyName: string | null; email: string | null }[];
+}
+
+const pick = (d: any): Dispute => ({
+    id: d.id, orderId: d.orderId, customerId: d.customerId, reason: d.reason, description: d.description, evidence: Array.isArray(d.evidence) ? d.evidence : [],
+    status: d.status, resolution: d.resolution ?? null, resolvedBy: d.resolvedBy ?? null, resolvedAt: d.resolvedAt ?? null, createdAt: d.createdAt, updatedAt: d.updatedAt,
+    order: d.order ? { id: d.order.id, status: d.order.status, customer: d.order.customer ?? null, items: (d.order.items || []).map((i: any) => ({ product: i.product ? { name: i.product.name } : null })) } : null,
+});
+
+export const disputeApi = {
+    list: (status: DisputeStatus | null, page = 1, limit = 50) =>
+        apiFetch(`/disputes?page=${page}&limit=${limit}${status ? `&status=${status}` : ''}`).then((r) => json<DisputePage>(r)).then((p) => ({ ...p, data: (p.data || []).map(pick) })),
+    stats: () => apiFetch('/disputes/stats').then((r) => json<DisputeStats>(r)),
+    get: (id: string) => apiFetch(`/disputes/${encodeURIComponent(id)}`).then((r) => json<any>(r)).then(pick),
+    /** PATCH /disputes/:id/status — the old Dispute Center only ever set UNDER_REVIEW. */
+    markUnderReview: (id: string) => send(`/disputes/${encodeURIComponent(id)}/status`, 'PATCH', { status: 'UNDER_REVIEW' }).then((r) => json<any>(r)),
+    /** PATCH /disputes/:id/resolve — records the decision; the server's reply is the updated dispute. */
+    resolve: (id: string, decision: DisputeDecision, resolution: string) =>
+        send(`/disputes/${encodeURIComponent(id)}/resolve`, 'PATCH', { decision, resolution }).then((r) => json<any>(r)),
+    orderFacts: (orderId: string) => apiFetch(`/orders/admin/${encodeURIComponent(orderId)}/detail`).then((r) => json<any>(r)).then((o): DisputeOrderFacts => ({
+        id: o.id, status: o.status, reviewStatus: o.reviewStatus,
+        payment: o.payment ? { status: o.payment.status ?? null, paidAt: o.payment.paidAt ?? null, card: o.payment.card ? { status: o.payment.card.status, capturedAt: o.payment.card.capturedAt ?? null, releasedAt: o.payment.card.releasedAt ?? null } : null } : null,
+        suppliers: (o.suppliers || []).map((s: any) => ({ id: s.id, name: s.name ?? null, companyName: s.companyName ?? null, email: s.email ?? null })),
+    })),
+};
+
+// ─── KYC (backend/src/kyc) ───────────────────────────────────────────────────
+export const KYC_STATUSES = ['PENDING', 'VERIFIED', 'REJECTED'] as const;
+export type KycStatus = (typeof KYC_STATUSES)[number];
+export interface KycDoc {
+    id: string; userId: string; documentType: string; frontImageUrl: string | null; backImageUrl: string | null; selfieUrl: string | null;
+    livenessScore: number | null; status: KycStatus; adminNotes: string | null; createdAt: string; updatedAt: string;
+    user: { id: string; name: string | null; email: string | null; role: string | null } | null;
+}
+export interface KycStats { pending: number; verified: number; rejected: number; unverified: number }
+const pickKyc = (d: any): KycDoc => ({
+    id: d.id, userId: d.userId, documentType: d.documentType, frontImageUrl: d.frontImageUrl || null, backImageUrl: d.backImageUrl || null, selfieUrl: d.selfieUrl || null,
+    livenessScore: typeof d.livenessScore === 'number' ? d.livenessScore : null, status: d.status, adminNotes: d.adminNotes ?? null,
+    createdAt: d.createdAt, updatedAt: d.updatedAt, user: d.user ? { id: d.user.id, name: d.user.name ?? null, email: d.user.email ?? null, role: d.user.role ?? null } : null,
+});
+
+export const kycApi = {
+    list: (status: KycStatus | null) => apiFetch(`/kyc/admin/all${status ? `?status=${status}` : ''}`).then((r) => json<any[]>(r)).then((rows) => (rows || []).map(pickKyc)),
+    stats: () => apiFetch('/kyc/admin/stats').then((r) => json<KycStats>(r)),
+    get: (id: string) => apiFetch(`/kyc/admin/${encodeURIComponent(id)}`).then((r) => json<any>(r)).then(pickKyc),
+    verify: (id: string, adminNotes?: string) => send(`/kyc/admin/${encodeURIComponent(id)}/verify`, 'PATCH', adminNotes ? { adminNotes } : {}).then((r) => json<any>(r)).then(pickKyc),
+    reject: (id: string, adminNotes: string) => send(`/kyc/admin/${encodeURIComponent(id)}/reject`, 'PATCH', { adminNotes }).then((r) => json<any>(r)).then(pickKyc),
+    revoke: (id: string, adminNotes: string) => send(`/kyc/admin/${encodeURIComponent(id)}/revoke`, 'PATCH', { adminNotes }).then((r) => json<any>(r)).then(pickKyc),
+    /** Private files (supabase://…) are opened through a signed URL that expires after one hour. */
+    signedUrl: (path: string) => apiFetch(`/kyc/admin/signed-url?path=${encodeURIComponent(path)}`).then((r) => json<{ url: string }>(r)).then((b) => b.url),
+};

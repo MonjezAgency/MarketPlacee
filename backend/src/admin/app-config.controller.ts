@@ -20,12 +20,14 @@ export class AppConfigController {
     constructor(private readonly appConfigService: AppConfigService, private readonly prisma: PrismaService) { }
 
     @Get('markup')
+    @Roles(Role.OWNER, Role.ADMIN) // pricing / platform settings (role matrix: frontend/src/lib/admin-access.ts)
     async getMarkup() {
         const markupData = await this.appConfigService.getMarkupPercentage();
         return { markup: markupData }; // { markup: { piece, pallet, container } }
     }
 
     @Post('markup')
+    @Roles(Role.OWNER, Role.ADMIN) // pricing / platform settings (role matrix: frontend/src/lib/admin-access.ts)
     async setMarkup(@Body() body: { piece: number; pallet: number; container: number; platformFee?: number; shippingMarkup?: number }) {
         await this.appConfigService.setMarkupPercentage(body);
         // Buyer prices moved: record them for price history (background).
@@ -34,21 +36,25 @@ export class AppConfigController {
     }
 
     @Get('all-products')
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR) // catalog review
     async getAllProducts() {
         return this.appConfigService.getAllProducts();
     }
 
     @Get('pending-products')
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR) // catalog review
     async getPendingProducts() {
         return this.appConfigService.getPendingProducts();
     }
 
     @Put('products/:id/approve')
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR) // catalog review
     async approveProduct(@Param('id') id: string) {
         return this.appConfigService.approveProduct(id);
     }
 
     @Put('products/:id/reject')
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR) // catalog review
     async rejectProduct(@Param('id') id: string, @Body('reason') reason: string) {
         return this.appConfigService.rejectProduct(id, reason);
     }
@@ -72,6 +78,7 @@ export class AppConfigController {
     }
 
     @Post('allowed-brands')
+    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR) // catalog review
     async setAllowedBrands(@Body('brands') brands: string[]) {
         if (!Array.isArray(brands)) {
             return { error: 'Brands must be an array of strings' };
@@ -81,6 +88,7 @@ export class AppConfigController {
     }
 
     @Post('currency')
+    @Roles(Role.OWNER, Role.ADMIN) // pricing / platform settings (role matrix: frontend/src/lib/admin-access.ts)
     async setPlatformCurrency(@Body('currency') currency: string | null) {
         await this.appConfigService.setPlatformCurrency(currency);
         return { message: 'Platform currency updated successfully', currency };
@@ -91,6 +99,7 @@ export class AppConfigController {
     }
 
     @Post('default-unit')
+    @Roles(Role.OWNER, Role.ADMIN) // pricing / platform settings (role matrix: frontend/src/lib/admin-access.ts)
     async setDefaultUnit(@Body('unit') unit: string) {
         await this.appConfigService.setDefaultDisplayUnit(unit);
         return { message: 'Default display unit updated', unit };
@@ -102,6 +111,7 @@ export class AppConfigController {
     }
 
     @Post('placements')
+    @Roles(Role.OWNER, Role.ADMIN) // pricing / platform settings (role matrix: frontend/src/lib/admin-access.ts)
     async setAdPlacements(@Body() data: any) {
         await this.appConfigService.setAdPlacements(data);
         return { message: 'Ad placements updated successfully' };
@@ -114,6 +124,7 @@ export class AppConfigController {
     }
 
     @Post('terms')
+    @Roles(Role.OWNER, Role.ADMIN) // pricing / platform settings (role matrix: frontend/src/lib/admin-access.ts)
     async setTerms(@Body() body: { content: string; version?: string }) {
         return this.appConfigService.setTerms(body.content || '', body.version);
     }

@@ -67,7 +67,7 @@ export class EmailTrackingController {
     /** Admin analytics overview (aggregate sent / opened / clicked). */
     @Get('analytics/overview')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+    @Roles(Role.OWNER, Role.ADMIN)
     @Throttle({ default: { limit: 60, ttl: 60_000 } })
     async overview(@Query('days') days?: string) {
         const n = parseInt(days || '30', 10);
@@ -77,7 +77,7 @@ export class EmailTrackingController {
     /** Per-campaign per-recipient drill-down. */
     @Get('analytics/campaigns/:id')
     @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(Role.OWNER, Role.ADMIN, Role.MODERATOR)
+    @Roles(Role.OWNER, Role.ADMIN)
     async campaignDetail(@Param('id') id: string) {
         return this.svc.campaignDetail(id);
     }
