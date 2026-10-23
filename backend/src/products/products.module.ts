@@ -26,6 +26,7 @@ import { OfferCompareService } from './offer-compare.service';
 import { ProductReviewService } from './product-review.service';
 import { AdminProductsService } from './admin-products.service';
 import { AdminCatalogController } from './admin-catalog.controller';
+import { AdminProductPhotosController } from './admin-product-photos.controller';
 
 import { StorageModule } from '../storage/storage.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -34,7 +35,7 @@ import { EmailModule } from '../email/email.module';
 @Module({
     imports: [PricingModule, AiAgentModule, StorageModule, NotificationsModule, EmailModule],
     providers: [ProductsService, PlacementService, EanService, EanCacheService, EanValidatorService, ExcelService, ReviewsService, SupplierImportService, ImageLookupService, ImportEnrichmentService, ImageDiscoveryService, SupplierOverviewService, PriceHistoryService, TargetPricesService, SupplierUpdatesService, OfferCompareService, ProductReviewService, AdminProductsService],
-    controllers: [AdminCatalogController, SupplierCatalogController, CatalogFieldsController, PriceHistoryController, TargetPricesController, ProductsController, PlacementController, ReviewsController, AdminReviewsController],
+    controllers: [AdminCatalogController, AdminProductPhotosController, SupplierCatalogController, CatalogFieldsController, PriceHistoryController, TargetPricesController, ProductsController, PlacementController, ReviewsController, AdminReviewsController],
     exports: [ProductsService, PlacementService, PriceHistoryService, ProductReviewService],
 })
 export class ProductsModule { }

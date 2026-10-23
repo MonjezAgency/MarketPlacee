@@ -15,6 +15,7 @@ import { DiscountsController } from '../../discounts/discounts.controller';
 import { EmailTrackingController } from '../../email-tracking/email-tracking.controller';
 import { ProductsController } from '../../products/products.controller';
 import { AdminCatalogController } from '../../products/admin-catalog.controller';
+import { AdminProductPhotosController } from '../../products/admin-product-photos.controller';
 
 /**
  * The role matrix on the endpoints behind the admin pages, checked through the real
@@ -48,6 +49,11 @@ const cases: [any, string, string[]][] = [
     [AppConfigController, 'setMarkup', ['OWNER', 'ADMIN']],
     [AppConfigController, 'getMarkup', ['OWNER', 'ADMIN']],
     [AdminCatalogController, 'updatePrice', ['OWNER', 'ADMIN']],
+    // Product photos: catalog staff read and re-search; applying a found photo changes a product (owner/admin)
+    [AdminProductPhotosController, 'list', ['OWNER', 'ADMIN', 'MODERATOR']],
+    [AdminProductPhotosController, 'retry', ['OWNER', 'ADMIN', 'MODERATOR']],
+    [AdminProductPhotosController, 'accept', ['OWNER', 'ADMIN']],
+    [AdminProductPhotosController, 'dismiss', ['OWNER', 'ADMIN']],
     [DiscountsController, 'createTier', ['OWNER', 'ADMIN']],
     [DiscountsController, 'addMember', ['OWNER', 'ADMIN']],
     [TargetPricesController, 'respond', ['OWNER', 'ADMIN']],

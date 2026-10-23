@@ -533,6 +533,8 @@ export class ProductsController {
             const state = await this.discovery?.enqueue((product as any).id).catch(() => null);
             return this.productsService.withCompleteness({ ...(product as any), price: (product as any).basePrice ?? null, imageDiscovery: state ?? null });
         }
+        // Atlantis Catalog products too: a product saved without a photo is searched by barcode; staff choose any result.
+        this.discovery?.trigger((product as any).id);
         return plainToInstance(ProductDto, product);
     }
 

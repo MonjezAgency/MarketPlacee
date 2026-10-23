@@ -24,6 +24,8 @@ export interface ProviderPhoto {
     url: string; previewUrl: string; kind: 'front' | 'packaging' | 'other'; language: string | null;
     /** Pixel size of the full-size file, when the record says (Open*Facts `images` metadata). */
     width?: number; height?: number;
+    /** The uploaded photo this selection was cut from (Open*Facts `imgid`): two selections of one upload are one photo. */
+    imgid?: string;
 }
 export interface ProviderRecord { code: string; name: string | null; brands: string | null; quantity: string | null; categories: string[]; photos: ProviderPhoto[]; pageUrl: string }
 export type ProviderResult =
@@ -85,7 +87,12 @@ export class HostQueue {
         return Math.ceil((start - this.now() + queued * gap) / 1000);
     }
 
-    fetch(url: string, init: RequestInit = {}): Promise<Response> {
+    /**
+     * `timeoutMs` starts when the request is actually sent, not when it is queued: with many
+     * lookups waiting their turn (a bulk import), a timeout set at queue time would expire
+     * before the request even left and every lookup would look like an outage.
+     */
+    fetch(url: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<Response> {
         const host = new URL(url).host;
         const gap = 60_000 / this.perMinute;
         const prev = this.chains.get(host) || Promise.resolve();
@@ -97,7 +104,8 @@ export class HostQueue {
                 const wait = Math.max(this.nextAt.get(host) || 0, this.pausedUntil.get(host) || 0) - this.now();
                 if (wait > 0) await this.sleep(wait);
                 this.nextAt.set(host, this.now() + gap);
-                const res = await this.fetcher(url, init);
+                const { timeoutMs, ...rest } = init;
+                const res = await this.fetcher(url, timeoutMs ? { ...rest, signal: AbortSignal.timeout(timeoutMs) } : rest);
                 if (res.status === 429 || res.status === 503) {
                     const ra = Number(res.headers.get('retry-after'));
                     const pause = Number.isFinite(ra) && ra > 0 ? Math.min(ra, 600) * 1000 : 60_000;
@@ -127,7 +135,7 @@ function openFactsProvider(o: { id: string; label: string; site: string; product
         async lookup(barcode) {
             let res: Response;
             try {
-                res = await queue.fetch(`${o.site}/api/v3/product/${encodeURIComponent(barcode)}.json?fields=${FIELDS}`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+                res = await queue.fetch(`${o.site}/api/v3/product/${encodeURIComponent(barcode)}.json?fields=${FIELDS}`, { headers: { 'User-Agent': USER_AGENT, Accept: 'application/json' }, timeoutMs: 10_000 });
             } catch (e: any) { return { status: 'unavailable', reason: e?.name === 'TimeoutError' ? 'timeout' : 'error' }; }
             if (res.status === 429 || res.status === 503) return { status: 'unavailable', reason: 'rate_limited' };
             if (res.status !== 404 && !res.ok) return { status: 'unavailable', reason: 'error' };
@@ -143,9 +151,13 @@ function openFactsProvider(o: { id: string; label: string; site: string; product
             const add = (u: unknown, kind: ProviderPhoto['kind'], language: string | null) => {
                 if (typeof u !== 'string' || !/^https:\/\//.test(u)) return;
                 const key = u.replace(/\.(\d+)\.(100|200|400|full)\./, '.$1.');
-                if (seen.has(key)) return;
+                const size = photoSize(p.images, u);
+                // The same upload selected as the front for several languages is one photo, offered once.
+                const same = size.imgid ? `img:${size.imgid}` : null;
+                if (seen.has(key) || (same && seen.has(same))) return;
                 seen.add(key);
-                photos.push({ url: u.replace(/\.(\d+)\.(100|200|400)\.(jpg|png)$/i, '.$1.full.$3'), previewUrl: u, kind, language, ...photoSize(p.images, u) });
+                if (same) seen.add(same);
+                photos.push({ url: u.replace(/\.(\d+)\.(100|200|400)\.(jpg|png)$/i, '.$1.full.$3'), previewUrl: u, kind, language, ...size });
             };
             const sel = p.selected_images || {};
             for (const [lang, u] of Object.entries(sel.front?.display || {})) add(u, 'front', lang);
@@ -183,13 +195,14 @@ export function openFactsElsewhere(j: any): string | null {
     return /^[a-z]{3,20}$/.test(v) ? v : null;
 }
 
-/** Full-size pixel size of a selected photo (…/front_en.14.400.jpg → images.front_en of the same revision). */
-export function photoSize(images: any, url: string): { width?: number; height?: number } {
+/** Full-size pixel size of a selected photo (…/front_en.14.400.jpg → images.front_en of the same revision), and the upload it was cut from. */
+export function photoSize(images: any, url: string): { width?: number; height?: number; imgid?: string } {
     const m = /\/((?:front|packaging)_[a-z]{2,3})\.(\d+)\.(?:100|200|400|full)\.(?:jpg|png)$/i.exec(url);
     const meta = m && images && typeof images === 'object' ? images[m[1]] : null;
     if (!m || !meta || String(meta.rev) !== m[2]) return {};
+    const imgid = meta.imgid !== undefined && meta.imgid !== null && /^\d{1,6}$/.test(String(meta.imgid)) ? String(meta.imgid) : undefined;
     const w = Number(meta?.sizes?.full?.w), h = Number(meta?.sizes?.full?.h);
-    return Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 ? { width: w, height: h } : {};
+    return { ...(Number.isFinite(w) && Number.isFinite(h) && w > 0 && h > 0 ? { width: w, height: h } : {}), ...(imgid ? { imgid } : {}) };
 }
 
 // ─── Barcode forms ────────────────────────────────────────────────────

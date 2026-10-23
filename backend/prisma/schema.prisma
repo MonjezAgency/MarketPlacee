@@ -204,16 +204,19 @@ model Product {
   category    String
   images      String[]
   /// Where a photo came from when it isn't the supplier's own (licence and attribution to show with it). Shape:
-  ///   { "<image url>": { "source": "Open Food Facts", "license": "CC BY-SA 3.0", "licenseUrl": "…", "attribution": "Open Food Facts contributors", "sourceUrl": "…", "barcode": "…", "addedAt": "ISO date" } }
-  /// Null / missing key = the supplier's own photo.
+  ///   { "<image url>": { "source": "Open Food Facts", "license": "CC BY-SA 3.0", "licenseUrl": "…", "attribution": "Open Food Facts contributors", "sourceUrl": "…", "barcode": "…", "addedAt": "ISO date",
+  ///                      "origin"?: "discovery", "originalUrl"?: "…", "chosenBy"?: "supplier" | "staff", "approvedBy"?: userId, "approvedByRole"?: role, "approvedAt"?: ISO, "tier"?: 1 | 2 | 3 | null, "imgid"?: "…" } }
+  /// Null / missing key = the supplier's (or staff's) own uploaded photo.
   imageCredits Json?
-  /// Background photo search by barcode for a product saved without a photo (supplier must approve any result;
+  /// Background photo search by barcode for a product saved without a photo (a person must approve any result;
   /// nothing here is ever applied automatically). Additive and optional; null = no search for this product. Shape:
-  ///   { "status": "searching" | "found_review" | "not_found" | "unavailable" | "invalid_barcode",
+  ///   { "status": "searching" | "found_review" | "not_found" | "unavailable" | "invalid_barcode", "mode"?: "fill" | "add",
   ///     "barcode": "…", "startedAt"?: ISO, "checkedAt"?: ISO, "reason"?: code, "reasons"?: [code],
   ///     "candidates": [{ "url", "previewUrl", "source", "sourceUrl", "license", "licenseUrl", "attribution",
-  ///                      "confidence": "verified" | "needs_confirmation", "reasons": [code], "kind", "language", "width", "height" }],
-  ///     "dismissed"?: [url], "attempts"?: n }
+  ///                      "confidence": "verified" | "needs_confirmation", "reasons": [code], "kind", "language", "width", "height", "imgid",
+  ///                      "tier": 1 | 2 | 3 | null, "score": n, "breakdown": [{ "key", "points" }], "visual": {…}, "role": "primary" | "gallery" | "review" }],
+  ///     "record"?: { productName, brand, quantity, sourceUrl }, "dismissed"?: [url], "attempts"?: n, "requestedBy"?: { id, role } }
+  /// See backend/src/products/image-discovery.service.ts and image-quality.ts.
   /// Kept apart from `status` (ProductStatus is the review workflow; this is only a hint for the supplier).
   imageDiscovery Json?
   // Short product demo videos — same array shape as images. Each

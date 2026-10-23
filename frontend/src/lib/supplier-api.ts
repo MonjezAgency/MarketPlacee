@@ -10,11 +10,22 @@ export interface DiscoveryCandidate {
     confidence: 'verified' | 'needs_confirmation'; reasons: string[];
     kind?: string; language?: string | null; width?: number; height?: number;
     productName?: string | null; brand?: string | null; quantity?: string | null;
+    /** 1 white background · 2 plain light background · 3 other photo of this exact product · null identity to check (backend image-quality.ts). */
+    tier?: 1 | 2 | 3 | null;
+    score?: number;
+    /** Score lines (keys translated in the productPhotos section as score_<key>). */
+    breakdown?: { key: string; points: number }[];
+    visual?: { analysed: boolean; background?: 'white' | 'light_neutral' | 'busy'; touches?: string[]; reason?: string } | null;
+    role?: 'primary' | 'gallery' | 'review';
 }
 export interface ImageDiscovery {
     status: 'searching' | 'found_review' | 'not_found' | 'unavailable' | 'invalid_barcode';
+    /** fill: the product has no photo · add: found photos can only be added after the existing ones. */
+    mode?: 'fill' | 'add';
     barcode: string; startedAt?: string; checkedAt?: string; reason?: string; reasons?: string[];
     candidates: DiscoveryCandidate[]; attempts?: number;
+    /** The database record, when it was rejected as a different product. */
+    record?: { productName: string | null; brand: string | null; quantity: string | null; sourceUrl: string } | null;
 }
 
 export interface SupplierProduct {
@@ -85,8 +96,8 @@ export const supplierApi = {
     imageLookup: (q: { productId?: string; ean: string; name?: string; brand?: string; weight?: string }) => post('/supplier-catalog/image-lookup', q).then((r) => json<any>(r)),
     imageDiscovery: (id: string) => apiFetch(`/supplier-catalog/products/${id}/image-discovery`, { cache: 'no-store' }).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     retryImageDiscovery: (id: string) => post(`/supplier-catalog/products/${id}/image-discovery/retry`, {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
-    /** Use a found photo: the server copies it, adds it to the product and records its licence. Returns the saved product. */
-    acceptDiscoveredImage: (id: string, url: string) => post(`/supplier-catalog/products/${id}/image-discovery/accept`, { url }).then((r) => json<SupplierProduct>(r)),
+    /** Use a found photo (and `also`: more confirmed photos for the gallery): the server copies them, adds them and records their licence. Returns the saved product. */
+    acceptDiscoveredImage: (id: string, url: string, also: string[] = []) => post(`/supplier-catalog/products/${id}/image-discovery/accept`, { url, also }).then((r) => json<SupplierProduct>(r)),
     dismissDiscoveredImage: (id: string, url?: string) => post(`/supplier-catalog/products/${id}/image-discovery/dismiss`, url ? { url } : {}).then((r) => json<{ state: ImageDiscovery | null }>(r)),
     acceptImage: (url: string) => post('/supplier-catalog/image-lookup/accept', { url }).then((r) => json<{ url: string }>(r)),
     preferences: () => apiFetch('/supplier-catalog/preferences', { cache: 'no-store' }).then((r) => json<{ defaultCurrency: string | null; suggestedCurrency: string; effectiveCurrency: string; country: string | null; currencies: string[]; rates: Record<string, number> }>(r)),

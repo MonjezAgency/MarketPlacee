@@ -98,10 +98,14 @@ function Workspace({ scope }: { scope: CatalogScope }) {
         <div data-no-translate className="text-start -mt-2">
             <PageHeader eyebrow={tp('title')} title={tp(isCatalog ? 'tabCatalog' : 'tabSubmissions')} description={tp(isCatalog ? 'catalogExplain' : 'submissionsExplain')}
                 actions={isCatalog ? <>
+                    <Link href="/admin/products/photos"><Button icon={<ImageIcon size={15} />}>{t('productPhotos', 'navLink')}</Button></Link>
                     <Button icon={<RefreshCw size={15} />} onClick={() => setBulkPriceOpen(true)}>{t('supplierCatalog', 'updatePricesStock')}</Button>
                     <Link href="/admin/products/catalog/import"><Button icon={<Upload size={15} />}>{tp('importFile')}</Button></Link>
                     <Link href="/admin/products/new"><Button variant="primary" icon={<Plus size={15} />}>{tp('addCatalogProduct')}</Button></Link>
-                </> : (c?.scopes.submissionsPending ? <Badge tone="warning">{tp('pendingBadge', { count: c.scopes.submissionsPending })}</Badge> : undefined)} />
+                </> : <>
+                    {c?.scopes.submissionsPending ? <Badge tone="warning">{tp('pendingBadge', { count: c.scopes.submissionsPending })}</Badge> : null}
+                    <Link href="/admin/products/photos"><Button icon={<ImageIcon size={15} />}>{t('productPhotos', 'navLink')}</Button></Link>
+                </>} />
 
             <Card bodyClassName="p-0">
                 <div className="flex flex-col gap-3 p-3 sm:p-4 border-b border-line">

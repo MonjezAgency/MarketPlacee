@@ -73,12 +73,14 @@ export class SupplierCatalogController {
         return this.discovery.retry(req.user.sub, id).then((state) => ({ state }));
     }
 
-    /** Use one of the stored candidates as the product photo (copied to storage and credited). */
+    /** Use stored candidates as the product photos (copied to storage and credited; never replaces a photo). */
     @Post('products/:id/image-discovery/accept')
     @Throttle({ default: { limit: 30, ttl: 60_000 } })
-    acceptImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { url?: string }) {
+    acceptImageDiscovery(@Request() req, @Param('id') id: string, @Body() body: { url?: string; also?: unknown }) {
         if (!body?.url || typeof body.url !== 'string') throw new BadRequestException('Choose a photo.');
-        return this.discovery.accept(req.user.sub, id, body.url);
+        // `also`: more photos of the same product for the gallery, after the main one.
+        const also = Array.isArray(body.also) ? body.also.filter((x): x is string => typeof x === 'string') : [];
+        return this.discovery.accept(req.user.sub, id, body.url, also);
     }
 
     /** "Not my product": one photo ({url}) or all of them. */

@@ -57,6 +57,7 @@ export const ADMIN_NAV_ROLES: Record<string, StaffRole[]> = {
 const ROUTE_ROLES: [string, StaffRole[]][] = [
     ...Object.entries(ADMIN_NAV_ROLES),
     ['/admin/products', CATALOG], // review list + /admin/products/[id] review
+    ['/admin/products/photos', CATALOG], // list + search again; using a found photo is OWNER/ADMIN (canDo applyCatalogPhotos)
     ['/admin/products/new', OA],
     ['/admin/products/catalog/import', OA],
     ['/admin/offers/new', OA],
@@ -124,6 +125,7 @@ export const ADMIN_ACTION_ROLES = {
     changeOrderStatus: ['OWNER', 'ADMIN', 'LOGISTICS'] as StaffRole[],
     exportOrders: OA,
     reviewProducts: CATALOG,
+    applyCatalogPhotos: OA,      // use / dismiss photos found by barcode on Atlantis Catalog products
     reviewOffers: CATALOG,
     manageSpecialOffers: OA,
     answerTargetPrices: OA,

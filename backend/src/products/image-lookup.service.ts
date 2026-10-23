@@ -100,6 +100,27 @@ export function compareNames(supplierName: string | undefined, sourceName: strin
     return shared >= Math.min(2, a.length, b.size);
 }
 
+/**
+ * A different variant of the same line, as opposed to names that are merely worded differently
+ * ("Lion Wild Crush" / "Lion Wildcrush", German / English names): a variant word on one side only
+ * (zero, light, diet…) or a different percentage. Only this kind of name difference rules a record out.
+ */
+export function variantConflict(supplierName: string | undefined, sourceName: string | null, brands: (string | null | undefined)[] = []): boolean {
+    const sa = specs(supplierName).get('%'), sb = specs(sourceName).get('%');
+    if (sa && sb && ![...sa].some((v) => sb.has(v))) return true;
+    const brandWords = new Set(brands.flatMap((b) => tokens(b)));
+    const a = tokens(supplierName).filter((t) => !brandWords.has(t)), b = tokens(sourceName).filter((t) => !brandWords.has(t));
+    if (!a.length || !b.length) return false;
+    const va = a.filter((t) => VARIANT.has(t)), vb = b.filter((t) => VARIANT.has(t));
+    return va.some((t) => !b.includes(t)) || vb.some((t) => !a.includes(t));
+}
+
+/** The supplier's brand written in the record's product name ("Nutella B-ready" by brand "Ferrero"): the brand agrees. */
+export function brandInName(supplierBrand: string | undefined, sourceName: string | null): boolean {
+    const a = String(supplierBrand || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    return a.length >= 3 && String(sourceName || '').toLowerCase().replace(/[^a-z0-9]+/g, '').includes(a);
+}
+
 export function compareBrands(supplierBrand: string | undefined, sourceBrands: string | null): boolean | null {
     const a = String(supplierBrand || '').toLowerCase().replace(/[^a-z0-9]+/g, '');
     if (!a || !sourceBrands) return null;
@@ -134,7 +155,9 @@ export function comparePack(supplier: { name?: string; weight?: string }, source
     }
     const ma = multipackCount(mine), mb = multipackCount(theirs);
     if (mb && mb !== ma) return { match: false, reason: `The source record is a ${mb}-pack${ma ? `, yours is a ${ma}-pack` : ' — your listing doesn’t say it’s a multipack'}.` };
-    if (ma && mb === null && source.quantity) return { match: false, reason: `Your listing is a ${ma}-pack; the source record looks like a single unit (${source.quantity}).` };
+    // "4-pack 160g" names the total: when that total matches the record, it is the same pack, not a single unit.
+    const perUnit = /(\d{1,3})\s*[x×]\s*\d/.test(mine.toLowerCase());
+    if (ma && mb === null && source.quantity && !(compared && !perUnit)) return { match: false, reason: `Your listing is a ${ma}-pack; the source record looks like a single unit (${source.quantity}).` };
     return { match: compared ? true : null, reason: null };
 }
 

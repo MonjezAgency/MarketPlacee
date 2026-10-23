@@ -496,7 +496,7 @@ function MediaEditor({ images, onChange, ean, error, productId, product, onPhoto
                 </div>
             </div>
             {urlErr && <p role="alert" className="text-[12.5px] text-red-700">{urlErr}</p>}
-            {/* Background search by the saved barcode; only shown while the product has no photo. */}
+            {/* Background search by the saved barcode: fills a product without photos, or looks for more after the saved ones. */}
             <ImageDiscoveryPanel productId={productId} product={product} ean={digitsOnly(ean)} hasImages={images.some(isRealImage)}
                 onAccepted={onPhotoAccepted} onUpload={() => fileRef.current?.click()} />
         </div>

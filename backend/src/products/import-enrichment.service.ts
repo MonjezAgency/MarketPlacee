@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { barcodeProblem, normaliseBarcode } from './catalog-rules';
-import { compareBrands, compareNames, comparePack } from './image-lookup.service';
+import { brandInName, compareBrands, compareNames, comparePack, variantConflict } from './image-lookup.service';
 import { HostQueue, buildProviders, kindOf, lookupPlan, sameGtin, type ProductDataProvider, type ProductKind, type ProviderPhoto, type ProviderRecord, type ProviderResult } from './product-data-providers';
 
 /**
@@ -24,7 +24,7 @@ export interface PhotoCandidate {
     license: string; licenseUrl: string; attribution: string;
     productName: string | null; brand: string | null; quantity: string | null;
     barcode: string;
-    kind?: ProviderPhoto['kind']; language?: string | null; width?: number; height?: number;
+    kind?: ProviderPhoto['kind']; language?: string | null; width?: number; height?: number; imgid?: string;
 }
 /** A candidate photo with how far it can be trusted for this product. */
 export interface RankedCandidate extends PhotoCandidate { confidence: 'verified' | 'needs_confirmation'; reasons: string[] }
@@ -250,11 +250,13 @@ export class ImportEnrichmentService {
         const reasons: string[] = [];
         const barcodeMatch = sameGtin(record.code || recs.code, recs.code);
         const nameMatch = compareNames(it.name, record.name, [it.brand, record.brands]);
-        const brandMatch = compareBrands(it.brand, record.brands);
+        const brandMatch = compareBrands(it.brand, record.brands) === false && brandInName(it.brand, record.name) ? true : compareBrands(it.brand, record.brands);
         const pack = comparePack({ name: it.name, weight: it.weight }, { name: record.name, quantity: record.quantity });
         if (!barcodeMatch) reasons.push('barcode_differs');
         if (recs.viaInner) reasons.push('case_code');
         if (nameMatch === false) reasons.push('name_differs');
+        // A different variant (zero / light / another %) is a different product; other wording differences only need a check.
+        if (nameMatch === false && variantConflict(it.name, record.name, [it.brand, record.brands])) reasons.push('variant_differs');
         if (brandMatch === false) reasons.push('brand_differs');
         if (pack.match === false) reasons.push('size_differs');
         if (nameMatch === null && brandMatch === null) reasons.push('nothing_to_compare');
@@ -280,7 +282,7 @@ export class ImportEnrichmentService {
         return {
             url: ph.url, previewUrl: ph.previewUrl, source: p.label, providerId: p.id, sourceUrl: r.pageUrl, license: p.license.images, licenseUrl: p.license.imagesUrl, attribution: p.license.attribution,
             productName: r.name, brand: r.brands, quantity: r.quantity, barcode, kind: ph.kind, language: ph.language,
-            ...(ph.width && ph.height ? { width: ph.width, height: ph.height } : {}),
+            ...(ph.width && ph.height ? { width: ph.width, height: ph.height } : {}), ...(ph.imgid ? { imgid: ph.imgid } : {}),
         };
     }
 

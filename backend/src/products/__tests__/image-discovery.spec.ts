@@ -338,3 +338,171 @@ describe('lookup engine: barcode forms, databases, photo choice', () => {
         expect(photoSize({ front_en: { rev: '13', sizes: { full: { w: 1, h: 1 } } } }, `${IMG}/594/114/302/8849/front_en.14.400.jpg`)).toEqual({});
     });
 });
+
+describe('choosing the best photos: identity first, then the white-background packshot', () => {
+    const redbull = '9002490100070';
+    const rbRow = { id: 'rb', supplierId: 's1', ean: redbull, name: 'Red Bull Energy Drink 250ml', brand: 'Red Bull', category: 'Energy Drinks' };
+    const sized = (code: string, lang: string, rev: number, w: number, h: number, extra: Partial<ProviderPhoto> = {}) => photo(code, lang, rev, { width: w, height: h, ...extra });
+    const white = { analysed: true as const, width: 300, height: 400, background: 'white' as const, whiteBorder: 1, lightBorder: 1, borderSpread: 0, cleanCorners: 4, touches: [], fit: 'margin' as const, coverage: 0.3 };
+    const shelf = { ...white, background: 'busy' as const, whiteBorder: 0.05, lightBorder: 0.1, borderSpread: 60, cleanCorners: 0, touches: ['left' as const], fit: 'cut' as const };
+    /** Fake pixels: the visual answer per preview URL. */
+    const looks = (svc: ImageDiscoveryService, byUrl: Record<string, any>) => { svc.inspectImage = async (u) => byUrl[u] ?? { analysed: false, reason: 'download_failed' }; };
+
+    it('exact product with a white-background photo: it is the main photo (tier 1), shelf photos go to the gallery', async () => {
+        const a = sized(redbull, 'ro', 5, 1200, 1600), b = sized(redbull, 'en', 7, 3024, 4032);
+        const off = provider('off', 'food', { [redbull]: { status: 'found', record: rec(redbull, 'Red Bull Energy Drink 250 ml', 'Red Bull', '250 ml', [b, a], ['en:energy-drinks']) } });
+        const { svc, db, settle } = setup([rbRow], [off.p]);
+        looks(svc, { [a.previewUrl]: white, [b.previewUrl]: shelf });
+        await svc.enqueue('rb');
+        await settle();
+        const st = db.byId.get('rb')!.imageDiscovery;
+        expect(st.status).toBe('found_review');
+        expect(st.reasons).toEqual([]);
+        expect(st.candidates.map((c: any) => [c.url, c.tier, c.role])).toEqual([[a.url, 1, 'primary'], [b.url, 3, 'gallery']]);
+        expect(st.candidates[0].breakdown).toEqual(expect.arrayContaining([{ key: 'background_white', points: 15 }, { key: 'barcode_exact', points: 40 }]));
+        expect(db.byId.get('rb')!.images).toEqual([]);                    // still nothing applied
+    });
+
+    it('only natural photos of the exact product: offered, but marked "no clean background"', async () => {
+        const b = sized(redbull, 'en', 7, 3024, 4032);
+        const off = provider('off', 'food', { [redbull]: { status: 'found', record: rec(redbull, 'Red Bull Energy Drink 250 ml', 'Red Bull', '250 ml', [b], ['en:energy-drinks']) } });
+        const { svc, db, settle } = setup([rbRow], [off.p]);
+        looks(svc, { [b.previewUrl]: shelf });
+        await svc.enqueue('rb');
+        await settle();
+        expect(db.byId.get('rb')!.imageDiscovery).toMatchObject({ status: 'found_review', reasons: ['no_clean_background'], candidates: [expect.objectContaining({ tier: 3, role: 'primary' })] });
+    });
+
+    it('another flavour or size under the barcode: never offered, however clean the photo; the reason says why', async () => {
+        const a = sized(redbull, 'en', 5, 1200, 1600);
+        const off = provider('off', 'food', { [redbull]: { status: 'found', record: rec(redbull, 'Red Bull Sugarfree 473 ml', 'Red Bull', '473 ml', [a], ['en:energy-drinks']) } });
+        const { svc, db, settle } = setup([rbRow], [off.p]);
+        looks(svc, { [a.previewUrl]: white });
+        await svc.enqueue('rb');
+        await settle();
+        expect(db.byId.get('rb')!.imageDiscovery).toMatchObject({
+            status: 'not_found', reason: 'record_mismatch', candidates: [],
+            reasons: expect.arrayContaining(['record_mismatch', 'size_differs']),
+            record: { productName: 'Red Bull Sugarfree 473 ml', brand: 'Red Bull', quantity: '473 ml' },
+        });
+    });
+
+    it('identity rules from live data: a variant word rules out; other wording, a brand in the name and a "4-pack 160g" total do not', async () => {
+        const e = new ImportEnrichmentService();
+        const db: Record<string, ProviderResult> = {
+            '5449000131805': { status: 'found', record: rec('5449000131805', 'Coca-Cola Zero', 'Coca-Cola', '330 ml', [photo('5449000131805')], ['en:sodas']) },
+            '7613038529929': { status: 'found', record: rec('7613038529929', 'Lion Wildcrush', 'Nestlé', '360 g', [photo('7613038529929')], ['en:snacks']) },
+            '8000500224281': { status: 'found', record: rec('8000500224281', 'Nutella B-ready 22g', 'Ferrero', '22 g', [photo('8000500224281')], ['en:snacks']) },
+            '7613038427782': { status: 'found', record: rec('7613038427782', 'KitKat Chunky White', 'Nestlé', '160 g', [photo('7613038427782')], ['en:snacks']) },
+        };
+        e.useProviders([provider('off', 'food', db).p]);
+        const coke = await e.lookupOne({ ean: '5449000131805', name: 'Coca-Cola Original 330ml', brand: 'Coca-Cola', category: 'Soft Drinks' });
+        expect(coke.candidates[0].reasons).toEqual(expect.arrayContaining(['name_differs', 'variant_differs']));
+        const lion = await e.lookupOne({ ean: '7613038529929', name: 'Nestlé Lion Wild Crush 360g', brand: 'Nestlé', category: 'Chocolates & Sweets' });
+        expect(lion.candidates[0].reasons).not.toContain('variant_differs');
+        const nutella = await e.lookupOne({ ean: '8000500224281', name: 'Nutella B-ready T1 22g', brand: 'Nutella', category: 'Chocolates & Sweets' });
+        expect(nutella.candidates[0]).toMatchObject({ confidence: 'verified' });
+        const kit = await e.lookupOne({ ean: '7613038427782', name: 'KitKat Chunky White 4-pack 160g', brand: 'KitKat', category: 'Chocolates & Sweets' });
+        expect(kit.candidates[0].reasons).not.toContain('size_differs');
+    });
+
+    it('the same upload selected for two languages is one photo', async () => {
+        const images = { front_en: { rev: '5', imgid: '3', sizes: { full: { w: 1200, h: 1600 } } }, front_ro: { rev: '6', imgid: '3', sizes: { full: { w: 1200, h: 1600 } } } };
+        const fetcher: any = async () => new Response(JSON.stringify({ status: 'success', product: { code: redbull, product_name: 'Red Bull', brands: 'Red Bull', images,
+            selected_images: { front: { display: { en: `${IMG}/${redbull}/front_en.5.400.jpg`, ro: `${IMG}/${redbull}/front_ro.6.400.jpg` } } } } }), { status: 200 });
+        const [off] = buildProviders(new HostQueue(1000, fetcher, () => 0, async () => {}));
+        const r: any = await off.lookup(redbull);
+        expect(r.record.photos).toHaveLength(1);
+        expect(r.record.photos[0]).toMatchObject({ imgid: '3', width: 1200, height: 1600 });
+    });
+
+    it('a photo that can’t be downloaded is "not checked" (tier 3), and the search still answers', async () => {
+        const a = sized(redbull, 'en', 5, 1200, 1600);
+        const off = provider('off', 'food', { [redbull]: { status: 'found', record: rec(redbull, 'Red Bull Energy Drink 250 ml', 'Red Bull', '250 ml', [a], ['en:energy-drinks']) } });
+        const { svc, db, settle } = setup([rbRow], [off.p]);
+        svc.inspectImage = async () => { throw new Error('socket hang up'); };
+        await svc.enqueue('rb');
+        await settle();
+        expect(db.byId.get('rb')!.imageDiscovery.candidates[0]).toMatchObject({ tier: 3, visual: { analysed: false, reason: 'download_failed' } });
+    });
+
+    it('gallery: main photo plus confirmed extras in one step, credited as found and approved; unconfirmed extras refused', async () => {
+        const a = sized(redbull, 'ro', 5, 1200, 1600), b = sized(redbull, 'en', 7, 3024, 4032);
+        const off = provider('off', 'food', { [redbull]: { status: 'found', record: rec(redbull, 'Red Bull Energy Drink 250 ml', 'Red Bull', '250 ml', [b, a], ['en:energy-drinks']) } });
+        const { svc, db, products, settle } = setup([rbRow], [off.p]);
+        looks(svc, { [a.previewUrl]: white, [b.previewUrl]: shelf });
+        await svc.enqueue('rb');
+        await settle();
+        await expect(svc.accept('s1', 'rb', a.url, ['https://elsewhere.example/x.jpg'])).rejects.toThrow(/Only a photo found/);
+        const out: any = await svc.accept('s1', 'rb', a.url, [b.url]);
+        expect(products.supplierUpdate).toHaveBeenCalledWith('rb', 's1', expect.objectContaining({ images: ['https://cdn.example.com/front_ro.5.full.jpg', 'https://cdn.example.com/front_en.7.full.jpg'] }));
+        const credits = products.setImageCredits.mock.calls[0][1];
+        expect(credits['https://cdn.example.com/front_ro.5.full.jpg']).toMatchObject({ origin: 'discovery', chosenBy: 'supplier', approvedBy: 's1', approvedByRole: 'SUPPLIER', tier: 1, originalUrl: a.url });
+        expect(credits['https://cdn.example.com/front_en.7.full.jpg']).toMatchObject({ origin: 'discovery', tier: 3 });
+        expect(out.imageDiscovery).toBeNull();
+
+        // An unconfirmed photo can only be chosen on its own.
+        const c = sized(takis, 'en', 3, 800, 800);
+        const off2 = provider('off', 'food', { [takis]: { status: 'found', record: rec(takis, null as any, null as any, null, [c, sized(takis, 'ro', 4, 800, 800)], []) } });
+        const t = setup([{ ...takisRow, name: 'Hot chips', brand: null, category: 'Other' }], [off2.p]);
+        await t.svc.enqueue('p1');
+        await t.settle();
+        const cands = t.db.byId.get('p1')!.imageDiscovery.candidates;
+        expect(cands.every((x: any) => x.tier === null && x.role === 'review')).toBe(true);
+        await expect(t.svc.accept('s1', 'p1', cands[0].url, [cands[1].url])).rejects.toThrow(/confirmed as this exact product/);
+    });
+
+    it('a product with photos (supplier upload or approved) is never searched by itself; "look for more" only adds after them', async () => {
+        const a = sized(redbull, 'ro', 5, 1200, 1600);
+        const off = provider('off', 'food', { [redbull]: { status: 'found', record: rec(redbull, 'Red Bull Energy Drink 250 ml', 'Red Bull', '250 ml', [a], ['en:energy-drinks']) } });
+        const own = 'https://cdn.example.com/supplier-own.jpg';
+        const { svc, db, products, settle } = setup([{ ...rbRow, images: [own], imageCredits: null }], [off.p]);
+        looks(svc, { [a.previewUrl]: white });
+        expect(await svc.enqueue('rb')).toBeNull();                       // a save never searches
+        expect(off.calls).toEqual([]);
+        const st = await svc.retry('s1', 'rb');                            // the supplier asks for more
+        expect(st).toMatchObject({ status: 'searching', mode: 'add' });
+        await settle();
+        expect(db.byId.get('rb')!.imageDiscovery).toMatchObject({ status: 'found_review', mode: 'add', candidates: [expect.objectContaining({ role: 'gallery', tier: 1 })] });
+        await svc.enqueue('rb');                                           // a later save keeps the suggestion
+        expect(db.byId.get('rb')!.imageDiscovery.status).toBe('found_review');
+        await svc.accept('s1', 'rb', a.url);
+        expect(products.supplierUpdate).toHaveBeenLastCalledWith('rb', 's1', expect.objectContaining({ images: [own, 'https://cdn.example.com/front_ro.5.full.jpg'] }));
+        expect(db.byId.get('rb')!.images[0]).toBe(own);                    // the supplier's photo stays first
+    });
+
+    it('staff: list with reasons for everyone, but only Atlantis Catalog products get photos applied', async () => {
+        const a = sized(redbull, 'ro', 5, 1200, 1600);
+        const off = provider('off', 'food', { [redbull]: { status: 'found', record: rec(redbull, 'Red Bull Energy Drink 250 ml', 'Red Bull', '250 ml', [a], ['en:energy-drinks']) } });
+        const { svc, db, products, settle } = setup([{ ...rbRow, id: 'cat', supplierId: 'staff1' }, { ...rbRow, id: 'sup', supplierId: 's1' }, { ...takisRow, id: 'bad', ean: '5941143028848', supplierId: 'staff1' }], [off.p]);
+        const roles: Record<string, string> = { staff1: 'ADMIN', s1: 'SUPPLIER' };
+        db.prisma.user = { findUnique: jest.fn(async ({ where }: any) => ({ role: roles[where.id] })), findMany: jest.fn(async () => [{ id: 'staff1' }]) };
+        db.prisma.product.findMany = jest.fn(async ({ where }: any) => [...db.byId.values()].filter((r: any) => (where.supplierId?.in ? where.supplierId.in.includes(r.supplierId) : !where.supplierId.notIn.includes(r.supplierId))).map((r: any) => ({ ...r, supplier: { companyName: 'X' } })));
+        looks(svc, { [a.previewUrl]: white });
+        const retried = await svc.staffRetry({ id: 'staff1', role: 'MODERATOR' }, ['cat', 'sup', 'bad', 'nope']);
+        expect(retried.results.map((r) => [r.id, r.outcome])).toEqual([['cat', 'started'], ['sup', 'started'], ['bad', 'answered_recently'], ['nope', 'not_found']]);
+        await settle();
+        const cat = await svc.staffList({ scope: 'catalog' });
+        expect(cat.counts).toMatchObject({ review: 1, invalid_barcode: 1 });
+        expect(cat.items.find((i) => i.id === 'cat')!.discovery!.candidates).toHaveLength(1);
+        const sup = await svc.staffList({ scope: 'submissions' });
+        expect(sup.canApply).toBe(false);
+        expect(sup.items[0].discovery).toMatchObject({ status: 'found_review', candidates: [], found: 1, bestTier: 1 });   // status only
+        await expect(svc.staffAccept({ id: 'staff1', role: 'ADMIN' }, 'sup', a.url)).rejects.toThrow(/belongs to a supplier/);
+        await expect(svc.staffDismiss('sup', a.url)).rejects.toThrow(/belongs to a supplier/);
+        await svc.staffAccept({ id: 'staff1', role: 'ADMIN' }, 'cat', a.url);
+        expect(products.supplierUpdate).toHaveBeenCalledWith('cat', 'staff1', expect.objectContaining({ images: ['https://cdn.example.com/front_ro.5.full.jpg'] }));
+        expect(products.setImageCredits.mock.calls[0][1]['https://cdn.example.com/front_ro.5.full.jpg']).toMatchObject({ chosenBy: 'staff', approvedBy: 'staff1', approvedByRole: 'ADMIN', origin: 'discovery' });
+    });
+});
+
+describe('rate-limited queue', () => {
+    it('a lookup’s timeout starts when it is sent, not while it waits its turn (bulk imports queue many)', async () => {
+        const seen: boolean[] = [];
+        const fetcher: any = async (_u: string, init: any) => { seen.push(!!init.signal?.aborted); return new Response('{}', { status: 200 }); };
+        const q = new HostQueue(600, fetcher);   // one request per 100 ms
+        const res = await Promise.all([0, 1, 2].map(() => q.fetch('https://world.openfoodfacts.org/api/v3/product/1.json', { timeoutMs: 60 })));
+        expect(res.map((r) => r.status)).toEqual([200, 200, 200]);
+        expect(seen).toEqual([false, false, false]);   // the third waited ~200 ms but was not aborted
+    });
+});

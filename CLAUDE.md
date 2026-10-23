@@ -48,6 +48,11 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
   pages (linked from `/admin/settings`).
 - Admin Order Management: `/admin/orders` and `/admin/orders/[id]`, read models in `backend/src/orders/admin-orders.ts`
   (`GET /orders/admin/list|export|:id/detail`). No returns/refunds card: nothing records a return. Supplier net and markup only for OWNER/ADMIN.
+- Product photos by barcode: `backend/src/products/image-discovery.service.ts` (background search after a save without a photo; Open Food Facts API v3,
+  shared rate-limited queue) ranks photos with `image-quality.ts`: identity first (a record that contradicts brand, variant or size is never
+  offered), then pixels (tier 1 white background, 2 plain background, 3 other photo). Nothing is applied automatically and a found photo never
+  replaces one; credits (CC BY-SA, origin, approver) live in `Product.imageCredits`. Staff list: `/admin/products/photos` (Atlantis Catalog photos
+  applied by OWNER/ADMIN only; supplier products show status only).
 - Product bulk actions: `POST /products/admin/bulk`, per-row rules in `backend/src/products/admin-bulk.ts`; every skip is reported.
 - Notifications: persisted per user; `data.kind` + `data.params` let the bell (`components/ui/NotificationBell.tsx`,
   `lib/notifications.ts`) render them in the reader's language (keys in `locales/sections/notificationsCenter.ts`);
