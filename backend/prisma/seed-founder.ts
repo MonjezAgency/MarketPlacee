@@ -9,9 +9,16 @@ import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
+/** Passwords come only from the environment; nothing is hard-coded. */
+function requiredPassword(name: string): string {
+    const v = process.env[name];
+    if (!v || v.length < 12) throw new Error(`Set ${name} (at least 12 characters) to create this account.`);
+    return v;
+}
+
 async function main() {
     const email = 'Info@atlantisfmcg.com';
-    const adminEmail = 'Info@atlantisfmcg.com;
+    const adminEmail = 'Info@atlantisfmcg.com';
 
     // Ensure founder/CEO is OWNER with KYC bypassed
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -29,7 +36,7 @@ async function main() {
         });
         console.log(`✅ Updated ${email} → OWNER + KYC VERIFIED`);
     } else {
-        const hashedPassword = await bcrypt.hash(process.env.FOUNDER_PASSWORD || 'Atlantis@2025!', 10);
+        const hashedPassword = await bcrypt.hash(requiredPassword('FOUNDER_PASSWORD'), 10);
         await prisma.user.create({
             data: {
                 email,

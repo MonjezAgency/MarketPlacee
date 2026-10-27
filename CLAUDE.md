@@ -77,3 +77,5 @@ Before changing orders, payments, refunds, permissions or policy pages, read the
 - `frontend`: `npx tsc --noEmit` and `npm run build` (runs `check:i18n` — every key added to `locales/en.ts` must be translated in all seven locale files; see `locales/GLOSSARY.md`).
 - `backend`: `npx tsc --noEmit` and `npx jest`.
 - Schema changes must be additive (production runs `prisma db push`).
+- Production start (`start:prod`) runs `prisma db push` without `--accept-data-loss` and never runs the seed. `prisma/seed.ts` is a
+  first-run bootstrap only (`ALLOW_SEED=1`, passwords from the environment), creates missing accounts and never changes existing ones.

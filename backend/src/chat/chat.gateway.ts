@@ -44,6 +44,11 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       const payload = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET,
       });
+      // A two-step sign-in that hasn't passed the code check is not a sign-in.
+      if (payload?.twoFactorPending) {
+        client.disconnect();
+        return;
+      }
 
       const userId = payload.sub;
       client.data.userId = userId;

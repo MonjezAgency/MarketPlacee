@@ -65,6 +65,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     async validate(payload: any) {
+        // The token issued after the password step of two-step sign-in only opens the code
+        // check (AuthService.loginVerify2FA reads it itself); it is never a sign-in.
+        if (payload?.twoFactorPending) throw new UnauthorizedException('Finish two-step sign-in first');
         const now = Date.now();
         if (payload.sid) {
             // Session tokens: valid while their session isn't revoked.

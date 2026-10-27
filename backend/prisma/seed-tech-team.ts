@@ -16,7 +16,8 @@ const prisma = new PrismaClient();
 
 async function main() {
     const email = 'Monjez@monjez-agency.com';
-    const tempPassword = 'Monjez@2025!'; // Change after first login
+    const tempPassword = process.env.TECH_PASSWORD || '';
+    if (tempPassword.length < 12) throw new Error('Set TECH_PASSWORD (at least 12 characters) to create this account.');
 
     const existing = await prisma.user.findUnique({ where: { email } });
 
@@ -49,7 +50,6 @@ async function main() {
             },
         });
         console.log(`✅ Created tech team user: ${user.email}`);
-        console.log(`   Temp password: ${tempPassword}`);
         console.log(`   ⚠️  Change this password immediately after first login!`);
     }
 }

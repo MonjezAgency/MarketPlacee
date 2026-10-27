@@ -1,111 +1,58 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
+/**
+ * First-run bootstrap only. It no longer runs on every deploy (start:prod doesn't call it).
+ *
+ * Run it by hand, once, on an empty database:
+ *   ALLOW_SEED=1 OWNER_PASSWORD=… [TECH_PASSWORD=…] npx prisma db seed
+ *
+ * It only CREATES accounts that don't exist yet. It never changes the role, status,
+ * password or anything else of an existing account, and never deletes one: a block,
+ * demotion or password change made in the app stays as it is. Passwords come only from
+ * the environment; nothing is hard-coded.
+ */
 const prisma = new PrismaClient();
 
-async function main() {
-    console.log('🌱 Starting database seeding...');
+const FOUNDER_EMAIL = 'Info@atlantisfmcg.com';
+const TECH_EMAIL = 'Monjez@monjez-agency.com';
 
-    // 1. Create/Update Admin & Founder (Ali Dawara)
-    const founderEmail = 'Info@atlantisfmcg.com';
-    const existingFounder = await prisma.user.findFirst({
-        where: { email: { equals: founderEmail, mode: 'insensitive' } }
+async function createIfMissing(email: string, password: string | undefined, data: Record<string, unknown>) {
+    const existing = await prisma.user.findFirst({ where: { email: { equals: email, mode: 'insensitive' } }, select: { id: true } });
+    if (existing) {
+        console.log(`• ${email} already exists, left unchanged`);
+        return;
+    }
+    if (!password || password.length < 12) {
+        console.log(`• ${email} not created: set a password of at least 12 characters in the environment`);
+        return;
+    }
+    await prisma.user.create({
+        data: {
+            email,
+            password: await bcrypt.hash(password, 10),
+            status: 'ACTIVE',
+            emailVerified: true,
+            onboardingCompleted: true,
+            ...data,
+        } as any,
     });
+    console.log(`✅ Created ${email}`);
+}
 
-    if (existingFounder) {
-        // Guarantee status and roles, but NEVER overwrite their existing password hash!
-        await prisma.user.update({
-            where: { id: existingFounder.id },
-            data: {
-                name: 'Ali Dawara',
-                role: 'OWNER',
-                status: 'ACTIVE',
-                kycStatus: 'VERIFIED',
-                emailVerified: true,
-                onboardingCompleted: true,
-            },
-        });
-        console.log(`✅ Updated Founder (Guaranteed roles & status, preserved existing password): ${founderEmail}`);
-    } else {
-        const fallbackPassword = process.env.OWNER_PASSWORD || process.env.EMAIL_PASS || 'AliDawara@22';
-        const hashedFounderPassword = await bcrypt.hash(fallbackPassword, 10);
-        await prisma.user.create({
-            data: {
-                email: founderEmail,
-                name: 'Ali Dawara',
-                password: hashedFounderPassword,
-                role: 'OWNER',
-                status: 'ACTIVE',
-                kycStatus: 'VERIFIED',
-                emailVerified: true,
-                onboardingCompleted: true,
-            },
-        });
-        console.log(`✅ Created Founder: ${founderEmail}`);
+async function main() {
+    if (process.env.ALLOW_SEED !== '1') {
+        console.log('Seed skipped (set ALLOW_SEED=1 to run the first-run bootstrap).');
+        return;
     }
-
-    // 2. Remove Legacy Admin if exists — soft-handled to survive FK constraints
-    // (user might own Products with Restrict relation; deleting them would
-    // wipe real data, so we just deactivate the legacy account instead).
-    const oldAdminEmail = '7bd02025@gmail.com';
-    const oldAdmin = await prisma.user.findUnique({ where: { email: oldAdminEmail } });
-    if (oldAdmin) {
-        try {
-            await prisma.user.delete({ where: { email: oldAdminEmail } });
-            console.log(`🗑️ Removed Legacy Admin: ${oldAdminEmail}`);
-        } catch (err: any) {
-            // FK constraint — fall back to soft-deactivation
-            await prisma.user.update({
-                where: { email: oldAdminEmail },
-                data: { status: 'BLOCKED', emailVerified: false },
-            });
-            console.log(`⚠️ Legacy Admin has dependent records — soft-deactivated instead: ${oldAdminEmail}`);
-        }
-    }
-
-    // 3. Create/Update Tech Team User (Monjez@monjez-agency.com)
-    const techEmail = 'Monjez@monjez-agency.com';
-    const techPassword = 'Monjez@2025!';
-    const existingTech = await prisma.user.findUnique({ where: { email: techEmail } });
-
-    if (existingTech) {
-        await prisma.user.update({
-            where: { email: techEmail },
-            data: {
-                role: 'DEVELOPER',
-                status: 'ACTIVE',
-                kycStatus: 'VERIFIED',
-                emailVerified: true,
-                onboardingCompleted: true,
-            },
-        });
-        console.log(`✅ Updated Tech Team: ${techEmail}`);
-    } else {
-        const hashedTechPassword = await bcrypt.hash(techPassword, 10);
-        await prisma.user.create({
-            data: {
-                email: techEmail,
-                name: 'Monjez Agency',
-                companyName: 'Monjez Agency',
-                password: hashedTechPassword,
-                role: 'DEVELOPER',
-                status: 'ACTIVE',
-                kycStatus: 'VERIFIED',
-                emailVerified: true,
-                onboardingCompleted: true,
-            },
-        });
-        console.log(`✅ Created Tech Team: ${techEmail}`);
-    }
-
-    console.log('✅ Database seeding completed.');
+    await createIfMissing(FOUNDER_EMAIL, process.env.OWNER_PASSWORD, { name: 'Ali Dawara', role: 'OWNER', kycStatus: 'VERIFIED' });
+    await createIfMissing(TECH_EMAIL, process.env.TECH_PASSWORD, { name: 'Monjez Agency', companyName: 'Monjez Agency', role: 'DEVELOPER', kycStatus: 'VERIFIED' });
 }
 
 main()
     .catch((e) => {
-        // Don't fail the deploy on seed errors — log and continue so the
-        // app can still boot. Seed is best-effort post-deploy housekeeping.
-        console.error('⚠️ Seed encountered an error (non-fatal, continuing):', e);
+        console.error('Seed failed:', e?.message || e);
+        process.exitCode = 1;
     })
     .finally(async () => {
         await prisma.$disconnect();
