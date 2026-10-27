@@ -1,4 +1,4 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor, StreamableFile } from '@nestjs/common';
 import { Observable, from } from 'rxjs';
 import { mergeMap } from 'rxjs/operators';
 import { PrismaService } from './prisma.service';
@@ -17,7 +17,8 @@ export class PricePrivacyInterceptor implements NestInterceptor {
         const req = ctx.switchToHttp().getRequest();
         return next.handle().pipe(mergeMap((body) => from((async () => {
             const viewer = req.user ? { id: req.user.sub ?? req.user.userId, role: req.user.role } : null;
-            if (!body || typeof body !== 'object' || Buffer.isBuffer(body) || isPriceStaff(viewer)) return body;
+            // Downloads are built by their handler, which applies price privacy itself (e.g. users/me/data-export).
+            if (!body || typeof body !== 'object' || Buffer.isBuffer(body) || body instanceof StreamableFile || isPriceStaff(viewer)) return body;
             // Copy exactly as it would be serialized (JSON.stringify, which is what
             // Nest sends) so cached objects are never mutated and nothing else changes.
             let plain: any;

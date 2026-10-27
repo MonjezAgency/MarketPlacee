@@ -4,6 +4,7 @@ import {
     ArgumentsHost,
     HttpException,
     HttpStatus,
+    Logger,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { SecurityService } from './security.service';
@@ -63,6 +64,10 @@ export class SecurityExceptionFilter implements ExceptionFilter {
             });
         }
 
+        if (!(exception instanceof HttpException)) {
+            new Logger('ExceptionFilter').error(`${method} ${url} → 500: ${(exception as any)?.message || exception}`);
+        }
+
         // Default Nest behavior for the response
         // Keep the structured fields our own exceptions carry (e.g. { code:
         // 'EMAIL_NOT_VERIFIED' }, { code: 'ORIGIN_MISMATCH', productIds })
@@ -77,7 +82,19 @@ export class SecurityExceptionFilter implements ExceptionFilter {
             path: request.url,
             message: exception instanceof HttpException
                 ? (typeof (extra as any).message === 'string' || Array.isArray((extra as any).message) ? (extra as any).message : (exception as any).message)
-                : ((exception as any)?.message || 'Internal server error'), // unchanged legacy behaviour
+                : publicErrorMessage(exception),
         });
     }
+}
+
+/**
+ * Message for a non-HTTP exception. Plain Errors keep their message (legacy
+ * behaviour: some services throw readable Errors), but database client errors
+ * never reach the client: they carry SQL fragments, column names and server
+ * file paths. They are logged on the server (see catch()).
+ */
+export function publicErrorMessage(exception: unknown): string {
+    const name = String((exception as any)?.name || (exception as any)?.constructor?.name || '');
+    if (/^PrismaClient/.test(name)) return 'Internal server error';
+    return (exception as any)?.message || 'Internal server error';
 }

@@ -1,10 +1,11 @@
-import { Controller, Get, HttpCode } from '@nestjs/common';
+import { Controller, Get, HttpCode, Logger } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import Stripe from 'stripe';
 
 @Controller('health')
 export class HealthController {
     private stripe: Stripe;
+    private readonly logger = new Logger(HealthController.name);
 
     constructor(private readonly prisma: PrismaService) {
         this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {});
@@ -31,9 +32,11 @@ export class HealthController {
                 timestamp: new Date().toISOString(),
             };
         } catch (err: any) {
+            // Public endpoint: log the provider/database error, never echo it (it can carry key fragments, hosts or SQL).
+            this.logger.warn(`[HEALTH] check failed: ${err?.message}`);
             return {
                 status: 'error',
-                message: err.message,
+                message: 'Check failed',
                 responseTimeMs: Date.now() - start,
                 timestamp: new Date().toISOString(),
             };
@@ -55,9 +58,11 @@ export class HealthController {
                 timestamp: new Date().toISOString(),
             };
         } catch (err: any) {
+            // Public endpoint: log the provider/database error, never echo it (it can carry key fragments, hosts or SQL).
+            this.logger.warn(`[HEALTH] check failed: ${err?.message}`);
             return {
                 status: 'error',
-                message: err.message,
+                message: 'Check failed',
                 responseTimeMs: Date.now() - start,
                 timestamp: new Date().toISOString(),
             };

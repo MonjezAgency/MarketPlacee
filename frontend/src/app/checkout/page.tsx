@@ -356,7 +356,7 @@ export default function CheckoutPage() {
                                 <Button size="xl" className="rounded-3xl px-12 font-bold">Continue Shopping</Button>
                             </Link>
                         </div>
-                        <div className="absolute bottom-[-10%] right-[-5%] w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
+                        <div className="absolute bottom-[-10%] end-[-5%] w-64 h-64 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
                     </motion.div>
                 ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">

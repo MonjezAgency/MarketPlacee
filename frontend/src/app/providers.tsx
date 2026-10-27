@@ -20,7 +20,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
             if (userHasChosen) return;
 
             try {
-                const res = await fetch('/api/proxy/config/currency');
+                // Public backend endpoint: call it directly. Through /api/proxy it
+                // answered 401 for signed-out visitors (proxy allow-list).
+                const base = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/+$/, '');
+                if (!base) return;
+                const res = await fetch(`${base}/config/currency`);
                 if (res.ok) {
                     const data = await res.json();
                     // Double check in case user chose while we were fetching

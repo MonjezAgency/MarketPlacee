@@ -111,7 +111,7 @@ export default function OnboardingPage() {
                                 {isAr ? 'اسم الشركة' : 'Company Name'} *
                             </label>
                             <div className="relative group">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors">
+                                <span className="absolute start-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors">
                                     <Building2 size={18} />
                                 </span>
                                 <input
@@ -120,7 +120,7 @@ export default function OnboardingPage() {
                                     placeholder={isAr ? 'اسم شركتك المسجل' : 'Your registered company'}
                                     value={form.companyName}
                                     onChange={e => setForm({ ...form, companyName: e.target.value })}
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-primary/50 transition-all"
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 ps-12 pe-4 text-white outline-none focus:border-primary/50 transition-all"
                                 />
                             </div>
                         </div>
@@ -130,7 +130,7 @@ export default function OnboardingPage() {
                                 {isAr ? 'رقم الهاتف' : 'Phone Number'} *
                             </label>
                             <div className="relative group">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors">
+                                <span className="absolute start-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors">
                                     <Phone size={18} />
                                 </span>
                                 <input
@@ -139,7 +139,7 @@ export default function OnboardingPage() {
                                     placeholder="+971 00 000 0000"
                                     value={form.phone}
                                     onChange={e => setForm({ ...form, phone: e.target.value })}
-                                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-primary/50 transition-all"
+                                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 ps-12 pe-4 text-white outline-none focus:border-primary/50 transition-all"
                                 />
                             </div>
                         </div>
@@ -150,13 +150,13 @@ export default function OnboardingPage() {
                             {isAr ? 'الدولة' : 'Country'}
                         </label>
                         <div className="relative group">
-                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors">
+                            <span className="absolute start-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-primary transition-colors">
                                 <Globe size={18} />
                             </span>
                             <select
                                 value={form.country}
                                 onChange={e => setForm({ ...form, country: e.target.value })}
-                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white outline-none focus:border-primary/50 transition-all appearance-none"
+                                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 ps-12 pe-4 text-white outline-none focus:border-primary/50 transition-all appearance-none"
                             >
                                 {COUNTRIES.map(c => (
                                     <option key={c.iso} value={c.name} className="bg-slate-900">

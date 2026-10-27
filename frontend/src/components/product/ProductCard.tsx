@@ -83,7 +83,9 @@ export default function ProductCard({ product, index = 0 }: { product: Product; 
     const [, setDefaultUnit] = useState<'truck' | 'pallet' | 'carton'>('truck');
     const [markups, setMarkups] = useState<Markups>(DEFAULT_MARKUPS);
     useEffect(() => { getAdminDefaultUnit().then(setDefaultUnit); }, []);
-    useEffect(() => { getAdminMarkups().then(setMarkups); }, []);
+    // Prices are shown to signed-in buyers only; signed-out visitors skip the
+    // /config/markup call (the proxy answers 401 without a session).
+    useEffect(() => { if (isLoggedIn) getAdminMarkups().then(setMarkups); }, [isLoggedIn]);
 
     // Per-case price at the cheapest reachable tier — see lib/card-pricing.
     const listCardPrice = computeCardPrice(product, markups, isOwnProduct);

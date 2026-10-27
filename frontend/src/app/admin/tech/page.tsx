@@ -518,7 +518,7 @@ export default function TechDashboardPage() {
                     <Cpu size={24} className="mx-auto mb-3 text-muted-foreground group-hover:text-secondary transition-colors" />
                     <p className="text-xs font-black uppercase tracking-widest">System Settings</p>
                 </a>
-                <a href="/dashboard/support" className="glass-card p-6 text-center hover:scale-[1.03] transition-all group cursor-pointer">
+                <a href="/admin/support" className="glass-card p-6 text-center hover:scale-[1.03] transition-all group cursor-pointer">
                     <Terminal size={24} className="mx-auto mb-3 text-muted-foreground group-hover:text-accent transition-colors" />
                     <p className="text-xs font-black uppercase tracking-widest">Support Center</p>
                 </a>

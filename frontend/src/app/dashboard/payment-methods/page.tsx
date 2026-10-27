@@ -130,9 +130,9 @@ export default function CustomerPaymentMethodsPage() {
                                 <input type={showIban ? 'text' : 'password'} value={iban}
                                     onChange={e => setIban(e.target.value.toUpperCase().replace(/\s/g, ''))}
                                     placeholder="e.g. EG380019000500000000263180002"
-                                    className="w-full bg-background border border-border rounded-xl px-4 py-3 pr-12 text-sm font-mono outline-none focus:border-primary/50" />
+                                    className="w-full bg-background border border-border rounded-xl px-4 py-3 pe-12 text-sm font-mono outline-none focus:border-primary/50" />
                                 <button type="button" onClick={() => setShowIban(v => !v)}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                                    className="absolute end-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                                     {showIban ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </button>
                             </div>
@@ -158,7 +158,7 @@ export default function CustomerPaymentMethodsPage() {
                 <div className="flex items-center gap-3 mb-2">
                     <CreditCard size={20} className="text-muted-foreground" />
                     <p className="font-bold text-sm">Credit / Debit Card</p>
-                    <span className="ml-auto text-[10px] font-bold text-muted-foreground bg-muted px-2.5 py-1 rounded-full uppercase">Coming Soon</span>
+                    <span className="ms-auto text-[10px] font-bold text-muted-foreground bg-muted px-2.5 py-1 rounded-full uppercase">Coming Soon</span>
                 </div>
                 <p className="text-xs text-muted-foreground">Card tokenization via payment gateway — coming in the next release.</p>
             </div>

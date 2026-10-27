@@ -619,7 +619,7 @@ export default function Navbar() {
                                                     <Package size={16} className="text-ink-3" /> {t('nav', 'ordersTracking')}
                                                 </Link>
                                             )}
-                                            <Link role="menuitem" href="/saved" onClick={() => setIsAccountOpen(false)} className={menuItem}>
+                                            <Link role="menuitem" href="/wishlist" onClick={() => setIsAccountOpen(false)} className={menuItem}>
                                                 <Heart size={16} className="text-ink-3" />
                                                 <span className="flex-1">{t('nav', 'savedItems')}</span>
                                                 {savedCount > 0 && (

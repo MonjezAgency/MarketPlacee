@@ -134,7 +134,7 @@ export default function PaymentForm({ orderId, totalAmount }: Props) {
                     <div className="text-sm">
                         <p className="font-bold text-base mb-1">Payment Fields Failed to Mount</p>
                         <p className="mb-2">Stripe's Elements library is refusing to render the card inputs. This typically happens because:</p>
-                        <ul className="list-disc pl-5 space-y-1 mb-3 text-xs leading-relaxed">
+                        <ul className="list-disc ps-5 space-y-1 mb-3 text-xs leading-relaxed">
                             <li><strong>Incompatible Config:</strong> The PaymentIntent (currency/amount/methods) is incompatible with your Stripe Account permissions.</li>
                             <li><strong>Key Mismatch:</strong> Your Backend Secret Key environment (Test vs Live) doesn't perfectly match the Frontend Publishable Key.</li>
                             <li><strong>Ad-Blockers:</strong> The browser is actively blocking Stripe's JavaScript.</li>

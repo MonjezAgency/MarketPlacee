@@ -101,13 +101,16 @@ export default function TrackOrderPage() {
                                         <span className="font-bold text-sm">{shipment.expectedDelivery ? new Date(shipment.expectedDelivery).toLocaleDateString() : 'TBD'}</span>
                                     </div>
                                 </div>
+                                {/* The order total is only returned to the order's buyer (and staff). */}
+                                {shipment.order?.totalAmount != null && (
                                 <div className="space-y-1">
                                     <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Order Total</p>
                                     <div className="flex items-center gap-2">
                                         <DollarSign size={16} className="text-emerald-500" />
-                                        <span className="font-bold text-sm">{formatPrice(shipment.order.totalAmount || 0)}</span>
+                                        <span className="font-bold text-sm">{formatPrice(shipment.order.totalAmount)}</span>
                                     </div>
                                 </div>
+                                )}
                             </div>
 
                             {/* Timeline */}

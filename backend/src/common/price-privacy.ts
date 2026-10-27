@@ -47,7 +47,17 @@ function viewProduct(p: any, viewer: Viewer, m: Markups, ownerScoped = false) {
     delete p.supplierPrice;
     delete p.supplierCurrency;
     delete p.adminNotes;
+    // Who supplies a product is Atlantis's business: another supplier sees neither the id nor the account.
+    delete p.supplierId;
+    if (p.supplier && typeof p.supplier === 'object') delete p.supplier;
 }
+
+/**
+ * Buyers and anonymous visitors never receive supplier identity (ids, names,
+ * company names or emails) anywhere in a response: products, order lines,
+ * terms snapshots, fulfilment groups, mixed loads, ads.
+ */
+const isBuyerSide = (v: Viewer) => !v?.id || String(v?.role || '').toUpperCase() === 'CUSTOMER';
 
 /** Walks a response (objects, arrays, nested) and applies the viewer's price view in place. */
 /**
@@ -61,6 +71,10 @@ export function applyPricePrivacy<T>(body: T, viewer: Viewer, m: Markups, depth 
     const o: any = body;
     if ('supplierUnitPrice' in o) delete o.supplierUnitPrice;
     if (isProductLike(o)) viewProduct(o, viewer, m, ownerScoped);
+    if (isBuyerSide(viewer)) {
+        delete o.supplierId;
+        if (o.supplier && typeof o.supplier === 'object') delete o.supplier;
+    }
     for (const k of Object.keys(o)) {
         const v = o[k];
         if (v && typeof v === 'object') applyPricePrivacy(v, viewer, m, depth + 1, ownerScoped);

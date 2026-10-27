@@ -99,7 +99,7 @@ export default function HowItWorksPage() {
                                     )}>
                                         <s.icon size={22} />
                                     </span>
-                                    <span className={cn('absolute -top-1 -right-1 w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center ring-2 ring-white transition-colors', on ? 'bg-[#2EC4B6] text-heading' : 'bg-[#EEF2F5] text-ink-2')}>
+                                    <span className={cn('absolute -top-1 -end-1 w-6 h-6 rounded-full text-[11px] font-bold flex items-center justify-center ring-2 ring-white transition-colors', on ? 'bg-[#2EC4B6] text-heading' : 'bg-[#EEF2F5] text-ink-2')}>
                                         {i + 1}
                                     </span>
                                 </div>
@@ -117,7 +117,7 @@ export default function HowItWorksPage() {
 
                 {/* Mobile / tablet: vertical timeline */}
                 <ol className="lg:hidden relative mt-12 max-w-xl mx-auto">
-                    <span aria-hidden className="absolute left-[27px] top-4 bottom-4 border-l-2 border-dotted border-[#C7D2DD]" />
+                    <span aria-hidden className="absolute start-[27px] top-4 bottom-4 border-s-2 border-dotted border-[#C7D2DD]" />
                     {STEPS.map((s, i) => {
                         const on = active === i;
                         return (

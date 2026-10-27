@@ -232,7 +232,7 @@ function SidebarGroupComponent({ group, isOpen, pathname, badgeCounts, bare }: {
                                 <li key={link.href}>
                                     <div aria-disabled="true" className="flex items-center gap-2.5 h-9 px-2.5 text-[13.5px] font-medium rounded-lg text-slate-500 opacity-70 cursor-not-allowed select-none">
                                         <Icon size={16} /><span className="truncate">{label(link)}</span>
-                                        <span className="ms-auto text-[9.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">Soon</span>{/* i18n-ignore: legacy roadmap pill */}
+                                        <span className="ms-auto text-[9.5px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">{t('adminNav', 'soonBadge')}</span>
                                     </div>
                                 </li>
                             );

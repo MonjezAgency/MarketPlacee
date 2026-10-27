@@ -9,7 +9,6 @@ import {
     Database, Box
 } from 'lucide-react';
 import { apiFetch, fetchProducts } from '@/lib/api';
-import { PRODUCTS } from '@/lib/products';
 import { Product } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { showIPhoneToast } from '@/components/ui/IPhoneToast';
@@ -48,9 +47,9 @@ export default function AdminCategoriesPage() {
     const loadCategories = React.useCallback(async () => {
         setLoading(true);
         try {
-            let products: Product[] = await fetchProducts();
-            if (!products || products.length === 0) products = PRODUCTS;
-            
+            // Real catalog only: never count the static demo PRODUCTS as live products.
+            const products: Product[] = (await fetchProducts()) || [];
+
             const categoryMap: Record<string, number> = {};
             MASTER_CATEGORIES.forEach(cat => { categoryMap[cat] = 0; });
             products.forEach((p: Product) => {
@@ -77,9 +76,10 @@ export default function AdminCategoriesPage() {
             showIPhoneToast('Category already exists', 'error');
             return;
         }
+        // Categories are not stored on their own: a name exists once a product uses it.
         setCategories(prev => [{ name: trimmed, productCount: 0 }, ...prev]);
         setNewCategory('');
-        showIPhoneToast(`Added ${trimmed}`, 'success');
+        showIPhoneToast(`${trimmed} added to this list only (not saved until a product uses it)`, 'info');
     };
 
     const handleRemove = (index: number) => {
@@ -88,31 +88,36 @@ export default function AdminCategoriesPage() {
             return;
         }
         setCategories(prev => prev.filter((_, i) => i !== index));
-        showIPhoneToast('Category removed', 'info');
+        showIPhoneToast('Removed from this list (nothing was stored)', 'info');
     };
 
     const confirmEdit = async (index: number) => {
         const trimmed = editValue.trim();
         if (!trimmed || categories[index].name === trimmed) { setEditingIndex(null); return; }
+        // Renaming rewrites the category of every product that uses it. Staff may only edit
+        // Atlantis Catalog products (supplier products answer 403 SUPPLIER_OWNED), so count
+        // what the server actually changed instead of announcing success.
+        if (categories[index].productCount > 0
+            && !window.confirm(`Rename "${categories[index].name}" to "${trimmed}" on its products? Supplier-owned products can't be changed by staff and will keep the old name.`)) return; // i18n-ignore (legacy English-only page)
         setSaving(true);
         try {
-            // Logic for updating products remains same but with better UI
-            
-            const res = await apiFetch('/products', {
-            });
-            if (res.ok) {
-                const products = await res.json();
-                const toUpdate = products.filter((p: any) => p.category === categories[index].name);
-                for (const product of toUpdate) {
-                    await apiFetch(`/products/${product.id}`, {
-                        method: 'PATCH',
-                        body: JSON.stringify({ category: trimmed })
-                    });
-                }
+            const res = await apiFetch('/products');
+            if (!res.ok) throw new Error('load');
+            const products = await res.json();
+            const list = Array.isArray(products) ? products : (Array.isArray(products?.data) ? products.data : []);
+            const toUpdate = list.filter((p: any) => p.category === categories[index].name);
+            let changed = 0;
+            for (const product of toUpdate) {
+                const r = await apiFetch(`/products/${product.id}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify({ category: trimmed })
+                }).catch(() => null);
+                if (r?.ok) changed++;
             }
-            setCategories(prev => prev.map((c, i) => i === index ? { ...c, name: trimmed } : c));
             setEditingIndex(null);
-            showIPhoneToast('Schema updated', 'success');
+            await loadCategories();
+            if (changed === toUpdate.length) showIPhoneToast(`Renamed on ${changed} product(s)`, 'success');
+            else showIPhoneToast(`Renamed on ${changed} of ${toUpdate.length} products; the rest could not be changed`, 'error');
         } catch (err) {
             showIPhoneToast('Failed to update', 'error');
         } finally {

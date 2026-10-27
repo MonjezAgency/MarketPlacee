@@ -70,7 +70,7 @@ export default function AdminDiscountsPage() {
     React.useEffect(() => {
         const fetchBuyers = async () => {
             try {
-                const res = await apiFetch(`/admin/users`);
+                const res = await apiFetch(`/admin/users/list?role=CUSTOMER&limit=100`);
                 if (res.ok) {
                     const data = await res.json();
                     const list = Array.isArray(data) ? data : data.data || [];

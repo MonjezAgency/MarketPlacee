@@ -27,7 +27,7 @@ export default function AdminNewOfferPage() {
     });
 
     useEffect(() => {
-        apiFetch('/admin/users')
+        apiFetch('/admin/users/list?role=SUPPLIER&limit=100')
             .then(r => r.ok ? r.json() : [])
             .then(data => {
                 const list = Array.isArray(data) ? data : (data.data || []);
@@ -39,7 +39,7 @@ export default function AdminNewOfferPage() {
     useEffect(() => {
         if (!formData.supplierId) { setSupplierProducts([]); return; }
         setIsLoadingProducts(true);
-        apiFetch(`/admin/products?supplierId=${formData.supplierId}&limit=100`)
+        apiFetch(`/admin/users/${encodeURIComponent(formData.supplierId)}/products?limit=50`)
             .then(r => r.ok ? r.json() : [])
             .then(data => setSupplierProducts(Array.isArray(data) ? data : (data.data || [])))
             .catch(() => {})
@@ -81,7 +81,7 @@ export default function AdminNewOfferPage() {
 
             setSuccess(true);
             setTimeout(() => {
-                router.push('/admin/offers');
+                router.push('/admin/offers/supplier');
             }, 2000);
         } catch (err: any) {
             setError(err.message || 'Error creating offer.');
@@ -95,7 +95,7 @@ export default function AdminNewOfferPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                 <div className="space-y-4">
-                    <Link href="/admin/offers" className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">
+                    <Link href="/admin/offers/supplier" className="inline-flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors uppercase tracking-widest">
                         <ArrowLeft size={16} />
                         Back to Offers
                     </Link>
@@ -225,7 +225,7 @@ export default function AdminNewOfferPage() {
                     )}
 
                     <div className="pt-6 border-t border-border/50 flex justify-end gap-4">
-                        <Link href="/admin/offers">
+                        <Link href="/admin/offers/supplier">
                             <Button variant="outline" type="button" className="border-border/50 hover:bg-muted/50">Cancel</Button>
                         </Link>
                         <Button type="submit" isLoading={isSubmitting} className="font-black gap-2 min-w-[200px] bg-primary hover:bg-primary/90 text-primary-foreground">

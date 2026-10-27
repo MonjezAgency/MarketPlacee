@@ -8,23 +8,22 @@ export class AdsService {
 
     // Public endpoint for fetching ads based on frontend placement
     async getAdsByPlacement(type: string): Promise<any[]> {
-        // Map frontend placement strings to DB types if needed
-        const placementType = type.toUpperCase() as PlacementType;
+        // Unknown placement names (e.g. the storefront's SPONSORED_*) have no
+        // placements: an empty list, not a Prisma enum error (500).
+        const placementType = String(type || '').trim().toUpperCase() as PlacementType;
+        if (!(Object.values(PlacementType) as string[]).includes(placementType)) return [];
 
         const placements = await this.prisma.productPlacement.findMany({
             where: {
                 placementType: placementType,
                 status: 'ACTIVE',
                 startDate: { lte: new Date() },
-                endDate: { gte: new Date() }
+                endDate: { gte: new Date() },
+                // Only live catalogue products are ever shown publicly.
+                product: { status: 'APPROVED' },
             },
-            include: {
-                product: {
-                    include: {
-                        supplier: { select: { name: true, companyName: true, id: true } }
-                    }
-                }
-            },
+            // Public storefront data: the product only, never the supplier account.
+            include: { product: true },
             orderBy: { priorityOrder: 'desc' }
         });
 

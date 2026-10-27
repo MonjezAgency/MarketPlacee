@@ -177,7 +177,7 @@ export default function AddressPage() {
                             : <Navigation size={22} className="text-[#2EC4B6]" />
                         }
                     </span>
-                    <div className="text-left">
+                    <div className="text-start">
                         <p className="text-[14px] font-bold text-[#0F172A]">
                             {isGpsLoading ? 'Detecting your location…' : 'Use my current location'}
                         </p>
@@ -259,7 +259,7 @@ export default function AddressPage() {
                     {/* Preview */}
                     {(form.city || form.country) && (
                         <div className="mt-2 px-3 py-2.5 bg-[#F0FDFA] border border-[#2EC4B6]/30 rounded-xl text-[12px] text-[#0F172A] leading-relaxed">
-                            <span className="text-[#2EC4B6] font-bold mr-1.5">Preview:</span>
+                            <span className="text-[#2EC4B6] font-bold me-1.5">Preview:</span>
                             {formatForDisplay(form)}
                         </div>
                     )}
@@ -305,14 +305,14 @@ function Field({
                 {label}
             </label>
             <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]">{icon}</span>
+                <span className="absolute start-3 top-1/2 -translate-y-1/2 text-[#94A3B8]">{icon}</span>
                 <input
                     type="text"
                     value={value}
                     onChange={onChange}
                     placeholder={placeholder}
                     required={required}
-                    className="w-full h-11 pl-9 pr-3 text-[13px] border border-[#E5E7EB] rounded-xl outline-none
+                    className="w-full h-11 ps-9 pe-3 text-[13px] border border-[#E5E7EB] rounded-xl outline-none
                         focus:border-[#2EC4B6] focus:ring-2 focus:ring-[#2EC4B6]/20 transition-all
                         bg-[#FAFAFA] focus:bg-white placeholder:text-[#CBD5E1]"
                 />

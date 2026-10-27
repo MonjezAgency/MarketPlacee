@@ -123,19 +123,26 @@ function applyTranslation(item: PendingNode, translated: string) {
     if (item.type === 'text') {
         const n = item.node as Text;
         if (!n.isConnected) return;
+        // React re-rendered this node since it was queued (e.g. a dictionary string in the
+        // chosen language): its text is no longer ours to replace.
+        if ((n as any).__i18nOrig !== item.original || (n.textContent ?? '') !== ((n as any).__i18nLast ?? item.original)) return;
         // Mark our update so MutationObserver can skip the feedback
         // loop on `characterData` mutations.
         (n as any).__i18nApplying = true;
         n.textContent = finalText;
         (n as any).__i18nApplying = false;
         (n as any).__i18nLoc = currentLocale;
+        (n as any).__i18nLast = finalText;
     } else {
         const el = item.node as Element;
         if (!el.isConnected) return;
+        if ((el as any)[`__i18nAttrOrig_${item.attr}`] !== item.original
+            || el.getAttribute(item.attr!) !== ((el as any)[`__i18nAttrLast_${item.attr}`] ?? item.original)) return;
         (el as any)[`__i18nAttrApplying_${item.attr}`] = true;
         el.setAttribute(item.attr!, finalText);
         (el as any)[`__i18nAttrApplying_${item.attr}`] = false;
         (el as any)[`__i18nAttrLoc_${item.attr}`] = currentLocale;
+        (el as any)[`__i18nAttrLast_${item.attr}`] = finalText;
     }
 }
 
@@ -223,9 +230,14 @@ function processTextNode(n: Text) {
     if (n.parentElement.closest('[data-no-translate]')) return;
     if ((n as any).__i18nApplying) return;
 
-    // First time we see this node, freeze its English original.
-    if ((n as any).__i18nOrig === undefined) {
-        (n as any).__i18nOrig = n.textContent ?? '';
+    // First time we see this node, freeze its English original. If React has changed the
+    // text since we last wrote it, that new text is the original now (a stale English
+    // original would otherwise be written back over a translated dictionary string).
+    const cur = n.textContent ?? '';
+    if ((n as any).__i18nOrig === undefined || cur !== ((n as any).__i18nLast ?? (n as any).__i18nOrig)) {
+        (n as any).__i18nOrig = cur;
+        (n as any).__i18nLast = undefined;
+        (n as any).__i18nLoc = undefined;
     }
     const original: string = (n as any).__i18nOrig;
     if (!shouldTranslate(original)) return;
@@ -249,8 +261,11 @@ function processAttributes(el: Element) {
         if (!val) continue;
         if ((el as any)[`__i18nAttrApplying_${attr}`]) continue;
         const origKey = `__i18nAttrOrig_${attr}`;
-        if ((el as any)[origKey] === undefined) {
+        const lastKey = `__i18nAttrLast_${attr}`;
+        if ((el as any)[origKey] === undefined || val !== ((el as any)[lastKey] ?? (el as any)[origKey])) {
             (el as any)[origKey] = val;
+            (el as any)[lastKey] = undefined;
+            (el as any)[`__i18nAttrLoc_${attr}`] = undefined;
         }
         const original: string = (el as any)[origKey];
         if (!shouldTranslate(original)) continue;
@@ -302,11 +317,14 @@ function restoreOriginals(root: Node) {
     const walk = (n: Node) => {
         if (n.nodeType === Node.TEXT_NODE) {
             const tn = n as Text;
-            if ((tn as any).__i18nOrig !== undefined && (tn as any).__i18nLoc !== SOURCE_LOCALE) {
+            // Only text we wrote is restored; React-rendered text is left alone.
+            if ((tn as any).__i18nOrig !== undefined && (tn as any).__i18nLoc !== SOURCE_LOCALE
+                && (tn as any).__i18nLast !== undefined && tn.textContent === (tn as any).__i18nLast) {
                 (tn as any).__i18nApplying = true;
                 tn.textContent = (tn as any).__i18nOrig;
                 (tn as any).__i18nApplying = false;
                 (tn as any).__i18nLoc = SOURCE_LOCALE;
+                (tn as any).__i18nLast = undefined;
             }
             return;
         }
@@ -314,11 +332,13 @@ function restoreOriginals(root: Node) {
         const el = n as Element;
         for (const attr of ATTR_NAMES) {
             const orig = (el as any)[`__i18nAttrOrig_${attr}`];
-            if (orig !== undefined && (el as any)[`__i18nAttrLoc_${attr}`] !== SOURCE_LOCALE) {
+            const last = (el as any)[`__i18nAttrLast_${attr}`];
+            if (orig !== undefined && (el as any)[`__i18nAttrLoc_${attr}`] !== SOURCE_LOCALE && last !== undefined && el.getAttribute(attr) === last) {
                 (el as any)[`__i18nAttrApplying_${attr}`] = true;
                 el.setAttribute(attr, orig);
                 (el as any)[`__i18nAttrApplying_${attr}`] = false;
                 (el as any)[`__i18nAttrLoc_${attr}`] = SOURCE_LOCALE;
+                (el as any)[`__i18nAttrLast_${attr}`] = undefined;
             }
         }
         n.childNodes.forEach(walk);

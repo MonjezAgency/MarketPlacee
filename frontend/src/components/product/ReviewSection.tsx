@@ -221,7 +221,7 @@ export default function ReviewSection({ productId, onReviewSubmitted }: { produc
                         {previews.map((preview, i) => (
                             <div key={i} className="relative w-16 h-16 rounded-lg overflow-hidden ring-1 ring-line group">
                                 <img src={preview} alt="" className="w-full h-full object-cover" />
-                                <button type="button" onClick={() => removeImage(i)} aria-label="Remove photo" className="absolute top-1 right-1 bg-[#DC2626] text-white rounded-full p-0.5"><X size={11} /></button>
+                                <button type="button" onClick={() => removeImage(i)} aria-label="Remove photo" className="absolute top-1 end-1 bg-[#DC2626] text-white rounded-full p-0.5"><X size={11} /></button>
                             </div>
                         ))}
                         <button type="button" onClick={() => document.getElementById('review-images')?.click()} className="w-16 h-16 flex flex-col items-center justify-center gap-0.5 rounded-lg border border-dashed border-line-strong text-ink-3 hover:text-teal hover:border-[#2EC4B6]">

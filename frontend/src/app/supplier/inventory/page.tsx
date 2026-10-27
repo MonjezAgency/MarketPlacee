@@ -119,7 +119,8 @@ export default function StockPage() {
                                                     </div>
                                                 </td>
                                                 <td className="px-2 py-2.5 text-end tabular-nums font-semibold">
-                                                    {r.available <= 0 ? <Badge tone="danger">0</Badge> : int(r.available)}
+                                                    {/* Text in its own element: a bare text node beside a conditional element is what browser page translation breaks ("insertBefore: not a child"). */}
+                                                    {r.available <= 0 ? <Badge tone="danger">0</Badge> : <span>{int(r.available)}</span>}
                                                     {r.stockPallets ? <span className="block text-[11.5px] font-normal text-ink-3">{tc('palletsApprox', { count: r.stockPallets })}</span> : null}
                                                 </td>
                                                 <td className={cn('px-2 py-2.5 text-end tabular-nums', r.reserved ? 'text-amber-800' : 'text-ink-4')}>{int(r.reserved)}</td>

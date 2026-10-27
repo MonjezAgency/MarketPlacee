@@ -132,7 +132,7 @@ export default function TargetsClient() {
     const [page, setPage] = React.useState(1);
     const [showFilters, setShowFilters] = React.useState(false);
 
-    React.useEffect(() => { loadTargets().then(setState); getAdminMarkups().then(setMarkups); }, [signedIn]);
+    React.useEffect(() => { loadTargets().then(setState); if (signedIn) getAdminMarkups().then(setMarkups); }, [signedIn]);
     // The signed-in account's own watchlist (the same list Targets is counted from).
     React.useEffect(() => {
         if (!signedIn) { setWatched(new Set()); return; }

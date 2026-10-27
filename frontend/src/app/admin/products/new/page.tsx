@@ -280,7 +280,7 @@ export default function AdminAddProductWorkspace() {
             });
 
             if (res.ok) {
-                router.push('/admin/products');
+                router.push('/admin/products/catalog');
             } else {
                 const err = await res.json();
                 alert(`Error: ${err.message || 'Failed to create product'}`);
@@ -298,14 +298,14 @@ export default function AdminAddProductWorkspace() {
             <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-[#E5E7EB] px-6 py-4">
                 <div className="max-w-[1440px] mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/admin/products" className="w-10 h-10 flex items-center justify-center rounded-xl border border-[#E5E7EB] hover:bg-[#F1F5F9] transition-all">
+                        <Link href="/admin/products/catalog" className="w-10 h-10 flex items-center justify-center rounded-xl border border-[#E5E7EB] hover:bg-[#F1F5F9] transition-all">
                             <ChevronLeft size={20} className="text-[#6B7280]" />
                         </Link>
                         <div>
                             <h1 className="text-[24px] font-semibold leading-[32px] tracking-tight text-teal-600">Admin Product Catalog</h1>
                             <div className="flex items-center gap-2 mt-0.5">
                                 <span className="w-2 h-2 rounded-full bg-[#14B8A6] animate-pulse" />
-                                <span className="text-[12px] font-medium text-[#6B7280] uppercase tracking-wider">Direct System Injection</span>
+                                <span className="text-[12px] font-medium text-[#6B7280] uppercase tracking-wider">Atlantis Catalog product</span>
                             </div>
                         </div>
                     </div>
@@ -742,7 +742,7 @@ export default function AdminAddProductWorkspace() {
                         
                         {/* CARD 1: PRODUCT SUMMARY */}
                         <div className="bg-white border border-[#E5E7EB] rounded-[14px] p-4 shadow-sm">
-                            <h3 className="text-[14px] font-black uppercase tracking-widest text-[#6B7280] mb-4">Injection Summary</h3>
+                            <h3 className="text-[14px] font-black uppercase tracking-widest text-[#6B7280] mb-4">Summary</h3>
                             <div className="flex items-center gap-4 p-3 bg-[#F8FAFC] rounded-[12px] border border-[#E5E7EB]">
                                 <div className="w-16 h-16 bg-white border border-[#E5E7EB] rounded-lg flex items-center justify-center overflow-hidden">
                                     {formData.images[0] ? <img src={formData.images[0]} className="w-full h-full object-contain" /> : <ImageIcon size={20} className="text-[#E5E7EB]" />}
@@ -764,7 +764,7 @@ export default function AdminAddProductWorkspace() {
                         {/* CARD 2: COMPLETION PROGRESS */}
                         <div className="bg-white border border-[#E5E7EB] rounded-[14px] p-4 shadow-sm">
                             <div className="flex items-center justify-between mb-3">
-                                <h3 className="text-[14px] font-semibold">Quality Score</h3>
+                                <h3 className="text-[14px] font-semibold">Completeness</h3>
                                 <span className="text-[14px] font-bold text-[#14B8A6]">{Math.round(progress)}%</span>
                             </div>
                             <div className="w-full h-[8px] bg-[#F1F5F9] rounded-full overflow-hidden mb-4">
@@ -795,7 +795,7 @@ export default function AdminAddProductWorkspace() {
                             </div>
                             <div className="h-[40px] px-3 bg-[#F59E0B]/5 border border-[#F59E0B]/10 rounded-[10px] flex items-center gap-2 text-[#F59E0B]">
                                 <Info size={16} />
-                                <span className="text-[13px] font-medium">Product will be visible to all enterprise buyers</span>
+                                <span className="text-[13px] font-medium">Published to buyers only when every required field is complete; otherwise saved as waiting for review</span>
                             </div>
                         </div>
 
@@ -807,7 +807,7 @@ export default function AdminAddProductWorkspace() {
                         <div className="bg-white border border-[#E5E7EB] rounded-3xl p-8 shadow-sm">
                             <div className="flex items-center justify-between mb-8">
                                 <div>
-                                    <h3 className="text-xl font-bold text-[#111827]">Injection Specification</h3>
+                                    <h3 className="text-xl font-bold text-[#111827]">File format</h3>
                                     <p className="text-sm text-[#6B7280] mt-1">Ensure your CSV/Excel follows these mandatory attributes</p>
                                 </div>
                                 <div className="px-4 py-2 bg-[#F1F5F9] rounded-xl flex items-center gap-2">

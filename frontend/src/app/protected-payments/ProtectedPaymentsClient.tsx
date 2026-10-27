@@ -37,7 +37,7 @@ function OrderStack() {
                 <div className="mt-2.5 flex items-center justify-between"><span className="text-small text-ink-3">12 / 12 pallets checked</span><Pill tone="success" icon={<Check size={12} aria-hidden />} className="h-6">Pass</Pill></div>
             </Card>
             <Link_>After collection</Link_>
-            <div className="mx-auto w-fit rounded-full bg-surface ring-1 ring-line shadow-float pl-2 pr-4 py-2 flex items-center gap-2.5">
+            <div className="mx-auto w-fit rounded-full bg-surface ring-1 ring-line shadow-float ps-2 pe-4 py-2 flex items-center gap-2.5">
                 <span className="w-7 h-7 rounded-full bg-[#10B981] text-white flex items-center justify-center"><Check size={15} aria-hidden /></span>
                 <span className="text-[14.5px] font-semibold text-heading">Settled under the confirmed terms</span>
             </div>

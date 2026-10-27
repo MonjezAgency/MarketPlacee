@@ -39,7 +39,7 @@ const DEMO_SLIDES: Slide[] = [
         subtitleKey: "slide2Subtitle",
         badgeKey: "slide2Badge",
         ctaTextKey: "browseBrands",
-        ctaHref: "/suppliers"
+        ctaHref: "/categories"
     },
     {
         image: "https://images.unsplash.com/photo-1578575437130-527eed3abbec?auto=format&fit=crop&q=80&w=2000",

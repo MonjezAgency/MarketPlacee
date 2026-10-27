@@ -37,7 +37,12 @@ export function getAdminMarkups(): Promise<Markups> {
         // else tier ratios that pair with the buyer case price (see backend
         // common/price-privacy.ts).
         _markupsPromise = apiFetch('/config/markup')
-            .then(r => r.json())
+            .then(r => {
+                // A failed call (e.g. 401 before sign-in) must not be cached,
+                // or the defaults would stick for the rest of the session.
+                if (!r.ok) throw new Error(`config/markup ${r.status}`);
+                return r.json();
+            })
             .then(d => {
                 _markups = {
                     piece: Number(d?.piece) || DEFAULT_MARKUPS.piece,
@@ -46,7 +51,7 @@ export function getAdminMarkups(): Promise<Markups> {
                 };
                 return _markups;
             })
-            .catch(() => { _markups = { ...DEFAULT_MARKUPS }; return _markups; });
+            .catch(() => { _markupsPromise = null; return { ...DEFAULT_MARKUPS }; });
     }
     return _markupsPromise;
 }

@@ -355,7 +355,7 @@ export default function SecuritySettingsPage() {
                                 <p className="text-xs text-emerald-600 dark:text-emerald-500">Your email address is confirmed and active.</p>
                             </div>
                             <button onClick={() => { setEmailOtpStep('idle'); setEmailOtpCode(''); }}
-                                className="ml-auto text-xs text-muted-foreground hover:text-foreground font-bold">
+                                className="ms-auto text-xs text-muted-foreground hover:text-foreground font-bold">
                                 Test Again
                             </button>
                         </div>

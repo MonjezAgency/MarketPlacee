@@ -2,6 +2,9 @@ import { Controller, Get, UseGuards, Post, Patch, Param, Body, Query, Delete, Us
 import { cleanProfile, cleanBrands, ProfileFieldError } from './profile-fields';
 import { missingProfileFields, REQUIRED_PROFILE_FIELDS } from './profile-completion';
 import { toursView, parseTourUpdate, applyTourUpdate, TourInputError } from './product-tours';
+import { mayReadUserRecord } from './own-record';
+import { applyPricePrivacy } from '../common/price-privacy';
+import { readMarkups } from '../common/markups';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { UsersService } from './users.service';
 import { PrismaService } from '../common/prisma.service';
@@ -280,7 +283,8 @@ export class UsersController {
 
     @Get(':id/notifications')
     @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER)
-    async getNotifications(@Param('id') id: string) {
+    async getNotifications(@Param('id') id: string, @Request() req) {
+        if (!mayReadUserRecord(req.user, id)) throw new ForbiddenException('You can only read your own notifications.');
         return this.usersService.getNotifications(id);
     }
 
@@ -295,7 +299,11 @@ export class UsersController {
     @Get('me/data-export')
     @Roles(Role.ADMIN, Role.SUPPLIER, Role.CUSTOMER)
     async exportMyData(@Request() req, @Res({ passthrough: true }) res: Response) {
-        const data = await this.usersService.exportMyData(req.user.sub);
+        const raw = await this.usersService.exportMyData(req.user.sub);
+        // A download bypasses the response price-privacy interceptor, so apply the
+        // same view here: a buyer's export never carries supplier net prices,
+        // supplier ids or markups.
+        const data = applyPricePrivacy(JSON.parse(JSON.stringify(raw)), { id: req.user.sub, role: req.user.role }, await readMarkups(this.prisma));
         const json = JSON.stringify(data, null, 2);
         res.set({
             'Content-Type': 'application/json',

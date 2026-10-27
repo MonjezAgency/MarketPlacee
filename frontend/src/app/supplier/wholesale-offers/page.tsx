@@ -331,7 +331,7 @@ export default function SupplierOffersPage() {
             )}
 
             {/* Offers list */}
-            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-3xl overflow-x-auto">
                 {isLoading ? (
                     <div className="py-16 flex justify-center"><Loader2 className="animate-spin text-[#2EC4B6]" size={28} /></div>
                 ) : offers.length === 0 ? (

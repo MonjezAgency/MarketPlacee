@@ -483,7 +483,7 @@ function OffersTab({ id }: { id: string }) {
     const toolbar = (
         <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 border-b border-line text-[12.5px] text-ink-3">
             <span>{tu('offersDesc')}</span>
-            <Link href="/admin/offers" className="ms-auto font-medium text-teal hover:underline">{tu('openOffers')}</Link>
+            <Link href="/admin/offers/supplier" className="ms-auto font-medium text-teal hover:underline">{tu('openOffers')}</Link>
         </div>
     );
     return (

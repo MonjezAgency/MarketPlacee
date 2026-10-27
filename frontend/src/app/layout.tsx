@@ -88,24 +88,21 @@ export const metadata: Metadata = {
         alternateLocale: ['ar_EG', 'fr_FR', 'ro_RO'],
         images: [
             {
-                // TODO: replace /og-image.png with a 1200x630 branded OG image.
-                // Until that asset exists, fall back to /icon.png — it will
-                // render as a tiny logo in social previews. The audit called
-                // this out as a missed brand impression. Once a designed
-                // OG image lands in /public/og-image.png, this fallback
-                // becomes correct automatically.
-                url: '/og-image.png',
-                width: 1200,
-                height: 630,
+                // TODO: add a designed 1200x630 /public/og-image.png and point here.
+                // /og-image.png does not exist (404 on production), so previews use
+                // the served app icon (app/icon.png, 1254x1254) until that asset lands.
+                url: '/icon.png',
+                width: 1254,
+                height: 1254,
                 alt: 'Atlantis — B2B Wholesale Distributor across Europe and the Gulf',
             },
         ],
     },
     twitter: {
-        card: 'summary_large_image',
+        card: 'summary',
         title: 'Atlantis | B2B Wholesale Distributor — Europe & Gulf',
         description: 'Sold and shipped by Atlantis. Supplier-confirmed orders. EUR pricing. Source FMCG, electronics, industrial goods at scale.',
-        images: ['/og-image.png'],
+        images: ['/icon.png'],
     },
     robots: {
         index: true,

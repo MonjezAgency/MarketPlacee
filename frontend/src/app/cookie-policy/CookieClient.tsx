@@ -89,16 +89,16 @@ export default function CookiePolicyPage() {
                                         <table className="w-full text-xs">
                                             <thead>
                                                 <tr className="border-b border-border/50">
-                                                    <th className="text-left py-2 pr-4 font-bold text-foreground/80">Cookie Name</th>
-                                                    <th className="text-left py-2 pr-4 font-bold text-foreground/80">Purpose</th>
-                                                    <th className="text-left py-2 font-bold text-foreground/80">Duration</th>
+                                                    <th className="text-start py-2 pe-4 font-bold text-foreground/80">Cookie Name</th>
+                                                    <th className="text-start py-2 pe-4 font-bold text-foreground/80">Purpose</th>
+                                                    <th className="text-start py-2 font-bold text-foreground/80">Duration</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {type.examples.map((ex) => (
                                                     <tr key={ex.name} className="border-b border-border/30 last:border-0">
-                                                        <td className="py-3 pr-4 font-mono text-primary">{ex.name}</td>
-                                                        <td className="py-3 pr-4 text-muted-foreground leading-relaxed">{ex.purpose}</td>
+                                                        <td className="py-3 pe-4 font-mono text-primary">{ex.name}</td>
+                                                        <td className="py-3 pe-4 text-muted-foreground leading-relaxed">{ex.purpose}</td>
                                                         <td className="py-3 text-muted-foreground whitespace-nowrap">{ex.duration}</td>
                                                     </tr>
                                                 ))}
@@ -115,7 +115,7 @@ export default function CookiePolicyPage() {
                         <p className="text-sm text-muted-foreground leading-relaxed mb-4">
                             You can change your cookie preferences at any time:
                         </p>
-                        <ul className="text-sm text-muted-foreground space-y-2 list-disc pl-5">
+                        <ul className="text-sm text-muted-foreground space-y-2 list-disc ps-5">
                             <li>Use the cookie consent banner when you first visit the Platform</li>
                             <li>Clear cookies in your browser settings — this will log you out of the Platform</li>
                             <li>Most browsers allow you to block or delete cookies in their privacy settings</li>

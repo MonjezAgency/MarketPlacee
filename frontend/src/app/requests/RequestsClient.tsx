@@ -249,7 +249,7 @@ function LineRow({ line, index, canRemove, onChange, onRemove, onResolve, placeh
                             <p className="text-[11px] text-ink-3 tabular-nums flex items-center gap-2">
                                 {line.ean && <span>EAN {line.ean}</span>}
                                 {line.productId && (
-                                    <Link href={`/products/${line.productId}`} target="_blank" className="inline-flex items-center gap-0.5 font-semibold text-teal hover:underline">
+                                    <Link href={`/products/${line.productId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-0.5 font-semibold text-teal hover:underline">
                                         View product <ArrowUpRight size={11} />
                                     </Link>
                                 )}
