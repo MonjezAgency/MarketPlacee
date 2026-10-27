@@ -145,8 +145,17 @@ export default function RootLayout({
     // <div dir={...}> around the app and flips to RTL once the locale has
     // hydrated from localStorage. SSR-stable, no mismatch.
     return (
-        <html lang="en" dir="ltr" suppressHydrationWarning>
+        // translate="no" + the google meta: the site translates itself (7 locales). Browser page
+        // translation (Chrome/Edge) swaps React's text nodes for <font> wrappers, and the next
+        // update then crashes with "insertBefore/removeChild: not a child of this node".
+        <html lang="en" dir="ltr" translate="no" className="notranslate" suppressHydrationWarning>
             <head>
+                <meta name="google" content="notranslate" />
+                {/* Safety net for extensions that still rewrite the DOM: instead of crashing the page,
+                    removeChild/insertBefore tolerate a node that was moved or wrapped. */}
+                <script dangerouslySetInnerHTML={{
+                    __html: `try{if(typeof Node==='function'&&Node.prototype&&!Node.prototype.__atlDomGuard){var P=Node.prototype,rc=P.removeChild,ib=P.insertBefore;P.__atlDomGuard=true;P.removeChild=function(c){if(c&&c.parentNode!==this){if(c.parentNode&&this.contains(c)){return rc.call(c.parentNode,c)}return c}return rc.apply(this,arguments)};P.insertBefore=function(n,r){if(r&&r.parentNode!==this){var a=r;while(a&&a.parentNode!==this){a=a.parentNode}return ib.call(this,n,a||null)}return ib.apply(this,arguments)}}}catch(e){}`
+                }} />
                 <script
                     type="application/ld+json"
                     dangerouslySetInnerHTML={{
