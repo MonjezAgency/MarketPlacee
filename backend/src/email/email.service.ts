@@ -205,7 +205,7 @@ export class EmailService {
     await this.sendMail(email, 'Verify your email - Ali FMCG Marketplace', `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
         <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
-          <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
+          <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Ali&nbsp;<span style="color: #1BC7C9;">FMCG</span></h1>
           <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
         </div>
         <div style="padding: 40px 30px; background: #FFFFFF;">
@@ -272,7 +272,7 @@ export class EmailService {
     return this.sendMail(email, 'You have been invited to the Ali FMCG Team', `
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
           <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
-            <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Atlan<span style="color: #1BC7C9;">tis</span></h1>
+            <h1 style="color: #FFFFFF; font-size: 28px; margin: 0 0 8px; font-weight: 900;">Ali&nbsp;<span style="color: #1BC7C9;">FMCG</span></h1>
             <p style="color: #B0BCCF; font-size: 14px; margin: 0;">Enterprise B2B Distribution</p>
           </div>
           <div style="padding: 40px 30px; background: #FFFFFF;">
@@ -324,7 +324,7 @@ export class EmailService {
       await this.sendMail(email, `✅ Order Confirmed #${orderId.slice(0, 8).toUpperCase()} — Ali FMCG`, `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center;">
-              <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+              <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Ali&nbsp;<span style="color:#1BC7C9;">FMCG</span></h1>
               <p style="color:#B0BCCF; font-size:14px; margin:0;">B2B Marketplace</p>
             </div>
             <div style="padding:40px 30px; background:#fff;">
@@ -362,7 +362,7 @@ export class EmailService {
       await this.sendMail(email, `${info.title} — Order #${orderId.slice(0, 8).toUpperCase()}`, `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid ${info.color};">
-              <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+              <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Ali&nbsp;<span style="color:#1BC7C9;">FMCG</span></h1>
             </div>
             <div style="padding:40px 30px; background:#fff;">
               <h2 style="color:${info.color}; font-size:22px; margin:0 0 16px;">${info.title}</h2>
@@ -391,7 +391,7 @@ export class EmailService {
   async sendKycStatusEmail(email: string, name: string, status: 'VERIFIED' | 'REJECTED' | 'PENDING', adminNotes?: string) {
     if (status === 'PENDING') {
       try {
-        await this.sendMail(email, '⏳ KYC Submitted — Under Review', `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #F59E0B;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#F59E0B;font-size:22px;margin:0 0 16px;">KYC Documents Received ⏳</h2><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Your identity documents have been submitted and are under review. We'll notify you once complete — usually within 24 hours.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p></div></div>`);
+        await this.sendMail(email, '⏳ KYC Submitted — Under Review', `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #F59E0B;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Ali&nbsp;<span style="color:#1BC7C9;">FMCG</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#F59E0B;font-size:22px;margin:0 0 16px;">KYC Documents Received ⏳</h2><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;line-height:1.7;">Your identity documents have been submitted and are under review. We'll notify you once complete — usually within 24 hours.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p></div></div>`);
       } catch (err) {
         console.error('ERROR [sendKycStatusEmail PENDING]:', err);
       }
@@ -402,7 +402,7 @@ export class EmailService {
       await this.sendMail(email, isApproved ? '✅ KYC Verified — Ali FMCG' : '❌ KYC Review Required — Ali FMCG', `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid ${isApproved ? '#10B981' : '#EF4444'};">
-              <h1 style="color:#fff; font-size:28px; margin:0; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+              <h1 style="color:#fff; font-size:28px; margin:0; font-weight:900;">Ali&nbsp;<span style="color:#1BC7C9;">FMCG</span></h1>
             </div>
             <div style="padding:40px 30px; background:#fff;">
               <h2 style="color:${isApproved ? '#10B981' : '#EF4444'}; font-size:22px; margin:0 0 16px;">${isApproved ? 'Identity Verified ✅' : 'KYC Review Required ❌'}</h2>
@@ -701,7 +701,7 @@ export class EmailService {
       await this.sendMail(email, `🧾 Invoice ${invoiceNumber} — Ali FMCG Marketplace`, `
           <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
             <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid #1BC7C9;">
-              <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+              <h1 style="color:#fff; font-size:28px; margin:0 0 8px; font-weight:900;">Ali&nbsp;<span style="color:#1BC7C9;">FMCG</span></h1>
               <p style="color:#B0BCCF; font-size:14px; margin:0;">B2B Marketplace</p>
             </div>
             <div style="padding:40px 30px; background:#fff;">
@@ -763,7 +763,7 @@ export class EmailService {
       await this.sendMail(email, `✅ Order Confirmed + Invoice ${invoiceNumber} — ${shippingCompany} | Ali FMCG`, `
           <div style="font-family:'Segoe UI',Arial,sans-serif; max-width:620px; margin:0 auto; background:#F2F4F7; border-radius:16px; overflow:hidden;">
             <div style="background:#0A1A2F; padding:36px 30px; text-align:center; border-bottom:4px solid #1BC7C9;">
-              <h1 style="color:#fff; font-size:30px; margin:0 0 4px; font-weight:900; letter-spacing:-1px;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+              <h1 style="color:#fff; font-size:30px; margin:0 0 4px; font-weight:900; letter-spacing:-1px;">Ali&nbsp;<span style="color:#1BC7C9;">FMCG</span></h1>
               <p style="color:#B0BCCF; font-size:12px; margin:0; letter-spacing:2px; text-transform:uppercase;">B2B Marketplace</p>
             </div>
             <div style="background:#fff; padding:36px 30px 0;">
@@ -825,7 +825,7 @@ export class EmailService {
 
   async sendEmailOtp(email: string, name: string, code: string) {
     try {
-      await this.sendMail(email, `🔐 Your Ali FMCG Verification Code: ${code}`, `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #FF9900;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#0A1A2F;font-size:22px;margin:0 0 16px;">Verification Code 🔐</h2><p style="color:#2E2E2E;font-size:15px;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;">Your one-time verification code is:</p><div style="background:#F2F4F7;border-radius:12px;padding:24px;text-align:center;margin:24px 0;"><span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#0A1A2F;font-family:monospace;">${code}</span></div><p style="color:#667085;font-size:13px;">This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p></div></div>`);
+      await this.sendMail(email, `🔐 Your Ali FMCG Verification Code: ${code}`, `<div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;"><div style="background:#0A1A2F;padding:40px 30px;text-align:center;border-bottom:4px solid #FF9900;"><h1 style="color:#fff;font-size:28px;margin:0;font-weight:900;">Ali&nbsp;<span style="color:#1BC7C9;">FMCG</span></h1></div><div style="padding:40px 30px;background:#fff;"><h2 style="color:#0A1A2F;font-size:22px;margin:0 0 16px;">Verification Code 🔐</h2><p style="color:#2E2E2E;font-size:15px;">Hello <strong>${name}</strong>,</p><p style="color:#2E2E2E;font-size:15px;">Your one-time verification code is:</p><div style="background:#F2F4F7;border-radius:12px;padding:24px;text-align:center;margin:24px 0;"><span style="font-size:40px;font-weight:900;letter-spacing:12px;color:#0A1A2F;font-family:monospace;">${code}</span></div><p style="color:#667085;font-size:13px;">This code expires in <strong>10 minutes</strong>. Do not share it with anyone.</p></div><div style="background:#0A1A2F;padding:20px;text-align:center;"><p style="color:#667085;font-size:11px;margin:0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p></div></div>`);
     } catch (err) {
       console.error('ERROR [sendEmailOtp]:', err);
     }
@@ -868,7 +868,7 @@ export class EmailService {
             </div>
 
             <div style="background: #0A1A2F; padding: 25px; text-align: center;">
-              <p style="color: #FFFFFF; font-size: 16px; font-weight: 900; margin: 0 0 4px;">Atlan<span style="color: #1BC7C9;">tis</span></p>
+              <p style="color: #FFFFFF; font-size: 16px; font-weight: 900; margin: 0 0 4px;">Ali&nbsp;<span style="color: #1BC7C9;">FMCG</span></p>
               <p style="color: #667085; font-size: 11px; margin: 0;">© 2026 Ali FMCG Marketplace. All rights reserved.</p>
             </div>
           </div>
@@ -901,7 +901,7 @@ export class EmailService {
       const html = `
         <div style="font-family: 'Segoe UI', sans-serif; max-width: 600px; margin: 0 auto; background: #F2F4F7; border-radius: 16px; overflow: hidden;">
           <div style="background: #0A1A2F; padding: 40px 30px; text-align: center; border-bottom: 4px solid #F59E0B;">
-            <h1 style="color:#fff; font-size:28px; margin:0; font-weight:900;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+            <h1 style="color:#fff; font-size:28px; margin:0; font-weight:900;">Ali&nbsp;<span style="color:#1BC7C9;">FMCG</span></h1>
             <p style="color:#B0BCCF; font-size:14px; margin:8px 0 0;">Admin Alert</p>
           </div>
           <div style="padding:40px 30px; background:#fff;">

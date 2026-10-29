@@ -170,7 +170,7 @@ export class StripeWebhookController {
                     `
                     <div style="font-family:'Segoe UI',sans-serif;max-width:600px;margin:0 auto;background:#F2F4F7;border-radius:16px;overflow:hidden;">
                       <div style="background:#0A1A2F;padding:32px 30px;text-align:center;">
-                        <h1 style="color:#fff;font-size:26px;margin:0;">Atlan<span style="color:#1BC7C9;">tis</span></h1>
+                        <h1 style="color:#fff;font-size:26px;margin:0;">Ali&nbsp;<span style="color:#1BC7C9;">FMCG</span></h1>
                       </div>
                       <div style="padding:36px 30px;background:#fff;">
                         <h2 style="color:#0A1A2F;font-size:20px;margin:0 0 12px;">New Paid Order — Ready to Ship 🚀</h2>

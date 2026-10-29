@@ -25,7 +25,7 @@ export function teamInvitationEmail(p: { name: string; role: string; inviterName
     const html = `<!doctype html><html><body style="margin:0;padding:24px 12px;background:#F6F8FA;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Roboto,Helvetica,Arial,sans-serif;color:#0F172A;">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#FFFFFF;border:1px solid #E6E8EC;border-radius:16px;overflow:hidden;">
-<tr><td style="background:#0B1F3A;padding:22px 28px;"><span style="font-size:20px;font-weight:700;color:#FFFFFF;">Atlan<span style="color:#2EC4B6;">tis</span></span><span style="float:right;font-size:12px;color:#94A3B8;line-height:28px;">Team invitation</span></td></tr>
+<tr><td style="background:#0B1F3A;padding:22px 28px;"><span style="font-size:20px;font-weight:700;color:#FFFFFF;">Ali&nbsp;<span style="color:#2EC4B6;">FMCG</span></span><span style="float:right;font-size:12px;color:#94A3B8;line-height:28px;">Team invitation</span></td></tr>
 <tr><td style="padding:28px;">
 <h1 style="margin:0 0 12px;font-size:20px;line-height:1.3;color:#0B1F3A;">Join the Ali FMCG team</h1>
 ${para(`Hi ${esc(p.name) || 'there'}, ${esc(p.inviterName)} invited you to the Ali FMCG team as <strong>${esc(role)}</strong>.`)}

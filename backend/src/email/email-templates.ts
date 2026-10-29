@@ -30,7 +30,7 @@ export function getInvitationEmailHtml(params: {
           <tr>
             <td style="padding: 30px 40px; text-align: center;">
               <span style="font-size: 32px; font-weight: 900; color: #0A1A2F; letter-spacing: -1px;">
-                Atlan<span style="color: #1BC7C9;">tis</span>
+                Ali&nbsp;<span style="color: #1BC7C9;">FMCG</span>
               </span>
             </td>
           </tr>
@@ -290,7 +290,7 @@ export function getInvitationEmailHtml(params: {
               </p>
               <p style="margin: 0;">
                 <span style="font-size: 18px; font-weight: 900; color: #FFFFFF; letter-spacing: -0.5px;">
-                  Atlan<span style="color: #1BC7C9;">tis</span>
+                  Ali&nbsp;<span style="color: #1BC7C9;">FMCG</span>
                 </span>
               </p>
               <p style="color: #6B6B8D; font-size: 10px; margin: 8px 0 0 0; text-transform: uppercase; letter-spacing: 2px;">

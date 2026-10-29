@@ -147,7 +147,7 @@ ${input.preheader ? `<div style="display:none;max-height:0;overflow:hidden;mso-h
 <tr><td class="atl-pad" style="padding:24px 32px;background:#0B1F3A;border-radius:12px 12px 0 0;">
 <table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>
 <td valign="middle" style="padding-right:12px;"><a href="${esc(site)}"><img src="${esc(brand.logoUrl)}" width="40" height="40" alt="Ali FMCG" style="display:block;width:40px;height:40px;border:0;border-radius:8px;background:#FFFFFF;" /></a></td>
-<td valign="middle" style="${FONT}font-size:20px;font-weight:bold;letter-spacing:1px;color:#FFFFFF;">ATLAN<span style="color:#2EC4B6;">TIS.</span></td>
+<td valign="middle" style="${FONT}font-size:20px;font-weight:bold;letter-spacing:1px;color:#FFFFFF;">ALI&nbsp;<span style="color:#2EC4B6;">FMCG.</span></td>
 </tr></table>
 </td></tr>
 <tr><td class="atl-pad" style="padding:32px 32px 8px;">

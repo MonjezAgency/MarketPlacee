@@ -17,7 +17,7 @@ export const generateEmailTemplate = (type: EmailTemplate, data: any): EmailPayl
 
     const header = `
         <div style="background-color: ${bgColor}; padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
-            <h1 style="color: white; font-family: sans-serif; margin: 0; letter-spacing: -1px;">Atlan<span style="color: ${primaryColor};">tis</span></h1>
+            <h1 style="color: white; font-family: sans-serif; margin: 0; letter-spacing: -1px;">Ali&nbsp;<span style="color: ${primaryColor};">FMCG</span></h1>
         </div>
     `;
 

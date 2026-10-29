@@ -119,7 +119,7 @@ export class ReportsService {
 <body style="font-family:'Segoe UI',sans-serif;background:#F2F4F7;padding:40px 20px;margin:0">
 <div style="max-width:600px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.08)">
   <div style="background:#0A1A2F;padding:32px;text-align:center">
-    <h1 style="color:#fff;margin:0;font-size:26px;font-weight:900">Atlan<span style="color:#1BC7C9">tis</span></h1>
+    <h1 style="color:#fff;margin:0;font-size:26px;font-weight:900">Ali&nbsp;<span style="color:#1BC7C9">FMCG</span></h1>
     <p style="color:#B0BCCF;margin:8px 0 0;font-size:13px">${subject}</p>
     <p style="color:#667085;margin:4px 0 0;font-size:11px">Period: ${r.period} · Generated: ${new Date(r.generatedAt).toLocaleString()}</p>
   </div>

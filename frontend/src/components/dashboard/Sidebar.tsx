@@ -155,7 +155,7 @@ export default function Sidebar({ role = 'supplier' }: { role?: 'supplier' | 'bu
                 </div>
                 <div className="flex flex-col">
                     <h2 className="text-xl font-poppins font-black tracking-tighter text-white leading-none">
-                        Atlan<span className="text-teal-400">tis.</span> {/* i18n-ignore: brand wordmark */}
+                        Ali&nbsp;<span className="text-teal-400">FMCG.</span> {/* i18n-ignore: brand wordmark */}
                     </h2>
                     <span className="text-[9px] font-black uppercase tracking-[0.3em] text-teal-400/50 mt-1">{portalLabel}</span>
                 </div>

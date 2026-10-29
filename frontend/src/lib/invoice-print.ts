@@ -30,7 +30,7 @@ td{padding:12px;border-bottom:1px solid #F2F4F7;font-size:14px}
 .footer{text-align:center;color:#667085;font-size:11px;margin-top:40px;padding-top:16px;border-top:1px solid #E5E7EB}
 </style></head><body>
 <div class="header">
-  <div><div class="logo">Atlan<span>tis</span></div></div>
+  <div><div class="logo">Ali&nbsp;<span>FMCG</span></div></div>
   <div style="text-align:right">
     <div style="font-size:22px;font-weight:900">${esc(invoice.invoiceNumber)}</div>
     <div style="font-size:12px;color:#B0BCCF;margin-top:4px">Issued: ${new Date(invoice.createdAt).toLocaleDateString()}</div>

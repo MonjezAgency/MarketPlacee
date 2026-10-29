@@ -170,7 +170,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                                     exit={{ opacity: 0, x: dir === 'rtl' ? 10 : -10 }}
                                     className="font-black text-lg tracking-tighter text-white uppercase"
                                 >
-                                    Atlan<span className="text-[#0EA5A4]">tis.</span>{/* i18n-ignore: brand wordmark */}
+                                    Ali&nbsp;<span className="text-[#0EA5A4]">FMCG.</span>{/* i18n-ignore: brand wordmark */}
                                 </motion.span>
                             )}
                         </AnimatePresence>
@@ -325,7 +325,7 @@ export default function SupplierLayout({ children }: { children: React.ReactNode
                             className="absolute top-0 start-0 h-full w-[260px] bg-[#0F172A] flex flex-col shadow-2xl text-start"
                         >
                             <div className="h-16 flex items-center justify-between px-6 border-b border-white/5">
-                                <span className="font-black text-lg text-white uppercase">Atlan<span className="text-[#0EA5A4]">tis.</span></span>{/* i18n-ignore: brand wordmark */}
+                                <span className="font-black text-lg text-white uppercase">Ali&nbsp;<span className="text-[#0EA5A4]">FMCG.</span></span>{/* i18n-ignore: brand wordmark */}
                                 <button onClick={() => setIsMobileOpen(false)} aria-label={tr('closeMenu')} className="text-white/60"><X size={20} /></button>
                             </div>
                             <nav aria-label={tr('navAria')} className="flex-1 p-4 space-y-1">
