@@ -15,6 +15,7 @@ import { OrdersModule } from './orders/orders.module';
 import { CouponsModule } from './coupons/coupons.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { BrandDisplayInterceptor } from './common/brand-display';
 import { ShippingModule } from './shipping/shipping.module';
 import { DiscountsModule } from './discounts/discounts.module';
 import { InvoiceModule } from './invoices/invoice.module';
@@ -109,6 +110,11 @@ import { PromotionsModule } from './promotions/promotions.module';
             // Supplier price / markup privacy on every response (see common/price-privacy.ts).
             provide: APP_INTERCEPTOR,
             useClass: PricePrivacyInterceptor,
+        },
+        {
+            // Stored text from before the rename shows the current brand (see common/brand-display.ts).
+            provide: APP_INTERCEPTOR,
+            useClass: BrandDisplayInterceptor,
         },
     ],
 })
